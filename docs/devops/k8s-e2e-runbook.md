@@ -25,11 +25,11 @@ The workflow is defined in
 [`.github/workflows/k8s-e2e.yml`](https://github.com/ever-works/ever-works/blob/develop/.github/workflows/k8s-e2e.yml)
 and runs only when **the runtime path could be affected**:
 
-| Trigger             | Filter                                                |
-| ------------------- | ----------------------------------------------------- |
-| `push`              | `main`, `develop`, `stage`                            |
-| `pull_request`      | `main`, `develop`, `stage`                            |
-| `workflow_dispatch` | manual run (any branch)                               |
+| Trigger             | Filter                                                     |
+| ------------------- | ---------------------------------------------------------- |
+| `push`              | `main`, `develop`, `stage`                                 |
+| `pull_request`      | `main`, `develop`, `stage`                                 |
+| `workflow_dispatch` | manual run (any branch)                                    |
 | Path filter         | `packages/plugins/k8s/**`, `.github/workflows/k8s-e2e.yml` |
 
 Docs-only PRs and changes outside the k8s plugin do **not** spend
@@ -40,10 +40,10 @@ the ~5 minutes per matrix-cell that cluster provisioning costs.
 The job is fanned out across two axes — Kubernetes minor version and
 whether ingress-nginx is installed — for **four total cells per run**:
 
-| Kubernetes | kind node image            | Ingress controller |
-| ---------- | -------------------------- | ------------------ |
-| `v1.28`    | `kindest/node:v1.28.15`    | none / nginx       |
-| `v1.30`    | `kindest/node:v1.30.13`    | none / nginx       |
+| Kubernetes | kind node image         | Ingress controller |
+| ---------- | ----------------------- | ------------------ |
+| `v1.28`    | `kindest/node:v1.28.15` | none / nginx       |
+| `v1.30`    | `kindest/node:v1.30.13` | none / nginx       |
 
 The "none" row exercises the **no-ingress-controller** branch in
 `validateConnection.listIngressClasses`; the "nginx" row exercises the
@@ -63,14 +63,14 @@ When promoting a new Kubernetes floor:
 
 Source: [`packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts`](https://github.com/ever-works/ever-works/blob/develop/packages/plugins/k8s/src/__tests__/e2e/cluster.e2e.spec.ts).
 
-| Test case                                                       | Why mocks can't cover it                                            |
-| --------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `validateConnection` returns server version + ingress classes   | Real cluster fingerprint, real `IngressClass` schema across versions |
-| `ensureNamespace` is idempotent                                 | Real `409 Already Exists` round-trip on second call                  |
-| `applyDeployment` + `applyService` converge to a Ready Deployment | Server-side apply field-manager semantics + real readiness probes  |
-| `listManagedDeployments` returns the deployment we just created | Label-selector matching against a real API list                      |
-| `getDeployment` returns null for a missing Deployment           | Real `404` error class round-trip                                    |
-| `getIngressLoadBalancerHost` returns null when no Ingress exists | Real "no Ingress" path through `@kubernetes/client-node`             |
+| Test case                                                         | Why mocks can't cover it                                             |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `validateConnection` returns server version + ingress classes     | Real cluster fingerprint, real `IngressClass` schema across versions |
+| `ensureNamespace` is idempotent                                   | Real `409 Already Exists` round-trip on second call                  |
+| `applyDeployment` + `applyService` converge to a Ready Deployment | Server-side apply field-manager semantics + real readiness probes    |
+| `listManagedDeployments` returns the deployment we just created   | Label-selector matching against a real API list                      |
+| `getDeployment` returns null for a missing Deployment             | Real `404` error class round-trip                                    |
+| `getIngressLoadBalancerHost` returns null when no Ingress exists  | Real "no Ingress" path through `@kubernetes/client-node`             |
 
 The suite gates on the `KUBECONFIG_E2E_PATH` environment variable —
 when it is unset, every test is `describe.skip`-ed. This lets the same
@@ -190,13 +190,13 @@ The "Show cluster state on failure" step contains:
 
 Common failure modes and the right next step:
 
-| Symptom                                                               | Likely cause                                             | Fix                                                                                                            |
-| --------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `applyDeployment + applyService converge to a Ready Deployment` times out | Image pull is slow on a contended runner                 | First check: was `kind load docker-image` skipped? Bump test timeout `120_000` only if confirmed environmental |
-| `validateConnection` returns the wrong fingerprint shape              | A new minor of `@kubernetes/client-node` changed `getCode()` | Update `KubernetesApiService.fingerprint(...)` and the expectation in the e2e spec                              |
-| `IngressClass not found` in the `nginx` row                           | Controller manifest moved or pin-tag was retired         | Confirm `controller-v1.11.3` still resolves, or bump the pinned tag                                            |
-| `npm ERR! Missing peer dep` during `pnpm install`                     | Lockfile drift between develop and the branch            | Re-run `pnpm install` from a clean clone; if reproducible, the lockfile is broken on develop                   |
-| Workflow times out before `kind create cluster` finishes              | Runner congestion (typical for Saturday/late-night runs) | Re-run the failed cell. If repeated, raise `helm/kind-action@v1` `wait` from `120s` to `240s`                  |
+| Symptom                                                                   | Likely cause                                                 | Fix                                                                                                            |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `applyDeployment + applyService converge to a Ready Deployment` times out | Image pull is slow on a contended runner                     | First check: was `kind load docker-image` skipped? Bump test timeout `120_000` only if confirmed environmental |
+| `validateConnection` returns the wrong fingerprint shape                  | A new minor of `@kubernetes/client-node` changed `getCode()` | Update `KubernetesApiService.fingerprint(...)` and the expectation in the e2e spec                             |
+| `IngressClass not found` in the `nginx` row                               | Controller manifest moved or pin-tag was retired             | Confirm `controller-v1.11.3` still resolves, or bump the pinned tag                                            |
+| `npm ERR! Missing peer dep` during `pnpm install`                         | Lockfile drift between develop and the branch                | Re-run `pnpm install` from a clean clone; if reproducible, the lockfile is broken on develop                   |
+| Workflow times out before `kind create cluster` finishes                  | Runner congestion (typical for Saturday/late-night runs)     | Re-run the failed cell. If repeated, raise `helm/kind-action@v1` `wait` from `120s` to `240s`                  |
 
 ## Operating envelope
 

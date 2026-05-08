@@ -270,7 +270,7 @@ known to lack a Spec Kit feature folder:
       export → `pnpm --filter '@ever-works/k8s-plugin...' build` →
       `pnpm --filter @ever-works/k8s-plugin test:e2e` → `kind delete`);
       the on-failure debug hooks (`kubectl get nodes / ingressclass /
-    all -A | head -100` + `kubectl describe deployment -A | head -200`);
+  all -A | head -100` + `kubectl describe deployment -A | head -200`);
       a 5-row triage table mapping common failure modes to the right
       next step; and the operating envelope (one test image, one
       namespace per run, no persistent volumes, no external network).

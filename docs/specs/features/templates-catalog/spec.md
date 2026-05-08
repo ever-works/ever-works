@@ -233,7 +233,7 @@ found for this user and kind.' })`.
   currently assigned to one or more works
   (`workRepository.countByUserAndWebsiteTemplateId(userId, templateId)
     > 0`) for `kind: 'website'`, with singular vs. plural copy
-(`'1 work. … the template'`vs`'<N> works. … the template'`).
+  (`'1 work. … the template'`vs`'<N> works. … the template'`).
 - **FR-13** The system MUST refuse archive when the template is the
   user's current default AND inheriting works exist
   (`workRepository.countByUserAndInheritedWebsiteTemplateSelection(userId)
