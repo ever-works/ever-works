@@ -431,13 +431,13 @@ importers:
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.25.12)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.25.12)
       '@nestjs/schematics':
         specifier: ^11.0.10
-        version: 11.0.10(chokidar@3.6.0)(typescript@5.9.3)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
       '@swc/cli':
         specifier: ^0.8.1
-        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
+        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
       '@swc/core':
         specifier: ^1.15.24
         version: 1.15.24(@swc/helpers@0.5.21)
@@ -471,6 +471,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.1
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(esbuild@0.25.12)(jiti@2.6.1)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.1)(yaml@2.8.3)
 
   apps/mcp:
     dependencies:
@@ -901,16 +904,16 @@ importers:
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)
       '@nestjs/schematics':
         specifier: ^11.0.10
-        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
+        version: 11.0.10(chokidar@3.6.0)(typescript@5.9.3)
       '@nestjs/testing':
         specifier: ^11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)
       '@swc/cli':
         specifier: ^0.8.1
-        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core':
         specifier: ^1.15.24
         version: 1.15.24(@swc/helpers@0.5.21)
@@ -22012,7 +22015,7 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)':
+  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.25.12)':
     dependencies:
       '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
       '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
@@ -22023,14 +22026,14 @@ snapshots:
       chokidar: 4.0.3
       cli-table3: 0.6.5
       commander: 4.1.1
-      fork-ts-checker-webpack-plugin: 9.1.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21)))
+      fork-ts-checker-webpack-plugin: 9.1.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.25.12))
       glob: 13.0.6
       node-emoji: 1.11.0
       ora: 5.4.1
       tsconfig-paths: 4.2.0
       tsconfig-paths-webpack-plugin: 4.2.0
       typescript: 5.9.3
-      webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))
+      webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.25.12)
       webpack-node-externals: 3.0.0
     optionalDependencies:
       '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
@@ -22060,35 +22063,6 @@ snapshots:
       tsconfig-paths-webpack-plugin: 4.2.0
       typescript: 5.9.3
       webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))
-      webpack-node-externals: 3.0.0
-    optionalDependencies:
-      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
-      '@swc/core': 1.15.24(@swc/helpers@0.5.21)
-    transitivePeerDependencies:
-      - '@types/node'
-      - esbuild
-      - uglify-js
-      - webpack-cli
-
-  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.25.12)':
-    dependencies:
-      '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
-      '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
-      '@angular-devkit/schematics-cli': 19.2.23(@types/node@22.19.11)(chokidar@4.0.3)
-      '@inquirer/prompts': 7.10.1(@types/node@22.19.11)
-      '@nestjs/schematics': 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
-      ansis: 4.2.0
-      chokidar: 4.0.3
-      cli-table3: 0.6.5
-      commander: 4.1.1
-      fork-ts-checker-webpack-plugin: 9.1.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.25.12))
-      glob: 13.0.6
-      node-emoji: 1.11.0
-      ora: 5.4.1
-      tsconfig-paths: 4.2.0
-      tsconfig-paths-webpack-plugin: 4.2.0
-      typescript: 5.9.3
-      webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.25.12)
       webpack-node-externals: 3.0.0
     optionalDependencies:
       '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)

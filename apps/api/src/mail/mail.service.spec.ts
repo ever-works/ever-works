@@ -60,9 +60,7 @@ describe('MailService (listener layer)', () => {
     beforeEach(() => {
         mailer = { sendMail: jest.fn().mockResolvedValue(undefined) };
         service = new MailService(mailer as unknown as MailerService);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -305,9 +303,7 @@ describe('MailService (listener layer)', () => {
 
         it('falls back to <webAppUrl>/works/new when dashboardUrl is omitted (uses WEB_URL env)', async () => {
             setBranding({ WEB_URL: 'https://staging.test' });
-            const event = new UserConfirmedEvent(
-                fakeUser({ email: 'eve@x.test' }),
-            );
+            const event = new UserConfirmedEvent(fakeUser({ email: 'eve@x.test' }));
             await service.sendWelcomeEmail(event);
             expect(mailer.sendMail.mock.calls[0][0].context.dashboardUrl).toBe(
                 'https://staging.test/works/new',
@@ -325,9 +321,7 @@ describe('MailService (listener layer)', () => {
         it('logs error and swallows on mailer rejection', async () => {
             mailer.sendMail.mockRejectedValueOnce(new Error('boom'));
             await expect(
-                service.sendWelcomeEmail(
-                    new UserConfirmedEvent(fakeUser({ email: 'e@x.test' })),
-                ),
+                service.sendWelcomeEmail(new UserConfirmedEvent(fakeUser({ email: 'e@x.test' }))),
             ).resolves.toBeUndefined();
             expect(errorSpy).toHaveBeenCalled();
         });
