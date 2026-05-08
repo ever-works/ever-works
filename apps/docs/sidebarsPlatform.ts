@@ -83,6 +83,8 @@ const sidebars: SidebarsConfig = {
 				'api/deploy-capability',
 				'api/git-provider-capability',
 				'api/oauth-capability',
+				'api/search-capability',
+				'api/device-auth-capability',
 				'api/error-handling',
 				'api/guards-interceptors',
 				'api/websocket-events'
