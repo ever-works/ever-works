@@ -116,50 +116,112 @@ email?, expiresAt?}` shape (no throwing); used by the web
       [#486](https://github.com/ever-works/ever-works/pull/486).
 - [x] **T29**: `github-email.utils.spec.ts` — primary-email
       resolution from `/user/emails`.
-- [ ] **T30 (follow-up)**: `auth.controller.spec.ts` — controller-level
-      Jest suite covering all 14 endpoints. Pin: activity-log fire-and-forget
-      shape on login, the `Failed to send verification email` warn
-      log on register-side mail failure, the `verifyEmail` →
-      `issueSession` chain, the reset-password 4-step
-      (`getUserByPasswordResetToken` → `setPassword` →
-      `consumePasswordResetToken` → `signOutAll`) ordering, and the
-      `validateEmail*Token` non-throwing return shape.
-- [ ] **T31 (follow-up)**: `oauth.controller.spec.ts` — controller-level
-      Jest suite for the 2 endpoints. Pin: `getAuthUrl` calls
+- [x] **T30 (follow-up)**: `auth.controller.spec.ts` — 28 tests across
+      all 14 endpoints. Pinned: activity-log fire-and-forget shape on
+      login (`req.ip` → `x-forwarded-for` fallback, `.catch(() => {})`
+      swallow), `Failed to send verification email` warn log on
+      register-side mail failure with non-Error → `String()` coercion,
+      `verifyEmail` → `issueSession` chain (no session issue when
+      verify rejects), reset-password 4-step ordering pinned via
+      shared `order: string[]` array (`getUserByPasswordResetToken` →
+      `setPassword` → `consumePasswordResetToken` → `signOutAll`),
+      `validateEmail*Token` non-throwing return shape, `register`
+      `assertCanRegister` → `signUpEmail` → `sendVerificationEmail`
+      ordering, `sendVerification` deliberate omission of callback URL
+      (unlike `register`). PR
+      [#597](https://github.com/ever-works/ever-works/pull/597).
+- [x] **T31 (follow-up)**: `oauth.controller.spec.ts` — 9 tests across
+      the 2 endpoints. Pinned: `getAuthUrl` calls
       `socialAuthService.getAuthorizationUrl(providerId, undefined,
-state)` with the explicit `undefined` for `callbackUrl`;
-      `authRedirect` issues a session BEFORE logging the activity row;
-      the activity-log payload contains
-      `action='user.login.<providerId>'`,
+      state)` with explicit `undefined` for `callbackUrl`;
+      `authRedirect` runs `socialAuth.authenticate` →
+      `authProvider.issueSession` → `activityLogService.log` order;
+      activity-log payload contains `action='user.login.<providerId>'`,
       `summary='Signed in via <displayName>'`,
-      `metadata={provider: providerId}`, and `ipAddress`/`userAgent`
-      from `req.ip || req.headers['x-forwarded-for']` /
-      `req.headers['user-agent']`; activity-log rejection is
-      swallowed via `.catch(() => {})`.
-- [ ] **T32 (follow-up)**: `api-keys.controller.spec.ts` —
-      `revoke` returns `{message: 'API key revoked successfully'}` on
-      success and throws `NotFoundException('API key not found')` on
-      `deleteByIdAndUserId === false`.
-- [ ] **T33 (follow-up)**: `auth-session.guard.spec.ts` — the
-      most security-sensitive surface in the platform without a unit
-      suite. Pin every branch: - `@Public()` short-circuits to `true`. - `x-api-key` header with `ew_live_*` prefix → `validateKey` →
-      `findById` → hydrate `request.user`. - `Authorization: Bearer ew_live_*` → same path. - `x-api-key` AND `Bearer` both set → `x-api-key` wins. - Bearer token without `ew_live_` prefix → fall through to
-      `authProvider.authenticate`. - API-key path: invalid key → 401 (`'Invalid or expired API key'`). - API-key path: user inactive → 401 (`'User account is inactive'`). - API-key path: `iss='ever-works'`, `aud='ever-works'`,
-      `iat=floor(now/1000)`. - Session-token path: `iss='auth-runtime'`,
-      `aud='ever-works-users'`. - Both paths fail → `UnauthorizedException` (no message). - `ModuleRef.get(...)` lazy resolution: first call hydrates
-      `apiKeyService` + `userRepository`, second call reuses them
-      (asserted via `mock.calls.length`).
-- [ ] **T34 (follow-up)**: `auth-provider.service.spec.ts` —
-      Better Auth runtime mocked at module scope. Pin: bearer-token
-      path (`auth_session` lookup, expiry-deletes-the-row, hydrate
-      via `assertActiveUser`), Better Auth cookie path (suspended
-      user → `signOutAll` + 401), `signInEmail`'s
-      `ensureCredentialAccount` call BEFORE `auth.api.signInEmail`,
-      the password-mirror update with `registrationProvider='local'` + `lastLoginAt`, and the `'Failed to establish authenticated
-session'` 401 when Better Auth returns no token.
-- [ ] **T35 (follow-up)**: `auth-sync.service.spec.ts` — pin
-      `ensureCredentialAccount` upsert shape, `getCredentialPasswordHash`
-      null-on-missing, and `syncCredentialPassword` field write.
+      `metadata={provider: providerId}`, `ipAddress`/`userAgent`
+      derivation from `req.ip || req.headers['x-forwarded-for']` /
+      `req.headers['user-agent']`; activity-log rejection is swallowed
+      via `.catch(() => {})`; activity-log emission registered AFTER
+      `issueSession` resolves so it does NOT fire on session-store
+      failure. PR [#597](https://github.com/ever-works/ever-works/pull/597).
+- [x] **T32 (follow-up)**: `api-keys.controller.spec.ts` — 10 tests
+      pinning all 3 endpoints. `revoke` returns `{message: 'API key
+      revoked successfully'}` on `true`, throws `NotFoundException('API
+      key not found')` on `false`, propagates non-NotFound errors
+      verbatim. The critical `revokeKey(keyId, userId)` positional
+      invariant — NOT `(userId, keyId)` — pinned via dedicated test so
+      a future refactor cannot accidentally let any user revoke any
+      key by swapping args. PR
+      [#597](https://github.com/ever-works/ever-works/pull/597).
+- [x] **T33 (follow-up)**: `auth-session.guard.spec.ts` — 19 tests
+      pinning every branch of the four-mode guard surface: `@Public()`
+      short-circuit; `x-api-key` header with `ew_live_*` prefix
+      (rejects array headers, falls through on non-string /
+      non-prefixed values); `Authorization: Bearer ew_live_*` (falls
+      through on non-`ew_live_` Bearer tokens, falls through on
+      lowercase `bearer` because scheme matching is case-sensitive);
+      precedence (`x-api-key` wins over `Authorization` when both
+      set); successful API-key path constructs the documented
+      `AuthenticatedUser` envelope w/ `iss:'ever-works'`/`aud:'ever-works'`/`iat=now`,
+      falsy-`avatar` coerced to `null`, truthy-`avatar` preserved
+      verbatim; `UnauthorizedException('Invalid or expired API key')`
+      on null `validateKey`, `UnauthorizedException('User account is
+      inactive')` for missing-user AND inactive-user; lazy
+      `ModuleRef.get(ApiKeyService, {strict:false})` +
+      `ModuleRef.get(UserRepository, {strict:false})` resolution that
+      fires only on the FIRST API-key request and is cached on the
+      guard instance for subsequent requests; AuthProvider fallback
+      (returns true + attaches provider user with the original `cookie`
+      header propagated through `toHeaders()`, throws on `null`
+      provider user, propagates errors verbatim, treats missing
+      `request.headers` as empty without crashing). PR
+      [#597](https://github.com/ever-works/ever-works/pull/597).
+- [x] **T34 (follow-up)**: `auth-provider.service.spec.ts` — 39 tests.
+      Pinned: bearer-token path (`auth_session` lookup, expiry deletes
+      the row, hydrate via `assertActiveUser`); Better Auth cookie
+      path (suspended user → `signOutAll` + 401, `isActive: undefined`
+      treated as active, only strict-`false` trips suspended); falsy
+      avatar / image coerced to `null`; `registrationProvider`
+      fallback to `'local'`; `signInEmail` ordering
+      (`ensureCredentialAccount` BEFORE `auth.api.signInEmail` via
+      shared `order: string[]` array, password mirror skipped on
+      social-only / non-existent users), post-sign-in update writes
+      `password` + `lastLoginAt` + `registrationProvider:'local'`,
+      `'Failed to establish authenticated session'` 401 when Better
+      Auth returns no token, suspended user via `assertActiveUser`
+      AFTER Better Auth call; `signUpEmail` token-vs-no-token branches
+      (token → direct envelope; no token → falls through to
+      `issueSession`), post-sign-up update sets `isActive: true` +
+      `registrationProvider: 'local'`; `issueSession` 7-day TTL
+      (within 60s of `now + 7 * 24 * 60 * 60 * 1000`),
+      `ipAddress`/`userAgent` initialised to null, fresh token per
+      call; `changePassword` no-credential rejection, bcrypt
+      mismatch, success path writes new hash to BOTH stores; `setPassword`
+      hashes via runtime `password.hash` then writes both stores;
+      `signOut` bearer-vs-cookie branching (deletes session row when
+      bearer present, delegates to Better Auth otherwise);
+      `signOutAll` deletes every session row for the user;
+      `getBearerToken` private branches via `authenticate`
+      (case-insensitive `bearer`/`Bearer` scheme matching, non-bearer
+      schemes fall through, empty token after split → null,
+      missing-Authorization → null). 4 tests on
+      `request-headers.spec.ts` cover the `toHeaders` helper used by
+      every controller call site (Headers passthrough w/ defensive
+      copy, plain-object → Headers conversion, undefined → empty
+      Headers, falsy values skipped via `!value` guard, string-array
+      values joined w/ `", "`, lowercase normalisation by Headers
+      API). PR-pending.
+- [x] **T35 (follow-up)**: `auth-sync.service.spec.ts` — 12 tests.
+      Pinned: `findCredentialAccount` query shape `{ userId, providerId:
+      'credential' }`; `ensureCredentialAccount` short-circuits
+      WITHOUT writing when an existing row is present; new-row create
+      uses `userId` for BOTH `userId` AND `accountId` fields with a
+      fresh `randomUUID()` per call; `syncCredentialPassword` falls
+      through to `ensureCredentialAccount` when no row exists, calls
+      `repository.update(id, { password })` ONLY (no other columns
+      touched) when one does; `getCredentialPasswordHash` returns the
+      hash on hit, null on missing row, null on null/empty-string
+      password (the `account?.password || null` collapse). PR-pending.
 - [ ] **T36 (follow-up)**: `apps/web/e2e/auth.spec.ts` — audit
       against §2.1 / §2.2 of `spec.md`. Confirm every scenario has a
       matching playwright case; add what's missing (notably the
