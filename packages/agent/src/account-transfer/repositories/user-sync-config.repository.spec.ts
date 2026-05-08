@@ -64,7 +64,10 @@ describe('UserSyncConfigRepository', () => {
 
             const result = await repo.upsert('user-1', { repoOwner: 'new' });
 
-            expect(typeormRepo.update).toHaveBeenCalledWith({ userId: 'user-1' }, { repoOwner: 'new' });
+            expect(typeormRepo.update).toHaveBeenCalledWith(
+                { userId: 'user-1' },
+                { repoOwner: 'new' },
+            );
             expect(typeormRepo.create).not.toHaveBeenCalled();
             expect(typeormRepo.save).not.toHaveBeenCalled();
             expect(findOne).toHaveBeenCalledTimes(2);
@@ -181,10 +184,7 @@ describe('UserSyncConfigRepository', () => {
 
             await repo.updateError('user-1', 'boom');
 
-            expect(update).toHaveBeenCalledWith(
-                { userId: 'user-1' },
-                { lastSyncError: 'boom' },
-            );
+            expect(update).toHaveBeenCalledWith({ userId: 'user-1' }, { lastSyncError: 'boom' });
         });
 
         it('forwards the exact error message verbatim (no truncation/normalisation)', async () => {

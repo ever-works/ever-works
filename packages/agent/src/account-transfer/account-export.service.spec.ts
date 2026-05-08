@@ -279,7 +279,13 @@ describe('AccountExportService', () => {
 
     describe('exportWork — relations and AdvancedPrompts/schedule branching', () => {
         function setupOneWork(
-            extra: { prompts?: any; schedule?: any; members?: any[]; domains?: any[]; workPlugins?: any[] } = {},
+            extra: {
+                prompts?: any;
+                schedule?: any;
+                members?: any[];
+                domains?: any[];
+                workPlugins?: any[];
+            } = {},
         ) {
             const { service, mocks, ...rest } = makeService();
             mocks.userRepository.findById.mockResolvedValue({ username: 'a', email: 'a@a.a' });
@@ -322,7 +328,12 @@ describe('AccountExportService', () => {
         it('emits customDomains[] {domain, environment, verified, provider} with provider falling back to undefined', async () => {
             const { service } = setupOneWork({
                 domains: [
-                    { domain: 'a.test', environment: 'prod', verified: true, provider: 'cloudflare' },
+                    {
+                        domain: 'a.test',
+                        environment: 'prod',
+                        verified: true,
+                        provider: 'cloudflare',
+                    },
                     { domain: 'b.test', environment: 'preview', verified: false, provider: '' },
                 ],
             });
@@ -647,9 +658,9 @@ describe('AccountExportService', () => {
 
         it('omits markdown on a comparison when getComparisonMarkdown rejects (per-comparison failure)', async () => {
             const { service } = setupOneWork({
-                getComparisons: jest.fn().mockResolvedValue([
-                    { id: 'c1', slug: 'a-vs-b', title: 'A vs B' },
-                ]),
+                getComparisons: jest
+                    .fn()
+                    .mockResolvedValue([{ id: 'c1', slug: 'a-vs-b', title: 'A vs B' }]),
                 getComparisonMarkdown: jest.fn().mockRejectedValue(new Error('not-found')),
             });
 

@@ -256,9 +256,9 @@ describe('GitHubSyncService', () => {
             mocks.gitFacade.repositoryExists.mockResolvedValue(true);
             mocks.gitFacade.getRepository.mockResolvedValue({ isPrivate: false });
 
-            await expect(
-                service.configureSyncRepo('user-1', { createNew: true }),
-            ).rejects.toThrow(/Repository must be private/);
+            await expect(service.configureSyncRepo('user-1', { createNew: true })).rejects.toThrow(
+                /Repository must be private/,
+            );
             expect(mocks.gitFacade.createRepository).not.toHaveBeenCalled();
             expect(mocks.syncConfigRepository.upsert).not.toHaveBeenCalled();
         });
@@ -267,9 +267,9 @@ describe('GitHubSyncService', () => {
             const { service, mocks } = makeService();
             mocks.authAccountRepository.findProviderAccount.mockResolvedValue(null);
 
-            await expect(
-                service.configureSyncRepo('user-1', { createNew: true }),
-            ).rejects.toThrow(/GitHub OAuth not connected/);
+            await expect(service.configureSyncRepo('user-1', { createNew: true })).rejects.toThrow(
+                /GitHub OAuth not connected/,
+            );
             expect(mocks.gitFacade.getUser).not.toHaveBeenCalled();
         });
     });
@@ -507,7 +507,10 @@ describe('GitHubSyncService', () => {
             mocks.exportService.exportAccountData.mockRejectedValue(new Error('export-fail'));
 
             await expect(service.pushToGitHub('user-1')).rejects.toThrow('export-fail');
-            expect(mocks.syncConfigRepository.updateError).toHaveBeenCalledWith('user-1', 'export-fail');
+            expect(mocks.syncConfigRepository.updateError).toHaveBeenCalledWith(
+                'user-1',
+                'export-fail',
+            );
         });
 
         it('coerces non-Error rejections to String(error) when recording lastSyncError', async () => {
@@ -520,7 +523,10 @@ describe('GitHubSyncService', () => {
             mocks.exportService.exportAccountData.mockRejectedValue('plain-string');
 
             await expect(service.pushToGitHub('user-1')).rejects.toBe('plain-string');
-            expect(mocks.syncConfigRepository.updateError).toHaveBeenCalledWith('user-1', 'plain-string');
+            expect(mocks.syncConfigRepository.updateError).toHaveBeenCalledWith(
+                'user-1',
+                'plain-string',
+            );
         });
     });
 
@@ -561,7 +567,8 @@ describe('GitHubSyncService', () => {
             fsMocks.readFileSync.mockImplementation((p: string) => {
                 if (p.endsWith('manifest.json'))
                     return JSON.stringify({ version: 1, syncedAt: 'x', includesSecrets: true });
-                if (p.endsWith('profile.json')) return JSON.stringify({ username: 'a', email: 'a@a' });
+                if (p.endsWith('profile.json'))
+                    return JSON.stringify({ username: 'a', email: 'a@a' });
                 return '{}';
             });
             fsMocks.readdirSync.mockReturnValue([]);
@@ -624,7 +631,8 @@ describe('GitHubSyncService', () => {
             fsMocks.readFileSync.mockImplementation((p: string) => {
                 if (p.endsWith('manifest.json'))
                     return JSON.stringify({ version: 1, syncedAt: 'x', includesSecrets: false });
-                if (p.endsWith('profile.json')) return JSON.stringify({ username: 'a', email: 'a@a' });
+                if (p.endsWith('profile.json'))
+                    return JSON.stringify({ username: 'a', email: 'a@a' });
                 return '{}';
             });
             fsMocks.readdirSync.mockReturnValue([]);
@@ -646,7 +654,8 @@ describe('GitHubSyncService', () => {
             fsMocks.readFileSync.mockImplementation((p: string) => {
                 if (p.endsWith('manifest.json'))
                     return JSON.stringify({ version: 1, syncedAt: 'x', includesSecrets: false });
-                if (p.endsWith('profile.json')) return JSON.stringify({ username: 'a', email: 'a@a' });
+                if (p.endsWith('profile.json'))
+                    return JSON.stringify({ username: 'a', email: 'a@a' });
                 return '{}';
             });
             fsMocks.readdirSync.mockReturnValue([]);
@@ -676,7 +685,8 @@ describe('GitHubSyncService', () => {
             fsMocks.readFileSync.mockImplementation((p: string) => {
                 if (p.endsWith('manifest.json'))
                     return JSON.stringify({ version: 1, syncedAt: 'x', includesSecrets: true });
-                if (p.endsWith('profile.json')) return JSON.stringify({ username: 'a', email: 'a@a' });
+                if (p.endsWith('profile.json'))
+                    return JSON.stringify({ username: 'a', email: 'a@a' });
                 return '{}';
             });
             fsMocks.readdirSync.mockReturnValue([]);
@@ -757,7 +767,8 @@ describe('GitHubSyncService', () => {
             fsMocks.readFileSync.mockImplementation((p: string) => {
                 if (p.endsWith('manifest.json'))
                     return JSON.stringify({ version: 1, syncedAt: 'x', includesSecrets: false });
-                if (p.endsWith('profile.json')) return JSON.stringify({ username: 'a', email: 'a@a' });
+                if (p.endsWith('profile.json'))
+                    return JSON.stringify({ username: 'a', email: 'a@a' });
                 if (p.endsWith('user-plugins.json')) return JSON.stringify([{ pluginId: 'p1' }]);
                 if (p.endsWith('config.json')) return JSON.stringify({ name: 'A' });
                 if (p.endsWith('items.json')) return JSON.stringify([{ name: 'i1' }]);

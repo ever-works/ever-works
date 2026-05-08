@@ -7,11 +7,7 @@ jest.mock('../generators/data-generator/data-repository', () => ({
 import { AccountImportService } from './account-import.service';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { MASKED_SECRET_PREFIX } from './types';
-import type {
-    AccountExportPayload,
-    ConflictResolution,
-    ExportedWork,
-} from './types';
+import type { AccountExportPayload, ConflictResolution, ExportedWork } from './types';
 
 const dataRepoCreateMock = DataRepository.create as jest.Mock;
 
@@ -405,11 +401,7 @@ describe('AccountImportService', () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue(null);
 
-            const result = await service.applyImport(
-                'user-x',
-                makePayload([], []),
-                [],
-            );
+            const result = await service.applyImport('user-x', makePayload([], []), []);
 
             expect(result.success).toBe(false);
             expect(result.errors).toEqual(['User not found']);
@@ -541,11 +533,9 @@ describe('AccountImportService', () => {
             mocks.workRepository.existsByUserAndSlug.mockResolvedValue(false);
             mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'a-imported' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWork({ slug: 'a' })]),
-                [{ slug: 'a', strategy: 'rename' }],
-            );
+            await service.applyImport('user-1', makePayload([makeWork({ slug: 'a' })]), [
+                { slug: 'a', strategy: 'rename' },
+            ]);
 
             expect(mocks.workRepository.create).toHaveBeenCalledWith(
                 expect.objectContaining({ slug: 'a-imported' }),
@@ -567,9 +557,7 @@ describe('AccountImportService', () => {
 
             expect(mocks.workRepository.create).not.toHaveBeenCalled();
             expect(result.worksSkipped).toBe(1);
-            expect(result.errors).toEqual([
-                'Cannot rename "a" to "b" - slug already exists',
-            ]);
+            expect(result.errors).toEqual(['Cannot rename "a" to "b" - slug already exists']);
         });
 
         it('creates a NEW work when no existing row is found, defaulting owner to user.username', async () => {
@@ -794,9 +782,9 @@ describe('AccountImportService', () => {
             );
 
             expect(mocks.workMemberRepository.addMember).not.toHaveBeenCalled();
-            expect(
-                result.warnings.some((w) => w.includes('Member user "m1" not found')),
-            ).toBe(true);
+            expect(result.warnings.some((w) => w.includes('Member user "m1" not found'))).toBe(
+                true,
+            );
         });
 
         it('addMember is skipped when isMember already returns true (idempotent re-import)', async () => {
@@ -809,11 +797,7 @@ describe('AccountImportService', () => {
             mocks.workMemberRepository.isMember.mockResolvedValue(true);
             mocks.pluginRepository.findByPluginId.mockResolvedValue({ id: 'p' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWorkWithRelations()]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWorkWithRelations()]), []);
 
             expect(mocks.workMemberRepository.addMember).not.toHaveBeenCalled();
         });
@@ -827,13 +811,13 @@ describe('AccountImportService', () => {
             mocks.workRepository.create.mockResolvedValue({ id: 'w-1', slug: 'a' });
             mocks.pluginRepository.findByPluginId.mockResolvedValue({ id: 'p' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWorkWithRelations()]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWorkWithRelations()]), []);
 
-            expect(mocks.workMemberRepository.addMember).toHaveBeenCalledWith('w-1', 'm1', 'editor');
+            expect(mocks.workMemberRepository.addMember).toHaveBeenCalledWith(
+                'w-1',
+                'm1',
+                'editor',
+            );
         });
 
         it('skips an existing customDomain (idempotent), and adds a new one with (workId, domain, provider)', async () => {
@@ -844,11 +828,7 @@ describe('AccountImportService', () => {
             mocks.workCustomDomainRepository.findOne.mockResolvedValue(null);
             mocks.pluginRepository.findByPluginId.mockResolvedValue({ id: 'p' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWorkWithRelations()]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWorkWithRelations()]), []);
 
             expect(mocks.workCustomDomainRepository.addDomain).toHaveBeenCalledWith(
                 'w-1',
@@ -864,11 +844,7 @@ describe('AccountImportService', () => {
             mocks.workRepository.create.mockResolvedValue({ id: 'w-1', slug: 'a' });
             mocks.pluginRepository.findByPluginId.mockResolvedValue({ id: 'p' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWorkWithRelations()]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWorkWithRelations()]), []);
 
             expect(mocks.advancedPromptsRepository.createOrUpdate).toHaveBeenCalledWith(
                 'w-1',
@@ -896,11 +872,7 @@ describe('AccountImportService', () => {
             mocks.workRepository.create.mockResolvedValue({ id: 'w-1', slug: 'a' });
             mocks.pluginRepository.findByPluginId.mockResolvedValue({ id: 'p' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWorkWithRelations()]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWorkWithRelations()]), []);
 
             expect(mocks.scheduleRepository.upsert).toHaveBeenCalledWith(
                 'w-1',
@@ -1065,11 +1037,7 @@ describe('AccountImportService', () => {
             mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
             mocks.workRepository.create.mockResolvedValue({ id: 'w-1', slug: 'a' });
 
-            await service.applyImport(
-                'user-1',
-                makePayload([makeWork({ slug: 'a' })]),
-                [],
-            );
+            await service.applyImport('user-1', makePayload([makeWork({ slug: 'a' })]), []);
 
             expect(mocks.gitFacade.cloneOrPull).not.toHaveBeenCalled();
         });
@@ -1089,7 +1057,14 @@ describe('AccountImportService', () => {
             const work = makeWork({
                 slug: 'a',
                 items: [
-                    { name: 'A', description: 'd', source_url: 'u', category: 'c', tags: [], markdown: '# md' },
+                    {
+                        name: 'A',
+                        description: 'd',
+                        source_url: 'u',
+                        category: 'c',
+                        tags: [],
+                        markdown: '# md',
+                    },
                 ] as any,
                 comparisons: [
                     {
@@ -1114,9 +1089,7 @@ describe('AccountImportService', () => {
             expect(data.writeCollections).toHaveBeenCalledWith([{ id: 'col1', name: 'Col' }]);
 
             // Item: markdown is stripped from the data write and re-written separately
-            expect(data.writeItem).toHaveBeenCalledWith(
-                expect.objectContaining({ name: 'A' }),
-            );
+            expect(data.writeItem).toHaveBeenCalledWith(expect.objectContaining({ name: 'A' }));
             const itemCallArg = data.writeItem.mock.calls[0][0];
             expect(itemCallArg.markdown).toBeUndefined();
             expect(data.writeItemMarkdown).toHaveBeenCalledWith(expect.anything(), '# md');
@@ -1169,7 +1142,9 @@ describe('AccountImportService', () => {
 
             const work = makeWork({
                 slug: 'a',
-                items: [{ name: 'A', description: 'd', source_url: 'u', category: 'c', tags: [] }] as any,
+                items: [
+                    { name: 'A', description: 'd', source_url: 'u', category: 'c', tags: [] },
+                ] as any,
                 siteConfig: { siteName: 'Best' },
             });
             await service.applyImport('user-1', makePayload([work]), []);
@@ -1193,7 +1168,9 @@ describe('AccountImportService', () => {
 
             const work = makeWork({
                 slug: 'a',
-                items: [{ name: 'A', description: 'd', source_url: 'u', category: 'c', tags: [] }] as any,
+                items: [
+                    { name: 'A', description: 'd', source_url: 'u', category: 'c', tags: [] },
+                ] as any,
             });
             const result = await service.applyImport('user-1', makePayload([work]), []);
 
