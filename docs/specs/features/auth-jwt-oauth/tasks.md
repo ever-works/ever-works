@@ -133,7 +133,7 @@ email?, expiresAt?}` shape (no throwing); used by the web
 - [x] **T31 (follow-up)**: `oauth.controller.spec.ts` — 9 tests across
       the 2 endpoints. Pinned: `getAuthUrl` calls
       `socialAuthService.getAuthorizationUrl(providerId, undefined,
-    state)` with explicit `undefined` for `callbackUrl`;
+  state)` with explicit `undefined` for `callbackUrl`;
       `authRedirect` runs `socialAuth.authenticate` →
       `authProvider.issueSession` → `activityLogService.log` order;
       activity-log payload contains `action='user.login.<providerId>'`,
@@ -146,8 +146,8 @@ email?, expiresAt?}` shape (no throwing); used by the web
       failure. PR [#597](https://github.com/ever-works/ever-works/pull/597).
 - [x] **T32 (follow-up)**: `api-keys.controller.spec.ts` — 10 tests
       pinning all 3 endpoints. `revoke` returns `{message: 'API key
-    revoked successfully'}` on `true`, throws `NotFoundException('API
-    key not found')` on `false`, propagates non-NotFound errors
+  revoked successfully'}` on `true`, throws `NotFoundException('API
+  key not found')` on `false`, propagates non-NotFound errors
       verbatim. The critical `revokeKey(keyId, userId)` positional
       invariant — NOT `(userId, keyId)` — pinned via dedicated test so
       a future refactor cannot accidentally let any user revoke any
@@ -166,7 +166,7 @@ email?, expiresAt?}` shape (no throwing); used by the web
       falsy-`avatar` coerced to `null`, truthy-`avatar` preserved
       verbatim; `UnauthorizedException('Invalid or expired API key')`
       on null `validateKey`, `UnauthorizedException('User account is
-    inactive')` for missing-user AND inactive-user; lazy
+  inactive')` for missing-user AND inactive-user; lazy
       `ModuleRef.get(ApiKeyService, {strict:false})` +
       `ModuleRef.get(UserRepository, {strict:false})` resolution that
       fires only on the FIRST API-key request and is cached on the
@@ -213,7 +213,7 @@ email?, expiresAt?}` shape (no throwing); used by the web
       API). PR-pending.
 - [x] **T35 (follow-up)**: `auth-sync.service.spec.ts` — 12 tests.
       Pinned: `findCredentialAccount` query shape `{ userId, providerId:
-    'credential' }`; `ensureCredentialAccount` short-circuits
+  'credential' }`; `ensureCredentialAccount` short-circuits
       WITHOUT writing when an existing row is present; new-row create
       uses `userId` for BOTH `userId` AND `accountId` fields with a
       fresh `randomUUID()` per call; `syncCredentialPassword` falls
