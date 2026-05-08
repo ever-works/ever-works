@@ -34,7 +34,7 @@ async function buildCLI() {
     // Then, compile CLI TypeScript with proper decorator support
     try {
         execSync(
-            'npx tsc --project tsconfig.json --outDir temp-build --emitDecoratorMetadata true --experimentalDecorators true --target ES2020 --module Node16 --moduleResolution Node16 --esModuleInterop true --allowSyntheticDefaultImports true --skipLibCheck true',
+            'npx tsc --project tsconfig.build.json --outDir temp-build --emitDecoratorMetadata true --experimentalDecorators true --target ES2020 --module Node16 --moduleResolution Node16 --esModuleInterop true --allowSyntheticDefaultImports true --skipLibCheck true',
             {
                 cwd: __dirname,
                 stdio: 'inherit',

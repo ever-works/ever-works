@@ -87,17 +87,11 @@ describe('agent/events submodule', () => {
         it('every published event class extends BaseEvent', () => {
             expect(new WorkCreatedEvent(fakeWork)).toBeInstanceOf(BaseEvent);
             expect(new WorkGenerationCompletedEvent(fakeWork)).toBeInstanceOf(BaseEvent);
+            expect(new WorksConfigSyncRequestedEvent('w', 'u', 'schedule_updated')).toBeInstanceOf(
+                BaseEvent,
+            );
             expect(
-                new WorksConfigSyncRequestedEvent('w', 'u', 'schedule_updated'),
-            ).toBeInstanceOf(BaseEvent);
-            expect(
-                new WorksConfigSyncFailedEvent(
-                    'w',
-                    'u',
-                    'schedule_updated',
-                    'org/repo',
-                    'boom',
-                ),
+                new WorksConfigSyncFailedEvent('w', 'u', 'schedule_updated', 'org/repo', 'boom'),
             ).toBeInstanceOf(BaseEvent);
             const payload: DeploymentEventPayload = {
                 work: fakeWork,
@@ -266,9 +260,7 @@ describe('agent/events submodule', () => {
         it('re-exports every published event class', () => {
             expect(eventsBarrel.WorkCreatedEvent).toBe(WorkCreatedEvent);
             expect(eventsBarrel.WorkGenerationCompletedEvent).toBe(WorkGenerationCompletedEvent);
-            expect(eventsBarrel.WorksConfigSyncRequestedEvent).toBe(
-                WorksConfigSyncRequestedEvent,
-            );
+            expect(eventsBarrel.WorksConfigSyncRequestedEvent).toBe(WorksConfigSyncRequestedEvent);
             expect(eventsBarrel.WorksConfigSyncFailedEvent).toBe(WorksConfigSyncFailedEvent);
             expect(eventsBarrel.DeploymentDispatchedEvent).toBe(DeploymentDispatchedEvent);
             expect(eventsBarrel.DeploymentCompletedEvent).toBe(DeploymentCompletedEvent);

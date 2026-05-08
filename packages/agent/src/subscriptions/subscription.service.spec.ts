@@ -367,10 +367,7 @@ describe('SubscriptionService', () => {
                 1,
                 SubscriptionPlanCode.STANDARD,
             );
-            expect(planRepository.findByCode).toHaveBeenNthCalledWith(
-                2,
-                SubscriptionPlanCode.FREE,
-            );
+            expect(planRepository.findByCode).toHaveBeenNthCalledWith(2, SubscriptionPlanCode.FREE);
         });
 
         it('throws when the configured plan AND the FREE fallback are both missing', async () => {
@@ -412,9 +409,7 @@ describe('SubscriptionService', () => {
             const { service } = makeService(
                 {},
                 {
-                    findActiveByUser: jest
-                        .fn()
-                        .mockResolvedValue({ plan: STANDARD_PLAN }),
+                    findActiveByUser: jest.fn().mockResolvedValue({ plan: STANDARD_PLAN }),
                 },
             );
 
@@ -436,9 +431,7 @@ describe('SubscriptionService', () => {
             ]) {
                 expect(byCadence[cadence].allowed).toBe(false);
                 expect(byCadence[cadence].payPerUse).toBe(true);
-                expect(byCadence[cadence].reason).toBe(
-                    'Upgrade to Premium for this cadence',
-                );
+                expect(byCadence[cadence].reason).toBe('Upgrade to Premium for this cadence');
             }
         });
 
@@ -447,9 +440,7 @@ describe('SubscriptionService', () => {
             const { service } = makeService(
                 {},
                 {
-                    findActiveByUser: jest
-                        .fn()
-                        .mockResolvedValue({ plan: planWithoutCadences }),
+                    findActiveByUser: jest.fn().mockResolvedValue({ plan: planWithoutCadences }),
                 },
             );
 
@@ -508,12 +499,12 @@ describe('SubscriptionService', () => {
 
         it('returns MONTHLY when allowedCadences is nullish', () => {
             const { service } = makeService();
-            expect(
-                service.getDefaultCadence({ allowedCadences: undefined } as any),
-            ).toBe(WorkScheduleCadence.MONTHLY);
-            expect(
-                service.getDefaultCadence({ allowedCadences: null } as any),
-            ).toBe(WorkScheduleCadence.MONTHLY);
+            expect(service.getDefaultCadence({ allowedCadences: undefined } as any)).toBe(
+                WorkScheduleCadence.MONTHLY,
+            );
+            expect(service.getDefaultCadence({ allowedCadences: null } as any)).toBe(
+                WorkScheduleCadence.MONTHLY,
+            );
         });
     });
 
@@ -581,20 +572,14 @@ describe('SubscriptionService', () => {
             process.env.SUBSCRIPTIONS_ENABLED = 'false';
             const { service } = makeService();
             await expect(
-                service.assignPlanToUser(
-                    { id: 'u1' } as any,
-                    SubscriptionPlanCode.PREMIUM,
-                ),
+                service.assignPlanToUser({ id: 'u1' } as any, SubscriptionPlanCode.PREMIUM),
             ).rejects.toThrow(BadRequestException);
         });
 
         it('throws NotFoundException when the requested plan code is not in the DB', async () => {
             const { service } = makeService({ findByCode: jest.fn().mockResolvedValue(null) });
             await expect(
-                service.assignPlanToUser(
-                    { id: 'u1' } as any,
-                    SubscriptionPlanCode.PREMIUM,
-                ),
+                service.assignPlanToUser({ id: 'u1' } as any, SubscriptionPlanCode.PREMIUM),
             ).rejects.toThrow(NotFoundException);
         });
 
@@ -650,9 +635,7 @@ describe('SubscriptionService', () => {
             expect(summary.plan).toBe(STANDARD_PLAN);
             expect(summary.enabled).toBe(true);
             expect(summary.allowances).toHaveLength(7);
-            expect(summary.allowances.map((a) => a.cadence)).toEqual(
-                ALL_CADENCES_IN_PUBLIC_ORDER,
-            );
+            expect(summary.allowances.map((a) => a.cadence)).toEqual(ALL_CADENCES_IN_PUBLIC_ORDER);
         });
 
         it('reflects the kill-switch in `enabled` and resolves the default plan', async () => {

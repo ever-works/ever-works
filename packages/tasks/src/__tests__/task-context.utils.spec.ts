@@ -181,11 +181,7 @@ describe('createTaskContext', () => {
         hydrator.initialize.mockRejectedValueOnce(new Error('plugin-load-failed'));
 
         await expect(
-            createTaskContext(
-                appContext as any,
-                { workId: 'w', userId: 'u' },
-                FakeOrchestrator,
-            ),
+            createTaskContext(appContext as any, { workId: 'w', userId: 'u' }, FakeOrchestrator),
         ).rejects.toThrow('plugin-load-failed');
 
         expect(apiClient.fetchWorkContext).not.toHaveBeenCalled();
@@ -195,11 +191,7 @@ describe('createTaskContext', () => {
         apiClient.fetchWorkContext.mockRejectedValueOnce(new Error('api-down'));
 
         await expect(
-            createTaskContext(
-                appContext as any,
-                { workId: 'w', userId: 'u' },
-                FakeOrchestrator,
-            ),
+            createTaskContext(appContext as any, { workId: 'w', userId: 'u' }, FakeOrchestrator),
         ).rejects.toThrow('api-down');
 
         // appContext.get was called for hydrator + api-client + … but NOT for the orchestrator
