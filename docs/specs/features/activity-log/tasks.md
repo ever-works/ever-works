@@ -143,7 +143,7 @@ status / summary / details / createdAt` plus the metadata
 - [ ] T29. **Follow-up**: integration tests in `packages/agent` (Jest)
       hitting a real Postgres test container to pin (a) the four
       composite indexes, (b) the `(userId, workId)` `ON DELETE SET
-  NULL` behaviour, and (c) the reconcile pass against a seeded
+NULL` behaviour, and (c) the reconcile pass against a seeded
       orphan-in-progress row. Currently only unit tests cover the
       reconciliation path.
 

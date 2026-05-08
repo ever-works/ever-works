@@ -147,8 +147,8 @@ spec backfill but are good candidates for a future hourly-tracker run.
 
 - [ ] **T-OQ-1**. Decide the fate of `POST /api/deploy/teams` (the
       workless variant). It currently returns `{teams: [], message: 'To
-  fetch teams, use the work-specific endpoint or configure your
-  token in Plugin Settings.'}` — pure placeholder. Either remove it
+fetch teams, use the work-specific endpoint or configure your
+token in Plugin Settings.'}` — pure placeholder. Either remove it
       (breaking change for the UI's empty-state hint) or rename to
       `/api/deploy/teams/hint` to clarify intent.
 
@@ -165,7 +165,7 @@ spec backfill but are good candidates for a future hourly-tracker run.
       restarts. The current behaviour is documented in §Plan §11
       (Risks): a redeploy mid-verification silently abandons the
       poller; users can re-resolve via `POST
-  /api/deploy/works/:id/lookup`. Trigger.dev migration would land
+/api/deploy/works/:id/lookup`. Trigger.dev migration would land
       under `packages/tasks/src/tasks/trigger/deploy-verification.task.ts`
       with idempotent CAS updates on `work.deploymentState`.
 
@@ -182,11 +182,11 @@ spec backfill but are good candidates for a future hourly-tracker run.
 
 - [ ] **T-OQ-6**. Add a per-controller `@Throttle` decorator stack so
       bulk endpoints (`POST /api/deploy/batch`, `POST
-  /api/screenshot/capture`) cannot be hammered. Today they inherit
+/api/screenshot/capture`) cannot be hammered. Today they inherit
       the global throttler config only.
 
 - [ ] **T-DOCS-1**. Author `docs/api/plugins-capabilities/{deploy,search,
-  screenshot,oauth,git-providers,device-auth}.md` with one Markdown
+screenshot,oauth,git-providers,device-auth}.md` with one Markdown
       page per capability listing endpoints, request/response shapes,
       and example curl invocations.
 
