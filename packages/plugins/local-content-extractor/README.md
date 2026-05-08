@@ -39,6 +39,16 @@ If you need JavaScript-rendered pages, paywalled content, anti-bot bypass, headl
 
 This plugin has no required settings. A few internal tuning knobs (`timeout`, `minContentLength`, `userAgent`) are exposed in the schema but are hidden from the UI and use sensible defaults.
 
+## Troubleshooting
+
+| Symptom                                        | Likely cause                                                                                     | Fix                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `403` from the extractor               | API key / token missing or revoked                                                               | Re-enter the credential from the Local Content Extractor dashboard, or set `PLUGIN_LOCAL_CONTENT_EXTRACTOR_API_KEY` in the host environment for default fallback          |
+| `Failed to extract content` for a specific URL | Page requires authentication, JavaScript rendering, or a custom client (Notion, PDF, login wall) | Verify the URL is publicly reachable; if it requires JavaScript/auth, switch to a more capable extractor (`scrapfly` / `notion-extractor` / `pdf-extractor`) for that URL |
+| Plugin not used during extraction              | Another content-extractor plugin is set as the default                                           | In **Settings → Plugins**, set `local-content-extractor` as the default for `content-extractor`, or disable competing plugins                                             |
+| Returned content is missing main article       | Page uses non-standard markup or JavaScript-rendered content                                     | Switch to `scrapfly` or `firecrawl` for that URL — `local-content-extractor` does no JS rendering                                                                         |
+| `healthCheck` reports unhealthy                | Credential invalid OR Local Content Extractor endpoint unreachable from the host                 | Verify the credential with a manual call to the upstream API and confirm outbound HTTPS is allowed by the firewall                                                        |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

@@ -1,13 +1,13 @@
 ---
 id: works-config
-title: works.yml Configuration
-sidebar_label: works.yml Config
+title: .works/works.yml Configuration
+sidebar_label: .works/works.yml Config
 sidebar_position: 6
 ---
 
-# `works.yml` Configuration
+# `.works/works.yml` Configuration
 
-`works.yml` is a single YAML file, committed to a work's **data repository**, that captures the work's generation configuration in source-controlled form. The platform reads it at import time to bootstrap a work's settings, and writes it back after each generation to keep it in sync.
+`.works/works.yml` is a single YAML file, committed to a work's **data repository**, that captures the work's generation configuration in source-controlled form. The platform reads it at import time to bootstrap a work's settings, and writes it back after each generation to keep it in sync.
 
 This makes a work's configuration:
 
@@ -16,14 +16,14 @@ This makes a work's configuration:
 - **Source-of-truth-friendly** — you can hand-author it, or let the platform produce it.
 
 :::tip When to use this
-Use `works.yml` when you want to onboard an existing data repo into the platform without manually re-entering its settings, or when you maintain works outside the platform UI (e.g. via PRs, CI scripts, or config templates).
+Use `.works/works.yml` when you want to onboard an existing data repo into the platform without manually re-entering its settings, or when you maintain works outside the platform UI (e.g. via PRs, CI scripts, or config templates).
 :::
 
 ## File Locations
 
-When the platform reads from a repo it only uses `works.yml` at the data-repository root.
+When the platform reads from a repo it only uses `.works/works.yml` at the data-repository root.
 
-When the platform writes the config back after generation, it uses **`works.yml`** at the data-repository root.
+When the platform writes the config back after generation, it uses **`.works/works.yml`** at the data-repository root.
 
 ## Schema
 
@@ -98,16 +98,16 @@ The dash-separated forms (`every-3-hours`, `every-8-hours`, `every-12-hours`) ar
 
 When you import an existing work data repo, the platform:
 
-1. Tries to fetch a `works.yml` from the candidate paths above.
+1. Tries to fetch a `.works/works.yml` from the candidate paths above.
 2. If found, parses it and **pre-fills the import flow** with the values it contains (name, prompt, model, providers, schedule).
 3. If parsing fails, surfaces the parse error to you (`Invalid works config at <path>: …`) so you can fix the file before retrying.
 4. Validates referenced plugins (e.g. that `providers.ai = openai` corresponds to an installed plugin) before letting the import complete.
 
-When you confirm the import, the platform persists the parsed `works.yml` settings to the work entity AND keeps the imported file in the data repo for future round-trips.
+When you confirm the import, the platform persists the parsed `.works/works.yml` settings to the work entity AND keeps the imported file in the data repo for future round-trips.
 
 ## Sync After Generation
 
-Every successful generation writes a fresh `works.yml` to the data repo. The writer:
+Every successful generation writes a fresh `.works/works.yml` to the data repo. The writer:
 
 - **Preserves unknown fields** in the existing file (the platform only manages the fields it owns).
 - Writes back the work's current `name`, `initial_prompt`, `model`, `website_repo`, `providers`, and `schedule`.
@@ -117,7 +117,7 @@ If sync fails (for example, the data repo can't be cloned), the failure is logge
 
 ## Editing the File Manually
 
-You can hand-edit `works.yml` in the data repo and commit the change. Two ways the platform picks it up:
+You can hand-edit `.works/works.yml` in the data repo and commit the change. Two ways the platform picks it up:
 
 1. **Re-import** the work — the new values become the work config.
 2. **Trigger a generation** — at the start of generation the platform refreshes scoped settings; for fields the platform owns, the database values win.

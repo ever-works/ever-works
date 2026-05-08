@@ -42,6 +42,15 @@ Scrapfly serves dual purposes during work generation: capturing screenshots for 
 
 This plugin uses a `hybrid` configuration mode, so the API key can be supplied at the admin level, the user level, or via the environment variable.
 
+## Troubleshooting
+
+| Symptom                                        | Likely cause                                                                                     | Fix                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `403` from the extractor               | API key / token missing or revoked                                                               | Re-enter the credential from the Scrapfly dashboard, or set `PLUGIN_SCRAPFLY_API_KEY` in the host environment for default fallback                                        |
+| `Failed to extract content` for a specific URL | Page requires authentication, JavaScript rendering, or a custom client (Notion, PDF, login wall) | Verify the URL is publicly reachable; if it requires JavaScript/auth, switch to a more capable extractor (`scrapfly` / `notion-extractor` / `pdf-extractor`) for that URL |
+| Plugin not used during extraction              | Another content-extractor plugin is set as the default                                           | In **Settings → Plugins**, set `scrapfly` as the default for `content-extractor`, or disable competing plugins                                                            |
+| `healthCheck` reports unhealthy                | Credential invalid OR Scrapfly endpoint unreachable from the host                                | Verify the credential with a manual call to the upstream API and confirm outbound HTTPS is allowed by the firewall                                                        |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

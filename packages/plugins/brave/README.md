@@ -40,6 +40,16 @@ When enabled and set as the active search provider, Brave Search is used during 
 - **API Key** — Your Brave Search API key (secret, scoped per user, also configurable via `PLUGIN_BRAVE_API_KEY`).
 - **Default Max Results** — Default number of results per search (1–20, default 10).
 
+## Troubleshooting
+
+| Symptom                                      | Likely cause                                                            | Fix                                                                                                                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized` / `Authentication failed` | API key missing, revoked, or wrong key entered                          | Re-enter the **API Key** from the [Brave Search dashboard](https://api.search.brave.com/app/dashboard); or set `PLUGIN_BRAVE_API_KEY` in the host environment for default fallback |
+| `429 Too Many Requests`                      | Free-tier rate limit exceeded (1 query/sec)                             | Wait, throttle calls, or upgrade the plan in the Brave dashboard                                                                                                                   |
+| Plugin not used during work generation       | Another search plugin is set as the default for the `search` capability | In **Settings → Plugins**, set `brave` as the default for `search`, or disable competing search plugins                                                                            |
+| Empty results array                          | Query returned no Brave-indexed results, or `safesearch` filtered them  | Broaden the query, lower `safesearch` (`off` / `moderate` / `strict`), or remove time-range / country filters                                                                      |
+| `Healthcheck failed`                         | API key invalid OR Brave API endpoint unreachable from the host         | Verify the key with `curl -H 'X-Subscription-Token: $KEY' https://api.search.brave.com/res/v1/web/search?q=test` and confirm outbound HTTPS to `api.search.brave.com` is allowed   |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

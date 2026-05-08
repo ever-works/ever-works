@@ -22,47 +22,54 @@ The `@ever-works/agent` package is the core business logic layer of the Ever Wor
 
 ## Module Areas
 
-The agent package exposes **20 sub-module entry points** via the `exports` field in `package.json`. Each export maps to a distinct module area within `src/`:
+The agent package exposes **27 sub-module entry points** via the `exports` field in `package.json`. Each export maps to a distinct module area within `src/`:
 
-| Export Path              | Source Work                 | Purpose                                                  |
-| ------------------------ | --------------------------- | -------------------------------------------------------- |
-| `./generators`           | `src/generators/`           | Three-stage content generation (data, markdown, website) |
-| `./database`             | `src/database/`             | TypeORM entities, repositories, and database module      |
-| `./dto`                  | `src/dto/`                  | Data Transfer Objects for API validation                 |
-| `./entities`             | `src/entities/`             | TypeORM entity definitions (Work, User, etc.)            |
-| `./git`                  | `src/git/`                  | Git operations abstraction layer                         |
-| `./work-operations`      | `src/work-operations/`      | Low-level work CRUD operations                           |
-| `./items-generator`      | `src/items-generator/`      | Item generation DTOs and utilities                       |
-| `./tasks`                | `src/tasks/`                | Background task definitions                              |
-| `./events`               | `src/events/`               | Domain event classes (NestJS EventEmitter)               |
-| `./services`             | `src/services/`             | Work service layer (14 services)                         |
-| `./subscriptions`        | `src/subscriptions/`        | Subscription and billing logic                           |
-| `./config`               | `src/config/`               | Configuration constants and helpers                      |
-| `./cache`                | `src/cache/`                | Cache management utilities                               |
-| `./notifications`        | `src/notifications/`        | Notification system                                      |
-| `./import`               | `src/import/`               | Data import functionality                                |
-| `./facades`              | `src/facades/`              | Facade services for plugin capabilities                  |
-| `./plugins`              | `src/plugins/`              | Plugin registry, loader, and settings                    |
-| `./pipeline`             | `src/pipeline/`             | Pipeline builder, orchestrator, and executors            |
-| `./utils`                | `src/utils/`                | Shared utility functions                                 |
-| `./community-pr`         | `src/community-pr/`         | Community pull request management                        |
-| `./comparison-generator` | `src/comparison-generator/` | A-vs-B comparison page generation                        |
+| Export Path              | Source Work                 | Purpose                                                                                       |
+| ------------------------ | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `./generators`           | `src/generators/`           | Three-stage content generation (data, markdown, website)                                      |
+| `./database`             | `src/database/`             | TypeORM entities, repositories, and database module                                           |
+| `./dto`                  | `src/dto/`                  | Data Transfer Objects for API validation                                                      |
+| `./entities`             | `src/entities/`             | TypeORM entity definitions (Work, User, etc.)                                                 |
+| `./git`                  | (see Facades + Utils)       | Git operations — re-exported from `facades/git.facade.ts` and `utils/git-repository.utils.ts` |
+| `./work-operations`      | `src/work-operations/`      | Low-level work CRUD operations                                                                |
+| `./items-generator`      | `src/items-generator/`      | Item generation DTOs and utilities                                                            |
+| `./tasks`                | `src/tasks/`                | Background task definitions                                                                   |
+| `./events`               | `src/events/`               | Domain event classes (NestJS EventEmitter)                                                    |
+| `./services`             | `src/services/`             | Work service layer (14 services)                                                              |
+| `./onboarding`           | `src/onboarding/`           | Account onboarding adapters (GitHub-app + work import)                                        |
+| `./subscriptions`        | `src/subscriptions/`        | Subscription, plan, and billing-ledger logic                                                  |
+| `./config`               | `src/config/`               | Configuration constants and helpers                                                           |
+| `./constants`            | `src/constants/`            | Shared cross-module constants                                                                 |
+| `./cache`                | `src/cache/`                | Cache management utilities                                                                    |
+| `./notifications`        | `src/notifications/`        | Notification system                                                                           |
+| `./activity-log`         | `src/activity-log/`         | Per-user audit trail + Jitsu analytics dispatcher                                             |
+| `./import`               | `src/import/`               | Data import functionality                                                                     |
+| `./works-config`         | `src/works-config/`         | `works.yml` parser, validator, and writer                                                     |
+| `./facades`              | `src/facades/`              | Facade services for plugin capabilities                                                       |
+| `./plugins`              | `src/plugins/`              | Plugin registry, loader, and settings                                                         |
+| `./pipeline`             | `src/pipeline/`             | Pipeline builder, orchestrator, and executors                                                 |
+| `./utils`                | `src/utils/`                | Shared utility functions                                                                      |
+| `./community-pr`         | `src/community-pr/`         | Community pull request management                                                             |
+| `./comparison-generator` | `src/comparison-generator/` | A-vs-B comparison page generation                                                             |
+| `./template-catalog`     | `src/template-catalog/`     | Built-in + custom website-template registry                                                   |
+| `./account-transfer`     | `src/account-transfer/`     | Account export/import + GitHub-backed account sync                                            |
 
 ## Work Structure
 
 ```
 packages/agent/src/
+├── account-transfer/         # Account export / import / GitHub-backed sync
+├── activity-log/             # Per-user audit trail + analytics dispatcher
 ├── cache/                    # Cache management
 ├── community-pr/             # Community PR handling
 ├── comparison-generator/     # Item comparison generation
 ├── config/                   # Configuration constants
-├── constants/                # Shared constants
+├── constants/                # Shared cross-module constants
 ├── database/                 # TypeORM database module
-├── work-operations/     # Low-level work ops
 ├── dto/                      # Data Transfer Objects
 ├── entities/                 # TypeORM entities
 ├── events/                   # Domain events
-├── facades/                  # Capability facades (AI, Search, etc.)
+├── facades/                  # Capability facades (AI, Search, Git, …)
 ├── generators/               # Content generation pipeline
 │   ├── data-generator/       # Data generation (items, categories)
 │   ├── markdown-generator/   # Markdown/README generation
@@ -70,6 +77,7 @@ packages/agent/src/
 ├── import/                   # Data import logic
 ├── items-generator/          # Item generation DTOs
 ├── notifications/            # Notification system
+├── onboarding/               # Onboarding adapters (account + work)
 ├── pipeline/                 # Plugin-driven pipeline system
 │   ├── validators/           # Pipeline result validation
 │   └── __tests__/            # Pipeline test suite
@@ -80,9 +88,13 @@ packages/agent/src/
 │   ├── types/                # Service type definitions
 │   ├── utils/                # Service utilities
 │   └── __tests__/            # Service tests
-├── subscriptions/            # Subscription management
+├── subscriptions/            # Subscription, plan, and ledger services
 ├── tasks/                    # Background task definitions
-└── utils/                    # Shared utilities
+├── template-catalog/         # Built-in + custom website-template registry
+├── types/                    # Public type re-exports
+├── utils/                    # Shared utilities (incl. git-repository helpers)
+├── work-operations/          # Low-level work CRUD operations
+└── works-config/             # `works.yml` parser, validator, and writer
 ```
 
 ## NestJS Module Structure
@@ -134,23 +146,29 @@ The API provides HTTP controllers that delegate to agent services. For example, 
 
 ## Service Layer
 
-The `services/` work contains 14 specialized services that form the domain logic layer:
+The `services/` directory contains 19 specialized services that form the domain logic layer:
 
-| Service                         | Responsibility                    |
-| ------------------------------- | --------------------------------- |
-| `WorkLifecycleService`          | Create, update, delete works      |
-| `WorkGenerationService`         | Orchestrate full generation flow  |
-| `WorkQueryService`              | Query and list works              |
-| `WorkDetailService`             | Manage work details and metadata  |
-| `WorkOwnershipService`          | Handle ownership and permissions  |
-| `WorkMemberService`             | Manage work members               |
-| `WorkScheduleService`           | CRON-based scheduled regeneration |
-| `WorkScheduleDispatcherService` | Dispatch scheduled jobs           |
-| `WorkImportService`             | Import data from external sources |
-| `WorkAdvancedPromptsService`    | Custom AI prompt management       |
-| `WorkTaxonomyService`           | Category and tag management       |
-| `RepositoryManagementService`   | Git repository lifecycle          |
-| `GeneratorFormSchemaService`    | Dynamic form schema generation    |
+| Service                                | Responsibility                                                 |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `WorkLifecycleService`                 | Create, update, delete works                                   |
+| `WorkGenerationService`                | Orchestrate full generation flow                               |
+| `WorkQueryService`                     | Query and list works                                           |
+| `WorkDetailService`                    | Manage work details and metadata                               |
+| `WorkOwnershipService`                 | Handle ownership and permissions                               |
+| `WorkMemberService`                    | Manage work members                                            |
+| `WorkScheduleService`                  | CRON-based scheduled regeneration                              |
+| `WorkScheduleDispatcherService`        | Dispatch scheduled jobs                                        |
+| `WorkImportService`                    | Import data from external sources                              |
+| `WorkAdvancedPromptsService`           | Custom AI prompt management                                    |
+| `WorkTaxonomyService`                  | Category and tag management                                    |
+| `WorkWebsiteRepositoryStateService`    | Track website-repo provisioning + sync state                   |
+| `WorksManifestService`                 | Resolve and write the canonical `works.yml` manifest           |
+| `RepositoryManagementService`          | Git repository lifecycle                                       |
+| `GeneratorFormSchemaService`           | Dynamic form schema generation                                 |
+| `ItemHealthService`                    | Per-item source health checks (URL liveness, status mapping)   |
+| `ItemSourceValidationSchedulerService` | Schedules item source validation runs                          |
+| `StateMarkerService`                   | Persists generator/import state markers in the data repository |
+| `WebhookDeliveryService`               | Delivers outbound webhooks for domain events                   |
 
 ## Dependencies
 

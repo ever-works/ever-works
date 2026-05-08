@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Грешка при актуализиране на настройките за синхронизация",
                 "syncDisabled": "Синхронизацията е деактивирана",
                 "worksConfig": {
-                    "imported": "Импортирано от works.yml",
+                    "imported": "Импортирано от .works/works.yml",
                     "applied": "Приложено: {value}",
                     "enabled": "включен",
                     "disabled": "изключен",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Репозиторий с данни",
                         "awesomeReadme": "Awesome README",
                         "linkExisting": "Свързани съществуващи репозитории",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Общи настройки",
@@ -2349,7 +2349,7 @@
                     "description": "Автоматично тегли актуализации от изходното хранилище."
                 },
                 "worksConfigRestore": {
-                    "title": "Възстановяване на настройките от works.yml",
+                    "title": "Възстановяване на настройките от .works/works.yml",
                     "description": "Прилагане на AI доставчик, модел, график и свързани хранилища от това хранилище."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Поддържани формати на хранилища",
                     "dataRepo": {
                         "title": "Хранилище с данни",
-                        "description": "Хранилища с works.yml и структура на папка data/"
+                        "description": "Хранилища с .works/works.yml и структура на папка data/"
                     },
                     "awesomeReadme": {
                         "title": "Awesome списък",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Хранилище с данни",
                     "awesomeReadme": "Awesome списък",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "елемента",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Свържи хранилища"
                 },
                 "detectionFailed": "Не можахме автоматично да открием формата. Моля, изберете как да импортирате това хранилище.",
-                "detectionFailedMissingConfig": "Не беше намерена поддържана конфигурация. Добавете works.yml в репозиторито или изберете ръчен формат за импортиране по-долу.",
+                "detectionFailedMissingConfig": "Не беше намерена поддържана конфигурация. Добавете .works/works.yml в репозиторито или изберете ръчен формат за импортиране по-долу.",
                 "errors": {
                     "urlRequired": "Моля, въведете GitHub URL на хранилище",
                     "unsupportedFormat": "Този формат на хранилище не се поддържа. Моля, използвайте формат Хранилище с данни или Awesome списък.",

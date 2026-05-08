@@ -11,8 +11,8 @@
 
 ### AC-2: Configuration File
 
-- [ ] Reads existing `works.yml`
-- [ ] Creates `works.yml` for new works
+- [ ] Reads existing `.works/works.yml`
+- [ ] Creates `.works/works.yml` for new works
 - [ ] Increments version on each update
 - [ ] Preserves metadata (initial_prompt, timestamps)
 - [ ] Updates `last_request_data` with current DTO
@@ -96,7 +96,7 @@
 
 ### AC-12: Repository Structure
 
-- [ ] `works.yml` at root
+- [ ] `.works/works.yml` at root
 - [ ] `items/` work with JSON files
 - [ ] `categories.yml` at root
 - [ ] `tags.yml` at root

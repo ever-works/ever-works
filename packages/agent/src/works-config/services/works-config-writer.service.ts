@@ -8,7 +8,7 @@ import { Work, type RepositoryTarget } from '@src/entities/work.entity';
 import type { DataRepository } from '@src/generators/data-generator/data-repository';
 import { WorksConfigService, type ResolvedWorksConfig } from './works-config.service';
 
-const WORKS_CONFIG_FILENAME = 'works.yml';
+const WORKS_CONFIG_FILEPATH = '.works/works.yml';
 
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
@@ -37,6 +37,7 @@ export class WorksConfigWriterService {
         const existingRaw = await this.readExistingRaw(filePath);
         const nextConfig = this.buildConfig(existingRaw, options);
 
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
         await fs.writeFile(filePath, yaml.stringify(nextConfig), 'utf-8');
     }
 
@@ -171,7 +172,7 @@ export class WorksConfigWriterService {
     }
 
     private async resolveWorksConfigPath(repoDir: string): Promise<string> {
-        return path.join(repoDir, WORKS_CONFIG_FILENAME);
+        return path.join(repoDir, WORKS_CONFIG_FILEPATH);
     }
 
     private async readExistingRaw(filePath: string): Promise<Record<string, unknown>> {

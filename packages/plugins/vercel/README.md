@@ -40,6 +40,16 @@ When you deploy a work, Ever Works pushes the generated site to a GitHub reposit
 
 - **Vercel API Token** (required, secret, user-scoped) — your personal Vercel API token; the plugin uses `user-required` configuration mode, so each user must supply their own token.
 
+## Troubleshooting
+
+| Symptom                                             | Likely cause                                                                                                              | Fix                                                                                                                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized` from Vercel                      | API token missing, expired, or scoped to a different account/team                                                         | Re-issue a token at [vercel.com/account/tokens](https://vercel.com/account/tokens) and re-enter it; if deploying under a team, set **Team ID** / `DEPLOY_TEAM_SCOPE` to the team slug           |
+| Deployment never reaches `READY` (stuck `BUILDING`) | Vercel build script failing OR `DEPLOY_PROVIDER`/`DATA_REPOSITORY` GitHub Actions secret not set on the work's repository | Open the Vercel build log for the failing deployment; in the work's GitHub repo verify the four required Actions secrets exist (`TENANT_ID`, `DATA_REPOSITORY`, `VERCEL_TOKEN`, `DEPLOY_TOKEN`) |
+| `Domain mismatch` after binding a custom domain     | Domain not yet attached to the Vercel project, or DNS still propagating                                                   | In the Vercel dashboard add the domain to the deployed project, then re-run domain verification from Ever Works (gives DNS up to 48h to propagate)                                              |
+| Plugin not selected during deployment               | Another deployment plugin is set as the default                                                                           | In **Settings → Plugins**, set `vercel` as the default for `deployment`, or disable competing plugins                                                                                           |
+| `healthCheck` reports unhealthy                     | Credential invalid OR Vercel endpoint unreachable from the host                                                           | Verify the credential against the upstream API and confirm outbound HTTPS / cluster API connectivity is allowed                                                                                 |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

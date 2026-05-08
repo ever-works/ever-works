@@ -1,4 +1,4 @@
-# `works.yml` v1 — Manifest Schema
+# `.works/works.yml` v1 — Manifest Schema
 
 > The manifest is the source of truth for a Work in the zero-friction onboarding
 > flow. It lives at the root of the agent's GitHub repository and is read each
@@ -12,7 +12,7 @@
 
 ## File location and form
 
-- Path: `works.yml` at the repository root.
+- Path: `.works/works.yml` at the repository root.
 - Format: YAML 1.2.
 - Encoding: UTF-8, LF line endings.
 - Size: ≤ 64 KiB. Larger manifests should split fixed configuration here and put

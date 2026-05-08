@@ -72,7 +72,7 @@ function createWorksConfigRestoreServiceMock() {
 }
 
 describe('WorkImportService.analyzeRepository', () => {
-    it('does not surface the source works.yml repo as a slug conflict', async () => {
+    it('does not surface the source .works/works.yml repo as a slug conflict', async () => {
         const sourceRepoAnalyzer = {
             analyzeRepository: jest.fn().mockResolvedValue({
                 sourceUrl: 'https://github.com/ever-works/compare-cloud-pricing',
@@ -383,7 +383,7 @@ describe('WorkImportService.initiateImport', () => {
         });
     });
 
-    it('does not restore works.yml settings for data repo imports when disabled', async () => {
+    it('does not restore .works/works.yml settings for data repo imports when disabled', async () => {
         const workRepository = {
             findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockResolvedValue({

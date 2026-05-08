@@ -265,7 +265,8 @@ describe('SearchController', () => {
             } catch (e: any) {
                 expect(e.getResponse()).toEqual({
                     status: 'error',
-                    message: 'No search provider with all required settings configured is available.',
+                    message:
+                        'No search provider with all required settings configured is available.',
                 });
             }
             expect(searchFacade.search).not.toHaveBeenCalled();

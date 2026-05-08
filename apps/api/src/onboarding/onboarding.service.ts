@@ -49,7 +49,7 @@ interface ParsedRepoCoords {
     canonicalUrl: string;
 }
 
-const MANIFEST_PATHS = ['works.yml'] as const;
+const MANIFEST_PATHS = ['.works/works.yml'] as const;
 
 @Injectable()
 export class OnboardingService {
@@ -78,7 +78,7 @@ export class OnboardingService {
      *   4. Idempotency lookup on (githubIdentityHash, repoUrlCanonical) — return early
      *      if a row already exists for the same owner.
      *   5. Conflict check — return 409 if another identity owns the repo.
-     *   6. Fetch and validate `works.yml` via GitFacade.getFileContent + WorksManifestService.
+     *   6. Fetch and validate `.works/works.yml` via GitFacade.getFileContent + WorksManifestService.
      *   7. Persist OnboardingRequest with status='validated'.
      *
      * Stages deferred to subsequent slices:
@@ -125,8 +125,8 @@ export class OnboardingService {
                 code: 'manifest_invalid',
                 message:
                     parseResult.code === 'manifest_invalid_yaml'
-                        ? 'works.yml could not be parsed'
-                        : 'works.yml failed schema validation',
+                        ? '.works/works.yml could not be parsed'
+                        : '.works/works.yml failed schema validation',
                 errors: parseResult.errors,
             });
         }
@@ -320,7 +320,7 @@ export class OnboardingService {
 
         this.fail({
             code: 'manifest_missing',
-            message: 'works.yml not found at repository root',
+            message: '.works/works.yml not found in repository',
         });
     }
 

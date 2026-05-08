@@ -392,7 +392,12 @@ describe('OAuthService', () => {
 
         it('exchanges code, fetches user, upserts account with plugin: prefix and connectionSource=plugin', async () => {
             const before = Date.now();
-            const result = await service.handleOAuthCallback('user-1', 'github', 'code-abc', 'state-xyz');
+            const result = await service.handleOAuthCallback(
+                'user-1',
+                'github',
+                'code-abc',
+                'state-xyz',
+            );
             const after = Date.now();
 
             expect(oauthFacade.exchangeCodeForToken).toHaveBeenCalledWith(
@@ -430,7 +435,9 @@ describe('OAuthService', () => {
             const expectedMin = before + 3600 * 1000 - 50;
             const expectedMax = after + 3600 * 1000 + 50;
             expect(arg.accessTokenExpiresAt).toBeInstanceOf(Date);
-            expect((arg.accessTokenExpiresAt as Date).getTime()).toBeGreaterThanOrEqual(expectedMin);
+            expect((arg.accessTokenExpiresAt as Date).getTime()).toBeGreaterThanOrEqual(
+                expectedMin,
+            );
             expect((arg.accessTokenExpiresAt as Date).getTime()).toBeLessThanOrEqual(expectedMax);
 
             expect(result).toEqual({
@@ -501,9 +508,9 @@ describe('OAuthService', () => {
         it('throws BadRequestException when settings missing clientId/clientSecret', async () => {
             pluginSettingsService.getSettings.mockResolvedValue({});
 
-            await expect(
-                service.handleOAuthCallback('user-1', 'github', 'code'),
-            ).rejects.toThrow('OAuth credentials not configured for provider: github');
+            await expect(service.handleOAuthCallback('user-1', 'github', 'code')).rejects.toThrow(
+                'OAuth credentials not configured for provider: github',
+            );
 
             expect(oauthFacade.exchangeCodeForToken).not.toHaveBeenCalled();
             expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
@@ -512,9 +519,9 @@ describe('OAuthService', () => {
         it('propagates exchangeCodeForToken errors', async () => {
             oauthFacade.exchangeCodeForToken.mockRejectedValue(new Error('invalid_grant'));
 
-            await expect(
-                service.handleOAuthCallback('user-1', 'github', 'code'),
-            ).rejects.toThrow('invalid_grant');
+            await expect(service.handleOAuthCallback('user-1', 'github', 'code')).rejects.toThrow(
+                'invalid_grant',
+            );
             expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
         });
     });

@@ -31,7 +31,7 @@ Every work in Ever Works maps to a Git repository with a standardized YAML layou
 
 ```
 <repo-root>/
-  works.yml            # Work configuration (name, settings, pagination, etc.)
+  .works/works.yml            # Work configuration (name, settings, pagination, etc.)
   categories.yml        # Category definitions
   tags.yml              # Tag definitions
   collections.yml       # Collection definitions
@@ -52,7 +52,7 @@ Every work in Ever Works maps to a Git repository with a standardized YAML layou
 
 ## Configuration System
 
-The `DataRepository` manages a `works.yml` file with deep-merge semantics. The configuration schema (`IDataConfig`) includes:
+The `DataRepository` manages a `.works/works.yml` file with deep-merge semantics. The configuration schema (`IDataConfig`) includes:
 
 ```typescript
 interface IDataConfig {
@@ -109,7 +109,7 @@ The `DataGeneratorService.initialize()` method handles first-time work creation:
 
 1. **Repository Creation** -- Creates a new Git repository via the `GitFacadeService`.
 2. **Clone & Setup** -- Clones the repository locally and creates a `DataRepository` instance.
-3. **Config Initialization** -- Writes default `works.yml` with work metadata.
+3. **Config Initialization** -- Writes default `.works/works.yml` with work metadata.
 4. **Pipeline Execution** -- Delegates to the `PipelineOrchestratorService` to run the AI generation pipeline.
 5. **Item Writing** -- Writes generated items to YAML files in the `data/` work.
 6. **Deduplication** -- Skips writing items whose content matches existing files (no spurious Git diffs).
@@ -185,7 +185,7 @@ The data repository also supports comparison content stored under `comparisons/`
 - `writeComparison(comparison)` -- Writes comparison metadata as YAML.
 - `writeComparisonMarkdown(slug, markdown)` -- Writes the comparison article.
 - `writeComparisonExtendedMarkdown(slug, markdown)` -- Writes an extended version.
-- Comparisons track generation state in `works.yml` metadata to avoid regenerating pairs.
+- Comparisons track generation state in `.works/works.yml` metadata to avoid regenerating pairs.
 
 ## Legal Content
 

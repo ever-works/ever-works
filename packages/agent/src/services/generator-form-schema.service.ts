@@ -694,7 +694,7 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<RegisteredPlugin | undefined> {
-        // 1. Explicit pipelineId — from works.yml or user click in the form
+        // 1. Explicit pipelineId — from .works/works.yml or user click in the form
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
             if (

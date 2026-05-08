@@ -48,6 +48,16 @@ During work generation, the screenshot facade sends capture requests to Urlbox f
 - **Block Ads** — strip ads from captured pages (default: on).
 - **Hide Cookie Banners** — remove cookie consent banners (default: on).
 
+## Troubleshooting
+
+| Symptom                                    | Likely cause                                                                                     | Fix                                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `Authentication failed`            | API key (or signing secret) missing or wrong                                                     | Re-enter the credential(s) from the Urlbox dashboard, or set `PLUGIN_URLBOX_API_KEY` (and signing-secret env var if applicable) for default fallback |
+| Black / blank / `null` `imageUrl` returned | Target page failed to render within the configured timeout, or is blocked by anti-bot protection | Increase the timeout, enable wait-for-network-idle / `full_page` mode, or set a custom `user_agent` and `viewport`                                   |
+| Plugin not used for screenshot capture     | Another screenshot plugin is set as the default                                                  | In **Settings → Plugins**, set `urlbox` as the default for `screenshot`, or disable competing plugins                                                |
+| Quota exhausted / `429`                    | Monthly / per-minute screenshot cap reached on Urlbox                                            | Throttle calls, wait for the quota reset, or upgrade the plan in the Urlbox dashboard                                                                |
+| `healthCheck` reports unhealthy            | Credential invalid OR Urlbox endpoint unreachable from the host                                  | Verify the credential with a manual call to the upstream API and confirm outbound HTTPS is allowed by the firewall                                   |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

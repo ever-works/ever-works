@@ -17,7 +17,7 @@ This section covers individual capabilities built into the Ever Works Platform b
 | [Item Source Validation](./item-source-validation)   | Validate whether item source URLs are both reachable and actually good sources for the item               |
 | [Scheduled Updates](./scheduled-updates)             | Re-run the AI generation pipeline on a recurring cadence to keep content fresh                            |
 | [Generation Cancellation](./generation-cancellation) | Cancel an in-flight generation and roll back to a clean state from the dashboard or API                   |
-| [works.yml Config](./works-config)                   | Source-controlled work configuration in the data repo — used for onboarding existing repos and sync       |
+| [.works/works.yml Config](./works-config)            | Source-controlled work configuration in the data repo — used for onboarding existing repos and sync       |
 | [Work Import](./work-import)                         | Bootstrap a work from an existing data repo or Awesome List README                                        |
 | [Work Members](./work-members)                       | Invite collaborators with role-based access (Manager, Editor, Viewer)                                     |
 | [Comparisons](./comparisons)                         | Automatically generate A vs B comparison pages between work items with AI-powered research and scoring    |

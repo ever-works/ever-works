@@ -169,4 +169,4 @@ _None on develop._
     - `packages/agent/src/database/repositories/work-schedule.repository.ts`
     - `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts`
 - Related: [`works-config/spec.md`](../works-config/spec.md) (schedule
-  cadence is mirrored to `works.yml`)
+  cadence is mirrored to `.works/works.yml`)

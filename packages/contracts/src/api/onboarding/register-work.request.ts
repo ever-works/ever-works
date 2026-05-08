@@ -5,7 +5,7 @@
  * argument that is redacted from logs (MCP).
  */
 export interface RegisterWorkRequest {
-	/** HTTPS GitHub repo URL containing works.yml at root. */
+	/** HTTPS GitHub repo URL containing .works/works.yml at root. */
 	repo: string;
 
 	/** Optional contact email. */

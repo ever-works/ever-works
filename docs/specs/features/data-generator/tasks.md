@@ -13,7 +13,7 @@
       `packages/agent/src/data-generator/data-repository.ts` with
       methods: `clone`, `pull`, `commit`, `push`, `createBranch`,
       `switchBranch`.
-- [x] **T2**. `readConfig` / `writeConfig` for `works.yml` —
+- [x] **T2**. `readConfig` / `writeConfig` for `.works/works.yml` —
       preserve unknown fields on write (forward-compat).
 - [x] **T3**. `readItems` / `writeItem` / `removeItem` for the
       `items/` work (one JSON file per slug).
@@ -32,7 +32,7 @@
 - [x] **T8**. RECREATE mode: clear `items/` work before
       writing new items; reset `categories.yml` / `tags.yml` /
       `brands.yml` to the pipeline output.
-- [x] **T9**. Both modes increment `works.yml.version` and update
+- [x] **T9**. Both modes increment `.works/works.yml.version` and update
       `metadata.updated_at`.
 
 ## Phase 3 — Service orchestration
@@ -45,7 +45,7 @@
 - [x] **T11**. `initialize` flow:
     1. Resolve git token via `GitFacadeService`.
     2. Clone or pull data repository (create if missing for `mode === 'create'`).
-    3. Read existing `works.yml` + items + taxonomy.
+    3. Read existing `.works/works.yml` + items + taxonomy.
     4. Call `ItemsGeneratorService.generateItems()` with full context.
     5. Apply mode-specific merge.
     6. Write all files back to working tree.

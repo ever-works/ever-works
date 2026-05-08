@@ -70,7 +70,7 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
 });
 
 describe('SourceRepoAnalyzerService.analyzeRepository', () => {
-    it('classifies repos with data/ and works.yml as data_repo', async () => {
+    it('classifies repos with data/ and .works/works.yml as data_repo', async () => {
         const worksConfig = {
             initialPrompt: 'Keep it updated',
             raw: {},
@@ -82,14 +82,21 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getWorkContents: jest
-                .fn()
-                .mockResolvedValueOnce([
-                    { name: 'works.yml', type: 'file', path: 'works.yml' },
+            getWorkContents: jest.fn((_owner: string, _repo: string, dir: string) => {
+                if (dir === '.works') {
+                    return Promise.resolve([
+                        { name: 'works.yml', type: 'file', path: '.works/works.yml' },
+                    ]);
+                }
+                if (dir === 'data') {
+                    return Promise.resolve([{ name: 'item-a', type: 'dir', path: 'data/item-a' }]);
+                }
+                return Promise.resolve([
+                    { name: '.works', type: 'dir', path: '.works' },
                     { name: 'data', type: 'dir', path: 'data' },
                     { name: 'README.md', type: 'file', path: 'README.md' },
-                ])
-                .mockResolvedValueOnce([{ name: 'item-a', type: 'dir', path: 'data/item-a' }]),
+                ]);
+            }),
         };
 
         const worksConfigService = {
@@ -114,16 +121,20 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies repos with works.yml but without data/ as works_config', async () => {
+    it('classifies repos with .works/works.yml but without data/ as works_config', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getWorkContents: jest
-                .fn()
-                .mockResolvedValue([{ name: 'works.yml', type: 'file', path: 'works.yml' }]),
+            getWorkContents: jest.fn((_owner: string, _repo: string, dir: string) =>
+                Promise.resolve(
+                    dir === '.works'
+                        ? [{ name: 'works.yml', type: 'file', path: '.works/works.yml' }]
+                        : [{ name: '.works', type: 'dir', path: '.works' }],
+                ),
+            ),
         };
 
         const worksConfigService = {
@@ -147,17 +158,23 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies awesome README repos with works.yml as awesome_readme', async () => {
+    it('classifies awesome README repos with .works/works.yml as awesome_readme', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getWorkContents: jest.fn().mockResolvedValue([
-                { name: 'works.yml', type: 'file', path: 'works.yml' },
-                { name: 'README.md', type: 'file', path: 'README.md' },
-            ]),
+            getWorkContents: jest.fn((_owner: string, _repo: string, dir: string) =>
+                Promise.resolve(
+                    dir === '.works'
+                        ? [{ name: 'works.yml', type: 'file', path: '.works/works.yml' }]
+                        : [
+                              { name: '.works', type: 'dir', path: '.works' },
+                              { name: 'README.md', type: 'file', path: 'README.md' },
+                          ],
+                ),
+            ),
             getFileContent: jest.fn().mockResolvedValue({
                 content: [
                     '# Awesome Testing',

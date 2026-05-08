@@ -207,7 +207,7 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
-    private static readonly CONFIG_FILENAME = 'works.yml';
+    private static readonly CONFIG_FILEPATH = '.works/works.yml';
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -230,7 +230,7 @@ export class DataRepository {
     ): Promise<DataRepository> {
         /*
          *   File structure:
-         *      - works.yml
+         *      - .works/works.yml
          *      - categories.yml
          *      - tags.yml
          *      - data/
@@ -252,7 +252,7 @@ export class DataRepository {
 
         const repo = new DataRepository(
             dir,
-            path.join(dir, this.CONFIG_FILENAME),
+            path.join(dir, this.CONFIG_FILEPATH),
             [],
             categoriesPath,
             tagsPath,
@@ -471,6 +471,7 @@ export class DataRepository {
     async writeConfig(config: IDataConfig) {
         this.config = config;
         const str = yaml.stringify(config);
+        await fs.mkdir(path.dirname(this.configPath), { recursive: true });
         await fs.writeFile(this.configPath, str, 'utf-8');
     }
     async getNextVersion(config?: IDataConfig) {
@@ -497,7 +498,7 @@ export class DataRepository {
         return version.format();
     }
     /**
-     * Ensure a works.yml exists.
+     * Ensure a .works/works.yml exists.
      */
     async ensureDefaultConfig(overrides: Partial<IDataConfig> = {}): Promise<IDataConfig> {
         const exists = await this.fileExists(this.configPath);

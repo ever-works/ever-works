@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Échec de la mise à jour des paramètres de synchronisation",
                 "syncDisabled": "Synchronisation désactivée",
                 "worksConfig": {
-                    "imported": "Importé depuis works.yml",
+                    "imported": "Importé depuis .works/works.yml",
                     "applied": "Appliqué : {value}",
                     "enabled": "activé",
                     "disabled": "désactivé",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Dépôt de données",
                         "awesomeReadme": "README Awesome",
                         "linkExisting": "Dépôts existants liés",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Paramètres généraux",
@@ -2349,7 +2349,7 @@
                     "description": "Récupérer automatiquement les mises à jour du dépôt source."
                 },
                 "worksConfigRestore": {
-                    "title": "Restaurer les paramètres works.yml",
+                    "title": "Restaurer les paramètres .works/works.yml",
                     "description": "Appliquer le fournisseur IA, le modèle, la planification et les dépôts liés depuis ce dépôt."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Formats de dépôts pris en charge",
                     "dataRepo": {
                         "title": "Dépôt de données",
-                        "description": "Dépôts avec works.yml et structure de dossier data/"
+                        "description": "Dépôts avec .works/works.yml et structure de dossier data/"
                     },
                     "awesomeReadme": {
                         "title": "Liste Awesome",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Dépôt données",
                     "awesomeReadme": "Liste Awesome",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "éléments",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Lier les dépôts"
                 },
                 "detectionFailed": "Nous n'avons pas pu détecter automatiquement le format. Veuillez sélectionner comment importer ce dépôt.",
-                "detectionFailedMissingConfig": "Aucune configuration prise en charge n'a été trouvée. Ajoutez works.yml dans le dépôt, ou choisissez un format d'importation manuelle ci-dessous.",
+                "detectionFailedMissingConfig": "Aucune configuration prise en charge n'a été trouvée. Ajoutez .works/works.yml dans le dépôt, ou choisissez un format d'importation manuelle ci-dessous.",
                 "errors": {
                     "urlRequired": "Veuillez saisir une URL de dépôt GitHub",
                     "unsupportedFormat": "Ce format de dépôt n'est pas pris en charge. Veuillez utiliser un format Dépôt de données ou Liste Awesome.",

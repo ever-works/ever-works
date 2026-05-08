@@ -4,7 +4,7 @@ import * as yaml from 'yaml';
 import { GitFacadeService } from '@src/facades/git.facade';
 import type { RepositoryTarget } from '@src/entities/work.entity';
 
-const WORKS_CONFIG_FILEPATHS = ['works.yml'] as const;
+const WORKS_CONFIG_FILEPATHS = ['.works/works.yml'] as const;
 export interface WorksConfigSummary {
     name?: string;
     initialPrompt?: string;
@@ -13,7 +13,7 @@ export interface WorksConfigSummary {
     scheduleCadence?: WorkScheduleCadence | null;
     providers?: ProvidersDto;
     /**
-     * Deploy provider plugin id declared in `works.yml` (e.g. 'vercel', 'k8s').
+     * Deploy provider plugin id declared in `.works/works.yml` (e.g. 'vercel', 'k8s').
      * Validated against `DeployFacadeService.getAvailableProviders()` at apply
      * time; the works-config layer itself is provider-agnostic.
      */
@@ -48,7 +48,7 @@ export class WorksConfigService {
         const parsed = yaml.parse(content);
 
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error('works.yml must contain a YAML object at the root');
+            throw new Error('.works/works.yml must contain a YAML object at the root');
         }
 
         return this.toParsed(parsed as Record<string, unknown>);
@@ -127,7 +127,7 @@ export class WorksConfigService {
         try {
             const parsed = yaml.parse(file.content);
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                throw new Error('works.yml must contain a YAML object at the root');
+                throw new Error('.works/works.yml must contain a YAML object at the root');
             }
             return parsed as Record<string, unknown>;
         } catch (error) {

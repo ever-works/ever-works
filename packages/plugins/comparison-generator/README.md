@@ -51,6 +51,15 @@ Enable comparison generation per work from the work Generator settings. You can 
 - **Custom Prompt** (`custom_prompt`, hidden) — additional instructions appended to comparison generation prompts.
 - **Extended Analysis** (`extended_analysis`, hidden) — when enabled, generates a deeper analysis alongside the standard comparison. Defaults to `false`.
 
+## Troubleshooting
+
+| Symptom                                                      | Likely cause                                                              | Fix                                                                                                                                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Comparison generation fails with `No AI provider configured` | No AI-provider plugin enabled with a valid API key                        | Enable an AI-provider plugin (`openai`, `anthropic`, `google`, `groq`, `mistral`, `ollama`) and add its API key                           |
+| Comparison missing data for one of the items                 | Item is missing a `description` or `source_url`                           | Edit the item to populate description and source URL, then re-run the comparison                                                          |
+| Manual comparison endpoint returns `Items must be different` | Same `itemASlug` and `itemBSlug` passed                                   | Pick two distinct item slugs in the comparison form                                                                                       |
+| Comparison scheduler not generating new comparisons          | Cron disabled, or the work has no remaining comparisons left in its quota | Verify scheduler activity log; check `getRemainingComparisonCount` for the work — increase the quota or enable a higher subscription plan |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

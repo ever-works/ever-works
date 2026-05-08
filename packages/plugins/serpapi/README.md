@@ -44,6 +44,16 @@ When enabled and set as the active search provider, SerpAPI is used during work 
 - **Search Engine** — Which engine to use: `google` (default), `bing`, `yahoo`, `duckduckgo`, `baidu`, or `yandex`.
 - **Default Max Results** — Default number of results per search (1–100, default 10).
 
+## Troubleshooting
+
+| Symptom                                      | Likely cause                                                            | Fix                                                                                                                               |
+| -------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized` / `Authentication failed` | API key missing, revoked, or wrong key entered                          | Re-enter the **API Key** from the SerpAPI dashboard, or set `PLUGIN_SERPAPI_API_KEY` in the host environment for default fallback |
+| `429 Too Many Requests`                      | Free-tier or paid quota exhausted on SerpAPI                            | Throttle calls, wait for the quota reset, or upgrade the plan in the SerpAPI dashboard                                            |
+| Empty / sparse results                       | Query is too restrictive, time-range or domain filters are too narrow   | Broaden the query, relax `time_range` / `safesearch` / `include_domains` / `exclude_domains` filters, or raise `max_results`      |
+| Plugin not used during work generation       | Another search plugin is set as the default for the `search` capability | In **Settings → Plugins**, set `serpapi` as the default for `search`, or disable competing search plugins                         |
+| `healthCheck` reports unhealthy              | API key invalid OR SerpAPI endpoint unreachable from the host           | Verify the key with a manual `curl` against the documented endpoint and confirm outbound HTTPS is allowed by the firewall         |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:
