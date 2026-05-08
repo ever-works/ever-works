@@ -285,7 +285,7 @@ known to lack a Spec Kit feature folder:
 - [ ] CLI (`apps/cli`) — add command-level snapshot tests via esbuild + node.
 - [ ] Internal CLI (`apps/internal-cli`) — `nest-commander` testing module.
 - [ ] Admin app (`apps/admin`) — once routes stabilize.
-- [x] MCP server (`apps/mcp`) — audit completed 2026-05-08. The
+- [x] MCP server (`apps/mcp`) — audit completed 2026-05-08 ([#548](https://github.com/ever-works/ever-works/pull/548)). The
       7 prior spec files (`api-client.service`, `api-error`,
       `mcp-config`, `openapi-loader`, `sanitize`, `schema-converter`,
       `tool-registration`) cover the OpenAPI-tool registration
