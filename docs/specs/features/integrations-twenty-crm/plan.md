@@ -143,19 +143,14 @@ HTTP request lifecycles.
 - **Activity log**: this integration does NOT emit activity-log
   entries today. CRM CRUD is high-volume per-row work; if a future
   audit trail is required, the spec would need extension.
-- **Logger**:
-    - `TwentyCrmService.makeRequest` → `logger.debug('Making
-<method> request to <url>')` on every call.
-    - `TwentyCrmService.makeRequest` (catch) →
-      `logger.error('Twenty CRM API error: <msg>', {endpoint,
-method, status, data})`.
-    - `CrmSyncGuard.canActivate` →
-      `logger.warn('CRM integration is disabled - request blocked')`
-      and `logger.error('CRM configuration validation failed:', err)`.
-    - `CrmTenantService.resolveTenantContext` →
-      `logger.debug('Resolved tenant context: <json>')`.
-    - `CrmTenantService.validateTenantContext` →
-      `logger.error('Tenant ID is required')`.
+- **Logger**: - `TwentyCrmService.makeRequest` → `logger.debug('Making
+<method> request to <url>')` on every call. - `TwentyCrmService.makeRequest` (catch) →
+  `logger.error('Twenty CRM API error: <msg>', {endpoint,
+method, status, data})`. - `CrmSyncGuard.canActivate` →
+  `logger.warn('CRM integration is disabled - request blocked')`
+  and `logger.error('CRM configuration validation failed:', err)`. - `CrmTenantService.resolveTenantContext` →
+  `logger.debug('Resolved tenant context: <json>')`. - `CrmTenantService.validateTenantContext` →
+  `logger.error('Tenant ID is required')`.
 - **Metrics**: none new. Standard Nest request-duration histograms
   cover the controllers.
 

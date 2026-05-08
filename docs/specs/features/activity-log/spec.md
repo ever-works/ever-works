@@ -200,16 +200,13 @@ JITSU_WRITE_KEY` line at construction, and MUST NOT throw on
       (passwords, API keys, OAuth tokens) — producers strip secrets
       before logging.
     - CSV export only ever returns the authenticated user's rows.
-- **Observability**:
-    - `ActivityLogService` debug-logs every row written
-      (`Activity logged: [<actionType>] <summary> (user: <userId>)`)
-      and every dispatcher rejection (`Activity analytics dispatch
-failed: <message>`).
-    - `JitsuService` logs `Jitsu analytics disabled: missing
+- **Observability**: - `ActivityLogService` debug-logs every row written
+  (`Activity logged: [<actionType>] <summary> (user: <userId>)`)
+  and every dispatcher rejection (`Activity analytics dispatch
+failed: <message>`). - `JitsuService` logs `Jitsu analytics disabled: missing
 JITSU_HOST or JITSU_WRITE_KEY` once at boot when not
-      configured.
-    - Each listener `try/catch` logs at `error` level so audit gaps
-      are visible in the API logs.
+  configured. - Each listener `try/catch` logs at `error` level so audit gaps
+  are visible in the API logs.
 - **Compatibility**:
     - `ActivityActionType` is an additive enum — new values are
       backwards-compatible (older clients ignore unknown values via

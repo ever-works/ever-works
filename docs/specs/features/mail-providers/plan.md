@@ -137,12 +137,9 @@ volume.
 - **Per-call SMTP**:
     - `Sending email via SMTP to=<recipient> subject="<subject>"`
     - `Email sent via SMTP to=<recipient>`
-- **Per-call Resend**:
-    - `Sending email via Resend to=<recipient> from="<from>"
-subject="<subject>"`
-    - `Email sent via Resend to=<recipient> id=<resendId | "unknown">`
-- **Resend fallback**:
-    - `Resend client not initialized (missing RESEND_APIKEY?),
+- **Per-call Resend**: - `Sending email via Resend to=<recipient> from="<from>"
+subject="<subject>"` - `Email sent via Resend to=<recipient> id=<resendId | "unknown">`
+- **Resend fallback**: - `Resend client not initialized (missing RESEND_APIKEY?),
 falling back to faker for to=<recipient>` (warn).
 - **Faker default**:
     - `No mail provider configured, using faker for to=<recipient>`

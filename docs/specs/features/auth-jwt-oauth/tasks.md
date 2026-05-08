@@ -10,11 +10,11 @@ Outstanding follow-ups are flagged.
 
 - [x] **T1**: `AuthModule` declared with `DatabaseModule`, `HttpModule`,
       `ActivityLogModule` imports; `controllers: [OAuthController,
-    AuthController, ApiKeysController]`; exports `AuthService`,
+  AuthController, ApiKeysController]`; exports `AuthService`,
       `ApiKeyService`, `AuthSessionGuard`, `AUTH_PROVIDER`,
       `AUTH_RUNTIME_INSTANCE`, `AuthSyncService`.
 - [x] **T2**: `AUTH_PROVIDER` provided as `useExisting:
-    AuthProviderService`; `AUTH_RUNTIME_INSTANCE` provided as a
+  AuthProviderService`; `AUTH_RUNTIME_INSTANCE` provided as a
       DataSource-injected factory.
 - [x] **T3**: `@Public()` decorator + `IS_PUBLIC_KEY` reflector token
       defined under `auth/decorators/public.decorator.ts`.
@@ -34,7 +34,7 @@ Outstanding follow-ups are flagged.
       through FR-14.
 - [x] **T8**: `AuthService.validateEmailVerificationToken` and
       `validatePasswordResetToken` return `{valid, message,
-    email?, expiresAt?}` shape (no throwing); used by the web
+  email?, expiresAt?}` shape (no throwing); used by the web
       client to gate the reset/verify form before submit.
 - [x] **T9**: `AuthController.resetPassword` runs the full chain
       `getUserByPasswordResetToken` → `setPassword` →
@@ -127,7 +127,7 @@ Outstanding follow-ups are flagged.
 - [ ] **T31 (follow-up)**: `oauth.controller.spec.ts` — controller-level
       Jest suite for the 2 endpoints. Pin: `getAuthUrl` calls
       `socialAuthService.getAuthorizationUrl(providerId, undefined,
-    state)` with the explicit `undefined` for `callbackUrl`;
+  state)` with the explicit `undefined` for `callbackUrl`;
       `authRedirect` issues a session BEFORE logging the activity row;
       the activity-log payload contains
       `action='user.login.<providerId>'`,
@@ -156,7 +156,7 @@ Outstanding follow-ups are flagged.
       user → `signOutAll` + 401), `signInEmail`'s
       `ensureCredentialAccount` call BEFORE `auth.api.signInEmail`,
       the password-mirror update with `registrationProvider='local'` + `lastLoginAt`, and the `'Failed to establish authenticated
-    session'` 401 when Better Auth returns no token.
+  session'` 401 when Better Auth returns no token.
 - [ ] **T35 (follow-up)**: `auth-sync.service.spec.ts` — pin
       `ensureCredentialAccount` upsert shape, `getCredentialPasswordHash`
       null-on-missing, and `syncCredentialPassword` field write.
@@ -170,7 +170,7 @@ Outstanding follow-ups are flagged.
 - [ ] **T37 (OQ-2)**: Verify OAuth `state` on callback. Persist a
       short-TTL Redis key on URL request keyed by `state`; verify
       and delete on callback; throw `BadRequestException('Invalid
-    OAuth state')` on miss.
+  OAuth state')` on miss.
 - [ ] **T38 (OQ-3)**: Gate the `verificationToken` /
       `resetToken` echo behind `NODE_ENV !== 'production'`. The
       shape becomes `{message, expiresAt}` in prod, drop-in compatible

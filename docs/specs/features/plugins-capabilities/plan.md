@@ -249,12 +249,10 @@ planned migration path for the verifier.
 
 ## 9. Observability
 
-- **Activity-log emissions** (controller-emitted, fire-and-forget):
-    - `POST /api/deploy/works/:id` → `actionType: DEPLOYMENT, action:
+- **Activity-log emissions** (controller-emitted, fire-and-forget): - `POST /api/deploy/works/:id` → `actionType: DEPLOYMENT, action:
 'work.deployed', status: COMPLETED, summary: 'Triggered deployment
 for <work.name> via <providerName>'` (only when
-      `deploymentInitiated === true`).
-    - `POST /api/deploy/batch` → `actionType: DEPLOYMENT, action:
+  `deploymentInitiated === true`). - `POST /api/deploy/batch` → `actionType: DEPLOYMENT, action:
 'deployment.batch_started', status: COMPLETED, summary: 'Triggered
 batch deploy for <N> works', details: {workIds: [...]}`.
 - **Activity-log emissions** (listener-emitted, via deploy events):

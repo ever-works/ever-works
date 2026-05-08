@@ -117,16 +117,12 @@ There is **no** dedicated activity-log cron. Instead:
       caller awaits the first promise instead of starting a new one.
     - `reconcileCompletedAt: Map<string, number>` — runs within the
       last 5 seconds short-circuit.
-2. **Reconcile pass logic** (`reconcileStaleGenerationActivities`):
-    - Find every `in_progress` row with `actionType=GENERATION`.
-    - Bulk-load referenced works.
-    - For each row, look up the work; if `generateStatus.status` is
-      still `GENERATING`, leave it alone — the run is genuinely live.
-    - Otherwise resolve the terminal status
-      (`CANCELLED` → `CANCELLED`, `ERROR` → `FAILED`,
-      everything else → `COMPLETED`), build the new `details` payload
-      (item counts from the latest history row + frozen
-      `generateStatus`), and call `updateStatus(id, status, details,
+2. **Reconcile pass logic** (`reconcileStaleGenerationActivities`): - Find every `in_progress` row with `actionType=GENERATION`. - Bulk-load referenced works. - For each row, look up the work; if `generateStatus.status` is
+   still `GENERATING`, leave it alone — the run is genuinely live. - Otherwise resolve the terminal status
+   (`CANCELLED` → `CANCELLED`, `ERROR` → `FAILED`,
+   everything else → `COMPLETED`), build the new `details` payload
+   (item counts from the latest history row + frozen
+   `generateStatus`), and call `updateStatus(id, status, details,
 {action: 'generation.completed', summary})`.
 3. **Failure policy**: any per-row exception is logged at `warn` and
    skipped; the outer `try/catch` returns 0 from `reconcileStale...`
@@ -157,14 +153,10 @@ own terminal events, e.g. `DeploymentCompletedEvent` and
 
 ## 8. Observability
 
-- **Service-level logs**:
-    - `Activity logged: [<actionType>] <summary> (user: <userId>)`
-      (debug, every successful `log()`).
-    - `Activity analytics dispatch failed: <message>` (warn, every
-      Jitsu rejection).
-    - `Failed to reconcile stale generation activity <id>: <message>`
-      (warn, per-row reconcile failures).
-    - `Reconciled <n> stale in-progress generation activit<y|ies> for
+- **Service-level logs**: - `Activity logged: [<actionType>] <summary> (user: <userId>)`
+  (debug, every successful `log()`). - `Activity analytics dispatch failed: <message>` (warn, every
+  Jitsu rejection). - `Failed to reconcile stale generation activity <id>: <message>`
+  (warn, per-row reconcile failures). - `Reconciled <n> stale in-progress generation activit<y|ies> for
 user <userId>` (debug, when a pass actually rewrites rows).
 - **Listener logs**: each handler's `catch` writes a one-line
   `Failed to log <area> activity:` at `error` level so audit gaps are

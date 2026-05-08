@@ -270,7 +270,7 @@ UsageLedgerTriggerType.SCHEDULED` on ledger rows written by
 ## 7. Acceptance Criteria
 
 - [ ] `GET /api/subscriptions/plan` returns `{ enabled: false, plan:
-    null }` when `SUBSCRIPTIONS_ENABLED` is unset / not `'true'`.
+  null }` when `SUBSCRIPTIONS_ENABLED` is unset / not `'true'`.
 - [ ] `GET /api/subscriptions/plan` returns the resolved plan with the
       seven-cadence allowance grid when subscriptions are enabled.
 - [ ] `POST /api/subscriptions/plan` rejects with HTTP 400 when
@@ -297,7 +297,7 @@ UsageLedgerTriggerType.SCHEDULED` on ledger rows written by
       subscriptions are disabled OR `billingMode !== 'usage'`.
 - [ ] `UsageLedgerService.recordUsage` writes a row with
       `units = 1`, `amountCents = max(0, round(PAY_PER_USE_PRICE_USD *
-    100))`, `currency` from `BillingProvider.getDefaultCurrency()`, and
+  100))`, `currency` from `BillingProvider.getDefaultCurrency()`, and
       `metadata.cadence = schedule.cadence`, then awaits
       `BillingProvider.recordUsageCharge(entry)`.
 - [ ] `WorkScheduleService.markRunCompleted` records a ledger row;

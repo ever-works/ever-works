@@ -95,12 +95,9 @@
 - [x] T17. `ActivityLogAnalyticsDispatcher` injection token
       (`packages/agent/src/activity-log/activity-log-analytics-dispatcher.ts`).
 - [x] T18. `JitsuService` env-driven adapter
-      (`apps/api/src/activity-log/jitsu.service.ts`):
-    - Disabled at construction when `JITSU_HOST` or
-      `JITSU_WRITE_KEY` is missing (single info-level log line).
-    - `track(activity)` merges plain-object metadata only,
-      otherwise treats metadata as `{}`.
-    - Forwards `activityId / userId / workId / actionType / action /
+      (`apps/api/src/activity-log/jitsu.service.ts`): - Disabled at construction when `JITSU_HOST` or
+      `JITSU_WRITE_KEY` is missing (single info-level log line). - `track(activity)` merges plain-object metadata only,
+      otherwise treats metadata as `{}`. - Forwards `activityId / userId / workId / actionType / action /
 status / summary / details / createdAt` plus the metadata
       properties to the Jitsu client with `action` as the event name.
 - [x] T19. Dispatcher binding wired in `apps/api/src/activity-log/jitsu.module.ts`.
@@ -146,7 +143,7 @@ status / summary / details / createdAt` plus the metadata
 - [ ] T29. **Follow-up**: integration tests in `packages/agent` (Jest)
       hitting a real Postgres test container to pin (a) the four
       composite indexes, (b) the `(userId, workId)` `ON DELETE SET
-    NULL` behaviour, and (c) the reconcile pass against a seeded
+  NULL` behaviour, and (c) the reconcile pass against a seeded
       orphan-in-progress row. Currently only unit tests cover the
       reconciliation path.
 

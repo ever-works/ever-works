@@ -102,13 +102,11 @@ describe('PluginValidationService', () => {
         });
 
         it('coerces BadRequestException with object body to {success:false, message, modelResults}', async () => {
-            const validateConnection = jest
-                .fn()
-                .mockResolvedValue({
-                    success: false,
-                    message: 'bad',
-                    modelResults: [{ ok: false }],
-                });
+            const validateConnection = jest.fn().mockResolvedValue({
+                success: false,
+                message: 'bad',
+                modelResults: [{ ok: false }],
+            });
             pluginRegistry.get.mockReturnValue(
                 registered({ capabilities: ['ai-provider'], validateConnection }),
             );

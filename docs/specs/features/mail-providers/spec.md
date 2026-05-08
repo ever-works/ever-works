@@ -164,11 +164,8 @@ timeZoneName:'short'})`. `MailService.formatRoleName(role)` MUST
   `getDestination(data.to)` returning a `string[]`.
 - **FR-9** `getDestination(destination)` MUST accept `string |
 Address | (string|Address)[]`, MUST wrap a single value in an
-  array, and MUST map each entry through:
-    - `typeof to === 'string'` → return as-is.
-    - `'address' in to` → return `to.address`.
-    - else → fall through to `to` (which Node will coerce to its
-      `toString`).
+  array, and MUST map each entry through: - `typeof to === 'string'` → return as-is. - `'address' in to` → return `to.address`. - else → fall through to `to` (which Node will coerce to its
+  `toString`).
 - **FR-10** When `MAILER_PROVIDER=resend` but `RESEND_APIKEY` is
   unset, the module's `RESEND_CLIENT` factory MUST return
   `undefined` and `MailerService.sendMail` MUST log a warn-level
@@ -228,15 +225,11 @@ Address | (string|Address)[]`, MUST wrap a single value in an
       allow self-signed certs in dev environments — operators
       deploying to prod MUST front the SMTP host with a properly
       signed certificate or revisit this gate.
-- **Observability**:
-    - Construction log: `Mailer service initialized with provider:
-<provider>`.
-    - Per-call info logs around SMTP and Resend sends as described
-      in FR-13.
-    - Faker-fallback warn log when Resend client is not
-      initialised.
-    - Per-handler error log on delivery failure
-      (`Failed to send <kind> to <email>` + stack).
+- **Observability**: - Construction log: `Mailer service initialized with provider:
+<provider>`. - Per-call info logs around SMTP and Resend sends as described
+  in FR-13. - Faker-fallback warn log when Resend client is not
+  initialised. - Per-handler error log on delivery failure
+  (`Failed to send <kind> to <email>` + stack).
 - **Compatibility**:
     - Provider switching is a config change, not a code change
       (Constitution Principle II — capability-driven).

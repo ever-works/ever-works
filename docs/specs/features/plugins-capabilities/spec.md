@@ -371,16 +371,13 @@ userId)` / `startPluginDeviceAuth(pluginId, userId)` respectively.
       (we re-upsert on each successful exchange).
     - Domain regex on `addDomain` rejects path/scheme/whitespace
       payloads upfront.
-- **Observability**:
-    - Deploy: `DeploymentDispatchedEvent`, `DeploymentCompletedEvent`,
-      `DeploymentFailedEvent` are emitted via NestJS `EventEmitter2`;
-      the `ActivityLogListener` translates them into `actionType:
+- **Observability**: - Deploy: `DeploymentDispatchedEvent`, `DeploymentCompletedEvent`,
+  `DeploymentFailedEvent` are emitted via NestJS `EventEmitter2`;
+  the `ActivityLogListener` translates them into `actionType:
 DEPLOYMENT` rows. The single `'work.deployed'` activity-log entry
-      is emitted directly from the controller (fire-and-forget).
-    - Search/screenshot/OAuth/git-provider/device-auth: NO activity-log
-      emission (per-call CRUD-style traffic is too high-volume to audit).
-    - Errors are logged via the per-service `Logger` with the work id
-      and provider id where applicable.
+  is emitted directly from the controller (fire-and-forget). - Search/screenshot/OAuth/git-provider/device-auth: NO activity-log
+  emission (per-call CRUD-style traffic is too high-volume to audit). - Errors are logged via the per-service `Logger` with the work id
+  and provider id where applicable.
 - **Compatibility**: facade APIs are versioned via the `@ever-works/agent`
   package. New plugin contract methods (`getDeploymentSecrets`,
   `getWorkflowFilenames`) are optional — older plugins continue to
