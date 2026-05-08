@@ -85,6 +85,9 @@ const sidebars: SidebarsConfig = {
 				'api/oauth-capability',
 				'api/search-capability',
 				'api/device-auth-capability',
+				'api/activity-log',
+				'api/template-catalog',
+				'api/account',
 				'api/error-handling',
 				'api/guards-interceptors',
 				'api/websocket-events'

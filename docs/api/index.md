@@ -66,6 +66,9 @@ All tiers apply simultaneously. If any tier's limit is exceeded, the API returns
 | **Notifications**   | `/api/notifications`         | User notifications                               | [Other Modules](/api/other-modules#notifications-api)                                   |
 | **Members**         | `/api/works/:id/members`     | Work member management                           | [Works](/api/works)                                                                     |
 | **Comparisons**     | `/api/works/:id/comparisons` | A vs B comparison page generation and management | [Works](/api/works)                                                                     |
+| **Activity Log**    | `/api/activity-log`          | Per-user audit trail, filtering, CSV export       | [Activity Log](/api/activity-log)                                                       |
+| **Templates**       | `/api/templates`             | Built-in / custom / forked template catalog       | [Template Catalog](/api/template-catalog)                                               |
+| **Account**         | `/api/account`               | Export / import / GitHub-sync account data        | [Account Transfer](/api/account)                                                        |
 
 ## Request Format
 
