@@ -187,7 +187,7 @@ known to lack a Spec Kit feature folder:
 ### Docs gaps to audit
 
 - [x] `docs/packages/*` — every plugin now has a README; audit completed
-      2026-05-08. All 42 plugin READMEs already cover settings (`## Settings`
+      2026-05-08 ([#544](https://github.com/ever-works/ever-works/pull/544)). All 42 plugin READMEs already cover settings (`## Settings`
       section listing each schema field + scope + secret/envVar markers),
       capabilities (Plugin metadata table), and example configuration
       ("Getting started" steps). Added missing `## Troubleshooting` section
