@@ -14,7 +14,9 @@
         "build": "tsc --noEmit && node build.js",
         "build:cli": "tsc --noEmit && node build.js",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
-        "test:cli": "cd dist && npm install && node cli.js --help"
+        "test:cli": "cd dist && npm install && node cli.js --help",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "keywords": [],
     "packageManager": "pnpm@10.13.1",
@@ -23,7 +25,8 @@
         "@types/inquirer": "^9.0.9",
         "@types/node": "^22.19.3",
         "esbuild": "^0.25.12",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^3.2.1"
     },
     "dependencies": {
         "@ever-works/cli-shared": "workspace:*",
