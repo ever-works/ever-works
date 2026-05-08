@@ -496,14 +496,17 @@ describe('agent/config', () => {
             ['getBetaBranch', 'WEBSITE_TEMPLATE_BETA_BRANCH', 'stage', 'beta'],
             ['getMinimalOwner', 'WEBSITE_TEMPLATE_MINIMAL_OWNER', 'ever-works', 'other-org'],
             ['getMinimalBranch', 'WEBSITE_TEMPLATE_MINIMAL_BRANCH', 'main', 'develop'],
-        ])('%s defaults + override (%s default=%s override=%s)', (getter, envVar, defaultVal, overrideVal) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            expect((config.websiteTemplate as any)[getter]()).toBe(defaultVal);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (process.env as any)[envVar] = overrideVal;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            expect((config.websiteTemplate as any)[getter]()).toBe(overrideVal);
-        });
+        ])(
+            '%s defaults + override (%s default=%s override=%s)',
+            (getter, envVar, defaultVal, overrideVal) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                expect((config.websiteTemplate as any)[getter]()).toBe(defaultVal);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (process.env as any)[envVar] = overrideVal;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                expect((config.websiteTemplate as any)[getter]()).toBe(overrideVal);
+            },
+        );
 
         describe('getMinimalRepo', () => {
             it('returns undefined when env is unset (no default — gates the Minimal seed)', () => {

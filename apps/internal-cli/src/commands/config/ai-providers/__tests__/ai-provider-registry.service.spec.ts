@@ -91,9 +91,7 @@ describe('AiProviderRegistryService', () => {
         it('includes the displayName + " - " + description in each choice name', () => {
             const choices = service.getProviderChoices();
             const openAi = choices.find((c) => c.value === 'openai');
-            expect(openAi?.name).toBe(
-                'OpenAI - OpenAI GPT models (GPT-5, GPT-4o, o1/o3)',
-            );
+            expect(openAi?.name).toBe('OpenAI - OpenAI GPT models (GPT-5, GPT-4o, o1/o3)');
         });
     });
 

@@ -46,12 +46,14 @@ function makeWork(overrides: Partial<WorkLike> = {}): WorkLike {
     };
 }
 
-function makePr(overrides: Partial<{
-    number: number;
-    title: string;
-    body: string | null;
-    updatedAt: string;
-}> = {}) {
+function makePr(
+    overrides: Partial<{
+        number: number;
+        title: string;
+        body: string | null;
+        updatedAt: string;
+    }> = {},
+) {
     return {
         number: 42,
         title: 'Add new tool',
@@ -78,13 +80,15 @@ function makeDataRepoMock() {
     };
 }
 
-function makeService(overrides: Partial<{
-    gitFacade: any;
-    aiFacade: any;
-    workRepository: any;
-    generationHistoryRepository: any;
-    taskLockService: any;
-}> = {}) {
+function makeService(
+    overrides: Partial<{
+        gitFacade: any;
+        aiFacade: any;
+        workRepository: any;
+        generationHistoryRepository: any;
+        taskLockService: any;
+    }> = {},
+) {
     const gitFacade = overrides.gitFacade ?? {
         listPullRequests: jest.fn().mockResolvedValue([]),
         getPullRequestFiles: jest.fn().mockResolvedValue([]),
@@ -121,7 +125,14 @@ function makeService(overrides: Partial<{
         taskLockService as any,
     );
 
-    return { service, gitFacade, aiFacade, workRepository, generationHistoryRepository, taskLockService };
+    return {
+        service,
+        gitFacade,
+        aiFacade,
+        workRepository,
+        generationHistoryRepository,
+        taskLockService,
+    };
 }
 
 describe('CommunityPrProcessorService', () => {
@@ -226,7 +237,7 @@ describe('CommunityPrProcessorService', () => {
             expect(result.errors).toEqual([{ workId: 'w', error: 'plain-string-failure' }]);
         });
 
-        it('uses the work\'s existing communityPrState when present, otherwise a fresh skeleton', async () => {
+        it("uses the work's existing communityPrState when present, otherwise a fresh skeleton", async () => {
             const seededState: CommunityPrState = {
                 processedPrNumbers: [1, 2],
                 totalItemsAdded: 7,
@@ -429,7 +440,7 @@ describe('CommunityPrProcessorService', () => {
             expect(gitFacade.getPullRequestFiles).not.toHaveBeenCalled();
         });
 
-        it('honours the explicit autoClose argument over the work\'s communityPrAutoClose', async () => {
+        it("honours the explicit autoClose argument over the work's communityPrAutoClose", async () => {
             const pr = makePr();
             const file = { filename: 'data/x.yml', status: 'added', patch: '+ added' };
             const work = makeWork({ communityPrAutoClose: false });
@@ -635,8 +646,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'A', description: 'Da', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'B', description: 'Db', source_url: 'https://b', category: 'Dev', tags: ['t'] },
+                            {
+                                name: 'A',
+                                description: 'Da',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'B',
+                                description: 'Db',
+                                source_url: 'https://b',
+                                category: 'Dev',
+                                tags: ['t'],
+                            },
                         ],
                     },
                 }),
@@ -679,7 +702,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'X', description: 'd', source_url: 'https://x', category: 'AI', tags: [] },
+                            {
+                                name: 'X',
+                                description: 'd',
+                                source_url: 'https://x',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -754,8 +783,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'A', description: 'd', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'B', description: 'd', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: 'A',
+                                description: 'd',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'B',
+                                description: 'd',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -796,7 +837,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'A', description: 'd', source_url: 'https://a', category: 'AI', tags: [] },
+                            {
+                                name: 'A',
+                                description: 'd',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1097,9 +1144,21 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Foo Bar', description: 'a', source_url: 'https://a', category: 'AI', tags: [] },
+                            {
+                                name: 'Foo Bar',
+                                description: 'a',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
                             // Same slug after slugify
-                            { name: 'Foo Bar', description: 'a', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: 'Foo Bar',
+                                description: 'a',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1118,9 +1177,7 @@ describe('CommunityPrProcessorService', () => {
             const work = makeWork();
             const dataRepo = makeDataRepoMock();
             // First item already exists; second is new.
-            dataRepo.itemExists
-                .mockResolvedValueOnce(true)
-                .mockResolvedValueOnce(false);
+            dataRepo.itemExists.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
             dataRepoCreateMock.mockResolvedValue(dataRepo);
             const gitFacade = {
                 listPullRequests: jest.fn().mockResolvedValue([pr]),
@@ -1136,8 +1193,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Existing', description: 'a', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'Brand New', description: 'a', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: 'Existing',
+                                description: 'a',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'Brand New',
+                                description: 'a',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1174,7 +1243,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'A', description: 'a', source_url: 'https://a', category: 'AI', tags: [] },
+                            {
+                                name: 'A',
+                                description: 'a',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1220,8 +1295,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: '!!!', description: 'a', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'Real Item', description: 'a', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: '!!!',
+                                description: 'a',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'Real Item',
+                                description: 'a',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1260,7 +1347,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'X', description: 'd', source_url: 'https://x', category: 'AI', tags: [] },
+                            {
+                                name: 'X',
+                                description: 'd',
+                                source_url: 'https://x',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1277,7 +1370,11 @@ describe('CommunityPrProcessorService', () => {
             );
             expect(gitFacade.push).toHaveBeenCalledWith(
                 { dir: '/tmp/clone' },
-                expect.objectContaining({ userId: 'user-1', providerId: 'github', workId: 'work-1' }),
+                expect.objectContaining({
+                    userId: 'user-1',
+                    providerId: 'github',
+                    workId: 'work-1',
+                }),
             );
         });
 
@@ -1301,8 +1398,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Item One', description: 'd', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'Item Two', description: 'd', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: 'Item One',
+                                description: 'd',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'Item Two',
+                                description: 'd',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1348,7 +1457,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Just One', description: 'd', source_url: 'https://a', category: 'AI', tags: [] },
+                            {
+                                name: 'Just One',
+                                description: 'd',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1387,7 +1502,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Item', description: 'd', source_url: 'https://x', category: 'AI', tags: [] },
+                            {
+                                name: 'Item',
+                                description: 'd',
+                                source_url: 'https://x',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1425,8 +1546,20 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Alpha', description: 'd', source_url: 'https://a', category: 'AI', tags: [] },
-                            { name: 'Beta', description: 'd', source_url: 'https://b', category: 'AI', tags: [] },
+                            {
+                                name: 'Alpha',
+                                description: 'd',
+                                source_url: 'https://a',
+                                category: 'AI',
+                                tags: [],
+                            },
+                            {
+                                name: 'Beta',
+                                description: 'd',
+                                source_url: 'https://b',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1467,7 +1600,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'X', description: 'd', source_url: 'https://x', category: 'AI', tags: [] },
+                            {
+                                name: 'X',
+                                description: 'd',
+                                source_url: 'https://x',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1508,7 +1647,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Y', description: 'd', source_url: 'https://y', category: 'AI', tags: [] },
+                            {
+                                name: 'Y',
+                                description: 'd',
+                                source_url: 'https://y',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1540,7 +1685,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Z', description: 'd', source_url: 'https://z', category: 'AI', tags: [] },
+                            {
+                                name: 'Z',
+                                description: 'd',
+                                source_url: 'https://z',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
@@ -1580,7 +1731,13 @@ describe('CommunityPrProcessorService', () => {
                 askJson: jest.fn().mockResolvedValue({
                     result: {
                         items: [
-                            { name: 'Tool', description: 'A useful tool.', source_url: 'https://tool.example', category: 'AI', tags: [] },
+                            {
+                                name: 'Tool',
+                                description: 'A useful tool.',
+                                source_url: 'https://tool.example',
+                                category: 'AI',
+                                tags: [],
+                            },
                         ],
                     },
                 }),
