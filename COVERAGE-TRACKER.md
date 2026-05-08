@@ -123,6 +123,7 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
       `LocalPluginStore`, `TriggerLogger`, `TriggerService`,
       `collectPluginDependencies`, `TriggerInternalApiClient`,
       `task-context.utils`, and `worker-context.utils`
+      ([#565](https://github.com/ever-works/ever-works/pull/565))
       (`@trigger.dev/sdk`, `@ever-works/agent/config`, `@nestjs/core`'s
       `NestFactory.createApplicationContext`, and the trigger logger factory
       mocked). The 2026-05-08 follow-up adds 39 tests across three new
