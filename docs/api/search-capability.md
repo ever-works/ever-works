@@ -28,8 +28,8 @@ SearchModule
 
 ```typescript
 @Module({
-    imports: [FacadesModule, PluginsModule, AuthModule],
-    controllers: [SearchController]
+	imports: [FacadesModule, PluginsModule, AuthModule],
+	controllers: [SearchController]
 })
 export class SearchModule {}
 ```
@@ -60,12 +60,12 @@ provider, and which one is active.
 
 ```json
 {
-    "status": "success",
-    "available": true,
-    "activeProvider": {
-        "id": "tavily",
-        "name": "Tavily"
-    }
+	"status": "success",
+	"available": true,
+	"activeProvider": {
+		"id": "tavily",
+		"name": "Tavily"
+	}
 }
 ```
 
@@ -73,10 +73,10 @@ provider, and which one is active.
 
 ```json
 {
-    "status": "success",
-    "available": false,
-    "activeProvider": null,
-    "message": "No search provider is enabled. Enable a search plugin (e.g. Tavily, Linkup, Brave, Exa) in settings."
+	"status": "success",
+	"available": false,
+	"activeProvider": null,
+	"message": "No search provider is enabled. Enable a search plugin (e.g. Tavily, Linkup, Brave, Exa) in settings."
 }
 ```
 
@@ -84,10 +84,10 @@ provider, and which one is active.
 
 ```json
 {
-    "status": "success",
-    "available": false,
-    "activeProvider": null,
-    "message": "Search plugins are enabled but none have all required settings configured (e.g. API key)."
+	"status": "success",
+	"available": false,
+	"activeProvider": null,
+	"message": "Search plugins are enabled but none have all required settings configured (e.g. API key)."
 }
 ```
 
@@ -107,21 +107,21 @@ search provider.
 
 **Request Body (`SearchDto`):**
 
-| Field            | Type       | Required | Validation        | Description                                          |
-| ---------------- | ---------- | -------- | ----------------- | ---------------------------------------------------- |
-| `query`          | `string`   | Yes      | non-empty string  | Free-text search query                               |
-| `maxResults`     | `number`   | No       | `1` ≤ N ≤ `50`    | Cap on the number of results to return               |
-| `includeDomains` | `string[]` | No       | array of hostnames | Restrict results to these domains                    |
-| `excludeDomains` | `string[]` | No       | array of hostnames | Drop results from these domains                      |
+| Field            | Type       | Required | Validation         | Description                            |
+| ---------------- | ---------- | -------- | ------------------ | -------------------------------------- |
+| `query`          | `string`   | Yes      | non-empty string   | Free-text search query                 |
+| `maxResults`     | `number`   | No       | `1` ≤ N ≤ `50`     | Cap on the number of results to return |
+| `includeDomains` | `string[]` | No       | array of hostnames | Restrict results to these domains      |
+| `excludeDomains` | `string[]` | No       | array of hostnames | Drop results from these domains        |
 
 **Example Request:**
 
 ```json
 {
-    "query": "best project management tools",
-    "maxResults": 10,
-    "includeDomains": ["producthunt.com", "g2.com"],
-    "excludeDomains": ["pinterest.com"]
+	"query": "best project management tools",
+	"maxResults": 10,
+	"includeDomains": ["producthunt.com", "g2.com"],
+	"excludeDomains": ["pinterest.com"]
 }
 ```
 
@@ -129,16 +129,16 @@ search provider.
 
 ```json
 {
-    "status": "success",
-    "results": [
-        {
-            "title": "...",
-            "url": "...",
-            "snippet": "...",
-            "score": 0.91
-        }
-    ],
-    "provider": "Tavily"
+	"status": "success",
+	"results": [
+		{
+			"title": "...",
+			"url": "...",
+			"snippet": "...",
+			"score": 0.91
+		}
+	],
+	"provider": "Tavily"
 }
 ```
 
@@ -151,8 +151,8 @@ When no provider is configured:
 
 ```json
 {
-    "status": "error",
-    "message": "No search provider with all required settings configured is available."
+	"status": "error",
+	"message": "No search provider with all required settings configured is available."
 }
 ```
 
@@ -160,8 +160,8 @@ When the facade rejects with `NoProviderError`:
 
 ```json
 {
-    "status": "error",
-    "message": "No search provider configured. Enable a search plugin in settings."
+	"status": "error",
+	"message": "No search provider configured. Enable a search plugin in settings."
 }
 ```
 
@@ -169,8 +169,8 @@ When the upstream provider throws:
 
 ```json
 {
-    "status": "error",
-    "message": "<provider error message>"
+	"status": "error",
+	"message": "<provider error message>"
 }
 ```
 
@@ -178,8 +178,8 @@ When a non-Error rejection occurs:
 
 ```json
 {
-    "status": "error",
-    "message": "Search failed"
+	"status": "error",
+	"message": "Search failed"
 }
 ```
 
@@ -189,25 +189,25 @@ The `SearchDto` uses `class-validator` decorators:
 
 ```typescript
 export class SearchDto {
-    @IsString()
-    @IsNotEmpty()
-    query: string;
+	@IsString()
+	@IsNotEmpty()
+	query: string;
 
-    @IsOptional()
-    @IsNumber()
-    @Min(1)
-    @Max(50)
-    maxResults?: number;
+	@IsOptional()
+	@IsNumber()
+	@Min(1)
+	@Max(50)
+	maxResults?: number;
 
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    includeDomains?: string[];
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	includeDomains?: string[];
 
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    excludeDomains?: string[];
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	excludeDomains?: string[];
 }
 ```
 
@@ -218,10 +218,10 @@ the active provider in three steps:
 
 1. Enumerate all enabled SEARCH-capability plugins for the user via
    `pluginRegistry.getEnabledPluginsScoped(PLUGIN_CAPABILITIES.SEARCH,
-   undefined, userId)`. The cascade respects work → user → admin →
+undefined, userId)`. The cascade respects work → user → admin →
    environment.
 2. Sort the list with plugins that declare `defaultForCapabilities:
-   ['search']` in their manifest first (e.g. Tavily — the canonical
+['search']` in their manifest first (e.g. Tavily — the canonical
    default). Other plugins keep their registration order.
 3. For each plugin in the sorted list, resolve its settings via
    `pluginSettings.getSettings(pluginId, {userId, includeSecrets: true})`
@@ -236,18 +236,18 @@ of view.
 
 ## Supported Providers
 
-| Plugin ID      | Provider     | Required settings                                                                                |
-| -------------- | ------------ | ------------------------------------------------------------------------------------------------ |
-| `tavily`       | Tavily       | `apiKey` (env-var fallback `PLUGIN_TAVILY_API_KEY`)                                              |
-| `brave`        | Brave Search | `apiKey` (env-var fallback `PLUGIN_BRAVE_API_KEY`)                                               |
-| `exa`          | Exa.ai       | `apiKey` (env-var fallback `PLUGIN_EXA_API_KEY`)                                                 |
-| `perplexity`   | Perplexity   | `apiKey` (env-var fallback `PLUGIN_PERPLEXITY_API_KEY`)                                          |
-| `serpapi`      | SerpApi      | `apiKey` (env-var fallback `PLUGIN_SERPAPI_API_KEY`)                                             |
-| `linkup`       | Linkup       | `apiKey` (env-var fallback `PLUGIN_LINKUP_API_KEY`)                                              |
-| `valyu`        | Valyu        | `apiKey` (env-var fallback `PLUGIN_VALYU_API_KEY`)                                               |
-| `firecrawl`    | Firecrawl    | `apiKey` (env-var fallback `PLUGIN_FIRECRAWL_API_KEY`)                                           |
-| `jina`         | Jina AI      | `apiKey` (env-var fallback `PLUGIN_JINA_API_KEY`)                                                |
-| `brightdata`   | BrightData   | `apiToken` + `customerId` (env-var fallbacks `PLUGIN_BRIGHTDATA_API_TOKEN`/`PLUGIN_BRIGHTDATA_CUSTOMER_ID`) |
+| Plugin ID    | Provider     | Required settings                                                                                           |
+| ------------ | ------------ | ----------------------------------------------------------------------------------------------------------- |
+| `tavily`     | Tavily       | `apiKey` (env-var fallback `PLUGIN_TAVILY_API_KEY`)                                                         |
+| `brave`      | Brave Search | `apiKey` (env-var fallback `PLUGIN_BRAVE_API_KEY`)                                                          |
+| `exa`        | Exa.ai       | `apiKey` (env-var fallback `PLUGIN_EXA_API_KEY`)                                                            |
+| `perplexity` | Perplexity   | `apiKey` (env-var fallback `PLUGIN_PERPLEXITY_API_KEY`)                                                     |
+| `serpapi`    | SerpApi      | `apiKey` (env-var fallback `PLUGIN_SERPAPI_API_KEY`)                                                        |
+| `linkup`     | Linkup       | `apiKey` (env-var fallback `PLUGIN_LINKUP_API_KEY`)                                                         |
+| `valyu`      | Valyu        | `apiKey` (env-var fallback `PLUGIN_VALYU_API_KEY`)                                                          |
+| `firecrawl`  | Firecrawl    | `apiKey` (env-var fallback `PLUGIN_FIRECRAWL_API_KEY`)                                                      |
+| `jina`       | Jina AI      | `apiKey` (env-var fallback `PLUGIN_JINA_API_KEY`)                                                           |
+| `brightdata` | BrightData   | `apiToken` + `customerId` (env-var fallbacks `PLUGIN_BRIGHTDATA_API_TOKEN`/`PLUGIN_BRIGHTDATA_CUSTOMER_ID`) |
 
 `tavily` is the canonical default — it ships in the platform's
 `built-in-plugins.md` catalogue with `defaultForCapabilities:
@@ -264,16 +264,16 @@ The controller uses `SearchFacadeService` to execute the search:
 
 ```typescript
 const results = await this.searchFacade.search(
-    dto.query,
-    {
-        maxResults: dto.maxResults,
-        includeDomains: dto.includeDomains,
-        excludeDomains: dto.excludeDomains
-    },
-    {
-        userId: auth.userId,
-        providerOverride: provider.id
-    }
+	dto.query,
+	{
+		maxResults: dto.maxResults,
+		includeDomains: dto.includeDomains,
+		excludeDomains: dto.excludeDomains
+	},
+	{
+		userId: auth.userId,
+		providerOverride: provider.id
+	}
 );
 ```
 
@@ -295,8 +295,8 @@ Both cases return the structured envelope:
 
 ```json
 {
-    "status": "error",
-    "message": "<descriptive message>"
+	"status": "error",
+	"message": "<descriptive message>"
 }
 ```
 

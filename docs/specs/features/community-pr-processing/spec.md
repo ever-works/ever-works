@@ -304,20 +304,20 @@ TTL) so only one replica runs the cron at any time.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                      | Description                                                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CommunityPrState` (`entities/types.ts`) | `{processedPrNumbers: number[]; processedPrs?: Array<{number, updatedAt, outcome}>; lastProcessedAt?: string; totalItemsAdded?: number; lastError?: string \| null;}` |
-| `CommunityPrSinglePrResult`           | `{outcome: 'applied' \| 'ignored'; itemsAdded: number}` — the per-PR contract.                                                                          |
-| `CommunityPrTriggerSource`            | `'user' \| 'schedule' \| 'api'`. Differs from the original spec's three-value enum.                                                                     |
-| `CommunityPrProcessorService`         | Drives per-work + per-PR processing. Owned by `@ever-works/agent/community-pr`.                                                                         |
-| `CommunityPrSchedulerService`         | Hourly cron at `apps/api/src/works/tasks/community-pr-scheduler.service.ts`. Wraps `processAllWorks()` in an outer lock + try/catch.                    |
-| `extractedItemSchema`                 | `z.object({items: z.array(z.object({name, description, source_url, category, tags: z.array(z.string())}))})`.                                            |
-| `MAX_PROCESSED_PR_NUMBERS`            | 500 — FIFO eviction cap on both `processedPrNumbers` and `processedPrs`.                                                                                |
-| `MAX_CHANGE_CONTEXT_LENGTH`           | 50 000 — char cap on the diff context fed to the AI prompt.                                                                                              |
-| `COMMUNITY_PR_LOCK_TTL_MS`            | 30 minutes — per-work `community-pr:<workId>` lock TTL.                                                                                                  |
-| `community-pr:<workId>` / `works:community-pr-scheduler` | Lock keys (per-work and outer scheduler).                                                                                            |
-| `WorkHistoryActivityType.COMMUNITY_PR_MERGED` | `work_generation_history` activity-type stamp for community-PR runs.                                                                                |
-| `ActivityActionType.COMMUNITY_PR_MERGED`  | `activity_logs` action-type stamp emitted ONLY by the controller path (the service does NOT emit activity-log entries directly).                        |
+| Entity / concept                                         | Description                                                                                                                                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CommunityPrState` (`entities/types.ts`)                 | `{processedPrNumbers: number[]; processedPrs?: Array<{number, updatedAt, outcome}>; lastProcessedAt?: string; totalItemsAdded?: number; lastError?: string \| null;}` |
+| `CommunityPrSinglePrResult`                              | `{outcome: 'applied' \| 'ignored'; itemsAdded: number}` — the per-PR contract.                                                                                        |
+| `CommunityPrTriggerSource`                               | `'user' \| 'schedule' \| 'api'`. Differs from the original spec's three-value enum.                                                                                   |
+| `CommunityPrProcessorService`                            | Drives per-work + per-PR processing. Owned by `@ever-works/agent/community-pr`.                                                                                       |
+| `CommunityPrSchedulerService`                            | Hourly cron at `apps/api/src/works/tasks/community-pr-scheduler.service.ts`. Wraps `processAllWorks()` in an outer lock + try/catch.                                  |
+| `extractedItemSchema`                                    | `z.object({items: z.array(z.object({name, description, source_url, category, tags: z.array(z.string())}))})`.                                                         |
+| `MAX_PROCESSED_PR_NUMBERS`                               | 500 — FIFO eviction cap on both `processedPrNumbers` and `processedPrs`.                                                                                              |
+| `MAX_CHANGE_CONTEXT_LENGTH`                              | 50 000 — char cap on the diff context fed to the AI prompt.                                                                                                           |
+| `COMMUNITY_PR_LOCK_TTL_MS`                               | 30 minutes — per-work `community-pr:<workId>` lock TTL.                                                                                                               |
+| `community-pr:<workId>` / `works:community-pr-scheduler` | Lock keys (per-work and outer scheduler).                                                                                                                             |
+| `WorkHistoryActivityType.COMMUNITY_PR_MERGED`            | `work_generation_history` activity-type stamp for community-PR runs.                                                                                                  |
+| `ActivityActionType.COMMUNITY_PR_MERGED`                 | `activity_logs` action-type stamp emitted ONLY by the controller path (the service does NOT emit activity-log entries directly).                                      |
 
 ## 6. Out of Scope
 

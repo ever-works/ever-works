@@ -33,17 +33,17 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern               | Choice                                           | Rationale                                                                                                              |
-| --------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Persistence           | TypeORM `Conversation` + `ConversationMessage` entities w/ `@OneToMany` cascade and `(userId, updatedAt)` composite index | Existing pattern in `packages/agent/src/entities/` — matches `User`/`Work`/`ActivityLog` modelling.                    |
-| Repository            | `ConversationRepository` (Nest `@Injectable`, uses `@InjectRepository`)                                       | Owns all `(id, userId)` filters so cross-user reads cannot bypass it.                                                  |
-| HTTP transport        | Nest controllers + `Express`-style `Res` for SSE                                                                 | Streaming requires direct `res.write` — Nest's default Send-by-return doesn't support per-chunk flush.                 |
-| OpenAI compatibility  | Hand-mapped DTOs with `class-validator` + `class-transformer`                                                    | Lets us use the same Nest validation pipeline while keeping the wire shape OpenAI-identical.                            |
-| Validation pipe       | `new ValidationPipe({whitelist: true, transform: true})` (NO `forbidNonWhitelisted`)                             | AI SDK clients send extra fields (`stream_options`, `logprobs`, `parallel_tool_calls`, …) we don't use but must not 422 on. |
-| AI integration        | `AiFacadeService` from `@ever-works/agent/facades`                                                              | Capability-driven Principle II — provider/model/plugin all resolved by the facade.                                     |
-| Title generation      | Background `.catch(()=>{})` from the controller, NOT a Trigger.dev task                                          | Sub-second work, doesn't need to survive restarts; latency-of-message-append must NOT be coupled.                       |
-| SSE encoding          | `data: ${JSON.stringify(chunk)}\n\n` + `data: [DONE]\n\n` terminator                                              | OpenAI/Vercel-AI-SDK wire compatibility.                                                                                |
-| Error sanitisation    | Regex redaction of `(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}` + 300-char cap                                 | Matches the secret-shape patterns used elsewhere in the codebase; never let a provider's leaked key escape to the client. |
+| Concern              | Choice                                                                                                                    | Rationale                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Persistence          | TypeORM `Conversation` + `ConversationMessage` entities w/ `@OneToMany` cascade and `(userId, updatedAt)` composite index | Existing pattern in `packages/agent/src/entities/` — matches `User`/`Work`/`ActivityLog` modelling.                         |
+| Repository           | `ConversationRepository` (Nest `@Injectable`, uses `@InjectRepository`)                                                   | Owns all `(id, userId)` filters so cross-user reads cannot bypass it.                                                       |
+| HTTP transport       | Nest controllers + `Express`-style `Res` for SSE                                                                          | Streaming requires direct `res.write` — Nest's default Send-by-return doesn't support per-chunk flush.                      |
+| OpenAI compatibility | Hand-mapped DTOs with `class-validator` + `class-transformer`                                                             | Lets us use the same Nest validation pipeline while keeping the wire shape OpenAI-identical.                                |
+| Validation pipe      | `new ValidationPipe({whitelist: true, transform: true})` (NO `forbidNonWhitelisted`)                                      | AI SDK clients send extra fields (`stream_options`, `logprobs`, `parallel_tool_calls`, …) we don't use but must not 422 on. |
+| AI integration       | `AiFacadeService` from `@ever-works/agent/facades`                                                                        | Capability-driven Principle II — provider/model/plugin all resolved by the facade.                                          |
+| Title generation     | Background `.catch(()=>{})` from the controller, NOT a Trigger.dev task                                                   | Sub-second work, doesn't need to survive restarts; latency-of-message-append must NOT be coupled.                           |
+| SSE encoding         | `data: ${JSON.stringify(chunk)}\n\n` + `data: [DONE]\n\n` terminator                                                      | OpenAI/Vercel-AI-SDK wire compatibility.                                                                                    |
+| Error sanitisation   | Regex redaction of `(sk-                                                                                                  | key-                                                                                                                        | token- | Bearer\s+)[A-Za-z0-9_-]{10,}` + 300-char cap | Matches the secret-shape patterns used elsewhere in the codebase; never let a provider's leaked key escape to the client. |
 
 ## 3. Data Model
 
@@ -54,35 +54,37 @@ flowchart LR
 @Entity({ name: 'conversations' })
 @Index(['userId', 'updatedAt'])
 export class Conversation {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column() @Index() userId: string;
-    @ManyToOne(() => User, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'userId' }) user: User;
-    @Column({ type: 'varchar', length: 200, nullable: true }) title?: string;
-    @Column({ type: 'varchar', length: 100, nullable: true }) providerId?: string;
-    @Column({ type: 'varchar', length: 100, nullable: true }) model?: string;
-    @Column({ type: 'simple-json', nullable: true }) metadata?: Record<string, unknown>;
-    @OneToMany(() => ConversationMessage, (m) => m.conversation, { cascade: true })
-    messages: ConversationMessage[];
-    @CreateDateColumn() createdAt: Date;
-    @UpdateDateColumn() updatedAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column() @Index() userId: string;
+	@ManyToOne(() => User, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'userId' })
+	user: User;
+	@Column({ type: 'varchar', length: 200, nullable: true }) title?: string;
+	@Column({ type: 'varchar', length: 100, nullable: true }) providerId?: string;
+	@Column({ type: 'varchar', length: 100, nullable: true }) model?: string;
+	@Column({ type: 'simple-json', nullable: true }) metadata?: Record<string, unknown>;
+	@OneToMany(() => ConversationMessage, (m) => m.conversation, { cascade: true })
+	messages: ConversationMessage[];
+	@CreateDateColumn() createdAt: Date;
+	@UpdateDateColumn() updatedAt: Date;
 }
 
 // packages/agent/src/entities/conversation-message.entity.ts
 @Entity({ name: 'conversation_messages' })
 @Index(['conversationId', 'createdAt'])
 export class ConversationMessage {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column() @Index() conversationId: string;
-    @ManyToOne(() => Conversation, (c) => c.messages, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'conversationId' }) conversation: Conversation;
-    @Column({ type: 'varchar', length: 20 }) role: 'user' | 'assistant' | 'system' | 'tool';
-    @Column({ type: 'text' }) content: string;
-    @Column({ type: 'simple-json', nullable: true }) parts?: unknown[];
-    @Column({ type: 'varchar', length: 100, nullable: true }) model?: string;
-    @Column({ type: 'simple-json', nullable: true })
-    usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
-    @CreateDateColumn() createdAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column() @Index() conversationId: string;
+	@ManyToOne(() => Conversation, (c) => c.messages, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'conversationId' })
+	conversation: Conversation;
+	@Column({ type: 'varchar', length: 20 }) role: 'user' | 'assistant' | 'system' | 'tool';
+	@Column({ type: 'text' }) content: string;
+	@Column({ type: 'simple-json', nullable: true }) parts?: unknown[];
+	@Column({ type: 'varchar', length: 100, nullable: true }) model?: string;
+	@Column({ type: 'simple-json', nullable: true })
+	usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+	@CreateDateColumn() createdAt: Date;
 }
 ```
 
@@ -118,15 +120,15 @@ service pair.
 
 ### Conversation REST surface (`/api/conversations`)
 
-| Method   | Endpoint                          | Description                        | Status |
-| -------- | --------------------------------- | ---------------------------------- | ------ |
-| `GET`    | `/api/conversations`              | List user's conversations          | Shipped |
-| `POST`   | `/api/conversations`              | Create a conversation              | Shipped |
-| `GET`    | `/api/conversations/:id`          | Read one (with messages)           | Shipped |
-| `PATCH`  | `/api/conversations/:id`          | Rename (204)                       | Shipped |
-| `POST`   | `/api/conversations/:id/messages` | Append messages, derive title      | Shipped |
-| `DELETE` | `/api/conversations/:id`          | Delete one (204)                   | Shipped |
-| `DELETE` | `/api/conversations`              | Bulk delete user's conversations   | Shipped |
+| Method   | Endpoint                          | Description                      | Status  |
+| -------- | --------------------------------- | -------------------------------- | ------- |
+| `GET`    | `/api/conversations`              | List user's conversations        | Shipped |
+| `POST`   | `/api/conversations`              | Create a conversation            | Shipped |
+| `GET`    | `/api/conversations/:id`          | Read one (with messages)         | Shipped |
+| `PATCH`  | `/api/conversations/:id`          | Rename (204)                     | Shipped |
+| `POST`   | `/api/conversations/:id/messages` | Append messages, derive title    | Shipped |
+| `DELETE` | `/api/conversations/:id`          | Delete one (204)                 | Shipped |
+| `DELETE` | `/api/conversations`              | Bulk delete user's conversations | Shipped |
 
 For each endpoint:
 
@@ -142,9 +144,9 @@ For each endpoint:
 
 ### OpenAI-compatible chat completions (`/api/v1/chat/completions`)
 
-| Method | Endpoint                       | Description                                  | Status |
-| ------ | ------------------------------ | -------------------------------------------- | ------ |
-| `POST` | `/api/v1/chat/completions`     | OpenAI-compat chat completion (sync + SSE)   | Shipped |
+| Method | Endpoint                   | Description                                | Status  |
+| ------ | -------------------------- | ------------------------------------------ | ------- |
+| `POST` | `/api/v1/chat/completions` | OpenAI-compat chat completion (sync + SSE) | Shipped |
 
 - **Body**: `OpenAiChatCompletionRequestDto` — `messages` required;
   `model`, `temperature`, `max_tokens`, `top_p`, `frequency_penalty`,
@@ -187,8 +189,8 @@ based on `FacadeOptions`.
 
 ## 7. Background Jobs
 
-| Trigger                                           | When                                 | What it does                                     | Idempotency strategy                                                         |
-| ------------------------------------------------- | ------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Trigger                                           | When                                                            | What it does                                                   | Idempotency strategy                                                                                                          |
+| ------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `titleService.maybeGenerateTitle().catch(()=>{})` | On every `POST /:id/messages` reply, after the response is sent | Generate an AI title when the conversation crosses 4 messages. | Gated on `messageCount >= 4 && !metadata.aiTitle`; the `aiTitle:true` metadata flag prevents re-runs. Failures are swallowed. |
 
 This is **not** a Trigger.dev task — sub-second work, doesn't need to
@@ -241,13 +243,13 @@ execution, conversation sharing), the staged rollout would be:
 
 ## 11. Risks & Mitigations
 
-| Risk                                                                                                  | Likelihood | Impact                                                          | Mitigation                                                                                                                                                |
-| ----------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sequential `appendMessage` saves dominate latency on long conversations.                              | Medium     | Slow `POST /:id/messages` response, especially for long pastes. | OQ-5 follow-up — switch to a single batch save with explicit per-row `createdAt` once cross-driver tests are in place.                                    |
-| AI title generation uses a different work / provider than the user expects.                          | Low        | Wrong-toned title.                                              | OQ-4 follow-up — resolve provider from `conversation.providerId` first, fall back to first work only when `providerId` is unset.                          |
-| Provider key leaks via streaming error message.                                                       | Medium     | Credential exposure.                                            | `sanitizeErrorMessage` regex covers `sk-` / `key-` / `token-` / `Bearer …` shapes. 300-char truncation as belt-and-braces. Test pinned in PR #484.        |
-| Pre-headers vs post-headers error path divergence is subtle and easy to regress.                     | Low        | Half-open SSE connection / wrong-status JSON tail.              | Both paths are individually unit-tested in `openai-compat.service.spec.ts` (PR #484).                                                                     |
-| Tool-call delta mapper accidentally adds `id`/`type`/`name` to continuation chunks.                  | Medium     | `@ai-sdk/openai-compatible` parser breaks on every tool call.   | Behaviour is pinned by the FR-18 test ("Only include id/type/name on the first chunk of a tool call"); the comment in source links the parser invariant. |
+| Risk                                                                                | Likelihood | Impact                                                          | Mitigation                                                                                                                                               |
+| ----------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sequential `appendMessage` saves dominate latency on long conversations.            | Medium     | Slow `POST /:id/messages` response, especially for long pastes. | OQ-5 follow-up — switch to a single batch save with explicit per-row `createdAt` once cross-driver tests are in place.                                   |
+| AI title generation uses a different work / provider than the user expects.         | Low        | Wrong-toned title.                                              | OQ-4 follow-up — resolve provider from `conversation.providerId` first, fall back to first work only when `providerId` is unset.                         |
+| Provider key leaks via streaming error message.                                     | Medium     | Credential exposure.                                            | `sanitizeErrorMessage` regex covers `sk-` / `key-` / `token-` / `Bearer …` shapes. 300-char truncation as belt-and-braces. Test pinned in PR #484.       |
+| Pre-headers vs post-headers error path divergence is subtle and easy to regress.    | Low        | Half-open SSE connection / wrong-status JSON tail.              | Both paths are individually unit-tested in `openai-compat.service.spec.ts` (PR #484).                                                                    |
+| Tool-call delta mapper accidentally adds `id`/`type`/`name` to continuation chunks. | Medium     | `@ai-sdk/openai-compatible` parser breaks on every tool call.   | Behaviour is pinned by the FR-18 test ("Only include id/type/name on the first chunk of a tool call"); the comment in source links the parser invariant. |
 
 ## 12. Constitution Reconciliation
 

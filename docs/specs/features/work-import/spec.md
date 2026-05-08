@@ -11,29 +11,29 @@
 ## 1. Overview
 
 A user can bootstrap a new work in the platform from an **existing**
-GitHub repository — either an Ever Works-style data repo (`works.yml` +
+GitHub repository — either an Ever Works-style data repo (`.works/works.yml` +
 items folder) or an "Awesome List" README. The import flow detects the
 repo's shape, parses the existing content, validates it against plugins
-referenced in any `works.yml`, and creates the work with all parsed
+referenced in any `.works/works.yml`, and creates the work with all parsed
 metadata pre-filled.
 
 ## 2. User Scenarios
 
 ### 2.1 Primary scenarios
 
-- **Given** I have a data repo with `works.yml`, **when** I import it,
+- **Given** I have a data repo with `.works/works.yml`, **when** I import it,
   **then** the import flow pre-fills the work's name, prompt, model,
   providers, and schedule from the file.
 - **Given** I have an Awesome-List README, **when** I import it, **then**
   the platform parses the items and offers them as the seed for the
   work; further generation is on-demand.
-- **Given** the source repo has neither `works.yml` nor a recognised
+- **Given** the source repo has neither `.works/works.yml` nor a recognised
   Awesome-List structure, **when** I import it, **then** the platform
   falls back to creating a fresh work with the repo as the data repo.
 
 ### 2.2 Edge cases & failures
 
-- **Given** the `works.yml` references a plugin id that's not installed,
+- **Given** the `.works/works.yml` references a plugin id that's not installed,
   **when** I confirm the import, **then** the import is rejected with
   "plugin not installed" before any database writes occur.
 - **Given** the source repo's slug conflicts with an existing work I
@@ -47,14 +47,14 @@ metadata pre-filled.
 
 - **FR-1** The import flow MUST accept a GitHub URL (HTTPS, SSH, or
   `owner/repo` slug) and resolve it to a `RepositoryTarget`.
-- **FR-2** The platform MUST attempt to read `works.yml` from the source
+- **FR-2** The platform MUST attempt to read `.works/works.yml` from the source
   repo at the four candidate paths defined by the
   [`works-config`](../works-config/spec.md) feature.
-- **FR-3** When `works.yml` is found, the import flow MUST pre-fill the
+- **FR-3** When `.works/works.yml` is found, the import flow MUST pre-fill the
   work's name, prompt, model, providers, and schedule from it.
 - **FR-4** Plugin id validation against the registry MUST happen before
   any database writes.
-- **FR-5** When `works.yml` is absent, the platform MUST attempt
+- **FR-5** When `.works/works.yml` is absent, the platform MUST attempt
   Awesome-List-style README parsing as a fallback.
 - **FR-6** Slug conflicts MUST be detected case-insensitively and the user
   offered a unique alternative.
@@ -87,14 +87,14 @@ metadata pre-filled.
 
 - Importing from non-GitHub providers (GitLab, Bitbucket) — currently
   GitHub only.
-- Live two-way sync after import (use `works.yml` round-trip per
+- Live two-way sync after import (use `.works/works.yml` round-trip per
   [`works-config`](../works-config/spec.md)).
 
 ## 7. Acceptance Criteria
 
 - [x] HTTPS, SSH, and `owner/repo` URL formats are accepted.
-- [x] `works.yml`-based imports pre-fill all parsed fields.
-- [x] Awesome-List parsing kicks in only when `works.yml` is absent.
+- [x] `.works/works.yml`-based imports pre-fill all parsed fields.
+- [x] Awesome-List parsing kicks in only when `.works/works.yml` is absent.
 - [x] Plugin id validation rejects unknown ids before DB writes.
 - [x] Slug conflicts are detected case-insensitively.
 - [x] Tests cover both source shapes plus failure paths.

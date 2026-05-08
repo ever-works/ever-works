@@ -22,7 +22,8 @@ const HTTPS_URL = /^https?:\/\/.+/i;
 
 export class RegisterWorkRequestDto {
     @ApiProperty({
-        description: 'HTTPS GitHub URL of the manifest repo (must contain works.yml at root).',
+        description:
+            'HTTPS GitHub URL of the manifest repo (must contain .works/works.yml at root).',
         example: 'https://github.com/octocat/awesome-mcp',
     })
     @IsString()

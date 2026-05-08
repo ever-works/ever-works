@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "ไม่สามารถอัปเดตการตั้งค่าการซิงค์ได้",
                 "syncDisabled": "ปิดการซิงค์",
                 "worksConfig": {
-                    "imported": "นำเข้าจาก works.yml",
+                    "imported": "นำเข้าจาก .works/works.yml",
                     "applied": "นำไปใช้: {value}",
                     "enabled": "เปิดใช้งาน",
                     "disabled": "ปิดใช้งาน",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "คลังข้อมูล",
                         "awesomeReadme": "Awesome README",
                         "linkExisting": "เชื่อมโยงคลังที่มีอยู่",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "การตั้งค่าทั่วไป",
@@ -2349,7 +2349,7 @@
                     "description": "ดึงการอัปเดตจาก repository ต้นทางโดยอัตโนมัติ"
                 },
                 "worksConfigRestore": {
-                    "title": "กู้คืนการตั้งค่า works.yml",
+                    "title": "กู้คืนการตั้งค่า .works/works.yml",
                     "description": "ใช้ผู้ให้บริการ AI โมเดล กำหนดการ และการตั้งค่าคลังที่เกี่ยวข้องจากคลังนี้"
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "รูปแบบ Repository ที่รองรับ",
                     "dataRepo": {
                         "title": "Data Repository",
-                        "description": "Repository ที่มีโครงสร้าง works.yml และโฟลเดอร์ data/"
+                        "description": "Repository ที่มีโครงสร้าง .works/works.yml และโฟลเดอร์ data/"
                     },
                     "awesomeReadme": {
                         "title": "Awesome List",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Data Repo",
                     "awesomeReadme": "Awesome List",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "ไอเท็ม",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "ลิงก์ repository"
                 },
                 "detectionFailed": "เราไม่สามารถตรวจจับรูปแบบโดยอัตโนมัติได้ กรุณาเลือกวิธีนำเข้าของ repository นี้",
-                "detectionFailedMissingConfig": "ไม่พบการตั้งค่าที่รองรับ เพิ่ม works.yml ลงในคลัง หรือเลือกการนำเข้าด้วยตนเองด้านล่าง",
+                "detectionFailedMissingConfig": "ไม่พบการตั้งค่าที่รองรับ เพิ่ม .works/works.yml ลงในคลัง หรือเลือกการนำเข้าด้วยตนเองด้านล่าง",
                 "errors": {
                     "urlRequired": "กรุณาป้อน URL GitHub repository",
                     "unsupportedFormat": "รูปแบบ repository นี้ไม่รองรับ กรุณาใช้รูปแบบ Data Repository หรือ Awesome List",

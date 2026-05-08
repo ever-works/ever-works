@@ -32,9 +32,9 @@ DeviceAuthModule
 
 ```typescript
 @Module({
-    imports: [AuthModule, PluginsModule],
-    controllers: [DeviceAuthController],
-    providers: [DeviceAuthService]
+	imports: [AuthModule, PluginsModule],
+	controllers: [DeviceAuthController],
+	providers: [DeviceAuthService]
 })
 export class DeviceAuthModule {}
 ```
@@ -76,16 +76,16 @@ completes the device flow on the provider's site.
 
 ```json
 {
-    "installed": true,
-    "connected": false,
-    "pending": true,
-    "scope": "user",
-    "flowType": "device-code",
-    "prompt": {
-        "verificationUri": "https://github.com/login/device",
-        "userCode": "ABCD-1234"
-    },
-    "message": "Visit the verification URL and enter the code to complete sign-in."
+	"installed": true,
+	"connected": false,
+	"pending": true,
+	"scope": "user",
+	"flowType": "device-code",
+	"prompt": {
+		"verificationUri": "https://github.com/login/device",
+		"userCode": "ABCD-1234"
+	},
+	"message": "Visit the verification URL and enter the code to complete sign-in."
 }
 ```
 
@@ -122,18 +122,18 @@ cancelled).
 
 ```typescript
 export interface DeviceAuthPrompt {
-    verificationUri: string;
-    userCode: string;
+	verificationUri: string;
+	userCode: string;
 }
 
 export interface DeviceAuthStatus {
-    installed: boolean;            // Plugin loaded + advertises device-auth
-    connected: boolean;            // User has a valid stored token
-    pending: boolean;              // A device-code flow is in flight
-    scope: 'user';                 // Always per-user (no global device flows)
-    flowType: 'device-code';       // Discriminator for UI rendering
-    prompt?: DeviceAuthPrompt;     // Present iff pending === true
-    message: string;               // Human-readable status line
+	installed: boolean; // Plugin loaded + advertises device-auth
+	connected: boolean; // User has a valid stored token
+	pending: boolean; // A device-code flow is in flight
+	scope: 'user'; // Always per-user (no global device flows)
+	flowType: 'device-code'; // Discriminator for UI rendering
+	prompt?: DeviceAuthPrompt; // Present iff pending === true
+	message: string; // Human-readable status line
 }
 ```
 
@@ -149,9 +149,9 @@ To support this capability, a plugin must implement
 
 ```typescript
 export interface IDeviceAuthProvider {
-    getDeviceAuthStatus(userId: string): Promise<DeviceAuthStatus>;
-    startDeviceAuth(userId: string): Promise<DeviceAuthStatus>;
-    cancelDeviceAuth?(userId: string): Promise<DeviceAuthStatus>;
+	getDeviceAuthStatus(userId: string): Promise<DeviceAuthStatus>;
+	startDeviceAuth(userId: string): Promise<DeviceAuthStatus>;
+	cancelDeviceAuth?(userId: string): Promise<DeviceAuthStatus>;
 }
 ```
 
@@ -167,16 +167,16 @@ The capability registry detects this contract via `isDeviceAuthProvider`
 
 ## Plugins That Use This Capability
 
-| Plugin ID                | Provider                  | Notes                                                                |
-| ------------------------ | ------------------------- | -------------------------------------------------------------------- |
-| `claude-code`            | Claude Code OAuth          | User-scoped; surfaces `verification_uri_complete` + `user_code`     |
-| `claude-managed-agent`   | Claude Code (managed)      | Same flow as `claude-code` but with a managed-agent context wrapper  |
-| `codex`                  | OpenAI Codex CLI           | Device-code flow against the OpenAI auth endpoint                    |
-| `gemini`                 | Gemini CLI                 | Google's device-code flow                                            |
-| `opencode`               | OpenCode CLI               | Device-code flow against the OpenCode auth endpoint                  |
+| Plugin ID              | Provider              | Notes                                                               |
+| ---------------------- | --------------------- | ------------------------------------------------------------------- |
+| `claude-code`          | Claude Code OAuth     | User-scoped; surfaces `verification_uri_complete` + `user_code`     |
+| `claude-managed-agent` | Claude Code (managed) | Same flow as `claude-code` but with a managed-agent context wrapper |
+| `codex`                | OpenAI Codex CLI      | Device-code flow against the OpenAI auth endpoint                   |
+| `gemini`               | Gemini CLI            | Google's device-code flow                                           |
+| `opencode`             | OpenCode CLI          | Device-code flow against the OpenCode auth endpoint                 |
 
 Each of these plugins ships its own settings schema for the resulting
-token storage; the device-auth flow only handles the *acquisition* of
+token storage; the device-auth flow only handles the _acquisition_ of
 the token, not its long-term storage shape.
 
 ## Error Handling
@@ -184,11 +184,11 @@ the token, not its long-term storage shape.
 Errors propagate unwrapped from the underlying `PluginOperationsService`.
 Common failure modes:
 
-| Scenario                              | What happens                                                                |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| Plugin not installed / unloaded       | `PluginOperationsService` throws; the controller returns the original error |
-| Plugin doesn't implement device-auth  | `PluginOperationsService` throws `Plugin does not support device auth`      |
-| Upstream provider returns 4xx/5xx     | The plugin re-throws; the platform surfaces the message                     |
+| Scenario                             | What happens                                                                |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| Plugin not installed / unloaded      | `PluginOperationsService` throws; the controller returns the original error |
+| Plugin doesn't implement device-auth | `PluginOperationsService` throws `Plugin does not support device auth`      |
+| Upstream provider returns 4xx/5xx    | The plugin re-throws; the platform surfaces the message                     |
 
 Unlike the deploy/search/screenshot capabilities, the device-auth
 controller does NOT shape errors into `{status: 'error', message}`
@@ -208,10 +208,10 @@ spec](https://github.com/ever-works/ever-works/tree/develop/docs/specs/features/
 
 ## Source Files
 
-| File                                                                       | Purpose                              |
-| -------------------------------------------------------------------------- | ------------------------------------ |
-| `apps/api/src/plugins-capabilities/device-auth/device-auth.module.ts`      | Module definition                    |
-| `apps/api/src/plugins-capabilities/device-auth/device-auth.controller.ts`  | REST API controller                  |
-| `apps/api/src/plugins-capabilities/device-auth/device-auth.service.ts`     | Thin two-method passthrough          |
+| File                                                                           | Purpose                                    |
+| ------------------------------------------------------------------------------ | ------------------------------------------ |
+| `apps/api/src/plugins-capabilities/device-auth/device-auth.module.ts`          | Module definition                          |
+| `apps/api/src/plugins-capabilities/device-auth/device-auth.controller.ts`      | REST API controller                        |
+| `apps/api/src/plugins-capabilities/device-auth/device-auth.service.ts`         | Thin two-method passthrough                |
 | `packages/plugin/src/contracts/capabilities/device-auth-provider.interface.ts` | `DeviceAuthStatus` + `IDeviceAuthProvider` |
-| `packages/agent/src/plugins/plugin-operations.service.ts`                   | `PluginOperationsService` orchestrator |
+| `packages/agent/src/plugins/plugin-operations.service.ts`                      | `PluginOperationsService` orchestrator     |

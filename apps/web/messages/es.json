@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Error al actualizar la configuración de sincronización",
                 "syncDisabled": "Sincronización desactivada",
                 "worksConfig": {
-                    "imported": "Importado desde works.yml",
+                    "imported": "Importado desde .works/works.yml",
                     "applied": "Aplicado: {value}",
                     "enabled": "habilitado",
                     "disabled": "deshabilitado",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Repositorio de datos",
                         "awesomeReadme": "README impresionante",
                         "linkExisting": "Repositorios existentes vinculados",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Configuración general",
@@ -2349,7 +2349,7 @@
                     "description": "Actualizar automáticamente desde el repositorio fuente."
                 },
                 "worksConfigRestore": {
-                    "title": "Restaurar configuración de works.yml",
+                    "title": "Restaurar configuración de .works/works.yml",
                     "description": "Aplicar proveedor de IA, modelo, programación y repositorios relacionados desde este repositorio."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Formatos de Repositorio Soportados",
                     "dataRepo": {
                         "title": "Repositorio de Datos",
-                        "description": "Repositorios con estructura works.yml y carpeta data/"
+                        "description": "Repositorios con estructura .works/works.yml y carpeta data/"
                     },
                     "awesomeReadme": {
                         "title": "Lista Awesome",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Repo de Datos",
                     "awesomeReadme": "Lista Awesome",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "elementos",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Vincular repositorios"
                 },
                 "detectionFailed": "No pudimos detectar automáticamente el formato. Por favor, selecciona cómo importar este repositorio.",
-                "detectionFailedMissingConfig": "No se encontró ninguna configuración compatible. Agrega works.yml al repositorio, o elige un formato de importación manual a continuación.",
+                "detectionFailedMissingConfig": "No se encontró ninguna configuración compatible. Agrega .works/works.yml al repositorio, o elige un formato de importación manual a continuación.",
                 "errors": {
                     "urlRequired": "Por favor, ingresa una URL de repositorio de GitHub",
                     "unsupportedFormat": "Este formato de repositorio no está soportado. Por favor, usa un formato de Repositorio de Datos o Lista Awesome.",

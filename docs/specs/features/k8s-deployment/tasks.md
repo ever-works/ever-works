@@ -23,7 +23,7 @@
 ## Phase 1 — Plugin scaffold + works-config field (PR #1)
 
 > Goal: a discoverable but inert plugin **and** a provider-agnostic `deployProvider` field in
-> `works.yml`. The latter is independent of k8s and benefits Vercel immediately.
+> `.works/works.yml`. The latter is independent of k8s and benefits Vercel immediately.
 > Visibility = `'hidden'` until Phase 2 lands.
 
 - [ ] **T1**. Create plugin package skeleton at `packages/plugins/k8s/`:
@@ -73,7 +73,7 @@
 - [ ] **T6e**. Activity-log event `deploy_provider_conflict` when `work.deployProvider !== worksConfig.deployProvider` at sync time; data repo wins per FR-18.
     - **Test**: assert the event is emitted with both values.
 
-**Phase 1 DoD**: API boots; plugin appears in `/api/plugins` list; calling any deploy method throws `Not yet implemented`; a `works.yml` with `deployProvider: vercel` already round-trips and applies (no k8s code path involved). Tests T4–T5, T6a–T6c, T6e green. UI shows nothing yet (visibility hidden).
+**Phase 1 DoD**: API boots; plugin appears in `/api/plugins` list; calling any deploy method throws `Not yet implemented`; a `.works/works.yml` with `deployProvider: vercel` already round-trips and applies (no k8s code path involved). Tests T4–T5, T6a–T6c, T6e green. UI shows nothing yet (visibility hidden).
 
 ---
 

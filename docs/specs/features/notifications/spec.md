@@ -84,7 +84,7 @@ underlying issue is resolved.
 - **FR-8** `POST /api/notifications/:id/dismiss` MUST refuse persistent
   notifications with `BadRequestException` and MUST refuse missing /
   cross-user notifications with `BadRequestException("Notification not
-  found")`.
+found")`.
 - **FR-9** A `clearByDeduplicationKey(userId, key)` operation MUST be
   available so producers can clear a notification when the underlying
   issue resolves.
@@ -104,7 +104,7 @@ underlying issue is resolved.
 ## 4. Non-Functional Requirements
 
 - **Performance**: list queries are indexed on `(userId, createdAt
-  desc)` and `(userId, isPersistent)`; cap at 100 rows per request keeps
+desc)` and `(userId, isPersistent)`; cap at 100 rows per request keeps
   the panel snappy.
 - **Reliability**: distributed lock + idempotent dedup keys mean
   cleanup and producer code are safe to retry.
@@ -119,15 +119,15 @@ underlying issue is resolved.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept              | Description                                                                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Entity / concept              | Description                                                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Notification`                | TypeORM entity. Fields: `id, userId, type, category, title, message, actionUrl, actionLabel, metadata, isPersistent, isDismissed, isRead, expiresAt, deduplicationKey, createdAt`. |
-| `NotificationType`            | Enum: `info / warning / error / success`.                                                                            |
-| `NotificationCategory`        | Enum: `ai_credits / subscription / generation / system / security`.                                                  |
-| `NotificationService`         | `packages/agent/src/notifications/notification.service.ts` — create / dedup / list / read / dismiss / cleanup.       |
-| `NotificationCleanupService`  | `apps/api/src/notifications/notification-cleanup.service.ts` — distributed-lock-guarded cron worker.                 |
-| Per-cleanup lock key          | `notifications:cleanup` (single-instance, 5-min ttl).                                                                |
-| Deduplication key conventions | `ai_credits_depleted_<provider>`, `ai_provider_error_<provider>`, `generation_error_<workId>`, `schedule_paused_<workId>`, `git_auth_expired_<provider>`. |
+| `NotificationType`            | Enum: `info / warning / error / success`.                                                                                                                                          |
+| `NotificationCategory`        | Enum: `ai_credits / subscription / generation / system / security`.                                                                                                                |
+| `NotificationService`         | `packages/agent/src/notifications/notification.service.ts` — create / dedup / list / read / dismiss / cleanup.                                                                     |
+| `NotificationCleanupService`  | `apps/api/src/notifications/notification-cleanup.service.ts` — distributed-lock-guarded cron worker.                                                                               |
+| Per-cleanup lock key          | `notifications:cleanup` (single-instance, 5-min ttl).                                                                                                                              |
+| Deduplication key conventions | `ai_credits_depleted_<provider>`, `ai_provider_error_<provider>`, `generation_error_<workId>`, `schedule_paused_<workId>`, `git_auth_expired_<provider>`.                          |
 
 ## 6. Out of Scope
 

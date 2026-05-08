@@ -137,7 +137,7 @@ For a detailed explanation of the import system — including under-the-hood mec
 
 The import form starts by asking for a repository URL (or letting you browse your repositories). The platform then **analyzes** the repository to detect what type of source it is:
 
-- **Data Repository** — an existing Ever Works-format repo with `works.yml` and `data/` work. Items, categories, and tags are copied directly.
+- **Data Repository** — an existing Ever Works-format repo with `.works/works.yml` and `data/` work. Items, categories, and tags are copied directly.
 - **Awesome README** — a curated list with categorized links (like GitHub Awesome Lists). The AI pipeline processes the source as research seeds and builds a much larger work.
 - **Link Existing** — connects to an existing data repo without copying data, so the platform can manage it going forward.
 

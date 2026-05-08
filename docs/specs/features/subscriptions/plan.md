@@ -30,23 +30,23 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern                     | Choice                                                                                | Rationale                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| HTTP surface                | NestJS controller `apps/api/src/subscriptions/subscriptions.controller.ts`            | Same pattern as every other auth-guarded endpoint; SwaggerUI tags applied                                  |
-| Auth                        | `AuthSessionGuard` (cookie or `ew_live_*` API key)                                    | Plan reads/writes always require an authenticated user                                                     |
-| Validation                  | `class-validator` `@IsEnum(SubscriptionPlanCode)` on `UpdateSubscriptionPlanDto`       | Forces a closed-enum body; the validation pipe rejects unknown codes BEFORE the controller body            |
-| Plan catalog persistence    | `subscription_plans` (TypeORM `@Entity('subscription_plans')`) + `simple-json` for `allowedCadences` | Allows additive cadence values without a migration; `@Index(['code'], { unique: true })` enforces uniqueness |
-| Per-user link               | `users.defaultPlanId` FK + `user_subscriptions` (one active per user)                 | Two-tier model: `defaultPlan` is the "fallback when no active sub", `UserSubscription` is the active billing record |
-| Plan resolution precedence  | `getActiveSubscription` → `user.defaultPlan` → `resolveDefaultPlan` (config / FREE)   | Matches what the architecture spec describes; the four levels keep self-hosted, single-tenant, and SaaS branches all working with the same code path |
-| Plan seeding                | `onModuleInit` → `seedPlans` → `Promise.all(PLAN_SEED_DATA.map(upsert))`              | Idempotent; runs on every boot; guarantees the catalog is always at the latest seed shape                  |
-| Cadence allowance grid      | `ALL_CADENCES` (7 entries, ordered) projected with `Set` membership against `plan.allowedCadences` | The dashboard gets a stable seven-row response; `payPerUse: true` flag tells the UI which cadences require usage billing |
-| Recommendation helper       | `recommendationForCadence(cadence)` switch                                            | Maps each cadence to the suggested upgrade tier name; returned in the `reason` field                       |
-| Usage-ledger short-circuit  | Two early returns in `UsageLedgerService.recordUsage`: subscriptions-disabled OR billingMode != USAGE | Keeps subscription-mode runs free of any DB write                                                          |
-| Billing-provider abstraction| Abstract NestJS class `BillingProvider` + concrete `ManualBillingProvider`            | Future Stripe / LemonSqueezy / Paddle implementations can extend without touching feature code             |
-| Currency                    | `config.billing.getDefaultCurrency()` via `ManualBillingProvider`                     | Single config knob (`BILLING_DEFAULT_CURRENCY`, default `'usd'`) drives every ledger row                   |
-| Plan-limit gate             | `WorkScheduleService.updateSchedule` reads `scheduleRepository.countActiveByUser(user.id)` and compares to `plan.maxWorks` | Pre-flight gate that rejects with `PLAN_LIMIT_EXCEEDED` BEFORE the upsert                                  |
-| Cadence gate                | `WorkScheduleService.updateSchedule` calls `subscriptionService.requiresUsageBilling(cadence, plan, billingMode)` | Single helper covers both "subscriptions disabled" and "cadence allowed" branches; throws `BadRequestException` when `true` |
-| Post-completion accounting  | `WorkScheduleService.markRunCompleted` → `UsageLedgerService.recordUsage`             | Single call site; failed/skipped runs do NOT call this so they are free                                    |
+| Concern                      | Choice                                                                                                                     | Rationale                                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP surface                 | NestJS controller `apps/api/src/subscriptions/subscriptions.controller.ts`                                                 | Same pattern as every other auth-guarded endpoint; SwaggerUI tags applied                                                                            |
+| Auth                         | `AuthSessionGuard` (cookie or `ew_live_*` API key)                                                                         | Plan reads/writes always require an authenticated user                                                                                               |
+| Validation                   | `class-validator` `@IsEnum(SubscriptionPlanCode)` on `UpdateSubscriptionPlanDto`                                           | Forces a closed-enum body; the validation pipe rejects unknown codes BEFORE the controller body                                                      |
+| Plan catalog persistence     | `subscription_plans` (TypeORM `@Entity('subscription_plans')`) + `simple-json` for `allowedCadences`                       | Allows additive cadence values without a migration; `@Index(['code'], { unique: true })` enforces uniqueness                                         |
+| Per-user link                | `users.defaultPlanId` FK + `user_subscriptions` (one active per user)                                                      | Two-tier model: `defaultPlan` is the "fallback when no active sub", `UserSubscription` is the active billing record                                  |
+| Plan resolution precedence   | `getActiveSubscription` → `user.defaultPlan` → `resolveDefaultPlan` (config / FREE)                                        | Matches what the architecture spec describes; the four levels keep self-hosted, single-tenant, and SaaS branches all working with the same code path |
+| Plan seeding                 | `onModuleInit` → `seedPlans` → `Promise.all(PLAN_SEED_DATA.map(upsert))`                                                   | Idempotent; runs on every boot; guarantees the catalog is always at the latest seed shape                                                            |
+| Cadence allowance grid       | `ALL_CADENCES` (7 entries, ordered) projected with `Set` membership against `plan.allowedCadences`                         | The dashboard gets a stable seven-row response; `payPerUse: true` flag tells the UI which cadences require usage billing                             |
+| Recommendation helper        | `recommendationForCadence(cadence)` switch                                                                                 | Maps each cadence to the suggested upgrade tier name; returned in the `reason` field                                                                 |
+| Usage-ledger short-circuit   | Two early returns in `UsageLedgerService.recordUsage`: subscriptions-disabled OR billingMode != USAGE                      | Keeps subscription-mode runs free of any DB write                                                                                                    |
+| Billing-provider abstraction | Abstract NestJS class `BillingProvider` + concrete `ManualBillingProvider`                                                 | Future Stripe / LemonSqueezy / Paddle implementations can extend without touching feature code                                                       |
+| Currency                     | `config.billing.getDefaultCurrency()` via `ManualBillingProvider`                                                          | Single config knob (`BILLING_DEFAULT_CURRENCY`, default `'usd'`) drives every ledger row                                                             |
+| Plan-limit gate              | `WorkScheduleService.updateSchedule` reads `scheduleRepository.countActiveByUser(user.id)` and compares to `plan.maxWorks` | Pre-flight gate that rejects with `PLAN_LIMIT_EXCEEDED` BEFORE the upsert                                                                            |
+| Cadence gate                 | `WorkScheduleService.updateSchedule` calls `subscriptionService.requiresUsageBilling(cadence, plan, billingMode)`          | Single helper covers both "subscriptions disabled" and "cadence allowed" branches; throws `BadRequestException` when `true`                          |
+| Post-completion accounting   | `WorkScheduleService.markRunCompleted` → `UsageLedgerService.recordUsage`                                                  | Single call site; failed/skipped runs do NOT call this so they are free                                                                              |
 
 ## 3. Data Model
 
@@ -117,11 +117,11 @@ CREATE INDEX usage_ledger_schedule_idx     ON usage_ledger_entries("scheduleId")
 `PLAN_SEED_DATA` (in `subscription.service.ts`, applied via
 `SubscriptionPlanRepository.upsert` on every `onModuleInit`):
 
-| `code`     | `displayName` | `maxWorks` | `allowedCadences`                                                                                              | `monthlyPrice` | `overagePricePerRun` |
-| ---------- | ------------- | ---------- | -------------------------------------------------------------------------------------------------------------- | -------------- | -------------------- |
-| `free`     | `Free`        | `1`        | `ALL_CADENCES` *(temporary — see OQ-1; production gate is `[MONTHLY]`)*                                        | `'0'`          | `'10'`               |
-| `standard` | `Standard`    | `5`        | `[MONTHLY, WEEKLY, DAILY, EVERY_12_HOURS]`                                                                     | `'29'`         | `'8'`                |
-| `premium`  | `Premium`     | `15`       | `[MONTHLY, WEEKLY, DAILY, EVERY_12_HOURS, EVERY_8_HOURS, EVERY_3_HOURS, HOURLY]`                               | `'99'`         | `'0'`                |
+| `code`     | `displayName` | `maxWorks` | `allowedCadences`                                                                | `monthlyPrice` | `overagePricePerRun` |
+| ---------- | ------------- | ---------- | -------------------------------------------------------------------------------- | -------------- | -------------------- |
+| `free`     | `Free`        | `1`        | `ALL_CADENCES` _(temporary — see OQ-1; production gate is `[MONTHLY]`)_          | `'0'`          | `'10'`               |
+| `standard` | `Standard`    | `5`        | `[MONTHLY, WEEKLY, DAILY, EVERY_12_HOURS]`                                       | `'29'`         | `'8'`                |
+| `premium`  | `Premium`     | `15`       | `[MONTHLY, WEEKLY, DAILY, EVERY_12_HOURS, EVERY_8_HOURS, EVERY_3_HOURS, HOURLY]` | `'99'`         | `'0'`                |
 
 `ALL_CADENCES` order (used by both the seed and `getCadenceAllowances`
 projection): `MONTHLY, WEEKLY, DAILY, EVERY_12_HOURS, EVERY_8_HOURS,
@@ -129,10 +129,10 @@ EVERY_3_HOURS, HOURLY`.
 
 ## 5. HTTP Surface
 
-| Method | Path                       | Guard                | Body                            | Response                                                                                              |
-| ------ | -------------------------- | -------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| GET    | `/api/subscriptions/plan`  | `AuthSessionGuard`   | —                               | `{ status: 'success', enabled: false, plan: null }` OR `{ status: 'success', enabled: true, plan: { code, name, allowedCadences } }` |
-| POST   | `/api/subscriptions/plan`  | `AuthSessionGuard`   | `{ planCode: SubscriptionPlanCode }` | Same envelope as GET, with the new plan; throws 400 when subscriptions are disabled or the body fails `@IsEnum`. |
+| Method | Path                      | Guard              | Body                                 | Response                                                                                                                             |
+| ------ | ------------------------- | ------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/subscriptions/plan` | `AuthSessionGuard` | —                                    | `{ status: 'success', enabled: false, plan: null }` OR `{ status: 'success', enabled: true, plan: { code, name, allowedCadences } }` |
+| POST   | `/api/subscriptions/plan` | `AuthSessionGuard` | `{ planCode: SubscriptionPlanCode }` | Same envelope as GET, with the new plan; throws 400 when subscriptions are disabled or the body fails `@IsEnum`.                     |
 
 `POST` mutation order (controller `updatePlan`):
 
@@ -228,13 +228,9 @@ LemonSqueezy / Paddle implementations override `recordUsageCharge`.
 
 ```ts
 @Module({
-    imports: [DatabaseModule],
-    providers: [
-        SubscriptionService,
-        UsageLedgerService,
-        { provide: BillingProvider, useClass: ManualBillingProvider },
-    ],
-    exports: [SubscriptionService, UsageLedgerService, BillingProvider],
+	imports: [DatabaseModule],
+	providers: [SubscriptionService, UsageLedgerService, { provide: BillingProvider, useClass: ManualBillingProvider }],
+	exports: [SubscriptionService, UsageLedgerService, BillingProvider]
 })
 export class SubscriptionsModule {}
 ```
@@ -243,8 +239,8 @@ export class SubscriptionsModule {}
 
 ```ts
 @Module({
-    imports: [AuthModule, AgentSubscriptionsModule],
-    controllers: [SubscriptionsController],
+	imports: [AuthModule, AgentSubscriptionsModule],
+	controllers: [SubscriptionsController]
 })
 export class SubscriptionsModule {}
 ```
@@ -254,27 +250,27 @@ export class SubscriptionsModule {}
 
 ## 9. Configuration Surface
 
-| Knob                                            | Env var                                                     | Default       | Used by                                                  |
-| ----------------------------------------------- | ----------------------------------------------------------- | ------------- | -------------------------------------------------------- |
-| `config.subscriptions.isEnabled()`              | `SUBSCRIPTIONS_ENABLED`                                     | `'false'`     | `SubscriptionService.isEnabled`, all gate functions      |
-| `config.subscriptions.getDefaultPlanCode()`     | `SUBSCRIPTIONS_DEFAULT_PLAN`                                | `'free'`      | `resolveDefaultPlan`                                     |
-| `config.subscriptions.getPayPerUsePriceCents()` | `PAY_PER_USE_PRICE_USD` (parsed as USD then ×100, rounded)  | `500` (cents) | `UsageLedgerService.recordUsage`                         |
-| `config.subscriptions.scheduledUpdatesEnabled()`| `SCHEDULED_UPDATES_ENABLED`                                 | `'true'`      | `WorkScheduleService` (separate scheduling toggle)       |
-| `config.subscriptions.getMaxFailureBeforePause()`| `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`               | `3`           | `WorkScheduleService` (auto-pause threshold)             |
-| `config.subscriptions.getDispatchIntervalMinutes()`| `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES`              | `5`           | `WorkScheduleDispatcherCronService`                       |
-| `config.subscriptions.getMaxBatch()`            | `SCHEDULED_UPDATES_MAX_BATCH`                                | `25`          | `WorkScheduleDispatcherCronService`                       |
-| `config.billing.getDefaultCurrency()`           | `BILLING_DEFAULT_CURRENCY`                                   | `'usd'`       | `ManualBillingProvider`, `seedPlans`, ledger rows        |
-| `config.billing.stripe.getSecretKey()`          | `STRIPE_SECRET_KEY`                                          | unset         | Reserved for the Stripe `BillingProvider` impl (not wired today) |
-| `config.billing.stripe.getWebhookSecret()`      | `STRIPE_WEBHOOK_SECRET`                                      | unset         | Reserved for Stripe webhook verification                 |
+| Knob                                                | Env var                                                    | Default       | Used by                                                          |
+| --------------------------------------------------- | ---------------------------------------------------------- | ------------- | ---------------------------------------------------------------- |
+| `config.subscriptions.isEnabled()`                  | `SUBSCRIPTIONS_ENABLED`                                    | `'false'`     | `SubscriptionService.isEnabled`, all gate functions              |
+| `config.subscriptions.getDefaultPlanCode()`         | `SUBSCRIPTIONS_DEFAULT_PLAN`                               | `'free'`      | `resolveDefaultPlan`                                             |
+| `config.subscriptions.getPayPerUsePriceCents()`     | `PAY_PER_USE_PRICE_USD` (parsed as USD then ×100, rounded) | `500` (cents) | `UsageLedgerService.recordUsage`                                 |
+| `config.subscriptions.scheduledUpdatesEnabled()`    | `SCHEDULED_UPDATES_ENABLED`                                | `'true'`      | `WorkScheduleService` (separate scheduling toggle)               |
+| `config.subscriptions.getMaxFailureBeforePause()`   | `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`               | `3`           | `WorkScheduleService` (auto-pause threshold)                     |
+| `config.subscriptions.getDispatchIntervalMinutes()` | `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES`              | `5`           | `WorkScheduleDispatcherCronService`                              |
+| `config.subscriptions.getMaxBatch()`                | `SCHEDULED_UPDATES_MAX_BATCH`                              | `25`          | `WorkScheduleDispatcherCronService`                              |
+| `config.billing.getDefaultCurrency()`               | `BILLING_DEFAULT_CURRENCY`                                 | `'usd'`       | `ManualBillingProvider`, `seedPlans`, ledger rows                |
+| `config.billing.stripe.getSecretKey()`              | `STRIPE_SECRET_KEY`                                        | unset         | Reserved for the Stripe `BillingProvider` impl (not wired today) |
+| `config.billing.stripe.getWebhookSecret()`          | `STRIPE_WEBHOOK_SECRET`                                    | unset         | Reserved for Stripe webhook verification                         |
 
 ## 10. Test Surface
 
-| Layer       | File                                                                                     | What it pins                                                                                                                                                                           |
-| ----------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Controller  | `apps/api/src/subscriptions/subscriptions.controller.spec.ts` (9 tests, PR #496)         | `getPlan` enabled-false envelope, enabled mapping (`code/displayName` → `code/name + allowances`), `AuthService.getUser` + `summarizePlan` error propagation; `updatePlan` BadRequest when disabled (no `getUser` / `assignPlanToUser` side effects), happy-path mapping, plan envelope source = `assignPlanToUser` response, error propagation. |
-| Service     | `packages/agent/src/subscriptions/__tests__/subscription.service.spec.ts` (existing)     | `isEnabled` env coupling, `seedPlans` upsert calls, `resolvePlanForUser` four-level chain, `getCadenceAllowances` allowed/payPerUse projection, `requiresUsageBilling` truth table, `assignPlanToUser` enable/missing-plan/normalisation paths, default-plan fallback warn log. |
-| Service     | `packages/agent/src/subscriptions/__tests__/usage-ledger.service.spec.ts` (existing)     | `recordUsage` short-circuits when subscriptions disabled, short-circuits when `billingMode !== USAGE`, writes a row with `units = 1` + `amountCents` from config, fans out to `billingProvider.recordUsageCharge`. |
-| Consumer    | `packages/agent/src/services/__tests__/work-schedule.service.spec.ts` (existing)         | `updateSchedule` cadence gate via `requiresUsageBilling`, `PLAN_LIMIT_EXCEEDED` when `countActiveByUser >= plan.maxWorks`, `markRunCompleted` writes a ledger row, `markRunFailed` does NOT. |
+| Layer      | File                                                                                 | What it pins                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Controller | `apps/api/src/subscriptions/subscriptions.controller.spec.ts` (9 tests, PR #496)     | `getPlan` enabled-false envelope, enabled mapping (`code/displayName` → `code/name + allowances`), `AuthService.getUser` + `summarizePlan` error propagation; `updatePlan` BadRequest when disabled (no `getUser` / `assignPlanToUser` side effects), happy-path mapping, plan envelope source = `assignPlanToUser` response, error propagation. |
+| Service    | `packages/agent/src/subscriptions/__tests__/subscription.service.spec.ts` (existing) | `isEnabled` env coupling, `seedPlans` upsert calls, `resolvePlanForUser` four-level chain, `getCadenceAllowances` allowed/payPerUse projection, `requiresUsageBilling` truth table, `assignPlanToUser` enable/missing-plan/normalisation paths, default-plan fallback warn log.                                                                  |
+| Service    | `packages/agent/src/subscriptions/__tests__/usage-ledger.service.spec.ts` (existing) | `recordUsage` short-circuits when subscriptions disabled, short-circuits when `billingMode !== USAGE`, writes a row with `units = 1` + `amountCents` from config, fans out to `billingProvider.recordUsageCharge`.                                                                                                                               |
+| Consumer   | `packages/agent/src/services/__tests__/work-schedule.service.spec.ts` (existing)     | `updateSchedule` cadence gate via `requiresUsageBilling`, `PLAN_LIMIT_EXCEEDED` when `countActiveByUser >= plan.maxWorks`, `markRunCompleted` writes a ledger row, `markRunFailed` does NOT.                                                                                                                                                     |
 
 Conventions follow `docs/specs/features/<feature>/spec.md` + `plan.md` +
 `tasks.md` (Spec Kit), with the feature owner committing a PR that
@@ -282,14 +278,14 @@ checks these tests + updates `COVERAGE-TRACKER.md`.
 
 ## 11. Risks & Trade-offs
 
-| Risk                                                                                  | Mitigation                                                                                                                                                                                                                                              |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `seedPlans` overwrites operator customisations on every boot                          | Operators are expected to fork `PLAN_SEED_DATA` if they need alternate seed shapes. The seed runs intentionally on every boot to keep the `displayName` / `maxWorks` / `allowedCadences` columns consistent with the code.                              |
-| `assignPlanToUser` mutates the in-memory `User` reference                             | Documented in OQ-5; intentionally avoids a refetch in the controller's hot path. Callers should not hold an old reference past `assignPlanToUser`.                                                                                                      |
-| `BillingProvider.recordUsageCharge` is awaited unguarded                              | Today the default impl is a no-op so this is invisible. Future Stripe impls should wrap their HTTP call in retry / circuit-breaker patterns and update the entry's `status` to `failed` for off-line settlement (OQ-3).                                  |
-| `FREE` seed currently unlocks every cadence (`ALL_CADENCES` instead of `[MONTHLY]`)   | OQ-1; documented in §6 Out-of-Scope of `spec.md`. The unit suite pins the current behaviour so a re-tightening is a single-character flip + test update.                                                                                                |
-| `UserSubscription.billingProvider` defaults to `'stripe'` though Stripe is not wired  | OQ-4; the column is reserved for the per-user provider when Stripe lands. The platform-side `BillingProvider` abstract class is independent of this value today.                                                                                        |
-| No activity-log emission on plan change                                               | OQ-2; can be added later as a `SETTINGS_UPDATED` event. The controller is small enough that a single `.catch(() => {})` fire-and-forget log would suffice.                                                                                              |
+| Risk                                                                                 | Mitigation                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seedPlans` overwrites operator customisations on every boot                         | Operators are expected to fork `PLAN_SEED_DATA` if they need alternate seed shapes. The seed runs intentionally on every boot to keep the `displayName` / `maxWorks` / `allowedCadences` columns consistent with the code. |
+| `assignPlanToUser` mutates the in-memory `User` reference                            | Documented in OQ-5; intentionally avoids a refetch in the controller's hot path. Callers should not hold an old reference past `assignPlanToUser`.                                                                         |
+| `BillingProvider.recordUsageCharge` is awaited unguarded                             | Today the default impl is a no-op so this is invisible. Future Stripe impls should wrap their HTTP call in retry / circuit-breaker patterns and update the entry's `status` to `failed` for off-line settlement (OQ-3).    |
+| `FREE` seed currently unlocks every cadence (`ALL_CADENCES` instead of `[MONTHLY]`)  | OQ-1; documented in §6 Out-of-Scope of `spec.md`. The unit suite pins the current behaviour so a re-tightening is a single-character flip + test update.                                                                   |
+| `UserSubscription.billingProvider` defaults to `'stripe'` though Stripe is not wired | OQ-4; the column is reserved for the per-user provider when Stripe lands. The platform-side `BillingProvider` abstract class is independent of this value today.                                                           |
+| No activity-log emission on plan change                                              | OQ-2; can be added later as a `SETTINGS_UPDATED` event. The controller is small enough that a single `.catch(() => {})` fire-and-forget log would suffice.                                                                 |
 
 ## 12. Migration & Forward-Only Schema
 

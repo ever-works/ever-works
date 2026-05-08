@@ -101,7 +101,7 @@
     - `track(activity)` merges plain-object metadata only,
       otherwise treats metadata as `{}`.
     - Forwards `activityId / userId / workId / actionType / action /
-      status / summary / details / createdAt` plus the metadata
+status / summary / details / createdAt` plus the metadata
       properties to the Jitsu client with `action` as the event name.
 - [x] T19. Dispatcher binding wired in `apps/api/src/activity-log/jitsu.module.ts`.
 
@@ -146,7 +146,7 @@
 - [ ] T29. **Follow-up**: integration tests in `packages/agent` (Jest)
       hitting a real Postgres test container to pin (a) the four
       composite indexes, (b) the `(userId, workId)` `ON DELETE SET
-      NULL` behaviour, and (c) the reconcile pass against a seeded
+    NULL` behaviour, and (c) the reconcile pass against a seeded
       orphan-in-progress row. Currently only unit tests cover the
       reconciliation path.
 
@@ -192,7 +192,7 @@
 - **Reconciliation cron** — if the lazy per-request approach ever
   pressures the read path, consider promoting the reconcile pass to
   a `DistributedTaskLockService.runExclusive('activity-log:reconcile',
-  …)` cron job, similar to the notifications cleanup worker.
+…)` cron job, similar to the notifications cleanup worker.
 - **Storage partitioning** — the architecture spec calls out
   per-work partitioning as a future change at the 1M-row scale; this
   is the spec to amend if that work lands.

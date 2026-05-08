@@ -63,39 +63,39 @@ List paginated activity-log entries for the current user.
 
 **Query parameters:**
 
-| Param        | Type                                    | Default | Description                                                                                                                            |
-| ------------ | --------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `actionType` | `ActivityActionType`                    | —       | Filter by action type (e.g. `generation`, `deployment`, `work_created`). Full enum below.                                              |
-| `workId`     | `string`                                | —       | Restrict to one work.                                                                                                                  |
-| `status`     | `pending`/`in_progress`/`completed`/`failed`/`cancelled` | —       | Filter by status.                                                                                                                      |
-| `dateFrom`   | ISO 8601 date                           | —       | Lower bound on `createdAt`.                                                                                                            |
-| `dateTo`     | ISO 8601 date                           | —       | Upper bound on `createdAt`.                                                                                                            |
-| `search`     | `string`                                | —       | Substring match against `summary` and joined work name.                                                                                |
-| `limit`      | `number`                                | `25`    | Page size, hard-capped at `100` (`Math.min(limit, 100)`).                                                                              |
-| `offset`     | `number`                                | `0`     | Pagination offset.                                                                                                                     |
+| Param        | Type                                                     | Default | Description                                                                               |
+| ------------ | -------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `actionType` | `ActivityActionType`                                     | —       | Filter by action type (e.g. `generation`, `deployment`, `work_created`). Full enum below. |
+| `workId`     | `string`                                                 | —       | Restrict to one work.                                                                     |
+| `status`     | `pending`/`in_progress`/`completed`/`failed`/`cancelled` | —       | Filter by status.                                                                         |
+| `dateFrom`   | ISO 8601 date                                            | —       | Lower bound on `createdAt`.                                                               |
+| `dateTo`     | ISO 8601 date                                            | —       | Upper bound on `createdAt`.                                                               |
+| `search`     | `string`                                                 | —       | Substring match against `summary` and joined work name.                                   |
+| `limit`      | `number`                                                 | `25`    | Page size, hard-capped at `100` (`Math.min(limit, 100)`).                                 |
+| `offset`     | `number`                                                 | `0`     | Pagination offset.                                                                        |
 
 **Response 200:**
 
 ```json
 {
-  "activities": [
-    {
-      "id": "01HXAB...",
-      "userId": "user-123",
-      "workId": "work-abc",
-      "actionType": "generation",
-      "action": "generation.completed",
-      "status": "completed",
-      "summary": "Generated 42 items for My Directory",
-      "details": { "itemsCount": 42, "newItemsCount": 12, "updatedItemsCount": 30 },
-      "metadata": null,
-      "ipAddress": null,
-      "userAgent": null,
-      "createdAt": "2026-05-08T12:34:56.789Z",
-      "updatedAt": "2026-05-08T12:35:01.123Z"
-    }
-  ],
-  "total": 1
+	"activities": [
+		{
+			"id": "01HXAB...",
+			"userId": "user-123",
+			"workId": "work-abc",
+			"actionType": "generation",
+			"action": "generation.completed",
+			"status": "completed",
+			"summary": "Generated 42 items for My Directory",
+			"details": { "itemsCount": 42, "newItemsCount": 12, "updatedItemsCount": 30 },
+			"metadata": null,
+			"ipAddress": null,
+			"userAgent": null,
+			"createdAt": "2026-05-08T12:34:56.789Z",
+			"updatedAt": "2026-05-08T12:35:01.123Z"
+		}
+	],
+	"total": 1
 }
 ```
 
@@ -139,18 +139,18 @@ The `ActivityLogListener` subscribes to nine `@OnEvent` events. Every handler
 is wrapped in `try/catch + logger.error` so a write failure NEVER propagates
 back to the originating domain event.
 
-| Event                             | `actionType`        | `action`                  | `status`                         | Notes                                                                                       |
-| --------------------------------- | ------------------- | ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
-| `WorkCreatedEvent`                | `work_created`      | `work.created`            | `completed`                      | Records the work's id and name.                                                             |
-| `WorkGenerationCompletedEvent`    | `generation`        | `generation.completed`    | resolved from `work.generateStatus` | Updates the existing `IN_PROGRESS` row in place (via `findLatestByUserWorkActionStatus`) so a single run produces one row, not two. |
-| `WorksConfigSyncFailedEvent`      | `works_config_sync` | `works_config.sync_failed` | `failed`                         | `details.reason` + `details.repository` + `details.error`.                                  |
-| `UserCreatedEvent`                | `user_signup`       | `user.signup`             | `completed`                      | Fired on first registration.                                                                |
-| `UserConfirmedEvent`              | `user_login`        | `user.confirmed`          | `completed`                      | Fired on each session confirm; summary records the login provider.                          |
-| `UserPasswordChangedEvent`        | `password_changed`  | `user.password_changed`   | `completed`                      | Captures `event.ipAddress` for security review.                                             |
-| `MemberInvitedEvent`              | `member_invited`    | `member.invited`          | `completed`                      | `details.inviteeEmail` + `details.role`.                                                    |
-| `DeploymentDispatchedEvent`       | `deployment`        | `deployment.dispatched`   | `in_progress`                    | The verifier's later `Completed`/`Failed` event flips the same row to a terminal status.    |
-| `DeploymentCompletedEvent`        | `deployment`        | `deployment.succeeded`    | `completed`                      | Includes the deployment URL when present.                                                   |
-| `DeploymentFailedEvent`           | `deployment`        | `deployment.failed` or `deployment.cancelled` | `failed` or `cancelled`          | The terminal state coerces both `action` and `status` (`CANCELED` → `cancelled`).            |
+| Event                          | `actionType`        | `action`                                      | `status`                            | Notes                                                                                                                               |
+| ------------------------------ | ------------------- | --------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkCreatedEvent`             | `work_created`      | `work.created`                                | `completed`                         | Records the work's id and name.                                                                                                     |
+| `WorkGenerationCompletedEvent` | `generation`        | `generation.completed`                        | resolved from `work.generateStatus` | Updates the existing `IN_PROGRESS` row in place (via `findLatestByUserWorkActionStatus`) so a single run produces one row, not two. |
+| `WorksConfigSyncFailedEvent`   | `works_config_sync` | `works_config.sync_failed`                    | `failed`                            | `details.reason` + `details.repository` + `details.error`.                                                                          |
+| `UserCreatedEvent`             | `user_signup`       | `user.signup`                                 | `completed`                         | Fired on first registration.                                                                                                        |
+| `UserConfirmedEvent`           | `user_login`        | `user.confirmed`                              | `completed`                         | Fired on each session confirm; summary records the login provider.                                                                  |
+| `UserPasswordChangedEvent`     | `password_changed`  | `user.password_changed`                       | `completed`                         | Captures `event.ipAddress` for security review.                                                                                     |
+| `MemberInvitedEvent`           | `member_invited`    | `member.invited`                              | `completed`                         | `details.inviteeEmail` + `details.role`.                                                                                            |
+| `DeploymentDispatchedEvent`    | `deployment`        | `deployment.dispatched`                       | `in_progress`                       | The verifier's later `Completed`/`Failed` event flips the same row to a terminal status.                                            |
+| `DeploymentCompletedEvent`     | `deployment`        | `deployment.succeeded`                        | `completed`                         | Includes the deployment URL when present.                                                                                           |
+| `DeploymentFailedEvent`        | `deployment`        | `deployment.failed` or `deployment.cancelled` | `failed` or `cancelled`             | The terminal state coerces both `action` and `status` (`CANCELED` → `cancelled`).                                                   |
 
 Direct calls to `activityLogService.log(...)` from controllers are also
 wrapped fire-and-forget via `.catch(() => {})` so an audit-write failure does
@@ -208,16 +208,16 @@ The forwarded payload merges the row's `metadata` with the canonical fields:
 
 ```json
 {
-  "...metadata": "...",
-  "activityId": "01HX...",
-  "userId": "user-123",
-  "workId": "work-abc",
-  "actionType": "generation",
-  "action": "generation.completed",
-  "status": "completed",
-  "summary": "...",
-  "details": { "...": "..." },
-  "createdAt": "2026-05-08T12:34:56.789Z"
+	"...metadata": "...",
+	"activityId": "01HX...",
+	"userId": "user-123",
+	"workId": "work-abc",
+	"actionType": "generation",
+	"action": "generation.completed",
+	"status": "completed",
+	"summary": "...",
+	"details": { "...": "..." },
+	"createdAt": "2026-05-08T12:34:56.789Z"
 }
 ```
 
@@ -254,14 +254,14 @@ when the activity-log UI polls.
   forwards both fields verbatim, and the CSV export includes `summary`
   (which therefore must also be safe to display in the UI and email).
 - **Cascade**: `userId` cascades on user deletion; `workId` is `ON DELETE
-  SET NULL` so historical rows survive a deleted work.
+SET NULL` so historical rows survive a deleted work.
 
 ## Configuration
 
-| Env var            | Purpose                                                |
-| ------------------ | ------------------------------------------------------ |
-| `JITSU_HOST`       | Jitsu collector host. Required to enable analytics.    |
-| `JITSU_WRITE_KEY`  | Jitsu write key. Required to enable analytics.         |
+| Env var           | Purpose                                             |
+| ----------------- | --------------------------------------------------- |
+| `JITSU_HOST`      | Jitsu collector host. Required to enable analytics. |
+| `JITSU_WRITE_KEY` | Jitsu write key. Required to enable analytics.      |
 
 No other env vars are required — the module degrades gracefully if Jitsu is
 disabled.
@@ -270,10 +270,10 @@ disabled.
 
 ```typescript
 @Module({
-  imports: [JitsuModule, AgentActivityLogModule, DatabaseModule],
-  controllers: [ActivityLogController],
-  providers: [ActivityLogListener],
-  exports: [AgentActivityLogModule]
+	imports: [JitsuModule, AgentActivityLogModule, DatabaseModule],
+	controllers: [ActivityLogController],
+	providers: [ActivityLogListener],
+	exports: [AgentActivityLogModule]
 })
 export class ActivityLogModule {}
 ```

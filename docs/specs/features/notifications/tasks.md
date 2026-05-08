@@ -15,7 +15,7 @@
       (`packages/agent/src/entities/notification.types.ts`).
 - [x] T3. Indexes: `(userId, createdAt desc)`,
       `(userId, isPersistent)`, partial unique on `(userId,
-      deduplicationKey)`.
+    deduplicationKey)`.
 
 ## Phase 2 — Service
 

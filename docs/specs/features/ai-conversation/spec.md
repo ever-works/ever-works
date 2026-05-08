@@ -306,16 +306,16 @@ are upgraded to an AI-summarised title in the background.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                | Description                                                                                                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Conversation`                  | A per-user chat thread (`id`, `userId`, optional `title`, `providerId`, `model`, `metadata`, `createdAt`, `updatedAt`).                                                                            |
-| `ConversationMessage`           | A single turn in a conversation (`role`, `content`, optional `parts`, `model`, `usage`). `role` is one of `user` / `assistant` / `system` / `tool`.                                                |
-| `ConversationRepository`        | The data-access boundary: `create`, `findById`, `findByUser`, `appendMessage`, `appendMessages`, `updateTitle`, `delete`, `deleteAllByUser`. All read paths apply the `(id, userId)` filter.        |
-| `OpenAiCompatService`           | Translates between OpenAI's wire format and the platform's internal `ChatMessage` / `ChatCompletionOptions` / `ChatCompletionResponse` types and drives `AiFacadeService`.                          |
-| `OpenAiCompatController`        | The `POST /api/v1/chat/completions` HTTP surface — chooses streaming vs JSON based on `body.stream` and emits the right headers in either case.                                                    |
-| `ConversationController`        | The `/api/conversations` REST surface — list / create / get / update-title / append-messages / delete-one / delete-all.                                                                            |
-| `ConversationTitleService`      | The fire-and-forget AI title summariser; gated on `messageCount >= 4 && !metadata.aiTitle`.                                                                                                         |
-| `FacadeOptions`                 | The `{userId, workId?, providerOverride?}` shape forwarded to `AiFacadeService` so that plugin settings, AI provider routing, and per-work overrides resolve consistently.                          |
+| Entity / concept           | Description                                                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Conversation`             | A per-user chat thread (`id`, `userId`, optional `title`, `providerId`, `model`, `metadata`, `createdAt`, `updatedAt`).                                                                      |
+| `ConversationMessage`      | A single turn in a conversation (`role`, `content`, optional `parts`, `model`, `usage`). `role` is one of `user` / `assistant` / `system` / `tool`.                                          |
+| `ConversationRepository`   | The data-access boundary: `create`, `findById`, `findByUser`, `appendMessage`, `appendMessages`, `updateTitle`, `delete`, `deleteAllByUser`. All read paths apply the `(id, userId)` filter. |
+| `OpenAiCompatService`      | Translates between OpenAI's wire format and the platform's internal `ChatMessage` / `ChatCompletionOptions` / `ChatCompletionResponse` types and drives `AiFacadeService`.                   |
+| `OpenAiCompatController`   | The `POST /api/v1/chat/completions` HTTP surface — chooses streaming vs JSON based on `body.stream` and emits the right headers in either case.                                              |
+| `ConversationController`   | The `/api/conversations` REST surface — list / create / get / update-title / append-messages / delete-one / delete-all.                                                                      |
+| `ConversationTitleService` | The fire-and-forget AI title summariser; gated on `messageCount >= 4 && !metadata.aiTitle`.                                                                                                  |
+| `FacadeOptions`            | The `{userId, workId?, providerOverride?}` shape forwarded to `AiFacadeService` so that plugin settings, AI provider routing, and per-work overrides resolve consistently.                   |
 
 ## 6. Out of Scope
 

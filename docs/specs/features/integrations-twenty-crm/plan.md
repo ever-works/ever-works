@@ -30,18 +30,18 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern               | Choice                                                                                                                       | Rationale                                                                                                                  |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Module scope          | `@Global() forRoot()` / `forRootAsync()` so any consumer can `inject(ClientService)` without re-importing the module         | Matches `MailModule` and other Nest globals in the API.                                                                    |
-| HTTP client           | `@nestjs/axios` (`HttpService.request()` + `firstValueFrom`)                                                                 | Drop-in for the `axios` instance with Nest's RxJS-friendly wrapper.                                                        |
-| Config                | `@nestjs/config`'s `ConfigService.get<T>(...)` with explicit env-var keys                                                    | Same pattern as `apps/api/src/config/constants.ts` — keeps env contract grep-able.                                         |
-| Auth gate             | Per-class `@UseGuards(AuthSessionGuard)` (only on `CompaniesController` today — see OQ-1)                                     | Reuses the platform-wide session guard. Class-level gate is cheaper than method-level.                                      |
-| Config gate           | `CrmSyncGuard` reading `CrmConfigService.isEnabled` + `validateConfig`                                                        | Lets the integration self-disable when env vars are missing without surfacing a 500.                                       |
-| Retry strategy        | `RetryUtils.withRetry` — exponential back-off, jittered delay, last-error re-throw                                            | Twenty CRM rate-limits at 429 and stresses on 5xx; jitter avoids thundering-herd retries across replicas.                  |
-| Tenant addressing     | `CrmTenantService` — `tenantId = work_<workId>` / `globalTenantId` / `'global_everworks'`                                     | Future-proofing: today's single-workspace deployments use `global_everworks`; per-work tenants are a forward-compatible hook. |
-| Mapping utility       | `class MappingUtils` with static methods                                                                                      | Pure functions, no DI required. Same pattern as `RetryUtils`.                                                              |
-| Schema fetching       | `TwentyCrmService.makeRequest(..., schema=true)` swaps `/rest` → `/rest/metadata`                                              | Lets metadata-discovery callers (e.g. tooling, future schema-driven sync) reuse the same auth + headers.                   |
-| Error wrapping        | `HttpException({message, details}, statusCode)` for upstream errors; `HttpException('Failed to communicate ...', 503)` for transport | Lets Nest's exception filter render OpenAPI-shaped errors back to the client without leaking the upstream stack.            |
+| Concern           | Choice                                                                                                                               | Rationale                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Module scope      | `@Global() forRoot()` / `forRootAsync()` so any consumer can `inject(ClientService)` without re-importing the module                 | Matches `MailModule` and other Nest globals in the API.                                                                       |
+| HTTP client       | `@nestjs/axios` (`HttpService.request()` + `firstValueFrom`)                                                                         | Drop-in for the `axios` instance with Nest's RxJS-friendly wrapper.                                                           |
+| Config            | `@nestjs/config`'s `ConfigService.get<T>(...)` with explicit env-var keys                                                            | Same pattern as `apps/api/src/config/constants.ts` — keeps env contract grep-able.                                            |
+| Auth gate         | Per-class `@UseGuards(AuthSessionGuard)` (only on `CompaniesController` today — see OQ-1)                                            | Reuses the platform-wide session guard. Class-level gate is cheaper than method-level.                                        |
+| Config gate       | `CrmSyncGuard` reading `CrmConfigService.isEnabled` + `validateConfig`                                                               | Lets the integration self-disable when env vars are missing without surfacing a 500.                                          |
+| Retry strategy    | `RetryUtils.withRetry` — exponential back-off, jittered delay, last-error re-throw                                                   | Twenty CRM rate-limits at 429 and stresses on 5xx; jitter avoids thundering-herd retries across replicas.                     |
+| Tenant addressing | `CrmTenantService` — `tenantId = work_<workId>` / `globalTenantId` / `'global_everworks'`                                            | Future-proofing: today's single-workspace deployments use `global_everworks`; per-work tenants are a forward-compatible hook. |
+| Mapping utility   | `class MappingUtils` with static methods                                                                                             | Pure functions, no DI required. Same pattern as `RetryUtils`.                                                                 |
+| Schema fetching   | `TwentyCrmService.makeRequest(..., schema=true)` swaps `/rest` → `/rest/metadata`                                                    | Lets metadata-discovery callers (e.g. tooling, future schema-driven sync) reuse the same auth + headers.                      |
+| Error wrapping    | `HttpException({message, details}, statusCode)` for upstream errors; `HttpException('Failed to communicate ...', 503)` for transport | Lets Nest's exception filter render OpenAPI-shaped errors back to the client without leaking the upstream stack.              |
 
 ## 3. Data Model
 
@@ -69,12 +69,12 @@ and are consumed only by the controllers + service inside the
 
 ### Companies (`/api/twenty-crm/companies`)
 
-| Method   | Endpoint                              | Description           | Status   |
-| -------- | ------------------------------------- | --------------------- | -------- |
-| `GET`    | `/api/twenty-crm/companies`           | List companies        | Shipped  |
-| `POST`   | `/api/twenty-crm/companies`           | Create company        | Shipped  |
-| `PATCH`  | `/api/twenty-crm/companies/:id`       | Update company (PUT)  | Shipped  |
-| `DELETE` | `/api/twenty-crm/companies/:id`       | Delete company        | Shipped  |
+| Method   | Endpoint                        | Description          | Status  |
+| -------- | ------------------------------- | -------------------- | ------- |
+| `GET`    | `/api/twenty-crm/companies`     | List companies       | Shipped |
+| `POST`   | `/api/twenty-crm/companies`     | Create company       | Shipped |
+| `PATCH`  | `/api/twenty-crm/companies/:id` | Update company (PUT) | Shipped |
+| `DELETE` | `/api/twenty-crm/companies/:id` | Delete company       | Shipped |
 
 - **Auth**: `@UseGuards(AuthSessionGuard)` (class-level).
 - **Body**: `TwentyOrganization` — passed through verbatim. (No
@@ -145,10 +145,10 @@ HTTP request lifecycles.
   audit trail is required, the spec would need extension.
 - **Logger**:
     - `TwentyCrmService.makeRequest` → `logger.debug('Making
-      <method> request to <url>')` on every call.
+<method> request to <url>')` on every call.
     - `TwentyCrmService.makeRequest` (catch) →
       `logger.error('Twenty CRM API error: <msg>', {endpoint,
-      method, status, data})`.
+method, status, data})`.
     - `CrmSyncGuard.canActivate` →
       `logger.warn('CRM integration is disabled - request blocked')`
       and `logger.error('CRM configuration validation failed:', err)`.
@@ -169,14 +169,14 @@ ship to all environments and only activate where configured.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                                                                  | Likelihood | Impact                                                          | Mitigation                                                                                                                                                |
-| ----------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PeopleController` ships as dead code, masking a real auth gap if it gets wired up in a future PR.   | Medium     | New endpoint live without `AuthSessionGuard`.                   | OQ-1 + OQ-2 follow-ups — either decorate + register the controller OR remove it. Tests in PR #498 already cover the controller's intended behaviour.       |
-| Twenty CRM upstream changes its `/rest` schema.                                                       | Medium     | Mapping breaks; integration silently writes wrong data.         | Twenty wire-format types in `types/twenty-crm.types.ts` are the only schema lock; a contract test against a stub Twenty workspace would catch breakage.   |
-| Default request path skips `withRetry`.                                                              | High       | Single transient 503 surfaces as a user-facing error.            | OQ-8 follow-up — wrap `TwentyCrmService.makeRequest` in `withRetry` by default; retry only on `isRetryableError`-positive shapes.                          |
-| Bearer token leaks into a log line on a future change.                                               | Low        | Credential exposure.                                            | The token is only set in the `headers` getter of `TwentyCrmService`. Any change to that file should be reviewed for log-format additions.                  |
-| `MappingUtils.mapClientToContact` mis-splits non-Western names.                                      | Medium     | First/last name ordering wrong for users with single-token names or RTL ordering. | Pinned by tests (single-token name → `firstName`, `lastName=''`). A future enhancement could accept `firstName`/`lastName` directly when the source row provides them. |
-| `HttpException` from `makeRequest` exposes upstream `data.details`.                                  | Low        | Internal error structure leaks to API consumer.                 | Twenty CRM is the upstream; details are intentionally surfaced so the client can act. If Twenty leaks PII in error responses, that's a Twenty issue to fix. |
+| Risk                                                                                               | Likelihood | Impact                                                                            | Mitigation                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PeopleController` ships as dead code, masking a real auth gap if it gets wired up in a future PR. | Medium     | New endpoint live without `AuthSessionGuard`.                                     | OQ-1 + OQ-2 follow-ups — either decorate + register the controller OR remove it. Tests in PR #498 already cover the controller's intended behaviour.                   |
+| Twenty CRM upstream changes its `/rest` schema.                                                    | Medium     | Mapping breaks; integration silently writes wrong data.                           | Twenty wire-format types in `types/twenty-crm.types.ts` are the only schema lock; a contract test against a stub Twenty workspace would catch breakage.                |
+| Default request path skips `withRetry`.                                                            | High       | Single transient 503 surfaces as a user-facing error.                             | OQ-8 follow-up — wrap `TwentyCrmService.makeRequest` in `withRetry` by default; retry only on `isRetryableError`-positive shapes.                                      |
+| Bearer token leaks into a log line on a future change.                                             | Low        | Credential exposure.                                                              | The token is only set in the `headers` getter of `TwentyCrmService`. Any change to that file should be reviewed for log-format additions.                              |
+| `MappingUtils.mapClientToContact` mis-splits non-Western names.                                    | Medium     | First/last name ordering wrong for users with single-token names or RTL ordering. | Pinned by tests (single-token name → `firstName`, `lastName=''`). A future enhancement could accept `firstName`/`lastName` directly when the source row provides them. |
+| `HttpException` from `makeRequest` exposes upstream `data.details`.                                | Low        | Internal error structure leaks to API consumer.                                   | Twenty CRM is the upstream; details are intentionally surfaced so the client can act. If Twenty leaks PII in error responses, that's a Twenty issue to fix.            |
 
 ## 12. Constitution Reconciliation
 

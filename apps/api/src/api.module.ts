@@ -63,7 +63,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         NotificationsModule,
         ScreenshotModule,
         SearchModule,
-        AgentPluginsModule.forRoot(),
+        AgentPluginsModule.forRootAsync({
+            imports: [DatabaseModule],
+            useFactory: () => ({}),
+        }),
         PluginsModule,
         GitProviderModule,
         OAuthModule,

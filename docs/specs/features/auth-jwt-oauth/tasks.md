@@ -10,11 +10,11 @@ Outstanding follow-ups are flagged.
 
 - [x] **T1**: `AuthModule` declared with `DatabaseModule`, `HttpModule`,
       `ActivityLogModule` imports; `controllers: [OAuthController,
-      AuthController, ApiKeysController]`; exports `AuthService`,
+    AuthController, ApiKeysController]`; exports `AuthService`,
       `ApiKeyService`, `AuthSessionGuard`, `AUTH_PROVIDER`,
       `AUTH_RUNTIME_INSTANCE`, `AuthSyncService`.
 - [x] **T2**: `AUTH_PROVIDER` provided as `useExisting:
-      AuthProviderService`; `AUTH_RUNTIME_INSTANCE` provided as a
+    AuthProviderService`; `AUTH_RUNTIME_INSTANCE` provided as a
       DataSource-injected factory.
 - [x] **T3**: `@Public()` decorator + `IS_PUBLIC_KEY` reflector token
       defined under `auth/decorators/public.decorator.ts`.
@@ -34,7 +34,7 @@ Outstanding follow-ups are flagged.
       through FR-14.
 - [x] **T8**: `AuthService.validateEmailVerificationToken` and
       `validatePasswordResetToken` return `{valid, message,
-      email?, expiresAt?}` shape (no throwing); used by the web
+    email?, expiresAt?}` shape (no throwing); used by the web
       client to gate the reset/verify form before submit.
 - [x] **T9**: `AuthController.resetPassword` runs the full chain
       `getUserByPasswordResetToken` → `setPassword` →
@@ -62,8 +62,7 @@ Outstanding follow-ups are flagged.
       activity log.
 - [x] **T15**: `SocialAuthService.getAuthorizationUrl` builds the
       provider URL with `client_id`, `redirect_uri`, `response_type`,
-      `scope`, optional `state`, and Google-only `access_type=offline`
-      + `prompt=consent` (FR-18).
+      `scope`, optional `state`, and Google-only `access_type=offline` + `prompt=consent` (FR-18).
 - [x] **T16**: `SocialAuthService.authenticate` exchanges the code
       (omits `grant_type` for GitHub) and calls
       `authService.validateSocialUser` with the merged payload.
@@ -128,7 +127,7 @@ Outstanding follow-ups are flagged.
 - [ ] **T31 (follow-up)**: `oauth.controller.spec.ts` — controller-level
       Jest suite for the 2 endpoints. Pin: `getAuthUrl` calls
       `socialAuthService.getAuthorizationUrl(providerId, undefined,
-      state)` with the explicit `undefined` for `callbackUrl`;
+    state)` with the explicit `undefined` for `callbackUrl`;
       `authRedirect` issues a session BEFORE logging the activity row;
       the activity-log payload contains
       `action='user.login.<providerId>'`,
@@ -143,33 +142,21 @@ Outstanding follow-ups are flagged.
       `deleteByIdAndUserId === false`.
 - [ ] **T33 (follow-up)**: `auth-session.guard.spec.ts` — the
       most security-sensitive surface in the platform without a unit
-      suite. Pin every branch:
-      - `@Public()` short-circuits to `true`.
-      - `x-api-key` header with `ew_live_*` prefix → `validateKey` →
-        `findById` → hydrate `request.user`.
-      - `Authorization: Bearer ew_live_*` → same path.
-      - `x-api-key` AND `Bearer` both set → `x-api-key` wins.
-      - Bearer token without `ew_live_` prefix → fall through to
-        `authProvider.authenticate`.
-      - API-key path: invalid key → 401 (`'Invalid or expired API key'`).
-      - API-key path: user inactive → 401 (`'User account is inactive'`).
-      - API-key path: `iss='ever-works'`, `aud='ever-works'`,
-        `iat=floor(now/1000)`.
-      - Session-token path: `iss='auth-runtime'`,
-        `aud='ever-works-users'`.
-      - Both paths fail → `UnauthorizedException` (no message).
-      - `ModuleRef.get(...)` lazy resolution: first call hydrates
-        `apiKeyService` + `userRepository`, second call reuses them
-        (asserted via `mock.calls.length`).
+      suite. Pin every branch: - `@Public()` short-circuits to `true`. - `x-api-key` header with `ew_live_*` prefix → `validateKey` →
+      `findById` → hydrate `request.user`. - `Authorization: Bearer ew_live_*` → same path. - `x-api-key` AND `Bearer` both set → `x-api-key` wins. - Bearer token without `ew_live_` prefix → fall through to
+      `authProvider.authenticate`. - API-key path: invalid key → 401 (`'Invalid or expired API key'`). - API-key path: user inactive → 401 (`'User account is inactive'`). - API-key path: `iss='ever-works'`, `aud='ever-works'`,
+      `iat=floor(now/1000)`. - Session-token path: `iss='auth-runtime'`,
+      `aud='ever-works-users'`. - Both paths fail → `UnauthorizedException` (no message). - `ModuleRef.get(...)` lazy resolution: first call hydrates
+      `apiKeyService` + `userRepository`, second call reuses them
+      (asserted via `mock.calls.length`).
 - [ ] **T34 (follow-up)**: `auth-provider.service.spec.ts` —
       Better Auth runtime mocked at module scope. Pin: bearer-token
       path (`auth_session` lookup, expiry-deletes-the-row, hydrate
       via `assertActiveUser`), Better Auth cookie path (suspended
       user → `signOutAll` + 401), `signInEmail`'s
       `ensureCredentialAccount` call BEFORE `auth.api.signInEmail`,
-      the password-mirror update with `registrationProvider='local'`
-      + `lastLoginAt`, and the `'Failed to establish authenticated
-      session'` 401 when Better Auth returns no token.
+      the password-mirror update with `registrationProvider='local'` + `lastLoginAt`, and the `'Failed to establish authenticated
+    session'` 401 when Better Auth returns no token.
 - [ ] **T35 (follow-up)**: `auth-sync.service.spec.ts` — pin
       `ensureCredentialAccount` upsert shape, `getCredentialPasswordHash`
       null-on-missing, and `syncCredentialPassword` field write.
@@ -183,7 +170,7 @@ Outstanding follow-ups are flagged.
 - [ ] **T37 (OQ-2)**: Verify OAuth `state` on callback. Persist a
       short-TTL Redis key on URL request keyed by `state`; verify
       and delete on callback; throw `BadRequestException('Invalid
-      OAuth state')` on miss.
+    OAuth state')` on miss.
 - [ ] **T38 (OQ-3)**: Gate the `verificationToken` /
       `resetToken` echo behind `NODE_ENV !== 'production'`. The
       shape becomes `{message, expiresAt}` in prod, drop-in compatible

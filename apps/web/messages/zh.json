@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "更新同步设置失败",
                 "syncDisabled": "同步已禁用",
                 "worksConfig": {
-                    "imported": "从 works.yml 导入",
+                    "imported": "从 .works/works.yml 导入",
                     "applied": "已应用：{value}",
                     "enabled": "已启用",
                     "disabled": "已禁用",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "数据仓库",
                         "awesomeReadme": "精选 README",
                         "linkExisting": "链接现有仓库",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "通用设置",
@@ -2349,7 +2349,7 @@
                     "description": "自动从源仓库拉取更新。"
                 },
                 "worksConfigRestore": {
-                    "title": "恢复 works.yml 设置",
+                    "title": "恢复 .works/works.yml 设置",
                     "description": "从此仓库应用 AI 提供商、模型、计划和相关仓库设置。"
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "支持的仓库格式",
                     "dataRepo": {
                         "title": "数据仓库",
-                        "description": "具有 works.yml 和 data/ 文件夹结构的仓库"
+                        "description": "具有 .works/works.yml 和 data/ 文件夹结构的仓库"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 列表",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "数据仓库",
                     "awesomeReadme": "Awesome 列表",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "项目",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "链接仓库"
                 },
                 "detectionFailed": "我们无法自动检测格式。请选择导入此仓库的方式。",
-                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 works.yml，或者在下面选择手动导入格式。",
+                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 .works/works.yml，或者在下面选择手动导入格式。",
                 "errors": {
                     "urlRequired": "请输入 GitHub 仓库 URL",
                     "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",

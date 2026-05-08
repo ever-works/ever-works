@@ -28,17 +28,17 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern                    | Choice                                                              | Rationale                                                                                                            |
-| -------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Event ingestion            | NestJS `@OnEvent` listeners (`@nestjs/event-emitter`)               | Decouples mail delivery from domain code; event handler runs off the request hot path                              |
-| Provider abstraction       | `MailerService` switch keyed on `config.mail.provider()`            | Capability-driven (Constitution Principle II); env-var driven swap, zero code change                                  |
-| SMTP transport             | `@nestjs-modules/mailer` + Handlebars adapter                       | Battle-tested wrapper around Nodemailer; `inlineCssEnabled: true` + `strict: true`                                    |
-| Resend transport           | `resend` SDK (`Resend.emails.send`)                                 | First-class TypeScript SDK; `RESEND_CLIENT` is a Nest provider so we can swap it in tests                            |
-| Local-dev fallback         | `FakerMailerService`                                                | Lets local developers run the API without configuring a real provider; logs payloads at debug level                  |
-| Template engine            | Handlebars                                                          | Required by `@nestjs-modules/mailer`'s adapter; works for the Resend path via direct `Handlebars.compile`            |
-| Templates location         | `apps/api/src/templates/*.hbs`                                      | Lives next to the API code; `path.join(process.cwd(), 'src/templates', '<slug>.hbs')`                                 |
-| Branding context           | `config.branding.{appName, companyOwner, platformWebsite}` + `currentYear` | Single source of truth; merged into every template render                                                              |
-| Error policy               | `try/catch` + `logger.error` per handler                            | Mail delivery failures MUST NOT propagate back to the originating event emitter (Constitution Principle VI tests pin this) |
+| Concern              | Choice                                                                     | Rationale                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Event ingestion      | NestJS `@OnEvent` listeners (`@nestjs/event-emitter`)                      | Decouples mail delivery from domain code; event handler runs off the request hot path                                      |
+| Provider abstraction | `MailerService` switch keyed on `config.mail.provider()`                   | Capability-driven (Constitution Principle II); env-var driven swap, zero code change                                       |
+| SMTP transport       | `@nestjs-modules/mailer` + Handlebars adapter                              | Battle-tested wrapper around Nodemailer; `inlineCssEnabled: true` + `strict: true`                                         |
+| Resend transport     | `resend` SDK (`Resend.emails.send`)                                        | First-class TypeScript SDK; `RESEND_CLIENT` is a Nest provider so we can swap it in tests                                  |
+| Local-dev fallback   | `FakerMailerService`                                                       | Lets local developers run the API without configuring a real provider; logs payloads at debug level                        |
+| Template engine      | Handlebars                                                                 | Required by `@nestjs-modules/mailer`'s adapter; works for the Resend path via direct `Handlebars.compile`                  |
+| Templates location   | `apps/api/src/templates/*.hbs`                                             | Lives next to the API code; `path.join(process.cwd(), 'src/templates', '<slug>.hbs')`                                      |
+| Branding context     | `config.branding.{appName, companyOwner, platformWebsite}` + `currentYear` | Single source of truth; merged into every template render                                                                  |
+| Error policy         | `try/catch` + `logger.error` per handler                                   | Mail delivery failures MUST NOT propagate back to the originating event emitter (Constitution Principle VI tests pin this) |
 
 ## 3. Data Model
 
@@ -49,28 +49,28 @@ NestJS provider is a singleton per process.
 ```ts
 // apps/api/src/mail/types.ts
 export interface Address {
-    name: string;
-    address: string;
+	name: string;
+	address: string;
 }
 
 export interface SendMailOptions {
-    to?: string | Address | Array<string | Address>;
-    cc?: string | Address | Array<string | Address>;
-    bcc?: string | Address | Array<string | Address>;
-    replyTo?: string | Address | Array<string | Address>;
-    inReplyTo?: string | Address;
-    from?: string | Address;
-    subject?: string;
-    text?: string | Buffer;
-    html?: string | Buffer;
-    sender?: string | Address;
-    raw?: string | Buffer;
-    references?: string | string[];
-    encoding?: string;
-    date?: Date | string;
-    context?: { [name: string]: any };
-    transporterName?: string;
-    template?: string;
+	to?: string | Address | Array<string | Address>;
+	cc?: string | Address | Array<string | Address>;
+	bcc?: string | Address | Array<string | Address>;
+	replyTo?: string | Address | Array<string | Address>;
+	inReplyTo?: string | Address;
+	from?: string | Address;
+	subject?: string;
+	text?: string | Buffer;
+	html?: string | Buffer;
+	sender?: string | Address;
+	raw?: string | Buffer;
+	references?: string | string[];
+	encoding?: string;
+	date?: Date | string;
+	context?: { [name: string]: any };
+	transporterName?: string;
+	template?: string;
 }
 ```
 
@@ -81,15 +81,15 @@ endpoints. Public callers interact via emitting one of the seven
 domain events. Internal services interact via
 `MailerService.sendMail(options: SendMailOptions): Promise<void>`.
 
-| Trigger event                  | Template slug          | Notable defaults                                              |
-| ------------------------------ | ---------------------- | ------------------------------------------------------------- |
-| `UserCreatedEvent`             | `signup-confirmation`  | —                                                             |
-| `UserConfirmedEvent`           | `welcome`              | `dashboardUrl` defaults to `${webAppUrl}/works/new`           |
-| `UserPasswordChangedEvent`     | `password-changed`     | `formatDateTime(changedAt)`                                   |
-| `UserForgotPasswordEvent`      | `forgot-password`      | `expiresIn` defaults to `'1 hour'`                            |
-| `UserNewDeviceLoginEvent`      | `new-device-login`     | `formatDateTime(loginTime)`; passes device + browser + IP     |
-| `UserAccountDeletionEvent`     | `account-deletion`     | `expiresIn` defaults to `'24 hours'`                          |
-| `MemberInvitedEvent`           | `member-invitation`    | `formatRoleName(role)` (capitalise first char, lowercase rest) |
+| Trigger event              | Template slug         | Notable defaults                                               |
+| -------------------------- | --------------------- | -------------------------------------------------------------- |
+| `UserCreatedEvent`         | `signup-confirmation` | —                                                              |
+| `UserConfirmedEvent`       | `welcome`             | `dashboardUrl` defaults to `${webAppUrl}/works/new`            |
+| `UserPasswordChangedEvent` | `password-changed`    | `formatDateTime(changedAt)`                                    |
+| `UserForgotPasswordEvent`  | `forgot-password`     | `expiresIn` defaults to `'1 hour'`                             |
+| `UserNewDeviceLoginEvent`  | `new-device-login`    | `formatDateTime(loginTime)`; passes device + browser + IP      |
+| `UserAccountDeletionEvent` | `account-deletion`    | `expiresIn` defaults to `'24 hours'`                           |
+| `MemberInvitedEvent`       | `member-invitation`   | `formatRoleName(role)` (capitalise first char, lowercase rest) |
 
 ## 5. Plugin / Web / CLI
 
@@ -133,17 +133,17 @@ volume.
 ## 8. Observability
 
 - **Construction log**: `Mailer service initialized with provider:
-  <provider>` (info, once at boot).
+<provider>` (info, once at boot).
 - **Per-call SMTP**:
     - `Sending email via SMTP to=<recipient> subject="<subject>"`
     - `Email sent via SMTP to=<recipient>`
 - **Per-call Resend**:
     - `Sending email via Resend to=<recipient> from="<from>"
-      subject="<subject>"`
+subject="<subject>"`
     - `Email sent via Resend to=<recipient> id=<resendId | "unknown">`
 - **Resend fallback**:
     - `Resend client not initialized (missing RESEND_APIKEY?),
-      falling back to faker for to=<recipient>` (warn).
+falling back to faker for to=<recipient>` (warn).
 - **Faker default**:
     - `No mail provider configured, using faker for to=<recipient>`
       (debug).
@@ -155,15 +155,15 @@ volume.
 
 ## 9. Risks & Mitigations
 
-| Risk                                                              | Mitigation                                                                                                                                       |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MAILER_PROVIDER=resend` with missing `RESEND_APIKEY` crashes API | `RESEND_CLIENT` factory returns `undefined`; runtime fallback in `MailerService.sendMail` warns and routes through Faker                          |
-| Garbage `MAILER_PROVIDER` value crashes API                       | `default` switch arm routes through Faker                                                                                                        |
-| Mail delivery throws and breaks signup / password reset flow      | Per-handler `try/catch` + `logger.error` — listener swallows the rejection                                                                       |
-| Template referenced placeholder missing from context              | `HandlebarsAdapter` is built with `{strict: true}` so missing keys throw at render time — caught by per-handler `try/catch` (OQ-2 follow-up)     |
-| `Resend.emails.send` called with `to=undefined`                   | Currently throws `TypeError: Cannot use 'in' operator …` — pinned by current tests; FR-9 / OQ-1 follow-up tracks the proper guard               |
-| SMTP auth or network failure                                      | Caught by `MailService` per-handler `try/catch` and logged; upstream provider handles its own retry/backoff                                      |
-| Self-signed cert in production                                    | `tls.rejectUnauthorized: false` is intentional for dev — operators MUST audit per OQ-3                                                          |
+| Risk                                                              | Mitigation                                                                                                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MAILER_PROVIDER=resend` with missing `RESEND_APIKEY` crashes API | `RESEND_CLIENT` factory returns `undefined`; runtime fallback in `MailerService.sendMail` warns and routes through Faker                     |
+| Garbage `MAILER_PROVIDER` value crashes API                       | `default` switch arm routes through Faker                                                                                                    |
+| Mail delivery throws and breaks signup / password reset flow      | Per-handler `try/catch` + `logger.error` — listener swallows the rejection                                                                   |
+| Template referenced placeholder missing from context              | `HandlebarsAdapter` is built with `{strict: true}` so missing keys throw at render time — caught by per-handler `try/catch` (OQ-2 follow-up) |
+| `Resend.emails.send` called with `to=undefined`                   | Currently throws `TypeError: Cannot use 'in' operator …` — pinned by current tests; FR-9 / OQ-1 follow-up tracks the proper guard            |
+| SMTP auth or network failure                                      | Caught by `MailService` per-handler `try/catch` and logged; upstream provider handles its own retry/backoff                                  |
+| Self-signed cert in production                                    | `tls.rejectUnauthorized: false` is intentional for dev — operators MUST audit per OQ-3                                                       |
 
 ## 10. Constitution Reconciliation
 

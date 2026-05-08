@@ -50,13 +50,13 @@ flowchart TD
 | Module scope        | Local Nest module (`GitHubAppModule`) — NOT `@Global()`                                                   | The integration's services are only consumed by `apps/api` itself + the agent-onboarding flow which imports the module explicitly.       |
 | HTTP client         | `@nestjs/axios` (`HttpService` + `firstValueFrom`)                                                        | Same shape as the rest of `apps/api`'s outbound calls. RxJS observables get unwrapped at call sites for readability.                     |
 | App JWT minting     | `createGitHubAppJwt({appId, privateKey})` from `@ever-works/agent/utils`                                  | Centralised in the agent package so both `apps/api` and `packages/tasks` re-use one implementation.                                      |
-| Installation token  | `requestGitHubAppInstallationAccessToken(installationId, credentials)` from `@ever-works/agent/utils`     | Same package — keeps the JWT short-TTL cache in one place.                                                                              |
+| Installation token  | `requestGitHubAppInstallationAccessToken(installationId, credentials)` from `@ever-works/agent/utils`     | Same package — keeps the JWT short-TTL cache in one place.                                                                               |
 | State signing       | `crypto.createHmac('sha256', config.auth.secret()).update(<base64url>).digest('base64url')`               | Reuses the platform-wide auth secret; no new secret to provision. base64url avoids URL encoding noise.                                   |
 | State verification  | `crypto.timingSafeEqual` after a fixed-length guard                                                       | Constant-time comparison + length-pre-check matches GitHub's own webhook verification pattern.                                           |
 | Auth gate           | App-wide `AuthSessionGuard` (controllers do NOT carry method-level decorators except `@Public()`)         | The setup + callback endpoints are explicitly `@Public()`; the management endpoints inherit the global guard.                            |
 | Webhook signature   | `verifyGitHubWebhookSignature(rawBody, secret, header)` from `@ever-works/agent/utils`                    | Same agent helper, same constant-time comparison. The signature header is `x-hub-signature-256`.                                         |
 | Raw-body capture    | Global raw-body parser configured in `apps/api/src/main.ts` (already in place for Stripe-style verifiers) | Without `req.rawBody`, signature verification is impossible. The webhook controller defends the invariant by 400-ing on missing rawBody. |
-| User-OAuth fallback | `resolveGitHubAccountEmail(httpService, accessToken, primaryEmail)` from `apps/api/src/auth/utils`        | Shared with the social-login `github` OAuth flow — handles `null` primary email by hitting `/user/emails`.                              |
+| User-OAuth fallback | `resolveGitHubAccountEmail(httpService, accessToken, primaryEmail)` from `apps/api/src/auth/utils`        | Shared with the social-login `github` OAuth flow — handles `null` primary email by hitting `/user/emails`.                               |
 | Webhook event scope | Only `installation` + `installation_repositories`                                                         | These cover all the persisted-state changes the platform needs. Other events (push, repository, deployment) belong elsewhere.            |
 | Race safety         | `claimOwnershipIfUnassigned` uses `WHERE createdByUserId IS NULL` in the UPDATE                           | Concurrent two-leg OAuth handshakes for the same installation deterministically pick a single owner — no advisory locks needed.          |
 
@@ -100,18 +100,18 @@ flowchart TD
 
 ### Auth-bearing controller (`GitHubAppController`)
 
-| Method | Endpoint                                                                                | Auth        | Status  |
-| ------ | --------------------------------------------------------------------------------------- | ----------- | ------- |
-| `GET`  | `/api/github-app/setup`                                                                 | `@Public()` | Shipped |
-| `GET`  | `/api/github-app/callback`                                                              | `@Public()` | Shipped |
-| `GET`  | `/api/github-app/installations`                                                         | Global guard | Shipped |
-| `POST` | `/api/github-app/installations/:installationId/sync`                                    | Global guard | Shipped |
-| `POST` | `/api/github-app/installations/:installationId/repositories/:repositoryId/onboard`     | Global guard | Shipped |
+| Method | Endpoint                                                                           | Auth         | Status  |
+| ------ | ---------------------------------------------------------------------------------- | ------------ | ------- |
+| `GET`  | `/api/github-app/setup`                                                            | `@Public()`  | Shipped |
+| `GET`  | `/api/github-app/callback`                                                         | `@Public()`  | Shipped |
+| `GET`  | `/api/github-app/installations`                                                    | Global guard | Shipped |
+| `POST` | `/api/github-app/installations/:installationId/sync`                               | Global guard | Shipped |
+| `POST` | `/api/github-app/installations/:installationId/repositories/:repositoryId/onboard` | Global guard | Shipped |
 
 ### Webhook controller (`GitHubAppWebhookController`)
 
-| Method | Endpoint                  | Auth                                                   | Status  |
-| ------ | ------------------------- | ------------------------------------------------------ | ------- |
+| Method | Endpoint                   | Auth                                             | Status  |
+| ------ | -------------------------- | ------------------------------------------------ | ------- |
 | `POST` | `/api/github-app/webhooks` | `@Public()` (signature verification IS the gate) | Shipped |
 
 ## 5. Plugin Surface (if any)
@@ -198,17 +198,17 @@ credentials surface a clean `503 Service Unavailable` instead.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                                                                                | Likelihood | Impact                                                  | Mitigation                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing env var leaks as 500 from `getCredentials`                                                                  | Medium     | Operator-visible noise; users see opaque error          | OQ-2 follow-up — add a `GitHubAppSyncGuard` that promotes the missing-credentials case to a 503 at the controller boundary.                                                 |
-| State payload TTL too short for slow GitHub redirect                                                                | Low        | Legitimate users see "expired state" mid-flow           | 10 minutes is generous for the OAuth redirect. If reports surface, raise to 30 min — but never beyond GitHub's `code` TTL (10 min from issue).                              |
-| Concurrent claim-ownership races                                                                                    | Low        | Wrong user owns the installation                        | `claimOwnershipIfUnassigned` uses `WHERE createdByUserId IS NULL` — atomic. ✅                                                                                              |
-| GitHub renames `installation` event in the future                                                                   | Low        | Webhook silently drops events                            | OQ-6 follow-up — log unsupported event names at `debug` so renames are spottable in production logs.                                                                        |
-| `selected: true` default floods the platform with repos                                                             | Medium     | Org with hundreds of repos clogs the UI                 | OQ-9 follow-up — preserve prior `selected: false` rows during `replaceForInstallation`.                                                                                     |
-| Synthetic noreply email collision across deployments                                                                | Low        | Two deployments could write the same synthetic email    | OQ-4 follow-up — derive the suffix from `webAppUrl()`. Today, the synthetic email is never sent to, so collision is harmless until a future feature uses these addresses.   |
-| Installation-repo onboarding limited to `data_repo`                                                                 | Medium     | Users can't onboard website / agent / pipeline repos    | OQ-8 follow-up + spec extension — the analyzer can already detect those types; the gate is in `onboardInstallationRepository`.                                              |
-| Installation token leaks into a log line                                                                            | Low        | Credential exposure                                      | The token is only set in the request `headers` getter of `GitHubAppService`. Any change to that file should be reviewed for log additions.                                  |
-| Email-not-verified rejection surfaces as a generic 401                                                              | Medium     | Confused user — they don't see why the link refused     | OQ-3 follow-up — render this case as a setup-error page in the web UI rather than a callback 401.                                                                            |
+| Risk                                                    | Likelihood | Impact                                               | Mitigation                                                                                                                                                                |
+| ------------------------------------------------------- | ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing env var leaks as 500 from `getCredentials`      | Medium     | Operator-visible noise; users see opaque error       | OQ-2 follow-up — add a `GitHubAppSyncGuard` that promotes the missing-credentials case to a 503 at the controller boundary.                                               |
+| State payload TTL too short for slow GitHub redirect    | Low        | Legitimate users see "expired state" mid-flow        | 10 minutes is generous for the OAuth redirect. If reports surface, raise to 30 min — but never beyond GitHub's `code` TTL (10 min from issue).                            |
+| Concurrent claim-ownership races                        | Low        | Wrong user owns the installation                     | `claimOwnershipIfUnassigned` uses `WHERE createdByUserId IS NULL` — atomic. ✅                                                                                            |
+| GitHub renames `installation` event in the future       | Low        | Webhook silently drops events                        | OQ-6 follow-up — log unsupported event names at `debug` so renames are spottable in production logs.                                                                      |
+| `selected: true` default floods the platform with repos | Medium     | Org with hundreds of repos clogs the UI              | OQ-9 follow-up — preserve prior `selected: false` rows during `replaceForInstallation`.                                                                                   |
+| Synthetic noreply email collision across deployments    | Low        | Two deployments could write the same synthetic email | OQ-4 follow-up — derive the suffix from `webAppUrl()`. Today, the synthetic email is never sent to, so collision is harmless until a future feature uses these addresses. |
+| Installation-repo onboarding limited to `data_repo`     | Medium     | Users can't onboard website / agent / pipeline repos | OQ-8 follow-up + spec extension — the analyzer can already detect those types; the gate is in `onboardInstallationRepository`.                                            |
+| Installation token leaks into a log line                | Low        | Credential exposure                                  | The token is only set in the request `headers` getter of `GitHubAppService`. Any change to that file should be reviewed for log additions.                                |
+| Email-not-verified rejection surfaces as a generic 401  | Medium     | Confused user — they don't see why the link refused  | OQ-3 follow-up — render this case as a setup-error page in the web UI rather than a callback 401.                                                                         |
 
 ## 12. Constitution Reconciliation
 

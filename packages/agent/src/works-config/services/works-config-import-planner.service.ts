@@ -57,7 +57,7 @@ export class WorksConfigImportPlannerService {
         userId: string,
     ): Promise<void> {
         if (!worksConfig?.initialPrompt) {
-            throw new BadRequestException('works.yml is missing initial_prompt');
+            throw new BadRequestException('.works/works.yml is missing initial_prompt');
         }
 
         await this.validateProviderSettings(worksConfig, userId, { validateDefaults: true });
@@ -222,7 +222,7 @@ export class WorksConfigImportPlannerService {
 
         if (sameOwner && sameRepo) {
             throw new BadRequestException(
-                'works.yml website_repo must not point to the source work repository',
+                '.works/works.yml website_repo must not point to the source work repository',
             );
         }
     }

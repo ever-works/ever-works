@@ -21,7 +21,7 @@ invocation), with no prior account, no UI, and no human in the loop.
 The agent supplies a GitHub repository URL, a GitHub credential, and an
 identifying contact (email or agent identifier). The platform validates
 the credential, creates an Ever Works account on demand, links it to
-the agent's GitHub identity, reads a `works.yml` manifest from the
+the agent's GitHub identity, reads a `.works/works.yml` manifest from the
 repository, provisions the supporting repos (website, optional Awesome
 list), starts AI content generation, and deploys the resulting site —
 all asynchronously. Status is reported through any of three channels
@@ -42,7 +42,7 @@ A human is not in the loop for any happy-path scenario.
 ### 2.1 Primary scenarios
 
 - **Cold registration**: **Given** an agent that has never called Ever
-  Works before and a GitHub repository containing a `works.yml`,
+  Works before and a GitHub repository containing a `.works/works.yml`,
   **when** the agent makes a single onboarding request with the repo
   URL, a valid GitHub credential, and a contact identifier,
   **then** the platform creates an Ever Works account, links it to the
@@ -66,7 +66,7 @@ A human is not in the loop for any happy-path scenario.
   receives the same observable outcomes as the REST path.
 
 - **GitOps update**: **Given** an onboarded agent, **when** it commits
-  a change to `works.yml` in the manifest repo, **then** the platform
+  a change to `.works/works.yml` in the manifest repo, **then** the platform
   detects the push (via repo webhook), reconciles the Work, and
   triggers regeneration — without any new API call from the agent.
 
@@ -94,12 +94,12 @@ A human is not in the loop for any happy-path scenario.
   returns `403 Forbidden` with a typed error code
   (`gh_repo_access_denied`) and creates no account.
 
-- **Given** the repo has no `works.yml` at root, **when** the agent
+- **Given** the repo has no `.works/works.yml` at root, **when** the agent
   calls the endpoint, **then** the platform returns `422
 Unprocessable Entity` with `manifest_missing` and a pointer to the
   manifest schema docs.
 
-- **Given** `works.yml` is malformed or fails schema validation,
+- **Given** `.works/works.yml` is malformed or fails schema validation,
   **when** the agent calls the endpoint, **then** the platform
   returns `422` with per-field validation errors.
 
@@ -166,7 +166,7 @@ Unprocessable Entity` with `manifest_missing` and a pointer to the
   printable-ASCII charset restriction; cryptographic identity
   formats (DID, signed JWTs, etc.) are deferred to a future spec
   and can be layered on without changing the field name.
-- **FR-7** The system MUST read a `works.yml` manifest from the root
+- **FR-7** The system MUST read a `.works/works.yml` manifest from the root
   of the supplied repository and validate it against the published
   manifest schema.
 - **FR-8** The system MUST be idempotent for the same `(github_identity,
@@ -317,7 +317,7 @@ repo_url)` pair: a second call returns the existing `work_id`
   repo URL (canonicalised), terminal status, and the typed error
   code on failure. Latency, success rate, and rate-limit hits are
   exported as metrics.
-- **Compatibility**: `works.yml` is versioned (`apiVersion` field).
+- **Compatibility**: `.works/works.yml` is versioned (`apiVersion` field).
   v1 schema MUST be backwards-compatible additions only; breaking
   changes require a new `apiVersion`. The MCP tool and REST endpoint
   share the same parameter names where possible.
@@ -328,8 +328,8 @@ repo_url)` pair: a second call returns the existing `work_id`
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Agent`                | A non-human caller of the registration capability. Identified by its GitHub identity (user or installation).                                                                                                  |
 | `OnboardingRequest`    | A single registration attempt. Carries repo URL, credential, contact identifier, optional webhook URL and subdomain hint.                                                                                     |
-| `works.yml`            | A YAML manifest at the root of the agent's repo describing the desired Work: name, description, pipeline, plugins, taxonomy, item sources, deployment options. The source of truth for GitOps reconciliation. |
-| `Manifest Repo`        | The agent's repository containing `works.yml`. Distinct from the data, website, and Awesome-list repos that the platform may create.                                                                          |
+| `.works/works.yml`     | A YAML manifest at the root of the agent's repo describing the desired Work: name, description, pipeline, plugins, taxonomy, item sources, deployment options. The source of truth for GitOps reconciliation. |
+| `Manifest Repo`        | The agent's repository containing `.works/works.yml`. Distinct from the data, website, and Awesome-list repos that the platform may create.                                                                   |
 | `Account Linking`      | The pairing of an Ever Works account with a GitHub identity, established or reused at registration time.                                                                                                      |
 | `Subdomain Allocation` | The free `<slug>.ever.works` host assigned at registration before generation completes, so an agent can return a URL to its caller immediately.                                                               |
 | `Webhook Subscription` | The optional callback URL plus a per-account HMAC secret used to sign deliveries.                                                                                                                             |
@@ -384,9 +384,9 @@ repo_url)` returns the same `work_id` and does not create a
 - [ ] An invalid GitHub credential or one without repo write access
       causes a typed `403` with `gh_repo_access_denied` and creates
       no account.
-- [ ] A repo without `works.yml` causes a typed `422` with
+- [ ] A repo without `.works/works.yml` causes a typed `422` with
       `manifest_missing`.
-- [ ] A malformed `works.yml` causes a typed `422` with per-field
+- [ ] A malformed `.works/works.yml` causes a typed `422` with per-field
       errors.
 - [ ] A successful registration triggers background generation that
       ends in a deployed site at the assigned subdomain.
@@ -394,7 +394,7 @@ repo_url)` returns the same `work_id` and does not create a
       on terminal status, with HMAC-verifiable signature.
 - [ ] If state-marker writing was opted into, a file is committed
       to the manifest repo on terminal status.
-- [ ] A push that changes `works.yml` triggers reconciliation
+- [ ] A push that changes `.works/works.yml` triggers reconciliation
       without any new API call.
 - [ ] An Agent Card is served at `/.well-known/agent.json`
       describing the registration capability.

@@ -38,12 +38,12 @@ service-side anomalies to the same user.
   row is updated in place to `completed`/`failed`/`cancelled` (no new
   row is created) with item counts attached to `details`.
 - **Given** I want a single row's full payload, **when** I `GET
-  /api/activity-log/:id` and the row is `in_progress` for an active
+/api/activity-log/:id` and the row is `in_progress` for an active
   generation, **then** the response is enriched with `recentLogs` from
   the live `work.generateStatus` so I can read the latest pipeline
   output without polling another endpoint.
 - **Given** I want a CSV of last week's activity, **when** I `GET
-  /api/activity-log/export?dateFrom=…&dateTo=…`, **then** I receive
+/api/activity-log/export?dateFrom=…&dateTo=…`, **then** I receive
   `text/csv` with `attachment; filename=activity-log.csv` and one row
   per matching entry.
 - **Given** Jitsu is configured (`JITSU_HOST` + `JITSU_WRITE_KEY`
@@ -71,7 +71,7 @@ service-side anomalies to the same user.
   reconcile pass.
 - **Given** an activity row references a workId that has since been
   deleted, **when** the work is deleted, **then** TypeORM's `ON DELETE
-  SET NULL` on `workId` keeps the activity row in place with a null
+SET NULL` on `workId` keeps the activity row in place with a null
   workId rather than cascade-deleting audit history.
 - **Given** the analytics dispatcher is not bound (no Jitsu env vars),
   **when** an activity is logged, **then** the row is still persisted
@@ -101,7 +101,7 @@ service-side anomalies to the same user.
   and a human-readable `summary`.
 - **FR-2** A row MAY carry an optional `workId` foreign key. When the
   referenced work is deleted, the row MUST remain (`ON DELETE SET
-  NULL`) so the audit trail is not lost.
+NULL`) so the audit trail is not lost.
 - **FR-3** Optional `details` (jsonb) MUST be available for
   per-action structured payloads (item counts, repository name,
   switch mode, error details). `metadata` (jsonb) MUST be available
@@ -123,7 +123,7 @@ service-side anomalies to the same user.
 - **FR-8** `GET /api/activity-log/:id` MUST return the row only if it
   belongs to the authenticated user (cross-user reject via
   `findByIdAndUserId`); on miss it MUST return `404 Activity not
-  found`. When the row is `in_progress` and references a live work,
+found`. When the row is `in_progress` and references a live work,
   the response MUST attach the work's `generateStatus.recentLogs`
   array as `details.liveLogs` so callers do not need a second
   request.
@@ -141,7 +141,7 @@ service-side anomalies to the same user.
   swallow rejections via `logger.warn` so the audit write succeeds
   even when the dispatcher fails.
 - **FR-12** `ActivityLogService.updateStatus(id, status, details?,
-  updates?)` MUST also re-dispatch the updated row through the
+updates?)` MUST also re-dispatch the updated row through the
   analytics dispatcher so downstream consumers see status
   transitions. Updating a non-existent row MUST resolve to `null`
   without throwing.
@@ -156,7 +156,7 @@ service-side anomalies to the same user.
 - **FR-15** The Jitsu dispatcher (`JitsuService`) MUST be a no-op
   when either `JITSU_HOST` or `JITSU_WRITE_KEY` is missing, MUST log
   a single `Jitsu analytics disabled: missing JITSU_HOST or
-  JITSU_WRITE_KEY` line at construction, and MUST NOT throw on
+JITSU_WRITE_KEY` line at construction, and MUST NOT throw on
   missing env vars.
 - **FR-16** When dispatching, `JitsuService.track(activity)` MUST
   pass the row's `action` as the event name and merge the row's
@@ -204,9 +204,9 @@ service-side anomalies to the same user.
     - `ActivityLogService` debug-logs every row written
       (`Activity logged: [<actionType>] <summary> (user: <userId>)`)
       and every dispatcher rejection (`Activity analytics dispatch
-      failed: <message>`).
+failed: <message>`).
     - `JitsuService` logs `Jitsu analytics disabled: missing
-      JITSU_HOST or JITSU_WRITE_KEY` once at boot when not
+JITSU_HOST or JITSU_WRITE_KEY` once at boot when not
       configured.
     - Each listener `try/catch` logs at `error` level so audit gaps
       are visible in the API logs.
@@ -220,18 +220,18 @@ service-side anomalies to the same user.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept              | Description                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ActivityLog`                 | TypeORM entity at `packages/agent/src/entities/activity-log.entity.ts`. Per-row fields: `id, userId, workId?, actionType, action, status, summary, details?, metadata?, ipAddress?, userAgent?, createdAt, updatedAt`.                                                                                                                                  |
-| `ActivityActionType`          | Enum at `packages/agent/src/entities/activity-log.types.ts`. Spans generation, deployment, work / item / plugin / template / member / schedule lifecycles, import/export, settings, auth/account, AI chat, and community PR. New types are added as the platform evolves; the enum is the canonical taxonomy for the History tab and analytics events. |
-| `ActivityStatus`              | Enum: `pending` / `in_progress` / `completed` / `failed` / `cancelled`. `in_progress` rows are the only ones eligible for status reconciliation.                                                                                                                                                                                                       |
-| `ActivityLogService`          | `packages/agent/src/activity-log/activity-log.service.ts`. Owns: `log`, `updateStatus`, `findAll`, `countRunning`, `summarizeStatuses`, `findById`, `findByIdAndUserId`, `findLatestByUserWorkActionStatus`, `exportCsv`, `reconcileStaleGenerationActivities`, `formatGenerationCompletionSummary`, `resolveGenerationActivityStatus`.                  |
-| `ActivityLogListener`         | `apps/api/src/activity-log/activity-log.listener.ts`. Subscribes to nine `@OnEvent` handlers (work-created, generation-completed, works-config-sync-failed, user-created, user-confirmed, password-changed, member-invited, deployment-dispatched/-completed/-failed) and translates each event into the right `actionType` + `summary` + `details`.   |
-| `ActivityLogAnalyticsDispatcher` | Optional injection token (`ACTIVITY_LOG_ANALYTICS_DISPATCHER`). One implementation today: `JitsuService` (`apps/api/src/activity-log/jitsu.service.ts`).                                                                                                                                                                                              |
-| `JitsuService`                | Env-driven Jitsu client (`@jitsu/js`). Disabled at construction when `JITSU_HOST` or `JITSU_WRITE_KEY` is missing; otherwise calls `track(action, properties)` for every successful audit row.                                                                                                                                                          |
-| `ActivityLogController`       | `apps/api/src/activity-log/activity-log.controller.ts`. Six endpoints (list, running-count, summary, export, get-by-id, plus the implicit reconcile front-step on every read) behind `@ApiTags('Activity Log')` + `AuthSessionGuard`.                                                                                                                  |
-| Reconcile debounce            | Per-user `Map<string, Promise<void>>` for in-flight passes plus a `Map<string, number>` of completion timestamps. TTL constant: `ACTIVITY_RECONCILE_TTL_MS = 5_000` (5 s).                                                                                                                                                                              |
-| Filter taxonomy               | The History tab maps `ActivityActionType` values into UI-level filter groups (generation, items, comparisons, taxonomy, community-pr, chat, auth, account) — see [`docs/specs/architecture/activity-log.md`](../../architecture/activity-log.md) §4.                                                                                                   |
+| Entity / concept                 | Description                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ActivityLog`                    | TypeORM entity at `packages/agent/src/entities/activity-log.entity.ts`. Per-row fields: `id, userId, workId?, actionType, action, status, summary, details?, metadata?, ipAddress?, userAgent?, createdAt, updatedAt`.                                                                                                                                 |
+| `ActivityActionType`             | Enum at `packages/agent/src/entities/activity-log.types.ts`. Spans generation, deployment, work / item / plugin / template / member / schedule lifecycles, import/export, settings, auth/account, AI chat, and community PR. New types are added as the platform evolves; the enum is the canonical taxonomy for the History tab and analytics events. |
+| `ActivityStatus`                 | Enum: `pending` / `in_progress` / `completed` / `failed` / `cancelled`. `in_progress` rows are the only ones eligible for status reconciliation.                                                                                                                                                                                                       |
+| `ActivityLogService`             | `packages/agent/src/activity-log/activity-log.service.ts`. Owns: `log`, `updateStatus`, `findAll`, `countRunning`, `summarizeStatuses`, `findById`, `findByIdAndUserId`, `findLatestByUserWorkActionStatus`, `exportCsv`, `reconcileStaleGenerationActivities`, `formatGenerationCompletionSummary`, `resolveGenerationActivityStatus`.                |
+| `ActivityLogListener`            | `apps/api/src/activity-log/activity-log.listener.ts`. Subscribes to nine `@OnEvent` handlers (work-created, generation-completed, works-config-sync-failed, user-created, user-confirmed, password-changed, member-invited, deployment-dispatched/-completed/-failed) and translates each event into the right `actionType` + `summary` + `details`.   |
+| `ActivityLogAnalyticsDispatcher` | Optional injection token (`ACTIVITY_LOG_ANALYTICS_DISPATCHER`). One implementation today: `JitsuService` (`apps/api/src/activity-log/jitsu.service.ts`).                                                                                                                                                                                               |
+| `JitsuService`                   | Env-driven Jitsu client (`@jitsu/js`). Disabled at construction when `JITSU_HOST` or `JITSU_WRITE_KEY` is missing; otherwise calls `track(action, properties)` for every successful audit row.                                                                                                                                                         |
+| `ActivityLogController`          | `apps/api/src/activity-log/activity-log.controller.ts`. Six endpoints (list, running-count, summary, export, get-by-id, plus the implicit reconcile front-step on every read) behind `@ApiTags('Activity Log')` + `AuthSessionGuard`.                                                                                                                  |
+| Reconcile debounce               | Per-user `Map<string, Promise<void>>` for in-flight passes plus a `Map<string, number>` of completion timestamps. TTL constant: `ACTIVITY_RECONCILE_TTL_MS = 5_000` (5 s).                                                                                                                                                                             |
+| Filter taxonomy                  | The History tab maps `ActivityActionType` values into UI-level filter groups (generation, items, comparisons, taxonomy, community-pr, chat, auth, account) — see [`docs/specs/architecture/activity-log.md`](../../architecture/activity-log.md) §4.                                                                                                   |
 
 ## 6. Out of Scope
 

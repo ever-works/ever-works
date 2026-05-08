@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Не вдалося оновити налаштування синхронізації",
                 "syncDisabled": "Синхронізація вимкнена",
                 "worksConfig": {
-                    "imported": "Імпортовано з works.yml",
+                    "imported": "Імпортовано з .works/works.yml",
                     "applied": "Застосовано: {value}",
                     "enabled": "увімкнено",
                     "disabled": "вимкнено",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Репозиторій даних",
                         "awesomeReadme": "Чудовий README",
                         "linkExisting": "Пов’язані наявні репозиторії",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Загальні налаштування",
@@ -2349,7 +2349,7 @@
                     "description": "Автоматично отримувати оновлення з вихідного репозиторію."
                 },
                 "worksConfigRestore": {
-                    "title": "Відновити налаштування works.yml",
+                    "title": "Відновити налаштування .works/works.yml",
                     "description": "Застосувати постачальника ШІ, модель, розклад і пов'язані репозиторії з цього репозиторію."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Підтримувані формати репозиторіїв",
                     "dataRepo": {
                         "title": "Репозиторій даних",
-                        "description": "Репозиторії з works.yml та структурою папки data/"
+                        "description": "Репозиторії з .works/works.yml та структурою папки data/"
                     },
                     "awesomeReadme": {
                         "title": "Awesome-список",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Репозиторій даних",
                     "awesomeReadme": "Awesome-список",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "елементів",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Підключити репозиторії"
                 },
                 "detectionFailed": "Не вдалося автоматично виявити формат. Будь ласка, оберіть, як імпортувати цей репозиторій.",
-                "detectionFailedMissingConfig": "Не знайдено підтримуваної конфігурації. Додайте works.yml до репозиторію, або оберіть формат ручного імпорту нижче.",
+                "detectionFailedMissingConfig": "Не знайдено підтримуваної конфігурації. Додайте .works/works.yml до репозиторію, або оберіть формат ручного імпорту нижче.",
                 "errors": {
                     "urlRequired": "Будь ласка, введіть URL репозиторію GitHub",
                     "unsupportedFormat": "Цей формат репозиторію не підтримується. Будь ласка, використовуйте формат Репозиторію даних або Awesome-списку.",

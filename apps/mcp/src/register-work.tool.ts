@@ -7,7 +7,7 @@ const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
 const GITHUB_HTTPS_REPO = /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/i;
 
 const RegisterWorkSchema = z.object({
-	repo: z.string().regex(GITHUB_HTTPS_REPO).describe('HTTPS GitHub repo URL containing works.yml at root'),
+	repo: z.string().regex(GITHUB_HTTPS_REPO).describe('HTTPS GitHub repo URL containing .works/works.yml at root'),
 	githubToken: z
 		.string()
 		.min(4)
@@ -45,7 +45,7 @@ export class RegisterWorkTool {
 		name: 'register_work',
 		description:
 			'Zero-friction registration. Creates an Ever Works account if needed, links it to your ' +
-			'GitHub identity, parses works.yml from your repo, and queues a Work for generation. ' +
+			'GitHub identity, parses .works/works.yml from your repo, and queues a Work for generation. ' +
 			'Returns 202 with onboardingId, workId, statusUrl, and the assigned subdomain.',
 		parameters: RegisterWorkSchema
 	})

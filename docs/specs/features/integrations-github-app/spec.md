@@ -238,8 +238,8 @@ setup URL, and callback URL are derived with sensible defaults from
   (which falls back to `/user/emails` when the primary is null).
   The returned shape MUST be
   `{githubUserId: String(data.id), login, displayName: data.name || data.login,
-  email, emailVerified, avatarUrl: data.avatar_url || null,
-  nodeId: data.node_id || null, accessToken}`.
+email, emailVerified, avatarUrl: data.avatar_url || null,
+nodeId: data.node_id || null, accessToken}`.
 
 - **FR-8** `GitHubAppService.getInstallation(installationId)` MUST
   call `GET https://api.github.com/app/installations/:id` with the
@@ -275,25 +275,25 @@ setup URL, and callback URL are derived with sensible defaults from
   `undefined`.
 
 - **FR-14** `GitHubAppOnboardingService.completeUserAuth(input)` MUST
-  - verify the state (HMAC + 10-minute TTL),
-  - exchange the user code,
-  - resolve the GitHub user (via `getAuthenticatedGithubUser`),
-  - find-or-create the local user (the four-step chain in §2.1
-    + email-not-verified rejection),
-  - upsert the `auth_accounts` row with `providerId: 'github'`,
-    `accountId: <githubUserId>`, `tokenType: 'Bearer'`, full
-    OAuth-token fields, and `metadata: {nodeId, providerUserId, login}`,
-  - upsert the `github_app_user_links` row with the OAuth-app token
-    (kept distinct from the app installation token because GitHub
-    issues separate JWTs for each),
-  - re-call `getInstallation` so the row payload is fresh on the
-    second leg of the handshake,
-  - call `upsertFromGithub` again,
-  - call `claimOwnershipIfUnassigned(installationId, user.id, githubUserId)`
-    which atomically writes `createdByUserId`/`createdByGithubUserId`
-    only when the row's `createdByUserId IS NULL` (the WHERE clause
-    is the race-safety guarantee — concurrent claim attempts deterministically
-    pick a single owner).
+    - verify the state (HMAC + 10-minute TTL),
+    - exchange the user code,
+    - resolve the GitHub user (via `getAuthenticatedGithubUser`),
+    - find-or-create the local user (the four-step chain in §2.1
+        - email-not-verified rejection),
+    - upsert the `auth_accounts` row with `providerId: 'github'`,
+      `accountId: <githubUserId>`, `tokenType: 'Bearer'`, full
+      OAuth-token fields, and `metadata: {nodeId, providerUserId, login}`,
+    - upsert the `github_app_user_links` row with the OAuth-app token
+      (kept distinct from the app installation token because GitHub
+      issues separate JWTs for each),
+    - re-call `getInstallation` so the row payload is fresh on the
+      second leg of the handshake,
+    - call `upsertFromGithub` again,
+    - call `claimOwnershipIfUnassigned(installationId, user.id, githubUserId)`
+      which atomically writes `createdByUserId`/`createdByGithubUserId`
+      only when the row's `createdByUserId IS NULL` (the WHERE clause
+      is the race-safety guarantee — concurrent claim attempts deterministically
+      pick a single owner).
 
 - **FR-15** When `claimOwnershipIfUnassigned` returns `null` (no
   matching row), the onboarding service MUST throw
@@ -363,7 +363,7 @@ setup URL, and callback URL are derived with sensible defaults from
   the analyzer can read private repos. The auth payload forwarded
   to `WorkImportService.onboardLinkedRepository` MUST be
   `{mode: 'github_app_installation', providerId: 'github', installationId,
-  installationRepositoryId: repository.id, repoFullName: repository.fullName}`
+installationRepositoryId: repository.id, repoFullName: repository.fullName}`
   — explicitly carrying the platform-side repo entity id so the
   Work can re-resolve the row for token refresh.
 
@@ -437,7 +437,7 @@ setup URL, and callback URL are derived with sensible defaults from
   body, never in a URL query.
 - **Privacy**: Auto-created users without a verified email get a
   synthetic `@users.noreply.ever.works` address and `emailVerified:
-  false`. This prevents accidental cross-account linking via
+false`. This prevents accidental cross-account linking via
   unverified emails. The user-OAuth-app token is stored in BOTH
   the `auth_accounts` row (for user-bound API calls) and the
   `github_app_user_links` row (for installation-time bookkeeping)
@@ -459,20 +459,20 @@ setup URL, and callback URL are derived with sensible defaults from
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                           | Description                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GitHubAppInstallation`                    | Platform row mirroring GitHub's installation. PK `id` (uuid), unique `installationId` (string from GitHub), `appSlug`, `accountLogin`, `accountType`, `targetType`, `createdByUserId` (nullable), `createdByGithubUserId` (nullable), `suspendedAt` (nullable), `deletedAt` (nullable), `rawPayload` jsonb. |
-| `GitHubAppInstallationRepo`                | Per-installation repo. `installationEntityId` FK → `GitHubAppInstallation.id`, unique `(installationEntityId, githubRepoId)`, fields: `owner`, `repo`, `fullName`, `isPrivate`, `defaultBranch`, `selected`.                                                                                                |
-| `GitHubAppUserLink`                        | Maps GitHub-App-OAuth users to platform users. Unique on `githubUserId`. Fields: `userId`, `githubLogin`, `githubNodeId`, `accessToken`, `refreshToken`, `accessTokenExpiresAt`, `refreshTokenExpiresAt`, `scope`. Distinct from `auth_accounts.providerId='github'` because the GH-App OAuth client is a separate app from the social-login OAuth app. |
-| `auth_accounts` (`providerId='github'`)    | Platform-wide social-login row. The GitHub-App callback also writes here so the user's session-level GitHub auth survives even if the App is uninstalled.                                                                                                                                                |
-| `SetupStatePayload`                        | `{installationId, redirectTo?, setupAction?, issuedAt}` — HMAC-signed and base64url-encoded into the OAuth `state` parameter. 10-minute TTL.                                                                                                                                                            |
-| `GitHubAppSetupQueryDto`                   | Validated query for `GET /api/github-app/setup`. `installation_id` required; `setup_action` ∈ `{install, request}`; `redirectTo` optional (normalised by the service).                                                                                                                                  |
-| `GitHubAppCallbackQueryDto`                | Validated query for `GET /api/github-app/callback`. `code` and `state` both required; `class-validator` decorators ensure they are strings.                                                                                                                                                            |
-| `GitHubAppService`                         | HTTP client + JWT minting. Stateless.                                                                                                                                                                                                                                                                  |
-| `GitHubAppOnboardingService`               | OAuth state signing, `findOrCreateLocalUser`, `claimOwnershipIfUnassigned`. The user-resolution chain.                                                                                                                                                                                                  |
-| `GitHubAppSyncService`                     | Installation lifecycle, repo-list reconciliation, webhook handler, repo onboarding handoff to `WorkImportService`.                                                                                                                                                                                      |
-| `WorkImportService.onboardLinkedRepository`| Down-stream consumer. The auth payload `{mode:'github_app_installation', ...}` lets the new Work mint installation tokens at runtime.                                                                                                                                                                  |
-| `SourceRepoAnalyzerService`                | Static analyser. Reads the repo's `works.yml` to determine `detectedType` ∈ `{data_repo, website, …}`. Only `'data_repo'` is onboardable today.                                                                                                                                                        |
+| Entity / concept                            | Description                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GitHubAppInstallation`                     | Platform row mirroring GitHub's installation. PK `id` (uuid), unique `installationId` (string from GitHub), `appSlug`, `accountLogin`, `accountType`, `targetType`, `createdByUserId` (nullable), `createdByGithubUserId` (nullable), `suspendedAt` (nullable), `deletedAt` (nullable), `rawPayload` jsonb.                                             |
+| `GitHubAppInstallationRepo`                 | Per-installation repo. `installationEntityId` FK → `GitHubAppInstallation.id`, unique `(installationEntityId, githubRepoId)`, fields: `owner`, `repo`, `fullName`, `isPrivate`, `defaultBranch`, `selected`.                                                                                                                                            |
+| `GitHubAppUserLink`                         | Maps GitHub-App-OAuth users to platform users. Unique on `githubUserId`. Fields: `userId`, `githubLogin`, `githubNodeId`, `accessToken`, `refreshToken`, `accessTokenExpiresAt`, `refreshTokenExpiresAt`, `scope`. Distinct from `auth_accounts.providerId='github'` because the GH-App OAuth client is a separate app from the social-login OAuth app. |
+| `auth_accounts` (`providerId='github'`)     | Platform-wide social-login row. The GitHub-App callback also writes here so the user's session-level GitHub auth survives even if the App is uninstalled.                                                                                                                                                                                               |
+| `SetupStatePayload`                         | `{installationId, redirectTo?, setupAction?, issuedAt}` — HMAC-signed and base64url-encoded into the OAuth `state` parameter. 10-minute TTL.                                                                                                                                                                                                            |
+| `GitHubAppSetupQueryDto`                    | Validated query for `GET /api/github-app/setup`. `installation_id` required; `setup_action` ∈ `{install, request}`; `redirectTo` optional (normalised by the service).                                                                                                                                                                                  |
+| `GitHubAppCallbackQueryDto`                 | Validated query for `GET /api/github-app/callback`. `code` and `state` both required; `class-validator` decorators ensure they are strings.                                                                                                                                                                                                             |
+| `GitHubAppService`                          | HTTP client + JWT minting. Stateless.                                                                                                                                                                                                                                                                                                                   |
+| `GitHubAppOnboardingService`                | OAuth state signing, `findOrCreateLocalUser`, `claimOwnershipIfUnassigned`. The user-resolution chain.                                                                                                                                                                                                                                                  |
+| `GitHubAppSyncService`                      | Installation lifecycle, repo-list reconciliation, webhook handler, repo onboarding handoff to `WorkImportService`.                                                                                                                                                                                                                                      |
+| `WorkImportService.onboardLinkedRepository` | Down-stream consumer. The auth payload `{mode:'github_app_installation', ...}` lets the new Work mint installation tokens at runtime.                                                                                                                                                                                                                   |
+| `SourceRepoAnalyzerService`                 | Static analyser. Reads the repo's `.works/works.yml` to determine `detectedType` ∈ `{data_repo, website, …}`. Only `'data_repo'` is onboardable today.                                                                                                                                                                                                  |
 
 ## 6. Out of Scope
 
@@ -538,7 +538,7 @@ setup URL, and callback URL are derived with sensible defaults from
 ## 8. Open Questions
 
 - `[NEEDS CLARIFICATION: OQ-1]` `GitHubAppService.getCredentials`
-  throws an *unwrapped* `Error('GitHub App credentials are not configured')`,
+  throws an _unwrapped_ `Error('GitHub App credentials are not configured')`,
   not a `NestException`. With the global exception filter this
   surfaces as a 500. Should it be promoted to
   `ServiceUnavailableException` so the response code reflects the

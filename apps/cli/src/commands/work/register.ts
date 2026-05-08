@@ -18,9 +18,9 @@ interface RegisterOptions {
 
 export const registerCommand = new Command('register')
     .description(
-        'Zero-friction registration: creates an Ever Works account if needed and queues a Work from your GitHub repo manifest (works.yml).',
+        'Zero-friction registration: creates an Ever Works account if needed and queues a Work from your GitHub repo manifest (.works/works.yml).',
     )
-    .requiredOption('--repo <url>', 'HTTPS GitHub repo URL with works.yml at root')
+    .requiredOption('--repo <url>', 'HTTPS GitHub repo URL with .works/works.yml at root')
     .option('--github-token <token>', 'GitHub PAT (defaults to $GITHUB_TOKEN)')
     .option('--email <email>', 'Optional contact email')
     .option('--agent-id <id>', 'Optional opaque agent identifier')

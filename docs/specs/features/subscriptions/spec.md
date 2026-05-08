@@ -38,7 +38,7 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
 - **Given** subscriptions are enabled and I have no `user.defaultPlan` and no
   active `UserSubscription`, **when** I call `GET /api/subscriptions/plan`,
   **then** the response is `{ status: 'success', enabled: true, plan: {
-  code: 'free', name: 'Free', allowedCadences: [...] } }` where
+code: 'free', name: 'Free', allowedCadences: [...] } }` where
   `allowedCadences` is the seven-cadence allowance grid resolved from the
   configured default plan (`SUBSCRIPTIONS_DEFAULT_PLAN`, falling back to
   `'free'`).
@@ -47,7 +47,7 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
   code is `'premium'`, name is `'Premium'`, and every cadence in
   `allowedCadences` is `{ allowed: true, payPerUse: false }`.
 - **Given** subscriptions are enabled, **when** I call `POST
-  /api/subscriptions/plan` with `{ planCode: 'standard' }`, **then** my
+/api/subscriptions/plan` with `{ planCode: 'standard' }`, **then** my
   `users.defaultPlanId` is updated to the row whose `code === 'standard'`,
   the response plan reflects the new code/name/allowances, and a subsequent
   `GET /api/subscriptions/plan` reflects the updated plan.
@@ -67,17 +67,17 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
   schedule to `HOURLY` with `billingMode = 'subscription'`, **then**
   `WorkScheduleService.updateSchedule` throws
   `BadRequestException({ status: 'error', message: 'Selected cadence is not
-  available on your plan. Switch to pay-per-use to continue.' })` (Note:
+available on your plan. Switch to pay-per-use to continue.' })` (Note:
   the current `FREE` seed temporarily allows ALL cadences — see §6).
 
 ### 2.2 Edge cases & failures
 
 - **Given** subscriptions are disabled, **when** I call `POST
-  /api/subscriptions/plan`, **then** the controller throws
+/api/subscriptions/plan`, **then** the controller throws
   `BadRequestException('Subscriptions are disabled')` BEFORE any user
   lookup or plan assignment runs.
 - **Given** subscriptions are enabled, **when** I call `POST
-  /api/subscriptions/plan` with a `planCode` that fails the
+/api/subscriptions/plan` with a `planCode` that fails the
   `class-validator` `@IsEnum(SubscriptionPlanCode)` check, **then** the
   global validation pipe rejects the request with HTTP 400 BEFORE the
   controller body executes.
@@ -100,10 +100,10 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
   is creating-or-activating a schedule, **when** the user's count of
   active schedules already equals `plan.maxWorks`, **then** the service
   throws `BadRequestException({ status: 'error', code:
-  'PLAN_LIMIT_EXCEEDED', message: 'Your <DisplayName> plan allows up to
-  <maxWorks> scheduled works.' })` BEFORE the upsert.
+'PLAN_LIMIT_EXCEEDED', message: 'Your <DisplayName> plan allows up to
+<maxWorks> scheduled works.' })` BEFORE the upsert.
 - **Given** `UsageLedgerService.recordUsage` is invoked with `billingMode =
-  'subscription'`, **when** the service runs, **then** it returns `null`
+'subscription'`, **when** the service runs, **then** it returns `null`
   without writing a ledger row even though subscriptions are enabled.
 - **Given** the platform's `BillingProvider` raises while
   `recordUsageCharge` is awaited, **when** `recordUsage` runs, **then** the
@@ -143,13 +143,13 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
   `allowedCadences` set: cadences in the set are
   `{ allowed: true, payPerUse: false }`; cadences not in the set are
   `{ allowed: false, payPerUse: true, reason: 'Upgrade to <Tier> for
-  this cadence' }` where `<Tier>` is `Premium` for hourly/3h/8h cadences,
+this cadence' }` where `<Tier>` is `Premium` for hourly/3h/8h cadences,
   `Standard` for 12h/daily/weekly, and `Free` for monthly.
 - **FR-7** The system MUST expose `getDefaultCadence(plan)` that returns
   the LAST entry of `plan.allowedCadences` when the array is non-empty,
   falling back to `WorkScheduleCadence.MONTHLY` when empty.
 - **FR-8** The system MUST expose `requiresUsageBilling(cadence, plan,
-  billingMode)` returning `false` when subscriptions are disabled OR the
+billingMode)` returning `false` when subscriptions are disabled OR the
   cadence is in the plan's allowed set; otherwise returning
   `billingMode !== 'usage'` (i.e. cadence not allowed AND not in usage
   mode).
@@ -182,20 +182,20 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
   `requiresUsageBilling(cadence, plan, billingMode)` returns `true`,
   throwing
   `BadRequestException({ status: 'error', message: 'Selected cadence is
-  not available on your plan. Switch to pay-per-use to continue.' })`
+not available on your plan. Switch to pay-per-use to continue.' })`
   BEFORE any persistence.
 - **FR-16** The system MUST enforce `plan.maxWorks` in
   `WorkScheduleService.updateSchedule` when subscriptions are enabled and
   the request creates-or-activates a schedule: if
   `scheduleRepository.countActiveByUser(user.id) >= plan.maxWorks`, throw
   `BadRequestException({ status: 'error', code: 'PLAN_LIMIT_EXCEEDED',
-  message: 'Your <DisplayName> plan allows up to <maxWorks> scheduled
-  works.' })` BEFORE the upsert.
+message: 'Your <DisplayName> plan allows up to <maxWorks> scheduled
+works.' })` BEFORE the upsert.
 - **FR-17** The system MUST record a `UsageLedgerEntry` from
   `WorkScheduleService.markRunCompleted` ONLY (not from
   `markRunFailed` / `markRunSkipped`) — failed and skipped runs are free.
 - **FR-18** The system MUST include `triggerType =
-  UsageLedgerTriggerType.SCHEDULED` on ledger rows written by
+UsageLedgerTriggerType.SCHEDULED` on ledger rows written by
   `WorkScheduleService.markRunCompleted` and forward
   `generationHistoryId` from the call site to the ledger row.
 
@@ -231,20 +231,20 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                | Description                                                                                                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SubscriptionPlan`              | Catalog row keyed by `code` (`SubscriptionPlanCode`). Holds `displayName`, `maxWorks`, `allowedCadences[]`, `monthlyPrice`, `overagePricePerRun`, `currency`, `active`. |
-| `UserSubscription`              | Per-user active/canceled/past_due/trialing record linking a user to a plan via `planId`/`planCode`, with optional `currentPeriodEnd`, `cancelAtPeriodEnd`, `paymentMethodMeta`. |
-| `UsageLedgerEntry`              | Per-billable-event row: `userId`, `workId`, optional `scheduleId`, `triggerType` (`manual`/`scheduled`), `billingMode` (`subscription`/`usage`), `units`, `amountCents`, `currency`, `status` (`pending`/`queued_for_settlement`/`paid`/`canceled`), optional `generationHistoryId`, `metadata`. |
-| `SubscriptionPlanCode`          | Closed enum: `FREE = 'free'`, `STANDARD = 'standard'`, `PREMIUM = 'premium'`.                                                                                      |
-| `SubscriptionStatus`            | Closed enum: `ACTIVE`, `CANCELED`, `PAST_DUE`, `TRIALING`. Only `ACTIVE` is consulted by `findActiveByUser`.                                                       |
-| `SubscriptionBillingProvider`   | Closed enum on `UserSubscription`: `STRIPE` (default), `MANUAL`. Today the platform-side billing-provider abstraction (`BillingProvider`) is independent of this column. |
-| `UsageLedgerTriggerType`        | Closed enum: `MANUAL`, `SCHEDULED`. The current consumer (`WorkScheduleService`) writes `SCHEDULED` exclusively.                                                   |
-| `UsageLedgerStatus`             | Closed enum: `PENDING` (default), `QUEUED_FOR_SETTLEMENT`, `PAID`, `CANCELED`. `recordUsage` writes the default; promotion to `QUEUED_FOR_SETTLEMENT` is via `markQueued(ids)`. |
-| `WorkScheduleBillingMode`       | Closed enum imported from `@ever-works/contracts/api`: `SUBSCRIPTION`, `USAGE`. Stored on `WorkSchedule.billingMode`.                                              |
-| `WorkScheduleAllowedCadence`    | DTO: `{ cadence, allowed, payPerUse, reason? }`. The shape `getCadenceAllowances` returns and the API surfaces.                                                    |
-| `BillingProvider`               | Abstract NestJS provider with `getDefaultCurrency(): string` and `recordUsageCharge(entry): Promise<void>` (no-op default).                                        |
-| `ManualBillingProvider`         | Default registered impl: returns `config.billing.getDefaultCurrency()`, no remote charge.                                                                          |
+| Entity / concept              | Description                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SubscriptionPlan`            | Catalog row keyed by `code` (`SubscriptionPlanCode`). Holds `displayName`, `maxWorks`, `allowedCadences[]`, `monthlyPrice`, `overagePricePerRun`, `currency`, `active`.                                                                                                                          |
+| `UserSubscription`            | Per-user active/canceled/past_due/trialing record linking a user to a plan via `planId`/`planCode`, with optional `currentPeriodEnd`, `cancelAtPeriodEnd`, `paymentMethodMeta`.                                                                                                                  |
+| `UsageLedgerEntry`            | Per-billable-event row: `userId`, `workId`, optional `scheduleId`, `triggerType` (`manual`/`scheduled`), `billingMode` (`subscription`/`usage`), `units`, `amountCents`, `currency`, `status` (`pending`/`queued_for_settlement`/`paid`/`canceled`), optional `generationHistoryId`, `metadata`. |
+| `SubscriptionPlanCode`        | Closed enum: `FREE = 'free'`, `STANDARD = 'standard'`, `PREMIUM = 'premium'`.                                                                                                                                                                                                                    |
+| `SubscriptionStatus`          | Closed enum: `ACTIVE`, `CANCELED`, `PAST_DUE`, `TRIALING`. Only `ACTIVE` is consulted by `findActiveByUser`.                                                                                                                                                                                     |
+| `SubscriptionBillingProvider` | Closed enum on `UserSubscription`: `STRIPE` (default), `MANUAL`. Today the platform-side billing-provider abstraction (`BillingProvider`) is independent of this column.                                                                                                                         |
+| `UsageLedgerTriggerType`      | Closed enum: `MANUAL`, `SCHEDULED`. The current consumer (`WorkScheduleService`) writes `SCHEDULED` exclusively.                                                                                                                                                                                 |
+| `UsageLedgerStatus`           | Closed enum: `PENDING` (default), `QUEUED_FOR_SETTLEMENT`, `PAID`, `CANCELED`. `recordUsage` writes the default; promotion to `QUEUED_FOR_SETTLEMENT` is via `markQueued(ids)`.                                                                                                                  |
+| `WorkScheduleBillingMode`     | Closed enum imported from `@ever-works/contracts/api`: `SUBSCRIPTION`, `USAGE`. Stored on `WorkSchedule.billingMode`.                                                                                                                                                                            |
+| `WorkScheduleAllowedCadence`  | DTO: `{ cadence, allowed, payPerUse, reason? }`. The shape `getCadenceAllowances` returns and the API surfaces.                                                                                                                                                                                  |
+| `BillingProvider`             | Abstract NestJS provider with `getDefaultCurrency(): string` and `recordUsageCharge(entry): Promise<void>` (no-op default).                                                                                                                                                                      |
+| `ManualBillingProvider`       | Default registered impl: returns `config.billing.getDefaultCurrency()`, no remote charge.                                                                                                                                                                                                        |
 
 ## 6. Out of Scope
 
@@ -270,7 +270,7 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
 ## 7. Acceptance Criteria
 
 - [ ] `GET /api/subscriptions/plan` returns `{ enabled: false, plan:
-      null }` when `SUBSCRIPTIONS_ENABLED` is unset / not `'true'`.
+    null }` when `SUBSCRIPTIONS_ENABLED` is unset / not `'true'`.
 - [ ] `GET /api/subscriptions/plan` returns the resolved plan with the
       seven-cadence allowance grid when subscriptions are enabled.
 - [ ] `POST /api/subscriptions/plan` rejects with HTTP 400 when
@@ -297,7 +297,7 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
       subscriptions are disabled OR `billingMode !== 'usage'`.
 - [ ] `UsageLedgerService.recordUsage` writes a row with
       `units = 1`, `amountCents = max(0, round(PAY_PER_USE_PRICE_USD *
-      100))`, `currency` from `BillingProvider.getDefaultCurrency()`, and
+    100))`, `currency` from `BillingProvider.getDefaultCurrency()`, and
       `metadata.cadence = schedule.cadence`, then awaits
       `BillingProvider.recordUsageCharge(entry)`.
 - [ ] `WorkScheduleService.markRunCompleted` records a ledger row;
@@ -313,11 +313,11 @@ without writing, and `assignPlanToUser` rejects with HTTP 400.
 
 ## 8. Open Questions
 
-- `[NEEDS CLARIFICATION: OQ-1 — `FREE` seed currently allows ALL cadences (line 40 in `subscription.service.ts`: `allowedCadences: ALL_CADENCES // for now everything is free`). When does the production gate (`[WorkScheduleCadence.MONTHLY]`) ship? The behaviour spec describes the production-gated semantics, but the test suite must pin the current "everything free" behaviour or the tests will fail.]`
+- `[NEEDS CLARIFICATION: OQ-1 — `FREE`seed currently allows ALL cadences (line 40 in`subscription.service.ts`: `allowedCadences: ALL_CADENCES // for now everything is free`). When does the production gate (`[WorkScheduleCadence.MONTHLY]`) ship? The behaviour spec describes the production-gated semantics, but the test suite must pin the current "everything free" behaviour or the tests will fail.]`
 - `[NEEDS CLARIFICATION: OQ-2 — Should plan changes emit an activity-log entry (e.g. `user.subscription_plan_changed`)? Today the controller does not emit one, while almost every other settings endpoint does.]`
-- `[NEEDS CLARIFICATION: OQ-3 — `UsageLedgerService.recordUsage` does not wrap `billingProvider.recordUsageCharge(entry)` in a try/catch. A throwing billing provider crashes the originating run-completion path. The architecture spec describes a Trigger.dev retry loop for `failed` entries, but the entries are never marked `failed` today (status stays `PENDING`).]`
-- `[NEEDS CLARIFICATION: OQ-4 — `UserSubscription.billingProvider` defaults to `STRIPE` even though no Stripe integration is wired. This is the column carrying the per-user provider; the platform-side `BillingProvider` abstract class is separate. Should the default be `MANUAL` until Stripe lands?]`
-- `[NEEDS CLARIFICATION: OQ-5 — `assignPlanToUser` mutates `user.defaultPlan` / `user.defaultPlanId` in-place on the in-memory entity. This is convenient for the controller's immediate `summarizePlan` call but can cause subtle staleness in callers that hold an older reference. Document or remove?]`
+- `[NEEDS CLARIFICATION: OQ-3 — `UsageLedgerService.recordUsage`does not wrap`billingProvider.recordUsageCharge(entry)`in a try/catch. A throwing billing provider crashes the originating run-completion path. The architecture spec describes a Trigger.dev retry loop for`failed`entries, but the entries are never marked`failed`today (status stays`PENDING`).]`
+- `[NEEDS CLARIFICATION: OQ-4 — `UserSubscription.billingProvider`defaults to`STRIPE`even though no Stripe integration is wired. This is the column carrying the per-user provider; the platform-side`BillingProvider`abstract class is separate. Should the default be`MANUAL` until Stripe lands?]`
+- `[NEEDS CLARIFICATION: OQ-5 — `assignPlanToUser`mutates`user.defaultPlan`/`user.defaultPlanId`in-place on the in-memory entity. This is convenient for the controller's immediate`summarizePlan` call but can cause subtle staleness in callers that hold an older reference. Document or remove?]`
 
 ## 9. Constitution Gates
 

@@ -48,14 +48,14 @@ context is consistently enriched with the platform's branding
   `UserNewDeviceLoginEvent` fires, **then** I receive a
   `new-device-login` alert that includes the formatted login time
   (`Intl.DateTimeFormat('en-US', {year:numeric, month:long, day:numeric,
-  hour:'2-digit', minute:'2-digit', timeZoneName:'short'})`),
+hour:'2-digit', minute:'2-digit', timeZoneName:'short'})`),
   `device`, `browser`, `location`, `ipAddress`, the
   `verifyUrl`/`verifyToken`, and a `secureAccountUrl`.
 - **Given** I am invited to a work, **when** the
   `MemberInvitedEvent` fires, **then** I receive a `member-invitation`
   email with the inviter and invitee names, the work name, the
   formatted role label (`role.charAt(0).toUpperCase() +
-  role.slice(1).toLowerCase()`), and a `workUrl`.
+role.slice(1).toLowerCase()`), and a `workUrl`.
 - **Given** I request account deletion, **when** the
   `UserAccountDeletionEvent` fires, **then** I receive an
   `account-deletion` email with `deleteUrl`/`deleteToken`,
@@ -67,7 +67,7 @@ context is consistently enriched with the platform's branding
   via `HandlebarsAdapter` (with `inlineCssEnabled: true` and
   `strict: true`) and delivers the message — and the service emits
   two info-level log lines surrounding the call (`Sending …
-  to=<recipient> subject=…` then `Email sent via SMTP to=<recipient>`).
+to=<recipient> subject=…` then `Email sent via SMTP to=<recipient>`).
 - **Given** an admin sets `MAILER_PROVIDER=resend` and
   `RESEND_APIKEY`, **when** `MailerService.sendMail` runs, **then**
   the Resend client receives `{to, from, subject, html}` (where
@@ -86,7 +86,7 @@ context is consistently enriched with the platform's branding
   **when** the module factory builds the `RESEND_CLIENT` provider,
   **then** the client is `undefined` and the runtime falls through
   to the Faker delivery with a single `Resend client not initialized
-  (missing RESEND_APIKEY?), falling back to faker for to=<recipient>`
+(missing RESEND_APIKEY?), falling back to faker for to=<recipient>`
   warn-level log.
 - **Given** `MAILER_PROVIDER` is unset / `'none'` / `'faker'` / any
   unrecognised string, **when** `sendMail` runs, **then** the
@@ -149,8 +149,8 @@ context is consistently enriched with the platform's branding
   `expiresIn` to `'24 hours'`.
 - **FR-6** `MailService.formatDateTime(date)` MUST format dates via
   `Intl.DateTimeFormat('en-US', {year:numeric, month:long,
-  day:numeric, hour:'2-digit', minute:'2-digit',
-  timeZoneName:'short'})`. `MailService.formatRoleName(role)` MUST
+day:numeric, hour:'2-digit', minute:'2-digit',
+timeZoneName:'short'})`. `MailService.formatRoleName(role)` MUST
   capitalise the first character and lowercase the rest.
 - **FR-7** `MailerService.sendMail(data)` MUST switch on
   `config.mail.provider()` returning one of `'smtp'`, `'resend'`, or
@@ -163,7 +163,7 @@ context is consistently enriched with the platform's branding
   `resend.emails.send`. The `to` is normalised through
   `getDestination(data.to)` returning a `string[]`.
 - **FR-9** `getDestination(destination)` MUST accept `string |
-  Address | (string|Address)[]`, MUST wrap a single value in an
+Address | (string|Address)[]`, MUST wrap a single value in an
   array, and MUST map each entry through:
     - `typeof to === 'string'` → return as-is.
     - `'address' in to` → return `to.address`.
@@ -230,7 +230,7 @@ context is consistently enriched with the platform's branding
       signed certificate or revisit this gate.
 - **Observability**:
     - Construction log: `Mailer service initialized with provider:
-      <provider>`.
+<provider>`.
     - Per-call info logs around SMTP and Resend sends as described
       in FR-13.
     - Faker-fallback warn log when Resend client is not
@@ -247,18 +247,18 @@ context is consistently enriched with the platform's branding
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept             | Description                                                                                                                                                                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MailService`                | `apps/api/src/mail/mail.service.ts`. Subscribes to seven user-lifecycle events and translates each into a `MailerService.sendMail` call with the matching `template` slug and a branding-enriched context.                                                                                                              |
-| `MailerService`              | `apps/api/src/mail/providers/mailer.service.ts`. The provider-routing facade. Switches on `config.mail.provider()` between SMTP (`@nestjs-modules/mailer`), Resend (`resend` SDK), or the Faker default branch.                                                                                                          |
-| `FakerMailerService`         | `apps/api/src/mail/providers/faker-mailer.service.ts`. No-op debug-logging delivery used when no real provider is configured or when Resend is selected without an API key.                                                                                                                                              |
-| `MailerModule`               | `apps/api/src/mail/mail.module.ts`. Wires `MailerModule.forRootAsync` with the SMTP transport (`config.mail.smtpHost/Port/Secure/IgnoreTLS/User/Password`, `tls.rejectUnauthorized: false`, `defaults.from = config.mail.from()`, Handlebars adapter with `inlineCssEnabled: true` + `strict: true`) and the `RESEND_CLIENT` factory provider. |
-| `SendMailOptions`            | `apps/api/src/mail/types.ts`. `{to?, cc?, bcc?, replyTo?, inReplyTo?, from?, subject?, text?, html?, sender?, raw?, references?, encoding?, date?, context?, transporterName?, template?}`. Both single-recipient and array-of-recipient shapes are supported.                                                            |
-| `Address`                    | `{name: string; address: string}`. Used inside `to`/`cc`/`bcc`/etc.                                                                                                                                                                                                                                                       |
-| `MAILER_PROVIDER`            | Env-var switch: `smtp` / `resend` / anything-else (faker).                                                                                                                                                                                                                                                                |
-| Handlebars templates         | Seven `*.hbs` files under `apps/api/src/templates/`: `signup-confirmation`, `welcome`, `password-changed`, `forgot-password`, `new-device-login`, `account-deletion`, `member-invitation`. Compiled at request time via `Handlebars.compile`.                                                                              |
-| Branding context             | `{appName, companyOwner, platformWebsite, currentYear}` from `config.branding.*` and `new Date().getFullYear()`.                                                                                                                                                                                                          |
-| `RESEND_CLIENT` token        | NestJS provider injected via `@Optional() @Inject('RESEND_CLIENT')`. Built via `useFactory` that returns `new Resend(apiKey)` if `config.mail.resend.apiKey()` is truthy, else `undefined`.                                                                                                                                |
+| Entity / concept      | Description                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MailService`         | `apps/api/src/mail/mail.service.ts`. Subscribes to seven user-lifecycle events and translates each into a `MailerService.sendMail` call with the matching `template` slug and a branding-enriched context.                                                                                                                                     |
+| `MailerService`       | `apps/api/src/mail/providers/mailer.service.ts`. The provider-routing facade. Switches on `config.mail.provider()` between SMTP (`@nestjs-modules/mailer`), Resend (`resend` SDK), or the Faker default branch.                                                                                                                                |
+| `FakerMailerService`  | `apps/api/src/mail/providers/faker-mailer.service.ts`. No-op debug-logging delivery used when no real provider is configured or when Resend is selected without an API key.                                                                                                                                                                    |
+| `MailerModule`        | `apps/api/src/mail/mail.module.ts`. Wires `MailerModule.forRootAsync` with the SMTP transport (`config.mail.smtpHost/Port/Secure/IgnoreTLS/User/Password`, `tls.rejectUnauthorized: false`, `defaults.from = config.mail.from()`, Handlebars adapter with `inlineCssEnabled: true` + `strict: true`) and the `RESEND_CLIENT` factory provider. |
+| `SendMailOptions`     | `apps/api/src/mail/types.ts`. `{to?, cc?, bcc?, replyTo?, inReplyTo?, from?, subject?, text?, html?, sender?, raw?, references?, encoding?, date?, context?, transporterName?, template?}`. Both single-recipient and array-of-recipient shapes are supported.                                                                                 |
+| `Address`             | `{name: string; address: string}`. Used inside `to`/`cc`/`bcc`/etc.                                                                                                                                                                                                                                                                            |
+| `MAILER_PROVIDER`     | Env-var switch: `smtp` / `resend` / anything-else (faker).                                                                                                                                                                                                                                                                                     |
+| Handlebars templates  | Seven `*.hbs` files under `apps/api/src/templates/`: `signup-confirmation`, `welcome`, `password-changed`, `forgot-password`, `new-device-login`, `account-deletion`, `member-invitation`. Compiled at request time via `Handlebars.compile`.                                                                                                  |
+| Branding context      | `{appName, companyOwner, platformWebsite, currentYear}` from `config.branding.*` and `new Date().getFullYear()`.                                                                                                                                                                                                                               |
+| `RESEND_CLIENT` token | NestJS provider injected via `@Optional() @Inject('RESEND_CLIENT')`. Built via `useFactory` that returns `new Resend(apiKey)` if `config.mail.resend.apiKey()` is truthy, else `undefined`.                                                                                                                                                    |
 
 ## 6. Out of Scope
 
@@ -275,7 +275,7 @@ context is consistently enriched with the platform's branding
 - **Inbound mail processing.** The platform does not parse incoming
   mail (no IMAP/POP integration, no Resend webhook handler).
 - **Per-recipient personalisation beyond `{firstName,
-  inviteeName, dashboardUrl, …}`.** Anything richer lives in the
+inviteeName, dashboardUrl, …}`.** Anything richer lives in the
   Handlebars template's own context.
 - **Bulk / marketing email.** This surface is strictly for
   transactional, event-triggered messages.
@@ -311,11 +311,11 @@ context is consistently enriched with the platform's branding
 - **OQ-1 (FR-9 follow-up — Resend `to`-undefined crash).** As of
   2026-05-08, `MailerService.sendMail` builds its `recipient` log
   line via `data.to ? this.getDestination(data.to).join(', ') :
-  'unknown'`, but the Resend branch unconditionally calls
+'unknown'`, but the Resend branch unconditionally calls
   `this.getDestination(data.to)` — so when a caller omits `to`,
   the log line says `to=unknown` and then `getDestination(undefined)`
   throws `TypeError: Cannot use 'in' operator to search for
-  'address' in undefined`. The SMTP and Faker paths handle a
+'address' in undefined`. The SMTP and Faker paths handle a
   missing `to` cleanly. Tracked as a follow-up in `tasks.md`; not
   a regression — current behaviour is pinned by a test in
   `mailer.service.spec.ts`. A fix should short-circuit Resend the

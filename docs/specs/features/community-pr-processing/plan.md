@@ -40,18 +40,18 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern              | Choice                                                                                              | Rationale                                                                                                                                                       |
-| -------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Mutual exclusion     | `DistributedTaskLockService.runExclusive` (Postgres-backed advisory locks)                          | Principle IV. Outer scheduler lock + per-work lock; the same primitive used across all schedulers in `apps/api/src/works/tasks/`.                                  |
-| Trigger surface      | Cron (hourly) + manual POST endpoint                                                                | Hourly is the right cadence for community contributions; the manual endpoint lets owners drain a queue without waiting for the next tick.                         |
-| GitHub access        | `GitFacadeService` (resolves provider plugin from `work.gitProvider`)                               | Principle II. Switching to GitLab / Bitbucket is a plugin swap, not a service rewrite.                                                                              |
-| AI extraction        | `AiFacadeService.askJson(prompt, zodSchema, options, context)`                                      | Provider-agnostic; the work's plugin settings determine which AI provider runs. `temperature: 0.3` keeps output deterministic.                                     |
-| Output schema        | `zod` (`extractedItemSchema`)                                                                       | Schema validation built-in; bad responses throw and the per-PR `try/catch` records `lastError`.                                                                     |
-| State persistence    | `work.communityPrState` jsonb (additive column on `works`)                                          | Single-row update per `processWork` call; no separate state table; survives `Work` lifecycle.                                                                        |
-| History writes       | `WorkGenerationHistoryRepository.createEntry({activityType: COMMUNITY_PR_MERGED, ...})`             | Reuses the existing per-work generation timeline. Fire-and-forget so DB hiccups don't lose data already pushed to git.                                              |
-| Audit log emission   | Controller path emits `activity_logs` row; service path does NOT                                    | Matches the convention across `WorksController` — service layer is reusable from cron / Trigger.dev where there's no `auth.userId`. Audit is a controller concern. |
-| Slug dedup           | Set + `DataRepository.itemExists(slug)` check                                                       | Two-layer dedup: within-run (`Set<string>`) and across-runs (`itemExists` reads the data repo).                                                                      |
-| Context truncation   | Hard cap at 50 000 chars before AI prompt is built                                                  | LLM context windows + cost; large diffs are usually formatting-only PRs that don't add new items anyway.                                                            |
+| Concern            | Choice                                                                                  | Rationale                                                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Mutual exclusion   | `DistributedTaskLockService.runExclusive` (Postgres-backed advisory locks)              | Principle IV. Outer scheduler lock + per-work lock; the same primitive used across all schedulers in `apps/api/src/works/tasks/`.                                  |
+| Trigger surface    | Cron (hourly) + manual POST endpoint                                                    | Hourly is the right cadence for community contributions; the manual endpoint lets owners drain a queue without waiting for the next tick.                          |
+| GitHub access      | `GitFacadeService` (resolves provider plugin from `work.gitProvider`)                   | Principle II. Switching to GitLab / Bitbucket is a plugin swap, not a service rewrite.                                                                             |
+| AI extraction      | `AiFacadeService.askJson(prompt, zodSchema, options, context)`                          | Provider-agnostic; the work's plugin settings determine which AI provider runs. `temperature: 0.3` keeps output deterministic.                                     |
+| Output schema      | `zod` (`extractedItemSchema`)                                                           | Schema validation built-in; bad responses throw and the per-PR `try/catch` records `lastError`.                                                                    |
+| State persistence  | `work.communityPrState` jsonb (additive column on `works`)                              | Single-row update per `processWork` call; no separate state table; survives `Work` lifecycle.                                                                      |
+| History writes     | `WorkGenerationHistoryRepository.createEntry({activityType: COMMUNITY_PR_MERGED, ...})` | Reuses the existing per-work generation timeline. Fire-and-forget so DB hiccups don't lose data already pushed to git.                                             |
+| Audit log emission | Controller path emits `activity_logs` row; service path does NOT                        | Matches the convention across `WorksController` — service layer is reusable from cron / Trigger.dev where there's no `auth.userId`. Audit is a controller concern. |
+| Slug dedup         | Set + `DataRepository.itemExists(slug)` check                                           | Two-layer dedup: within-run (`Set<string>`) and across-runs (`itemExists` reads the data repo).                                                                    |
+| Context truncation | Hard cap at 50 000 chars before AI prompt is built                                      | LLM context windows + cost; large diffs are usually formatting-only PRs that don't add new items anyway.                                                           |
 
 ## 3. Data Model
 
@@ -81,9 +81,9 @@ flowchart TD
 
 ## 4. API Surface
 
-| Method | Endpoint                                          | Auth                                  | Description                                                          | Status  |
-| ------ | ------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ------- |
-| `POST` | `/api/works/:id/process-community-prs`            | Global `AuthSessionGuard` + owner gate | Manually drain pending community PRs; returns `{itemsAdded}`. | Shipped |
+| Method | Endpoint                               | Auth                                   | Description                                                   | Status  |
+| ------ | -------------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ------- |
+| `POST` | `/api/works/:id/process-community-prs` | Global `AuthSessionGuard` + owner gate | Manually drain pending community PRs; returns `{itemsAdded}`. | Shipped |
 
 (Note: the endpoint path uses dashes-not-slashes —
 `process-community-prs` — and the controller method is
@@ -131,11 +131,11 @@ benefits.
 ## 8. Security & Permissions
 
 - **Manual trigger** (`processCommunityPrs` in `WorksController`):
-  - Caller MUST be authenticated (global `AuthSessionGuard`).
-  - Caller MUST have access to the work (`workQueryService.getWork(id, user)`
-    enforces ownership / membership).
-  - Work MUST have `communityPrEnabled === true`
-    (`BadRequestException` otherwise).
+    - Caller MUST be authenticated (global `AuthSessionGuard`).
+    - Caller MUST have access to the work (`workQueryService.getWork(id, user)`
+      enforces ownership / membership).
+    - Work MUST have `communityPrEnabled === true`
+      (`BadRequestException` otherwise).
 - **Scheduler trigger**: server-side; no user context. Uses the
   work owner's GitHub tokens via the plugin-settings store.
 - **Token handling**: tokens are fetched lazily by `gitFacade.*`
@@ -184,17 +184,17 @@ removing `CommunityPrSchedulerService` from the works module.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                                                                       | Likelihood | Impact                                                  | Mitigation                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Per-work lock TTL (30m) expires mid-run on a slow work                                                     | Low        | A second replica may pick up the same work               | The scheduler's outer lock prevents that across replicas. For single-replica deploys, the in-memory `Set` of processed slugs prevents within-batch duplicates.                                       |
-| AI extraction returns plausible-but-wrong items                                                            | Medium     | Junk items added to the work                            | `temperature: 0.3` + zod schema; the data repo is a git repo, so a maintainer can revert the commit. Future: review queue (OQ-3 in `tasks.md`).                                                       |
-| GitHub rate limit hit mid-batch                                                                            | Low        | Run aborts; some PRs unprocessed                        | Per-PR try/catch records `lastError`; unprocessed PRs are picked up next hour. State is persisted at end-of-work, so progress is not lost beyond the in-flight PR.                                    |
-| Duplicate slugs across PRs land items in different file-paths                                              | Low        | One PR's item silently shadows another's                | `data.itemExists(slug)` reads the live filesystem; the second-arriving PR is skipped + logged. This is intentional — first-write-wins.                                                                  |
-| `recordCommunityPrHistory` fails after items pushed                                                        | Low        | History row missing for a successful run               | Caught + warn-logged; items remain in repo. A reconciliation job could backfill from git history (OQ-3).                                                                                                |
-| `processedPrNumbers` array unboundedly grows                                                               | High       | jsonb row balloons over years of operation              | 500-entry FIFO eviction on both `processedPrNumbers` and `processedPrs` arrays. Old PRs may be re-processed if they're still open and their numbers are evicted; `itemExists(slug)` blocks duplicate items in that case. |
-| Comment / auto-close fails after merge                                                                     | Medium     | PR contributor sees no acknowledgement                  | Caught + warn-logged; the merge is still durable. Owner can manually comment if needed.                                                                                                                  |
-| Manual endpoint has no rate limit                                                                          | Low        | Owner spams the endpoint                                | The per-work lock makes back-to-back calls effectively a no-op (subsequent calls see no unprocessed PRs); not exploitable. Future: `@Throttle({short: {limit: 5, ttl: 60_000}})`.                       |
-| Schedule cron doesn't run                                                                                  | Low        | Community PRs sit unprocessed                            | The manual endpoint is the operator's escape hatch. Future: alarm on `lastProcessedAt < now - 6h` for any `communityPrEnabled` work.                                                                     |
+| Risk                                                          | Likelihood | Impact                                     | Mitigation                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ---------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Per-work lock TTL (30m) expires mid-run on a slow work        | Low        | A second replica may pick up the same work | The scheduler's outer lock prevents that across replicas. For single-replica deploys, the in-memory `Set` of processed slugs prevents within-batch duplicates.                                                           |
+| AI extraction returns plausible-but-wrong items               | Medium     | Junk items added to the work               | `temperature: 0.3` + zod schema; the data repo is a git repo, so a maintainer can revert the commit. Future: review queue (OQ-3 in `tasks.md`).                                                                          |
+| GitHub rate limit hit mid-batch                               | Low        | Run aborts; some PRs unprocessed           | Per-PR try/catch records `lastError`; unprocessed PRs are picked up next hour. State is persisted at end-of-work, so progress is not lost beyond the in-flight PR.                                                       |
+| Duplicate slugs across PRs land items in different file-paths | Low        | One PR's item silently shadows another's   | `data.itemExists(slug)` reads the live filesystem; the second-arriving PR is skipped + logged. This is intentional — first-write-wins.                                                                                   |
+| `recordCommunityPrHistory` fails after items pushed           | Low        | History row missing for a successful run   | Caught + warn-logged; items remain in repo. A reconciliation job could backfill from git history (OQ-3).                                                                                                                 |
+| `processedPrNumbers` array unboundedly grows                  | High       | jsonb row balloons over years of operation | 500-entry FIFO eviction on both `processedPrNumbers` and `processedPrs` arrays. Old PRs may be re-processed if they're still open and their numbers are evicted; `itemExists(slug)` blocks duplicate items in that case. |
+| Comment / auto-close fails after merge                        | Medium     | PR contributor sees no acknowledgement     | Caught + warn-logged; the merge is still durable. Owner can manually comment if needed.                                                                                                                                  |
+| Manual endpoint has no rate limit                             | Low        | Owner spams the endpoint                   | The per-work lock makes back-to-back calls effectively a no-op (subsequent calls see no unprocessed PRs); not exploitable. Future: `@Throttle({short: {limit: 5, ttl: 60_000}})`.                                        |
+| Schedule cron doesn't run                                     | Low        | Community PRs sit unprocessed              | The manual endpoint is the operator's escape hatch. Future: alarm on `lastProcessedAt < now - 6h` for any `communityPrEnabled` work.                                                                                     |
 
 ## 12. Constitution Reconciliation
 

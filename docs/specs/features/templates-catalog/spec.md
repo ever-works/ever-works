@@ -39,8 +39,8 @@ five mutating endpoints (`add` / `update` / `archive` /
   `GET /api/templates?kind=website`, **then** the response is
   `{ status: 'success', kind: 'website', defaultTemplateId, templates }`
   where `templates` is the union of `(sourceType='built_in' AND
-  isActive=true)` rows and `(sourceType='custom' AND ownerUserId=me AND
-  isActive=true)` rows, sorted by `sourceType DESC` (custom first) then
+isActive=true)` rows and `(sourceType='custom' AND ownerUserId=me AND
+isActive=true)` rows, sorted by `sourceType DESC` (custom first) then
   `name ASC`.
 - **Given** the website-template GitHub catalog
   (`WEBSITE_TEMPLATE_CATALOG_ORG`, default `ever-works`) was last
@@ -55,10 +55,10 @@ five mutating endpoints (`add` / `update` / `archive` /
   `repository.name.toLowerCase()`).
 - **Given** I add a custom template, **when** I call
   `POST /api/templates/custom` with `{ kind: 'website', repositoryUrl:
-  'https://github.com/me/my-template', name: 'My Template' }`, **then**
+'https://github.com/me/my-template', name: 'My Template' }`, **then**
   the service `parseGitHubRepositoryUrl`s the URL, refuses non-GitHub
   URLs with `BadRequestException('Only valid GitHub repository URLs
-  are supported for custom templates.')`, refuses duplicate adds with
+are supported for custom templates.')`, refuses duplicate adds with
   `ConflictException('You already added this template repository.')`,
   and otherwise upserts a row keyed by `id = 'custom-<uuid>'` with
   `sourceType: 'custom'`, `ownerUserId: me`, normalised
@@ -68,14 +68,14 @@ five mutating endpoints (`add` / `update` / `archive` /
   fire-and-forget.
 - **Given** I fork a standard template, **when** I call
   `POST /api/templates/fork` with `{ kind: 'website', templateId:
-  'classic', targetOwner: 'me' }`, **then** the service rejects with
+'classic', targetOwner: 'me' }`, **then** the service rejects with
   `NotFoundException` if the template is not visible to me, with
   `BadRequestException('Only standard templates can be forked.')` if
   the template is already custom, with
   `BadRequestException('A target account or organization is
-  required.')` on empty `targetOwner`, and with
+required.')` on empty `targetOwner`, and with
   `BadRequestException('The selected fork target is not available for
-  this GitHub connection.')` if the resolved login is neither my
+this GitHub connection.')` if the resolved login is neither my
   GitHub user nor a connected organization. On the happy path it calls
   `gitFacade.forkRepository`, upserts a `custom-<uuid>` row that
   inherits the source template's `name`/`description`/`framework`/
@@ -100,9 +100,9 @@ five mutating endpoints (`add` / `update` / `archive` /
   `defaultTemplateId`.
 - **Given** I update a custom template, **when** I call
   `PUT /api/templates/custom/:templateId` with `{ kind: 'website', name,
-  description, framework, previewImageUrl, branch, betaBranch }`, **then**
+description, framework, previewImageUrl, branch, betaBranch }`, **then**
   the service refuses with `NotFoundException('Custom template not
-  found for this user and kind.')` when the row is not active, not
+found for this user and kind.')` when the row is not active, not
   custom, not mine, or does not match `kind`. On the happy path each
   field follows the "undefined → preserve, empty-string → null/preserve"
   rules pinned in §3 FR-9 / FR-10, the row is updated, and a
@@ -112,11 +112,11 @@ five mutating endpoints (`add` / `update` / `archive` /
   `{ kind: 'website' }`, **then** the service refuses with
   `NotFoundException` when the row is not active / mine / matching kind,
   refuses with `ConflictException('This template is still assigned to
-  N work(s). Reassign … before archiving the template.')` when the
+N work(s). Reassign … before archiving the template.')` when the
   template is currently assigned to one or more works (singular vs
   plural copy), additionally refuses with `ConflictException('This
-  template is your current default and N work(s) inherit it. Reassign
-  those works or change your default template before archiving.')` when
+template is your current default and N work(s) inherit it. Reassign
+those works or change your default template before archiving.')` when
   it is the user's default AND any works are inheriting it (only checked
   when not currently assigned to a specific work), then sets
   `isActive = false` and removes the matching `user_template_preferences`
@@ -139,14 +139,14 @@ five mutating endpoints (`add` / `update` / `archive` /
   `pageRepositories.length < perPage` exit, **when** the loop ends,
   **then** the service logs at warn level
   (`Template discovery for org <owner> hit the 50-page safety cap;
-  some repositories may be missing from the catalog.`).
+some repositories may be missing from the catalog.`).
 - **Given** a discovered repository would collide with an existing row
   whose id matches `repository.name.toLowerCase()` but does NOT match
   `(repositoryOwner, repositoryName)`, **when**
   `syncDiscoveredWebsiteTemplatesForUser` projects that repository,
   **then** the row is SKIPPED with a warn log
   (`Skipping discovered template "<fullName>" because id "<discoveredId>"
-  is already used by <owner>/<name>.`).
+is already used by <owner>/<name>.`).
 - **Given** the canonical built-in template id (e.g. `classic`) differs
   from the discovered id (e.g. `directory-web-template`), **when**
   `syncDiscoveredWebsiteTemplatesForUser` upserts the canonical row,
@@ -155,10 +155,10 @@ five mutating endpoints (`add` / `update` / `archive` /
   the user only sees one entry.
 - **Given** the user has no `user_template_preferences` row for a
   given kind, **when** `getDefaultTemplateIdForUser('website',
-  userId)` runs, **then** it falls back to
+userId)` runs, **then** it falls back to
   `getDefaultWebsiteTemplateId()` (env-driven via
   `WEBSITE_TEMPLATE_DEFAULT_ID`, fallback `'classic'`); for `kind:
-  'work'`, it returns `null` (no fallback).
+'work'`, it returns `null` (no fallback).
 - **Given** `seedBuiltInTemplates` throws during `onModuleInit`,
   **when** the module boots, **then** the service catches and warns
   (`Failed to seed built-in templates during startup: <msg>`); the
@@ -201,13 +201,13 @@ five mutating endpoints (`add` / `update` / `archive` /
   id is deactivated when it duplicates the canonical row's coordinates.
 - **FR-7** The system MUST refuse non-GitHub URLs in
   `addCustomTemplate` with `BadRequestException({ status: 'error',
-  message: 'Only valid GitHub repository URLs are supported for custom
-  templates.' })` (uses `parseGitHubRepositoryUrl` from
+message: 'Only valid GitHub repository URLs are supported for custom
+templates.' })` (uses `parseGitHubRepositoryUrl` from
   `@ever-works/contracts`).
 - **FR-8** The system MUST refuse duplicate `addCustomTemplate` calls
   by the same user against the same `parseGitHubRepositoryUrl`-canonical
   URL with `ConflictException({ status: 'error', message: 'You already
-  added this template repository.' })`.
+added this template repository.' })`.
 - **FR-9** The system MUST default `branch` to `'main'` and
   `syncBranches` to `[branch]` when those fields are omitted from
   `addCustomTemplate`'s body. `name` defaults to
@@ -228,35 +228,35 @@ five mutating endpoints (`add` / `update` / `archive` /
   `archiveCustomTemplateForUser` when the row is not
   `(active AND custom AND owned-by-me AND kind-matching)` with
   `NotFoundException({ status: 'error', message: 'Custom template not
-  found for this user and kind.' })`.
+found for this user and kind.' })`.
 - **FR-12** The system MUST refuse archive when the template is
   currently assigned to one or more works
   (`workRepository.countByUserAndWebsiteTemplateId(userId, templateId)
-  > 0`) for `kind: 'website'`, with singular vs. plural copy
-  (`'1 work. … the template'` vs `'<N> works. … the template'`).
+    > 0`) for `kind: 'website'`, with singular vs. plural copy
+(`'1 work. … the template'`vs`'<N> works. … the template'`).
 - **FR-13** The system MUST refuse archive when the template is the
   user's current default AND inheriting works exist
   (`workRepository.countByUserAndInheritedWebsiteTemplateSelection(userId)
-  > 0`) — only checked AFTER the per-template usage check passed.
+    > 0`) — only checked AFTER the per-template usage check passed.
 - **FR-14** The system MUST set `isActive = false` (soft delete) on
   archive and remove the matching
   `user_template_preferences (userId, kind, templateId)` row.
 - **FR-15** The system MUST refuse `setDefaultTemplateForUser` when
   the template is not visible to the user or `kind` does not match
   with `NotFoundException({ status: 'error', message: 'Template not
-  found for this user and kind.' })`. On success it upserts the
+found for this user and kind.' })`. On success it upserts the
   `(userId, kind, templateId)` row.
 - **FR-16** The system MUST refuse `forkTemplateForUser` with
   `NotFoundException` for invisible / kind-mismatched templates,
   `BadRequestException('Only standard templates can be forked.')` for
   custom templates, `BadRequestException('A target account or
-  organization is required.')` for empty `targetOwner` (after `.trim()`),
+organization is required.')` for empty `targetOwner` (after `.trim()`),
   and `BadRequestException('The selected fork target is not available
-  for this GitHub connection.')` when the target is neither the user's
+for this GitHub connection.')` when the target is neither the user's
   GitHub login nor a connected organization (case-insensitive match).
 - **FR-17** The system MUST short-circuit `forkTemplateForUser` when
   `findOwnedCustomByRepositoryCoordinates(kind, userId, targetOwner,
-  template.repositoryName)` returns a row: re-adopt it as the default
+template.repositoryName)` returns a row: re-adopt it as the default
   via `userTemplatePreferenceRepository.upsertDefault`, return
   `{ defaultTemplateId, template, repository, created: false }`, and
   do NOT call `gitFacade.forkRepository`.
@@ -268,12 +268,12 @@ five mutating endpoints (`add` / `update` / `archive` /
   inherited `name`/`description`/`framework`/`previewImageUrl`/
   `syncBranches`/`betaBranch` from the source template, and metadata
   `{ forkedFromTemplateId, forkedFromRepositoryUrl, forkedFromOwner,
-  forkedFromRepositoryName, forkTargetType: 'personal'|'organization' }`.
+forkedFromRepositoryName, forkTargetType: 'personal'|'organization' }`.
 - **FR-20** The system MUST set the fork as the user's default for that
   kind via `userTemplatePreferenceRepository.upsertDefault`.
 - **FR-21** The system MUST emit fire-and-forget activity-log entries
   via `activityLogService.log({ userId, actionType, action, status,
-  summary, metadata }).catch(() => {})` for the five mutating endpoints:
+summary, metadata }).catch(() => {})` for the five mutating endpoints:
   `template.added`, `template.updated`, `template.archived`,
   `template.default_set`, `template.forked` (the last only when
   `result.created === true`).
@@ -323,16 +323,16 @@ five mutating endpoints (`add` / `update` / `archive` /
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                | Description                                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Entity / concept                | Description                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Template`                      | Single registry row keyed by `id` (varchar PK, 120). Stores `kind`, `sourceType` (`built_in` / `custom`), optional `ownerUserId`, `name`, `description`, `framework`, `previewImageUrl`, `repositoryUrl`, `repositoryOwner`, `repositoryName`, `branch` (default `main`), `syncBranches[]`, `betaBranch`, `isActive`, `metadata` JSON. |
-| `UserTemplatePreference`        | Per-user, per-kind default selection — row keyed by `(userId, kind)` unique. Holds `templateId` pointing to the chosen `Template.id`.                                     |
-| `TemplateCatalogItem`           | DTO returned by every list / mutation: `{ id, kind, sourceType, originType, name, description, framework, previewImageUrl, repositoryUrl, repositoryOwner, repositoryName, branch, syncBranches[], betaBranch, isActive, isDefault, ownerUserId }`. |
-| `TemplateKind`                  | Closed union: `'website'` (web-output template) or `'work'` (work-data template). Currently only the `website` kind has discovery / `Minimal` / `Classic` seeds.          |
-| `TemplateSourceType`            | Closed union: `'built_in'` (seed-or-discovery owned) or `'custom'` (user-owned, possibly forked).                                                                         |
-| `originType`                    | Computed at projection time: `'standard'` (built-in), `'forked'` (custom + `metadata.forkedFromTemplateId`), `'custom_url'` (custom otherwise).                          |
-| `WebsiteTemplateConfig`         | Hard-coded per-deploy structure consumed by `seedBuiltInTemplates`: `{ id, name, description, owner, repo, branch, syncBranches[], betaBranch }`. Today: `Classic` always, plus `Minimal` when `WEBSITE_TEMPLATE_MINIMAL_REPO` is set. |
-| `getDefaultWebsiteTemplateId()` | Resolves the env-driven default (`WEBSITE_TEMPLATE_DEFAULT_ID`, fallback `'classic'`) only when the resolved id matches a configured template; otherwise `'classic'`.    |
+| `UserTemplatePreference`        | Per-user, per-kind default selection — row keyed by `(userId, kind)` unique. Holds `templateId` pointing to the chosen `Template.id`.                                                                                                                                                                                                  |
+| `TemplateCatalogItem`           | DTO returned by every list / mutation: `{ id, kind, sourceType, originType, name, description, framework, previewImageUrl, repositoryUrl, repositoryOwner, repositoryName, branch, syncBranches[], betaBranch, isActive, isDefault, ownerUserId }`.                                                                                    |
+| `TemplateKind`                  | Closed union: `'website'` (web-output template) or `'work'` (work-data template). Currently only the `website` kind has discovery / `Minimal` / `Classic` seeds.                                                                                                                                                                       |
+| `TemplateSourceType`            | Closed union: `'built_in'` (seed-or-discovery owned) or `'custom'` (user-owned, possibly forked).                                                                                                                                                                                                                                      |
+| `originType`                    | Computed at projection time: `'standard'` (built-in), `'forked'` (custom + `metadata.forkedFromTemplateId`), `'custom_url'` (custom otherwise).                                                                                                                                                                                        |
+| `WebsiteTemplateConfig`         | Hard-coded per-deploy structure consumed by `seedBuiltInTemplates`: `{ id, name, description, owner, repo, branch, syncBranches[], betaBranch }`. Today: `Classic` always, plus `Minimal` when `WEBSITE_TEMPLATE_MINIMAL_REPO` is set.                                                                                                 |
+| `getDefaultWebsiteTemplateId()` | Resolves the env-driven default (`WEBSITE_TEMPLATE_DEFAULT_ID`, fallback `'classic'`) only when the resolved id matches a configured template; otherwise `'classic'`.                                                                                                                                                                  |
 
 ## 6. Out of Scope
 
@@ -401,9 +401,9 @@ five mutating endpoints (`add` / `update` / `archive` /
 ## 8. Open Questions
 
 - `[NEEDS CLARIFICATION: OQ-1 — The fork flow hard-codes `providerId = 'github'`. When a non-GitHub git provider lands (GitLab, Bitbucket), the flow needs a per-template `providerId` field on the source template row, not a literal.]`
-- `[NEEDS CLARIFICATION: OQ-2 — The `kind: 'work'` discovery / seed path is empty (only `website` has built-in templates today). When work-template content lands, do we follow the same `*template` GitHub-name suffix convention or a different one (e.g. `*work-template`)?]`
-- `[NEEDS CLARIFICATION: OQ-3 — `addCustomTemplate` does NOT do an HTTP HEAD on `repositoryUrl` to validate that the repository actually exists / is accessible. A user can register a template pointing at a private repo they cannot read, then fail downstream when the website-generator tries to clone. Should the catalog do an early reachability check?]`
-- `[NEEDS CLARIFICATION: OQ-4 — `getDefaultTemplateIdForUser` falls back to `getDefaultWebsiteTemplateId()` even when the user has explicitly archived the seed default. Today this means the user's UI keeps showing `classic` as default even after they archive it via discovery. Worth a follow-up to skip the fallback when the resolved id is no longer active.]`
+- `[NEEDS CLARIFICATION: OQ-2 — The `kind: 'work'`discovery / seed path is empty (only`website`has built-in templates today). When work-template content lands, do we follow the same`*template`GitHub-name suffix convention or a different one (e.g.`*work-template`)?]`
+- `[NEEDS CLARIFICATION: OQ-3 — `addCustomTemplate`does NOT do an HTTP HEAD on`repositoryUrl` to validate that the repository actually exists / is accessible. A user can register a template pointing at a private repo they cannot read, then fail downstream when the website-generator tries to clone. Should the catalog do an early reachability check?]`
+- `[NEEDS CLARIFICATION: OQ-4 — `getDefaultTemplateIdForUser`falls back to`getDefaultWebsiteTemplateId()`even when the user has explicitly archived the seed default. Today this means the user's UI keeps showing`classic` as default even after they archive it via discovery. Worth a follow-up to skip the fallback when the resolved id is no longer active.]`
 - `[NEEDS CLARIFICATION: OQ-5 — There is no controller-level activity-log emission for `template.refreshed`. Should refreshes be logged for audit? They mutate persisted rows on a successful discovery pass.]`
 
 ## 9. Constitution Gates

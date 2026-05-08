@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { OnboardingRequest, WebhookSubscription } from '@ever-works/agent/entities';
 import {
     ONBOARDING_ACCOUNT_UPSERT,
     ONBOARDING_GIT_PROVIDER,
@@ -23,12 +21,7 @@ import { OnboardingWorkAdapter } from './onboarding-work.adapter';
 import { WellKnownController } from './well-known.controller';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([OnboardingRequest, WebhookSubscription]),
-        FacadesModule,
-        DatabaseModule,
-        WorkModule,
-    ],
+    imports: [FacadesModule, DatabaseModule, WorkModule],
     controllers: [OnboardingController, WellKnownController],
     providers: [
         OnboardingService,

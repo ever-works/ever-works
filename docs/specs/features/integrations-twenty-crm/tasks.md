@@ -65,8 +65,7 @@
       [`apps/api/src/integrations/twenty-crm/utils/retry.utils.ts`](../../../../apps/api/src/integrations/twenty-crm/utils/retry.utils.ts)
     - `withRetry` exponential-back-off helper, last-error re-throw,
       no-sleep on `maxAttempts === 1`.
-    - `isRetryableError` — ECONNRESET / ETIMEDOUT / ENOTFOUND, 5xx,
-      429.
+    - `isRetryableError` — ECONNRESET / ETIMEDOUT / ENOTFOUND, 5xx, 429.
     - `calculateRetryDelay` — exponential + 10% jitter, clamped at
       `maxDelayMs`.
 - [x] **T9**. `MappingUtils` at
@@ -116,8 +115,8 @@
       empty-name fallback, `mapCompanyToOrganization` URL /
       `startsWith('http')` host extraction + unparseable →
       undefined, `mapItemToProduct` / `mapItemToDeal` USD default
-      + supplied-currency override + 50%-probability NEW-stage deal,
-      `validate*Data` happy + missing-field paths.
+        - supplied-currency override + 50%-probability NEW-stage deal,
+          `validate*Data` happy + missing-field paths.
     - `CrmConfigService` (10) — env reads + 3 numeric defaults,
       explicit overrides, `isEnabled` triple-AND, `validateConfig`
       lists each missing key.

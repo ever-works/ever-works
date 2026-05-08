@@ -12,7 +12,7 @@
       `@nestjs-modules/mailer` with the SMTP transport
       (`config.mail.smtpHost/Port/Secure/IgnoreTLS/User/Password` +
       `tls.rejectUnauthorized: false`), `defaults.from =
-      config.mail.from()`, and the Handlebars adapter
+    config.mail.from()`, and the Handlebars adapter
       (`inlineCssEnabled: true`, `strict: true`) reading from
       `${process.cwd()}/src/templates`.
 - [x] T2. `RESEND_CLIENT` provider built via `useFactory`:
@@ -37,16 +37,16 @@
 - [x] T8. Default branch routes to `FakerMailerService` with a
       debug log.
 - [x] T9. `getDestination(destination)` normalises `string |
-      Address | (string|Address)[]` to `string[]` (string
+    Address | (string|Address)[]` to `string[]` (string
       pass-through, `address` field extraction, fallthrough to
       `toString`).
 - [x] T10. `readHtmlTemplate(data)` resolves
       `${cwd}/src/templates/${template}.hbs` with `{encoding:
-      'utf8'}` and compiles via `Handlebars.compile`; falls back to
+    'utf8'}` and compiles via `Handlebars.compile`; falls back to
       `data.html` (Buffer or string), then `data.text` (Buffer or
       string), then empty string.
 - [x] T11. Constructor log line: `Mailer service initialized with
-      provider: <provider>`.
+    provider: <provider>`.
 
 ## Phase 3 — Faker Fallback
 
@@ -60,7 +60,7 @@
       user-lifecycle events:
     - `UserCreatedEvent` → `signup-confirmation`.
     - `UserConfirmedEvent` → `welcome` (default `dashboardUrl =
-      ${webAppUrl}/works/new`).
+${webAppUrl}/works/new`).
     - `UserPasswordChangedEvent` → `password-changed`
       (`formatDateTime(changedAt)`).
     - `UserForgotPasswordEvent` → `forgot-password` (default
@@ -73,7 +73,7 @@
     - `MemberInvitedEvent` → `member-invitation`
       (`formatRoleName(role)`).
 - [x] T14. `getBrandingContext()` returns `{appName, companyOwner,
-      platformWebsite, currentYear}` and is merged into every
+    platformWebsite, currentYear}` and is merged into every
       template context.
 - [x] T15. Each handler wraps its body in `try/catch` +
       `logger.error('Failed to send …', err?.stack ?? err)` so
@@ -81,8 +81,8 @@
       event emitter.
 - [x] T16. `formatDateTime(date)` uses
       `Intl.DateTimeFormat('en-US', {year:numeric, month:long,
-      day:numeric, hour:'2-digit', minute:'2-digit',
-      timeZoneName:'short'})`.
+    day:numeric, hour:'2-digit', minute:'2-digit',
+    timeZoneName:'short'})`.
 - [x] T17. `formatRoleName(role)` capitalises the first character
       and lowercases the rest.
 

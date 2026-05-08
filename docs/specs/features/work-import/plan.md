@@ -25,12 +25,12 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern        | Choice                                      | Rationale                                     |
-| -------------- | ------------------------------------------- | --------------------------------------------- |
-| Repo detection | Try `works.yml` paths; fall back to README  | `works-config` has highest fidelity           |
-| Awesome parser | Markdown AST traversal of nested lists      | Tolerates varied formatting; no JS evaluation |
-| Dry-run        | Planner returns a preview without DB writes | UX — user can review before committing        |
-| Slug conflict  | Case-insensitive lookup against `works`     | Matches GitHub repo naming                    |
+| Concern        | Choice                                            | Rationale                                     |
+| -------------- | ------------------------------------------------- | --------------------------------------------- |
+| Repo detection | Try `.works/works.yml` paths; fall back to README | `works-config` has highest fidelity           |
+| Awesome parser | Markdown AST traversal of nested lists            | Tolerates varied formatting; no JS evaluation |
+| Dry-run        | Planner returns a preview without DB writes       | UX — user can review before committing        |
+| Slug conflict  | Case-insensitive lookup against `works`           | Matches GitHub repo naming                    |
 
 ## 3. Data Model
 
@@ -67,11 +67,11 @@ runs as a Trigger.dev fan-out task once the work is created.
 
 ## 9. Risks & Mitigations
 
-| Risk                                                          | Mitigation                                          |
-| ------------------------------------------------------------- | --------------------------------------------------- |
-| Awesome-List with non-standard format                         | Skip on parse failure; user can hand-author later   |
-| Plugin id changed after the source's `works.yml` was authored | Validation + clear error                            |
-| Race between two users importing same repo                    | First-creator wins; second gets uniqueness conflict |
+| Risk                                                                 | Mitigation                                          |
+| -------------------------------------------------------------------- | --------------------------------------------------- |
+| Awesome-List with non-standard format                                | Skip on parse failure; user can hand-author later   |
+| Plugin id changed after the source's `.works/works.yml` was authored | Validation + clear error                            |
+| Race between two users importing same repo                           | First-creator wins; second gets uniqueness conflict |
 
 ## 10. Constitution Reconciliation
 

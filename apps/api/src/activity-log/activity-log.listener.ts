@@ -101,7 +101,7 @@ export class ActivityLogListener {
                 actionType: ActivityActionType.WORKS_CONFIG_SYNC,
                 action: 'works_config.sync_failed',
                 status: ActivityStatus.FAILED,
-                summary: `Failed to sync works.yml to ${event.repository}`,
+                summary: `Failed to sync .works/works.yml to ${event.repository}`,
                 details: {
                     reason: event.reason,
                     repository: event.repository,
@@ -109,7 +109,7 @@ export class ActivityLogListener {
                 },
             });
         } catch (error) {
-            this.logger.error('Failed to log works.yml sync failure activity:', error);
+            this.logger.error('Failed to log .works/works.yml sync failure activity:', error);
         }
     }
 
