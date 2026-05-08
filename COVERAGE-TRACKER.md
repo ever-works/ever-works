@@ -21,14 +21,14 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~446 across `apps/` + `packages/` (was 445
-  earlier on 2026-05-09; +1 apps/api `deployment-verifier.service.spec.ts`
-  landed 2026-05-09 closing the only setInterval-driven service in
-  apps/api that had no unit suite. See `Done` for the running ledger).
+- **Spec files (`*.spec.ts`)**: ~447 across `apps/` + `packages/` (was 446
+  earlier on 2026-05-09; +1 apps/api `auth/config/social-auth.providers.spec.ts`
+  landed 2026-05-09 pinning the four-provider OAuth registry that
+  `SocialAuthService` consumes. See `Done` for the running ledger).
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
-- **API source spec count**: **83** specs inside `apps/api/src/` (was 82
-  earlier on 2026-05-09; the new entry is the deployment verifier
-  background task — `plugins-capabilities/deploy/tasks/deployment-verifier.service.spec.ts`).
+- **API source spec count**: **84** specs inside `apps/api/src/` (was 83
+  earlier on 2026-05-09; the new entry is the social-auth provider
+  registry — `auth/config/social-auth.providers.spec.ts`).
 - **Spec Kit features (`docs/specs/features/`)**: 33 directories (was 24 on
   2026-05-07; +9 retrospective specs authored on 2026-05-08).
 - **Plugins with ZERO unit tests (14)**: ALL closed as of 2026-05-07 —
@@ -46,6 +46,10 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — apps/api `auth/config/social-auth.providers` registry unit suite (PR pending)**
+
+Adds 43 unit tests in `apps/api/src/auth/config/social-auth.providers.spec.ts` pinning the OAuth provider registry table that powers `SocialAuthService`. The registry was previously exercised only indirectly through the service-level suite (#496-era); this direct suite catches drift between the registry shape and the four providers it must expose. **Registry shape** (4 tests) — exactly the four documented keys (`github`/`google`/`facebook`/`linkedin`), each entry's `id` field matches its registry key (no key/id drift), every provider exposes `callbackUrl`/`clientId`/`clientSecret` as **lazy getter functions** (so env vars are read at call time, not at module load), every provider has `https://`-prefixed `authorizationUrl`/`tokenUrl` and a non-empty `displayName`, every provider has a non-empty `scopes[]` of non-empty strings. **Per-provider** (24 tests across 4 providers): GitHub uses `https://github.com/login/oauth/{authorize,access_token}` + `displayName: 'GitHub'`, mirrors `[...GITHUB_SCOPES]` (preserving order) BUT owns its own copy via the spread (regression guard so a future direct-reference refactor doesn't accidentally let registry consumers mutate `GITHUB_SCOPES`), omits `scopeSeparator` (defaults to space at the call site), reads `GH_CLIENT_ID`/`GH_CLIENT_SECRET` lazily (env-set vs env-deleted both pinned), honors `GH_CALLBACK_URL` override on `callbackUrl()`. Google uses `https://accounts.google.com/o/oauth2/v2/auth` + `https://oauth2.googleapis.com/token`, declares `[openid, email, profile]` (in order), omits `scopeSeparator`, reads `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` lazily. Facebook uses **v23.0** URLs (`https://www.facebook.com/v23.0/dialog/oauth` + `https://graph.facebook.com/v23.0/oauth/access_token`), declares `[email, public_profile]`, uses `scopeSeparator: ','` (the **only** provider that joins scopes with `,` instead of ` `), reads `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` lazily. LinkedIn uses `https://www.linkedin.com/oauth/v2/{authorization,accessToken}`, declares `[openid, profile, email]`, omits `scopeSeparator`, reads `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET` lazily. **`getSocialAuthProviderConfig`** (15 tests) — parametrized happy-path returns the exact registry object reference (`toBe`, not `toEqual`) for every documented provider AND the entry id matches the requested id; parametrized error path throws `BadRequestException` with the verbatim `Unsupported OAuth provider: <id>` message for `'discord'`/`'apple'`/`'unknown'`/`''`/`'GITHUB'` (case-sensitive — uppercase rejected)/`'github '` (trailing-whitespace rejected); **explicitly rejects `'github-app'`** (the GitHub App OAuth flow under `apps/api/src/integrations/github-app` is NOT a social-auth registry key — pin so a future "consolidate the two flows" refactor breaks loudly). All env-var setters are wrapped in `try/finally` blocks that restore the original env state regardless of test outcome. Closes the only direct-coverage gap in `apps/api/src/auth/config/`.
 
 **2026-05-09 — apps/api `plugins-capabilities/deploy/tasks/deployment-verifier.service` unit suite ([#604](https://github.com/ever-works/ever-works/pull/604))**
 
