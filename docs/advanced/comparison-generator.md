@@ -130,7 +130,7 @@ Both flows share the same generation pipeline after pair selection.
 
 ## State Tracking
 
-Comparison state is persisted in the data repository's `works.yml` under `metadata.comparison_state`:
+Comparison state is persisted in the data repository's `.works/works.yml` under `metadata.comparison_state`:
 
 ```yaml
 metadata:

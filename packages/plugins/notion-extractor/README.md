@@ -42,6 +42,16 @@ When a source URL points to a Notion page (notion.so or notion.site), the conten
 - **Use Splitbee for public pages** (`useSplitbeeForPublicPages`) — boolean, default `true`. Recommended unless you hit rate limits.
 - **Request Timeout** (`timeout`) — number, default `30000` ms. Range 5000–120000 ms.
 
+## Troubleshooting
+
+| Symptom                                        | Likely cause                                                                                     | Fix                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `403` from the extractor               | API key / token missing or revoked                                                               | Re-enter the credential from the Notion Page Extractor dashboard, or set `PLUGIN_NOTION_EXTRACTOR_API_KEY` in the host environment for default fallback                   |
+| `Failed to extract content` for a specific URL | Page requires authentication, JavaScript rendering, or a custom client (Notion, PDF, login wall) | Verify the URL is publicly reachable; if it requires JavaScript/auth, switch to a more capable extractor (`scrapfly` / `notion-extractor` / `pdf-extractor`) for that URL |
+| Plugin not used during extraction              | Another content-extractor plugin is set as the default                                           | In **Settings → Plugins**, set `notion-extractor` as the default for `content-extractor`, or disable competing plugins                                                    |
+| `Notion API error: object_not_found`           | Page not shared with the integration token                                                       | In Notion, open the page → **Share** → **Add connections** and grant the integration access                                                                               |
+| `healthCheck` reports unhealthy                | Credential invalid OR Notion Page Extractor endpoint unreachable from the host                   | Verify the credential with a manual call to the upstream API and confirm outbound HTTPS is allowed by the firewall                                                        |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

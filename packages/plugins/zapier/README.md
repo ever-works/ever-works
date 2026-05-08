@@ -49,6 +49,16 @@ When this plugin is selected as the active pipeline, the platform invokes a Zapi
 
 Authentication requires either `accessToken` _or_ both `clientId` and `clientSecret`. The generator form additionally exposes per-run options including the action reference (app key, action type, action key, authentication ID), the result shape (`structured` / native record / `side-effect`), the field mapping for native records, and the action timeout.
 
+## Troubleshooting
+
+| Symptom                                                           | Likely cause                                                                          | Fix                                                                                                                                                             |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation never starts / stays at `0%`                           | `zapier` not selected as the active pipeline plugin for this work                     | Open the work → **Plugins** → `pipeline` capability and set `zapier` as the active pipeline; or set it as the global pipeline default in **Settings → Plugins** |
+| Step fails with `No AI / search / screenshot provider configured` | Pipeline depends on capability plugins that are not enabled or have no credentials    | Enable and configure the matching capability plugin (AI provider, search, screenshot, content-extractor) for the work or globally                               |
+| Step output looks wrong / generic                                 | Form-field tuning not set; pipeline using defaults that don't match the work's domain | Open the **Generator Form** for the work, set domain-specific fields (categories, target keywords, source URLs), and re-run the affected step                   |
+| Webhook returns `404` / `Not Found`                               | Scenario / Zap not enabled or webhook URL stale                                       | In the Zapier Automation dashboard verify the scenario is **active**, copy a fresh webhook URL into the plugin settings, and trigger a test run                 |
+| Pipeline cannot resume after host restart                         | Checkpoint not persisted (only the standard pipeline persists checkpoints today)      | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                           |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

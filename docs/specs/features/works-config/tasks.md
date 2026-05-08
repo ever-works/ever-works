@@ -1,4 +1,4 @@
-# Task Breakdown: `works.yml` Source-Controlled Work Configuration
+# Task Breakdown: `.works/works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Plan**: `./plan.md`
@@ -37,7 +37,7 @@ similar future work.
 
 ## Phase 3 — Integration
 
-- [x] **T10**. Import flow reads `works.yml` and pre-fills the import form.
+- [x] **T10**. Import flow reads `.works/works.yml` and pre-fills the import form.
 - [x] **T11**. Work generation pipeline calls the writer at the end of
       a successful run.
 - [x] **T12**. Activity log entries cover parse failures, plugin-id

@@ -106,7 +106,7 @@ which now live folded into `tasks.md`).
 | [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction     |
 | [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo             |
 | [`website-generator`](features/website-generator/spec)             | Retrospective | Static site generation pipeline                                |
-| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled work configuration               |
+| [`works-config`](features/works-config/spec)                       | Retrospective | `.works/works.yml` source-controlled work configuration        |
 
 ## Reading order for new contributors
 

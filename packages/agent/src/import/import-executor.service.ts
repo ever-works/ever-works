@@ -325,7 +325,7 @@ export class ImportExecutorService {
                 return {
                     success: false,
                     workId: work.id,
-                    error: 'works.yml is missing initial_prompt',
+                    error: '.works/works.yml is missing initial_prompt',
                     errorCode: WorkImportErrorCode.PARSE_FAILED,
                 };
             }

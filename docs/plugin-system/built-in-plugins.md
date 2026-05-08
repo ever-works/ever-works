@@ -455,7 +455,7 @@ Deploy work websites to Vercel. This is the **default deployment provider** and 
 
 ### Kubernetes
 
-Deploy work websites to any Kubernetes cluster you control as an alternative to Vercel. Selectable per-work via `deployProvider: k8s` (dashboard or `works.yml`). Supports a pluggable container registry (GitHub Container Registry by default) and ingress controller strategies (nginx, Traefik, plus a generic fallback). See [Kubernetes Deployment](../features/k8s-deployment.md) for the full user guide.
+Deploy work websites to any Kubernetes cluster you control as an alternative to Vercel. Selectable per-work via `deployProvider: k8s` (dashboard or `.works/works.yml`). Supports a pluggable container registry (GitHub Container Registry by default) and ingress controller strategies (nginx, Traefik, plus a generic fallback). See [Kubernetes Deployment](../features/k8s-deployment.md) for the full user guide.
 
 | Field              | Value           |
 | ------------------ | --------------- |

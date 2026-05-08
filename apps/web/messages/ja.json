@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "同期設定の更新に失敗しました",
                 "syncDisabled": "同期が無効",
                 "worksConfig": {
-                    "imported": "works.yml からインポート済み",
+                    "imported": ".works/works.yml からインポート済み",
                     "applied": "適用済み: {value}",
                     "enabled": "有効",
                     "disabled": "無効",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "データリポジトリ",
                         "awesomeReadme": "素晴らしい README",
                         "linkExisting": "リンクされた既存リポジトリ",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "一般設定",
@@ -2349,7 +2349,7 @@
                     "description": "ソースリポジトリから自動的に更新を取得。"
                 },
                 "worksConfigRestore": {
-                    "title": "works.yml 設定を復元",
+                    "title": ".works/works.yml 設定を復元",
                     "description": "このリポジトリから AI プロバイダー、モデル、スケジュール、関連リポジトリ設定を適用します。"
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "サポートされるリポジトリ形式",
                     "dataRepo": {
                         "title": "データ リポジトリ",
-                        "description": "works.yml と data/ フォルダ構造を持つリポジトリ"
+                        "description": ".works/works.yml と data/ フォルダ構造を持つリポジトリ"
                     },
                     "awesomeReadme": {
                         "title": "Awesome リスト",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "データ リポ",
                     "awesomeReadme": "Awesome リスト",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "アイテム",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "リポジトリをリンク"
                 },
                 "detectionFailed": "形式を自動検出できませんでした。このリポジトリのインポート方法を選択してください。",
-                "detectionFailedMissingConfig": "サポートされている設定が見つかりませんでした。リポジトリに works.yml を追加するか、以下の手動インポート形式を選択してください。",
+                "detectionFailedMissingConfig": "サポートされている設定が見つかりませんでした。リポジトリに .works/works.yml を追加するか、以下の手動インポート形式を選択してください。",
                 "errors": {
                     "urlRequired": "GitHub リポジトリ URL を入力してください",
                     "unsupportedFormat": "このリポジトリ形式はサポートされていません。データ リポジトリまたは Awesome リスト形式を使用してください。",

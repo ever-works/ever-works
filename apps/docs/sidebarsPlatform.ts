@@ -83,6 +83,11 @@ const sidebars: SidebarsConfig = {
 				'api/deploy-capability',
 				'api/git-provider-capability',
 				'api/oauth-capability',
+				'api/search-capability',
+				'api/device-auth-capability',
+				'api/activity-log',
+				'api/template-catalog',
+				'api/account',
 				'api/error-handling',
 				'api/guards-interceptors',
 				'api/websocket-events'
@@ -300,7 +305,8 @@ const sidebars: SidebarsConfig = {
 				'devops/logging-aggregation',
 				'devops/disaster-recovery',
 				'devops/performance-monitoring',
-				'devops/kubernetes'
+				'devops/kubernetes',
+				'devops/k8s-e2e-runbook'
 			]
 		},
 		{

@@ -26,9 +26,7 @@ describe('GitProviderController', () => {
             getRepositories: jest.fn(),
             getUser: jest.fn(),
         };
-        controller = new GitProviderController(
-            gitProviderService as unknown as GitProviderService,
-        );
+        controller = new GitProviderController(gitProviderService as unknown as GitProviderService);
     });
 
     afterEach(() => {

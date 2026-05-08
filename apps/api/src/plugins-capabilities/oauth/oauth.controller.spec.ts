@@ -132,20 +132,20 @@ describe('OAuthController', () => {
         it('wraps Error rejection in BadRequestException with the original message', async () => {
             oauthService.getOAuthUrl.mockRejectedValue(new Error('credentials missing'));
 
-            await expect(
-                controller.getConnectUrl(req, 'github', 'cb'),
-            ).rejects.toBeInstanceOf(BadRequestException);
-            await expect(
-                controller.getConnectUrl(req, 'github', 'cb'),
-            ).rejects.toThrow('credentials missing');
+            await expect(controller.getConnectUrl(req, 'github', 'cb')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+            await expect(controller.getConnectUrl(req, 'github', 'cb')).rejects.toThrow(
+                'credentials missing',
+            );
         });
 
         it('wraps non-Error rejection in BadRequestException with generic message', async () => {
             oauthService.getOAuthUrl.mockRejectedValue('something');
 
-            await expect(
-                controller.getConnectUrl(req, 'github', 'cb'),
-            ).rejects.toThrow('Failed to get OAuth URL');
+            await expect(controller.getConnectUrl(req, 'github', 'cb')).rejects.toThrow(
+                'Failed to get OAuth URL',
+            );
         });
     });
 
@@ -171,7 +171,12 @@ describe('OAuthController', () => {
             const info = { id: 'github', connected: true };
             oauthService.handleOAuthCallback.mockResolvedValue(info);
 
-            const result = await controller.handleOAuthCallback(req, 'github', 'code-abc', 'state-xyz');
+            const result = await controller.handleOAuthCallback(
+                req,
+                'github',
+                'code-abc',
+                'state-xyz',
+            );
 
             expect(oauthService.handleOAuthCallback).toHaveBeenCalledWith(
                 'user-1',
@@ -199,9 +204,7 @@ describe('OAuthController', () => {
             const err = new Error('upstream');
             oauthService.handleOAuthCallback.mockRejectedValue(err);
 
-            await expect(
-                controller.handleOAuthCallback(req, 'github', 'code'),
-            ).rejects.toBe(err);
+            await expect(controller.handleOAuthCallback(req, 'github', 'code')).rejects.toBe(err);
         });
     });
 

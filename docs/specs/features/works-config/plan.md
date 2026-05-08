@@ -1,4 +1,4 @@
-# Implementation Plan: `works.yml` Source-Controlled Work Configuration
+# Implementation Plan: `.works/works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Spec**: `./spec.md`
@@ -14,7 +14,7 @@
 flowchart LR
     A[Import flow] -->|reads| B[WorksConfigService.loadFromRepository]
     B -->|GET file content| C[GitFacadeService]
-    C --> D{works.yml exists?}
+    C --> D{.works/works.yml exists?}
     D -->|yes| E[parse YAML]
     D -->|no| F[returns null]
     E --> G[ParsedWorksConfig]
@@ -43,7 +43,7 @@ No schema changes — the writer mirrors existing `works` columns
 
 ## 4. API Surface
 
-No new endpoints. `works.yml` is read during the existing
+No new endpoints. `.works/works.yml` is read during the existing
 `POST /api/works/import` flow and written by the work generation
 flow.
 
@@ -54,11 +54,11 @@ None — the service references existing plugin facades for git access only.
 ## 6. Web / CLI Surface
 
 The import flow's existing UI displays parsed values in disabled form fields
-labeled "From works.yml". No new pages.
+labeled "From .works/works.yml". No new pages.
 
 ## 7. Background Jobs
 
-None — `works.yml` is read at import time and written at the end of each
+None — `.works/works.yml` is read at import time and written at the end of each
 generation, both in-process.
 
 ## 8. Security & Permissions
@@ -68,7 +68,7 @@ generation, both in-process.
   elevated privileges.
 - The writer commits as the platform's git identity (per the user's
   configured `gitProvider` plugin).
-- `works.yml` MUST NOT contain secrets — enforced by the writer (which
+- `.works/works.yml` MUST NOT contain secrets — enforced by the writer (which
   only writes non-secret fields) and by reviewer convention.
 
 ## 9. Observability
@@ -83,17 +83,17 @@ generation, both in-process.
 ## 10. Phased Rollout
 
 The feature shipped behind no flag — small enough to land directly. Future
-breaking changes to the `works.yml` schema would ship a new version field
+breaking changes to the `.works/works.yml` schema would ship a new version field
 and a migration step in the parser.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                 | Likelihood | Impact | Mitigation                                                                              |
-| ---------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------- |
-| User commits a secret in `works.yml` accidentally    | Low        | Med    | Writer never writes secret fields; reviewer convention; docs                            |
-| Renaming a field breaks existing hand-authored files | Med        | Med    | Field aliases (multiple keys map to the same parsed property)                           |
-| Sync push race vs concurrent manual edits            | Low        | Low    | Writer runs inside the same git session that just committed                             |
-| YAML round-trip drops comments                       | High       | Low    | Documented limitation; users who want comments use `works.yml` and accept the trade-off |
+| Risk                                                     | Likelihood | Impact | Mitigation                                                                                     |
+| -------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------------- |
+| User commits a secret in `.works/works.yml` accidentally | Low        | Med    | Writer never writes secret fields; reviewer convention; docs                                   |
+| Renaming a field breaks existing hand-authored files     | Med        | Med    | Field aliases (multiple keys map to the same parsed property)                                  |
+| Sync push race vs concurrent manual edits                | Low        | Low    | Writer runs inside the same git session that just committed                                    |
+| YAML round-trip drops comments                           | High       | Low    | Documented limitation; users who want comments use `.works/works.yml` and accept the trade-off |
 
 ## 12. Constitution Reconciliation
 

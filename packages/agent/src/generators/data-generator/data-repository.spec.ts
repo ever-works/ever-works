@@ -75,12 +75,17 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('uses works.yml as the primary data config', async () => {
+    it('uses .works/works.yml as the primary data config', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
         await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+        await fs.mkdir(path.join(repoDir, '.works'), { recursive: true });
         await Promise.all([
-            fs.writeFile(path.join(repoDir, 'works.yml'), 'name: Compare Cloud Pricing\n', 'utf-8'),
+            fs.writeFile(
+                path.join(repoDir, '.works/works.yml'),
+                'name: Compare Cloud Pricing\n',
+                'utf-8',
+            ),
             fs.writeFile(path.join(repoDir, 'categories.yml'), '[]\n', 'utf-8'),
             fs.writeFile(path.join(repoDir, 'tags.yml'), '[]\n', 'utf-8'),
             fs.writeFile(path.join(repoDir, 'collections.yml'), '[]\n', 'utf-8'),
@@ -97,14 +102,14 @@ describe('DataRepository', () => {
             version: 1,
         } as any);
 
-        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toContain(
-            'name: Generated Config',
-        );
+        await expect(
+            fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        ).resolves.toContain('name: Generated Config');
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('uses provided default config overrides when creating works.yml', async () => {
+    it('uses provided default config overrides when creating .works/works.yml', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
         const repository = await DataRepository.create(repoDir, {
@@ -114,9 +119,9 @@ describe('DataRepository', () => {
         await expect(repository.getConfig()).resolves.toMatchObject({
             company_name: 'Compare Cloud Pricing',
         });
-        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toContain(
-            'company_name: Compare Cloud Pricing',
-        );
+        await expect(
+            fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        ).resolves.toContain('company_name: Compare Cloud Pricing');
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });

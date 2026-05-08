@@ -979,7 +979,7 @@ export class DataGeneratorService {
     }
 
     /**
-     * Update website settings in works.yml and push to git repository.
+     * Update website settings in .works/works.yml and push to git repository.
      */
     async updateWebsiteSettings(
         work: Work,

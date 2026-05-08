@@ -18,7 +18,7 @@ flowchart LR
     UI[/en/settings/plugins/deployment/] -->|POST settings| API[Plugins controller]
     API --> Settings[(plugin_settings — kubeconfig, registry config)]
 
-    YAML[works.yml in data repo] -->|sync| WCFG[works-config layer]
+    YAML[.works/works.yml in data repo] -->|sync| WCFG[works-config layer]
     WCFG -->|deployProvider field| Work[(work.deployProvider)]
 
     Deploy[Deploy a work] --> DeployCtl[DeployController]
@@ -431,7 +431,7 @@ This is provider-agnostic — Vercel benefits from it on day one too (FR-19).
 Two small Vercel changes ride along, both of them parity work:
 
 1. **Implement the new optional `IDeploymentPlugin.getWorkflowFilenames()` and `getDeploymentSecrets()` methods** on the Vercel plugin so that current behaviour is preserved when `DeployService` switches from a hardcoded list to `plugin.getWorkflowFilenames()`. Vercel returns `['deploy_vercel.yaml', 'deploy_prod.yaml']` and an empty `getDeploymentSecrets()`. (Tasks T24a/T24b.)
-2. **`works.yml` carrying `deployProvider: vercel`** now sets `work.deployProvider = 'vercel'` on sync — Vercel needs no code change for this; only the works-config tests are extended with a vercel case. (Task T6b.)
+2. **`.works/works.yml` carrying `deployProvider: vercel`** now sets `work.deployProvider = 'vercel'` on sync — Vercel needs no code change for this; only the works-config tests are extended with a vercel case. (Task T6b.)
 
 ## 6. Web / CLI Surface
 

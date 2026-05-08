@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Cập nhật cài đặt đồng bộ thất bại",
                 "syncDisabled": "Đồng bộ đã tắt",
                 "worksConfig": {
-                    "imported": "Đã nhập từ works.yml",
+                    "imported": "Đã nhập từ .works/works.yml",
                     "applied": "Đã áp dụng: {value}",
                     "enabled": "bật",
                     "disabled": "tắt",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Kho dữ liệu",
                         "awesomeReadme": "README tuyệt vời",
                         "linkExisting": "Kho hiện có được liên kết",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Cài đặt chung",
@@ -2349,7 +2349,7 @@
                     "description": "Tự động kéo cập nhật từ kho nguồn."
                 },
                 "worksConfigRestore": {
-                    "title": "Khôi phục cài đặt works.yml",
+                    "title": "Khôi phục cài đặt .works/works.yml",
                     "description": "Áp dụng nhà cung cấp AI, mô hình, lịch và kho liên quan từ kho này."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Định Dạng Kho Hỗ Trợ",
                     "dataRepo": {
                         "title": "Kho Dữ Liệu",
-                        "description": "Các kho có works.yml và cấu trúc công việc data/"
+                        "description": "Các kho có .works/works.yml và cấu trúc công việc data/"
                     },
                     "awesomeReadme": {
                         "title": "Danh Sách Awesome",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Kho Dữ Liệu",
                     "awesomeReadme": "Danh Sách Awesome",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "mục",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Liên kết kho"
                 },
                 "detectionFailed": "Chúng tôi không thể tự động phát hiện định dạng. Vui lòng chọn cách nhập kho này.",
-                "detectionFailedMissingConfig": "Không tìm thấy cấu hình được hỗ trợ. Thêm works.yml vào kho, hoặc chọn định dạng nhập thủ công bên dưới.",
+                "detectionFailedMissingConfig": "Không tìm thấy cấu hình được hỗ trợ. Thêm .works/works.yml vào kho, hoặc chọn định dạng nhập thủ công bên dưới.",
                 "errors": {
                     "urlRequired": "Vui lòng nhập URL kho GitHub",
                     "unsupportedFormat": "Định dạng kho này không được hỗ trợ. Vui lòng sử dụng định dạng Kho Dữ Liệu hoặc Danh Sách Awesome.",

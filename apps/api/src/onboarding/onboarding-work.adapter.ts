@@ -18,7 +18,7 @@ interface ManifestShape {
 /**
  * Api-side implementation of `OnboardingWorkCreator` (T9c).
  *
- * Translates the parsed `works.yml` manifest into a `CreateWorkDto` and
+ * Translates the parsed `.works/works.yml` manifest into a `CreateWorkDto` and
  * delegates to the existing `WorkLifecycleService.createWork`. The
  * lifecycle service handles the heavy lifting:
  *   - Creates the Work row + the data, website, and (optionally) awesome

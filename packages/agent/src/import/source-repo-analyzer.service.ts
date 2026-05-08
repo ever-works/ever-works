@@ -20,6 +20,8 @@ interface RepoContent {
     path: string;
 }
 
+const WORKS_CONFIG_DIR = '.works';
+
 // Supported git provider URL patterns
 const GIT_PROVIDER_PATTERNS: Array<{
     pattern: RegExp;
@@ -266,7 +268,7 @@ export class SourceRepoAnalyzerService {
         };
         worksConfig?: ReturnType<WorksConfigService['parse']>;
     }> {
-        const hasWorksConfig = contents.some((c) => c.name === 'works.yml' && c.type === 'file');
+        const hasWorksConfig = this.hasWorksConfig(contents);
         const hasConfig = hasWorksConfig;
 
         const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
@@ -780,7 +782,7 @@ export class SourceRepoAnalyzerService {
                 return null;
             }
 
-            const hasConfig = contents.some((c) => c.name === 'works.yml' && c.type === 'file');
+            const hasConfig = this.hasWorksConfig(contents);
             const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
             if (!hasConfig || !hasDataFolder) {
@@ -800,6 +802,28 @@ export class SourceRepoAnalyzerService {
             this.logger.debug(`No ecosystem data repo found for ${owner}/${repo}: ${err.message}`);
             return null;
         }
+    }
+
+    private hasWorksConfig(rootContents: RepoContent[]): boolean {
+        if (
+            rootContents.some(
+                (content) =>
+                    content.type === 'file' &&
+                    (content.path === '.works/works.yml' || content.name === '.works/works.yml'),
+            )
+        ) {
+            return true;
+        }
+
+        const worksDir = rootContents.find(
+            (content) => content.name === WORKS_CONFIG_DIR && content.type === 'dir',
+        );
+
+        if (!worksDir) {
+            return false;
+        }
+
+        return true;
     }
 
     private async detectRelatedRepos(

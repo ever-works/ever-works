@@ -93,7 +93,7 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
                     );
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to restore schedule from works.yml for work ${work.id}: ${
+                        `Failed to restore schedule from .works/works.yml for work ${work.id}: ${
                             error instanceof Error ? error.message : String(error)
                         }`,
                     );

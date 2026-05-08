@@ -87,7 +87,7 @@ Dispatcher method that routes to the appropriate import method based on `sourceT
 Analyzes external repositories to determine their type and structure:
 
 - **`parseGitUrl(url)`** -- parse a repository URL into `{ owner, repo, provider }`. Supports GitHub, GitLab, and Bitbucket URL patterns.
-- **`analyzeRepository(sourceUrl, token?)`** -- analyze a repository's structure and detect its type. Checks for `works.yml` + `data/` work (data repo), or README with list patterns (awesome list).
+- **`analyzeRepository(sourceUrl, token?)`** -- analyze a repository's structure and detect its type. Checks for `.works/works.yml` + `data/` work (data repo), or README with list patterns (awesome list).
 - **`analyzeForLinking(sourceUrl, token)`** -- extended analysis for the link-existing workflow. Checks write access, counts items/categories, and detects related repos (markdown, website).
 - **`checkSlugConflicts(owner, slug, token)`** -- check if repository names would conflict with existing repos. Suggests alternative slugs if conflicts are found.
 - **`getReadmeContent(sourceUrl, token?)`** -- fetch README content with multiple fallback strategies.
@@ -96,7 +96,7 @@ Analyzes external repositories to determine their type and structure:
 
 The analyzer classifies repositories by examining their contents:
 
-- `data_repo` -- has `works.yml` (or `.yaml`) AND a `data/` work
+- `data_repo` -- has `.works/works.yml` (or `.yaml`) AND a `data/` work
 - `awesome_readme` -- has a README with section headers and 5+ list-formatted links
 - `null` -- structure not recognized
 

@@ -48,6 +48,15 @@ Per-work generator form fields (Level 3):
 - **Maximum Items** (`apify_maxItems`) — limit the number of items to import (default `100`, `0` = no limit).
 - **Filter by Relevance** (`apify_filterByRelevance`) — only import items relevant to the work prompt (default `true`).
 
+## Troubleshooting
+
+| Symptom                          | Likely cause                                                                | Fix                                                                                                                           |
+| -------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized`               | API token missing or revoked                                                | Re-issue the API token from the Apify console and re-enter it; or set `PLUGIN_APIFY_API_KEY` for default fallback             |
+| Actor / dataset returns no items | Actor input misconfigured, dataset filter too restrictive, or run timed out | In the Apify dashboard re-run the actor manually with the same input, inspect the run log, then adjust input fields and retry |
+| Plugin not used as data source   | Another data-source plugin is set as the default                            | In **Settings → Plugins**, set `apify` as the default for `data-source`, or disable competing plugins                         |
+| `healthCheck` reports unhealthy  | Credential invalid OR Apify endpoint unreachable from the host              | Verify the credential against the upstream API and confirm outbound HTTPS is allowed by the firewall                          |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:
