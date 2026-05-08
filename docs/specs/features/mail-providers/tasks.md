@@ -134,12 +134,16 @@ timeZoneName:'short'})`.
 
 ## Phase 7 — Bug Fixes
 
-- [ ] T22. **Follow-up (FR-9 / OQ-1)**:
-      `MailerService.sendMail` Resend branch crashes when `to` is
-      omitted. Short-circuit Resend the same way the log line
-      does (e.g. `to: data.to ? this.getDestination(data.to) : []`).
-      Update the corresponding assertion in
-      `mailer.service.spec.ts` so the test pins the new behaviour.
+- [x] T22. (FR-9 / OQ-1): `MailerService.sendMail` Resend branch
+      no longer crashes when `to` is omitted. The call site
+      `to: this.getDestination(data.to)` is now short-circuited to
+      `to: data.to ? this.getDestination(data.to) : []`, mirroring
+      the log line's `data.to ? this.getDestination(data.to).join(', ') : 'unknown'`
+      gate. The corresponding assertion in `mailer.service.spec.ts`
+      flipped from "rejects with `'address' in` TypeError" to
+      "forwards `to: []` to `resend.emails.send`". The "to=unknown"
+      log line still fires, mirroring the SMTP / faker branches'
+      tolerance of a missing `to` field.
 
 ## Phase 8 — Docs
 
@@ -159,13 +163,11 @@ timeZoneName:'short'})`.
 - [x] Per-handler `try/catch` + `logger.error` means a delivery
       failure does NOT propagate back to the originating event.
 - [x] Both providers are unit-tested with branching coverage; the
-      Resend-`to`-undefined edge case is pinned (and tracked as a
-      follow-up to fix).
+      Resend-`to`-undefined edge case now forwards `to: []` instead
+      of crashing.
 
 ## Follow-ups discovered
 
-- **T22** — fix the Resend `to=undefined` crash documented in
-  OQ-1 / FR-9 / `mailer.service.spec.ts` follow-up.
 - **T24** — operator-facing devops doc covering SMTP vs Resend
   configuration, `tls.rejectUnauthorized` audit guidance, and the
   new-template workflow.

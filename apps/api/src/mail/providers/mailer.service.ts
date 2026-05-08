@@ -45,7 +45,7 @@ export class MailerService {
                     `Sending email via Resend to=${recipient} from="${from}" subject="${data.subject}"`,
                 );
                 const result = await this.resend.emails.send({
-                    to: this.getDestination(data.to),
+                    to: data.to ? this.getDestination(data.to) : [],
                     from,
                     subject: data.subject,
                     html: await this.readHtmlTemplate(data),
