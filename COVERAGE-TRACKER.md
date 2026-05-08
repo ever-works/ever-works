@@ -119,14 +119,40 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
       and the `DomainType` enum (2026-05-07).
 - [x] `packages/monitoring` — Sentry + PostHog SDKs mocked, 72 tests across config, services, interceptors (2026-05-07).
 - [x] `packages/cli-shared` — utils + prompt services fully covered (116 tests across slug, validation, config-check, generator-steps, base-prompt.service, work-prompt.service).
-- [x] `packages/tasks` — vitest scaffolded; 61 tests across `LocalPluginStore`,
-      `TriggerLogger`, `TriggerService`, and `collectPluginDependencies`
-      (`@trigger.dev/sdk` and `@ever-works/agent/config` mocked).
-      Follow-ups: `TriggerInternalApiClient` (HTTP retry), `worker-context` /
-      `task-context` utilities, and the four task entrypoints
+- [x] `packages/tasks` — vitest scaffolded; 100 tests across
+      `LocalPluginStore`, `TriggerLogger`, `TriggerService`,
+      `collectPluginDependencies`, `TriggerInternalApiClient`,
+      `task-context.utils`, and `worker-context.utils`
+      (`@trigger.dev/sdk`, `@ever-works/agent/config`, `@nestjs/core`'s
+      `NestFactory.createApplicationContext`, and the trigger logger factory
+      mocked). The 2026-05-08 follow-up adds 39 tests across three new
+      files: `TriggerInternalApiClient` (20 tests covering constructor env
+      guards for `TRIGGER_INTERNAL_API_URL`/`TRIGGER_INTERNAL_SECRET`,
+      URL composition (trailing-slash strip on base + leading-slash strip
+      on path + `URLSearchParams`-encoded `userId`), `fetchWorkContext`
+      GET shape + `x-trigger-secret` header + 204/empty-body → undefined,
+      `callRemote` POST `/remote/call` with SuperJSON args+meta envelope
+      and SuperJSON-deserialized result, retry behaviour: 5xx retries up
+      to 3× with exponential backoff `500/1000/2000ms` pinned via
+      `vi.useFakeTimers` + `advanceTimersByTimeAsync`, 4xx never retries,
+      network errors retry up to 3×, non-Error rejections coerced to
+      Error); `task-context.utils` (9 tests covering hydrator-before-fetch
+      ordering, `fetchWorkContext(workId, userId)` positional shape,
+      `class-transformer` `plainToInstance(Work|User, …)` hydration,
+      `work.user = user` re-attachment, orchestrator resolution AFTER
+      fetch, gitToken passthrough vs undefined-on-omit, hydrator-error
+      short-circuits the fetch, fetchWorkContext-error short-circuits
+      the orchestrator resolve); `worker-context.utils` (10 tests
+      covering default `TriggerWorkerModule` vs caller-supplied module
+      token, `useLogger(createTriggerLogger(name))` ordering before fn,
+      fn return-value passthrough, appContext passed to fn, close-on-
+      success / close-on-fn-throw / close-error-propagation /
+      try-finally close-error-overrides-body-error semantics,
+      `NestFactory` rejection short-circuits fn + close paths).
+      Outstanding follow-up: the four task entrypoints
       (`work-generation` / `work-import` / `work-onboarding` /
-      `work-schedule-dispatcher`) — these need NestFactory mocked and are
-      best done as a dedicated follow-up.
+      `work-schedule-dispatcher`) — these need fuller NestFactory
+      stubbing and are best done as a dedicated follow-up.
 
 ### API module unit tests
 
