@@ -47,6 +47,17 @@ Configured via `settingsSchema`:
 
 The CLI binary location is taken from the `binaryPath` setting and resolved against the host PATH; the plugin runs Hermes in one-shot mode against an isolated workspace per generation.
 
+## Troubleshooting
+
+| Symptom                                                           | Likely cause                                                                                         | Fix                                                                                                                                                                   |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation never starts / stays at `0%`                           | `hermes-agent` not selected as the active pipeline plugin for this work                              | Open the work → **Plugins** → `pipeline` capability and set `hermes-agent` as the active pipeline; or set it as the global pipeline default in **Settings → Plugins** |
+| Step fails with `No AI / search / screenshot provider configured` | Pipeline depends on capability plugins that are not enabled or have no credentials                   | Enable and configure the matching capability plugin (AI provider, search, screenshot, content-extractor) for the work or globally                                     |
+| Step output looks wrong / generic                                 | Form-field tuning not set; pipeline using defaults that don't match the work's domain                | Open the **Generator Form** for the work, set domain-specific fields (categories, target keywords, source URLs), and re-run the affected step                         |
+| Subprocess error: `command not found` / `hermes: not found`       | Hermes CLI not installed on the host running the API, or `binaryPath` points to a missing executable | Install Hermes on the API host and run `hermes model` for the configured profile; if the binary isn't on `PATH`, set the **Binary Path** setting to the absolute path |
+| Run aborts on the first tool-call approval prompt                 | `yolo` is set to `false` and there's no operator to confirm prompts                                  | Set `yolo: true` for automated runs (default), or run interactively in dev only                                                                                       |
+| Pipeline cannot resume after host restart                         | Checkpoint not persisted (only the standard pipeline persists checkpoints today)                     | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                                 |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

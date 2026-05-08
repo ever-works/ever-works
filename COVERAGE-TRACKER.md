@@ -186,9 +186,38 @@ known to lack a Spec Kit feature folder:
 
 ### Docs gaps to audit
 
-- [ ] `docs/packages/*` — every plugin now has a README (PR landed); audit
-      that each one mentions: settings, env vars, capabilities, example
-      configuration, troubleshooting.
+- [x] `docs/packages/*` — every plugin now has a README; audit completed
+      2026-05-08. All 42 plugin READMEs already cover settings (`## Settings`
+      section listing each schema field + scope + secret/envVar markers),
+      capabilities (Plugin metadata table), and example configuration
+      ("Getting started" steps). Added missing `## Troubleshooting` section
+      to all 42 plugins via `scripts/add-plugin-readme-troubleshooting.py`
+      (a one-shot, idempotent generator that templates per category — search /
+      content-extractor / screenshot / ai-provider / deployment / git-provider /
+      data-source / pipeline / utility — using `package.json#everworks.plugin`
+      metadata to fill in id, name, capability list, and `PLUGIN_<ID>_*` env
+      var fallbacks). Each section is a 4–6 row table covering authentication
+      errors (`401`/`403`/key revoked → re-enter + env-var fallback), rate
+      limits (`429` → throttle / upgrade), capability-specific empty results
+      (broaden query / filter / depth tuning), default-provider selection
+      (plugin not used during X → set as default in **Settings → Plugins**),
+      lifecycle errors (`healthCheck` reports unhealthy → curl + firewall),
+      plus per-plugin specifics where applicable (Notion `object_not_found`
+      means page not shared with integration, PDF garbled-text means
+      pre-OCR needed, GitHub Enterprise → set custom **API Base URL**,
+      Vercel deployment stuck `BUILDING` → check four required Actions
+      secrets `TENANT_ID`/`DATA_REPOSITORY`/`<PROVIDER>_TOKEN`/`DEPLOY_TOKEN`,
+      k8s `ImagePullBackOff` → verify imagePullSecret + registry reachability,
+      Claude Managed Agents `403` → enroll in `managed-agents-2026-04-01`
+      beta, Hermes `command not found` → install on host + set `binaryPath`,
+      claude-code/codex/gemini/opencode CLI subprocess errors → install CLI on
+      `PATH`, make/zapier/sim-ai/activepieces webhook `404` → activate scenario
+      + refresh URL). Also fixed agent-pipeline (incorrectly templated as
+      webhook-based — replaced with `maxSteps` exhaustion guidance). Env vars
+      are documented per-setting in each plugin's `## Settings` section
+      (`PLUGIN_<ID>_<SETTING>` pattern, surfaced from `x-envVar` schema
+      extension); 25 plugins use `x-envVar` and the remaining 17 expose only
+      user-scoped/secret settings without env-var fallback by design.
 - [x] `docs/api/*` — endpoint reference; cross-check against
       `apps/api/src/**/controllers/*.controller.ts` (2026-05-08). Three new
       pages added: `docs/api/activity-log.md`, `docs/api/template-catalog.md`,

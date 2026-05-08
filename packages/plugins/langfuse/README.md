@@ -47,6 +47,14 @@ When Langfuse is enabled as the active prompt provider, Ever Works fetches named
 - **Prompt Label** (`promptLabel`) — label used to fetch prompts (e.g. `production`, `staging`). Defaults to `production`.
 - **Cache TTL (seconds)** (`cacheTtlSeconds`) — how long to cache fetched prompts locally. Defaults to 300, max 86400.
 
+## Troubleshooting
+
+| Symptom                           | Likely cause                                                       | Fix                                                                                                                                                                      |
+| --------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `401 Unauthorized` from Langfuse  | Public/secret key missing or wrong project                         | Re-issue keys at the Langfuse dashboard and re-enter both **Public Key** and **Secret Key**; or set `PLUGIN_LANGFUSE_PUBLIC_KEY` / `PLUGIN_LANGFUSE_SECRET_KEY` env vars |
+| Prompts not appearing in Langfuse | Plugin not enabled OR `host` URL points to wrong region            | Enable the plugin globally; verify **Host** matches the dashboard region (`https://cloud.langfuse.com` for US, `https://cloud.langfuse.eu` for EU)                       |
+| `healthCheck` reports unhealthy   | Credentials invalid OR Langfuse endpoint unreachable from the host | Verify the credentials with a `curl` against the documented `/api/public/health` endpoint and confirm outbound HTTPS is allowed                                          |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

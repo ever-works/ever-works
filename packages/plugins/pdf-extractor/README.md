@@ -44,6 +44,16 @@ When a source URL points to a PDF file (.pdf extension), the content extractor f
 - **Max Pages** (`maxPages`) — maximum pages to process, default `50`, range 1–500 (hidden).
 - **Request Timeout** (`timeout`) — HTTP timeout in ms, default `60000`, range 5000–300000 (hidden).
 
+## Troubleshooting
+
+| Symptom                                        | Likely cause                                                                                     | Fix                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `403` from the extractor               | API key / token missing or revoked                                                               | Re-enter the credential from the PDF Content Extractor dashboard, or set `PLUGIN_PDF_EXTRACTOR_API_KEY` in the host environment for default fallback                      |
+| `Failed to extract content` for a specific URL | Page requires authentication, JavaScript rendering, or a custom client (Notion, PDF, login wall) | Verify the URL is publicly reachable; if it requires JavaScript/auth, switch to a more capable extractor (`scrapfly` / `notion-extractor` / `pdf-extractor`) for that URL |
+| Plugin not used during extraction              | Another content-extractor plugin is set as the default                                           | In **Settings → Plugins**, set `pdf-extractor` as the default for `content-extractor`, or disable competing plugins                                                       |
+| Garbled / empty text from a scanned PDF        | PDF is image-only; this extractor does not OCR                                                   | Pre-process the PDF through OCR (e.g. `ocrmypdf`) before passing the URL, or use a service that includes OCR                                                              |
+| `healthCheck` reports unhealthy                | Credential invalid OR PDF Content Extractor endpoint unreachable from the host                   | Verify the credential with a manual call to the upstream API and confirm outbound HTTPS is allowed by the firewall                                                        |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:
