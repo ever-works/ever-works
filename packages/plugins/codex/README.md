@@ -164,6 +164,17 @@ CODEX_SMOKE_BYPASS_SANDBOX=1 pnpm smoke
 
 Requires either `OPENAI_API_KEY` in the environment or local Codex auth (`codex login`).
 
+## Troubleshooting
+
+| Symptom                                                           | Likely cause                                                                          | Fix                                                                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation never starts / stays at `0%`                           | `codex` not selected as the active pipeline plugin for this work                      | Open the work → **Plugins** → `pipeline` capability and set `codex` as the active pipeline; or set it as the global pipeline default in **Settings → Plugins** |
+| Step fails with `No AI / search / screenshot provider configured` | Pipeline depends on capability plugins that are not enabled or have no credentials    | Enable and configure the matching capability plugin (AI provider, search, screenshot, content-extractor) for the work or globally                              |
+| Step output looks wrong / generic                                 | Form-field tuning not set; pipeline using defaults that don't match the work's domain | Open the **Generator Form** for the work, set domain-specific fields (categories, target keywords, source URLs), and re-run the affected step                  |
+| Subprocess error: `command not found`                             | `Codex Generator` CLI not installed on the host running the API                       | Install the Codex Generator CLI on the API host and ensure it is on `PATH`; verify by running `which <cli>` from the same shell that launches `pnpm dev:api`   |
+| Authentication / device-auth flow stalls                          | Device-auth code never confirmed in the upstream IDE / browser                        | Re-run the device-auth flow from **Settings → Plugins → codex → Connect**, then complete the prompt in the upstream service before the code expires            |
+| Pipeline cannot resume after host restart                         | Checkpoint not persisted (only the standard pipeline persists checkpoints today)      | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                          |
+
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)

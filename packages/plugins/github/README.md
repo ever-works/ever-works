@@ -41,6 +41,16 @@ The GitHub plugin is managed by the platform administrator. If you signed in wit
 
 This plugin uses `admin-only` configuration mode — settings are managed at the platform level and not per user.
 
+## Troubleshooting
+
+| Symptom                                                          | Likely cause                                                                                        | Fix                                                                                                                                                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401 Bad credentials` / `Resource not accessible by integration` | OAuth app misconfigured, token revoked, or the GitHub App is not installed on the target repository | Verify **Client ID** / **Client Secret** match the GitHub OAuth App, or install the GitHub App on the target repository; check `PLUGIN_GITHUB_CLIENT_ID` / `PLUGIN_GITHUB_CLIENT_SECRET` env-var fallbacks |
+| OAuth login redirects loop or returns `state mismatch`           | Callback URL mismatch between the OAuth App and the configured `webAppUrl`                          | In the GitHub OAuth App settings, set the callback to `<webAppUrl>/api/auth/callback/github`; confirm `webAppUrl` in `apps/api` matches the URL used by the browser                                        |
+| Repository creation fails with `name already exists`             | Slug collision in the user's namespace                                                              | Pick a unique slug or delete the conflicting repository in GitHub before re-running the work creation                                                                                                      |
+| Webhook payloads not received                                    | Webhook signature secret mismatch or webhook URL not reachable                                      | Confirm `GITHUB_APP_WEBHOOK_SECRET` matches the value in the GitHub App settings; expose `/api/github-app/webhooks` to GitHub (use a tunnel for local dev)                                                 |
+| GitHub Enterprise instance — calls fail with `404`               | API base URL still points to public GitHub                                                          | Set **API Base URL** to the GHES API endpoint, e.g. `https://github.example.com/api/v3`                                                                                                                    |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

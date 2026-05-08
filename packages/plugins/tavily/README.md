@@ -40,6 +40,17 @@ During work generation, the search facade uses Tavily to find information about 
 
 - **API Key** — Your Tavily API key (secret, scoped per user, also configurable via `PLUGIN_TAVILY_API_KEY`).
 
+## Troubleshooting
+
+| Symptom                                | Likely cause                                                               | Fix                                                                                                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `401 Unauthorized` / "Invalid API key" | API key missing, revoked, or wrong account                                 | Copy a fresh key from the [Tavily dashboard](https://app.tavily.com/) and re-enter it; or set `PLUGIN_TAVILY_API_KEY` in the host environment for default fallback |
+| `429 Too Many Requests`                | Free-tier (1k req/mo) or paid quota exhausted                              | Wait for monthly reset or upgrade plan in the Tavily dashboard                                                                                                     |
+| Empty / sparse search results          | Search depth set to `basic` or query is overly specific                    | Switch to `advanced` depth in the search call, broaden the query, or relax `include_domains` / `exclude_domains` filters                                           |
+| `Failed to extract content` for a URL  | Page is gated by login, Cloudflare, or robots.txt; or the URL is malformed | Verify the URL is publicly reachable; for protected pages enable a different content-extractor (`scrapfly`, `notion-extractor`, `pdf-extractor`)                   |
+| Tavily not used during work generation | Another search plugin is set as the default                                | In **Settings → Plugins**, set `tavily` as the default for `search`, or disable competing plugins                                                                  |
+| `Healthcheck failed`                   | API key invalid OR `api.tavily.com` unreachable from the host              | Run `curl -H 'Authorization: Bearer $KEY' https://api.tavily.com/search -d '{"query":"test"}'` to confirm; check outbound HTTPS firewall rules                     |
+
 ## Local development
 
 This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:

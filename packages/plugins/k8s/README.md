@@ -143,3 +143,13 @@ kind get kubeconfig --name ever-works-test > /tmp/kubeconfig
 - No Helm/Kustomize input — manifests are rendered as typed JS objects.
 - No GitOps mode (Argo CD / Flux) — imperative SSA only.
 - The deploy workflow YAML and Dockerfile live in the website-template repos (separate PRs to `ever-works/directory-web-template` and `ever-works/directory-web-minimal-template`).
+
+## Troubleshooting
+
+| Symptom                                            | Likely cause                                                                | Fix                                                                                                                                                                                        |
+| -------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Forbidden` / `Unauthorized` from the cluster      | Service-account token missing or RBAC permissions too narrow                | Re-issue a long-lived service-account token with the documented Role/RoleBinding and re-enter it; verify with `kubectl auth can-i create deployments --as=system:serviceaccount:<ns>:<sa>` |
+| Deployment stuck in `Pending` / `ImagePullBackOff` | Image not yet pushed to the configured registry, or imagePullSecret missing | Push the image and verify the registry is reachable from the cluster; ensure the namespace has a valid imagePullSecret referenced by the deployment                                        |
+| `x509: certificate signed by unknown authority`    | Custom CA on the API server not bundled into the kubeconfig                 | Provide the CA bundle in the **Kubeconfig** setting, or set `KUBECONFIG_INSECURE=true` only in non-production environments                                                                 |
+| Plugin not selected during deployment              | Another deployment plugin is set as the default                             | In **Settings → Plugins**, set `k8s` as the default for `deployment`, or disable competing plugins                                                                                         |
+| `healthCheck` reports unhealthy                    | Credential invalid OR Kubernetes endpoint unreachable from the host         | Verify the credential against the upstream API and confirm outbound HTTPS / cluster API connectivity is allowed                                                                            |
