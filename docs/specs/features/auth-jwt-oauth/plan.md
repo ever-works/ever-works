@@ -81,86 +81,89 @@ tell which store backs their token — by design.
 
 The auth feature reads/writes:
 
-| Column                       | Type      | Notes                                     |
-| ---------------------------- | --------- | ----------------------------------------- |
-| id                           | uuid PK   |                                            |
-| email                        | text      | unique                                     |
-| username                     | text      |                                            |
-| password                     | text      | bcrypt hash, mirror of Better Auth         |
-| avatar                       | text      | nullable                                   |
-| registrationProvider         | text      | 'local' / 'github' / 'google' / etc.       |
-| emailVerified                | boolean   | default false                              |
-| emailVerificationToken       | text      | nullable; cleared on success               |
-| emailVerificationExpires     | timestamp | nullable; cleared on success               |
-| passwordResetToken           | text      | nullable; cleared atomically by `clearPasswordResetToken` |
-| passwordResetExpires         | timestamp | nullable                                   |
-| isActive                     | boolean   | suspended ⇒ false; guard refuses           |
-| committerName                | text      | nullable; clearable via update-profile     |
-| committerEmail               | text      | nullable; clearable                        |
-| lastLoginAt                  | timestamp | updated on login                           |
+| Column                   | Type      | Notes                                                     |
+| ------------------------ | --------- | --------------------------------------------------------- |
+| id                       | uuid PK   |                                                           |
+| email                    | text      | unique                                                    |
+| username                 | text      |                                                           |
+| password                 | text      | bcrypt hash, mirror of Better Auth                        |
+| avatar                   | text      | nullable                                                  |
+| registrationProvider     | text      | 'local' / 'github' / 'google' / etc.                      |
+| emailVerified            | boolean   | default false                                             |
+| emailVerificationToken   | text      | nullable; cleared on success                              |
+| emailVerificationExpires | timestamp | nullable; cleared on success                              |
+| passwordResetToken       | text      | nullable; cleared atomically by `clearPasswordResetToken` |
+| passwordResetExpires     | timestamp | nullable                                                  |
+| isActive                 | boolean   | suspended ⇒ false; guard refuses                          |
+| committerName            | text      | nullable; clearable via update-profile                    |
+| committerEmail           | text      | nullable; clearable                                       |
+| lastLoginAt              | timestamp | updated on login                                          |
 
 ### `auth_session` (managed via raw TypeORM repository)
 
-| Column     | Type      | Notes                                  |
-| ---------- | --------- | -------------------------------------- |
-| id         | uuid PK   | randomUUID()                           |
-| userId     | uuid FK   | → users.id                             |
-| token      | text      | base64url, 32 chars                     |
-| expiresAt  | timestamp | now + 7d on issuance                    |
-| ipAddress  | text      | nullable                                |
-| userAgent  | text      | nullable                                |
+| Column    | Type      | Notes                |
+| --------- | --------- | -------------------- |
+| id        | uuid PK   | randomUUID()         |
+| userId    | uuid FK   | → users.id           |
+| token     | text      | base64url, 32 chars  |
+| expiresAt | timestamp | now + 7d on issuance |
+| ipAddress | text      | nullable             |
+| userAgent | text      | nullable             |
 
 ### `auth_account` (OAuth provider links — `AuthAccountRepository`)
 
-| Column                  | Type      | Notes                              |
-| ----------------------- | --------- | ---------------------------------- |
-| userId                  | uuid FK   | → users.id                         |
-| providerId              | text      | 'github' / 'google' / 'facebook' / 'linkedin' |
-| accountId               | text      | provider's user id                 |
-| username                | text      |                                    |
-| email                   | text      |                                    |
-| accessToken             | text      |                                    |
-| refreshToken            | text      | nullable                           |
-| tokenType               | text      | default 'Bearer'                   |
-| accessTokenExpiresAt    | timestamp | nullable                           |
-| scope                   | text      | nullable                           |
-| metadata                | jsonb     | `{providerUserId, ...providerSpecific}` |
+| Column               | Type      | Notes                                         |
+| -------------------- | --------- | --------------------------------------------- |
+| userId               | uuid FK   | → users.id                                    |
+| providerId           | text      | 'github' / 'google' / 'facebook' / 'linkedin' |
+| accountId            | text      | provider's user id                            |
+| username             | text      |                                               |
+| email                | text      |                                               |
+| accessToken          | text      |                                               |
+| refreshToken         | text      | nullable                                      |
+| tokenType            | text      | default 'Bearer'                              |
+| accessTokenExpiresAt | timestamp | nullable                                      |
+| scope                | text      | nullable                                      |
+| metadata             | jsonb     | `{providerUserId, ...providerSpecific}`       |
 
 ### `api_key` (managed by `ApiKeyRepository`)
 
-| Column     | Type      | Notes                                          |
-| ---------- | --------- | ---------------------------------------------- |
-| id         | uuid PK   |                                                |
-| userId     | uuid FK   |                                                |
-| name       | text      | user-supplied label                            |
-| hashedKey  | text      | sha256 of `ew_live_<32 hex bytes>`             |
-| prefix     | text      | first 12 chars of the raw key (display-only)   |
-| expiresAt  | timestamp | nullable; null = never expires                 |
-| lastUsedAt | timestamp | nullable; updated fire-and-forget on validate  |
-| createdAt  | timestamp |                                                |
+| Column     | Type      | Notes                                         |
+| ---------- | --------- | --------------------------------------------- |
+| id         | uuid PK   |                                               |
+| userId     | uuid FK   |                                               |
+| name       | text      | user-supplied label                           |
+| hashedKey  | text      | sha256 of `ew_live_<32 hex bytes>`            |
+| prefix     | text      | first 12 chars of the raw key (display-only)  |
+| expiresAt  | timestamp | nullable; null = never expires                |
+| lastUsedAt | timestamp | nullable; updated fire-and-forget on validate |
+| createdAt  | timestamp |                                               |
 
 ## 3. Module wiring
 
 `AuthModule` (`apps/api/src/auth/auth.module.ts`):
 
 ```ts
-imports: [DatabaseModule, HttpModule, ActivityLogModule]
+imports: [DatabaseModule, HttpModule, ActivityLogModule];
 providers: [
-  AuthService, ApiKeyService, AuthProviderService, AuthSyncService,
-  SocialAuthService, AuthSessionGuard,
-  ApiKeyRepository, UserRepository, AuthAccountRepository,
-  { provide: AUTH_PROVIDER, useExisting: AuthProviderService },
-  {
-    provide: AUTH_RUNTIME_INSTANCE,
-    inject: [DataSource],
-    useFactory: (ds) => createAuthRuntimeInstance(ds),
-  },
-]
-controllers: [OAuthController, AuthController, ApiKeysController]
-exports: [
-  AuthService, ApiKeyService, AuthSessionGuard,
-  AUTH_PROVIDER, AUTH_RUNTIME_INSTANCE, AuthSyncService,
-]
+	AuthService,
+	ApiKeyService,
+	AuthProviderService,
+	AuthSyncService,
+	SocialAuthService,
+	AuthSessionGuard,
+	ApiKeyRepository,
+	UserRepository,
+	AuthAccountRepository,
+	{ provide: AUTH_PROVIDER, useExisting: AuthProviderService },
+	{
+		provide: AUTH_RUNTIME_INSTANCE,
+		inject: [DataSource],
+		useFactory: (ds) => createAuthRuntimeInstance(ds)
+	}
+];
+controllers: [OAuthController, AuthController, ApiKeysController];
+exports: [AuthService, ApiKeyService, AuthSessionGuard, AUTH_PROVIDER, AUTH_RUNTIME_INSTANCE, AuthSyncService];
 ```
 
 Three deliberate choices:
@@ -261,23 +264,23 @@ Client → any guarded route, headers carry "Authorization: Bearer <token>"
 
 ## 7. Configuration / environment variables
 
-| Var                         | Used by                          |
-| --------------------------- | -------------------------------- |
-| `BCRYPT_ROUNDS`             | `authConstants.bcryptSaltRounds` |
-| `WEB_APP_URL`               | `config.webAppUrl()` — default callbacks |
-| `AUTH_SECRET`               | Better Auth runtime              |
-| `GITHUB_CLIENT_ID`          | `config.github.clientId()`       |
-| `GITHUB_CLIENT_SECRET`      | `config.github.clientSecret()`   |
-| `GITHUB_CALLBACK_URL`       | `config.github.callbackUrl()`    |
-| `GOOGLE_CLIENT_ID`          | `config.google.clientId()`       |
-| `GOOGLE_CLIENT_SECRET`      | `config.google.clientSecret()`   |
+| Var                                                   | Used by                                          |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| `BCRYPT_ROUNDS`                                       | `authConstants.bcryptSaltRounds`                 |
+| `WEB_APP_URL`                                         | `config.webAppUrl()` — default callbacks         |
+| `AUTH_SECRET`                                         | Better Auth runtime                              |
+| `GITHUB_CLIENT_ID`                                    | `config.github.clientId()`                       |
+| `GITHUB_CLIENT_SECRET`                                | `config.github.clientSecret()`                   |
+| `GITHUB_CALLBACK_URL`                                 | `config.github.callbackUrl()`                    |
+| `GOOGLE_CLIENT_ID`                                    | `config.google.clientId()`                       |
+| `GOOGLE_CLIENT_SECRET`                                | `config.google.clientSecret()`                   |
 | `GOOGLE_CONNECT_CALLBACK_URL` / `GOOGLE_CALLBACK_URL` | alias semantics — see `config/constants.spec.ts` |
-| `FACEBOOK_CLIENT_ID`        | `config.facebook.clientId()`     |
-| `FACEBOOK_CLIENT_SECRET`    | `config.facebook.clientSecret()` |
-| `FACEBOOK_CALLBACK_URL`     | `config.facebook.callbackUrl()`  |
-| `LINKEDIN_CLIENT_ID`        | `config.linkedin.clientId()`     |
-| `LINKEDIN_CLIENT_SECRET`    | `config.linkedin.clientSecret()` |
-| `LINKEDIN_CALLBACK_URL`     | `config.linkedin.callbackUrl()`  |
+| `FACEBOOK_CLIENT_ID`                                  | `config.facebook.clientId()`                     |
+| `FACEBOOK_CLIENT_SECRET`                              | `config.facebook.clientSecret()`                 |
+| `FACEBOOK_CALLBACK_URL`                               | `config.facebook.callbackUrl()`                  |
+| `LINKEDIN_CLIENT_ID`                                  | `config.linkedin.clientId()`                     |
+| `LINKEDIN_CLIENT_SECRET`                              | `config.linkedin.clientSecret()`                 |
+| `LINKEDIN_CALLBACK_URL`                               | `config.linkedin.callbackUrl()`                  |
 
 `SocialAuthService.getConfiguredProviders` advertises only the
 providers whose `clientId()` AND `clientSecret()` both return
@@ -286,12 +289,12 @@ frontend.
 
 ## 8. Test surfaces
 
-| File                                                           | Tests | Notes |
-| -------------------------------------------------------------- | ----- | ----- |
-| `apps/api/src/auth/services/auth.service.spec.ts`              | 45    | All public methods incl. social-user reconciliation, profile field stripping, github repo-scope gating, expired-token filtering, atomic-clear race semantics |
-| `apps/api/src/auth/services/social-auth.service.spec.ts`       | 37    | All four providers (GitHub/Google/Facebook/LinkedIn), URL building, code exchange (incl. GitHub no-grant_type), error paths |
-| `apps/api/src/auth/services/api-key.service.spec.ts`           | 15    | 10-key cap, expiresAt-in-past rejection, sha256 hashing, expiry, fire-and-forget updateLastUsed |
-| `apps/api/src/auth/utils/github-email.utils.spec.ts`           | (in tree) | Primary-email resolution from `/user/emails` |
+| File                                                     | Tests     | Notes                                                                                                                                                        |
+| -------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/auth/services/auth.service.spec.ts`        | 45        | All public methods incl. social-user reconciliation, profile field stripping, github repo-scope gating, expired-token filtering, atomic-clear race semantics |
+| `apps/api/src/auth/services/social-auth.service.spec.ts` | 37        | All four providers (GitHub/Google/Facebook/LinkedIn), URL building, code exchange (incl. GitHub no-grant_type), error paths                                  |
+| `apps/api/src/auth/services/api-key.service.spec.ts`     | 15        | 10-key cap, expiresAt-in-past rejection, sha256 hashing, expiry, fire-and-forget updateLastUsed                                                              |
+| `apps/api/src/auth/utils/github-email.utils.spec.ts`     | (in tree) | Primary-email resolution from `/user/emails`                                                                                                                 |
 
 Open follow-ups (T15–T18 in `tasks.md`):
 
@@ -335,7 +338,7 @@ own feature folders.
 
 - **R-1**: Better Auth and the platform's `users` table can drift
   if `AuthSyncService` fails partway through a password change.
-  Mitigation: the sync runs *after* the Better Auth update, so a
+  Mitigation: the sync runs _after_ the Better Auth update, so a
   failure leaves Better Auth as the source of truth and the next
   successful login resyncs `users.password`.
 - **R-2**: OAuth `state` is unverified (OQ-2). Risk of session

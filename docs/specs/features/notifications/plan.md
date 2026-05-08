@@ -32,35 +32,35 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern             | Choice                                                       | Rationale                                                |
-| ------------------- | ------------------------------------------------------------ | -------------------------------------------------------- |
-| Storage             | Postgres via TypeORM entity                                  | Same primary store as the rest of the platform           |
-| Deduplication       | Optional `deduplicationKey` + service-side check + DB unique constraint | Defence in depth against in-process and cross-process races |
-| Mutual exclusion    | `DistributedTaskLockService.runExclusive`                    | Constitution Principle IV; cleanup only                  |
-| Cron                | Per-instance scheduled service (`@Cron`) + lock              | Multiple replicas safe; cleanup runs once per window     |
-| API                 | NestJS REST controller behind `AuthSessionGuard`             | Matches the rest of the platform                         |
-| Persistent banner   | `isPersistent` flag + dedicated `/persistent` endpoint        | UI can render a global banner without scanning the list  |
+| Concern           | Choice                                                                  | Rationale                                                   |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Storage           | Postgres via TypeORM entity                                             | Same primary store as the rest of the platform              |
+| Deduplication     | Optional `deduplicationKey` + service-side check + DB unique constraint | Defence in depth against in-process and cross-process races |
+| Mutual exclusion  | `DistributedTaskLockService.runExclusive`                               | Constitution Principle IV; cleanup only                     |
+| Cron              | Per-instance scheduled service (`@Cron`) + lock                         | Multiple replicas safe; cleanup runs once per window        |
+| API               | NestJS REST controller behind `AuthSessionGuard`                        | Matches the rest of the platform                            |
+| Persistent banner | `isPersistent` flag + dedicated `/persistent` endpoint                  | UI can render a global banner without scanning the list     |
 
 ## 3. Data Model
 
 ```ts
 @Entity('notifications')
 class Notification {
-    id: string;
-    userId: string; // FK -> users
-    type: 'info' | 'warning' | 'error' | 'success';
-    category: 'ai_credits' | 'subscription' | 'generation' | 'system' | 'security';
-    title: string;
-    message: string;
-    actionUrl?: string;
-    actionLabel?: string;
-    metadata?: Record<string, any>; // jsonb
-    isPersistent: boolean; // default false
-    isDismissed: boolean; // default false
-    isRead: boolean; // default false
-    expiresAt?: Date;
-    deduplicationKey?: string;
-    createdAt: Date;
+	id: string;
+	userId: string; // FK -> users
+	type: 'info' | 'warning' | 'error' | 'success';
+	category: 'ai_credits' | 'subscription' | 'generation' | 'system' | 'security';
+	title: string;
+	message: string;
+	actionUrl?: string;
+	actionLabel?: string;
+	metadata?: Record<string, any>; // jsonb
+	isPersistent: boolean; // default false
+	isDismissed: boolean; // default false
+	isRead: boolean; // default false
+	expiresAt?: Date;
+	deduplicationKey?: string;
+	createdAt: Date;
 }
 ```
 
@@ -72,14 +72,14 @@ Indexes (additive, non-breaking migration):
 
 ## 4. API Surface
 
-| Method | Endpoint                              | Description                                                              |
-| ------ | ------------------------------------- | ------------------------------------------------------------------------ |
-| `GET`  | `/api/notifications`                  | List w/ `unreadOnly`/`limit`/`offset`/`category`. `limit` capped at 100. |
-| `GET`  | `/api/notifications/unread-count`     | `{count}` envelope.                                                      |
-| `GET`  | `/api/notifications/persistent`       | Returns only `isPersistent=true` rows for the current user.              |
-| `POST` | `/api/notifications/:id/read`         | Mark single notification read; 400 if cross-user / missing.              |
-| `POST` | `/api/notifications/read-all`         | Mark all current-user notifications read.                                |
-| `POST` | `/api/notifications/:id/dismiss`      | Dismiss; 400 with explanation if `isPersistent=true`.                    |
+| Method | Endpoint                          | Description                                                              |
+| ------ | --------------------------------- | ------------------------------------------------------------------------ |
+| `GET`  | `/api/notifications`              | List w/ `unreadOnly`/`limit`/`offset`/`category`. `limit` capped at 100. |
+| `GET`  | `/api/notifications/unread-count` | `{count}` envelope.                                                      |
+| `GET`  | `/api/notifications/persistent`   | Returns only `isPersistent=true` rows for the current user.              |
+| `POST` | `/api/notifications/:id/read`     | Mark single notification read; 400 if cross-user / missing.              |
+| `POST` | `/api/notifications/read-all`     | Mark all current-user notifications read.                                |
+| `POST` | `/api/notifications/:id/dismiss`  | Dismiss; 400 with explanation if `isPersistent=true`.                    |
 
 All endpoints return JSON envelopes:
 
@@ -125,14 +125,14 @@ deployment). Each invocation:
 
 ## 9. Risks & Mitigations
 
-| Risk                                            | Mitigation                                                                |
-| ----------------------------------------------- | ------------------------------------------------------------------------- |
-| Notification flood from a stuck error loop      | `deduplicationKey` collapses repeated emissions to a single row           |
-| Cleanup running on multiple replicas            | `DistributedTaskLockService` lock                                         |
-| User dismisses a critical security notification | `isPersistent=true` notifications refuse dismissal w/ explanatory message |
+| Risk                                            | Mitigation                                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Notification flood from a stuck error loop      | `deduplicationKey` collapses repeated emissions to a single row                           |
+| Cleanup running on multiple replicas            | `DistributedTaskLockService` lock                                                         |
+| User dismisses a critical security notification | `isPersistent=true` notifications refuse dismissal w/ explanatory message                 |
 | Race condition on parallel inserts of same key  | Catch unique-constraint code (`23505` / `ER_DUP_ENTRY` / `SQLITE_CONSTRAINT`) and recover |
-| Notification table unbounded growth             | 30-day expiry sweep + 7-day dismissed sweep                               |
-| Cleanup error wedges the next window            | Outer try/catch logs and swallows; lock TTL caps held lock to 5 min       |
+| Notification table unbounded growth             | 30-day expiry sweep + 7-day dismissed sweep                                               |
+| Cleanup error wedges the next window            | Outer try/catch logs and swallows; lock TTL caps held lock to 5 min                       |
 
 ## 10. Constitution Reconciliation
 

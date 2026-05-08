@@ -73,9 +73,7 @@ describe('PluginValidationService', () => {
         });
 
         it('returns null when plugin has none of validateConnection/isAvailable/git-provider', async () => {
-            pluginRegistry.get.mockReturnValue(
-                registered({ capabilities: ['ai-provider'] }),
-            );
+            pluginRegistry.get.mockReturnValue(registered({ capabilities: ['ai-provider'] }));
 
             const result = await service.tryValidateConnection('plug-1', 'u-1');
 
@@ -104,9 +102,11 @@ describe('PluginValidationService', () => {
         });
 
         it('coerces BadRequestException with object body to {success:false, message, modelResults}', async () => {
-            const validateConnection = jest
-                .fn()
-                .mockResolvedValue({ success: false, message: 'bad', modelResults: [{ ok: false }] });
+            const validateConnection = jest.fn().mockResolvedValue({
+                success: false,
+                message: 'bad',
+                modelResults: [{ ok: false }],
+            });
             pluginRegistry.get.mockReturnValue(
                 registered({ capabilities: ['ai-provider'], validateConnection }),
             );
@@ -242,8 +242,7 @@ describe('PluginValidationService', () => {
 
             expect(result).toEqual({
                 success: false,
-                message:
-                    'Local connection test failed. Check your credentials and try again.',
+                message: 'Local connection test failed. Check your credentials and try again.',
                 modelResults: undefined,
             });
         });
@@ -261,9 +260,9 @@ describe('PluginValidationService', () => {
         it('throws NotFoundException when plugin state is not "loaded"', async () => {
             pluginRegistry.get.mockReturnValue(registered({ state: 'failed' }));
 
-            await expect(service.validateUserPluginConnection('plug-1', 'u-1')).rejects.toBeInstanceOf(
-                NotFoundException,
-            );
+            await expect(
+                service.validateUserPluginConnection('plug-1', 'u-1'),
+            ).rejects.toBeInstanceOf(NotFoundException);
         });
 
         it('returns successful validateConnection result', async () => {
@@ -330,8 +329,7 @@ describe('PluginValidationService', () => {
                 service.validateUserPluginConnection('plug-1', 'u-1'),
             ).rejects.toMatchObject({
                 response: {
-                    message:
-                        'Cool connection test failed. Check your credentials and try again.',
+                    message: 'Cool connection test failed. Check your credentials and try again.',
                     statusCode: 400,
                 },
             });

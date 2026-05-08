@@ -43,7 +43,7 @@
       `WEBSITE_DISCOVERY_SYNC_TTL_MS = 1000 * 60 * 60` (1 h).
 - [x] T6. `onModuleInit` wraps `seedBuiltInTemplates()` in a try/catch
       and warn-logs on failure (`Failed to seed built-in templates
-      during startup: <msg>`).
+during startup: <msg>`).
 - [x] T7. `seedBuiltInTemplates`: maps `listWebsiteTemplates()` (which
       returns `Classic` always, plus `Minimal` env-gated) through
       `toBuiltInWebsiteTemplateRecord`, and `Promise.all`-`upsert`s each.
@@ -54,23 +54,23 @@
       reads. Returns `{ defaultTemplateId, templates: TemplateCatalogItem[] }`.
 - [x] T9. `addCustomTemplate(input, userId)`:
       `parseGitHubRepositoryUrl` → BadRequest `'Only valid GitHub
-      repository URLs are supported for custom templates.'`;
+repository URLs are supported for custom templates.'`;
       `findOwnedCustomByRepositoryUrl(kind, userId, canonicalUrl)` →
       Conflict `'You already added this template repository.'`;
       otherwise `upsert({ id: 'custom-' + randomUUID(), sourceType:
-      'custom', ownerUserId: userId, name: input.name?.trim() ||
-      humanizeRepositoryName(repo), description: input.description?.trim()
-      || null, framework: input.framework?.trim() ||
-      inferFrameworkFromRepository(repo), previewImageUrl:
-      input.previewImageUrl?.trim() || null, repositoryUrl:
-      canonicalUrl, repositoryOwner: owner, repositoryName: repo,
-      branch: input.branch?.trim() || 'main', syncBranches:
-      input.syncBranches?.length ? input.syncBranches : [branch],
-      betaBranch: input.betaBranch?.trim() || null, isActive: true,
-      metadata: {} })`.
+'custom', ownerUserId: userId, name: input.name?.trim() ||
+humanizeRepositoryName(repo), description: input.description?.trim()
+|| null, framework: input.framework?.trim() ||
+inferFrameworkFromRepository(repo), previewImageUrl:
+input.previewImageUrl?.trim() || null, repositoryUrl:
+canonicalUrl, repositoryOwner: owner, repositoryName: repo,
+branch: input.branch?.trim() || 'main', syncBranches:
+input.syncBranches?.length ? input.syncBranches : [branch],
+betaBranch: input.betaBranch?.trim() || null, isActive: true,
+metadata: {} })`.
 - [x] T10. `updateCustomTemplateForUser({ kind, templateId, name?,
-      description?, framework?, previewImageUrl?, branch?, betaBranch? },
-      userId)`: `findOwnedCustomById` then guard
+description?, framework?, previewImageUrl?, branch?, betaBranch? },
+userId)`: `findOwnedCustomById` then guard
       `(template.kind === input.kind && template.isActive)` →
       NotFound `'Custom template not found for this user and kind.'`.
       Field rules per FR-10: `name` empty-string preserves existing,
@@ -82,21 +82,21 @@
 - [x] T11. `archiveCustomTemplateForUser({ kind, templateId }, userId)`:
       same `findOwnedCustomById` guard; for `kind: 'website'`
       run `workRepository.countByUserAndWebsiteTemplateId(userId,
-      template.id)` — Conflict (singular vs. plural copy) when `> 0`;
+template.id)` — Conflict (singular vs. plural copy) when `> 0`;
       then if the template is the user's current default, run
       `workRepository.countByUserAndInheritedWebsiteTemplateSelection(
-      userId)` — Conflict (singular vs. plural copy) when `> 0`. On
+userId)` — Conflict (singular vs. plural copy) when `> 0`. On
       success: `updateById({ isActive: false })` then
       `userTemplatePreferenceRepository.deleteByUserKindAndTemplateId(
-      userId, kind, template.id)`. Returns `{ templateId, archived:
-      true }`.
+userId, kind, template.id)`. Returns `{ templateId, archived:
+true }`.
 - [x] T12. `setDefaultTemplateForUser(kind, templateId, userId)`:
       `findVisibleById` + kind match → NotFound `'Template not found
-      for this user and kind.'`. Otherwise
+for this user and kind.'`. Otherwise
       `userTemplatePreferenceRepository.upsertDefault(userId, kind,
-      templateId)`. Returns `{ defaultTemplateId: templateId }`.
+templateId)`. Returns `{ defaultTemplateId: templateId }`.
 - [x] T13. `forkTemplateForUser({ kind, templateId, targetOwner },
-      userId)`: six error classes per FR-16; existing-fork short-circuit
+userId)`: six error classes per FR-16; existing-fork short-circuit
       per FR-17; failed `gitFacade.forkRepository` → BadRequest
       `'Forking the selected template failed.'` (FR-18); success
       upserts the row with the seven `metadata.forkedFromX` audit
@@ -110,23 +110,23 @@
       `userTemplatePreferenceRepository.findByUserAndKind` → if
       `findVisibleById(preference.templateId, userId)` resolves to a
       visible kind-matched row, return its id. Otherwise: for `kind:
-      'website'` return `getDefaultWebsiteTemplateId()` (env-driven,
+'website'` return `getDefaultWebsiteTemplateId()` (env-driven,
       `'classic'` fallback); for `kind: 'work'` return `null`.
 - [x] T16. `refreshTemplatesForUser(kind, userId)`: when `kind ===
-      'website'` run `syncDiscoveredWebsiteTemplatesForUser(userId)`
+'website'` run `syncDiscoveredWebsiteTemplatesForUser(userId)`
       unconditionally; then return `listTemplatesForUser(kind, userId)`.
 
 ## Phase 3 — Discovery
 
 - [x] T17. `syncDiscoveredWebsiteTemplatesIfStale(userId)`:
       `templateRepository.hasRecentDiscoveredBuiltInTemplates('website',
-      catalogOwner, now - 1h)` → only when `false` runs
+catalogOwner, now - 1h)` → only when `false` runs
       `syncDiscoveredWebsiteTemplatesForUser(userId)`.
 - [x] T18. `syncDiscoveredWebsiteTemplatesForUser(userId)`: tries to
       get `accessToken = await gitFacade.getAccessToken({ userId,
-      providerId: 'github' })`; walks pages 1..50 of 100 repos via
+providerId: 'github' })`; walks pages 1..50 of 100 repos via
       `listRepositories({ providerId, userId, token: accessToken },
-      page, 100, { owner: catalogOwner, type: 'org' })` (token path)
+page, 100, { owner: catalogOwner, type: 'org' })` (token path)
       OR `listPublicRepositories(providerId, page, 100, ...)` (no-token
       fallback). Breaks early when `pageRepositories.length < 100`.
       Warn-logs the 50-page safety cap.
@@ -134,26 +134,26 @@
       `isStandardTemplateRepository(repo)` (`/template$/i.test(repo.trim())`).
 - [x] T20. Reconcile discovered ids: prefer
       `findBuiltInByRepositoryCoordinates('website', repo.owner,
-      repo.name)`'s id as the canonical id; otherwise
+repo.name)`'s id as the canonical id; otherwise
       `repo.name.toLowerCase()`. When the discovered id collides with
       an existing row whose coordinates differ, SKIP with warn log
       (`Skipping discovered template "<fullName>" because id
-      "<discoveredId>" is already used by …`).
+"<discoveredId>" is already used by …`).
 - [x] T21. Upsert each discovered template with `id: canonicalId,
-      kind: 'website', sourceType: 'built_in', name:
-      humanizeRepositoryName(repo.name), description: repo.description
-      || null, framework: inferFrameworkFromRepository(repo.name),
-      repositoryUrl: repo.url, repositoryOwner / Name, branch:
-      repo.defaultBranch || 'main', syncBranches:
-      [repo.defaultBranch || 'main'], betaBranch: null, isActive:
-      true, metadata: { discoveredFromOrganization: catalogOwner,
-      fullName: repo.fullName }`.
+kind: 'website', sourceType: 'built_in', name:
+humanizeRepositoryName(repo.name), description: repo.description
+|| null, framework: inferFrameworkFromRepository(repo.name),
+repositoryUrl: repo.url, repositoryOwner / Name, branch:
+repo.defaultBranch || 'main', syncBranches:
+[repo.defaultBranch || 'main'], betaBranch: null, isActive:
+true, metadata: { discoveredFromOrganization: catalogOwner,
+fullName: repo.fullName }`.
 - [x] T22. Deactivate the duplicate row when
       `canonicalId !== discoveredId` AND a discovered-id row exists
       with matching coordinates AND is currently active.
 - [x] T23. Outer try/catch: warn-log
       `Failed to sync discovered website templates for user <userId>:
-      <msg>` and resolve so the calling list endpoint still completes.
+<msg>` and resolve so the calling list endpoint still completes.
 
 ## Phase 4 — HTTP Surface
 
@@ -164,13 +164,13 @@
 - [x] T25. `GET /api/templates` accepts `?kind=<website|work>` via
       `ListTemplatesQueryDto`; runs
       `templateCatalogService.listTemplatesForUser(query.kind,
-      auth.userId)`; returns `{ status: 'success', kind,
-      defaultTemplateId, templates }`.
+auth.userId)`; returns `{ status: 'success', kind,
+defaultTemplateId, templates }`.
 - [x] T26. `POST /api/templates/custom` accepts `AddCustomTemplateDto`;
       after success emits fire-and-forget activity-log
       `{ actionType: TEMPLATE_ADDED, action: 'template.added', status:
-      COMPLETED, summary: 'Added <kind> template: <name>', metadata:
-      { templateId, kind } }.catch(() => {})`.
+COMPLETED, summary: 'Added <kind> template: <name>', metadata:
+{ templateId, kind } }.catch(() => {})`.
 - [x] T27. `PUT /api/templates/custom/:templateId` accepts
       `UpdateCustomTemplateDto`; emits
       `TEMPLATE_UPDATED` / `template.updated` activity-log entry on
@@ -178,23 +178,23 @@
 - [x] T28. `POST /api/templates/custom/:templateId/archive` accepts
       `ArchiveCustomTemplateDto`; emits `TEMPLATE_ARCHIVED` /
       `template.archived` on success; returns `{ status: 'success',
-      templateId, archived: true }`.
+templateId, archived: true }`.
 - [x] T29. `PUT /api/templates/default` accepts
       `SetDefaultTemplateDto`; emits `TEMPLATE_DEFAULT_SET` /
       `template.default_set`; returns `{ status: 'success', kind,
-      defaultTemplateId }`.
+defaultTemplateId }`.
 - [x] T30. `POST /api/templates/fork` accepts `ForkTemplateDto`; emits
       `TEMPLATE_FORKED` / `template.forked` ONLY when `result.created
-      === true` (gated by `if (result.created)` in the controller);
+=== true` (gated by `if (result.created)` in the controller);
       returns `{ status: 'success', kind, defaultTemplateId, template,
-      repository, created }`.
+repository, created }`.
 - [x] T31. `POST /api/templates/refresh` accepts `RefreshTemplatesDto`;
       runs `refreshTemplatesForUser`; returns `{ status: 'success',
-      kind, defaultTemplateId, templates }`. NO activity-log emission.
+kind, defaultTemplateId, templates }`. NO activity-log emission.
 - [x] T32. DTOs in `apps/api/src/template-catalog/dto/list-templates.dto.ts`
       with `@IsString` + `@IsIn(['website','work'])` on every `kind`
       field; `@IsUrl({ protocols: ['http','https'], require_protocol:
-      true })` on `repositoryUrl` / `previewImageUrl`; `@IsOptional()`
+true })` on `repositoryUrl` / `previewImageUrl`; `@IsOptional()`
       on every optional field.
 
 ## Phase 5 — Tests

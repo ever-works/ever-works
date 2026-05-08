@@ -19,7 +19,7 @@ flowchart LR
     A -.->|MCP register_work tool| M[apps/mcp register_work]
     M --> S
     B --> S[OnboardingService]
-    S -->|validate token + read works.yml| GH[GitHub API via existing<br/>git-provider plugin]
+    S -->|validate token + read .works/works.yml| GH[GitHub API via existing<br/>git-provider plugin]
     S -->|find or create| AC[Better Auth account]
     S -->|persist request| DB[(onboarding_requests<br/>webhook_subscriptions)]
     S -->|create Work| WS[WorksService<br/>existing flow]
@@ -49,7 +49,7 @@ flowchart LR
 
 - `apps/api/src/onboarding/` module (controller, service, DTOs)
 - `OnboardingRequest` and `WebhookSubscription` entities
-- `WorksManifestService` — parse and validate `works.yml`
+- `WorksManifestService` — parse and validate `.works/works.yml`
 - `WebhookDeliveryService` — HMAC-signed deliveries with retry
 - `register_work` MCP tool in `apps/mcp/`
 - `/.well-known/agent.json` route
@@ -64,7 +64,7 @@ flowchart LR
 | Webhook delivery           | New `WebhookDeliveryService` using BullMQ queue with exponential retry  | BullMQ already in deps; built-in retry; out-of-band from the Trigger.dev pipeline                     |
 | GitHub credential validate | Existing `git-provider` capability via `GitFacade`                      | No new direct integration; Principle I                                                                |
 | Manifest schema            | Zod schema in `@ever-works/contracts`                                   | Already used by some DTOs; lets us share the schema between API (validation) and CLI (lint)           |
-| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `works.yml` ergonomics               |
+| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `.works/works.yml` ergonomics        |
 | Webhook signing            | HMAC-SHA256 over raw body, GitHub-style `X-Hub-Signature-256` header    | Matches FR-12; reuses helper from `github-app-webhook.controller.ts` if exposed, else new shared util |
 | Public endpoint protection | `@Public()` + `@Throttle()` (existing decorators)                       | The endpoint is the bootstrap; no JWT possible; throttling guards against abuse                       |
 | MCP tool placement         | Inside `apps/mcp/`, no per-tool authentication for `register_work`      | Matches FR-15 (per-tool auth, not per-server); avoids a second MCP server                             |
@@ -170,7 +170,7 @@ New in `packages/contracts/src/api/onboarding/`:
 
 - `register-work.dto.ts` — request DTO (typed, class-validator decorators on the API side, type only in contracts)
 - `register-work.response.ts` — response shape
-- `manifest.schema.ts` — Zod schema for `works.yml` v1
+- `manifest.schema.ts` — Zod schema for `.works/works.yml` v1
 - `webhook-event.ts` — discriminated union of webhook payloads
 
 ## 4. API Surface
@@ -252,7 +252,7 @@ export interface RegisterWorkResponseDto {
 | 400    | `validation_error`                        | DTO validation failure                                  |
 | 403    | `gh_repo_access_denied`                   | Token cannot read or write the repo                     |
 | 409    | `repo_already_owned`                      | Repo previously onboarded by a different identity       |
-| 422    | `manifest_missing`                        | No `works.yml` at repo root                             |
+| 422    | `manifest_missing`                        | No `.works/works.yml` at repo root                      |
 | 422    | `manifest_invalid`                        | Schema validation failure (per-field errors)            |
 | 422    | `unsupported_capability`                  | Pipeline / plugin in manifest unsupported               |
 | 422    | `gh_insufficient_scope_for_repo_creation` | Manifest opts in to platform-managed repos, scope short |
@@ -289,12 +289,12 @@ If the manifest names a pipeline / plugin not present in the registry, we return
 
 ## 7. Background Jobs
 
-| Trigger                              | When                                          | What it does                                                                                 | Idempotency strategy                                                |
-| ------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `work-onboarding.task` (Trigger.dev) | Enqueued by `OnboardingService.handle()`      | Validates manifest → calls `WorksService.createFromManifest` → triggers existing import flow | DB row in `onboarding_requests` is the lock; CAS update on `status` |
-| `webhook-delivery.queue` (BullMQ)    | On every terminal status transition           | Loads `WebhookSubscription`, signs payload, POSTs with retry                                 | `X-Ever-Works-Delivery` UUID; consumer-side de-dup is recommended   |
-| `state-marker.task` (Trigger.dev)    | On every terminal status transition           | Commits `.works/state.json` to manifest repo if opted in                                     | Path is fixed; commit message includes delivery UUID                |
-| GitHub repo webhook → reconciler     | On push to manifest repo touching `works.yml` | Re-runs validation, triggers regeneration via existing `work-generation.task`                | DB-level CAS on `works.last_manifest_sha`                           |
+| Trigger                              | When                                                 | What it does                                                                                 | Idempotency strategy                                                |
+| ------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `work-onboarding.task` (Trigger.dev) | Enqueued by `OnboardingService.handle()`             | Validates manifest → calls `WorksService.createFromManifest` → triggers existing import flow | DB row in `onboarding_requests` is the lock; CAS update on `status` |
+| `webhook-delivery.queue` (BullMQ)    | On every terminal status transition                  | Loads `WebhookSubscription`, signs payload, POSTs with retry                                 | `X-Ever-Works-Delivery` UUID; consumer-side de-dup is recommended   |
+| `state-marker.task` (Trigger.dev)    | On every terminal status transition                  | Commits `.works/state.json` to manifest repo if opted in                                     | Path is fixed; commit message includes delivery UUID                |
+| GitHub repo webhook → reconciler     | On push to manifest repo touching `.works/works.yml` | Re-runs validation, triggers regeneration via existing `work-generation.task`                | DB-level CAS on `works.last_manifest_sha`                           |
 
 ## 8. Security & Permissions
 
@@ -317,7 +317,7 @@ Activity log events emitted via the existing `ActivityLogService`:
 | `onboarding.received`         | Request accepted by controller (post-DTO-validation)                        |
 | `onboarding.token_validated`  | GitHub token resolves and grants required access                            |
 | `onboarding.token_rejected`   | GitHub token validation failed (with typed code)                            |
-| `onboarding.manifest_invalid` | `works.yml` missing or fails schema                                         |
+| `onboarding.manifest_invalid` | `.works/works.yml` missing or fails schema                                  |
 | `onboarding.account_linked`   | New or existing account linked to GitHub identity                           |
 | `onboarding.work_created`     | Work row + repos created, generation enqueued                               |
 | `onboarding.terminal`         | Generation finished (success / failure) — payload used for webhook + marker |

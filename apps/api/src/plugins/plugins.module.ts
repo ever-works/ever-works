@@ -1,12 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-    PluginEntity,
-    UserPluginEntity,
-    WorkPluginEntity,
-    PluginOperationsService,
-    SettingsSchemaValidatorService,
-} from '@ever-works/agent/plugins';
+import { PluginOperationsService, SettingsSchemaValidatorService } from '@ever-works/agent/plugins';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
@@ -19,17 +12,10 @@ import { PluginValidationService } from './plugin-validation.service';
 /**
  * API module for plugin management endpoints.
  * Note: The core PluginsModule from @ever-works/agent/plugins must be
- * initialized with forRoot() at the app root level for this to work.
+ * initialized at the app root level for this to work.
  */
 @Module({
-    imports: [
-        DatabaseModule,
-        TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, WorkPluginEntity]),
-        FacadesModule,
-        WorkModule,
-        AuthModule,
-        ActivityLogModule,
-    ],
+    imports: [DatabaseModule, FacadesModule, WorkModule, AuthModule, ActivityLogModule],
     controllers: [PluginsController],
     providers: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
     exports: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],

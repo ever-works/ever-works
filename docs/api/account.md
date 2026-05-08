@@ -57,14 +57,18 @@ masked). Real secret values are NEVER exported in this mode.
 
 ```json
 {
-  "version": 1,
-  "exportedAt": "2026-05-08T12:34:56.789Z",
-  "includesSecrets": false,
-  "data": {
-    "profile": { "username": "...", "email": "...", "avatar": "..." },
-    "works": [ /* ExportedWork[] — see types.ts */ ],
-    "userPlugins": [ /* ExportedUserPlugin[] */ ]
-  }
+	"version": 1,
+	"exportedAt": "2026-05-08T12:34:56.789Z",
+	"includesSecrets": false,
+	"data": {
+		"profile": { "username": "...", "email": "...", "avatar": "..." },
+		"works": [
+			/* ExportedWork[] — see types.ts */
+		],
+		"userPlugins": [
+			/* ExportedUserPlugin[] */
+		]
+	}
 }
 ```
 
@@ -83,19 +87,19 @@ Validate a payload and surface conflicts BEFORE applying anything.
 
 ```json
 {
-  "valid": true,
-  "errors": [],
-  "version": 1,
-  "includesSecrets": false,
-  "hasMaskedSecrets": true,
-  "profile": { /* ExportedProfile */ },
-  "workCount": 3,
-  "totalItemCount": 142,
-  "userPluginCount": 7,
-  "conflicts": [
-    { "slug": "my-work", "existingName": "My Work (current)", "incomingName": "My Work (incoming)" }
-  ],
-  "missingPlugins": ["serpapi"]
+	"valid": true,
+	"errors": [],
+	"version": 1,
+	"includesSecrets": false,
+	"hasMaskedSecrets": true,
+	"profile": {
+		/* ExportedProfile */
+	},
+	"workCount": 3,
+	"totalItemCount": 142,
+	"userPluginCount": 7,
+	"conflicts": [{ "slug": "my-work", "existingName": "My Work (current)", "incomingName": "My Work (incoming)" }],
+	"missingPlugins": ["serpapi"]
 }
 ```
 
@@ -116,22 +120,24 @@ Apply a previously-previewed payload.
 
 ```json
 {
-  "payload": { /* AccountExportPayload */ },
-  "resolutions": [
-    { "slug": "my-work", "strategy": "skip" },
-    { "slug": "other-work", "strategy": "rename", "newSlug": "other-work-v2" },
-    { "slug": "third-work", "strategy": "overwrite" }
-  ]
+	"payload": {
+		/* AccountExportPayload */
+	},
+	"resolutions": [
+		{ "slug": "my-work", "strategy": "skip" },
+		{ "slug": "other-work", "strategy": "rename", "newSlug": "other-work-v2" },
+		{ "slug": "third-work", "strategy": "overwrite" }
+	]
 }
 ```
 
 `resolutions` enumerates `ConflictResolution` per slug:
 
-| `strategy`  | Semantics                                                                  |
-| ----------- | -------------------------------------------------------------------------- |
-| `skip`      | Leave the existing work untouched and drop the incoming one.               |
-| `overwrite` | Replace the existing work's contents with the incoming payload.            |
-| `rename`    | Create the incoming work under `newSlug` (which MUST be unique).           |
+| `strategy`  | Semantics                                                        |
+| ----------- | ---------------------------------------------------------------- |
+| `skip`      | Leave the existing work untouched and drop the incoming one.     |
+| `overwrite` | Replace the existing work's contents with the incoming payload.  |
+| `rename`    | Create the incoming work under `newSlug` (which MUST be unique). |
 
 If a conflict is reported in the preview but missing from `resolutions`, the
 service treats it as `skip` (safe-by-default). Slugs that aren't conflicts
@@ -141,13 +147,13 @@ are imported normally.
 
 ```json
 {
-  "success": true,
-  "worksCreated": 2,
-  "worksUpdated": 1,
-  "worksSkipped": 1,
-  "userPluginsImported": 7,
-  "errors": [],
-  "warnings": ["Plugin serpapi is not installed; configuration skipped."]
+	"success": true,
+	"worksCreated": 2,
+	"worksUpdated": 1,
+	"worksSkipped": 1,
+	"userPluginsImported": 7,
+	"errors": [],
+	"warnings": ["Plugin serpapi is not installed; configuration skipped."]
 }
 ```
 
@@ -159,13 +165,13 @@ Return the current GitHub-sync configuration for the user.
 
 ```json
 {
-  "configured": true,
-  "hasOAuth": true,
-  "repoOwner": "my-user",
-  "repoName": "ever-works-account",
-  "lastPushAt": "2026-05-08T12:00:00.000Z",
-  "lastPullAt": "2026-05-07T18:30:00.000Z",
-  "lastSyncError": null
+	"configured": true,
+	"hasOAuth": true,
+	"repoOwner": "my-user",
+	"repoName": "ever-works-account",
+	"lastPushAt": "2026-05-08T12:00:00.000Z",
+	"lastPullAt": "2026-05-07T18:30:00.000Z",
+	"lastSyncError": null
 }
 ```
 
@@ -179,10 +185,10 @@ Select an existing GitHub repository for sync, OR create a new one.
 
 **Request body:**
 
-| Mode               | Body                                                  | Effect                                                                                  |
-| ------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Use existing repo  | `{ "repoFullName": "owner/repo" }`                    | Saves the coordinate to the user's sync config. The repo must already exist on GitHub.  |
-| Create a new repo  | `{ "createNew": true }`                               | Creates a new private repo under the user's GitHub account using a default name.        |
+| Mode              | Body                               | Effect                                                                                 |
+| ----------------- | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| Use existing repo | `{ "repoFullName": "owner/repo" }` | Saves the coordinate to the user's sync config. The repo must already exist on GitHub. |
+| Create a new repo | `{ "createNew": true }`            | Creates a new private repo under the user's GitHub account using a default name.       |
 
 **Response 200:** the updated `SyncStatus` (same shape as `GET /sync/status`).
 
@@ -215,7 +221,9 @@ Apply a previously-previewed pull, with explicit conflict resolutions.
 
 ```json
 {
-  "resolutions": [ /* ConflictResolution[] */ ]
+	"resolutions": [
+		/* ConflictResolution[] */
+	]
 }
 ```
 
@@ -234,10 +242,10 @@ NOT touched — this just disconnects the platform side.
 Account export distinguishes settings (`settings`) from secret settings
 (`secretSettings`) on every plugin. The masking rules:
 
-| Mode (`includeSecrets`) | Behaviour                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `false` (default)       | Every `secretSettings` value is replaced via `maskSecretValue` (`MASKED:abc***1234` for length > 8).   |
-| `true`                  | `secretSettings` is exported verbatim. The payload is then a credentials artefact.                     |
+| Mode (`includeSecrets`) | Behaviour                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| `false` (default)       | Every `secretSettings` value is replaced via `maskSecretValue` (`MASKED:abc***1234` for length > 8). |
+| `true`                  | `secretSettings` is exported verbatim. The payload is then a credentials artefact.                   |
 
 On import, `containsMaskedSecrets(secretSettings)` flags any plugin whose
 secrets are still placeholders, and the preview / result includes a
@@ -247,8 +255,8 @@ secrets are still placeholders, and the preview / result includes a
 
 ```typescript
 @Module({
-  imports: [AuthModule, AccountTransferModule],
-  controllers: [AccountController],
+	imports: [AuthModule, AccountTransferModule],
+	controllers: [AccountController]
 })
 export class AccountModule {}
 ```

@@ -12,7 +12,7 @@ notification surface.
 
 The platform uses **`@nestjs/event-emitter`** to decouple modules
 that don't need synchronous coupling. A work creation, a
-generation completion, or a `works.yml` sync request fires a typed
+generation completion, or a `.works/works.yml` sync request fires a typed
 event; downstream consumers subscribe to it independently. The event
 emitter is **in-process only** — there's no message broker, no Redis
 pub/sub, no durable queue. For durable async work the platform uses
@@ -68,8 +68,8 @@ The events shipped today (in
 | ------------------------------- | ----------------------------- | --------------------------------------------------- |
 | `WorkCreatedEvent`              | `work.created`                | A new work has been persisted (any creation method) |
 | `WorkGenerationCompletedEvent`  | `work.generation.completed`   | A pipeline run finished successfully                |
-| `WorksConfigSyncRequestedEvent` | `works-config.sync.requested` | A work mutation needs `works.yml` updated           |
-| `WorksConfigSyncFailedEvent`    | `works-config.sync.failed`    | A `works.yml` sync write failed                     |
+| `WorksConfigSyncRequestedEvent` | `works-config.sync.requested` | A work mutation needs `.works/works.yml` updated    |
+| `WorksConfigSyncFailedEvent`    | `works-config.sync.failed`    | A `.works/works.yml` sync write failed              |
 
 Future events follow the same shape — a class extending `BaseEvent`,
 a static `EVENT_NAME`, a constructor capturing the relevant entities
@@ -203,12 +203,12 @@ wildcard matching; literal event names with colons still route fine.
 
 Some platform features are implemented as event-sourced read models:
 
-| Read model           | Source events                                               |
-| -------------------- | ----------------------------------------------------------- |
-| Activity log         | All `work.*` events + auth + plan events                    |
-| Notifications drawer | Subset of activity-log events that match `NotificationKind` |
-| `works.yml` sync     | `work.generation.completed` → write back                    |
-| Cost reporting       | `pipeline:step-status-changed` with `aiUsage` accumulators  |
+| Read model              | Source events                                               |
+| ----------------------- | ----------------------------------------------------------- |
+| Activity log            | All `work.*` events + auth + plan events                    |
+| Notifications drawer    | Subset of activity-log events that match `NotificationKind` |
+| `.works/works.yml` sync | `work.generation.completed` → write back                    |
+| Cost reporting          | `pipeline:step-status-changed` with `aiUsage` accumulators  |
 
 Each read model is a thin subscriber + writer. None of them update
 shared state directly — they always go through their own service +

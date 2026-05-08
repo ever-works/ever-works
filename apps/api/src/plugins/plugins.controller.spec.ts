@@ -131,9 +131,7 @@ describe('PluginsController', () => {
 
     describe('listPluginModels', () => {
         it('forwards (pluginId, userId) and returns models array', async () => {
-            pluginsService.listPluginModels.mockResolvedValue([
-                { id: 'gpt-5', name: 'GPT-5' },
-            ]);
+            pluginsService.listPluginModels.mockResolvedValue([{ id: 'gpt-5', name: 'GPT-5' }]);
 
             const result = await controller.listPluginModels(auth, 'openai');
 
@@ -299,9 +297,9 @@ describe('PluginsController', () => {
         it('does not emit log when service rejects (and never calls tryValidateConnection)', async () => {
             pluginsService.updateUserPluginSettings.mockRejectedValue(new Error('boom'));
 
-            await expect(
-                controller.updatePluginSettings(auth, 'p', {} as any),
-            ).rejects.toThrow('boom');
+            await expect(controller.updatePluginSettings(auth, 'p', {} as any)).rejects.toThrow(
+                'boom',
+            );
             expect(pluginValidationService.tryValidateConnection).not.toHaveBeenCalled();
             expect(activityLogService.log).not.toHaveBeenCalled();
         });
@@ -360,9 +358,10 @@ describe('PluginsController', () => {
 
             const result = await controller.validatePluginConnection(auth, 'p');
 
-            expect(
-                pluginValidationService.validateUserPluginConnection,
-            ).toHaveBeenCalledWith('p', 'user-1');
+            expect(pluginValidationService.validateUserPluginConnection).toHaveBeenCalledWith(
+                'p',
+                'user-1',
+            );
             expect(result).toEqual({ success: true, message: 'ok' });
         });
 
@@ -371,9 +370,9 @@ describe('PluginsController', () => {
                 new Error('not loaded'),
             );
 
-            await expect(
-                controller.validatePluginConnection(auth, 'p'),
-            ).rejects.toThrow('not loaded');
+            await expect(controller.validatePluginConnection(auth, 'p')).rejects.toThrow(
+                'not loaded',
+            );
         });
     });
 
@@ -426,12 +425,11 @@ describe('PluginsController', () => {
 
             expect(order).toEqual(['edit', 'enable']);
             expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('w-1', 'user-1');
-            expect(pluginsService.enablePluginForWork).toHaveBeenCalledWith(
-                'w-1',
-                'p',
-                'user-1',
-                { settings: { x: 1 }, activeCapability: 'search', priority: 5 },
-            );
+            expect(pluginsService.enablePluginForWork).toHaveBeenCalledWith('w-1', 'p', 'user-1', {
+                settings: { x: 1 },
+                activeCapability: 'search',
+                priority: 5,
+            });
             expect(activityLogService.log).toHaveBeenCalledWith({
                 userId: 'user-1',
                 workId: 'w-1',
@@ -449,20 +447,19 @@ describe('PluginsController', () => {
 
             await controller.enableWorkPlugin(auth, 'w-1', 'p', {} as any);
 
-            expect(pluginsService.enablePluginForWork).toHaveBeenCalledWith(
-                'w-1',
-                'p',
-                'user-1',
-                { settings: undefined, activeCapability: undefined, priority: undefined },
-            );
+            expect(pluginsService.enablePluginForWork).toHaveBeenCalledWith('w-1', 'p', 'user-1', {
+                settings: undefined,
+                activeCapability: undefined,
+                priority: undefined,
+            });
         });
 
         it('does not emit log when ensureCanEdit rejects', async () => {
             ownershipService.ensureCanEdit.mockRejectedValue(new Error('nope'));
 
-            await expect(
-                controller.enableWorkPlugin(auth, 'w-1', 'p', {} as any),
-            ).rejects.toThrow('nope');
+            await expect(controller.enableWorkPlugin(auth, 'w-1', 'p', {} as any)).rejects.toThrow(
+                'nope',
+            );
             expect(pluginsService.enablePluginForWork).not.toHaveBeenCalled();
             expect(activityLogService.log).not.toHaveBeenCalled();
         });
@@ -470,9 +467,9 @@ describe('PluginsController', () => {
         it('does not emit log when enablePluginForWork rejects', async () => {
             pluginsService.enablePluginForWork.mockRejectedValue(new Error('boom'));
 
-            await expect(
-                controller.enableWorkPlugin(auth, 'w-1', 'p', {} as any),
-            ).rejects.toThrow('boom');
+            await expect(controller.enableWorkPlugin(auth, 'w-1', 'p', {} as any)).rejects.toThrow(
+                'boom',
+            );
             expect(activityLogService.log).not.toHaveBeenCalled();
         });
     });
@@ -489,11 +486,7 @@ describe('PluginsController', () => {
             const result = await controller.disableWorkPlugin(auth, 'w-1', 'p');
 
             expect(order).toEqual(['edit', 'disable']);
-            expect(pluginsService.disablePluginForWork).toHaveBeenCalledWith(
-                'w-1',
-                'p',
-                'user-1',
-            );
+            expect(pluginsService.disablePluginForWork).toHaveBeenCalledWith('w-1', 'p', 'user-1');
             expect(activityLogService.log).toHaveBeenCalledWith({
                 userId: 'user-1',
                 workId: 'w-1',
@@ -576,12 +569,7 @@ describe('PluginsController', () => {
             pluginsService.updateWorkPluginSettings.mockResolvedValue({ id: 'p' });
             pluginValidationService.tryValidateConnection.mockResolvedValue(null);
 
-            const result = await controller.updateWorkPluginSettings(
-                auth,
-                'w-1',
-                'p',
-                {} as any,
-            );
+            const result = await controller.updateWorkPluginSettings(auth, 'w-1', 'p', {} as any);
 
             expect(result).toEqual({ id: 'p', validation: null });
         });

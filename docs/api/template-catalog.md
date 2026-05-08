@@ -38,9 +38,9 @@ emission on the five mutating endpoints.
 
 Every endpoint is parameterised by `kind`:
 
-| Kind      | Purpose                                                     |
-| --------- | ----------------------------------------------------------- |
-| `website` | Templates for the public-facing website repository.         |
+| Kind      | Purpose                                                       |
+| --------- | ------------------------------------------------------------- |
+| `website` | Templates for the public-facing website repository.           |
 | `work`    | Templates for the work content repository (work scaffolding). |
 
 The `kind` is validated via `class-validator`'s `@IsIn(['website', 'work'])`
@@ -52,10 +52,10 @@ on every DTO.
 boot, wrapped in `try/catch + warn-log` so a seed failure never blocks app
 startup:
 
-| Template  | Required env var                          | Notes                                                                                |
-| --------- | ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Classic` | always                                    | The canonical default for new websites.                                              |
-| `Minimal` | `WEBSITE_TEMPLATE_MINIMAL_REPO`           | Optional; only seeded when the env var points at a `<owner>/<repo>` coordinate.      |
+| Template  | Required env var                | Notes                                                                           |
+| --------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `Classic` | always                          | The canonical default for new websites.                                         |
+| `Minimal` | `WEBSITE_TEMPLATE_MINIMAL_REPO` | Optional; only seeded when the env var points at a `<owner>/<repo>` coordinate. |
 
 Built-in templates are kept in sync across reboots via
 `findBuiltInByRepositoryCoordinates(owner, repo)` so reseeding is idempotent.
@@ -77,33 +77,33 @@ List templates visible to the current user for one kind.
 
 ```json
 {
-  "status": "success",
-  "kind": "website",
-  "defaultTemplateId": "tmpl-classic",
-  "templates": [
-    {
-      "id": "tmpl-classic",
-      "name": "Classic",
-      "description": "...",
-      "framework": "Next.js",
-      "previewImageUrl": "https://...",
-      "repositoryUrl": "https://github.com/ever-works/website-classic-template",
-      "branch": "main",
-      "originType": "standard",
-      "kind": "website",
-      "isActive": true
-    }
-  ]
+	"status": "success",
+	"kind": "website",
+	"defaultTemplateId": "tmpl-classic",
+	"templates": [
+		{
+			"id": "tmpl-classic",
+			"name": "Classic",
+			"description": "...",
+			"framework": "Next.js",
+			"previewImageUrl": "https://...",
+			"repositoryUrl": "https://github.com/ever-works/website-classic-template",
+			"branch": "main",
+			"originType": "standard",
+			"kind": "website",
+			"isActive": true
+		}
+	]
 }
 ```
 
 The `originType` field discriminates display rules in the UI:
 
-| `originType`  | Meaning                                                            |
-| ------------- | ------------------------------------------------------------------ |
-| `standard`    | Built-in seed (`Classic` / `Minimal`).                             |
-| `forked`      | A fork the user created from a built-in template via this catalog. |
-| `custom_url`  | A custom template added via `POST /api/templates/custom`.          |
+| `originType` | Meaning                                                            |
+| ------------ | ------------------------------------------------------------------ |
+| `standard`   | Built-in seed (`Classic` / `Minimal`).                             |
+| `forked`     | A fork the user created from a built-in template via this catalog. |
+| `custom_url` | A custom template added via `POST /api/templates/custom`.          |
 
 ### `POST /api/templates/custom`
 
@@ -113,14 +113,14 @@ Add a custom template from a GitHub repository URL.
 
 ```json
 {
-  "kind": "website",
-  "repositoryUrl": "https://github.com/owner/my-template",
-  "name": "My Template",
-  "description": "...",
-  "framework": "Next.js",
-  "previewImageUrl": "https://...",
-  "branch": "main",
-  "betaBranch": "beta"
+	"kind": "website",
+	"repositoryUrl": "https://github.com/owner/my-template",
+	"name": "My Template",
+	"description": "...",
+	"framework": "Next.js",
+	"previewImageUrl": "https://...",
+	"branch": "main",
+	"betaBranch": "beta"
 }
 ```
 
@@ -215,12 +215,12 @@ seven `metadata.forkedFromX` audit fields and the activity log is emitted.
 
 ```json
 {
-  "status": "success",
-  "kind": "website",
-  "created": true,
-  "template": { "id": "tmpl-fork-1", "name": "...", "originType": "forked" },
-  "repository": { "fullName": "my-org/website-classic-template" },
-  "defaultTemplateId": "tmpl-fork-1"
+	"status": "success",
+	"kind": "website",
+	"created": true,
+	"template": { "id": "tmpl-fork-1", "name": "...", "originType": "forked" },
+	"repository": { "fullName": "my-org/website-classic-template" },
+	"defaultTemplateId": "tmpl-fork-1"
 }
 ```
 
@@ -256,21 +256,17 @@ default is itself archived; today the fallback still returns it.
 
 ## Configuration
 
-| Env var                          | Purpose                                                                  |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| `WEBSITE_TEMPLATE_MINIMAL_REPO`  | Optional `<owner>/<repo>` coordinate for the `Minimal` website seed.     |
-| `WEBSITE_DISCOVERY_SYNC_TTL_MS`  | TTL for the discovery pass. Default 1 hour. Lower for development.       |
+| Env var                         | Purpose                                                              |
+| ------------------------------- | -------------------------------------------------------------------- |
+| `WEBSITE_TEMPLATE_MINIMAL_REPO` | Optional `<owner>/<repo>` coordinate for the `Minimal` website seed. |
+| `WEBSITE_DISCOVERY_SYNC_TTL_MS` | TTL for the discovery pass. Default 1 hour. Lower for development.   |
 
 ## Module registration
 
 ```typescript
 @Module({
-  imports: [
-    AuthModule,
-    AgentTemplateCatalogModule,
-    AgentActivityLogModule,
-  ],
-  controllers: [TemplateCatalogController],
+	imports: [AuthModule, AgentTemplateCatalogModule, AgentActivityLogModule],
+	controllers: [TemplateCatalogController]
 })
 export class TemplateCatalogModule {}
 ```

@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Senkronizasyon ayarları güncellenemedi",
                 "syncDisabled": "Senkronizasyon Devre Dışı",
                 "worksConfig": {
-                    "imported": "works.yml'den içe aktarıldı",
+                    "imported": ".works/works.yml'den içe aktarıldı",
                     "applied": "Uygulandı: {value}",
                     "enabled": "etkin",
                     "disabled": "devre dışı",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Veri Deposu",
                         "awesomeReadme": "Harika README",
                         "linkExisting": "Bağlı Mevcut Depolar",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Genel Ayarlar",
@@ -2349,7 +2349,7 @@
                     "description": "Kaynak deposundan güncellemeleri otomatik çekin."
                 },
                 "worksConfigRestore": {
-                    "title": "works.yml ayarlarını geri yükle",
+                    "title": ".works/works.yml ayarlarını geri yükle",
                     "description": "Bu depodan AI sağlayıcısı, model, zamanlama ve ilgili depo ayarlarını uygula."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Desteklenen Depo Formatları",
                     "dataRepo": {
                         "title": "Veri Deposu",
-                        "description": "works.yml ve data/ klasör yapısına sahip depolar"
+                        "description": ".works/works.yml ve data/ klasör yapısına sahip depolar"
                     },
                     "awesomeReadme": {
                         "title": "Harika Liste",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Veri Deposu",
                     "awesomeReadme": "Harika Liste",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "öğe",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Depoları bağla"
                 },
                 "detectionFailed": "Formatı otomatik tespit edemedik. Lütfen bu deposunu nasıl içe aktaracağınızı seçin.",
-                "detectionFailedMissingConfig": "Desteklenen bir yapılandırma bulunamadı. Depoya works.yml ekleyin veya aşağıdan manuel içe aktarma biçimini seçin.",
+                "detectionFailedMissingConfig": "Desteklenen bir yapılandırma bulunamadı. Depoya .works/works.yml ekleyin veya aşağıdan manuel içe aktarma biçimini seçin.",
                 "errors": {
                     "urlRequired": "Lütfen GitHub depo URL'si girin",
                     "unsupportedFormat": "Bu depo formatı desteklenmiyor. Lütfen Veri Deposu veya Harika Liste formatı kullanın.",

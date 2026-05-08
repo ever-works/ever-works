@@ -38,7 +38,7 @@ Imports from a structured Ever Works data repository that already contains items
 **Required structure in source repo:**
 
 ```
-works.yml          # Work configuration
+.works/works.yml          # Work configuration
 categories.yml      # Category definitions
 data/
   item-slug-1/      # One work per item
@@ -124,7 +124,7 @@ Supports multiple Git providers:
 
 Analyzes the root work contents to classify repositories:
 
-1. **Data repo**: Has `works.yml` + `data/` work.
+1. **Data repo**: Has `.works/works.yml` + `data/` work.
 2. **Awesome README**: Has `README.md` that passes the "awesome list" heuristic (section headers + multiple categorized links).
 3. **Unknown**: Neither pattern matches.
 

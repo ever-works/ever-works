@@ -26,23 +26,23 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern                       | Choice                                                                          | Rationale                                                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| HTTP surface                  | NestJS controller `apps/api/src/template-catalog/template-catalog.controller.ts` | Same per-endpoint shape as the rest of the API; SwaggerUI tags applied                                     |
-| Auth                          | Global `AuthSessionGuard` (no `@Public()` on any endpoint)                      | Templates are per-user resources                                                                           |
-| Validation                    | `class-validator` DTOs in `dto/list-templates.dto.ts`                            | `@IsIn(['website','work'])` on `kind`; `@IsUrl({ protocols, require_protocol })` on URLs                   |
-| Persistence (catalog)         | TypeORM `templates` table, varchar PK (`built-in id` or `'custom-<uuid>'`)       | Single table for built-in + custom; `sourceType` discriminates; `ownerUserId` carries custom ownership     |
-| Persistence (default)         | TypeORM `user_template_preferences` table, `(userId, kind)` unique               | Per-kind default; falls back to env-driven `getDefaultWebsiteTemplateId()` when missing                    |
-| Built-in seed                 | `WebsiteTemplateConfig` array (`Classic` always, `Minimal` env-gated) → `upsert(template)` | Idempotent; runs on every boot; tolerates partial seed failure via try/catch wrap in `onModuleInit`      |
-| Discovery                     | `GitFacadeService.listRepositories({ owner, type: 'org' })` walked up to 50 × 100 with name filter `/template$/i` | TTL-gated (1 h via `WEBSITE_DISCOVERY_SYNC_TTL_MS`) so list endpoint stays fast in steady state           |
-| Id reconciliation             | `findBuiltInByRepositoryCoordinates` (canonical wins) → `repository.name.toLowerCase()` (discovered) | Avoids drift when an operator renames a discovered repo; deactivates duplicate discovered rows           |
-| Custom-template id scheme     | `'custom-' + randomUUID()`                                                       | Never collides with built-in ids; explicit prefix for fast scan in DB tooling                              |
-| URL parsing                   | `parseGitHubRepositoryUrl` from `@ever-works/contracts`                          | Single source of truth for canonical form (`https://github.com/<owner>/<repo>` w/ `.git` stripped)         |
-| Branch defaults               | `branch ??= 'main'`, `syncBranches ??= [branch]`                                 | Matches the most common GitHub default; users can override                                                 |
-| Update field policy           | `field === undefined ? existing : (field.trim() || existing|null)`               | Explicit-undefined preserves; explicit-empty clears (or preserves for `name`/`branch`)                     |
-| Fork flow                     | `gitFacade.getUser` + `getOrganizations` (parallel) → target check → `forkRepository` → upsert + `setDefault` | Personal-vs-organization detection by case-insensitive `login` match                                       |
-| Activity-log emission         | `activityLogService.log({...}).catch(() => {})` in controller                    | Fire-and-forget; mutations never fail because audit emission failed                                        |
-| Error vocabulary              | `BadRequestException` / `ConflictException` / `NotFoundException` w/ `{ status, message }` body | Matches the rest of the API's error envelope shape                                                         |
+| Concern                   | Choice                                                                                                            | Rationale                                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------- | ------ | -------------------------------------------------------------------------------------- |
+| HTTP surface              | NestJS controller `apps/api/src/template-catalog/template-catalog.controller.ts`                                  | Same per-endpoint shape as the rest of the API; SwaggerUI tags applied                                 |
+| Auth                      | Global `AuthSessionGuard` (no `@Public()` on any endpoint)                                                        | Templates are per-user resources                                                                       |
+| Validation                | `class-validator` DTOs in `dto/list-templates.dto.ts`                                                             | `@IsIn(['website','work'])` on `kind`; `@IsUrl({ protocols, require_protocol })` on URLs               |
+| Persistence (catalog)     | TypeORM `templates` table, varchar PK (`built-in id` or `'custom-<uuid>'`)                                        | Single table for built-in + custom; `sourceType` discriminates; `ownerUserId` carries custom ownership |
+| Persistence (default)     | TypeORM `user_template_preferences` table, `(userId, kind)` unique                                                | Per-kind default; falls back to env-driven `getDefaultWebsiteTemplateId()` when missing                |
+| Built-in seed             | `WebsiteTemplateConfig` array (`Classic` always, `Minimal` env-gated) → `upsert(template)`                        | Idempotent; runs on every boot; tolerates partial seed failure via try/catch wrap in `onModuleInit`    |
+| Discovery                 | `GitFacadeService.listRepositories({ owner, type: 'org' })` walked up to 50 × 100 with name filter `/template$/i` | TTL-gated (1 h via `WEBSITE_DISCOVERY_SYNC_TTL_MS`) so list endpoint stays fast in steady state        |
+| Id reconciliation         | `findBuiltInByRepositoryCoordinates` (canonical wins) → `repository.name.toLowerCase()` (discovered)              | Avoids drift when an operator renames a discovered repo; deactivates duplicate discovered rows         |
+| Custom-template id scheme | `'custom-' + randomUUID()`                                                                                        | Never collides with built-in ids; explicit prefix for fast scan in DB tooling                          |
+| URL parsing               | `parseGitHubRepositoryUrl` from `@ever-works/contracts`                                                           | Single source of truth for canonical form (`https://github.com/<owner>/<repo>` w/ `.git` stripped)     |
+| Branch defaults           | `branch ??= 'main'`, `syncBranches ??= [branch]`                                                                  | Matches the most common GitHub default; users can override                                             |
+| Update field policy       | `field === undefined ? existing : (field.trim()                                                                   |                                                                                                        | existing | null)` | Explicit-undefined preserves; explicit-empty clears (or preserves for `name`/`branch`) |
+| Fork flow                 | `gitFacade.getUser` + `getOrganizations` (parallel) → target check → `forkRepository` → upsert + `setDefault`     | Personal-vs-organization detection by case-insensitive `login` match                                   |
+| Activity-log emission     | `activityLogService.log({...}).catch(() => {})` in controller                                                     | Fire-and-forget; mutations never fail because audit emission failed                                    |
+| Error vocabulary          | `BadRequestException` / `ConflictException` / `NotFoundException` w/ `{ status, message }` body                   | Matches the rest of the API's error envelope shape                                                     |
 
 ## 3. Data Model
 
@@ -88,15 +88,15 @@ CREATE INDEX        user_template_pref_template_idx ON user_template_preferences
 
 ## 4. HTTP Surface
 
-| Method | Path                                          | Body / Query                                                                                              | Activity log emitted          | Notes                                                                                       |
-| ------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| GET    | `/api/templates`                              | `?kind=website|work`                                                                                      | —                             | Triggers discovery pass when stale (kind=website only)                                      |
-| POST   | `/api/templates/custom`                       | `{ kind, repositoryUrl, name?, description?, framework?, previewImageUrl?, branch?, betaBranch? }`        | `template.added`              | `parseGitHubRepositoryUrl` validates URL                                                    |
-| PUT    | `/api/templates/custom/:templateId`           | `{ kind, name?, description?, framework?, previewImageUrl?, branch?, betaBranch? }`                       | `template.updated`            | undefined → preserve, empty-string → clear/preserve per FR-10                                |
-| POST   | `/api/templates/custom/:templateId/archive`   | `{ kind }`                                                                                                | `template.archived`           | Soft delete via `isActive=false` + remove preference row                                     |
-| PUT    | `/api/templates/default`                      | `{ kind, templateId }`                                                                                    | `template.default_set`        | Refuses invisible/kind-mismatched template                                                  |
-| POST   | `/api/templates/fork`                         | `{ kind, templateId, targetOwner }`                                                                       | `template.forked` (only when `created`) | Built-in only; short-circuits to existing fork row when (kind,user,targetOwner,repoName) match |
-| POST   | `/api/templates/refresh`                      | `{ kind }`                                                                                                | —                             | Unconditional discovery (kind=website); falls through for kind=work                          |
+| Method | Path                                        | Body / Query                                                                                       | Activity log emitted                    | Notes                                                                                          |
+| ------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| GET    | `/api/templates`                            | `?kind=website                                                                                     | work`                                   | —                                                                                              | Triggers discovery pass when stale (kind=website only) |
+| POST   | `/api/templates/custom`                     | `{ kind, repositoryUrl, name?, description?, framework?, previewImageUrl?, branch?, betaBranch? }` | `template.added`                        | `parseGitHubRepositoryUrl` validates URL                                                       |
+| PUT    | `/api/templates/custom/:templateId`         | `{ kind, name?, description?, framework?, previewImageUrl?, branch?, betaBranch? }`                | `template.updated`                      | undefined → preserve, empty-string → clear/preserve per FR-10                                  |
+| POST   | `/api/templates/custom/:templateId/archive` | `{ kind }`                                                                                         | `template.archived`                     | Soft delete via `isActive=false` + remove preference row                                       |
+| PUT    | `/api/templates/default`                    | `{ kind, templateId }`                                                                             | `template.default_set`                  | Refuses invisible/kind-mismatched template                                                     |
+| POST   | `/api/templates/fork`                       | `{ kind, templateId, targetOwner }`                                                                | `template.forked` (only when `created`) | Built-in only; short-circuits to existing fork row when (kind,user,targetOwner,repoName) match |
+| POST   | `/api/templates/refresh`                    | `{ kind }`                                                                                         | —                                       | Unconditional discovery (kind=website); falls through for kind=work                            |
 
 ## 5. Discovery Algorithm (Website Kind)
 
@@ -219,16 +219,16 @@ forkTemplateForUser({ kind, templateId, targetOwner }, userId):
 
 ## 7. Configuration Surface
 
-| Knob                                              | Env var                                  | Default                              | Used by                                                       |
-| ------------------------------------------------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------------------------- |
-| `config.websiteTemplate.getCatalogOrganization()` | `WEBSITE_TEMPLATE_CATALOG_ORG`           | `'ever-works'`                       | Discovery owner filter                                        |
-| `config.websiteTemplate.getDefaultTemplateId()`   | `WEBSITE_TEMPLATE_DEFAULT_ID`            | `'classic'`                          | `getDefaultWebsiteTemplateId` fallback                        |
-| `config.websiteTemplate.getBetaBranch()`          | `WEBSITE_TEMPLATE_BETA_BRANCH`           | `'stage'`                            | `Classic` template `betaBranch`                               |
-| `config.websiteTemplate.getMinimalOwner()`        | `WEBSITE_TEMPLATE_MINIMAL_OWNER`         | `'ever-works'`                       | `Minimal` template owner (only when minimal repo set)         |
-| `config.websiteTemplate.getMinimalRepo()`         | `WEBSITE_TEMPLATE_MINIMAL_REPO`          | unset (omitted from seed when unset) | `Minimal` template repo                                       |
-| `config.websiteTemplate.getMinimalBranch()`       | `WEBSITE_TEMPLATE_MINIMAL_BRANCH`        | `'main'`                             | `Minimal` template branch                                     |
-| `config.websiteTemplate.getMinimalBetaBranch()`   | `WEBSITE_TEMPLATE_MINIMAL_BETA_BRANCH`   | `null`                               | `Minimal` template beta branch                                |
-| `WEBSITE_DISCOVERY_SYNC_TTL_MS` (constant)        | — (in-code, 1 h)                          | `1000 * 60 * 60`                     | Discovery freshness gate                                      |
+| Knob                                              | Env var                                | Default                              | Used by                                               |
+| ------------------------------------------------- | -------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `config.websiteTemplate.getCatalogOrganization()` | `WEBSITE_TEMPLATE_CATALOG_ORG`         | `'ever-works'`                       | Discovery owner filter                                |
+| `config.websiteTemplate.getDefaultTemplateId()`   | `WEBSITE_TEMPLATE_DEFAULT_ID`          | `'classic'`                          | `getDefaultWebsiteTemplateId` fallback                |
+| `config.websiteTemplate.getBetaBranch()`          | `WEBSITE_TEMPLATE_BETA_BRANCH`         | `'stage'`                            | `Classic` template `betaBranch`                       |
+| `config.websiteTemplate.getMinimalOwner()`        | `WEBSITE_TEMPLATE_MINIMAL_OWNER`       | `'ever-works'`                       | `Minimal` template owner (only when minimal repo set) |
+| `config.websiteTemplate.getMinimalRepo()`         | `WEBSITE_TEMPLATE_MINIMAL_REPO`        | unset (omitted from seed when unset) | `Minimal` template repo                               |
+| `config.websiteTemplate.getMinimalBranch()`       | `WEBSITE_TEMPLATE_MINIMAL_BRANCH`      | `'main'`                             | `Minimal` template branch                             |
+| `config.websiteTemplate.getMinimalBetaBranch()`   | `WEBSITE_TEMPLATE_MINIMAL_BETA_BRANCH` | `null`                               | `Minimal` template beta branch                        |
+| `WEBSITE_DISCOVERY_SYNC_TTL_MS` (constant)        | — (in-code, 1 h)                       | `1000 * 60 * 60`                     | Discovery freshness gate                              |
 
 ## 8. Module Wiring
 
@@ -236,9 +236,9 @@ forkTemplateForUser({ kind, templateId, targetOwner }, userId):
 
 ```ts
 @Module({
-    imports: [DatabaseModule, GitFacadeModule, /* WorkRepository deps */],
-    providers: [TemplateCatalogService],
-    exports: [TemplateCatalogService],
+	imports: [DatabaseModule, GitFacadeModule /* WorkRepository deps */],
+	providers: [TemplateCatalogService],
+	exports: [TemplateCatalogService]
 })
 export class TemplateCatalogModule {}
 ```
@@ -247,8 +247,8 @@ export class TemplateCatalogModule {}
 
 ```ts
 @Module({
-    imports: [AgentTemplateCatalogModule, ActivityLogModule],
-    controllers: [TemplateCatalogController],
+	imports: [AgentTemplateCatalogModule, ActivityLogModule],
+	controllers: [TemplateCatalogController]
 })
 export class TemplateCatalogModule {}
 ```
@@ -258,21 +258,21 @@ export class TemplateCatalogModule {}
 
 ## 9. Test Surface
 
-| Layer       | File                                                                                            | What it pins                                                                                                                                                                |
-| ----------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Controller  | `apps/api/src/template-catalog/template-catalog.controller.spec.ts`                             | Each of the 7 endpoints' positional service args, response envelope, activity-log emission shape (`actionType` / `action` / `summary` / `metadata`), and `result.created` gate on `template.forked`. |
-| Service     | `packages/agent/src/template-catalog/template-catalog.service.spec.ts`                          | `seedBuiltInTemplates` upsert calls, `listTemplatesForUser` ordering + discovery gate, `addCustomTemplate` URL/duplicate/defaults, `updateCustomTemplateForUser` undefined-vs-empty rules, `archiveCustomTemplateForUser` usage / inheriting-default refusal copy, `setDefaultTemplateForUser` 404 + upsert, `forkTemplateForUser` six error classes + short-circuit + happy path metadata, `getDefaultTemplateIdForUser` four-level resolution, discovery dedup + canonical-vs-discovered id reconciliation. |
+| Layer      | File                                                                   | What it pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Controller | `apps/api/src/template-catalog/template-catalog.controller.spec.ts`    | Each of the 7 endpoints' positional service args, response envelope, activity-log emission shape (`actionType` / `action` / `summary` / `metadata`), and `result.created` gate on `template.forked`.                                                                                                                                                                                                                                                                                                          |
+| Service    | `packages/agent/src/template-catalog/template-catalog.service.spec.ts` | `seedBuiltInTemplates` upsert calls, `listTemplatesForUser` ordering + discovery gate, `addCustomTemplate` URL/duplicate/defaults, `updateCustomTemplateForUser` undefined-vs-empty rules, `archiveCustomTemplateForUser` usage / inheriting-default refusal copy, `setDefaultTemplateForUser` 404 + upsert, `forkTemplateForUser` six error classes + short-circuit + happy path metadata, `getDefaultTemplateIdForUser` four-level resolution, discovery dedup + canonical-vs-discovered id reconciliation. |
 
 ## 10. Risks & Trade-offs
 
-| Risk                                                                                       | Mitigation                                                                                                                                                                                                                                              |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Discovery walk burns GitHub rate budget for every cold list call                           | 1-hour TTL gate via `hasRecentDiscoveredBuiltInTemplates` keeps steady-state at zero discovery calls; the 50-page cap protects against unbounded walks.                                                                                                  |
-| Discovered template id collides with an unrelated built-in id                              | Skip-with-warn-log path in `syncDiscoveredWebsiteTemplatesForUser`; the canonical row by coordinates always wins.                                                                                                                                       |
-| `addCustomTemplate` accepts unreachable / private URLs                                     | OQ-3; documented. Today the failure surfaces in the website-generator's clone path, not the catalog.                                                                                                                                                    |
-| `getDefaultTemplateIdForUser` falls back to seed default even after the user archives it  | OQ-4; documented. Low-impact because users almost never archive the seed default.                                                                                                                                                                       |
-| Fork flow hard-codes `providerId = 'github'`                                              | OQ-1; acceptable today since GitHub is the only git-provider plugin. When a second lands, the fork flow needs a per-template `providerId` field on the source row.                                                                                       |
-| Re-fork against a new target owner produces an entirely separate row                       | Intentional: re-forking into a different org/account is treated as a new template the user owns; the existing-fork short-circuit only triggers when `(kind, userId, targetOwner, repositoryName)` match exactly.                                          |
+| Risk                                                                                     | Mitigation                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discovery walk burns GitHub rate budget for every cold list call                         | 1-hour TTL gate via `hasRecentDiscoveredBuiltInTemplates` keeps steady-state at zero discovery calls; the 50-page cap protects against unbounded walks.                                                          |
+| Discovered template id collides with an unrelated built-in id                            | Skip-with-warn-log path in `syncDiscoveredWebsiteTemplatesForUser`; the canonical row by coordinates always wins.                                                                                                |
+| `addCustomTemplate` accepts unreachable / private URLs                                   | OQ-3; documented. Today the failure surfaces in the website-generator's clone path, not the catalog.                                                                                                             |
+| `getDefaultTemplateIdForUser` falls back to seed default even after the user archives it | OQ-4; documented. Low-impact because users almost never archive the seed default.                                                                                                                                |
+| Fork flow hard-codes `providerId = 'github'`                                             | OQ-1; acceptable today since GitHub is the only git-provider plugin. When a second lands, the fork flow needs a per-template `providerId` field on the source row.                                               |
+| Re-fork against a new target owner produces an entirely separate row                     | Intentional: re-forking into a different org/account is treated as a new template the user owns; the existing-fork short-circuit only triggers when `(kind, userId, targetOwner, repositoryName)` match exactly. |
 
 ## 11. Migration & Forward-Only Schema
 

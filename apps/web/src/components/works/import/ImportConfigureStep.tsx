@@ -428,7 +428,7 @@ export function ImportConfigureStep({
                 </div>
             )}
 
-            {/* works.yml restore option */}
+            {/* .works/works.yml restore option */}
             {canToggleWorksConfigRestore && (
                 <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <div>

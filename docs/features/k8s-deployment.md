@@ -24,7 +24,7 @@ Use the Kubernetes provider when you need to host on your own infrastructure —
 ## How it works
 
 1. **Configure once** — paste your `kubeconfig` and registry credentials in the Kubernetes plugin settings.
-2. **Pick the provider** — set `deployProvider: k8s` on a work (Settings → Deployment, or `works.yml`).
+2. **Pick the provider** — set `deployProvider: k8s` on a work (Settings → Deployment, or `.works/works.yml`).
 3. **Deploy** — the platform builds a container image of your generated website, pushes it to your registry with a deterministic tag, and applies the manifests to your namespace using server-side apply.
 4. **Status** — the deployment facade polls the rollout state. Once the `Deployment` is `Available`, your work is reported as `ready`.
 5. **Redeploy** — subsequent deploys are rolling updates of the same `Deployment`, so previous versions stay in the rollout history.
@@ -110,13 +110,13 @@ kubectl create rolebinding ever-works \
 
 ## Pick the provider for a work
 
-Either via the dashboard (Work → Settings → Deployment → Provider → **Kubernetes**) or in your work's `works.yml`:
+Either via the dashboard (Work → Settings → Deployment → Provider → **Kubernetes**) or in your work's `.works/works.yml`:
 
 ```yaml
 deployProvider: k8s
 ```
 
-The same `deployProvider` field works for any deploy plugin (`vercel`, `k8s`, future providers). When `works.yml` and the dashboard disagree, the data repo wins (Ever Works treats the data repo as the source of truth) and a `deploy_provider_conflict` activity-log entry tells you about the change.
+The same `deployProvider` field works for any deploy plugin (`vercel`, `k8s`, future providers). When `.works/works.yml` and the dashboard disagree, the data repo wins (Ever Works treats the data repo as the source of truth) and a `deploy_provider_conflict` activity-log entry tells you about the change.
 
 Once selected, the **Deploy** button on the work runs through the Kubernetes plugin instead of Vercel.
 

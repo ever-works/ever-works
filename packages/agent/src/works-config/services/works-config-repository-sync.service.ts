@@ -31,7 +31,7 @@ export class WorksConfigRepositorySyncService {
         const work = await this.workRepository.findById(options.workId);
         if (!work?.user) {
             this.logger.warn(
-                `Skipping works.yml sync for ${options.workId}: work or owner was not found`,
+                `Skipping .works/works.yml sync for ${options.workId}: work or owner was not found`,
             );
             return;
         }
@@ -55,7 +55,7 @@ export class WorksConfigRepositorySyncService {
 
             const changes = await this.gitFacade.getStatus(work.gitProvider, dataRepository.dir);
             if (changes.length === 0) {
-                this.logger.debug(`works.yml already up to date for ${owner}/${repo}`);
+                this.logger.debug(`.works/works.yml already up to date for ${owner}/${repo}`);
                 return;
             }
 
@@ -63,7 +63,7 @@ export class WorksConfigRepositorySyncService {
             await this.gitFacade.commit(
                 work.gitProvider,
                 dataRepository.dir,
-                `sync works.yml after ${options.reason}`,
+                `sync .works/works.yml after ${options.reason}`,
                 committer,
             );
             await this.gitFacade.pull(dest, committer, {
@@ -74,7 +74,9 @@ export class WorksConfigRepositorySyncService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
-            this.logger.warn(`Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`);
+            this.logger.warn(
+                `Failed to sync .works/works.yml for ${owner}/${repo}: ${errorMessage}`,
+            );
             this.eventEmitter?.emit(
                 WorksConfigSyncFailedEvent.EVENT_NAME,
                 new WorksConfigSyncFailedEvent(
@@ -96,7 +98,9 @@ export class WorksConfigRepositorySyncService {
                 throw error;
             }
 
-            this.logger.warn('works.yml sync push was rejected as non-fast-forward; force pushing');
+            this.logger.warn(
+                '.works/works.yml sync push was rejected as non-fast-forward; force pushing',
+            );
             await this.gitFacade.push({ dir, force: true }, { userId, providerId });
         }
     }

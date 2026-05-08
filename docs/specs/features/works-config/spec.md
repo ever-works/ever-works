@@ -1,4 +1,4 @@
-# Feature Specification: `works.yml` Source-Controlled Work Configuration
+# Feature Specification: `.works/works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Branch**: `feat/works-yml-onboarding` (merged via PR #395)
@@ -21,19 +21,19 @@ existing repo and writes it back after every successful generation.
 
 ### 2.1 Primary scenarios
 
-- **Given** I have an existing data repo with a hand-authored `works.yml`,
+- **Given** I have an existing data repo with a hand-authored `.works/works.yml`,
   **when** I import it into the platform, **then** the import flow is
   pre-filled with the values from the file (name, prompt, model, providers,
   schedule), so I don't need to re-enter them.
 - **Given** I generate a work through the platform UI, **when**
-  generation completes successfully, **then** a fresh `works.yml` is
+  generation completes successfully, **then** a fresh `.works/works.yml` is
   committed to the data repo capturing the work's current
   configuration.
-- **Given** I edit `works.yml` directly in the data repo and trigger an
+- **Given** I edit `.works/works.yml` directly in the data repo and trigger an
   import, **when** the import runs, **then** the updated values become the
   work's new config.
 - **Given** I clear a field (model, prompt) in the platform UI, **when** the
-  next generation runs, **then** the field is removed from `works.yml`
+  next generation runs, **then** the field is removed from `.works/works.yml`
   rather than left as an empty value.
 
 ### 2.2 Edge cases & failures
@@ -42,10 +42,10 @@ existing repo and writes it back after every successful generation.
   paths, **when** the platform attempts to read it, **then** the import
   surfaces an `Invalid works config at <path>: <reason>` error and the
   user can fix and retry.
-- **Given** `works.yml` references a plugin id that's not installed, **when**
+- **Given** `.works/works.yml` references a plugin id that's not installed, **when**
   the import is confirmed, **then** the import fails with a clear "plugin
   not installed" error before any database writes happen.
-- **Given** the data repo has unknown top-level fields in `works.yml`,
+- **Given** the data repo has unknown top-level fields in `.works/works.yml`,
   **when** the platform writes back after generation, **then** unknown
   fields are preserved on round-trip.
 - **Given** the post-generation sync fails (data repo unreachable, push
@@ -55,11 +55,11 @@ existing repo and writes it back after every successful generation.
 
 ## 3. Functional Requirements
 
-- **FR-1** The system MUST attempt to read `works.yml` from the data repo root.
-- **FR-2** The system MUST parse a successfully-read `works.yml` into a
+- **FR-1** The system MUST attempt to read `.works/works.yml` from the data repo root.
+- **FR-2** The system MUST parse a successfully-read `.works/works.yml` into a
   typed config and surface its values in the import flow's UI fields.
 - **FR-3** The system MUST validate plugin id references in
-  `works.yml.providers.{ai,search,screenshot,contentExtractor,pipeline}`
+  `.works/works.yml.providers.{ai,search,screenshot,contentExtractor,pipeline}`
   against the installed plugin registry before allowing import to complete.
 - **FR-4** The system MUST accept aliased field names: `prompt` for
   `initial_prompt`, `title` for `name`, `websiteRepo` /
@@ -69,7 +69,7 @@ existing repo and writes it back after every successful generation.
   string (`"weekly"`) or an object (`{enabled: true, cadence: "weekly"}`),
   plus alternate keys `frequency` / `interval`.
 - **FR-6** The system MUST treat `schedule.enabled: false` as "no schedule".
-- **FR-7** After every successful generation the system MUST write `works.yml`
+- **FR-7** After every successful generation the system MUST write `.works/works.yml`
   at the data-repository root capturing the work's current
   configuration.
 - **FR-8** The writer MUST preserve unknown top-level fields present in the
@@ -88,13 +88,13 @@ existing repo and writes it back after every successful generation.
 
 ## 4. Non-Functional Requirements
 
-- **Performance**: parsing a `works.yml` is O(file size); the pre-fill step
+- **Performance**: parsing a `.works/works.yml` is O(file size); the pre-fill step
   must not measurably slow the import flow (target ≤ 100 ms for files
   under 16 KB).
 - **Reliability**: post-generation sync uses the same git facade used by the
   rest of the system; failures are surfaced in the activity log within
   one generation cycle.
-- **Security & privacy**: `works.yml` is committed to the user's repo, so
+- **Security & privacy**: `.works/works.yml` is committed to the user's repo, so
   it MUST NOT contain secrets. Plugin **ids** are committed; plugin
   **credentials** never are.
 - **Observability**: parse errors and sync failures appear in the activity
@@ -116,20 +116,20 @@ existing repo and writes it back after every successful generation.
 
 - Two-way live sync (the file is written only at generation boundaries, not on
   every UI edit).
-- Storing secrets in `works.yml` (intentionally — secrets stay in the
+- Storing secrets in `.works/works.yml` (intentionally — secrets stay in the
   encrypted plugin-settings store).
-- Separate per-environment overrides inside `works.yml` (environments
+- Separate per-environment overrides inside `.works/works.yml` (environments
   differ via the platform's settings cascade, not the file).
 
 ## 7. Acceptance Criteria
 
-- [x] Importing a repo that has `works.yml` pre-fills the import form with
+- [x] Importing a repo that has `.works/works.yml` pre-fills the import form with
       parsed values.
 - [x] All four candidate file paths are tried in priority order.
 - [x] Importing a repo with malformed YAML surfaces a parse error with the
       file path.
 - [x] Plugin id validation rejects unknown ids before the import completes.
-- [x] After a successful generation, `works.yml` is committed to the data
+- [x] After a successful generation, `.works/works.yml` is committed to the data
       repo with the work's current config.
 - [x] Round-tripping a file with unknown top-level fields preserves them.
 - [x] Clearing a field in the UI removes the corresponding key from the file
@@ -147,7 +147,7 @@ _None — feature is shipped and stable on `develop`._
 ## 9. Constitution Gates
 
 - [x] **Principle I (Plugin-first)**: N/A — this is a core feature, not a
-      plugin integration. Plugin ids referenced by `works.yml` are validated
+      plugin integration. Plugin ids referenced by `.works/works.yml` are validated
       against the registry.
 - [x] **Principle II (Capability-driven)**: `providers.{ai,search,…}` keys
       map to capabilities, not to specific plugin internals.
@@ -160,7 +160,7 @@ _None — feature is shipped and stable on `develop`._
       operates on existing entities.
 - [x] **Principle VI (Tests)**: unit tests under
       `packages/agent/src/works-config/__tests__/`.
-- [x] **Principle VII (Secret hygiene)**: `works.yml` is explicitly limited
+- [x] **Principle VII (Secret hygiene)**: `.works/works.yml` is explicitly limited
       to non-secret config; secrets stay in the encrypted plugin-settings
       store.
 - [x] **Principle VIII (Plugin counts)**: not affected.

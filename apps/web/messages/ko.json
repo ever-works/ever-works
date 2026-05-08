@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "동기화 설정 업데이트 실패",
                 "syncDisabled": "동기화 비활성화됨",
                 "worksConfig": {
-                    "imported": "works.yml에서 가져옴",
+                    "imported": ".works/works.yml에서 가져옴",
                     "applied": "적용됨: {value}",
                     "enabled": "활성화됨",
                     "disabled": "비활성화됨",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "데이터 저장소",
                         "awesomeReadme": "Awesome README",
                         "linkExisting": "연결된 기존 저장소",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "일반 설정",
@@ -2349,7 +2349,7 @@
                     "description": "소스 저장소에서 업데이트 자동 가져오기."
                 },
                 "worksConfigRestore": {
-                    "title": "works.yml 설정 복원",
+                    "title": ".works/works.yml 설정 복원",
                     "description": "이 저장소의 AI 제공자, 모델, 일정 및 관련 저장소 설정을 적용합니다."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "지원 저장소 형식",
                     "dataRepo": {
                         "title": "데이터 저장소",
-                        "description": "works.yml과 data/ 폴더 구조를 가진 저장소"
+                        "description": ".works/works.yml과 data/ 폴더 구조를 가진 저장소"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 목록",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "데이터 Repo",
                     "awesomeReadme": "Awesome 목록",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "항목",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "저장소 연결"
                 },
                 "detectionFailed": "형식을 자동 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요.",
-                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
+                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 .works/works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
                 "errors": {
                     "urlRequired": "GitHub 저장소 URL을 입력하세요",
                     "unsupportedFormat": "이 저장소 형식을 지원하지 않습니다. 데이터 저장소 또는 Awesome 목록 형식을 사용하세요.",

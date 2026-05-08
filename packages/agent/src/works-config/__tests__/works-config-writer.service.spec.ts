@@ -6,6 +6,15 @@ import { WorksConfigService } from '../services/works-config.service';
 import { WorksConfigWriterService } from '../services/works-config-writer.service';
 
 describe('WorksConfigWriterService', () => {
+    const writeExistingConfig = async (repoDir: string, content: string | string[]) => {
+        await fs.mkdir(path.join(repoDir, '.works'), { recursive: true });
+        await fs.writeFile(
+            path.join(repoDir, '.works/works.yml'),
+            Array.isArray(content) ? content.join('\n') : content,
+            'utf-8',
+        );
+    };
+
     const createWork = () =>
         ({
             name: 'Compare Cloud Pricing',
@@ -19,7 +28,7 @@ describe('WorksConfigWriterService', () => {
             scheduledCadence: 'weekly',
         }) as any;
 
-    it('writes generation state to works.yml without using data config parsing', async () => {
+    it('writes generation state to .works/works.yml without using data config parsing', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
@@ -37,7 +46,9 @@ describe('WorksConfigWriterService', () => {
             },
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written).toMatchObject({
             name: 'Compare Cloud Pricing',
@@ -57,13 +68,13 @@ describe('WorksConfigWriterService', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('preserves unknown existing works.yml fields while updating managed fields', async () => {
+    it('preserves unknown existing .works/works.yml fields while updating managed fields', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
-        await fs.writeFile(
-            path.join(repoDir, 'works.yml'),
-            ['custom_field: keep-me', 'initial_prompt: Old prompt', ''].join('\n'),
-            'utf-8',
-        );
+        await writeExistingConfig(repoDir, [
+            'custom_field: keep-me',
+            'initial_prompt: Old prompt',
+            '',
+        ]);
 
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
@@ -75,7 +86,9 @@ describe('WorksConfigWriterService', () => {
             },
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written.custom_field).toBe('keep-me');
         expect(written.initial_prompt).toBe('New prompt');
@@ -85,19 +98,15 @@ describe('WorksConfigWriterService', () => {
 
     it('preserves existing managed fields when a sync does not provide replacements', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
-        await fs.writeFile(
-            path.join(repoDir, 'works.yml'),
-            [
-                'initial_prompt: Existing prompt',
-                'model: openai/gpt-5.1',
-                'providers:',
-                '  ai: openai',
-                '  pipeline: agent-pipeline',
-                'website_repo: ever-works/custom-website',
-                '',
-            ].join('\n'),
-            'utf-8',
-        );
+        await writeExistingConfig(repoDir, [
+            'initial_prompt: Existing prompt',
+            'model: openai/gpt-5.1',
+            'providers:',
+            '  ai: openai',
+            '  pipeline: agent-pipeline',
+            'website_repo: ever-works/custom-website',
+            '',
+        ]);
 
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
@@ -106,7 +115,9 @@ describe('WorksConfigWriterService', () => {
             dataRepository: { dir: repoDir } as any,
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written).toMatchObject({
             initial_prompt: 'Existing prompt',
@@ -123,11 +134,12 @@ describe('WorksConfigWriterService', () => {
 
     it('removes stale providers when a projection explicitly clears them', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
-        await fs.writeFile(
-            path.join(repoDir, 'works.yml'),
-            ['providers:', '  ai: openai', '  pipeline: agent-pipeline', ''].join('\n'),
-            'utf-8',
-        );
+        await writeExistingConfig(repoDir, [
+            'providers:',
+            '  ai: openai',
+            '  pipeline: agent-pipeline',
+            '',
+        ]);
 
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
@@ -139,7 +151,9 @@ describe('WorksConfigWriterService', () => {
             },
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written.providers).toBeUndefined();
 
@@ -148,11 +162,7 @@ describe('WorksConfigWriterService', () => {
 
     it('removes stale model when a projection explicitly clears it', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
-        await fs.writeFile(
-            path.join(repoDir, 'works.yml'),
-            ['model: openai/gpt-5.1', ''].join('\n'),
-            'utf-8',
-        );
+        await writeExistingConfig(repoDir, ['model: openai/gpt-5.1', '']);
 
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
@@ -164,14 +174,16 @@ describe('WorksConfigWriterService', () => {
             },
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written.model).toBeUndefined();
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('writes imported works.yml-only state before schedule is applied to the work', async () => {
+    it('writes imported .works/works.yml-only state before schedule is applied to the work', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
         const work = {
             ...createWork(),
@@ -194,7 +206,9 @@ describe('WorksConfigWriterService', () => {
             },
         });
 
-        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+        const written = yaml.parse(
+            await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+        );
 
         expect(written).toMatchObject({
             initial_prompt: 'Imported prompt',
@@ -219,19 +233,17 @@ describe('WorksConfigWriterService', () => {
                 request: { deployProvider: 'k8s' },
             });
 
-            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
             expect(written.deployProvider).toBe('k8s');
 
             await fs.rm(repoDir, { recursive: true, force: true });
         });
 
-        it('preserves existing works.yml deployProvider when no override', async () => {
+        it('preserves existing .works/works.yml deployProvider when no override', async () => {
             const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
-            await fs.writeFile(
-                path.join(repoDir, 'works.yml'),
-                'deployProvider: vercel\n',
-                'utf-8',
-            );
+            await writeExistingConfig(repoDir, 'deployProvider: vercel\n');
 
             const service = new WorksConfigWriterService(new WorksConfigService({} as any));
             await service.writeToDataRepository({
@@ -239,7 +251,9 @@ describe('WorksConfigWriterService', () => {
                 dataRepository: { dir: repoDir } as any,
             });
 
-            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
             expect(written.deployProvider).toBe('vercel');
 
             await fs.rm(repoDir, { recursive: true, force: true });
@@ -255,7 +269,9 @@ describe('WorksConfigWriterService', () => {
                 dataRepository: { dir: repoDir } as any,
             });
 
-            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
             expect(written.deployProvider).toBe('k8s');
 
             await fs.rm(repoDir, { recursive: true, force: true });
@@ -263,11 +279,7 @@ describe('WorksConfigWriterService', () => {
 
         it('clears deployProvider when request explicitly passes null', async () => {
             const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
-            await fs.writeFile(
-                path.join(repoDir, 'works.yml'),
-                'deployProvider: vercel\n',
-                'utf-8',
-            );
+            await writeExistingConfig(repoDir, 'deployProvider: vercel\n');
 
             const service = new WorksConfigWriterService(new WorksConfigService({} as any));
             await service.writeToDataRepository({
@@ -276,13 +288,15 @@ describe('WorksConfigWriterService', () => {
                 request: { deployProvider: null },
             });
 
-            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
             expect(written.deployProvider).toBeUndefined();
 
             await fs.rm(repoDir, { recursive: true, force: true });
         });
 
-        it('imported works.yml deployProvider beats the work entity value', async () => {
+        it('imported .works/works.yml deployProvider beats the work entity value', async () => {
             const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
             const service = new WorksConfigWriterService(new WorksConfigService({} as any));
             const work = { ...createWork(), deployProvider: 'vercel' };
@@ -293,7 +307,9 @@ describe('WorksConfigWriterService', () => {
                 importedWorksConfig: { deployProvider: 'k8s' } as any,
             });
 
-            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            const written = yaml.parse(
+                await fs.readFile(path.join(repoDir, '.works/works.yml'), 'utf-8'),
+            );
             // Provider-agnostic: imported value wins over work entity, just
             // like other works-config fields. (Spec FR-18 — data repo is
             // source of truth.)

@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "सिंक सेटिंग्स अपडेट करने में विफल",
                 "syncDisabled": "सिंक अक्षम",
                 "worksConfig": {
-                    "imported": "works.yml से आयातित",
+                    "imported": ".works/works.yml से आयातित",
                     "applied": "लागू: {value}",
                     "enabled": "सक्षम",
                     "disabled": "अक्षम",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "डेटा रिपॉजिटरी",
                         "awesomeReadme": "शानदार README",
                         "linkExisting": "लिंक की गई मौजूदा रिपॉजिटरीज़",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "सामान्य सेटिंग्स",
@@ -2349,7 +2349,7 @@
                     "description": "स्रोत रिपॉजिटरी से अपडेट स्वचालित रूप से लें।"
                 },
                 "worksConfigRestore": {
-                    "title": "works.yml सेटिंग पुनर्स्थापित करें",
+                    "title": ".works/works.yml सेटिंग पुनर्स्थापित करें",
                     "description": "इस रिपॉजिटरी से AI प्रदाता, मॉडल, शेड्यूल और संबंधित रिपॉजिटरी सेटिंग लागू करें।"
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "समर्थित रिपॉजिटरी प्रारूप",
                     "dataRepo": {
                         "title": "डेटा रिपॉजिटरी",
-                        "description": "works.yml और data/ फ़ोल्डर संरचना वाली रिपॉजिटरीज़"
+                        "description": ".works/works.yml और data/ फ़ोल्डर संरचना वाली रिपॉजिटरीज़"
                     },
                     "awesomeReadme": {
                         "title": "अद्भुत सूची",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "डेटा रिपो",
                     "awesomeReadme": "अद्भुत सूची",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "आइटम",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "रिपॉजिटरीज़ लिंक करें"
                 },
                 "detectionFailed": "हम प्रारूप का स्वचालित रूप से पता नहीं लगा सके। कृपया बताएँ कि इस रिपॉजिटरी को कैसे आयात करें।",
-                "detectionFailedMissingConfig": "कोई समर्थित कॉन्फ़िग़ नहीं मिला। रिपॉजिटरी में works.yml जोड़ें, या नीचे मैनुअल आयात प्रारूप चुनें।",
+                "detectionFailedMissingConfig": "कोई समर्थित कॉन्फ़िग़ नहीं मिला। रिपॉजिटरी में .works/works.yml जोड़ें, या नीचे मैनुअल आयात प्रारूप चुनें।",
                 "errors": {
                     "urlRequired": "कृपया GitHub रिपॉजिटरी URL दर्ज करें",
                     "unsupportedFormat": "यह रिपॉजिटरी प्रारूप समर्थित नहीं है। कृपया डेटा रिपॉजिटरी या अद्भुत सूची प्रारूप उपयोग करें।",

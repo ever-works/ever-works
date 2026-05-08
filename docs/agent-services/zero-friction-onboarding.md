@@ -20,7 +20,7 @@ manifest schema, see the feature spec under
 After one call:
 
 - An Ever Works account linked to your GitHub identity.
-- A new **Work** generated from your `works.yml` manifest.
+- A new **Work** generated from your `.works/works.yml` manifest.
 - A free subdomain: `<slug>.ever.works`.
 - A deployed directory site with `/llms.txt` and `/items.json` for
   downstream agents.
@@ -83,14 +83,14 @@ GET https://api.ever.works/.well-known/agent.json
 }
 ```
 
-| Field          | Type   | Required | Description                                                         |
-| -------------- | ------ | -------- | ------------------------------------------------------------------- |
-| `repo`         | string | yes      | HTTPS URL to the manifest repo. Must contain `works.yml` at root.   |
-| `email`        | string | no       | Contact channel. Optional but recommended for human reachability.   |
-| `agentId`      | string | no       | Opaque identifier for the agent's own bookkeeping. Up to 256 chars. |
-| `webhookUrl`   | string | no       | HTTPS URL for signed terminal-status callbacks.                     |
-| `subdomain`    | string | no       | DNS-safe slug; if taken, the platform allocates an alternative.     |
-| `agentPayment` | object | no       | Reserved for v2 paid plane. Ignored at v1.                          |
+| Field          | Type   | Required | Description                                                              |
+| -------------- | ------ | -------- | ------------------------------------------------------------------------ |
+| `repo`         | string | yes      | HTTPS URL to the manifest repo. Must contain `.works/works.yml` at root. |
+| `email`        | string | no       | Contact channel. Optional but recommended for human reachability.        |
+| `agentId`      | string | no       | Opaque identifier for the agent's own bookkeeping. Up to 256 chars.      |
+| `webhookUrl`   | string | no       | HTTPS URL for signed terminal-status callbacks.                          |
+| `subdomain`    | string | no       | DNS-safe slug; if taken, the platform allocates an alternative.          |
+| `agentPayment` | object | no       | Reserved for v2 paid plane. Ignored at v1.                               |
 
 ### Response — `202 Accepted`
 
@@ -114,7 +114,7 @@ Every error carries a `code` slug you can branch on:
 | 400    | `validation_error`                        | Body or header failed validation                                  |
 | 403    | `gh_repo_access_denied`                   | Token cannot read or write the named repo                         |
 | 409    | `repo_already_owned`                      | Repo previously onboarded by a different GitHub identity          |
-| 422    | `manifest_missing`                        | No `works.yml` at repo root                                       |
+| 422    | `manifest_missing`                        | No `.works/works.yml` at repo root                                |
 | 422    | `manifest_invalid`                        | Schema validation failed (per-field errors in body)               |
 | 422    | `unsupported_capability`                  | Pipeline / plugin in manifest is not registered                   |
 | 422    | `gh_insufficient_scope_for_repo_creation` | Manifest opts in to platform-managed repos, scope is insufficient |
@@ -191,7 +191,7 @@ a webhook server running.
 ## GitOps reconciliation
 
 After onboarding, push commits to the manifest repo to update the Work.
-On every push that changes `works.yml`, the platform reconciles and
+On every push that changes `.works/works.yml`, the platform reconciles and
 regenerates. No new API call required.
 
 ## Credential modes

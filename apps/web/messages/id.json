@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "Gagal memperbarui pengaturan sinkronisasi",
                 "syncDisabled": "Sinkronisasi Dinonaktifkan",
                 "worksConfig": {
-                    "imported": "Diimpor dari works.yml",
+                    "imported": "Diimpor dari .works/works.yml",
                     "applied": "Diterapkan: {value}",
                     "enabled": "diaktifkan",
                     "disabled": "dinonaktifkan",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "Repositori Data",
                         "awesomeReadme": "README Hebat",
                         "linkExisting": "Repositori Eksisting yang Ditautkan",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "Pengaturan Umum",
@@ -2349,7 +2349,7 @@
                     "description": "Tarik pembaruan secara otomatis dari repositori sumber."
                 },
                 "worksConfigRestore": {
-                    "title": "Pulihkan pengaturan works.yml",
+                    "title": "Pulihkan pengaturan .works/works.yml",
                     "description": "Terapkan penyedia AI, model, jadwal, dan pengaturan repositori terkait dari repositori ini."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "Format Repositori yang Didukung",
                     "dataRepo": {
                         "title": "Repositori Data",
-                        "description": "Repositori dengan works.yml dan struktur folder data/"
+                        "description": "Repositori dengan .works/works.yml dan struktur folder data/"
                     },
                     "awesomeReadme": {
                         "title": "Daftar Hebat",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "Repo Data",
                     "awesomeReadme": "Daftar Hebat",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "item",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Hubungkan repositori"
                 },
                 "detectionFailed": "Kami tidak dapat mendeteksi format secara otomatis. Harap pilih cara mengimpor repositori ini.",
-                "detectionFailedMissingConfig": "Tidak ditemukan konfigurasi yang didukung. Tambahkan works.yml ke repositori, atau pilih format impor manual di bawah ini.",
+                "detectionFailedMissingConfig": "Tidak ditemukan konfigurasi yang didukung. Tambahkan .works/works.yml ke repositori, atau pilih format impor manual di bawah ini.",
                 "errors": {
                     "urlRequired": "Harap masukkan URL repositori GitHub",
                     "unsupportedFormat": "Format repositori ini tidak didukung. Harap gunakan format Repositori Data atau Daftar Hebat.",

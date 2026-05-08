@@ -36,7 +36,7 @@ export class OnboardingController {
         description:
             'Validates the GitHub credential against the named repo, creates an Ever Works ' +
             "account if one does not yet exist for the agent's GitHub identity, parses the " +
-            'works.yml manifest from the repo, and queues a Work for generation. Returns 202 ' +
+            '.works/works.yml manifest from the repo, and queues a Work for generation. Returns 202 ' +
             'with a status URL and the assigned subdomain. Subsequent calls with the same ' +
             '(github_identity, repo) return the same onboardingId without duplicating.',
     })

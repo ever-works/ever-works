@@ -204,7 +204,7 @@ spec:
         expect(git.getFileContent).toHaveBeenCalledWith(
             'octocat',
             'awesome-mcp',
-            'works.yml',
+            '.works/works.yml',
             expect.objectContaining({ token: 'token-aaaa' }),
         );
         expect(manifest.parseAndValidate).toHaveBeenCalled();
@@ -319,7 +319,7 @@ spec:
         ).rejects.toMatchObject({ response: { code: 'gh_repo_access_denied' } });
     });
 
-    it('rejects with manifest_missing when works.yml is not present', async () => {
+    it('rejects with manifest_missing when .works/works.yml is not present', async () => {
         const repo = fakeRepository();
         repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         const git = fakeGitFacade();
@@ -359,7 +359,7 @@ spec:
         });
     });
 
-    it('rejects when only works.yaml is present', async () => {
+    it('rejects when only .works/works.yml is present', async () => {
         const repo = fakeRepository();
         repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         const git = fakeGitFacade();
@@ -374,7 +374,7 @@ spec:
         expect(git.getFileContent).toHaveBeenCalledWith(
             'octocat',
             'awesome-mcp',
-            'works.yml',
+            '.works/works.yml',
             expect.anything(),
         );
     });

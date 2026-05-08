@@ -258,7 +258,7 @@ comparisons/
     netlify--vercel-extended.md      # Extended analysis (if enabled)
 ```
 
-The `works.yml` metadata tracks comparison state:
+The `.works/works.yml` metadata tracks comparison state:
 
 ```yaml
 metadata:

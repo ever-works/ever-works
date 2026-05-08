@@ -1815,7 +1815,7 @@
                 "syncUpdateFailed": "נכשל בעדכון הגדרות הסנכרון",
                 "syncDisabled": "סנכרון מושבת",
                 "worksConfig": {
-                    "imported": "מיובא מ-works.yml",
+                    "imported": "מיובא מ-.works/works.yml",
                     "applied": "מיושם: {value}",
                     "enabled": "מופעל",
                     "disabled": "לא פעיל",
@@ -1832,7 +1832,7 @@
                         "dataRepo": "מאגר נתונים",
                         "awesomeReadme": "README מדהים",
                         "linkExisting": "מאגרים קיימים מקושרים",
-                        "worksConfig": "works.yml"
+                        "worksConfig": ".works/works.yml"
                     }
                 },
                 "generalSettings": "הגדרות כלליות",
@@ -2349,7 +2349,7 @@
                     "description": "משוך עדכונים אוטומטית ממאגר המקור."
                 },
                 "worksConfigRestore": {
-                    "title": "שחזר הגדרות works.yml",
+                    "title": "שחזר הגדרות .works/works.yml",
                     "description": "החל ספק AI, מודל, לוח זמנים ומאגרים קשורים ממאגר זה."
                 },
                 "sourceMethod": {
@@ -2369,7 +2369,7 @@
                     "title": "פורמטי מאגרים נתמכים",
                     "dataRepo": {
                         "title": "מאגר נתונים",
-                        "description": "מאגרים עם works.yml ומבנה תיקיית data/"
+                        "description": "מאגרים עם .works/works.yml ומבנה תיקיית data/"
                     },
                     "awesomeReadme": {
                         "title": "רשימת Awesome",
@@ -2388,7 +2388,7 @@
                 "badges": {
                     "dataRepo": "מאגר נתונים",
                     "awesomeReadme": "רשימת Awesome",
-                    "worksConfig": "works.yml"
+                    "worksConfig": ".works/works.yml"
                 },
                 "preview": {
                     "items": "פריטים",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "קשר מאגרים"
                 },
                 "detectionFailed": "לא הצלחנו לזהות את הפורמט אוטומטית. נא בחר כיצד לייבא מאגר זה.",
-                "detectionFailedMissingConfig": "לא נמצאה תצורה נתמכת. הוסף works.yml למאגר, או בחר בפורמט ייבוא ידני למטה.",
+                "detectionFailedMissingConfig": "לא נמצאה תצורה נתמכת. הוסף .works/works.yml למאגר, או בחר בפורמט ייבוא ידני למטה.",
                 "errors": {
                     "urlRequired": "נא הזן URL מאגר GitHub",
                     "unsupportedFormat": "פורמט מאגר זה לא נתמך. נא השתמש בפורמט מאגר נתונים או רשימת Awesome.",

@@ -235,7 +235,7 @@ describe('ActivityLogListener', () => {
                     actionType: ActivityActionType.WORKS_CONFIG_SYNC,
                     action: 'works_config.sync_failed',
                     status: ActivityStatus.FAILED,
-                    summary: 'Failed to sync works.yml to org/repo',
+                    summary: 'Failed to sync .works/works.yml to org/repo',
                     details: {
                         reason: 'permission_denied',
                         repository: 'org/repo',

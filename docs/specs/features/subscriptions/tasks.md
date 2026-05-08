@@ -26,7 +26,7 @@
       `'0'`).
 - [x] T4. `SubscriptionService.onModuleInit` → `seedPlans()`:
       `Promise.all(PLAN_SEED_DATA.map(plan => upsert({ ...plan, currency:
-      config.billing.getDefaultCurrency(), active: true })))`. Idempotent
+config.billing.getDefaultCurrency(), active: true })))`. Idempotent
       via `findByCode` lookup inside `upsert`.
 
 ## Phase 2 — Per-User Subscription & Usage Schema
@@ -62,7 +62,7 @@
 
 - [x] T9. `SubscriptionService.isEnabled()` reads
       `config.subscriptions.isEnabled()` (env var `SUBSCRIPTIONS_ENABLED
-      === 'true'`).
+=== 'true'`).
 - [x] T10. `SubscriptionService.getActiveSubscription(userId)` →
       `userSubscriptionRepository.findActiveByUser(userId)`.
 - [x] T11. `SubscriptionService.resolvePlanForUser(user)` four-level
@@ -73,7 +73,7 @@
       `config.subscriptions.getDefaultPlanCode()` (default `'free'`),
       normalises via `normalizePlanCode`, looks up the plan; on miss
       logs warn (`Subscription plan <code> not found, falling back to
-      FREE`) and falls back to `FREE`; throws when neither resolves.
+FREE`) and falls back to `FREE`; throws when neither resolves.
 - [x] T13. `SubscriptionService.normalizePlanCode(value)`:
       `value?.toLowerCase()`; if it matches a `SubscriptionPlanCode`
       value, return it; otherwise return `SubscriptionPlanCode.FREE`.
@@ -88,7 +88,7 @@
 - [x] T15. `SubscriptionService.getDefaultCadence(plan)` returns the
       LAST entry of `plan.allowedCadences` or `MONTHLY` when empty.
 - [x] T16. `SubscriptionService.requiresUsageBilling(cadence, plan,
-      billingMode)`: returns `false` when subscriptions are disabled
+billingMode)`: returns `false` when subscriptions are disabled
       OR cadence is in the plan's allowed set; otherwise returns
       `billingMode !== USAGE`.
 
@@ -107,8 +107,8 @@
       tightened gate. Tracked as OQ-1.
 - [x] T19. `SubscriptionService.summarizePlan(user)`:
       `Promise.all([resolvePlanForUser(user),
-      getCadenceAllowances(user)])` → `{ plan, allowances, enabled:
-      isEnabled() }`.
+getCadenceAllowances(user)])` → `{ plan, allowances, enabled:
+isEnabled() }`.
 
 ## Phase 5 — HTTP Surface
 
@@ -119,10 +119,10 @@
 - [x] T21. `GET /plan` runs `authService.getUser(auth.userId)` →
       `subscriptionService.summarizePlan(user)`; when
       `summary.enabled === false` returns `{ status: 'success', enabled:
-      false, plan: null }`; otherwise returns
+false, plan: null }`; otherwise returns
       `{ status: 'success', enabled: true, plan: { code:
-      summary.plan.code, name: summary.plan.displayName,
-      allowedCadences: summary.allowances } }`.
+summary.plan.code, name: summary.plan.displayName,
+allowedCadences: summary.allowances } }`.
 - [x] T22. `POST /plan` `UpdateSubscriptionPlanDto` with
       `@IsEnum(SubscriptionPlanCode)` on `planCode`. Body throws 400
       via the validation pipe when the code is unknown.
@@ -131,8 +131,8 @@
       disabled (BEFORE any user lookup); resolves user via
       `authService.getUser`; calls `assignPlanToUser`; calls
       `summarizePlan(user)`; returns `{ status: 'success', enabled:
-      true, plan: { code: plan.code, name: plan.displayName,
-      allowedCadences: summary.allowances } }`.
+true, plan: { code: plan.code, name: plan.displayName,
+allowedCadences: summary.allowances } }`.
 
 ## Phase 6 — Usage-Ledger Pipeline
 
@@ -150,16 +150,16 @@
       `amountCents = config.subscriptions.getPayPerUsePriceCents()`,
       `entry = await ledgerRepository.record({...})` with
       `{ userId, workId, scheduleId: schedule?.id, triggerType,
-      billingMode, units: 1, amountCents, currency:
-      billingProvider.getDefaultCurrency(), generationHistoryId,
-      metadata: { cadence: schedule?.cadence } }`,
+billingMode, units: 1, amountCents, currency:
+billingProvider.getDefaultCurrency(), generationHistoryId,
+metadata: { cadence: schedule?.cadence } }`,
       then `await billingProvider.recordUsageCharge(entry)`,
       then return `entry`.
 - [x] T27. Module wiring at
       `packages/agent/src/subscriptions/subscriptions.module.ts`:
       imports `DatabaseModule`; providers `SubscriptionService`,
       `UsageLedgerService`, `{ provide: BillingProvider, useClass:
-      ManualBillingProvider }`; exports all three so consumers can
+ManualBillingProvider }`; exports all three so consumers can
       inject `SubscriptionService` / `UsageLedgerService` /
       `BillingProvider`.
 - [x] T28. `apps/api` re-export at
@@ -175,26 +175,26 @@
       `subscriptionService.isEnabled()`.
 - [x] T30. `WorkScheduleService.updateSchedule(workId, dto, user)` runs
       `subscriptionService.requiresUsageBilling(cadence, plan,
-      billingMode)` BEFORE persistence — when `true`, throws
+billingMode)` BEFORE persistence — when `true`, throws
       `BadRequestException({ status: 'error', message: 'Selected
-      cadence is not available on your plan. Switch to pay-per-use to
-      continue.' })`.
+cadence is not available on your plan. Switch to pay-per-use to
+continue.' })`.
 - [x] T31. `WorkScheduleService.updateSchedule(workId, dto, user)`
       enforces `plan.maxWorks` when subscriptions are enabled and the
       request creates-or-activates: throws
       `BadRequestException({ status: 'error', code:
-      'PLAN_LIMIT_EXCEEDED', message: 'Your <DisplayName> plan allows
-      up to <maxWorks> scheduled works.' })` when
+'PLAN_LIMIT_EXCEEDED', message: 'Your <DisplayName> plan allows
+up to <maxWorks> scheduled works.' })` when
       `scheduleRepository.countActiveByUser(user.id) >= plan.maxWorks`.
 - [x] T32. `WorkScheduleService.updateSchedule` defaults the cadence to
       `subscriptionService.getDefaultCadence(plan)` when neither
       `dto.cadence` nor `existing?.cadence` is set; throws
       `BadRequestException('Cadence is required to enable scheduled
-      updates')` when nothing resolves.
+updates')` when nothing resolves.
 - [x] T33. `WorkScheduleService.markRunCompleted` calls
       `usageLedgerService.recordUsage({ userId, workId, schedule,
-      triggerType: SCHEDULED, billingMode: schedule.billingMode,
-      generationHistoryId })`.
+triggerType: SCHEDULED, billingMode: schedule.billingMode,
+generationHistoryId })`.
 - [x] T34. `WorkScheduleService.markRunFailed` and
       `markRunSkipped` do NOT call `recordUsage` (failed / skipped
       runs are free).
@@ -225,7 +225,7 @@
       `billingProvider.recordUsageCharge(entry)`, returns the entry.
 - [x] T38. `work-schedule.service.spec.ts` (consumer side) — pins the
       cadence-gate (`BadRequestException` w/ `Switch to pay-per-use to
-      continue.`), `PLAN_LIMIT_EXCEEDED` (count vs `maxWorks`),
+continue.`), `PLAN_LIMIT_EXCEEDED` (count vs `maxWorks`),
       `markRunCompleted` ledger write, `markRunFailed` /
       `markRunSkipped` no-write.
 - [ ] T39. **FOLLOW-UP** — Add a Postgres-container integration test
@@ -249,8 +249,8 @@
 - [ ] T42. **OQ-2** — Decide whether to emit an activity-log entry on
       plan change. If yes, fire-and-forget
       `activityLogService.log({ userId: user.id, action:
-      'user.subscription_plan_changed', actionType: SETTINGS_UPDATED,
-      details: { oldCode, newCode } }).catch(() => {})` from
+'user.subscription_plan_changed', actionType: SETTINGS_UPDATED,
+details: { oldCode, newCode } }).catch(() => {})` from
       `updatePlan` AFTER `assignPlanToUser` resolves.
 - [ ] T43. **OQ-3** — Wrap
       `billingProvider.recordUsageCharge(entry)` in a try/catch in

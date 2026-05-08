@@ -4,7 +4,7 @@ import { WorksConfigService } from '../services/works-config.service';
 describe('WorksConfigService', () => {
     const service = new WorksConfigService({} as any);
 
-    it('parses a minimal works.yml config', () => {
+    it('parses a minimal .works/works.yml config', () => {
         const result = service.parse(`
 name: Compare Cloud Pricing
 initial_prompt: Compare cloud pricing across storage and compute services
@@ -29,7 +29,7 @@ providers:
         });
     });
 
-    it('parses a works.yml with deployProvider: k8s', () => {
+    it('parses a .works/works.yml with deployProvider: k8s', () => {
         const result = service.parse(`
 name: My Site
 deployProvider: k8s
@@ -38,7 +38,7 @@ deployProvider: k8s
         expect(result.deployProvider).toBe('k8s');
     });
 
-    it('parses a works.yml with deployProvider: vercel (provider-agnostic)', () => {
+    it('parses a .works/works.yml with deployProvider: vercel (provider-agnostic)', () => {
         const result = service.parse(`
 name: My Site
 deployProvider: vercel
@@ -81,10 +81,10 @@ schedule:
         expect(result.scheduleCadence).toBe(WorkScheduleCadence.EVERY_12_HOURS);
     });
 
-    it('loads works config from root works.yml', async () => {
+    it('loads works config from root .works/works.yml', async () => {
         const gitFacade = {
             getFileContent: jest.fn((_owner, _repo, filePath) => {
-                if (filePath === 'works.yml') {
+                if (filePath === '.works/works.yml') {
                     return Promise.resolve({
                         content: 'initial_prompt: Build everything\n',
                     });
@@ -108,7 +108,7 @@ schedule:
         expect(gitFacade.getFileContent).toHaveBeenCalledWith(
             'Ntermast',
             'Compare-Cloud-Pricing',
-            'works.yml',
+            '.works/works.yml',
             {
                 token: 'token',
                 providerId: 'github',
@@ -119,7 +119,7 @@ schedule:
     it('throws the actual parse error when a works config file exists but is invalid', async () => {
         const gitFacade = {
             getFileContent: jest.fn((_owner, _repo, filePath) => {
-                if (filePath === 'works.yml') {
+                if (filePath === '.works/works.yml') {
                     return Promise.resolve({
                         content: 'name: Compare Cloud Pricing\n  initial_prompt: broken\n',
                     });
@@ -133,7 +133,7 @@ schedule:
 
         await expect(
             loader.loadFromRepository('Ntermast', 'Compare-Cloud-Pricing', 'github', 'token'),
-        ).rejects.toThrow('Invalid works config at works.yml:');
+        ).rejects.toThrow('Invalid works config at .works/works.yml:');
     });
 
     it('parses website_repo from a full GitHub URL', () => {

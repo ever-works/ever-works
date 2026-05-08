@@ -137,7 +137,7 @@ export class WorksManifestService {
                 errors: [
                     {
                         path: '',
-                        message: 'works.yml exceeds 64 KiB limit',
+                        message: '.works/works.yml exceeds 64 KiB limit',
                         subcode: 'manifest.size_limit',
                     },
                 ],

@@ -179,10 +179,10 @@ To generate data and create a GitHub repository for the work, send a POST reques
 
 **Company Object:**
 
-| Field     | Type   | Required                           | Description                                                                          |
-| --------- | ------ | ---------------------------------- | ------------------------------------------------------------------------------------ |
-| `name`    | string | `required` (when company provided) | Company name that will be written to works.yml                                       |
-| `website` | string | `required` (when company provided) | Company website URL (must be valid HTTP/HTTPS URL) that will be written to works.yml |
+| Field     | Type   | Required                           | Description                                                                                 |
+| --------- | ------ | ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `name`    | string | `required` (when company provided) | Company name that will be written to .works/works.yml                                       |
+| `website` | string | `required` (when company provided) | Company website URL (must be valid HTTP/HTTPS URL) that will be written to .works/works.yml |
 
 **Configuration Options:**
 
@@ -371,7 +371,7 @@ POST /api/works/{id}/submit-item
 The PR will be automatically merged if either:
 
 1. `pay_and_publish_now` is set to `true` in the request
-2. `autoapproval` is set to `true` in the repository's works.yml
+2. `autoapproval` is set to `true` in the repository's .works/works.yml
 
 Otherwise, the PR will be created and require manual review.
 

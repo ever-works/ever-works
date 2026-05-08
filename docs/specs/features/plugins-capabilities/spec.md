@@ -60,12 +60,12 @@ HTTP contract on top of it.
 - **Given** I am NOT the work creator AND the work owner has not
   configured a deploy token, **when** I `POST /api/deploy/works/:id`,
   **then** I get a `BadRequest` with the message `"The work owner has
-  not configured <Provider> credentials."` (i.e. the message points at
+not configured <Provider> credentials."` (i.e. the message points at
   the owner, not at me).
 - **Given** the deploy verifier hits its 13-minute hard cap with no
   terminal state from the provider, **when** the timeout fires, **then**
   the verifier emits `DeploymentFailedEvent` with `terminalState:
-  'TIMEOUT'`, persists `deploymentState: 'TIMEOUT'`, and the
+'TIMEOUT'`, persists `deploymentState: 'TIMEOUT'`, and the
   `ActivityLogListener` records a failed entry.
 - **Given** I trigger a second deploy for the same work while a
   verification poll is still in flight, **when** `startVerification`
@@ -81,12 +81,12 @@ HTTP contract on top of it.
 - **Given** a screenshot capture returns `success: false` from the
   provider, **when** the controller runs, **then** it throws
   `BadRequest` with the provider's `error` field (or `"Failed to capture
-  screenshot"` fallback) — the response is NEVER `{success: false}`
+screenshot"` fallback) — the response is NEVER `{success: false}`
   inside a 200.
 - **Given** my OAuth callback `code` is missing or empty, **when** I
   `GET /api/oauth/:providerId/callback/plugins?state=…`, **then** the
   controller returns `BadRequest` with `{status: 'error', message:
-  'Authorization code is required'}` BEFORE any service call.
+'Authorization code is required'}` BEFORE any service call.
 - **Given** I request `/api/git-providers/:providerId/user` and my OAuth
   token has been revoked upstream, **when** `getUser` throws, **then**
   the controller returns `{success: false, error: <message>}` inside a
@@ -94,7 +94,7 @@ HTTP contract on top of it.
 - **Given** a batch deploy with 7 works, **when** `POST /api/deploy/batch`
   runs, **then** the service runs them in two rolling batches of 5 with
   a 2-second sleep between batches; the controller returns `status:
-  'success' | 'partial' | 'error'` based on the success/fail counts.
+'success' | 'partial' | 'error'` based on the success/fail counts.
 
 ## 3. Functional Requirements
 
@@ -131,27 +131,27 @@ HTTP contract on top of it.
   per-user list (not the global registry).
 - **FR-7** `GET /api/deploy/providers/:providerId/configured` MUST
   return a four-flag envelope: `{configured, available, enabled,
-  message}` distinguishing _provider not registered_, _registered but
+message}` distinguishing _provider not registered_, _registered but
   disabled_, and _enabled but missing settings_.
 - **FR-8** `POST /api/deploy/works/:id` MUST run the chain
   `ensureCanEdit → isConfigured → validateToken → deploy →
-  startVerification → activityLogService.log({action: 'work.deployed'})`.
+startVerification → activityLogService.log({action: 'work.deployed'})`.
   Failure at any step short-circuits with a `BadRequest`.
 - **FR-9** `POST /api/deploy/works/:id` MUST emit a fire-and-forget
   activity-log entry with `actionType: DEPLOYMENT, action:
-  'work.deployed', status: COMPLETED, summary: 'Triggered deployment for
-  <work.name> via <providerName>'` ONLY when `deploymentInitiated ===
-  true`.
+'work.deployed', status: COMPLETED, summary: 'Triggered deployment for
+<work.name> via <providerName>'` ONLY when `deploymentInitiated ===
+true`.
 - **FR-10** The deploy service MUST set the four required GitHub Actions
   secrets on every dispatch (`TENANT_ID = work.id`, `DATA_REPOSITORY =
-  work.getDataRepo()`, `<PROVIDER>_TOKEN = deployToken`, `DEPLOY_TOKEN =
-  deployToken`) and one repository variable (`DEPLOY_PROVIDER =
-  work.deployProvider || 'vercel'`). `DEPLOY_PROVIDER` is set as a
+work.getDataRepo()`, `<PROVIDER>_TOKEN = deployToken`, `DEPLOY_TOKEN =
+deployToken`) and one repository variable (`DEPLOY_PROVIDER =
+work.deployProvider || 'vercel'`). `DEPLOY_PROVIDER` is set as a
   variable, not a secret, because GitHub Actions templates need it
   available in `if:` conditions.
 - **FR-11** The deploy service MUST set two optional secrets when their
   inputs are non-empty: `DEPLOY_TEAM_SCOPE = teamScope` and `GH_TOKEN =
-  gitToken`.
+gitToken`.
 - **FR-12** The deploy service MUST always generate and set a fresh
   `CRON_SECRET` (32 bytes, hex-encoded) on every dispatch — the existing
   value is replaced, not preserved.
@@ -171,7 +171,7 @@ HTTP contract on top of it.
   exactly once.
 - **FR-16** On successful dispatch, the deploy service MUST emit
   `DeploymentDispatchedEvent` with payload `{work, userId, providerId,
-  providerName: plugin.providerName ?? plugin.name ?? plugin.id}`. On
+providerName: plugin.providerName ?? plugin.name ?? plugin.id}`. On
   failure, NO event is emitted.
 - **FR-17** `POST /api/deploy/batch` MUST run `ensureCanEdit` for each
   item BEFORE calling the service, run the underlying deploys in
@@ -180,7 +180,7 @@ HTTP contract on top of it.
   `status === 'pending'`.
 - **FR-18** `POST /api/deploy/batch` MUST emit a single fire-and-forget
   activity-log entry with `action: 'deployment.batch_started', summary:
-  'Triggered batch deploy for <N> works', details: {workIds: [...]}`
+'Triggered batch deploy for <N> works', details: {workIds: [...]}`
   regardless of per-work outcome.
 - **FR-19** `POST /api/deploy/batch` MUST coerce the response status
   from the success/fail counts: `failed === 0` → `'success'`;
@@ -196,7 +196,7 @@ HTTP contract on top of it.
 - **FR-22** The deployment verifier MUST emit exactly one terminal
   event per verification run: `DeploymentCompletedEvent` for `'READY'`;
   otherwise `DeploymentFailedEvent` with `terminalState ∈ {'ERROR',
-  'TIMEOUT', 'CANCELED', 'UNKNOWN'}`. The `terminated` boolean guard
+'TIMEOUT', 'CANCELED', 'UNKNOWN'}`. The `terminated` boolean guard
   prevents duplicate emissions when `cancel()` and a poll resolution
   race.
 - **FR-23** When `startVerification` is called for a work that already
@@ -206,7 +206,7 @@ HTTP contract on top of it.
   `/works/:id/domains[/:domain[/verify]]`) MUST short-circuit with a
   `BadRequest` when `work.website` is empty (i.e. before any
   `deployFacade.*Domain` call), with the message `"No deployment exists
-  for this work. Deploy first before managing domains."`.
+for this work. Deploy first before managing domains."`.
 - **FR-25** The deploy controller's `addDomain` body MUST validate the
   `domain` field against the regex
   `/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/`
@@ -225,20 +225,20 @@ HTTP contract on top of it.
   missing.
 - **FR-28** `GET /api/search/check-availability` MUST distinguish two
   failure messages: `"Search plugins are enabled but none have all
-  required settings configured (e.g. API key)."` (some enabled, none
+required settings configured (e.g. API key)."` (some enabled, none
   configured) and `"No search provider is enabled. Enable a search
-  plugin (e.g. Tavily, Linkup, Brave, Exa) in settings."` (none
+plugin (e.g. Tavily, Linkup, Brave, Exa) in settings."` (none
   enabled).
 - **FR-29** `POST /api/search/` MUST run `resolveConfiguredProvider`
   BEFORE forwarding to `searchFacade.search`, throwing a `BadRequest`
   with `"No search provider with all required settings configured is
-  available."` if no provider resolves.
+available."` if no provider resolves.
 - **FR-30** `POST /api/search/` MUST forward the resolved provider via
   `providerOverride` so the facade short-circuits its own resolution
   step.
 - **FR-31** `searchFacade.search` errors of type `NoProviderError`
   MUST be remapped to `"No search provider configured. Enable a search
-  plugin in settings."` with status `'error'`. All other Errors MUST
+plugin in settings."` with status `'error'`. All other Errors MUST
   surface their `message`; non-Error throws MUST coerce to
   `"Search failed"`.
 
@@ -278,12 +278,12 @@ HTTP contract on top of it.
 ### 3.5 OAuth (`/api/oauth/*`)
 
 - **FR-40** `GET /api/oauth/providers` MUST return `{configured:
-  oauthFacade.isConfigured(), providers: getAvailableProviders()}` so
+oauthFacade.isConfigured(), providers: getAvailableProviders()}` so
   the UI can grey out disabled providers.
 - **FR-41** `GET /api/oauth/:providerId/connection` MUST resolve the
   user's connected provider account via
   `AuthAccountRepository.findConnectedProviderAccount(userId, providerId,
-  {usePluginProviderId: true})`, and validate the cached `accessToken`
+{usePluginProviderId: true})`, and validate the cached `accessToken`
   by calling `oauthFacade.getAuthenticatedUser(providerId, accessToken)`.
   Failure to resolve a user MUST coerce to `connected: false` (NOT a
   4xx).
@@ -317,12 +317,12 @@ HTTP contract on top of it.
 ### 3.6 Git Provider (`/api/git-providers/*`)
 
 - **FR-49** `GET /api/git-providers` MUST return `{configured:
-  gitFacade.isConfigured(), providers: getAvailableProviders()}`.
+gitFacade.isConfigured(), providers: getAvailableProviders()}`.
 - **FR-50** `GET /api/git-providers/:providerId/connection` MUST
   resolve auth in two parallel branches: (a) OAuth via
   `AuthAccountRepository.findConnectedProviderAccount(usePluginProviderId:
-  true)`; (b) PAT via `gitFacade.hasValidCredentials({userId,
-  providerId})`. The user-resolution call differs by branch:
+true)`; (b) PAT via `gitFacade.hasValidCredentials({userId,
+providerId})`. The user-resolution call differs by branch:
   OAuth-branch passes `{providerId, token: accessToken}`; PAT-branch
   passes `{userId, providerId}`. The response reports `authMethod`
   accordingly: `'oauth'` when an OAuth token is present (even if
@@ -333,14 +333,14 @@ HTTP contract on top of it.
   positional arguments to `gitFacade.listRepositories`.
 - **FR-52** Like the OAuth controller, every git-provider response
   endpoint MUST wrap service errors in `{success: false, error:
-  <message>}` inside a 200 — NEVER 4xx.
+<message>}` inside a 200 — NEVER 4xx.
 
 ### 3.7 Device Auth (`/api/device-auth/*`)
 
 - **FR-53** `GET /api/device-auth/:pluginId/status` and `POST
-  /api/device-auth/:pluginId/start` MUST be thin two-line passthroughs
+/api/device-auth/:pluginId/start` MUST be thin two-line passthroughs
   to `pluginOperationsService.getPluginDeviceAuthStatus(pluginId,
-  userId)` / `startPluginDeviceAuth(pluginId, userId)` respectively.
+userId)` / `startPluginDeviceAuth(pluginId, userId)` respectively.
   Errors MUST propagate unwrapped.
 - **FR-54** Both endpoints MUST forward `(pluginId, userId)` in
   positional order — NOT `(userId, pluginId)` — because the underlying
@@ -359,28 +359,25 @@ HTTP contract on top of it.
   verification queue is in-memory only — process restarts cancel
   in-flight verifications (documented limitation; see Open Questions).
 - **Security**:
-  - All endpoints behind `AuthSessionGuard`; ownership enforced via
-    `WorkOwnershipService` on every per-work mutation.
-  - Plugin-supplied `getDeploymentSecrets` output is pushed into
-    GitHub Actions secrets via `setActionSecret`, NEVER logged. Even
-    the count is logged as a number, not the keys.
-  - `CRON_SECRET` is regenerated on every deploy — old workflows
-    cannot reuse stale values.
-  - OAuth tokens persist in `auth_accounts.accessToken` /
-    `refreshToken`; rotation is the OAuth provider's responsibility
-    (we re-upsert on each successful exchange).
-  - Domain regex on `addDomain` rejects path/scheme/whitespace
-    payloads upfront.
-- **Observability**:
-  - Deploy: `DeploymentDispatchedEvent`, `DeploymentCompletedEvent`,
-    `DeploymentFailedEvent` are emitted via NestJS `EventEmitter2`;
-    the `ActivityLogListener` translates them into `actionType:
-    DEPLOYMENT` rows. The single `'work.deployed'` activity-log entry
-    is emitted directly from the controller (fire-and-forget).
-  - Search/screenshot/OAuth/git-provider/device-auth: NO activity-log
-    emission (per-call CRUD-style traffic is too high-volume to audit).
-  - Errors are logged via the per-service `Logger` with the work id
-    and provider id where applicable.
+    - All endpoints behind `AuthSessionGuard`; ownership enforced via
+      `WorkOwnershipService` on every per-work mutation.
+    - Plugin-supplied `getDeploymentSecrets` output is pushed into
+      GitHub Actions secrets via `setActionSecret`, NEVER logged. Even
+      the count is logged as a number, not the keys.
+    - `CRON_SECRET` is regenerated on every deploy — old workflows
+      cannot reuse stale values.
+    - OAuth tokens persist in `auth_accounts.accessToken` /
+      `refreshToken`; rotation is the OAuth provider's responsibility
+      (we re-upsert on each successful exchange).
+    - Domain regex on `addDomain` rejects path/scheme/whitespace
+      payloads upfront.
+- **Observability**: - Deploy: `DeploymentDispatchedEvent`, `DeploymentCompletedEvent`,
+  `DeploymentFailedEvent` are emitted via NestJS `EventEmitter2`;
+  the `ActivityLogListener` translates them into `actionType:
+DEPLOYMENT` rows. The single `'work.deployed'` activity-log entry
+  is emitted directly from the controller (fire-and-forget). - Search/screenshot/OAuth/git-provider/device-auth: NO activity-log
+  emission (per-call CRUD-style traffic is too high-volume to audit). - Errors are logged via the per-service `Logger` with the work id
+  and provider id where applicable.
 - **Compatibility**: facade APIs are versioned via the `@ever-works/agent`
   package. New plugin contract methods (`getDeploymentSecrets`,
   `getWorkflowFilenames`) are optional — older plugins continue to
@@ -388,19 +385,19 @@ HTTP contract on top of it.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                 | Description                                                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Capability                       | One of: `deploy`, `search`, `screenshot`, `oauth`, `git-provider`, `device-auth`. Maps 1:1 to a sub-module under `apps/api/src/plugins-capabilities/`. |
-| Capability facade                | Agent-package service that resolves the right plugin and orchestrates the call (`DeployFacadeService`, `SearchFacadeService`, …). |
-| `RepoContext`                    | `{owner, repo, token, publicKey}` bundle used by `DeployService` to push secrets/variables to a single GitHub repo.          |
-| `RegisteredPlugin`               | Wrapper over a loaded plugin with manifest + state + plugin instance, returned by `PluginRegistryService`.                   |
-| `ProviderOption`                 | `{id, name, description, configured, isDefault, icon}` — the projected provider shape returned by `/check-availability`.    |
-| `DeploymentReadyState`           | `'BUILDING' \| 'ERROR' \| 'INITIALIZING' \| 'QUEUED' \| 'READY' \| 'CANCELED' \| 'TIMEOUT'`. Authoritative for `work.deploymentState`. |
-| `OAuthConnectionInfo`            | `{connected, providerId, username?, email?, avatarUrl?, connectionSource: 'plugin' \| 'social', authMethod?}` envelope returned by `/connection` endpoints. |
-| `GitProviderConnectionInfo`      | Same shape as `OAuthConnectionInfo`, plus `authMethod ∈ {'oauth', 'personal-access-token'}`.                                  |
-| `BatchDeployItemResultDto`       | `{workId, slug, status: 'pending' \| 'error', message, owner?, repository?}` per-work record returned in the batch envelope. |
-| `BatchDeployResponseDto`         | `{status: 'success' \| 'partial' \| 'error', message, totalRequested, successfullyStarted, failed, results[]}`.              |
-| `DeviceAuthStatus`               | `{state, userCode?, verificationUri?, expiresAt?, …}` envelope returned by the device-auth flow.                              |
+| Entity / concept            | Description                                                                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Capability                  | One of: `deploy`, `search`, `screenshot`, `oauth`, `git-provider`, `device-auth`. Maps 1:1 to a sub-module under `apps/api/src/plugins-capabilities/`.      |
+| Capability facade           | Agent-package service that resolves the right plugin and orchestrates the call (`DeployFacadeService`, `SearchFacadeService`, …).                           |
+| `RepoContext`               | `{owner, repo, token, publicKey}` bundle used by `DeployService` to push secrets/variables to a single GitHub repo.                                         |
+| `RegisteredPlugin`          | Wrapper over a loaded plugin with manifest + state + plugin instance, returned by `PluginRegistryService`.                                                  |
+| `ProviderOption`            | `{id, name, description, configured, isDefault, icon}` — the projected provider shape returned by `/check-availability`.                                    |
+| `DeploymentReadyState`      | `'BUILDING' \| 'ERROR' \| 'INITIALIZING' \| 'QUEUED' \| 'READY' \| 'CANCELED' \| 'TIMEOUT'`. Authoritative for `work.deploymentState`.                      |
+| `OAuthConnectionInfo`       | `{connected, providerId, username?, email?, avatarUrl?, connectionSource: 'plugin' \| 'social', authMethod?}` envelope returned by `/connection` endpoints. |
+| `GitProviderConnectionInfo` | Same shape as `OAuthConnectionInfo`, plus `authMethod ∈ {'oauth', 'personal-access-token'}`.                                                                |
+| `BatchDeployItemResultDto`  | `{workId, slug, status: 'pending' \| 'error', message, owner?, repository?}` per-work record returned in the batch envelope.                                |
+| `BatchDeployResponseDto`    | `{status: 'success' \| 'partial' \| 'error', message, totalRequested, successfullyStarted, failed, results[]}`.                                             |
+| `DeviceAuthStatus`          | `{state, userCode?, verificationUri?, expiresAt?, …}` envelope returned by the device-auth flow.                                                            |
 
 ## 6. Out of Scope
 
@@ -447,24 +444,24 @@ HTTP contract on top of it.
 ## 8. Open Questions
 
 - `[NEEDS CLARIFICATION: should the deploy verifier persist its
-  in-memory queue across API restarts via Trigger.dev so a redeploy
-  doesn't silently abandon in-flight verifications?]` — see OQ-3.
+in-memory queue across API restarts via Trigger.dev so a redeploy
+doesn't silently abandon in-flight verifications?]` — see OQ-3.
 - `[NEEDS CLARIFICATION: should the OAuth/git-provider/device-auth
-  controllers ever return 4xx responses for downstream errors, or is
-  the `{success: false, error}`-in-200 envelope the canonical
-  contract?]` — current code is asymmetric (deploy/search/screenshot
+controllers ever return 4xx responses for downstream errors, or is
+the `{success: false, error}`-in-200 envelope the canonical
+contract?]` — current code is asymmetric (deploy/search/screenshot
   throw 4xx; OAuth/git-provider/device-auth wrap into 200).
 - `[NEEDS CLARIFICATION: should the search endpoint expose
-  `providerOverride` from the DTO instead of always falling through
-  to `resolveConfiguredProvider`?]` — search currently has no
+`providerOverride`from the DTO instead of always falling through
+to`resolveConfiguredProvider`?]` — search currently has no
   per-call provider override; screenshot does.
 - `[NEEDS CLARIFICATION: should the deploy controller emit a separate
-  activity-log entry on `validateToken` rejection so users can see
-  failed-credentials attempts in the audit trail?]` — currently no
+activity-log entry on `validateToken` rejection so users can see
+failed-credentials attempts in the audit trail?]` — currently no
   log entry until `deploymentInitiated === true`.
-- `[NEEDS CLARIFICATION: should `/api/deploy/teams` (the workless
-  variant) be removed since it always returns `{teams: []}` and
-  redirects users to the work-specific endpoint?]` — see OQ-1.
+- `[NEEDS CLARIFICATION: should `/api/deploy/teams`(the workless
+variant) be removed since it always returns`{teams: []}` and
+redirects users to the work-specific endpoint?]` — see OQ-1.
 
 ## 9. Constitution Gates
 

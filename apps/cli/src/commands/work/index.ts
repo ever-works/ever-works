@@ -42,6 +42,8 @@ export const workCommand = new Command('work')
         console.log('  delete              - Delete a work');
         console.log('  status              - Check the status of a work');
         console.log('  plugins             - Manage plugins for a work');
-        console.log('  register            - Zero-friction registration from a works.yml repo');
+        console.log(
+            '  register            - Zero-friction registration from a .works/works.yml repo',
+        );
         console.log('\nUse "work <command> --help" for more information about a command.');
     });

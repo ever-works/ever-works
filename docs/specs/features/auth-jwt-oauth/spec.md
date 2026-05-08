@@ -56,12 +56,12 @@ This feature deliberately does **not** include:
   (`USER_LOGIN`, `summary='Signed in'`, `ipAddress`+`userAgent` from
   the request), and the response is `{access_token, user}`.
 - **Given** I want to sign in with GitHub, **when** I `GET
-  /api/oauth/github/url?state=<csrf>`, **then** the response is
+/api/oauth/github/url?state=<csrf>`, **then** the response is
   `{url}` where `url` is `https://github.com/login/oauth/authorize?…`
   with `client_id`, `redirect_uri`, `response_type=code`, `scope` (the
   full `GITHUB_SCOPES` set joined by space), and `state`.
 - **Given** GitHub redirects back, **when** I `GET
-  /api/oauth/github/callback?code=…`, **then** the platform exchanges
+/api/oauth/github/callback?code=…`, **then** the platform exchanges
   the code via `POST https://github.com/login/oauth/access_token`
   WITHOUT a `grant_type` field (GitHub-specific quirk), fetches
   `/user` and `/user/emails`, picks the primary verified email via
@@ -76,7 +76,7 @@ This feature deliberately does **not** include:
   has `given_name=Jane`, `family_name=Doe` and `name` is missing,
   **then** `displayName` falls back to `'Jane Doe'`.
 - **Given** I forgot my password, **when** I `POST
-  /api/auth/forgot-password` with my email, **then** a 32-byte hex
+/api/auth/forgot-password` with my email, **then** a 32-byte hex
   reset token is stored on `users.passwordResetToken` with a 1-hour
   expiry, and `UserForgotPasswordEvent` is emitted with the resolved
   callback URL (the body's `resetPasswordCallbackUrl + ?token=` if
@@ -93,12 +93,12 @@ This feature deliberately does **not** include:
   cleared, `UserConfirmedEvent` is emitted, and a fresh session token
   is issued so the client can drop the email-verification gate.
 - **Given** I have at most 9 active API keys, **when** I `POST
-  /api/auth/api-keys` with `{name}` and an optional ISO `expiresAt`
+/api/auth/api-keys` with `{name}` and an optional ISO `expiresAt`
   in the future, **then** the platform generates 32 bytes of entropy,
   prefixes with `ew_live_`, stores the SHA-256 digest, and returns
   the **raw key once** (`{id, name, key, prefix, expiresAt, createdAt}`).
 - **Given** I own a key, **when** I send `Authorization: Bearer
-  ew_live_…` (or `x-api-key: ew_live_…`), **then** `AuthSessionGuard`
+ew_live_…` (or `x-api-key: ew_live_…`), **then** `AuthSessionGuard`
   resolves the user via the SHA-256 digest, refuses if `isActive=false`
   or `expiresAt < now`, fires `apiKeyRepository.updateLastUsed(...)`
   fire-and-forget, and treats my request as fully authenticated.
@@ -177,7 +177,7 @@ This feature deliberately does **not** include:
   resolves with `{message: 'Logged out successfully'}`. Other
   devices for the same user remain signed in.
 - **Given** I want to terminate every device, **when** I `POST
-  /api/auth/logout-all`, **then** `auth_session` rows for `userId`
+/api/auth/logout-all`, **then** `auth_session` rows for `userId`
   are bulk-deleted via TypeORM `repository.delete({userId})`.
 - **Given** I update my profile with `committerName: null`, **when**
   `updateUserProfile` runs, **then** the field is cleared in the
@@ -326,50 +326,50 @@ This feature deliberately does **not** include:
   database). Empty-string committer values are also treated as clear
   via the `value || null` coalesce.
 - **FR-18**: `SocialAuthService.getAuthorizationUrl(providerId,
-  callbackUrl?, state?)` MUST: resolve the provider config (or throw
+callbackUrl?, state?)` MUST: resolve the provider config (or throw
   for unsupported providers); use `callbackUrl` if provided else
   `provider.callbackUrl()`; build URLSearchParams with `client_id`,
   `redirect_uri`, `response_type='code'`, `scope` joined by
   `provider.scopeSeparator || ' '`; append `state` when provided;
   append `access_type=offline` + `prompt=consent` for Google ONLY.
 - **FR-19**: `SocialAuthService.authenticate(providerId, code,
-  callbackUrl?)` MUST exchange the code (omitting `grant_type` for
+callbackUrl?)` MUST exchange the code (omitting `grant_type` for
   GitHub, sending `grant_type=authorization_code` for everyone else),
   fetch the provider's user-info, then call
   `authService.validateSocialUser({...socialUser, provider:
-  provider.id, accessToken, refreshToken, tokenType, scope,
-  expiresAt})`.
+provider.id, accessToken, refreshToken, tokenType, scope,
+expiresAt})`.
 - **FR-20**: `SocialAuthService.exchangeCodeForTokens` MUST send the
   request as `application/x-www-form-urlencoded` with `Accept:
-  application/json`. The response body's `expires_in` (number) MUST
+application/json`. The response body's `expires_in` (number) MUST
   be converted to `expiresAt = new Date(Date.now() + expires_in *
-  1000)`; missing/non-numeric values yield `expiresAt=null`.
+1000)`; missing/non-numeric values yield `expiresAt=null`.
 - **FR-21**: `SocialAuthService.getSocialUser` MUST dispatch on
   `providerId` to one of `getGitHubUser`/`getGoogleUser`/
   `getFacebookUser`/`getLinkedInUser`. Each reader MUST:
-  - Set `displayName` from a provider-specific fallback chain
-    (GitHub: `data.name || data.login || email-localpart`;
-    Google: `data.name || email-localpart`;
-    Facebook: `data.name || email-localpart`;
-    LinkedIn: `data.name || '<given> <family>' || email-localpart`).
-  - Set `emailVerified` per provider:
-    GitHub uses `resolveGitHubAccountEmail`'s verified flag,
-    Google `data.email_verified !== false` (default-true),
-    LinkedIn `data.email_verified !== false`,
-    Facebook **always** `false`.
-  - Throw `BadRequestException('No email found in <Provider> profile')`
-    when the email is missing.
+    - Set `displayName` from a provider-specific fallback chain
+      (GitHub: `data.name || data.login || email-localpart`;
+      Google: `data.name || email-localpart`;
+      Facebook: `data.name || email-localpart`;
+      LinkedIn: `data.name || '<given> <family>' || email-localpart`).
+    - Set `emailVerified` per provider:
+      GitHub uses `resolveGitHubAccountEmail`'s verified flag,
+      Google `data.email_verified !== false` (default-true),
+      LinkedIn `data.email_verified !== false`,
+      Facebook **always** `false`.
+    - Throw `BadRequestException('No email found in <Provider> profile')`
+      when the email is missing.
 - **FR-22**: `SocialAuthService.getConfiguredProviders()` MUST
   return an array of provider IDs whose `clientId()` AND
   `clientSecret()` env-readers both return truthy strings.
   `GET /api/auth/providers` returns `{emailPassword: true,
-  socialProviders: [...]}` to the client.
+socialProviders: [...]}` to the client.
 - **FR-23**: `AuthProviderService.signInEmail` MUST:
   (a) when the user already has a local password, run
   `authSyncService.ensureCredentialAccount(userId, passwordHash)` so
   Better Auth's credential table stays in sync;
   (b) call `auth.api.signInEmail({headers, body: {email, password,
-  rememberMe: true}})`;
+rememberMe: true}})`;
   (c) re-fetch the user via `assertActiveUser`, mirror the new
   password hash + `lastLoginAt` + `registrationProvider='local'`
   into `users`;
@@ -383,12 +383,12 @@ This feature deliberately does **not** include:
   platform's `auth_session` table).
 - **FR-25**: `AuthProviderService.issueSession(userId)` MUST create
   a row in `auth_session` with:
-  - `id = randomUUID()`;
-  - `token = randomBytes(24).toString('base64url')` (32 chars,
-    URL-safe);
-  - `expiresAt = now + 7 days`;
-  - `ipAddress: null`, `userAgent: null` (callers can populate
-    later via the activity-log path).
+    - `id = randomUUID()`;
+    - `token = randomBytes(24).toString('base64url')` (32 chars,
+      URL-safe);
+    - `expiresAt = now + 7 days`;
+    - `ipAddress: null`, `userAgent: null` (callers can populate
+      later via the activity-log path).
 - **FR-26**: `AuthProviderService.changePassword` MUST require an
   authenticated user (Bearer token OR Better Auth session), fetch
   the current credential password hash, refuse with
@@ -463,11 +463,11 @@ This feature deliberately does **not** include:
   `prefix` is the only fragment kept for human display in the keys
   list.
 - **NFR-3 (security)**: All token-bearing fields are random:
-  - Verification tokens / reset tokens: `randomBytes(32).hex` (64
-    chars).
-  - API keys: `randomBytes(32).hex` after the `ew_live_` prefix.
-  - Session tokens: `randomBytes(24).base64url` (32 chars).
-  All three use Node's crypto module — no `Math.random()`.
+    - Verification tokens / reset tokens: `randomBytes(32).hex` (64
+      chars).
+    - API keys: `randomBytes(32).hex` after the `ew_live_` prefix.
+    - Session tokens: `randomBytes(24).base64url` (32 chars).
+      All three use Node's crypto module — no `Math.random()`.
 - **NFR-4 (privacy)**: `getUserProfile` MUST never return the
   password hash, the verification/reset tokens, or their expiry
   fields. The exclusion is implemented as a destructuring strip
@@ -489,14 +489,14 @@ This feature deliberately does **not** include:
   pin both shapes — changing either is a breaking change.
 - **NFR-8 (testability)**: All four services are covered by
   Jest unit tests:
-  - `auth.service.spec.ts` — 45 tests
-    ([#486](https://github.com/ever-works/ever-works/pull/486)).
-  - `social-auth.service.spec.ts` — 37 tests
-    ([#488](https://github.com/ever-works/ever-works/pull/488)).
-  - `api-key.service.spec.ts` — 15 tests
-    ([#486](https://github.com/ever-works/ever-works/pull/486)).
-  - `github-email.utils.spec.ts` — primary-email resolution from
-    `/user/emails`.
+    - `auth.service.spec.ts` — 45 tests
+      ([#486](https://github.com/ever-works/ever-works/pull/486)).
+    - `social-auth.service.spec.ts` — 37 tests
+      ([#488](https://github.com/ever-works/ever-works/pull/488)).
+    - `api-key.service.spec.ts` — 15 tests
+      ([#486](https://github.com/ever-works/ever-works/pull/486)).
+    - `github-email.utils.spec.ts` — primary-email resolution from
+      `/user/emails`.
 
 ## 5. Out of Scope
 

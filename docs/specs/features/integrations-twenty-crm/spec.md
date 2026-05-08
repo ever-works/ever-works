@@ -95,7 +95,7 @@ internal error to clients.
   failure), **when** `TwentyCrmService.makeRequest` catches the
   thrown axios error, **then** the service logs the event and
   re-throws as `HttpException("Failed to communicate with Twenty CRM",
-  503)`.
+503)`.
 - **Given** Twenty returns an error body with `message`, `statusCode`,
   and optional `details`, **when** `makeRequest` catches it, **then**
   the service throws
@@ -118,7 +118,7 @@ internal error to clients.
 - **Given** `MappingUtils.validateContactData` checks a contact with
   no name fields and no email, **when** it runs, **then** it returns
   both `'Either firstName or lastName is required'` and `'Email is
-  required'`.
+required'`.
 - **Given** an `EverWorksCompany.website` is malformed
   (`'not-a-url'` even after https-prefix), **when**
   `extractDomainFromWebsite` parses, **then** the `URL` constructor
@@ -166,13 +166,13 @@ internal error to clients.
   with `logger.warn('CRM integration is disabled - request blocked')`
   when `isEnabled` is `false`; MUST call `validateConfig`; MUST
   return `false` with `logger.error('CRM configuration validation
-  failed:', err)` on any throw; MUST return `true` only when both
+failed:', err)` on any throw; MUST return `true` only when both
   pass.
 - **FR-6** The `@CrmSync(enabled?: boolean)` decorator MUST set the
   `crm_sync` Nest metadata key with the supplied `enabled` flag
   (default `true`).
 - **FR-7** `TwentyCrmService.makeRequest(method, endpoint, data?,
-  params?, schema?)` MUST: build the URL as
+params?, schema?)` MUST: build the URL as
   `${apiUrl}/rest${endpoint}` (or `${apiUrl}/rest/metadata${endpoint}`
   when `schema === true`); set headers
   `Authorization: Bearer <apiKey>`,
@@ -185,9 +185,9 @@ internal error to clients.
   `{endpoint, method, status, data}` context; if
   `error.response.data` is set, throw
   `HttpException({message: data.message ?? 'Twenty CRM API error',
-  details: data.details}, error.response.status ?? 500)`; else
+details: data.details}, error.response.status ?? 500)`; else
   throw `HttpException('Failed to communicate with Twenty CRM',
-  HttpStatus.SERVICE_UNAVAILABLE)`.
+HttpStatus.SERVICE_UNAVAILABLE)`.
 - **FR-9** `ClientService` MUST expose 16 thin-wrapper methods —
   `create`/`get`/`update`/`delete` for each of the four entity types
   (`company`, `contact`, `deal`, `product`) plus four list
@@ -214,11 +214,11 @@ internal error to clients.
   `POST /`, `PATCH /:id`, `DELETE /:id`. On `POST`, the
   controller MUST explicitly project the body into
   `{firstName, lastName, email, phone, companyId, position,
-  avatarUrl}` — extra keys MUST be dropped at the boundary.
+avatarUrl}` — extra keys MUST be dropped at the boundary.
 - **FR-14** `CrmTenantService.resolveTenantContext(workId?, userId?,
-  globalTenantId?)` MUST set `tenantId = workId ? \`work_${workId}\` :
+globalTenantId?)` MUST set `tenantId = workId ? \`work\_${workId}\` :
   globalTenantId || 'global_everworks'`, log the resulting context at
-  debug, and return `{tenantId, workId, userId}`.
+debug, and return `{tenantId, workId, userId}`.
 - **FR-15** `CrmTenantService.getTenantEndpointPrefix(ctx)` MUST
   return `/tenants/${ctx.tenantId}` so callers can build
   multi-tenant URLs.
@@ -229,16 +229,16 @@ internal error to clients.
   flattened `{tenantId, workId, userId}` object — preserving
   `undefined` values rather than stripping them.
 - **FR-18** `RetryUtils.withRetry(fn, maxAttempts=3, delayMs=1000,
-  backoffMultiplier=2)` MUST run `fn()` once per attempt, sleep
+backoffMultiplier=2)` MUST run `fn()` once per attempt, sleep
   `delayMs * backoffMultiplier^(attempt-1)` between attempts, and
   re-throw the LAST error after exhausting attempts. The helper MUST
   NOT sleep when `maxAttempts === 1`.
 - **FR-19** `RetryUtils.isRetryableError` MUST return `true` for
   `error.code in {ECONNRESET, ETIMEDOUT, ENOTFOUND}`, for
   `error.response.status >= 500`, and for `error.response.status ===
-  429`. All other shapes MUST return `false`.
+429`. All other shapes MUST return `false`.
 - **FR-20** `RetryUtils.calculateRetryDelay(baseDelayMs, attempt,
-  backoffMultiplier=2, maxDelayMs=30000)` MUST compute
+backoffMultiplier=2, maxDelayMs=30000)` MUST compute
   `baseDelayMs * backoffMultiplier^(attempt-1)`, add 10% jitter
   (`Math.random() * 0.1 * delay`), and clamp the result via
   `Math.min(delay + jitter, maxDelayMs)`.
@@ -296,21 +296,21 @@ internal error to clients.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept           | Description                                                                                                                         |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `TwentyContact`            | Twenty CRM person — `firstName`, `lastName`, `email`, `phone`, `position`, `companyId`, `avatarUrl`, plus standard `id`/timestamps.   |
-| `TwentyOrganization`       | Twenty CRM company — `name`, `domainName`, `address`, `employees`, `linkedinUrl`, `xUrl`, `annualRecurringRevenue`, `idealCustomerProfile`. |
-| `TwentyProduct`            | Twenty CRM product — `name`, `description`, `price`, `currency`, `category`.                                                         |
-| `TwentyDeal`               | Twenty CRM deal — `title`, `amount`, `currency`, `stage`, `probability`, `companyId`, `personId`.                                    |
-| `EverWorksClient`          | Platform-side client/customer — `name` (single field, split at the boundary), `email`, `phone`, `companyId`, `position`.             |
-| `EverWorksCompany`         | Platform-side company — `name`, `website`, `description`, `industry`, `size`.                                                       |
-| `EverWorksItem`            | Platform-side item — `name`, `description`, `price`, `currency`, `category`, `companyId`, `clientId`.                                |
-| `CrmTenantContext`         | `(tenantId, workId?, userId?)` — derived by `CrmTenantService.resolveTenantContext` and consumed by tenant-aware callers.           |
-| `CrmConfigService`         | Reads `TWENTY_CRM_*` env vars; gates the integration via `isEnabled`.                                                                |
-| `CrmSyncGuard`             | Nest guard that refuses the request when `isEnabled` is false or `validateConfig` throws.                                            |
-| `@CrmSync(enabled?)`       | Decorator that stamps the `crm_sync` metadata key. Currently informational — no consumer reads it (see OQ-5).                       |
-| `RetryUtils.withRetry`     | Retry helper: exponential back-off with last-error re-throw.                                                                         |
-| `MappingUtils`             | EverWorks → Twenty wire-format mappers + `validate*Data` helpers.                                                                     |
+| Entity / concept       | Description                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TwentyContact`        | Twenty CRM person — `firstName`, `lastName`, `email`, `phone`, `position`, `companyId`, `avatarUrl`, plus standard `id`/timestamps.         |
+| `TwentyOrganization`   | Twenty CRM company — `name`, `domainName`, `address`, `employees`, `linkedinUrl`, `xUrl`, `annualRecurringRevenue`, `idealCustomerProfile`. |
+| `TwentyProduct`        | Twenty CRM product — `name`, `description`, `price`, `currency`, `category`.                                                                |
+| `TwentyDeal`           | Twenty CRM deal — `title`, `amount`, `currency`, `stage`, `probability`, `companyId`, `personId`.                                           |
+| `EverWorksClient`      | Platform-side client/customer — `name` (single field, split at the boundary), `email`, `phone`, `companyId`, `position`.                    |
+| `EverWorksCompany`     | Platform-side company — `name`, `website`, `description`, `industry`, `size`.                                                               |
+| `EverWorksItem`        | Platform-side item — `name`, `description`, `price`, `currency`, `category`, `companyId`, `clientId`.                                       |
+| `CrmTenantContext`     | `(tenantId, workId?, userId?)` — derived by `CrmTenantService.resolveTenantContext` and consumed by tenant-aware callers.                   |
+| `CrmConfigService`     | Reads `TWENTY_CRM_*` env vars; gates the integration via `isEnabled`.                                                                       |
+| `CrmSyncGuard`         | Nest guard that refuses the request when `isEnabled` is false or `validateConfig` throws.                                                   |
+| `@CrmSync(enabled?)`   | Decorator that stamps the `crm_sync` metadata key. Currently informational — no consumer reads it (see OQ-5).                               |
+| `RetryUtils.withRetry` | Retry helper: exponential back-off with last-error re-throw.                                                                                |
+| `MappingUtils`         | EverWorks → Twenty wire-format mappers + `validate*Data` helpers.                                                                           |
 
 ## 6. Out of Scope
 

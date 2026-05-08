@@ -18,7 +18,7 @@ without copying anything) — and routes each through a different
 import path while sharing common analyzer + executor infrastructure.
 
 This spec covers the **source-repo analyzer** (auto-detection), the
-**three import paths**, the **`works.yml` integration**, the
+**three import paths**, the **`.works/works.yml` integration**, the
 **enrichment prompt** for Awesome imports, and the
 **post-completion sync** that ensures the resulting work looks
 identical to one created via AI Creation.
@@ -61,10 +61,10 @@ of source the URL points at. The algorithm:
 1. Resolve the URL to `(owner, repo)`. Strip protocol and `.git`.
 2. Verify it exists via `GitFacadeService.repositoryExists`.
 3. Probe for **data-repo markers**:
-    - `works.yml` at root
+    - `.works/works.yml` at root
     - `data/` work with at least one item file
     - `categories.yml` (optional but indicative)
-    - root `works.yml` (see [`works-config`](../features/works-config/spec.md))
+    - root `.works/works.yml` (see [`works-config`](../features/works-config/spec.md))
 4. Probe for **Awesome README markers**:
     - `README.md` with at least 5 link-list entries
     - Repo description containing "awesome" or repo name starting `awesome-`
@@ -105,8 +105,8 @@ snappy.
 Source repo                          Platform
     │                                    │
     ├─ clone ───────────────────────────▶│
-    │                                    ├─ read works.yml
-    │                                    ├─ read works.yml (if present)
+    │                                    ├─ read .works/works.yml
+    │                                    ├─ read .works/works.yml (if present)
     │                                    ├─ read categories.yml
     │                                    ├─ read tags.yml
     │                                    ├─ read collections.yml
@@ -250,7 +250,7 @@ if (sourceType === 'data-repo') {
 	} else {
 		work.dataRepository = parseRepositoryReference(input.sourceUrl);
 	}
-	await this.copyEntities(work); // members, plugins, schedule from works.yml
+	await this.copyEntities(work); // members, plugins, schedule from .works/works.yml
 	return { workId: work.id };
 }
 
@@ -262,9 +262,9 @@ return { workId: work.id };
 Each branch ends with a `work_imported` activity-log entry
 recording the source type and source URL.
 
-## 8. `works.yml` Integration
+## 8. `.works/works.yml` Integration
 
-When importing a data repo, the executor reads `works.yml` from the
+When importing a data repo, the executor reads `.works/works.yml` from the
 source via `WorksConfigService` (see
 [`features/works-config/spec`](../features/works-config/spec.md)) and
 uses its values to:
@@ -275,7 +275,7 @@ uses its values to:
   `contentExtractor` from `providers`.
 - Pre-set the schedule cadence from `schedule`.
 
-This means a data repo with a `works.yml` round-trips cleanly between
+This means a data repo with a `.works/works.yml` round-trips cleanly between
 Ever Works instances — export from one, import into another, end up
 with the same configuration without the user re-entering it.
 
