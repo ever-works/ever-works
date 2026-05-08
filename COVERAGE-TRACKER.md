@@ -229,7 +229,7 @@ known to lack a Spec Kit feature folder:
       user-documented; the onboarding surface is captured implicitly via
       the well-known controller, which hosts the public agent-card
       endpoint and could be a follow-up `well-known.md` page.
-- [x] `docs/architecture/*` — audit completed 2026-05-08. No stale
+- [x] `docs/architecture/*` — audit completed 2026-05-08 ([#547](https://github.com/ever-works/ever-works/pull/547)). No stale
       `directory`/`directories` references remain after the
       Directory→Work rename (PR #436) — `grep -ri 'director' docs/architecture/`
       returns zero matches. Refreshed `docs/architecture/agent-package.md`
@@ -252,7 +252,7 @@ known to lack a Spec Kit feature folder:
       `event-system`, `events-deep-dive`, `generator-system`, etc.)
       do not reference the legacy `directory.yml` shape and need no
       edits.
-- [x] `docs/devops/*` — added 2026-05-08 at `docs/devops/k8s-e2e-runbook.md`
+- [x] `docs/devops/*` — added 2026-05-08 ([#547](https://github.com/ever-works/ever-works/pull/547)) at `docs/devops/k8s-e2e-runbook.md`
       (registered in `apps/docs/sidebarsPlatform.ts` at sidebar position 15,
       after `devops/kubernetes`). Documents the `.github/workflows/k8s-e2e.yml`
       job (#464): the `paths:` filter that gates the workflow on
@@ -285,7 +285,37 @@ known to lack a Spec Kit feature folder:
 - [ ] CLI (`apps/cli`) — add command-level snapshot tests via esbuild + node.
 - [ ] Internal CLI (`apps/internal-cli`) — `nest-commander` testing module.
 - [ ] Admin app (`apps/admin`) — once routes stabilize.
-- [ ] MCP server (`apps/mcp`) — already has 7 spec files; audit edge cases.
+- [x] MCP server (`apps/mcp`) — audit completed 2026-05-08. The
+      7 prior spec files (`api-client.service`, `api-error`,
+      `mcp-config`, `openapi-loader`, `sanitize`, `schema-converter`,
+      `tool-registration`) cover the OpenAPI-tool registration
+      pipeline, the API client, and config / sanitisation utilities.
+      Added 4 new spec files (33 tests) to cover the four remaining
+      uncovered surfaces: `ping.tool.spec.ts` (4 tests — single
+      `text` content envelope w/ `pong` body, fresh-envelope-per-call
+      no-shared-state, sync-not-Promise return),
+      `health.controller.spec.ts` (3 tests — `{status:'ok'}` envelope,
+      fresh-object-per-call, sync return), `api-key.guard.spec.ts`
+      (9 tests — `EVER_WORKS_API_KEY` unset / empty-string falsy /
+      `request.headers` undefined / Authorization-missing / wrong-scheme
+      `Basic …` / wrong-key value / case-mismatched `bearer …` (strict
+      equality, NOT case-insensitive) / trailing-whitespace token /
+      exact-match `Bearer <key>` happy path),
+      `register-work.tool.spec.ts` (17 tests — 2xx envelope shape with
+      pretty-printed JSON, default `https://api.ever.works` API base
+      when `EVER_WORKS_API_URL` is unset, trailing-slash strip on
+      `EVER_WORKS_API_URL`, `X-GitHub-Token` header forwarding (token
+      MUST NOT appear in body), `Idempotency-Key` header conditional
+      on `idempotencyKey` provided, body excludes `githubToken` and
+      `idempotencyKey`, POST + Content-Type/Accept JSON headers,
+      empty-body 2xx → `{}` parse, non-JSON 2xx → `{raw}` fallback,
+      non-2xx → `isError:true` envelope w/ `HTTP <status>` text,
+      non-JSON error body → `{raw}` in error envelope, fetch-rejection
+      Error → `Ever Works API unreachable: <message>`, non-Error
+      rejection → `String(err)` coercion, GitHub token NEVER appears
+      in error envelopes (auth-error AND fetch-rejection paths both
+      asserted), all-optional-fields-omitted body shape). Total MCP
+      coverage: 11 spec files / 95 tests, all passing.
 - [ ] Performance / load tests for the standard pipeline (15 steps).
 - [ ] Visual-regression for marketing pages once those settle.
 
