@@ -19,20 +19,20 @@
 4. Update this file in the same PR (move the item to "Done", add the PR link,
    record any follow-ups discovered).
 
-## Inventory snapshot (2026-05-07, refreshed 2026-05-08)
+## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~442 across `apps/` + `packages/` (was 439
-  earlier on 2026-05-08; +3 apps/api auth provider specs landed
-  2026-05-08 — `auth-provider.service.spec.ts`, `auth-sync.service.spec.ts`,
-  `request-headers.spec.ts`, in addition to the auth controller + guard
-  batch and several other PRs in the intervening hours — see `Done` for
-  the running ledger).
+- **Spec files (`*.spec.ts`)**: ~443 across `apps/` + `packages/` (was 442
+  earlier on 2026-05-08; +1 apps/api `activity-log.controller.spec.ts`
+  landed 2026-05-09 closing the only remaining ActivityLog-module gap —
+  see `Done` for the running ledger).
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
-- **API source spec count**: **75** specs inside `apps/api/src/` (was 72 on
-  2026-05-08; the per-module audit landed across multiple 2026-05-07/08 PRs
-  and the auth-providers PR added the three newest entries — every file
-  under `apps/api/src/auth/` except the abstract base and types declarations
-  now has a unit suite).
+- **API source spec count**: **80** specs inside `apps/api/src/` (was 75 on
+  2026-05-08; the four new entries in the intervening hours are the
+  auth-controllers + guard batch — `auth.controller.spec.ts`,
+  `oauth.controller.spec.ts`, `api-keys.controller.spec.ts`,
+  `auth-session.guard.spec.ts` — the deploy-controller suite
+  (`deploy.controller.spec.ts`), and the activity-log controller suite
+  (`activity-log.controller.spec.ts`).
 - **Spec Kit features (`docs/specs/features/`)**: 33 directories (was 24 on
   2026-05-07; +9 retrospective specs authored on 2026-05-08).
 - **Plugins with ZERO unit tests (14)**: ALL closed as of 2026-05-07 —
@@ -236,6 +236,36 @@ service-level unit tests (Jest + `@nestjs/testing`) for:
       env-driven enable/disable + payload mapping) and
       `ActivityLogListener` (25 tests covering all 9 `@OnEvent`
       handlers, both happy + error paths) — [#482](https://github.com/ever-works/ever-works/pull/482).
+      `ActivityLogController` covered 2026-05-09 — 33 tests in
+      `activity-log.controller.spec.ts` covering all five endpoints
+      (`getActivities`/`getRunningCount`/`getSummary`/`exportCsv`/`getActivity`)
+      plus the private `reconcileActivities` helper observable through
+      the endpoints. Pins: in-flight `Map` per-user dedup (two concurrent
+      callers run reconcile once), 5-second `ACTIVITY_RECONCILE_TTL_MS`
+      cache (call within 5s skips, call past 5.001s retries), reconcile
+      rejection swallowed AND completedAt NOT cached so the next call
+      retries (vs. successful runs that ARE cached for 5s), per-user
+      isolation (different `userId`s run independently and forward the
+      correct positional arg), reconcile-before-service ordering pinned
+      via shared `order` array on every endpoint; `getActivities` query
+      forwarding (every filter forwarded, ISO `dateFrom`/`dateTo` parsed
+      to `Date`, `Math.min(limit, 100)` cap incl. boundary `limit=100`,
+      `{activities, total}` envelope shape so service-side extras don't
+      leak); `getRunningCount` `{count}` envelope; `getSummary` `{counts}`
+      envelope; `exportCsv` filter forwarding + `Content-Type: text/csv`
+      and `Content-Disposition: attachment; filename=activity-log.csv`
+      headers + body via `res.send`, error path skips both header writes
+      and `send`; `getActivity` `NotFoundException` on null lookup
+      (cross-user safety via composite-key `findByIdAndUserId`),
+      `details ?? {}` default coercion when activity has no details,
+      live-logs override behaviour (status===`'in_progress'` AND
+      `workId` AND `work.generateStatus.recentLogs.length>0` →
+      override; otherwise preserve `activity.details.liveLogs`; null
+      work / no `generateStatus` / empty `recentLogs` / missing `workId`
+      all preserve original; no `liveLogs` key injected when activity
+      had none and override path didn't fire). Mocks
+      `@ever-works/agent/{activity-log,database,entities}` so the
+      transitive TypeORM/agent runtime trees aren't pulled in.
 - [x] `auth/services/api-key.service` (15 tests, 2026-05-07) — `ApiKeyService` covering create (10-key cap, expiresAt-in-past rejection, ew*live* prefix + sha256 hashing, future expiresAt, unique-key generation), list/revoke, and validate (sha256 lookup, null-when-missing, null-when-expired, null-expiresAt = never-expiring, fire-and-forget updateLastUsed swallowing failure).
 - [x] `auth/services/auth.service` (45 tests, 2026-05-07) — `AuthService` covering assertCanRegister, validateSocialUser (new user creation with trusted-email emit, unverified-email gating, suspended-account rejection, provider-link bypass, upsertProviderAccount field mapping), sendVerificationEmail (24h expiry, callback URL token-append vs default), verifyEmail, forgotPassword (1h expiry, callback URL handling, generic-message safety), getUserByPasswordResetToken, consumePasswordResetToken, getUser, getUserProfile (sensitive-field stripping, github repo-scope gating, expired-token filtering), updateUserProfile (selective field updates, committer-field clearing semantics), validateEmailVerificationToken, validatePasswordResetToken.
 - [x] `auth/services/social-auth.service` (37 tests, 2026-05-07) — `SocialAuthService` covering all four OAuth providers (GitHub/Google/Facebook/LinkedIn): `getAuthorizationUrl` (default vs override callback+state, Google access_type=offline+prompt=consent, Facebook comma scope separator, LinkedIn default space separator, unknown provider + missing client id rejection); `getProviderDisplayName` for all four + unknown; `getConfiguredProviders` (full env, missing client id/secret, empty); `authenticate` (GitHub full flow w/o `grant_type` + `/user` + `/user/emails` resolution via `resolveGitHubAccountEmail`, displayName fallback chain login→email-local-part; Google emailVerified default-true vs explicit false, expires_in→expiresAt computation; Facebook always-false emailVerified, picture nesting; LinkedIn OIDC userinfo + given/family fallback + locale metadata; missing access_token, missing email per provider, missing client id/secret, unknown provider; readNumber/readOptionalString edge cases). HttpService mocked with rxjs `of()`.
