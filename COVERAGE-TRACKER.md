@@ -326,6 +326,27 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
+**2026-05-09 — packages/agent error-classification.utils direct coverage (+68 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/services/utils/error-classification.utils.ts` (133 LOC) — a substring-pattern dispatcher used by `WorkGenerationService.handleErrorNotification` to map raw provider/git errors into one of five user-facing notification flavours. The classification rules are documented order-sensitive (`ai_credits` → `ai_provider` → `git_auth` → `account_level` → `unknown`) AND substring-overlap-sensitive: `'authentication'` matches BOTH `isAiProviderError` AND `isGitAuthError`'s second leg, so a git authentication failure is only classified as `git_auth` when the message ALSO contains `'git'`/`'github'`/`'gitlab'` AND the second leg keyword is one of `token`/`expired`/`permission denied` (the only ones not already in `ai_provider`'s pattern). The new file is `packages/agent/src/services/utils/error-classification.utils.spec.ts` and pins:
+
+- **Input shape coercion (8 tests)** — `Error`/`TypeError` `.message` passthrough; raw-string passthrough; `String(error)` coercion for number/null/undefined/object-literal (`'404'`/`'null'`/`'undefined'`/`'[object Object]'`); the `errorLower` lowercasing is internal-only (the returned `result.message` preserves the original case so a UI rendering it preserves the upstream casing).
+- **`ai_credits` priority (8 tests)** — every documented substring (`insufficient_quota`, `rate_limit`, `quota exceeded`, `credits`, `billing`, `exceeded your current quota`); case-insensitive match via internal lowercasing; beats `ai_provider` AND `account_level` when both substrings co-occur (priority pin so a future re-ordering of the four `if` checks is a deliberate behavioural shift).
+- **`ai_provider` (6 tests)** — every documented substring (`invalid_api_key`, `authentication`, `unauthorized`, `api key`); mixed-case `API Key` lowercasing; does NOT also classify as `git_auth` for a plain `'authentication failure'` (the git_auth path requires both legs of an AND).
+- **`git_auth` (8 tests)** — only reachable via the second-leg keywords NOT in `ai_provider` (`token`/`expired`/`permission denied`) combined with `git`/`github`/`gitlab`; explicitly pinned that `'github authentication failed'` and `'gitlab unauthorized'` are intercepted by `ai_provider` first (priority pin); the AND-gate first leg pinned (a bare `'git pull failed'` falls through to `unknown`).
+- **`account_level` (5 tests)** — `account` / `subscription` / `plan limit` / `not configured`; emits empty `provider`.
+- **`unknown` fallback (4 tests)** — random/empty inputs; pinned to return `provider: ''` and `message` verbatim.
+- **`detectAiProvider` (10 tests)** — exercised via `ai_credits`/`ai_provider` paths: `openai` → `OpenAI`, `anthropic`/`claude` → `Anthropic`, `google`/`gemini` → `Google`, `groq` → `Groq`, `ollama` → `Ollama`, `openrouter` → `OpenRouter`, fallback `'AI Provider'`; first-match-wins ordering pinned (`openai` beats `anthropic`; `claude` (Anthropic alias) beats `google`).
+- **`detectGitProvider` (4 tests)** — `github`/`gitlab`/`bitbucket` mapping; fallback `'Git Provider'` for the bare `git` keyword; first-match ordering (`github` beats `gitlab` when both appear).
+- **Return shape contract (2 tests)** — every return is exactly `{type, provider, message}`; `type` is always one of the five documented `ErrorClassificationType` literals.
+- **`notifyForClassifiedError` dispatch routing (5 tests)** — `ai_credits` → `notifyAiCreditsDepleted(userId, provider, message)`; `ai_provider` → `notifyAiProviderError(userId, provider, message)`; `git_auth` → `notifyGitAuthExpired(userId, provider)` (message DROPPED — pinned via call-args length); `account_level` → `notifyGenerationAccountError(userId, workId, workName, message)` (provider DROPPED); `unknown` → silent no-op (no notifier invoked, the `switch` has no `default` branch).
+- **Rejection propagation (2 tests)** — Error rejection from a notifier propagates verbatim; non-Error rejection (e.g. a string) is NOT String-coerced — propagated by-reference.
+- **Await semantics (1 test)** — the chosen notifier is awaited before `notifyForClassifiedError` resolves (sequential ordering pin via shared `ops` array + microtask boundary).
+
+Total agent-package suite: 3588 → 3656 tests across 169 → 170 suites, all green.
+
+---
+
 **2026-05-09 — packages/agent PipelineOrchestratorService + comparison/types direct coverage (+44 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [#668](https://github.com/ever-works/ever-works/pull/668))**
 
 Two previously-uncovered files in the agent package closed in a single sweep (the parallel scheduled-task run combined them on a shared branch):
