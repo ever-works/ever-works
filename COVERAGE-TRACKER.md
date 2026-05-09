@@ -343,7 +343,28 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent UserPluginRepository direct coverage (+33 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent PluginRepository direct coverage (+37 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/plugins/repositories/plugin.repository.ts` (183 LOC) — the TypeORM-wrapper repository for `plugins` rows (the `pluginId`-unique catalogue of installed plugin entities + their lifecycle state + scoped settings). The repository is consumed across `PluginRegistryService`, `PluginLifecycleManagerService`, `PluginSettingsService`, and the `apps/api` plugins controllers; pinning the query shape protects every downstream caller from a silent driver swap or a relation-key change. The new file is `packages/agent/src/plugins/repositories/plugin.repository.spec.ts` and pins:
+
+- **`create` (1 test)** — proxies through `repository.create(data)` then `repository.save(...)`.
+- **`findByPluginId` / `findById` (4 tests)** — `where: { pluginId }` / `where: { id }` lookup, NO relation hints (plugins is a flat table — pinned so a future "join in a relation" tweak is deliberate); null passthrough when no row.
+- **`findAll` defensive `where`-builder (6 tests)** — omits `where` entirely (returns `find({order: name ASC})` w/o a `where` key) when no options are provided OR when all options are undefined; builds a `where` with each provided field individually; combines multiple fields when present (category + state + builtIn); `builtIn: false` STILL adds the filter — the predicate is `!== undefined` (NOT truthy-check) so a literal `false` is NOT silently dropped; always orders by `name: ASC` (alphabetical UI list).
+- **`findByCategory` (1 test)** — `where: { category }` + `order: { name: 'ASC' }`.
+- **`findByCapability` in-memory filter (2 tests)** — pulls the full table then filters in-memory by `capabilities.includes(...)` (intentional — the array-typed `capabilities` column has driver-specific SQL handling: Postgres `&&`/`@>`, MySQL `JSON_CONTAINS`, sqljs has neither — the in-memory filter keeps the repository driver-agnostic, pinned so a future "switch to SQL-side array contains" optimisation is a deliberate, driver-targeted diff); empty-array fallback when no plugin advertises the capability.
+- **`findByPluginIds` empty-array short-circuit (2 tests)** — short-circuits to `[]` on empty input WITHOUT touching `repository.find` (avoids the invalid `WHERE pluginId IN ()` SQL); forwards non-empty IDs via TypeORM `In(...)`.
+- **`updateByPluginId` / `update (by id)` (3 tests)** — UPDATE + re-fetch via `findByPluginId`/`findById` (TypeORM's `Repository.update` resolves to an `UpdateResult` w/ no entity — every caller depends on the refetch); null passthrough when refetch finds nothing.
+- **`updateState` (5 tests)** — writes new state via updateByPluginId; does NOT stamp `loadedAt` for non-loaded states (e.g. `'error'`, pinned because `loadedAt` is the "last SUCCESSFUL load" timestamp shown in the UI — a future "always update loadedAt" tweak that would make every error event LOOK like a successful load is a deliberate diff); STAMPS `loadedAt = new Date()` only when state === 'loaded' (verified within `before`/`after` `Date.now()` window); forwards `error` when provided — predicate `error !== undefined` (NOT truthy-check) so empty-string clears prior error rather than being silently dropped; omits `lastError` from write when error arg is undefined.
+- **`updateSettings` (3 tests)** — writes only `settings` when secretSettings is omitted; includes secretSettings when provided; **CRITICAL contract**: `secretSettings = {}` (empty object) forwarded verbatim, NOT collapsed to undefined (predicate `secretSettings !== undefined`).
+- **`deleteByPluginId` / `delete (by id)` (5 tests)** — `(affected ?? 0) > 0` predicate; both methods return false on 0 / undefined.
+- **`exists` (3 tests)** — uses `count` (NOT findOne) for cheaper presence check; predicate `> 0` (NOT `=== 1`) — defensive against driver-level duplicates; false on `count === 0`.
+- **`upsert` (2 tests)** — finds existing → UPDATE + refetch (NO `create`/`save` call); finds none → `create` then `save` (NO `update` call).
+
+Total agent-package suite: +37 tests across 1 new suite, all green.
+
+---
+
+**2026-05-09 — packages/agent UserPluginRepository direct coverage (+33 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#677](https://github.com/ever-works/ever-works/pull/677))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/plugins/repositories/user-plugin.repository.ts` (165 LOC) — the TypeORM-wrapper repository for `user_plugins` rows (the `(userId, pluginId)`-unique table that holds per-user plugin enable state + scoped settings). The repository is consumed across `PluginRegistryService`, `PluginSettingsService`, `PluginOperationsService`, and the `apps/api` controllers; pinning the query shape protects every downstream caller from a silent driver swap or a relation-key change. The new file is `packages/agent/src/plugins/repositories/user-plugin.repository.spec.ts` and pins:
 
