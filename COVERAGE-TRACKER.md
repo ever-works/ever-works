@@ -26,176 +26,176 @@
   validator + comparison-generator types/prompt-keys sweep — adds
   `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
   (49 tests on the 122-LOC pure-function validator — every top-level guard
-  + every per-field branch + the aggregate-errors contract + the
-  `validatePipelineResultOrThrow` plugin-id-segment / falsy-empty-string
-  branch),
-  `packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`
-  (5 tests pinning the three `comparison.<name>` wire strings consumed by
-  Langfuse + the writer fallback), and
-  `packages/agent/src/comparison-generator/comparison/types.spec.ts`
-  (26 tests pinning `DEFAULT_COMPARISON_SETTINGS` four-key literal +
-  deliberate optional-field omission + module-singleton identity +
-  `ComparisonProgressStage` exhaustive-union runtime tuple); +1 net spec
-  file in the prior agent `sanitize.util`
-  direct-coverage sweep — adds
-  `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` (54 tests
-  on the security-critical 213-LOC sanitization utility — `sanitizeText`
-  default-options matrix + every override toggle independently pinned +
-  the `maxLength:0` falsy-zero gotcha + documented operation order
-  control-strip → newline-replace → collapse → trim → maxLength;
-  `sanitizeDescription` 500-char cap; `sanitizeName` 100-char cap;
-  `sanitizePrompt` 5000-char cap w/ newlines AND multi-space runs
-  preserved; `sanitizeObject` recursive walk w/ non-mutation guarantee
-    - array-element recursion + null-guard; `sanitizeStringTransform`
-      and `sanitizeDescriptionTransform` class-transformer adapters;
-      `sanitizeStringArray` falsy/non-array → `[]` + per-entry sanitise +
-      post-filter empty-string drop), closing the security-critical
-      zero-coverage gap on the most-imported utility in the agent package
-      — see `Done` ledger; +3 net spec files in the prior agent
-      database-helpers + enrichment-prompt utility sweep — adds
-      `packages/agent/src/database/utils/helper.spec.ts` (16 tests on
-      `getTlsOptions` + `parseDatabaseUrl`),
-      `packages/agent/src/database/database-config.factory.spec.ts`
-      (27 tests on the 7 documented `DatabaseConfigurations` entries +
-      `createDatabaseModuleWithEnv` env-write contract + cross-config
-      invariant), and `packages/agent/src/import/enrichment-prompt.utils.spec.ts`
-      (21 tests on `buildImportGenerationDto` covering name fallback,
-      hardcoded generation_method/website_repository_creation_method,
-      pluginConfig defaults, providers default-agent-pipeline merging, and
-      the prompt's expansion-factor matrix + four-step header ordering +
-      legal-safety + 30%-cap directives). Closes three previously-uncovered
-      tiny utility files in `packages/agent/src/` covering 279 LOC of
-      source. Total agent-package suite: 3185 → 3249 tests across 154 → 157
-      suites — see `Done` ledger; +10 net spec files in the prior agent
-      NestJS-module wiring sweep — adds `*.module.spec.ts` for ALL 10
-      previously-uncovered modules in `packages/agent/src/`: `work-operations`,
-      `notifications`,
-      `activity-log`, `community-pr`, `template-catalog`,
-      `comparison-generator`, `pipeline`, `import`,
-      `generators/website-generator`, `generators/data-generator`. 50 tests
-      across the 10 specs pinning the standard `Reflect.getMetadata`-based
-      provider/exports/imports shape (with documented per-module length
-      invariants so a silent extra-import is a deliberate change), plus
-      barrel re-exports where present. Each spec mocks transitive
-      ESM-only / TypeORM-pulling dependencies (`DatabaseModule`,
-      `FacadesModule`, `data-generator.service` w/ `p-map`, etc.) at module
-      scope — same pattern as the existing `markdown-generator.module.spec.ts`
-      / `account-transfer.module.spec.ts` / `subscriptions.module.spec.ts`.
-      This closes the agent-package NestJS-module zero-coverage gap entirely
-      (every `*.module.ts` under `packages/agent/src/` now has a co-located
-      spec). Highlights: `WorkOperationsModule`'s deliberate
-      `DatabaseModule` re-export pinned; `CommunityPrModule`'s
-      `DistributedTaskLockService` provided locally but NOT exported pinned;
-      `DataGeneratorModule`'s `WorksConfigService`/`WorksConfigWriterService`
-      helpers provided but NOT exported pinned; `PipelineModule`'s
-      intentional non-import of `PluginsModule` (which is `forRoot`-global)
-      pinned; — see `Done` ledger; +2 net spec files
-      in the prior agent `MarkdownGeneratorService` direct-coverage sweep — adds
-      `packages/agent/src/generators/markdown-generator/markdown-generator.service.spec.ts`
-      (49 tests on the 508-LOC orchestrator) and
-      `packages/agent/src/generators/markdown-generator/markdown-generator.module.spec.ts`
-      (5 tests pinning the module providers/exports + barrel runtime symbols),
-      closing the per-file zero-coverage gap inside
-      `packages/agent/src/generators/markdown-generator/` for the orchestrator
-      surface — see `Done` ledger; +1 net spec file in the prior agent
-      `WebsiteUpdateService` direct-coverage sweep — adds
-      `packages/agent/src/generators/website-generator/website-update.service.spec.ts`
-      (26 tests covering `updateRepository` duplicate-then-template
-      fallback chain w/ wrapped "All update methods failed" rethrow,
-      `options.branch` override + `getLatestCommit` null-coercion +
-      falsy-`branchSync` coercion; `ensureTemplateDefaultBranch`
-      best-effort warn-and-continue across listing-fail / branch-missing
-      / non-Error rejection / `updateRepository`-fail; thin
-      `syncAllBranchesFromTemplate` delegate; `checkForUpdate`
-      four-branch projection w/ beta-branch path; private `updateFork`
-      pinned via reflection; `copyRepositoryFiles` `.git`-skip +
-      recursive subdir mirror w/ rm-rejection swallowed), closing the
-      per-file zero-coverage gap inside
-      `packages/agent/src/generators/website-generator/` for the update
-      surface — see `Done` ledger; +2 net spec files in the prior agent
-      markdown-generator helper-class sweep — adds
-      `packages/agent/src/generators/markdown-generator/readme-builder.spec.ts`
-      (17 tests on the fluent `ReadmeBuilder` builder — `addHeader`/`addSubHeader`/`addParagraph`/`addNewLine` chaining,
-      `enableToC()` opt-in rendering w/ `## 📑 Table of Contents`
-        - en-US-formatted counts + duplicate-slug `-1`/`-2` disambiguation
-          via github-slugger + `0` rendered as `(0)` not omitted, `addItem`
-          format `- [name](url) - description` + optional `([Read more](/details/<slug>.md))` + backtick-wrapped tag
-          list joined w/ spaces, end-to-end document shape) and
-          `packages/agent/src/generators/markdown-generator/markdown-repository.spec.ts`
-          (13 tests on the on-disk repository helper — `cleanup` recursive
-          `rm`, `resetFiles` allowlist (`.git`, `.gitignore`, `.github`,
-          `.vscode`, `.env`, `.nvmrc`, plus every dotfile starting with
-          `.git`) + sequential await-per-iteration removal order +
-          `readdir`-failure short-circuit, `ensureWorksExist` recursive
-          mkdir of `details/`, `writeReadme`/`writeDetails`/`writeLicense`
-          utf-8 writes, `removeDetails` rm with `force:true` only — NOT
-          recursive, the public readonly `dir` field, and the `dir` →
-          `dir/details` derivation contract — `node:fs/promises` is mocked at
-          module scope so the suite never touches the real filesystem),
-          closing the markdown-generator helper-class zero-coverage gap (the
-          remaining file in the subdir is `markdown-generator.service.ts`,
-          508 LOC, deferred to a dedicated follow-up) — see `Done` ledger;
-          +1 net spec file in the prior agent
-          `BranchSyncService` direct-coverage sweep — adds
-          `packages/agent/src/generators/website-generator/branch-sync.service.spec.ts`
-          (24 tests covering `syncBranch` clone-rename-replaceRemote-push-cleanup
-          pipeline + temp-dir cleanup on failure paths, `syncAllBranches`
-          branch-mapping expansion + skip-mapped-target rule + sequential
-          `MAX_CONCURRENT_SYNCS=1` semantics + per-batch 1000ms inter-batch
-          delay + `Promise.allSettled` rejection-to-error-result coercion +
-          optional `cleanupExtraBranches` purge w/ swallowed delete failures
-            - warn-and-return-early on `listBranches` failure, `syncFromTemplate`
-              beta-branch-mapping construction + outer try/catch null fallback +
-              resolveForWork-rethrow pin), closing the per-file zero-coverage gap
-              inside `packages/agent/src/generators/website-generator/` for the
-              branch-sync surface — see `Done` ledger; +2 net spec files in the
-              earlier agent `BaseFacadeService`/`FacadesModule` direct-coverage
-              sweep — adds
-              `packages/agent/src/facades/__tests__/base.facade.spec.ts` (66 tests
-              on the abstract base via a `TestFacadeService extends BaseFacadeService`
-              re-exposer) and `packages/agent/src/facades/__tests__/facades.module.spec.ts`
-              (9 tests pinning the module providers/exports + barrel runtime symbols),
-              closing the per-file zero-coverage gap inside `packages/agent/src/facades/`
-              — see `Done` ledger; +0 net spec files in the WorkGenerationService
-              orchestrators follow-up sweep — extends the existing
-              `services/__tests__/work-generation.service.spec.ts` from 126 → 172
-              tests, closing the previously-pending 7 multi-step pipeline orchestrators
-              (`processGeneration` / `executeGenerationPipeline` / `finalizeGeneration` /
-              `runInProcessGeneration` / `prepareProviders` /
-              `ensureProvidersEnabledForWork` / `dispatchGenerationTask`) — see `Done`
-              ledger; **the WorkGenerationService private-orchestrator zero-coverage
-              gap is now empty.** The earlier 2026-05-09 sweep covered 7 simpler
-              helpers: `resolveGenerationFinalStatus` / `resolveGenerationErrorMessage` /
-              `buildScheduleRunOutcome` / `isNonFatalWebsiteGenerationError` /
-              `markGenerationStarted` / `finalizeCancelledGeneration` /
-              `handleErrorNotification`; +1 packages/agent service spec landed 2026-05-09
-              in the small-service coverage sweep #6 — `WorkGenerationService` (focused
-              first sweep covering wrapper / simpler methods) — see `Done` ledger; +1 packages/agent service spec
-              landed earlier 2026-05-09
-              in the small-service coverage sweep #5 — `ItemHealthService` — see
-              `Done` ledger;
-              +1 packages/agent service spec landed earlier 2026-05-09
-              in the small-service coverage sweep #4 — `WorkTaxonomyService` — see
-              `Done` ledger;
-              +1 packages/agent service spec landed earlier 2026-05-09
-              in the small-service coverage sweep #3 — `WorkMemberService` — see
-              `Done` ledger;
-              +3 packages/agent service specs landed earlier 2026-05-09
-              in the small-service coverage sweep #2 — `ItemSourceValidationSchedulerService` +
-              `WorkDetailService` + `RepositoryManagementService` — see `Done` ledger;
-              +2 packages/agent service specs landed earlier 2026-05-09
-              in the small-service coverage sweep — `WorkAdvancedPromptsService` +
-              `WorkWebsiteRepositoryStateService` — see `Done` ledger;
-              +1 prior packages/agent service spec landed 2026-05-09
-              in the WorkOwnershipService sweep — see `Done` ledger; +4 packages/agent
-              repository specs landed earlier 2026-05-09
-              in sweep #3: activity-log + notification + work-member + work — closing the
-              agent-package repository zero-coverage gap entirely; +4 in the previous
-              sweep #2: work-custom-domain + user + conversation + template; +8 in
-              the prior sweep — subscription-plan + work-advanced-prompts +
-              user-template-preference + user-subscription + usage-ledger +
-              webhook-subscription + refresh-token + onboarding-request. See `Done`
-              for the running ledger).
+    - every per-field branch + the aggregate-errors contract + the
+      `validatePipelineResultOrThrow` plugin-id-segment / falsy-empty-string
+      branch),
+      `packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`
+      (5 tests pinning the three `comparison.<name>` wire strings consumed by
+      Langfuse + the writer fallback), and
+      `packages/agent/src/comparison-generator/comparison/types.spec.ts`
+      (26 tests pinning `DEFAULT_COMPARISON_SETTINGS` four-key literal +
+      deliberate optional-field omission + module-singleton identity +
+      `ComparisonProgressStage` exhaustive-union runtime tuple); +1 net spec
+      file in the prior agent `sanitize.util`
+      direct-coverage sweep — adds
+      `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` (54 tests
+      on the security-critical 213-LOC sanitization utility — `sanitizeText`
+      default-options matrix + every override toggle independently pinned +
+      the `maxLength:0` falsy-zero gotcha + documented operation order
+      control-strip → newline-replace → collapse → trim → maxLength;
+      `sanitizeDescription` 500-char cap; `sanitizeName` 100-char cap;
+      `sanitizePrompt` 5000-char cap w/ newlines AND multi-space runs
+      preserved; `sanitizeObject` recursive walk w/ non-mutation guarantee
+        - array-element recursion + null-guard; `sanitizeStringTransform`
+          and `sanitizeDescriptionTransform` class-transformer adapters;
+          `sanitizeStringArray` falsy/non-array → `[]` + per-entry sanitise +
+          post-filter empty-string drop), closing the security-critical
+          zero-coverage gap on the most-imported utility in the agent package
+          — see `Done` ledger; +3 net spec files in the prior agent
+          database-helpers + enrichment-prompt utility sweep — adds
+          `packages/agent/src/database/utils/helper.spec.ts` (16 tests on
+          `getTlsOptions` + `parseDatabaseUrl`),
+          `packages/agent/src/database/database-config.factory.spec.ts`
+          (27 tests on the 7 documented `DatabaseConfigurations` entries +
+          `createDatabaseModuleWithEnv` env-write contract + cross-config
+          invariant), and `packages/agent/src/import/enrichment-prompt.utils.spec.ts`
+          (21 tests on `buildImportGenerationDto` covering name fallback,
+          hardcoded generation_method/website_repository_creation_method,
+          pluginConfig defaults, providers default-agent-pipeline merging, and
+          the prompt's expansion-factor matrix + four-step header ordering +
+          legal-safety + 30%-cap directives). Closes three previously-uncovered
+          tiny utility files in `packages/agent/src/` covering 279 LOC of
+          source. Total agent-package suite: 3185 → 3249 tests across 154 → 157
+          suites — see `Done` ledger; +10 net spec files in the prior agent
+          NestJS-module wiring sweep — adds `*.module.spec.ts` for ALL 10
+          previously-uncovered modules in `packages/agent/src/`: `work-operations`,
+          `notifications`,
+          `activity-log`, `community-pr`, `template-catalog`,
+          `comparison-generator`, `pipeline`, `import`,
+          `generators/website-generator`, `generators/data-generator`. 50 tests
+          across the 10 specs pinning the standard `Reflect.getMetadata`-based
+          provider/exports/imports shape (with documented per-module length
+          invariants so a silent extra-import is a deliberate change), plus
+          barrel re-exports where present. Each spec mocks transitive
+          ESM-only / TypeORM-pulling dependencies (`DatabaseModule`,
+          `FacadesModule`, `data-generator.service` w/ `p-map`, etc.) at module
+          scope — same pattern as the existing `markdown-generator.module.spec.ts`
+          / `account-transfer.module.spec.ts` / `subscriptions.module.spec.ts`.
+          This closes the agent-package NestJS-module zero-coverage gap entirely
+          (every `*.module.ts` under `packages/agent/src/` now has a co-located
+          spec). Highlights: `WorkOperationsModule`'s deliberate
+          `DatabaseModule` re-export pinned; `CommunityPrModule`'s
+          `DistributedTaskLockService` provided locally but NOT exported pinned;
+          `DataGeneratorModule`'s `WorksConfigService`/`WorksConfigWriterService`
+          helpers provided but NOT exported pinned; `PipelineModule`'s
+          intentional non-import of `PluginsModule` (which is `forRoot`-global)
+          pinned; — see `Done` ledger; +2 net spec files
+          in the prior agent `MarkdownGeneratorService` direct-coverage sweep — adds
+          `packages/agent/src/generators/markdown-generator/markdown-generator.service.spec.ts`
+          (49 tests on the 508-LOC orchestrator) and
+          `packages/agent/src/generators/markdown-generator/markdown-generator.module.spec.ts`
+          (5 tests pinning the module providers/exports + barrel runtime symbols),
+          closing the per-file zero-coverage gap inside
+          `packages/agent/src/generators/markdown-generator/` for the orchestrator
+          surface — see `Done` ledger; +1 net spec file in the prior agent
+          `WebsiteUpdateService` direct-coverage sweep — adds
+          `packages/agent/src/generators/website-generator/website-update.service.spec.ts`
+          (26 tests covering `updateRepository` duplicate-then-template
+          fallback chain w/ wrapped "All update methods failed" rethrow,
+          `options.branch` override + `getLatestCommit` null-coercion +
+          falsy-`branchSync` coercion; `ensureTemplateDefaultBranch`
+          best-effort warn-and-continue across listing-fail / branch-missing
+          / non-Error rejection / `updateRepository`-fail; thin
+          `syncAllBranchesFromTemplate` delegate; `checkForUpdate`
+          four-branch projection w/ beta-branch path; private `updateFork`
+          pinned via reflection; `copyRepositoryFiles` `.git`-skip +
+          recursive subdir mirror w/ rm-rejection swallowed), closing the
+          per-file zero-coverage gap inside
+          `packages/agent/src/generators/website-generator/` for the update
+          surface — see `Done` ledger; +2 net spec files in the prior agent
+          markdown-generator helper-class sweep — adds
+          `packages/agent/src/generators/markdown-generator/readme-builder.spec.ts`
+          (17 tests on the fluent `ReadmeBuilder` builder — `addHeader`/`addSubHeader`/`addParagraph`/`addNewLine` chaining,
+          `enableToC()` opt-in rendering w/ `## 📑 Table of Contents`
+            - en-US-formatted counts + duplicate-slug `-1`/`-2` disambiguation
+              via github-slugger + `0` rendered as `(0)` not omitted, `addItem`
+              format `- [name](url) - description` + optional `([Read more](/details/<slug>.md))` + backtick-wrapped tag
+              list joined w/ spaces, end-to-end document shape) and
+              `packages/agent/src/generators/markdown-generator/markdown-repository.spec.ts`
+              (13 tests on the on-disk repository helper — `cleanup` recursive
+              `rm`, `resetFiles` allowlist (`.git`, `.gitignore`, `.github`,
+              `.vscode`, `.env`, `.nvmrc`, plus every dotfile starting with
+              `.git`) + sequential await-per-iteration removal order +
+              `readdir`-failure short-circuit, `ensureWorksExist` recursive
+              mkdir of `details/`, `writeReadme`/`writeDetails`/`writeLicense`
+              utf-8 writes, `removeDetails` rm with `force:true` only — NOT
+              recursive, the public readonly `dir` field, and the `dir` →
+              `dir/details` derivation contract — `node:fs/promises` is mocked at
+              module scope so the suite never touches the real filesystem),
+              closing the markdown-generator helper-class zero-coverage gap (the
+              remaining file in the subdir is `markdown-generator.service.ts`,
+              508 LOC, deferred to a dedicated follow-up) — see `Done` ledger;
+              +1 net spec file in the prior agent
+              `BranchSyncService` direct-coverage sweep — adds
+              `packages/agent/src/generators/website-generator/branch-sync.service.spec.ts`
+              (24 tests covering `syncBranch` clone-rename-replaceRemote-push-cleanup
+              pipeline + temp-dir cleanup on failure paths, `syncAllBranches`
+              branch-mapping expansion + skip-mapped-target rule + sequential
+              `MAX_CONCURRENT_SYNCS=1` semantics + per-batch 1000ms inter-batch
+              delay + `Promise.allSettled` rejection-to-error-result coercion +
+              optional `cleanupExtraBranches` purge w/ swallowed delete failures
+                - warn-and-return-early on `listBranches` failure, `syncFromTemplate`
+                  beta-branch-mapping construction + outer try/catch null fallback +
+                  resolveForWork-rethrow pin), closing the per-file zero-coverage gap
+                  inside `packages/agent/src/generators/website-generator/` for the
+                  branch-sync surface — see `Done` ledger; +2 net spec files in the
+                  earlier agent `BaseFacadeService`/`FacadesModule` direct-coverage
+                  sweep — adds
+                  `packages/agent/src/facades/__tests__/base.facade.spec.ts` (66 tests
+                  on the abstract base via a `TestFacadeService extends BaseFacadeService`
+                  re-exposer) and `packages/agent/src/facades/__tests__/facades.module.spec.ts`
+                  (9 tests pinning the module providers/exports + barrel runtime symbols),
+                  closing the per-file zero-coverage gap inside `packages/agent/src/facades/`
+                  — see `Done` ledger; +0 net spec files in the WorkGenerationService
+                  orchestrators follow-up sweep — extends the existing
+                  `services/__tests__/work-generation.service.spec.ts` from 126 → 172
+                  tests, closing the previously-pending 7 multi-step pipeline orchestrators
+                  (`processGeneration` / `executeGenerationPipeline` / `finalizeGeneration` /
+                  `runInProcessGeneration` / `prepareProviders` /
+                  `ensureProvidersEnabledForWork` / `dispatchGenerationTask`) — see `Done`
+                  ledger; **the WorkGenerationService private-orchestrator zero-coverage
+                  gap is now empty.** The earlier 2026-05-09 sweep covered 7 simpler
+                  helpers: `resolveGenerationFinalStatus` / `resolveGenerationErrorMessage` /
+                  `buildScheduleRunOutcome` / `isNonFatalWebsiteGenerationError` /
+                  `markGenerationStarted` / `finalizeCancelledGeneration` /
+                  `handleErrorNotification`; +1 packages/agent service spec landed 2026-05-09
+                  in the small-service coverage sweep #6 — `WorkGenerationService` (focused
+                  first sweep covering wrapper / simpler methods) — see `Done` ledger; +1 packages/agent service spec
+                  landed earlier 2026-05-09
+                  in the small-service coverage sweep #5 — `ItemHealthService` — see
+                  `Done` ledger;
+                  +1 packages/agent service spec landed earlier 2026-05-09
+                  in the small-service coverage sweep #4 — `WorkTaxonomyService` — see
+                  `Done` ledger;
+                  +1 packages/agent service spec landed earlier 2026-05-09
+                  in the small-service coverage sweep #3 — `WorkMemberService` — see
+                  `Done` ledger;
+                  +3 packages/agent service specs landed earlier 2026-05-09
+                  in the small-service coverage sweep #2 — `ItemSourceValidationSchedulerService` +
+                  `WorkDetailService` + `RepositoryManagementService` — see `Done` ledger;
+                  +2 packages/agent service specs landed earlier 2026-05-09
+                  in the small-service coverage sweep — `WorkAdvancedPromptsService` +
+                  `WorkWebsiteRepositoryStateService` — see `Done` ledger;
+                  +1 prior packages/agent service spec landed 2026-05-09
+                  in the WorkOwnershipService sweep — see `Done` ledger; +4 packages/agent
+                  repository specs landed earlier 2026-05-09
+                  in sweep #3: activity-log + notification + work-member + work — closing the
+                  agent-package repository zero-coverage gap entirely; +4 in the previous
+                  sweep #2: work-custom-domain + user + conversation + template; +8 in
+                  the prior sweep — subscription-plan + work-advanced-prompts +
+                  user-template-preference + user-subscription + usage-ledger +
+                  webhook-subscription + refresh-token + onboarding-request. See `Done`
+                  for the running ledger).
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
 - **API source spec count**: **101** specs inside `apps/api/src/` (was 95
   earlier on 2026-05-09; +6 small-utility DTO specs landed in the
