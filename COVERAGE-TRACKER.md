@@ -107,7 +107,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent BranchSyncService direct coverage (+24 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent BranchSyncService direct coverage (+24 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#644](https://github.com/ever-works/ever-works/pull/644))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/generators/website-generator/branch-sync.service.ts` (327 LOC) — the only public service in the website-generator subdir without a co-located spec (siblings `website-generator.service.ts` + `website-template-resolver.service.ts` already had specs). The new file is `packages/agent/src/generators/website-generator/branch-sync.service.spec.ts` and pins three groups:
 
