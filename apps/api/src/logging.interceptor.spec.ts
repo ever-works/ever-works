@@ -104,9 +104,7 @@ describe('LoggingInterceptor', () => {
 
             await lastValueFrom(interceptor.intercept(ctx, next));
 
-            expect(logSpy).toHaveBeenCalledWith(
-                'Outgoing Response: POST /api/works 201 - 123ms',
-            );
+            expect(logSpy).toHaveBeenCalledWith('Outgoing Response: POST /api/works 201 - 123ms');
         });
 
         it('falls back to status 200 when response has no statusCode', async () => {
@@ -149,9 +147,7 @@ describe('LoggingInterceptor', () => {
                 String(c[0]).startsWith('Error Response'),
             );
             expect(errorCall).toBeDefined();
-            expect(errorCall![0]).toMatch(
-                /^Error Response: GET \/api\/missing 404 - \d+ms$/,
-            );
+            expect(errorCall![0]).toMatch(/^Error Response: GET \/api\/missing 404 - \d+ms$/);
         });
 
         it('falls back to statusCode 500 when err has no .response', async () => {
@@ -220,9 +216,7 @@ describe('LoggingInterceptor', () => {
 
             await expect(lastValueFrom(interceptor.intercept(ctx, next))).rejects.toBe(err);
 
-            expect(errorSpy).toHaveBeenCalledWith(
-                'Error Response: GET /api/x 500 - 250ms',
-            );
+            expect(errorSpy).toHaveBeenCalledWith('Error Response: GET /api/x 500 - 250ms');
         });
     });
 });

@@ -1,10 +1,7 @@
 import type { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { ActivityLogRepository } from '../activity-log.repository';
 import { ActivityLog } from '../../../entities/activity-log.entity';
-import {
-    ActivityActionType,
-    ActivityStatus,
-} from '../../../entities/activity-log.types';
+import { ActivityActionType, ActivityStatus } from '../../../entities/activity-log.types';
 
 type Mocked = jest.Mocked<
     Pick<
@@ -61,9 +58,7 @@ describe('ActivityLogRepository', () => {
             count: jest.fn(),
             createQueryBuilder: jest.fn(),
         };
-        service = new ActivityLogRepository(
-            repository as unknown as Repository<ActivityLog>,
-        );
+        service = new ActivityLogRepository(repository as unknown as Repository<ActivityLog>);
     });
 
     describe('create', () => {
@@ -182,9 +177,7 @@ describe('ActivityLogRepository', () => {
             const rows = [{ id: 'a1' } as ActivityLog];
             repository.find.mockResolvedValueOnce(rows);
 
-            await expect(
-                service.findInProgressGenerationsByUserId('u1'),
-            ).resolves.toBe(rows);
+            await expect(service.findInProgressGenerationsByUserId('u1')).resolves.toBe(rows);
 
             expect(repository.find).toHaveBeenCalledWith({
                 where: {
@@ -199,10 +192,10 @@ describe('ActivityLogRepository', () => {
 
     describe('findByUserId / findByUserIdForExport', () => {
         it('default options: builds the base query (userId where, work join, ORDER BY createdAt DESC, take=25, skip=0) when only userId is provided', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[{ id: 'a1' } as ActivityLog], 1],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [
+                [{ id: 'a1' } as ActivityLog],
+                1,
+            ]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -225,10 +218,7 @@ describe('ActivityLogRepository', () => {
         });
 
         it('forwards every optional filter (actionType / workId / status / dateFrom / dateTo) when provided', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[], 0],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [[], 0]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -263,10 +253,7 @@ describe('ActivityLogRepository', () => {
         });
 
         it('skips the search Brackets when search trims to empty (`prepareCaseInsensitiveContainsPattern` returns undefined for whitespace-only)', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[], 0],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [[], 0]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -284,10 +271,7 @@ describe('ActivityLogRepository', () => {
         });
 
         it('registers a search Brackets with summary OR work.name LIKE clauses when the trimmed search is non-empty (lowercase + escaped + wrapped with `%`)', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[], 0],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [[], 0]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -321,10 +305,7 @@ describe('ActivityLogRepository', () => {
         });
 
         it('caps requested limit at 100 (enforceCap=true via findByUserId) — passing limit:200 still calls take(100)', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[], 0],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [[], 0]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -336,10 +317,7 @@ describe('ActivityLogRepository', () => {
         });
 
         it('limit:100 boundary stays at 100 (Math.min with itself)', async () => {
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [[], 0],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [[], 0]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -371,10 +349,10 @@ describe('ActivityLogRepository', () => {
 
         it('findByUserIdForExport unwraps to the activities array AND skips the 100-cap (enforceCap=false — limit:5000 is honoured verbatim, used by the controller for the 10 000-row CSV export ceiling)', async () => {
             const rows = [{ id: 'a1' } as ActivityLog, { id: 'a2' } as ActivityLog];
-            const { chain, fns } = buildChain<[ActivityLog[], number]>(
-                'getManyAndCount',
-                [rows, rows.length],
-            );
+            const { chain, fns } = buildChain<[ActivityLog[], number]>('getManyAndCount', [
+                rows,
+                rows.length,
+            ]);
             repository.createQueryBuilder.mockReturnValueOnce(
                 chain as unknown as SelectQueryBuilder<ActivityLog>,
             );
@@ -394,9 +372,7 @@ describe('ActivityLogRepository', () => {
         it('counts by composite (userId, status)', async () => {
             repository.count.mockResolvedValueOnce(7);
 
-            await expect(
-                service.countByStatus('u1', ActivityStatus.IN_PROGRESS),
-            ).resolves.toBe(7);
+            await expect(service.countByStatus('u1', ActivityStatus.IN_PROGRESS)).resolves.toBe(7);
 
             expect(repository.count).toHaveBeenCalledWith({
                 where: { userId: 'u1', status: ActivityStatus.IN_PROGRESS },

@@ -24,15 +24,10 @@ describe('WorkAdvancedPromptsService', () => {
             ensureAccess: jest.fn().mockResolvedValue({}),
             ensureCanEdit: jest.fn().mockResolvedValue({}),
         };
-        service = new WorkAdvancedPromptsService(
-            repository as any,
-            ownershipService as any,
-        );
+        service = new WorkAdvancedPromptsService(repository as any, ownershipService as any);
     });
 
-    const buildPrompts = (
-        overrides: Partial<WorkAdvancedPrompts> = {},
-    ): WorkAdvancedPrompts =>
+    const buildPrompts = (overrides: Partial<WorkAdvancedPrompts> = {}): WorkAdvancedPrompts =>
         ({
             id: 'row-1',
             workId: 'w-1',
@@ -269,7 +264,10 @@ describe('WorkAdvancedPromptsService', () => {
 
         it('returns the updated row mapped through toResponseDto using the caller workId', async () => {
             repository.createOrUpdate.mockResolvedValue(
-                buildPrompts({ workId: 'OTHER-WORK', updatedAt: new Date('2026-05-09T00:00:00.000Z') }),
+                buildPrompts({
+                    workId: 'OTHER-WORK',
+                    updatedAt: new Date('2026-05-09T00:00:00.000Z'),
+                }),
             );
 
             const result = await service.updateAdvancedPrompts('w-1', dto, 'u-1');

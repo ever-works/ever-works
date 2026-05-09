@@ -34,7 +34,9 @@ describe('appendCustomPrompt', () => {
 
     it('preserves internal whitespace in the custom prompt verbatim', () => {
         const result = appendCustomPrompt(base, 'Line one\nLine two\n  indented');
-        expect(result).toBe(`${base}\n\n## Additional User Instructions:\nLine one\nLine two\n  indented`);
+        expect(result).toBe(
+            `${base}\n\n## Additional User Instructions:\nLine one\nLine two\n  indented`,
+        );
     });
 
     it('separates the custom prompt from the base with exactly one blank line', () => {

@@ -16,10 +16,7 @@ describe('RepositoryManagementService', () => {
             updateRepository: jest.fn(),
         };
         workRepository = { update: jest.fn().mockResolvedValue(undefined) };
-        service = new RepositoryManagementService(
-            gitFacade as any,
-            workRepository as any,
-        );
+        service = new RepositoryManagementService(gitFacade as any, workRepository as any);
     });
 
     afterEach(() => {
@@ -331,12 +328,7 @@ describe('RepositoryManagementService', () => {
                     buildUpdated({ url: `https://x/${repoName}`, isPrivate: true }),
                 );
 
-                await service.updateRepositoryVisibility(
-                    work,
-                    user,
-                    repoType,
-                    true,
-                );
+                await service.updateRepositoryVisibility(work, user, repoType, true);
 
                 expect(gitFacade.updateRepository).toHaveBeenCalledWith(
                     owner,
@@ -386,9 +378,7 @@ describe('RepositoryManagementService', () => {
             // a single repo does not leak unset values.
             const work = buildWork({ repoVisibility: undefined });
             const user = buildUser();
-            gitFacade.updateRepository.mockResolvedValue(
-                buildUpdated({ isPrivate: false }),
-            );
+            gitFacade.updateRepository.mockResolvedValue(buildUpdated({ isPrivate: false }));
 
             await service.updateRepositoryVisibility(work, user, 'website', false);
 
@@ -401,9 +391,7 @@ describe('RepositoryManagementService', () => {
             const cached: RepoVisibility = { data: false, work: false, website: true };
             const work = buildWork({ repoVisibility: cached });
             const user = buildUser();
-            gitFacade.updateRepository.mockResolvedValue(
-                buildUpdated({ isPrivate: true }),
-            );
+            gitFacade.updateRepository.mockResolvedValue(buildUpdated({ isPrivate: true }));
 
             await service.updateRepositoryVisibility(work, user, 'work', true);
 
@@ -419,9 +407,7 @@ describe('RepositoryManagementService', () => {
             const cached: RepoVisibility = { data: false, work: false, website: true };
             const work = buildWork({ repoVisibility: cached });
             const user = buildUser();
-            gitFacade.updateRepository.mockResolvedValue(
-                buildUpdated({ isPrivate: true }),
-            );
+            gitFacade.updateRepository.mockResolvedValue(buildUpdated({ isPrivate: true }));
 
             await service.updateRepositoryVisibility(work, user, 'data', true);
 
@@ -443,12 +429,7 @@ describe('RepositoryManagementService', () => {
                 }),
             );
 
-            const result = await service.updateRepositoryVisibility(
-                work,
-                user,
-                'data',
-                true,
-            );
+            const result = await service.updateRepositoryVisibility(work, user, 'data', true);
 
             expect(result).toEqual({
                 type: 'data',
@@ -465,16 +446,9 @@ describe('RepositoryManagementService', () => {
             // if a future caller forgets to re-query getRepositoriesStatus.
             const work = buildWork();
             const user = buildUser();
-            gitFacade.updateRepository.mockResolvedValue(
-                buildUpdated({ isPrivate: false }),
-            );
+            gitFacade.updateRepository.mockResolvedValue(buildUpdated({ isPrivate: false }));
 
-            const result = await service.updateRepositoryVisibility(
-                work,
-                user,
-                'website',
-                false,
-            );
+            const result = await service.updateRepositoryVisibility(work, user, 'website', false);
 
             expect(result.exists).toBe(true);
         });
@@ -489,9 +463,9 @@ describe('RepositoryManagementService', () => {
             const err = new Error('forbidden');
             gitFacade.updateRepository.mockRejectedValue(err);
 
-            await expect(
-                service.updateRepositoryVisibility(work, user, 'data', true),
-            ).rejects.toBe(err);
+            await expect(service.updateRepositoryVisibility(work, user, 'data', true)).rejects.toBe(
+                err,
+            );
             expect(workRepository.update).not.toHaveBeenCalled();
         });
 

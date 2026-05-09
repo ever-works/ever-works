@@ -72,9 +72,9 @@ describe('WorkRepository', () => {
             // First findOne resolves with an existing row (the duplicate-check inside findByOwnerAndSlug)
             repository.findOne.mockResolvedValueOnce({ id: 'w1' } as Work);
 
-            await expect(
-                service.create({ owner: 'me', slug: 'site' }, user),
-            ).rejects.toThrow('Work already exists');
+            await expect(service.create({ owner: 'me', slug: 'site' }, user)).rejects.toThrow(
+                'Work already exists',
+            );
 
             expect(repository.create).not.toHaveBeenCalled();
             expect(repository.save).not.toHaveBeenCalled();
@@ -89,10 +89,7 @@ describe('WorkRepository', () => {
             repository.create.mockReturnValueOnce(created);
             repository.save.mockResolvedValueOnce(saved);
 
-            const result = await service.create(
-                { owner: 'me', slug: 'site', name: 'X' },
-                user,
-            );
+            const result = await service.create({ owner: 'me', slug: 'site', name: 'X' }, user);
 
             expect(result).toEqual({ id: 'w1', name: 'X' });
             expect(repository.create).toHaveBeenCalledWith({
@@ -210,7 +207,9 @@ describe('WorkRepository', () => {
         });
 
         it('returns [] without touching the repository when every id is falsy (filtered out)', async () => {
-            await expect(service.findByIds(['', null as unknown as string, undefined as unknown as string])).resolves.toEqual([]);
+            await expect(
+                service.findByIds(['', null as unknown as string, undefined as unknown as string]),
+            ).resolves.toEqual([]);
             expect(repository.find).not.toHaveBeenCalled();
         });
 
@@ -448,9 +447,7 @@ describe('WorkRepository', () => {
         it('counts works using a specific template id (drives the "Cannot archive — N works still use this template" UI copy)', async () => {
             repository.count.mockResolvedValueOnce(3);
 
-            await expect(
-                service.countByUserAndWebsiteTemplateId('u1', 't1'),
-            ).resolves.toBe(3);
+            await expect(service.countByUserAndWebsiteTemplateId('u1', 't1')).resolves.toBe(3);
 
             expect(repository.count).toHaveBeenCalledWith({
                 where: { userId: 'u1', websiteTemplateId: 't1' },
@@ -487,17 +484,17 @@ describe('WorkRepository', () => {
         it('merges the new lastPullRequest fields onto the existing fields (so a `data` PR update does not erase the `main` PR)', async () => {
             repository.findOne
                 // first findById refetch returns existing PR state
-                .mockResolvedValueOnce(({
+                .mockResolvedValueOnce({
                     id: 'w1',
                     lastPullRequest: {
                         main: { number: 1 },
                     },
-                } as unknown) as Work);
+                } as unknown as Work);
             repository.update.mockResolvedValueOnce({} as never);
 
-            await service.updateLastPullRequest('w1', ({
+            await service.updateLastPullRequest('w1', {
                 data: { number: 2 },
-            } as unknown) as Work['lastPullRequest']);
+            } as unknown as Work['lastPullRequest']);
 
             expect(repository.update).toHaveBeenCalledWith('w1', {
                 lastPullRequest: {
@@ -508,15 +505,15 @@ describe('WorkRepository', () => {
         });
 
         it('overwrites existing keys when both old and new have the same key (spread order: existing first, new last — last wins)', async () => {
-            repository.findOne.mockResolvedValueOnce(({
+            repository.findOne.mockResolvedValueOnce({
                 id: 'w1',
                 lastPullRequest: { main: { number: 1 } },
-            } as unknown) as Work);
+            } as unknown as Work);
             repository.update.mockResolvedValueOnce({} as never);
 
-            await service.updateLastPullRequest('w1', ({
+            await service.updateLastPullRequest('w1', {
                 main: { number: 99 },
-            } as unknown) as Work['lastPullRequest']);
+            } as unknown as Work['lastPullRequest']);
 
             expect(repository.update).toHaveBeenCalledWith('w1', {
                 lastPullRequest: { main: { number: 99 } },
@@ -843,9 +840,7 @@ describe('WorkRepository', () => {
                 chain as unknown as SelectQueryBuilder<Work>,
             );
 
-            await expect(
-                service.getAccessibleStats({ userId: 'u1' }),
-            ).resolves.toEqual({
+            await expect(service.getAccessibleStats({ userId: 'u1' })).resolves.toEqual({
                 totalWorks: 10,
                 totalItems: 50,
                 activeWebsites: 7,
@@ -891,9 +886,7 @@ describe('WorkRepository', () => {
                 chain as unknown as SelectQueryBuilder<Work>,
             );
 
-            await expect(
-                service.getAccessibleStats({ userId: 'u1' }),
-            ).resolves.toEqual({
+            await expect(service.getAccessibleStats({ userId: 'u1' })).resolves.toEqual({
                 totalWorks: 0,
                 totalItems: 0,
                 activeWebsites: 0,
@@ -950,10 +943,7 @@ describe('WorkRepository', () => {
             ['findWithWebsiteAutoUpdateEnabled', { websiteTemplateAutoUpdate: true }],
             ['findWithCommunityPrEnabled', { communityPrEnabled: true }],
             ['findWithComparisonsEnabled', { comparisonsEnabled: true }],
-            [
-                'findWithScheduledSourceValidationEnabled',
-                { scheduledUpdatesEnabled: true },
-            ],
+            ['findWithScheduledSourceValidationEnabled', { scheduledUpdatesEnabled: true }],
         ] as const)('%s queries by the flag with user joined', async (method, where) => {
             const rows = [{ id: 'w1' } as Work];
             repository.find.mockResolvedValueOnce(rows);
@@ -1056,9 +1046,7 @@ describe('WorkRepository', () => {
                 sourceValidationNextRunAt: Date;
             };
             expect(partial.sourceValidationLastRunAt).toBeInstanceOf(Date);
-            expect(partial.sourceValidationLastRunAt.getTime()).toBeGreaterThanOrEqual(
-                before,
-            );
+            expect(partial.sourceValidationLastRunAt.getTime()).toBeGreaterThanOrEqual(before);
             expect(partial.sourceValidationLastRunAt.getTime()).toBeLessThanOrEqual(after);
             expect(partial.sourceValidationNextRunAt).toBe(nextRunAt);
         });

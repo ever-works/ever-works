@@ -12,8 +12,10 @@ import {
 } from './email-verification.dto';
 import { UpdateProfileDto } from './update-profile.dto';
 
-const constraintsFor = (errs: { property: string; constraints?: Record<string, string> }[], property: string) =>
-    errs.find((e) => e.property === property)?.constraints ?? {};
+const constraintsFor = (
+    errs: { property: string; constraints?: Record<string, string> }[],
+    property: string,
+) => errs.find((e) => e.property === property)?.constraints ?? {};
 
 describe('apps/api auth DTO validation', () => {
     describe('RegisterDto', () => {

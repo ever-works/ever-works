@@ -99,7 +99,12 @@ describe('OnboardingRequestRepository', () => {
                 update,
             } as unknown as SelectQueryBuilder<OnboardingRequest>);
 
-            const result = await service.tryTransition('o1', 'received' as OnboardingStatus, 'validating' as OnboardingStatus, { workId: 'w1' });
+            const result = await service.tryTransition(
+                'o1',
+                'received' as OnboardingStatus,
+                'validating' as OnboardingStatus,
+                { workId: 'w1' },
+            );
 
             expect(result).toBe(true);
             expect(update).toHaveBeenCalledTimes(1);
@@ -120,7 +125,11 @@ describe('OnboardingRequestRepository', () => {
                 update,
             } as unknown as SelectQueryBuilder<OnboardingRequest>);
 
-            const result = await service.tryTransition('o1', 'received' as OnboardingStatus, 'validating' as OnboardingStatus);
+            const result = await service.tryTransition(
+                'o1',
+                'received' as OnboardingStatus,
+                'validating' as OnboardingStatus,
+            );
 
             expect(result).toBe(false);
             // No `extra` argument → set() called with just the status patch
@@ -136,7 +145,13 @@ describe('OnboardingRequestRepository', () => {
                 update,
             } as unknown as SelectQueryBuilder<OnboardingRequest>);
 
-            await expect(service.tryTransition('o1', 'received' as OnboardingStatus, 'validating' as OnboardingStatus)).resolves.toBe(false);
+            await expect(
+                service.tryTransition(
+                    'o1',
+                    'received' as OnboardingStatus,
+                    'validating' as OnboardingStatus,
+                ),
+            ).resolves.toBe(false);
         });
     });
 

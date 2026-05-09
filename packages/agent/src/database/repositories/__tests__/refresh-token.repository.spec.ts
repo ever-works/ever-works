@@ -3,10 +3,7 @@ import { RefreshTokenRepository } from '../refresh-token.repository';
 import { RefreshToken } from '../../../entities/refresh-token.entity';
 
 type Mocked = jest.Mocked<
-    Pick<
-        Repository<RefreshToken>,
-        'create' | 'save' | 'findOne' | 'find' | 'update' | 'delete'
-    >
+    Pick<Repository<RefreshToken>, 'create' | 'save' | 'findOne' | 'find' | 'update' | 'delete'>
 >;
 
 describe('RefreshTokenRepository', () => {
@@ -134,7 +131,9 @@ describe('RefreshTokenRepository', () => {
 
             await expect(service.deleteExpiredTokens()).resolves.toBe(4);
 
-            const where = repository.delete.mock.calls[0][0] as { expiresAt: ReturnType<typeof LessThan> };
+            const where = repository.delete.mock.calls[0][0] as {
+                expiresAt: ReturnType<typeof LessThan>;
+            };
             // class-validator-style operator instances expose `_value` for assertion. The
             // shape (`LessThan(Date)`) is exercised here so a future swap to a different
             // operator (e.g. `BeforeDate`) breaks loudly.

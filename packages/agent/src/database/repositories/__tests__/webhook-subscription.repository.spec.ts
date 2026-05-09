@@ -117,7 +117,10 @@ describe('WebhookSubscriptionRepository', () => {
             await service.markSuccess('w1');
 
             expect(repository.update).toHaveBeenCalledTimes(1);
-            const [id, patch] = repository.update.mock.calls[0] as [string, { consecutiveFailures: number; lastDeliveryAt: Date }];
+            const [id, patch] = repository.update.mock.calls[0] as [
+                string,
+                { consecutiveFailures: number; lastDeliveryAt: Date },
+            ];
             expect(id).toBe('w1');
             expect(patch.consecutiveFailures).toBe(0);
             expect(patch.lastDeliveryAt).toBeInstanceOf(Date);
@@ -133,7 +136,11 @@ describe('WebhookSubscriptionRepository', () => {
             } as WebhookSubscription);
 
             await expect(service.incrementFailure('w1')).resolves.toBe(3);
-            expect(repository.increment).toHaveBeenCalledWith({ id: 'w1' }, 'consecutiveFailures', 1);
+            expect(repository.increment).toHaveBeenCalledWith(
+                { id: 'w1' },
+                'consecutiveFailures',
+                1,
+            );
             expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 'w1' } });
         });
 
@@ -153,7 +160,10 @@ describe('WebhookSubscriptionRepository', () => {
             const before = Date.now();
             await service.markFailed('w1');
 
-            const [id, patch] = repository.update.mock.calls[0] as [string, { status: string; lastDeliveryAt: Date }];
+            const [id, patch] = repository.update.mock.calls[0] as [
+                string,
+                { status: string; lastDeliveryAt: Date },
+            ];
             expect(id).toBe('w1');
             expect(patch.status).toBe('failed');
             expect(patch.lastDeliveryAt.getTime()).toBeGreaterThanOrEqual(before);

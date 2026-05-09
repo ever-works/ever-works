@@ -322,11 +322,7 @@ describe('WorkTaxonomyService', () => {
         });
 
         it('returns documented success envelope with the new category', async () => {
-            const result = await service.createCategory(
-                'w-1',
-                { name: 'New Cat' } as any,
-                'u-1',
-            );
+            const result = await service.createCategory('w-1', { name: 'New Cat' } as any, 'u-1');
 
             expect(result).toEqual({
                 status: 'success',
@@ -475,12 +471,7 @@ describe('WorkTaxonomyService', () => {
                 collections: [],
             });
 
-            const result = await service.updateCategory(
-                'w-1',
-                'a',
-                { name: '' } as any,
-                'u-1',
-            );
+            const result = await service.updateCategory('w-1', 'a', { name: '' } as any, 'u-1');
 
             expect(result.category.name).toBe('Apples');
         });
@@ -870,11 +861,7 @@ describe('WorkTaxonomyService', () => {
         });
 
         it('returns documented success envelope', async () => {
-            const result = await service.createCollection(
-                'w-1',
-                { name: 'Picks' } as any,
-                'u-1',
-            );
+            const result = await service.createCollection('w-1', { name: 'Picks' } as any, 'u-1');
 
             expect(result).toEqual({
                 status: 'success',
@@ -955,12 +942,7 @@ describe('WorkTaxonomyService', () => {
                 collections: [buildCollection({ id: 'a' })],
             });
 
-            await service.updateCollection(
-                'w-1',
-                'a',
-                { name: 'New', extra: 'x' } as any,
-                'u-1',
-            );
+            await service.updateCollection('w-1', 'a', { name: 'New', extra: 'x' } as any, 'u-1');
 
             const [entry] = generationHistoryRepository.createEntry.mock.calls[0];
             expect(entry.activityType).toBe(WorkHistoryActivityType.COLLECTION_CHANGE);
@@ -975,19 +957,16 @@ describe('WorkTaxonomyService', () => {
                 collections: [buildCollection({ id: 'a' })],
             });
 
-            await expect(
-                service.deleteCollection('w-1', 'missing', 'u-1'),
-            ).rejects.toBeInstanceOf(NotFoundException);
+            await expect(service.deleteCollection('w-1', 'missing', 'u-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
         });
 
         it('removes the collection and writes COLLECTION_CHANGE history', async () => {
             dataGenerator.getCategoriesTags.mockResolvedValue({
                 categories: [],
                 tags: [],
-                collections: [
-                    buildCollection({ id: 'a' }),
-                    buildCollection({ id: 'b' }),
-                ],
+                collections: [buildCollection({ id: 'a' }), buildCollection({ id: 'b' })],
             });
 
             await service.deleteCollection('w-1', 'b', 'u-1');
@@ -1041,9 +1020,9 @@ describe('WorkTaxonomyService', () => {
             const err = new Error('history db down');
             generationHistoryRepository.createEntry.mockRejectedValueOnce(err);
 
-            await expect(
-                service.createCategory('w-1', { name: 'X' } as any, 'u-1'),
-            ).rejects.toBe(err);
+            await expect(service.createCategory('w-1', { name: 'X' } as any, 'u-1')).rejects.toBe(
+                err,
+            );
         });
 
         it('forwards startedAt/finishedAt as the SAME Date instance', async () => {

@@ -51,9 +51,7 @@ describe('ItemSourceValidationSchedulerService', () => {
             itemHealthService as any,
         );
         // Silence the error channel; reassert via the spy in error-path tests.
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -225,9 +223,7 @@ describe('ItemSourceValidationSchedulerService', () => {
 
             const result = await service.processDueSchedules();
 
-            expect(result.errors).toEqual([
-                { workId: 'work-str-err', message: 'plain-string' },
-            ]);
+            expect(result.errors).toEqual([{ workId: 'work-str-err', message: 'plain-string' }]);
             expect(errorSpy).toHaveBeenCalledWith(
                 'Source validation failed for work work-str-err',
                 undefined,
@@ -390,9 +386,7 @@ describe('ItemSourceValidationSchedulerService', () => {
             // — caller-not-changing-cadence preserves the stored value.
             const work = buildWork({ sourceValidationCadence: 'weekly' as any });
             workRepository.findById.mockResolvedValue(work);
-            scheduleService.calculateNextRun.mockReturnValue(
-                new Date('2026-07-01T00:00:00Z'),
-            );
+            scheduleService.calculateNextRun.mockReturnValue(new Date('2026-07-01T00:00:00Z'));
 
             const dto: UpdateSourceValidationDto = { enabled: true } as any;
             const allowed: WorkScheduleAllowedCadence[] = [
@@ -445,9 +439,7 @@ describe('ItemSourceValidationSchedulerService', () => {
                     { enabled: true, cadence: 'hourly' } as any,
                     dailyAllowed,
                 ),
-            ).rejects.toThrow(
-                "Cadence 'hourly' is not allowed by your subscription plan",
-            );
+            ).rejects.toThrow("Cadence 'hourly' is not allowed by your subscription plan");
             expect(workRepository.update).not.toHaveBeenCalled();
         });
 
@@ -490,9 +482,7 @@ describe('ItemSourceValidationSchedulerService', () => {
         it('passes the allow-check when cadence matches one of the allowed entries', async () => {
             const work = buildWork();
             workRepository.findById.mockResolvedValue(work);
-            scheduleService.calculateNextRun.mockReturnValue(
-                new Date('2026-06-01T00:00:00Z'),
-            );
+            scheduleService.calculateNextRun.mockReturnValue(new Date('2026-06-01T00:00:00Z'));
 
             const result = await service.updateSettings(
                 'work-1',

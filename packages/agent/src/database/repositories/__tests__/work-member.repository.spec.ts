@@ -25,9 +25,7 @@ describe('WorkMemberRepository', () => {
             update: jest.fn(),
             delete: jest.fn(),
         };
-        service = new WorkMemberRepository(
-            repository as unknown as Repository<WorkMember>,
-        );
+        service = new WorkMemberRepository(repository as unknown as Repository<WorkMember>);
     });
 
     describe('addMember', () => {
@@ -37,12 +35,7 @@ describe('WorkMemberRepository', () => {
             repository.create.mockReturnValueOnce(created);
             repository.save.mockResolvedValueOnce(saved);
 
-            const result = await service.addMember(
-                'w1',
-                'u1',
-                WorkMemberRole.EDITOR,
-                'inviter-1',
-            );
+            const result = await service.addMember('w1', 'u1', WorkMemberRole.EDITOR, 'inviter-1');
 
             expect(result).toBe(saved);
             expect(repository.create).toHaveBeenCalledWith({
@@ -174,9 +167,7 @@ describe('WorkMemberRepository', () => {
         it('returns false when no membership exists (skipping the hierarchy check entirely)', async () => {
             repository.findOne.mockResolvedValueOnce(null);
 
-            await expect(
-                service.hasRole('w1', 'u1', WorkMemberRole.EDITOR),
-            ).resolves.toBe(false);
+            await expect(service.hasRole('w1', 'u1', WorkMemberRole.EDITOR)).resolves.toBe(false);
         });
 
         it('delegates to member.hasRoleOrHigher when a row exists — MANAGER passes the EDITOR threshold', async () => {
@@ -186,9 +177,7 @@ describe('WorkMemberRepository', () => {
             } as unknown as WorkMember;
             repository.findOne.mockResolvedValueOnce(member);
 
-            await expect(
-                service.hasRole('w1', 'u1', WorkMemberRole.EDITOR),
-            ).resolves.toBe(true);
+            await expect(service.hasRole('w1', 'u1', WorkMemberRole.EDITOR)).resolves.toBe(true);
 
             expect(member.hasRoleOrHigher).toHaveBeenCalledWith(WorkMemberRole.EDITOR);
         });
@@ -200,9 +189,7 @@ describe('WorkMemberRepository', () => {
             } as unknown as WorkMember;
             repository.findOne.mockResolvedValueOnce(member);
 
-            await expect(
-                service.hasRole('w1', 'u1', WorkMemberRole.EDITOR),
-            ).resolves.toBe(false);
+            await expect(service.hasRole('w1', 'u1', WorkMemberRole.EDITOR)).resolves.toBe(false);
         });
     });
 
@@ -229,9 +216,7 @@ describe('WorkMemberRepository', () => {
             repository.update.mockResolvedValueOnce({} as never);
             repository.findOne.mockResolvedValueOnce(null);
 
-            await expect(
-                service.updateRole('w1', 'u1', WorkMemberRole.EDITOR),
-            ).resolves.toBeNull();
+            await expect(service.updateRole('w1', 'u1', WorkMemberRole.EDITOR)).resolves.toBeNull();
         });
     });
 
@@ -289,9 +274,7 @@ describe('WorkMemberRepository', () => {
             const rows = [{ id: 'm1' } as WorkMember];
             repository.find.mockResolvedValueOnce(rows);
 
-            await expect(
-                service.findByRole('w1', WorkMemberRole.MANAGER),
-            ).resolves.toBe(rows);
+            await expect(service.findByRole('w1', WorkMemberRole.MANAGER)).resolves.toBe(rows);
 
             expect(repository.find).toHaveBeenCalledWith({
                 where: { workId: 'w1', role: WorkMemberRole.MANAGER },

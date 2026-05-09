@@ -40,7 +40,9 @@ describe('@Public() decorator', () => {
             }
         }
 
-        expect(Reflect.getMetadata(IS_PUBLIC_KEY, Controller.prototype.protectedHandler)).toBeUndefined();
+        expect(
+            Reflect.getMetadata(IS_PUBLIC_KEY, Controller.prototype.protectedHandler),
+        ).toBeUndefined();
     });
 
     it('Public is a zero-arg factory returning a method/class decorator', () => {

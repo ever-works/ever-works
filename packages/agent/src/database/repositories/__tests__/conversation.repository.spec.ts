@@ -4,7 +4,10 @@ import { Conversation } from '../../../entities/conversation.entity';
 import { ConversationMessage } from '../../../entities/conversation-message.entity';
 
 type MockedConv = jest.Mocked<
-    Pick<Repository<Conversation>, 'create' | 'save' | 'findOne' | 'findAndCount' | 'update' | 'delete'>
+    Pick<
+        Repository<Conversation>,
+        'create' | 'save' | 'findOne' | 'findAndCount' | 'update' | 'delete'
+    >
 >;
 type MockedMsg = jest.Mocked<Pick<Repository<ConversationMessage>, 'create' | 'save'>>;
 

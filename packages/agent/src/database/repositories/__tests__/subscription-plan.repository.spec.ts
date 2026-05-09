@@ -2,7 +2,9 @@ import type { Repository } from 'typeorm';
 import { SubscriptionPlanRepository } from '../subscription-plan.repository';
 import { SubscriptionPlan, SubscriptionPlanCode } from '@src/entities';
 
-type Mocked = jest.Mocked<Pick<Repository<SubscriptionPlan>, 'find' | 'findOne' | 'update' | 'create' | 'save'>>;
+type Mocked = jest.Mocked<
+    Pick<Repository<SubscriptionPlan>, 'find' | 'findOne' | 'update' | 'create' | 'save'>
+>;
 
 describe('SubscriptionPlanRepository', () => {
     let repository: Mocked;
@@ -16,7 +18,9 @@ describe('SubscriptionPlanRepository', () => {
             create: jest.fn(),
             save: jest.fn(),
         };
-        service = new SubscriptionPlanRepository(repository as unknown as Repository<SubscriptionPlan>);
+        service = new SubscriptionPlanRepository(
+            repository as unknown as Repository<SubscriptionPlan>,
+        );
     });
 
     describe('findAllActive', () => {
@@ -57,7 +61,11 @@ describe('SubscriptionPlanRepository', () => {
     describe('upsert', () => {
         it('updates by id and refetches when an existing plan with the same code is found', async () => {
             const existing = { id: 'p1', code: SubscriptionPlanCode.FREE } as SubscriptionPlan;
-            const updated = { id: 'p1', code: SubscriptionPlanCode.FREE, maxWorks: 5 } as SubscriptionPlan;
+            const updated = {
+                id: 'p1',
+                code: SubscriptionPlanCode.FREE,
+                maxWorks: 5,
+            } as SubscriptionPlan;
             repository.findOne
                 .mockResolvedValueOnce(existing) // findByCode lookup
                 .mockResolvedValueOnce(updated); // refetch by id
@@ -81,7 +89,10 @@ describe('SubscriptionPlanRepository', () => {
             repository.create.mockReturnValueOnce(created);
             repository.save.mockResolvedValueOnce(saved);
 
-            const result = await service.upsert({ code: SubscriptionPlanCode.PREMIUM, displayName: 'Premium' });
+            const result = await service.upsert({
+                code: SubscriptionPlanCode.PREMIUM,
+                displayName: 'Premium',
+            });
 
             expect(result).toBe(saved);
             expect(repository.create).toHaveBeenCalledWith({

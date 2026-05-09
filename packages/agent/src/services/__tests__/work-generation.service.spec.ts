@@ -28,10 +28,7 @@ import { GenerateStatusType } from '@src/entities/types';
 import { WorkScheduleBillingMode } from '@src/entities/types';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
-import {
-    createGenerationCancelledError,
-    isGenerationCancelledError,
-} from '@src/utils';
+import { createGenerationCancelledError, isGenerationCancelledError } from '@src/utils';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
 
 import type { Work } from '@src/entities/work.entity';
@@ -291,9 +288,9 @@ describe('WorkGenerationService', () => {
             const err = new BadRequestException('forbidden domain');
             ownershipService.ensureCanEdit.mockRejectedValue(err);
             const service = buildService();
-            await expect(
-                service.updateDomainType('work-1', 'tools', buildUser()),
-            ).rejects.toBe(err);
+            await expect(service.updateDomainType('work-1', 'tools', buildUser())).rejects.toBe(
+                err,
+            );
         });
 
         it('wraps generic Error in BadRequestException with normalized message', async () => {
@@ -362,9 +359,7 @@ describe('WorkGenerationService', () => {
             const err = new BadRequestException('not allowed');
             ownershipService.ensureCanEdit.mockRejectedValue(err);
             const service = buildService();
-            await expect(
-                service.regenerateMarkdown('work-1', buildUser()),
-            ).rejects.toBe(err);
+            await expect(service.regenerateMarkdown('work-1', buildUser())).rejects.toBe(err);
         });
 
         it('wraps generic Error and includes id in BadRequestException payload', async () => {
@@ -378,7 +373,11 @@ describe('WorkGenerationService', () => {
             } catch (error: any) {
                 expect(error).toBeInstanceOf(BadRequestException);
                 expect(error.getResponse()).toEqual(
-                    expect.objectContaining({ status: 'error', id: 'work-1', message: 'disk full' }),
+                    expect.objectContaining({
+                        status: 'error',
+                        id: 'work-1',
+                        message: 'disk full',
+                    }),
                 );
             }
         });
@@ -486,7 +485,11 @@ describe('WorkGenerationService', () => {
             } catch (error: any) {
                 expect(error).toBeInstanceOf(BadRequestException);
                 expect(error.getResponse()).toEqual(
-                    expect.objectContaining({ status: 'error', workId: 'work-1', message: 'disk full' }),
+                    expect.objectContaining({
+                        status: 'error',
+                        workId: 'work-1',
+                        message: 'disk full',
+                    }),
                 );
             }
         });
@@ -527,7 +530,10 @@ describe('WorkGenerationService', () => {
             const work = buildWork();
             const user = buildUser();
             ownershipService.ensureCanEdit.mockResolvedValue({ work } as any);
-            websiteUpdateService.updateRepository.mockResolvedValue({ method: 'pull', message: 'ok' });
+            websiteUpdateService.updateRepository.mockResolvedValue({
+                method: 'pull',
+                message: 'ok',
+            });
 
             const service = buildService();
             await service.updateWebsiteRepository('work-1', user);
@@ -539,9 +545,7 @@ describe('WorkGenerationService', () => {
             const err = new BadRequestException('not allowed');
             ownershipService.ensureCanEdit.mockRejectedValue(err);
             const service = buildService();
-            await expect(
-                service.updateWebsiteRepository('work-1', buildUser()),
-            ).rejects.toBe(err);
+            await expect(service.updateWebsiteRepository('work-1', buildUser())).rejects.toBe(err);
         });
 
         it('wraps generic Error w/ workId in BadRequestException payload', async () => {
@@ -555,7 +559,11 @@ describe('WorkGenerationService', () => {
             } catch (error: any) {
                 expect(error).toBeInstanceOf(BadRequestException);
                 expect(error.getResponse()).toEqual(
-                    expect.objectContaining({ status: 'error', workId: 'work-1', message: 'clone failed' }),
+                    expect.objectContaining({
+                        status: 'error',
+                        workId: 'work-1',
+                        message: 'clone failed',
+                    }),
                 );
             }
         });
@@ -683,7 +691,9 @@ describe('WorkGenerationService', () => {
             );
 
             const [prompt] = aiFacade.askJson.mock.calls[0];
-            expect(prompt).toContain('Prefer matching one of these existing categories: tools, libs');
+            expect(prompt).toContain(
+                'Prefer matching one of these existing categories: tools, libs',
+            );
         });
 
         it('coerces falsy brand to undefined via `||` (NOT `??`) — empty-string brand drops too', async () => {
@@ -805,11 +815,7 @@ describe('WorkGenerationService', () => {
             dataGenerator.getItems.mockResolvedValue([]);
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result).toEqual({
                 status: 'success',
@@ -880,11 +886,7 @@ describe('WorkGenerationService', () => {
             screenshotFacade.capture.mockResolvedValue({ cacheUrl: 'cdn', imageUrl: null });
 
             const service = buildService();
-            await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(screenshotFacade.capture).toHaveBeenCalledTimes(1);
         });
@@ -914,11 +916,7 @@ describe('WorkGenerationService', () => {
             ]);
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.message).toBe('No items with source URLs found');
             expect(screenshotFacade.capture).not.toHaveBeenCalled();
@@ -932,11 +930,7 @@ describe('WorkGenerationService', () => {
             screenshotFacade.isAvailable.mockReturnValue(false);
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.status).toBe('error');
             expect(result.message).toBe('Screenshot service is not available');
@@ -951,11 +945,7 @@ describe('WorkGenerationService', () => {
             screenshotFacade.capture.mockResolvedValue({ cacheUrl: 'cdn', imageUrl: null });
 
             const service = buildService();
-            await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser({ id: 'caller' }),
-            );
+            await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser({ id: 'caller' }));
 
             const [opts, ctx] = screenshotFacade.capture.mock.calls[0];
             expect(opts).toEqual({
@@ -978,11 +968,7 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.results[0].primaryImage).toBe('https://cdn/a.png');
         });
@@ -998,11 +984,7 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.results[0].primaryImage).toBe('https://upstream/a.png');
         });
@@ -1020,17 +1002,17 @@ describe('WorkGenerationService', () => {
                 .mockResolvedValueOnce({ cacheUrl: 'https://cdn/b.png', imageUrl: null });
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.status).toBe('partial');
             expect(result.successCount).toBe(1);
             expect(result.errorCount).toBe(1);
             expect(result.results[0]).toEqual(
-                expect.objectContaining({ itemSlug: 'a', primaryImage: null, error: 'upstream 5xx' }),
+                expect.objectContaining({
+                    itemSlug: 'a',
+                    primaryImage: null,
+                    error: 'upstream 5xx',
+                }),
             );
             expect(result.results[1]).toEqual(
                 expect.objectContaining({ itemSlug: 'b', primaryImage: 'https://cdn/b.png' }),
@@ -1045,11 +1027,7 @@ describe('WorkGenerationService', () => {
             screenshotFacade.capture.mockRejectedValue('plain-string');
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.results[0].error).toBe('Unknown error');
         });
@@ -1062,11 +1040,7 @@ describe('WorkGenerationService', () => {
             screenshotFacade.capture.mockRejectedValue(new Error('failed'));
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.status).toBe('error');
             expect(result.successCount).toBe(0);
@@ -1084,11 +1058,7 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            const result = await service.bulkCaptureImages(
-                'work-1',
-                { mode: 'all' },
-                buildUser(),
-            );
+            const result = await service.bulkCaptureImages('work-1', { mode: 'all' }, buildUser());
 
             expect(result.status).toBe('success');
         });
@@ -1426,9 +1396,7 @@ describe('WorkGenerationService', () => {
             const service = buildService();
             const result = await service.runScheduledUpdate(schedule);
 
-            expect(result).toEqual(
-                expect.objectContaining({ slug: 'work-99', status: 'skipped' }),
-            );
+            expect(result).toEqual(expect.objectContaining({ slug: 'work-99', status: 'skipped' }));
         });
 
         it('routes to runScheduledSync when work has a syncable sourceRepository', async () => {
@@ -1819,7 +1787,11 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            await service.removeItem('work-1', { item_slug: 'old-item' } as any, buildUser({ id: 'u-1' }));
+            await service.removeItem(
+                'work-1',
+                { item_slug: 'old-item' } as any,
+                buildUser({ id: 'u-1' }),
+            );
 
             expect(generationHistoryRepository.createEntry).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1877,7 +1849,9 @@ describe('WorkGenerationService', () => {
                 { item_slug: 'x' } as any,
                 buildUser(),
             );
-            expect(result).toEqual(expect.objectContaining({ status: 'success', extraField: 'preserved' }));
+            expect(result).toEqual(
+                expect.objectContaining({ status: 'success', extraField: 'preserved' }),
+            );
         });
 
         it('status=error → BadRequestException w/ normalized message', async () => {
@@ -1900,11 +1874,7 @@ describe('WorkGenerationService', () => {
 
             const service = buildService();
             try {
-                await service.removeItem(
-                    'work-1',
-                    { item_slug: 'x' } as any,
-                    buildUser(),
-                );
+                await service.removeItem('work-1', { item_slug: 'x' } as any, buildUser());
                 throw new Error('should not reach');
             } catch (error: any) {
                 expect(error).toBeInstanceOf(BadRequestException);
@@ -1996,11 +1966,7 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            await service.updateItemMetadata(
-                'work-1',
-                { item_slug: 'x' } as any,
-                buildUser(),
-            );
+            await service.updateItemMetadata('work-1', { item_slug: 'x' } as any, buildUser());
 
             expect(markdownGenerator.initialize).toHaveBeenCalledWith(
                 expect.anything(),
@@ -2019,11 +1985,7 @@ describe('WorkGenerationService', () => {
             });
 
             const service = buildService();
-            await service.updateItemMetadata(
-                'work-1',
-                { item_slug: 'x' } as any,
-                buildUser(),
-            );
+            await service.updateItemMetadata('work-1', { item_slug: 'x' } as any, buildUser());
 
             expect(generationHistoryRepository.createEntry).not.toHaveBeenCalled();
         });
@@ -2037,11 +1999,7 @@ describe('WorkGenerationService', () => {
 
             const service = buildService();
             await expect(
-                service.updateItemMetadata(
-                    'work-1',
-                    { item_slug: 'x' } as any,
-                    buildUser(),
-                ),
+                service.updateItemMetadata('work-1', { item_slug: 'x' } as any, buildUser()),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
@@ -2056,11 +2014,7 @@ describe('WorkGenerationService', () => {
 
             const service = buildService();
             try {
-                await service.updateItemMetadata(
-                    'work-1',
-                    { item_slug: 'x' } as any,
-                    buildUser(),
-                );
+                await service.updateItemMetadata('work-1', { item_slug: 'x' } as any, buildUser());
                 throw new Error('should not reach');
             } catch (error: any) {
                 expect(error).toBeInstanceOf(BadRequestException);
@@ -2089,11 +2043,7 @@ describe('WorkGenerationService', () => {
 
             const service = buildService();
             await expect(
-                service.generateItems(
-                    'work-1',
-                    { name: 'X', prompt: 'p' } as any,
-                    buildUser(),
-                ),
+                service.generateItems('work-1', { name: 'X', prompt: 'p' } as any, buildUser()),
             ).rejects.toBeInstanceOf(ConflictException);
             expect(generationHistoryRepository.createEntry).not.toHaveBeenCalled();
         });
@@ -2264,8 +2214,7 @@ describe('WorkGenerationService', () => {
                 context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
             });
 
-            const [{ dto: payload }] =
-                generationDispatcher.dispatchWorkGeneration.mock.calls[0];
+            const [{ dto: payload }] = generationDispatcher.dispatchWorkGeneration.mock.calls[0];
             expect(payload.prompt).toBe('INITIAL');
         });
 
@@ -2291,8 +2240,7 @@ describe('WorkGenerationService', () => {
                 awaitCompletion: false,
             });
 
-            const [{ dto: payload }] =
-                generationDispatcher.dispatchWorkGeneration.mock.calls[0];
+            const [{ dto: payload }] = generationDispatcher.dispatchWorkGeneration.mock.calls[0];
             expect(payload.prompt).toBe('fallback');
         });
 
@@ -2328,8 +2276,7 @@ describe('WorkGenerationService', () => {
                 awaitCompletion: false,
             });
 
-            const [{ dto: payload }] =
-                generationDispatcher.dispatchWorkGeneration.mock.calls[0];
+            const [{ dto: payload }] = generationDispatcher.dispatchWorkGeneration.mock.calls[0];
             expect(payload.generation_method).toBe(GenerationMethod.CREATE_UPDATE);
             expect(payload.update_with_pull_request).toBe(true);
         });
@@ -2365,8 +2312,7 @@ describe('WorkGenerationService', () => {
                 awaitCompletion: false,
             });
 
-            const [{ dto: payload }] =
-                generationDispatcher.dispatchWorkGeneration.mock.calls[0];
+            const [{ dto: payload }] = generationDispatcher.dispatchWorkGeneration.mock.calls[0];
             expect(payload.providers).toEqual({ ai: 'anthropic', search: 'tavily' });
         });
 
@@ -2402,8 +2348,7 @@ describe('WorkGenerationService', () => {
                 context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
             });
 
-            const [{ dto: payload }] =
-                generationDispatcher.dispatchWorkGeneration.mock.calls[0];
+            const [{ dto: payload }] = generationDispatcher.dispatchWorkGeneration.mock.calls[0];
             expect(payload.config).toEqual({
                 max_search_queries: 10,
                 max_results_per_query: 5,

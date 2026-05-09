@@ -13,11 +13,7 @@ describe('WorksConfigSyncListener', () => {
     });
 
     it('forwards workId/userId/reason from the event verbatim', async () => {
-        const event = new WorksConfigSyncRequestedEvent(
-            'work-123',
-            'user-456',
-            'schedule_updated',
-        );
+        const event = new WorksConfigSyncRequestedEvent('work-123', 'user-456', 'schedule_updated');
 
         await listener.handleSyncRequested(event);
 
@@ -55,12 +51,8 @@ describe('WorksConfigSyncListener', () => {
 
         for (const reason of reasons) {
             syncWork.mockClear();
-            await listener.handleSyncRequested(
-                new WorksConfigSyncRequestedEvent('w', 'u', reason),
-            );
-            expect(syncWork).toHaveBeenCalledWith(
-                expect.objectContaining({ reason }),
-            );
+            await listener.handleSyncRequested(new WorksConfigSyncRequestedEvent('w', 'u', reason));
+            expect(syncWork).toHaveBeenCalledWith(expect.objectContaining({ reason }));
         }
     });
 

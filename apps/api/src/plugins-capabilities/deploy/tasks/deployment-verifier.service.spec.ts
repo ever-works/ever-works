@@ -18,10 +18,7 @@ import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { DeployFacadeService } from '@ever-works/agent/facades';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { PluginRegistryService } from '@ever-works/agent/plugins';
-import {
-    DeploymentCompletedEvent,
-    DeploymentFailedEvent,
-} from '@ever-works/agent/events';
+import { DeploymentCompletedEvent, DeploymentFailedEvent } from '@ever-works/agent/events';
 import { DeploymentVerifierService } from './deployment-verifier.service';
 
 type DeploymentReadyState =
@@ -72,12 +69,8 @@ describe('DeploymentVerifierService', () => {
         );
         // Silence the logger; only `errorSpy` and `debugSpy` are asserted.
         jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {

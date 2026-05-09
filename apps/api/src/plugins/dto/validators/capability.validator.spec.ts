@@ -15,7 +15,8 @@ import {
 
 describe('IsValidCapabilityConstraint', () => {
     const constraint = new IsValidCapabilityConstraint();
-    const argsStub = (value: unknown) => ({ value }) as unknown as Parameters<typeof constraint.validate>[1];
+    const argsStub = (value: unknown) =>
+        ({ value }) as unknown as Parameters<typeof constraint.validate>[1];
 
     it.each(Object.values(PLUGIN_CAPABILITIES))(
         'validate(%s) returns true for the documented capability',
@@ -52,7 +53,9 @@ describe('IsValidCapabilityConstraint', () => {
 
     it('defaultMessage interpolates non-string values via template-literal coercion', () => {
         // null → 'null', undefined → 'undefined', 42 → '42'
-        expect(constraint.defaultMessage(argsStub(null))).toContain("'null' is not a valid capability");
+        expect(constraint.defaultMessage(argsStub(null))).toContain(
+            "'null' is not a valid capability",
+        );
         expect(constraint.defaultMessage(argsStub(undefined))).toContain(
             "'undefined' is not a valid capability",
         );
@@ -86,7 +89,9 @@ describe('@IsValidCapability decorator', () => {
         expect(errors).toHaveLength(1);
         expect(errors[0].constraints).toBeDefined();
         const messages = Object.values(errors[0].constraints ?? {});
-        expect(messages.some((m) => m.includes("'totally-fake' is not a valid capability"))).toBe(true);
+        expect(messages.some((m) => m.includes("'totally-fake' is not a valid capability"))).toBe(
+            true,
+        );
     });
 
     it('rejects non-string values', async () => {

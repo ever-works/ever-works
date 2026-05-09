@@ -119,9 +119,7 @@ describe('onboarding RegisterWorkRequestDto validation', () => {
                 agentId: 'agent\n123',
             });
             const errs = await validate(dto);
-            expect(constraintsFor(errs, 'agentId').matches).toBe(
-                'agentId must be printable ASCII',
-            );
+            expect(constraintsFor(errs, 'agentId').matches).toBe('agentId must be printable ASCII');
         });
 
         it('rejects agentId containing space (space is 0x20, below 0x21)', async () => {

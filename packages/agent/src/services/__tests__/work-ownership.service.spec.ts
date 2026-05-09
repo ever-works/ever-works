@@ -69,17 +69,20 @@ describe('WorkOwnershipService', () => {
             WorkMemberRole.MANAGER,
             WorkMemberRole.EDITOR,
             WorkMemberRole.VIEWER,
-        ])('creator passes minimumRole=%s without invoking member.hasRoleOrHigher', async (minimumRole) => {
-            const work = { id: 'w-1', userId: 'user-1' };
-            workRepository.findById.mockResolvedValue(work);
+        ])(
+            'creator passes minimumRole=%s without invoking member.hasRoleOrHigher',
+            async (minimumRole) => {
+                const work = { id: 'w-1', userId: 'user-1' };
+                workRepository.findById.mockResolvedValue(work);
 
-            const result = await service.ensureAccess('w-1', 'user-1', minimumRole);
+                const result = await service.ensureAccess('w-1', 'user-1', minimumRole);
 
-            expect(result.role).toBe(WorkMemberRole.OWNER);
-            expect(result.isCreator).toBe(true);
-            expect(result.member).toBeNull();
-            expect(workMemberRepository.findMember).not.toHaveBeenCalled();
-        });
+                expect(result.role).toBe(WorkMemberRole.OWNER);
+                expect(result.isCreator).toBe(true);
+                expect(result.member).toBeNull();
+                expect(workMemberRepository.findMember).not.toHaveBeenCalled();
+            },
+        );
 
         it('throws ForbiddenException when non-creator has no membership row', async () => {
             workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
@@ -160,52 +163,47 @@ describe('WorkOwnershipService', () => {
             [WorkMemberRole.VIEWER, WorkMemberRole.MANAGER, false],
             [WorkMemberRole.VIEWER, WorkMemberRole.EDITOR, false],
             [WorkMemberRole.VIEWER, WorkMemberRole.VIEWER, true],
-        ])('member role hierarchy: %s vs minimum %s → passes=%s', async (role, minimum, shouldPass) => {
-            const work = { id: 'w-1', userId: 'creator' };
-            const member = buildMember(role);
-            workRepository.findById.mockResolvedValue(work);
-            workMemberRepository.findMember.mockResolvedValue(member);
+        ])(
+            'member role hierarchy: %s vs minimum %s → passes=%s',
+            async (role, minimum, shouldPass) => {
+                const work = { id: 'w-1', userId: 'creator' };
+                const member = buildMember(role);
+                workRepository.findById.mockResolvedValue(work);
+                workMemberRepository.findMember.mockResolvedValue(member);
 
-            if (shouldPass) {
-                const result = await service.ensureAccess('w-1', 'other-user', minimum);
-                expect(result.role).toBe(role);
-            } else {
-                await expect(service.ensureAccess('w-1', 'other-user', minimum)).rejects.toBeInstanceOf(
-                    ForbiddenException,
-                );
-            }
-        });
+                if (shouldPass) {
+                    const result = await service.ensureAccess('w-1', 'other-user', minimum);
+                    expect(result.role).toBe(role);
+                } else {
+                    await expect(
+                        service.ensureAccess('w-1', 'other-user', minimum),
+                    ).rejects.toBeInstanceOf(ForbiddenException);
+                }
+            },
+        );
     });
 
     describe('ensureCanView / ensureCanEdit / ensureCanManageMembers / ensureIsOwner', () => {
         it('ensureCanView delegates to ensureAccess with VIEWER', async () => {
-            const spy = jest
-                .spyOn(service, 'ensureAccess')
-                .mockResolvedValue({} as any);
+            const spy = jest.spyOn(service, 'ensureAccess').mockResolvedValue({} as any);
             await service.ensureCanView('w-1', 'u-1');
             expect(spy).toHaveBeenCalledWith('w-1', 'u-1', WorkMemberRole.VIEWER);
         });
 
         it('ensureCanEdit delegates to ensureAccess with EDITOR', async () => {
-            const spy = jest
-                .spyOn(service, 'ensureAccess')
-                .mockResolvedValue({} as any);
+            const spy = jest.spyOn(service, 'ensureAccess').mockResolvedValue({} as any);
             await service.ensureCanEdit('w-1', 'u-1');
             expect(spy).toHaveBeenCalledWith('w-1', 'u-1', WorkMemberRole.EDITOR);
         });
 
         it('ensureCanManageMembers delegates to ensureAccess with MANAGER', async () => {
-            const spy = jest
-                .spyOn(service, 'ensureAccess')
-                .mockResolvedValue({} as any);
+            const spy = jest.spyOn(service, 'ensureAccess').mockResolvedValue({} as any);
             await service.ensureCanManageMembers('w-1', 'u-1');
             expect(spy).toHaveBeenCalledWith('w-1', 'u-1', WorkMemberRole.MANAGER);
         });
 
         it('ensureIsOwner delegates to ensureAccess with OWNER', async () => {
-            const spy = jest
-                .spyOn(service, 'ensureAccess')
-                .mockResolvedValue({} as any);
+            const spy = jest.spyOn(service, 'ensureAccess').mockResolvedValue({} as any);
             await service.ensureIsOwner('w-1', 'u-1');
             expect(spy).toHaveBeenCalledWith('w-1', 'u-1', WorkMemberRole.OWNER);
         });
