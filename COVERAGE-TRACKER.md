@@ -231,7 +231,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent database.config direct coverage (+28 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent database.config direct coverage (+28 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#657](https://github.com/ever-works/ever-works/pull/657))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/database/database.config.ts` (201 LOC) — the TypeORM `registerAs('database', ...)` factory that resolves the runtime database driver, host, credentials, and SSL settings. The new file is `packages/agent/src/database/database.config.spec.ts` and pins:
 
