@@ -21,9 +21,26 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~515 across `apps/` + `packages/` (was 513
-  earlier on 2026-05-09; +2 net spec files in the agent
-  `PipelineOrchestratorService` + `comparison/types` direct-coverage sweep
+- **Spec files (`*.spec.ts`)**: ~516 across `apps/` + `packages/` (was 515
+  earlier on 2026-05-09; +1 net spec file in the agent
+  `FullPipelineExecutorService` direct-coverage sweep — adds
+  `packages/agent/src/pipeline/full-pipeline-executor.service.spec.ts`
+  (22 tests on the 239-LOC self-managed-pipeline executor: `execute`
+  STARTED→plugin.execute→COMPLETED w/ wrapper-measured duration
+  override; full signal/options/onProgress forwarding; log-interceptor
+  lifecycle (attached on `onLogEntry`, routed into the documented
+  envelope, removed in finally on both success AND throw); invalid-
+  result handling (non-object single error, multi-error `'; '` join,
+  FAILED emitted exactly ONCE); plugin.execute rejection →
+  `buildErrorPipelineResult` envelope w/ `totalSteps` from
+  `plugin.getStepDefinitions().length`; `executeWithCancellation`
+  abort wiring + listener removal in finally on success AND throw +
+  cancel-rejection swallowed + skip-when-plugin-lacks-cancel;
+  `getPluginState` null-safe wrapper; private emitter helpers
+  envelope shapes), closing the per-file zero-coverage gap on the
+  second of three pipeline executors — see `Done` ledger; +2 net
+  spec files in the prior agent `PipelineOrchestratorService` +
+  `comparison/types` direct-coverage sweep
   — adds `packages/agent/src/comparison-generator/comparison/types.spec.ts`
   (11 tests on the 60-LOC contracts module pinning
   `DEFAULT_COMPARISON_SETTINGS` four-default merge target +
@@ -325,6 +342,23 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent FullPipelineExecutorService direct coverage (+22 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/full-pipeline-executor.service.ts` (239 LOC) — the executor that runs self-managed pipeline plugins (e.g. `claude-code`, where the plugin owns step ordering and orchestration internally rather than delegating each step back to the engine). The orchestrator routes self-managed pipelines through this service, so a regression in event emission, validation, or cancellation wiring is invisible to the existing `PipelineOrchestratorService` suite (which mocks the executor).
+
+The new file is `packages/agent/src/pipeline/full-pipeline-executor.service.spec.ts` and pins:
+
+- **`execute` happy path (4 tests)** — emits `pipeline:started` BEFORE invoking `plugin.execute` (asserted via `mock.calls.find` on the emit ordering); calls `facadeService.createStepExecutionContext(work, request.providers, request.aiModel, options?.signal)` to build the per-execution context; passes `{...options, execContext, onLogEntry: options?.onLogEntry}` into `plugin.execute(work, request, existing, ...)`; emits `pipeline:completed` w/ `{workId, pipelineId, duration, stepsCompleted, outputs}` envelope on success; **CRITICAL contract**: the wrapper REPLACES the plugin's reported `duration` field with its own `Date.now() - startTime` measurement (a plugin returning a stale `duration: 9999` will be overridden — pinned via fake timers); `signal` forwarded into the facade context; `onProgress` callback forwarded verbatim into `plugin.execute`.
+- **`execute` log-interceptor lifecycle (5 tests)** — when `options.onLogEntry` is set, `contextFactory.addLogInterceptor(plugin.id, fn)` is invoked and the returned remove fn is called in the `finally` block; the interceptor's `(level, message)` arguments are routed into the documented envelope `{timestamp, level, source: 'pipeline', event: 'message', message}` (the `level` cast to `GenerationStepLog['level']` is type-only — runtime forwarding is verbatim); the interceptor is correctly removed even when `plugin.execute` rejects (finally-block invariance); without `onLogEntry`, `addLogInterceptor` is NEVER called and the optional-call guard `removeInterceptor?.()` short-circuits cleanly.
+- **`execute` invalid-result handling (4 tests)** — when `plugin.execute` returns a non-object (string, primitive), `validatePipelineResult` produces a single `'Result must be an object'` error and the wrapper throws `Plugin "<id>" returned invalid pipeline result: <errors>`; the catch path emits `pipeline:failed` ONCE per execute call (no double-emission across the inner-throw and outer-catch), then returns `buildErrorPipelineResult(...)` w/ `totalSteps` sourced from `plugin.getStepDefinitions().length` (so the failure envelope is still informative); multi-error case → errors joined with `'; '`; plugin.execute rejection → FAILED w/ `error.message` + `completedSteps: 0` and the same error-envelope shape.
+- **`executeWithCancellation` (4 tests)** — when both `plugin.cancel` AND `options.signal` are present, `signal.addEventListener('abort', handler, {once: true})` is registered and a `removeEventListener` is queued in the `finally` block; firing `abort` on the signal triggers `plugin.cancel()` exactly once; `plugin.cancel` rejection is swallowed via `.catch(err => logger.error(...))` so the abort handler does not propagate; when `plugin.cancel` is `undefined`, the abort wiring is skipped entirely (no `addEventListener` call); listener removal in `finally` runs even when `execute` throws (the wrapper still recovers via the inner try/catch and returns an error envelope, so the `finally` is reached).
+- **`getPluginState` (2 tests)** — proxies `plugin.getState()` when defined; returns `null` when `plugin.getState` is undefined.
+- **Event emission helpers (3 tests, exercised via `execute`)** — `emitPipelineEvent` merges `{timestamp, ...payload}` (the spread runs after the timestamp default, so an explicit `payload.timestamp` would win — pinned via the default-ISO branch); `emitPipelineCompleted` forwards `outputs` from the **validated** result (NOT the raw plugin return); `emitPipelineFailed` envelope shape `{timestamp, workId, pipelineId, error, failedStep:undefined, completedSteps:0}` pinned literally via `toEqual` so a future "add failedStepLogs" addition is a deliberate change.
+
+Total agent-package suite: 3693 → 3715 tests across 171 → 172 suites, all green.
+
+---
 
 **2026-05-09 — packages/agent WorksConfigImportApplierService direct coverage (+37 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
 
