@@ -21,8 +21,39 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~506 across `apps/` + `packages/` (was 505
-  earlier on 2026-05-09; +1 net spec file in the agent `sanitize.util`
+- **Spec files (`*.spec.ts`)**: ~509 across `apps/` + `packages/` (was 506
+  earlier on 2026-05-09; +3 net spec files in the agent tiny-utility
+  coverage sweep — adds
+  `packages/agent/src/activity-log/activity-log-analytics-dispatcher.spec.ts`
+  (7 tests on the string DI-token literal + `ActivityLogAnalyticsDispatcher`
+  interface + barrel re-export — pins the string-vs-Symbol-token shape so
+  a future swap to `Symbol(...)` (which would silently break every
+  cross-module `@Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)` binding) is a
+  deliberate change),
+  `packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`
+  (8 tests on the three documented Langfuse-facing prompt keys
+  `comparison.structure` / `comparison.markdown` / `comparison.extended-analysis`
+  + dotted-namespace regex + uniqueness + `as const` JSON-roundtrip
+  + barrel `COMPARISON_PROMPT_KEYS`-rename pin — pinned so the
+  agent-package keys stay aligned with the Langfuse UI), and
+  `packages/agent/src/plugins/utils/__tests__/plugin-model-settings.utils.spec.ts`
+  (22 tests on `buildProviderModelSummaries` covering all 5 documented
+  rules: schema-without-model-fields short-circuit (undef schema / no
+  properties / no `x-widget:'model-select'` / all-empty-resolved →
+  undefined), happy-path summary shape (key/label/value/source/isWorkOverride),
+  `isWorkOverride === source==='work'` matrix across all 5 SettingSource
+  literals, `title || key` fallback (incl. empty-string `title` falsy gotcha),
+  value normalisation (whitespace trim, post-trim empty skip, non-string
+  number/null/undefined skip, missing-from-map skip, undefined-resolved-arg,
+  `setting.source` undefined coercion), dedup by trimmed value (collapses
+  same-model-twice, case-sensitive distinction, leading/trailing whitespace
+  does NOT bypass dedup), `MODEL_FIELD_ORDER` sort
+  (`defaultModel` → `simpleModel` → `mediumModel` → `complexModel` → `model`
+  with reverse-registered properties as the proof, unrecognised keys pushed
+  to end, both-unrecognised → stable insertion order via `return 0`), and
+  non-model-field filtering ignoring `x-widget:'password'`/no-widget
+  siblings). Closes three previously-uncovered files in `packages/agent/src/`
+  — see `Done` ledger; +1 net spec file in the prior agent `sanitize.util`
   direct-coverage sweep — adds
   `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` (54 tests
   on the security-critical 213-LOC sanitization utility — `sanitizeText`
@@ -205,6 +236,18 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent tiny-utility coverage sweep (+37 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes three previously-uncovered small files in `packages/agent/src/` — each a contracts-only / pure-function surface that fell through prior sweeps because the consumer files (`activity-log.service.ts` / `comparison-writer.ts` / `plugin-operations.service.ts` / `generator-form-schema.service.ts`) cover them only indirectly. The three new spec files:
+
+- **`packages/agent/src/activity-log/activity-log-analytics-dispatcher.spec.ts`** (7 tests) — pins the `ACTIVITY_LOG_ANALYTICS_DISPATCHER` DI token (string literal `'ACTIVITY_LOG_ANALYTICS_DISPATCHER'` — NOT a `Symbol(...)`, deliberately, so cross-module `@Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)` bindings in `apps/api/src/activity-log/jitsu.service.ts` resolve to the same key as the agent-package consumer; pinned via a `typeof === 'string'` assertion + literal-value match + truthy / non-empty-length / re-import-singleton-identity check), the `ActivityLogAnalyticsDispatcher` interface contract via runtime mock impl (forwards activity verbatim, returns `Promise<void>`, rejection propagates — error handling lives at the calling site, not in the interface), and the barrel re-export from `activity-log/index.ts`.
+- **`packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`** (8 tests) — pins the three Langfuse-facing prompt keys consumed by `comparison-writer.ts:373/392/418`: `STRUCTURE === 'comparison.structure'`, `MARKDOWN === 'comparison.markdown'`, `EXTENDED_ANALYSIS === 'comparison.extended-analysis'`. Adds shape contracts: exactly-three-keys regression guard against silent additions, `^comparison\.[a-z][a-z0-9-]*$` dotted-namespace regex, value-uniqueness so two keys cannot accidentally point at the same Langfuse prompt, `as const` JSON-roundtrip equivalence so a future swap to a `let` non-const map (which would lose the literal-type narrowing) breaks loudly, and a barrel re-export pin under the deliberately-renamed alias `COMPARISON_PROMPT_KEYS` (with an explicit `not.toBeDefined` on the un-prefixed name so a future "drop the rename" refactor breaks loudly — the rename exists because sibling generators may also ship their own `PROMPT_KEYS` and the un-prefixed name would clash at the shared barrel level).
+- **`packages/agent/src/plugins/utils/__tests__/plugin-model-settings.utils.spec.ts`** (22 tests) — covers `buildProviderModelSummaries` (consumed by `PluginOperationsService` + `GeneratorFormSchemaService` to surface a per-provider list of currently-selected model values to the UI). Five rule groups pinned: (1) **schema-without-model-fields short-circuit** (undefined schema / no `properties` / no property has `x-widget:'model-select'` / all model fields resolved to empty-string OR whitespace-only values — all four → `undefined`, NOT `[]`, because the consumer treats `undefined` as "no models to surface"); (2) **happy-path summary shape** (returns `{key, label, value, source, isWorkOverride}` — `isWorkOverride === source === 'work'` matrix across ALL 5 documented `SettingSource` literals (`default`/`env`/`admin`/`work`/`user`), `title || key` fallback (with empty-string `title` falsy gotcha pinned — pinned so a future swap to `title ?? key` (which would preserve `''`) is a deliberate change)); (3) **value normalisation** (`String.prototype.trim` applied, post-trim empty-string skip, non-string number/null/undefined skip, missing-from-resolved-map skip, `resolved` arg can be `undefined` (optional-chain `resolved?.[key]` is the only thing keeping that path alive), `setting.source` undefined coercion when malformed entry has no source field); (4) **dedup by trimmed value** (collapses two fields resolved to same model into one summary with first-by-sort-order winning, case-sensitive distinction (`'gpt-4o'` vs `'GPT-4o'` are distinct because the dedup is `Set<string>`-based), leading/trailing whitespace does NOT bypass dedup because dedup runs on the post-trim value); (5) **`MODEL_FIELD_ORDER` sort** — the documented order `defaultModel → simpleModel → mediumModel → complexModel → model` is enforced via REVERSE-registered properties (proves the sort is doing the work, not just preserving insertion order), unrecognised keys pushed to end (after the documented five), both-unrecognised → stable insertion-order preservation via `return 0` from the sort comparator. Plus a non-model-field filtering test confirming `x-widget:'password'` and no-`x-widget` siblings are ignored.
+
+Total agent-package suite: 3303 → 3340 tests across 158 → 161 suites, all green (full run on the branch verified locally before push). Spec coverage on the four uncovered tiny-utility files in `packages/agent/src/` is now closed (74 LOC — the tasks dispatcher tokens are already covered via `tasks.spec.ts`, and `works-config-sync.listener.ts` is already covered via `works-config/__tests__/works-config-sync.listener.spec.ts` — both confirmed by direct inspection during this sweep).
+
+---
 
 **2026-05-09 — packages/agent sanitize.util direct coverage (+54 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#654](https://github.com/ever-works/ever-works/pull/654))**
 
