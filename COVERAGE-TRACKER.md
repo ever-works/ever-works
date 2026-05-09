@@ -461,7 +461,7 @@ Total agent-package suite: 3693 → 3728 tests across 171 → 172 suites, all gr
 
 ---
 
-**2026-05-10 — packages/agent PipelineFacadeService direct coverage (+30 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-10 — packages/agent PipelineFacadeService direct coverage (+30 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#680](https://github.com/ever-works/ever-works/pull/680))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/pipeline-facade.service.ts` (300 LOC) — the facade-binding service that creates the `StepExecutionContext` consumed by both pipeline executors (`StepPipelineExecutorService` and `FullPipelineExecutorService`). Every pipeline-step plugin call goes through one of the bound facades produced here, so a regression in the `aiModelOverride` precedence rules or `providerOverrides` plumbing would silently route every step through the wrong provider.
 
