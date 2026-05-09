@@ -37,33 +37,30 @@ const COLUMNS: ColumnDef[] = [
         key: 'not_started',
         icon: CircleDashed,
         dotClass: 'bg-slate-400 dark:bg-slate-500',
-        headerClass:
-            'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700/40',
-        countClass:
-            'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400',
-        cardBorderClass: 'border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/14',
+        headerClass: 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700/40',
+        countClass: 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400',
+        cardBorderClass:
+            'border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/14',
         iconColorClass: 'text-slate-400 dark:text-slate-500',
     },
     {
         key: 'scheduled',
         icon: Clock,
         dotClass: 'bg-blue-400 dark:bg-blue-400',
-        headerClass:
-            'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40',
-        countClass:
-            'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-        cardBorderClass: 'border-blue-200/60 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700/50',
+        headerClass: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40',
+        countClass: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        cardBorderClass:
+            'border-blue-200/60 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700/50',
         iconColorClass: 'text-blue-500 dark:text-blue-400',
     },
     {
         key: 'generating',
         icon: Loader2,
         dotClass: 'bg-primary animate-pulse',
-        headerClass:
-            'bg-gray-50 dark:bg-white/[0.02] border-gray-200 dark:border-white/10',
-        countClass:
-            'bg-gray-100 dark:bg-white/8 text-gray-700 dark:text-white/70',
-        cardBorderClass: 'border-primary/20 dark:border-white/10 hover:border-primary/40 dark:hover:border-white/20',
+        headerClass: 'bg-gray-50 dark:bg-white/[0.02] border-gray-200 dark:border-white/10',
+        countClass: 'bg-gray-100 dark:bg-white/8 text-gray-700 dark:text-white/70',
+        cardBorderClass:
+            'border-primary/20 dark:border-white/10 hover:border-primary/40 dark:hover:border-white/20',
         iconColorClass: 'text-gray-500 dark:text-white/60',
     },
     {
@@ -72,20 +69,19 @@ const COLUMNS: ColumnDef[] = [
         dotClass: 'bg-emerald-500 dark:bg-emerald-400',
         headerClass:
             'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/40',
-        countClass:
-            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
-        cardBorderClass: 'border-emerald-200/60 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700/50',
+        countClass: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+        cardBorderClass:
+            'border-emerald-200/60 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700/50',
         iconColorClass: 'text-emerald-500 dark:text-emerald-400',
     },
     {
         key: 'failed',
         icon: XCircle,
         dotClass: 'bg-red-500 dark:bg-red-400',
-        headerClass:
-            'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40',
-        countClass:
-            'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-        cardBorderClass: 'border-red-200/60 dark:border-red-800/30 hover:border-red-300 dark:hover:border-red-700/50',
+        headerClass: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40',
+        countClass: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+        cardBorderClass:
+            'border-red-200/60 dark:border-red-800/30 hover:border-red-300 dark:hover:border-red-700/50',
         iconColorClass: 'text-red-500 dark:text-red-400',
     },
 ];
@@ -145,7 +141,8 @@ function KanbanCard({ work, col }: KanbanCardProps) {
                     </h4>
                     {work.slug && (
                         <p className="text-[10px] text-text-muted dark:text-text-muted-dark mt-0.5 truncate">
-                            {work.owner ? `${work.owner}/` : ''}{work.slug}
+                            {work.owner ? `${work.owner}/` : ''}
+                            {work.slug}
                         </p>
                     )}
                 </div>
@@ -237,9 +234,7 @@ function StatusBadge({ work, col }: StatusBadgeProps) {
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400',
             )}
         >
-            <Icon
-                className={cn('w-2.5 h-2.5 shrink-0', isGenerating && 'animate-spin')}
-            />
+            <Icon className={cn('w-2.5 h-2.5 shrink-0', isGenerating && 'animate-spin')} />
             <span className="truncate">{label}</span>
             {status === GenerateStatusType.GENERATED && hasWarnings && (
                 <AlertTriangle className="w-2.5 h-2.5 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -300,9 +295,7 @@ function KanbanColumn({ col, works }: KanbanColumnProps) {
                         </p>
                     </div>
                 ) : (
-                    works.map((work) => (
-                        <KanbanCard key={work.id} work={work} col={col} />
-                    ))
+                    works.map((work) => <KanbanCard key={work.id} work={work} col={col} />)
                 )}
             </div>
         </div>
@@ -328,11 +321,7 @@ export function WorksKanbanView({ works }: WorksKanbanViewProps) {
         <div className="w-full overflow-x-auto pb-2">
             <div className="flex gap-3 min-w-[900px]">
                 {COLUMNS.map((col) => (
-                    <KanbanColumn
-                        key={col.key}
-                        col={col}
-                        works={grouped.get(col.key)!}
-                    />
+                    <KanbanColumn key={col.key} col={col} works={grouped.get(col.key)!} />
                 ))}
             </div>
         </div>

@@ -6,14 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
-import {
-    Clock,
-    Loader2,
-    CheckCircle2,
-    XCircle,
-    OctagonMinus,
-    type LucideIcon,
-} from 'lucide-react';
+import { Clock, Loader2, CheckCircle2, XCircle, OctagonMinus, type LucideIcon } from 'lucide-react';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
@@ -236,9 +229,7 @@ function ActivityColumn({ col, entries }: ActivityColumnProps) {
                         </p>
                     </div>
                 ) : (
-                    entries.map((entry) => (
-                        <ActivityCard key={entry.id} entry={entry} col={col} />
-                    ))
+                    entries.map((entry) => <ActivityCard key={entry.id} entry={entry} col={col} />)
                 )}
             </div>
         </div>
@@ -253,9 +244,7 @@ interface ActivityKanbanViewProps {
 
 export function ActivityKanbanView({ activities }: ActivityKanbanViewProps) {
     const grouped = useMemo(() => {
-        const map = new Map<ColumnKey, ActivityLogEntry[]>(
-            COLUMNS.map((c) => [c.key, []]),
-        );
+        const map = new Map<ColumnKey, ActivityLogEntry[]>(COLUMNS.map((c) => [c.key, []]));
         for (const entry of activities) {
             const col = map.get(entry.status as ColumnKey);
             if (col) col.push(entry);
@@ -267,11 +256,7 @@ export function ActivityKanbanView({ activities }: ActivityKanbanViewProps) {
         <div className="w-full overflow-x-auto pb-2">
             <div className="flex gap-3 min-w-[900px]">
                 {COLUMNS.map((col) => (
-                    <ActivityColumn
-                        key={col.key}
-                        col={col}
-                        entries={grouped.get(col.key)!}
-                    />
+                    <ActivityColumn key={col.key} col={col} entries={grouped.get(col.key)!} />
                 ))}
             </div>
         </div>
