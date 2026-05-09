@@ -343,7 +343,31 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent DatabaseModule decorator-metadata coverage (+15 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent UserPluginRepository direct coverage (+33 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/plugins/repositories/user-plugin.repository.ts` (165 LOC) — the TypeORM-wrapper repository for `user_plugins` rows (the `(userId, pluginId)`-unique table that holds per-user plugin enable state + scoped settings). The repository is consumed across `PluginRegistryService`, `PluginSettingsService`, `PluginOperationsService`, and the `apps/api` controllers; pinning the query shape protects every downstream caller from a silent driver swap or a relation-key change. The new file is `packages/agent/src/plugins/repositories/user-plugin.repository.spec.ts` and pins:
+
+- **`create` (1 test)** — proxies through `repository.create(data)` then `repository.save(...)` (return value forwarded verbatim).
+- **`findByUserAndPlugin` (2 tests)** — composite-key `where: { userId, pluginId }` + `pluginEntity` relation hint; null passthrough when no row.
+- **`findById` (2 tests)** — `where: { id }` + `pluginEntity` relation; null passthrough.
+- **`findByUser` (1 test)** — `where: { userId }` + `pluginEntity` relation + `order: { createdAt: 'DESC' }` (the "most-recently-added plugin first" invariant pinned so a future "switch to ASC" tweak is deliberate).
+- **`findEnabledByUser` (1 test)** — `where: { userId, enabled: true }` + `pluginEntity` relation, NO `order` key (consumer iterates all matched rows or applies its own ordering — pinned so a default order doesn't drift back in by accident).
+- **`findByPlugin` (1 test)** — `where: { pluginId }` + `user` relation (the inverse — given a pluginId, load all users with a record). Pinned distinct from the other lookups which use the `pluginEntity` relation.
+- **`update` (2 tests)** — UPDATEs by id, then re-fetches via `findById` (TypeORM's `Repository.update` resolves to an `UpdateResult` w/ no entity — every caller depends on the refetch); returns null when the post-UPDATE refetch finds nothing (e.g. concurrent delete).
+- **`updateByUserAndPlugin` (2 tests)** — UPDATEs by composite key, then refetches via `findByUserAndPlugin`; null passthrough when refetch finds nothing.
+- **`updateSettings` (4 tests)** — passes only `settings` when `secretSettings` is omitted; includes `secretSettings` when provided; **CRITICAL contract**: `secretSettings = {}` (empty object) is forwarded verbatim, NOT collapsed to undefined — the predicate is `secretSettings !== undefined` (NOT truthy-check), which is how callers clear all secrets back to "none"; returns the refetched entity.
+- **`setEnabled` (4 tests)** — UPDATEs `enabled` by composite key, returns true on `affected > 0`; returns false on `affected === 0`; returns false on `affected === undefined` (defence-in-depth — `(result.affected ?? 0) > 0` evaluates `undefined ?? 0 > 0 → 0 > 0 → false`, pinned so a future "rely on truthiness" tweak that treats undefined as true is deliberate); `enabled` flag forwarded verbatim (false vs true).
+- **`delete` (3 tests)** — true on `affected > 0`, false on 0 / undefined.
+- **`deleteByUserAndPlugin` (2 tests)** — DELETE by composite key; same boolean return contract.
+- **`deleteByPlugin` (3 tests)** — returns the integer `affected` count (NOT a boolean — pinned distinct from the other delete methods because the plugin-uninstall flow logs how many user rows were swept); 0 fallback for missing/undefined affected.
+- **`exists` (3 tests)** — uses `count` (cheaper than `findOne`) with composite-key where; predicate is `> 0` (NOT `=== 1`) so `count === 2` still returns true (defensive against driver bug); false on `count === 0`.
+- **`upsert` (2 tests)** — finds existing → UPDATE + refetch (NO `create`/`save` call); finds none → `create` then `save` (NO `update` call).
+
+Total agent-package suite: +33 tests across 1 new suite, all green.
+
+---
+
+**2026-05-09 — packages/agent DatabaseModule decorator-metadata coverage (+15 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#676](https://github.com/ever-works/ever-works/pull/676))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/database/database.module.ts` (96 LOC) — the central NestJS module that all `packages/agent` and `apps/api` feature modules import to resolve TypeORM-backed repositories. `database-config.factory.spec.ts` and `database.config.spec.ts` already cover the connection-options factory and entities list; this new spec restricts itself to the static `@Module()` decorator metadata so the wire surface (imports / providers / exports lists) is pinned regardless of the runtime DataSource. The new file is `packages/agent/src/database/database.module.spec.ts` and pins:
 
