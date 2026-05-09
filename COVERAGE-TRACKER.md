@@ -21,10 +21,60 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~517 across `apps/` + `packages/` (was 516
+- **Spec files (`*.spec.ts`)**: ~518 across `apps/` + `packages/` (was 517
   earlier on 2026-05-10; +1 net spec file in the agent
-  `PipelineFacadeService` direct-coverage sweep — adds
-  `packages/agent/src/pipeline/pipeline-facade.service.spec.ts`
+  `pipeline-result.validator` direct-coverage sweep — adds
+  `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
+  (78 tests on the 122-LOC pure-function validator pinning the
+  `validatePipelineResult(unknown) → {valid, errors[], result?}` envelope
+  used by the in-process pipeline executors to reject malformed
+  PipelineResult shapes returned from third-party plugins: the
+  early-return short-circuit on non-object inputs (null/undefined/
+  number/string/boolean) yielding the single-message
+  `['Result must be an object']` envelope vs. the per-field accumulator
+  branch that runs for arrays-as-objects (typeof [] === 'object', so
+  arrays fall through to per-field checks instead of short-circuiting —
+  pinned because a future `Array.isArray` short-circuit refactor would
+  silently change behaviour); the eight per-field check ORDER pinned
+  (success → outputs → stepsCompleted → totalSteps → state → duration →
+  error → failedStep) so a reorder of the validator breaks loudly; the
+  outputs object's five required arrays (items/categories/tags/
+  collections/brands) AND the documented short-circuit where the nested
+  array checks DO NOT run when outputs itself is missing/null/non-object
+  (single-envelope-error policy, no error-spam); the state object's
+  partial-optional shape — `state===undefined` skips ALL nested checks,
+  `state===null/non-object` produces a SINGLE envelope error and skips
+  the four nested checks, but `state===object` runs all four nested
+  checks (isRunning bool / isCancelled bool / completedSteps array /
+  failedSteps array); the documented gotcha that `duration` is labelled
+  "Optional fields validation" in the source comment block but is
+  ACTUALLY required (no `r.duration !== undefined` gate before the
+  typeof check) — pinned by an explicit "duration is NOT optional"
+  describe block that fails if a future "make duration truly optional"
+  refactor lands without updating callers; the truly-optional `error`
+  field accepting `undefined`, `string`, AND `instanceof Error` (incl.
+  TypeError as Error subclass) but rejecting null/number/plain-object;
+  the truly-optional `failedStep` field accepting `undefined` and
+  `string` but rejecting null/number; the "no range check" semantics for
+  `duration` (negative numbers pass — pinned because a future `>= 0`
+  guard would change behaviour); NaN-passes-typeof-number gotcha pinned
+  for `stepsCompleted` (a future switch to `Number.isFinite` should be
+  deliberate); result envelope shape (`result.result === input` on
+  success, `result.result === undefined` on failure, no clone); plus
+  the `validatePipelineResultOrThrow(unknown, pluginId?)` thin wrapper —
+  reuses the validator and projects the errors[] into a single Error
+  message via `errors.join('; ')`, with the documented two-format
+  string `Invalid pipeline result${pluginId ? \` from plugin '<id>'\`
+  : ''}: <joined errors>` pinned for both no-plugin-id AND with-plugin-id
+  cases, the empty-string-pluginId-treated-as-falsy case (no `from
+  plugin '...'` segment), the whitespace-only-pluginId-treated-as-truthy
+  case (no implicit `.trim()`, included verbatim — pinned so a future
+  trim refactor breaks loudly), success-on-failed-run (`success: false`
+  with an `error` field is a perfectly valid PipelineResult SHAPE — the
+  wrapper only throws when the shape is wrong, not when the run itself
+  failed), and the per-call fresh-Error-instance contract); +1 net spec
+  file in the prior agent `PipelineFacadeService` direct-coverage sweep
+  — adds `packages/agent/src/pipeline/pipeline-facade.service.spec.ts`
   (30 tests on the 300-LOC facade-binding service that creates the
   `StepExecutionContext` consumed by both pipeline executors:
   guard-rails (throws on missing `work.user` / empty `user.id`);
@@ -363,6 +413,24 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-10 — packages/agent pipeline-result.validator direct coverage (+78 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/validators/pipeline-result.validator.ts` (122 LOC) — the pure-function shape validator used by the in-process pipeline executors to reject malformed `PipelineResult` envelopes returned from third-party pipeline plugins (e.g. `standard-pipeline`, `agent-pipeline`, the CLI-wrapper plugins like `claude-code` / `codex` / `gemini` / `opencode`). A regression here would let an ill-formed plugin response propagate downstream and crash the orchestrator at a much later (and harder-to-diagnose) call site. The new file is `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts` and pins:
+
+- **Non-object short-circuit (5+1 tests)** — `null`, `undefined`, `number`, `string`, `boolean` all return the single-error envelope `{valid:false, errors:['Result must be an object'], result:undefined}`. Plus the **arrays-fall-through gotcha**: `typeof [] === 'object' && [] !== null`, so `validatePipelineResult([])` does NOT short-circuit on the early return — it falls through to the per-field accumulator and produces a list of field errors instead of the single envelope error. Pinned so a future `Array.isArray` short-circuit refactor breaks loudly.
+- **Happy path (4 tests)** — fully-populated valid result, in-flight result (`state.isRunning=true`), cancelled result (`state.isCancelled=true`), and failed-but-shape-valid result (`success: false`).
+- **`success` field (5 tests, parametrized)** — `undefined`, `null`, `number`, `string`, `object` all rejected with verbatim `'Missing or invalid "success" field (expected boolean)'`.
+- **`outputs` field (16 tests)** — `outputs===missing/null/non-object` produces a SINGLE envelope error and the nested array checks DO NOT run (no error spam — pinned because the implementation has explicit short-circuit logic). The five required nested arrays (`items`, `categories`, `tags`, `collections`, `brands`) each rejected when missing OR when set to a non-array (object instead of array). When `outputs={}`, ALL FIVE nested errors are reported. Forward-compatibility: extra unknown keys on `outputs` are accepted (does not over-validate).
+- **`stepsCompleted` / `totalSteps` fields (7 tests)** — both rejected when `undefined`/`null`/string. PLUS the **NaN-passes-typeof-number gotcha** pinned for `stepsCompleted` (since `typeof NaN === 'number'` the typeof check passes — a future switch to `Number.isFinite` should be deliberate).
+- **`state` field (12 tests)** — three-mode optionality: `state===undefined` skips ALL nested checks (zero state errors); `state===null/non-object/string` produces a SINGLE envelope error and skips the four nested checks; `state===object` runs all four nested checks (`isRunning` bool / `isCancelled` bool / `completedSteps` array / `failedSteps` array). When `state={}`, ALL FOUR nested errors are reported.
+- **`duration` field (6 tests)** — pinned the documented gotcha that `duration` is labelled "Optional fields validation" in the source comment block but is ACTUALLY required (no `r.duration !== undefined` gate before the typeof check). Rejected when missing / `undefined` / `null` / string. Accepts `0` AND **negative numbers** (no range check — pinned because a future `>= 0` guard would change behaviour).
+- **`error` field (7 tests, truly optional)** — accepts `undefined`, string, `instanceof Error`, AND `instanceof TypeError` (Error subclass — `instanceof Error` matches). Rejects number, plain object, AND `null` (null is not undefined, not a string, and not `instanceof Error`).
+- **`failedStep` field (4 tests, truly optional)** — accepts `undefined` and string; rejects number and `null`.
+- **Result envelope shape (3 tests)** — `result.result === input` (same reference, no clone) on success; `result.result === undefined` on failure; the eight per-field check ORDER pinned (success → outputs → stepsCompleted → totalSteps → state → duration → error → failedStep) so a reorder of the validator breaks loudly.
+- **`validatePipelineResultOrThrow` thin wrapper (8 tests)** — returns the validated result unchanged on success (same reference); throws Error with verbatim `Invalid pipeline result: <errors-joined-with-"; ">` when no plugin id; throws Error with `Invalid pipeline result from plugin '<id>': <joined>` when plugin id provided. Pinned: empty-string pluginId treated as falsy (no `from plugin '...'` segment); whitespace-only pluginId treated as truthy and included verbatim with NO implicit `.trim()` (a future trim refactor breaks loudly); success-on-failed-run is valid (a `success: false` with an `error` field is a perfectly valid PipelineResult SHAPE — the wrapper only throws when the SHAPE is wrong, not when the run itself failed); per-call fresh Error instance (not a singleton).
+
+Total agent-package suite: 3903 → 3981 tests across 178 → 179 suites, all green. **Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/validators/`** (the only file in that directory) — the remaining pipeline gap is now `pipeline/executable-pipeline.class.ts` (333 LOC) and `pipeline/step-pipeline-executor.service.ts` (813 LOC), both of which are richer integration-style targets and tracked separately.
 
 **2026-05-09 — packages/agent WorkPluginRepository direct coverage (+38 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
 
