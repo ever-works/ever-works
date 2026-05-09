@@ -175,7 +175,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent NestJS-module wiring sweep (+50 tests across 10 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent NestJS-module wiring sweep (+50 tests across 10 new specs, scheduled-task `platform-tests-and-docs` cycle, [#651](https://github.com/ever-works/ever-works/pull/651))**
 
 Closes the agent-package NestJS-module zero-coverage gap entirely — every `*.module.ts` under `packages/agent/src/` now has a co-located spec. The 10 new specs follow the established `Reflect.getMetadata` pattern from `markdown-generator.module.spec.ts` / `account-transfer.module.spec.ts` / `subscriptions.module.spec.ts`: each pins the providers/exports/imports shape with a documented per-module length invariant so a future silent extra-import is a deliberate change, plus barrel re-exports where present.
 
