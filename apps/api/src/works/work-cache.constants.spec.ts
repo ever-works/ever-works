@@ -83,7 +83,9 @@ describe('work-cache.constants', () => {
         });
 
         it('starts with WORK_COUNT_CACHE_KEY_PREFIX', () => {
-            expect(getWorkCountCacheKey('w', 'u').startsWith(WORK_COUNT_CACHE_KEY_PREFIX)).toBe(true);
+            expect(getWorkCountCacheKey('w', 'u').startsWith(WORK_COUNT_CACHE_KEY_PREFIX)).toBe(
+                true,
+            );
         });
     });
 
@@ -93,7 +95,9 @@ describe('work-cache.constants', () => {
         });
 
         it('starts with WORK_ITEMS_CACHE_KEY_PREFIX', () => {
-            expect(getWorkItemsCacheKey('w', 'u').startsWith(WORK_ITEMS_CACHE_KEY_PREFIX)).toBe(true);
+            expect(getWorkItemsCacheKey('w', 'u').startsWith(WORK_ITEMS_CACHE_KEY_PREFIX)).toBe(
+                true,
+            );
         });
     });
 
@@ -104,7 +108,9 @@ describe('work-cache.constants', () => {
 
         it('starts with WORK_CATEGORIES_TAGS_CACHE_KEY_PREFIX', () => {
             expect(
-                getWorkCategoriesTagsCacheKey('w', 'u').startsWith(WORK_CATEGORIES_TAGS_CACHE_KEY_PREFIX),
+                getWorkCategoriesTagsCacheKey('w', 'u').startsWith(
+                    WORK_CATEGORIES_TAGS_CACHE_KEY_PREFIX,
+                ),
             ).toBe(true);
         });
     });

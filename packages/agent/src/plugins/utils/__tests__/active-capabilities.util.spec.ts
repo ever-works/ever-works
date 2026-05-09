@@ -14,9 +14,11 @@ describe('getActiveCapabilities', () => {
     });
 
     it('preserves insertion order when there are no duplicates', () => {
-        expect(
-            getActiveCapabilities({ activeCapabilities: ['c', 'a', 'b'] }),
-        ).toEqual(['c', 'a', 'b']);
+        expect(getActiveCapabilities({ activeCapabilities: ['c', 'a', 'b'] })).toEqual([
+            'c',
+            'a',
+            'b',
+        ]);
     });
 
     it('deduplicates via Set semantics — first occurrence wins', () => {
@@ -38,14 +40,15 @@ describe('getActiveCapabilities', () => {
     });
 
     it('treats undefined activeCapabilities as an empty array', () => {
-        expect(getActiveCapabilities({ activeCapabilities: undefined as unknown as string[] }))
-            .toEqual([]);
+        expect(
+            getActiveCapabilities({ activeCapabilities: undefined as unknown as string[] }),
+        ).toEqual([]);
     });
 
     it('treats null activeCapabilities as an empty array via `?? []`', () => {
-        expect(
-            getActiveCapabilities({ activeCapabilities: null as unknown as string[] }),
-        ).toEqual([]);
+        expect(getActiveCapabilities({ activeCapabilities: null as unknown as string[] })).toEqual(
+            [],
+        );
     });
 
     it('returns an empty array for null record input', () => {
@@ -100,9 +103,10 @@ describe('hasActiveCapability', () => {
 
 describe('addActiveCapability', () => {
     it('appends a new capability', () => {
-        expect(
-            addActiveCapability({ activeCapabilities: ['search'] }, 'screenshot'),
-        ).toEqual(['search', 'screenshot']);
+        expect(addActiveCapability({ activeCapabilities: ['search'] }, 'screenshot')).toEqual([
+            'search',
+            'screenshot',
+        ]);
     });
 
     it('is idempotent — adding an already-present capability does not duplicate', () => {
@@ -135,9 +139,12 @@ describe('addActiveCapability', () => {
     });
 
     it('preserves insertion order — appended at the end', () => {
-        expect(
-            addActiveCapability({ activeCapabilities: ['c', 'a', 'b'] }, 'd'),
-        ).toEqual(['c', 'a', 'b', 'd']);
+        expect(addActiveCapability({ activeCapabilities: ['c', 'a', 'b'] }, 'd')).toEqual([
+            'c',
+            'a',
+            'b',
+            'd',
+        ]);
     });
 });
 
@@ -149,9 +156,9 @@ describe('removeActiveCapability', () => {
     });
 
     it('is idempotent — removing a missing capability returns the cleaned list', () => {
-        expect(
-            removeActiveCapability({ activeCapabilities: ['search'] }, 'screenshot'),
-        ).toEqual(['search']);
+        expect(removeActiveCapability({ activeCapabilities: ['search'] }, 'screenshot')).toEqual([
+            'search',
+        ]);
     });
 
     it('returns an empty array when removing the only entry', () => {
@@ -171,9 +178,9 @@ describe('removeActiveCapability', () => {
     });
 
     it('is case-sensitive', () => {
-        expect(
-            removeActiveCapability({ activeCapabilities: ['search'] }, 'SEARCH'),
-        ).toEqual(['search']);
+        expect(removeActiveCapability({ activeCapabilities: ['search'] }, 'SEARCH')).toEqual([
+            'search',
+        ]);
     });
 
     it('strips falsy entries during the cleanup pass', () => {

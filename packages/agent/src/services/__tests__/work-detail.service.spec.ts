@@ -1,8 +1,4 @@
-import {
-    WorkDetailService,
-    WORK_DETAIL_PROMPT,
-    workDetailSchema,
-} from '../work-detail.service';
+import { WorkDetailService, WORK_DETAIL_PROMPT, workDetailSchema } from '../work-detail.service';
 import type { User } from '@src/entities/user.entity';
 
 describe('WorkDetailService', () => {
@@ -17,12 +13,8 @@ describe('WorkDetailService', () => {
         workRepository = { existsByUserAndSlug: jest.fn().mockResolvedValue(false) };
         service = new WorkDetailService(aiFacade as any, workRepository as any);
         // Silence the logger and reassert via the spies in error-path tests.
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        logSpy = jest
-            .spyOn((service as any).logger, 'log')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -236,10 +228,7 @@ describe('WorkDetailService', () => {
 
             expect(result.slug).toBe('hello-world');
             expect(workRepository.existsByUserAndSlug).toHaveBeenCalledTimes(1);
-            expect(workRepository.existsByUserAndSlug).toHaveBeenCalledWith(
-                'u-1',
-                'hello-world',
-            );
+            expect(workRepository.existsByUserAndSlug).toHaveBeenCalledWith('u-1', 'hello-world');
         });
 
         it('appends -1 when the base slug exists and -1 is free', async () => {
@@ -282,11 +271,7 @@ describe('WorkDetailService', () => {
                 result: { description: 'd', keywords: [], categories: [] },
             });
 
-            const result = await service.generateWorkDetails(
-                'Test',
-                'p',
-                buildUser({ id: 'u-1' }),
-            );
+            const result = await service.generateWorkDetails('Test', 'p', buildUser({ id: 'u-1' }));
 
             expect(result.slug).toBe('test-3');
             expect(workRepository.existsByUserAndSlug).toHaveBeenCalledTimes(4);
@@ -301,16 +286,9 @@ describe('WorkDetailService', () => {
                 result: { description: 'd', keywords: [], categories: [] },
             });
 
-            await service.generateWorkDetails(
-                'Same Name',
-                'p',
-                buildUser({ id: 'user-A' }),
-            );
+            await service.generateWorkDetails('Same Name', 'p', buildUser({ id: 'user-A' }));
 
-            expect(workRepository.existsByUserAndSlug).toHaveBeenCalledWith(
-                'user-A',
-                'same-name',
-            );
+            expect(workRepository.existsByUserAndSlug).toHaveBeenCalledWith('user-A', 'same-name');
         });
     });
 
@@ -416,7 +394,7 @@ describe('WorkDetailService', () => {
             });
 
             const result = await service.generateWorkDetails(
-                "Cool Stuff! (and more?)",
+                'Cool Stuff! (and more?)',
                 'p',
                 buildUser(),
             );

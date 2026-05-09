@@ -59,7 +59,11 @@ describe('UserSubscriptionRepository', () => {
 
     describe('createOrUpdate', () => {
         it('updates the active subscription in place when one exists, then refetches with the plan', async () => {
-            const existing = { id: 's1', userId: 'u1', status: SubscriptionStatus.ACTIVE } as UserSubscription;
+            const existing = {
+                id: 's1',
+                userId: 'u1',
+                status: SubscriptionStatus.ACTIVE,
+            } as UserSubscription;
             const updated = { id: 's1', userId: 'u1' } as UserSubscription;
             repository.findOne
                 .mockResolvedValueOnce(existing) // findActiveByUser
@@ -110,7 +114,9 @@ describe('UserSubscriptionRepository', () => {
     describe('cancel', () => {
         it('updates the row to CANCELED status', async () => {
             await service.cancel('s1');
-            expect(repository.update).toHaveBeenCalledWith('s1', { status: SubscriptionStatus.CANCELED });
+            expect(repository.update).toHaveBeenCalledWith('s1', {
+                status: SubscriptionStatus.CANCELED,
+            });
         });
     });
 });

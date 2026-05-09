@@ -2,10 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-import {
-    BatchDeployDto,
-    BatchDeployItemDto,
-} from './batch-deploy.dto';
+import { BatchDeployDto, BatchDeployItemDto } from './batch-deploy.dto';
 import { DeployWorkDto, GetTeamsDto, ValidateTokenDto } from './deploy.dto';
 
 const constraintsFor = (

@@ -1,16 +1,9 @@
 import type { Repository, SelectQueryBuilder, DeleteQueryBuilder } from 'typeorm';
 import { NotificationRepository } from '../notification.repository';
-import {
-    Notification,
-    NotificationCategory,
-    NotificationType,
-} from '../../../entities';
+import { Notification, NotificationCategory, NotificationType } from '../../../entities';
 
 type Mocked = jest.Mocked<
-    Pick<
-        Repository<Notification>,
-        'create' | 'save' | 'findOne' | 'update' | 'createQueryBuilder'
-    >
+    Pick<Repository<Notification>, 'create' | 'save' | 'findOne' | 'update' | 'createQueryBuilder'>
 >;
 
 /**
@@ -63,9 +56,7 @@ describe('NotificationRepository', () => {
             update: jest.fn(),
             createQueryBuilder: jest.fn(),
         };
-        service = new NotificationRepository(
-            repository as unknown as Repository<Notification>,
-        );
+        service = new NotificationRepository(repository as unknown as Repository<Notification>);
     });
 
     describe('create', () => {
@@ -180,10 +171,9 @@ describe('NotificationRepository', () => {
                 expect.anything(),
             );
             // undismissedOnly default true → isDismissed:false clause
-            expect(fns.andWhere).toHaveBeenCalledWith(
-                'notification.isDismissed = :isDismissed',
-                { isDismissed: false },
-            );
+            expect(fns.andWhere).toHaveBeenCalledWith('notification.isDismissed = :isDismissed', {
+                isDismissed: false,
+            });
             // category undefined → no category clause
             expect(fns.andWhere).not.toHaveBeenCalledWith(
                 'notification.category = :category',
@@ -234,10 +224,9 @@ describe('NotificationRepository', () => {
 
             await service.findByUserId('u1', { category: NotificationCategory.SECURITY });
 
-            expect(fns.andWhere).toHaveBeenCalledWith(
-                'notification.category = :category',
-                { category: NotificationCategory.SECURITY },
-            );
+            expect(fns.andWhere).toHaveBeenCalledWith('notification.category = :category', {
+                category: NotificationCategory.SECURITY,
+            });
         });
 
         it('forwards explicit limit + offset, including limit:0 NOT defaulted (`limit = 50` is `=` w/ destructuring default — undefined-only triggers default)', async () => {
@@ -319,9 +308,7 @@ describe('NotificationRepository', () => {
             const row = { id: 'n1' } as Notification;
             repository.findOne.mockResolvedValueOnce(row);
 
-            await expect(
-                service.findByDeduplicationKey('u1', 'dedup-1'),
-            ).resolves.toBe(row);
+            await expect(service.findByDeduplicationKey('u1', 'dedup-1')).resolves.toBe(row);
 
             expect(repository.findOne).toHaveBeenCalledWith({
                 where: { userId: 'u1', deduplicationKey: 'dedup-1' },
@@ -355,10 +342,9 @@ describe('NotificationRepository', () => {
             expect(fns.andWhere).toHaveBeenCalledWith('notification.isRead = :isRead', {
                 isRead: false,
             });
-            expect(fns.andWhere).toHaveBeenCalledWith(
-                'notification.isDismissed = :isDismissed',
-                { isDismissed: false },
-            );
+            expect(fns.andWhere).toHaveBeenCalledWith('notification.isDismissed = :isDismissed', {
+                isDismissed: false,
+            });
             expect(fns.andWhere).toHaveBeenCalledWith(
                 '(notification.expiresAt IS NULL OR notification.expiresAt > :now)',
                 { now: 2_000_000_000_000 },
@@ -389,10 +375,9 @@ describe('NotificationRepository', () => {
 
             expect(repository.createQueryBuilder).toHaveBeenCalledWith();
             expect(del).toHaveBeenCalledTimes(1);
-            expect(where).toHaveBeenCalledWith(
-                'expiresAt IS NOT NULL AND expiresAt < :now',
-                { now: 3_000_000_000_000 },
-            );
+            expect(where).toHaveBeenCalledWith('expiresAt IS NOT NULL AND expiresAt < :now', {
+                now: 3_000_000_000_000,
+            });
             expect(execute).toHaveBeenCalledTimes(1);
         });
 
@@ -418,16 +403,14 @@ describe('NotificationRepository', () => {
 
             await expect(service.deleteOlderThan({ olderThanDays: 7 })).resolves.toBe(12);
 
-            const callArgs = (where.mock.calls[0] as unknown) as [string, { cutoffDate: Date }];
+            const callArgs = where.mock.calls[0] as unknown as [string, { cutoffDate: Date }];
             expect(callArgs[0]).toBe('createdAt < :cutoffDate');
             const params = callArgs[1];
             expect(params.cutoffDate).toBeInstanceOf(Date);
             // cutoff is roughly 7 days before now; allow a small jitter window
             const expected = new Date();
             expected.setDate(expected.getDate() - 7);
-            expect(Math.abs(params.cutoffDate.getTime() - expected.getTime())).toBeLessThan(
-                60_000,
-            );
+            expect(Math.abs(params.cutoffDate.getTime() - expected.getTime())).toBeLessThan(60_000);
             // No isDismissed filter when option omitted
             expect(andWhere).not.toHaveBeenCalled();
         });
@@ -502,14 +485,12 @@ describe('NotificationRepository', () => {
             expect(fns.where).toHaveBeenCalledWith('notification.userId = :userId', {
                 userId: 'u1',
             });
-            expect(fns.andWhere).toHaveBeenCalledWith(
-                'notification.isPersistent = :isPersistent',
-                { isPersistent: true },
-            );
-            expect(fns.andWhere).toHaveBeenCalledWith(
-                'notification.isDismissed = :isDismissed',
-                { isDismissed: false },
-            );
+            expect(fns.andWhere).toHaveBeenCalledWith('notification.isPersistent = :isPersistent', {
+                isPersistent: true,
+            });
+            expect(fns.andWhere).toHaveBeenCalledWith('notification.isDismissed = :isDismissed', {
+                isDismissed: false,
+            });
             expect(fns.andWhere).toHaveBeenCalledWith(
                 '(notification.expiresAt IS NULL OR notification.expiresAt > :now)',
                 { now: 4_000_000_000_000 },

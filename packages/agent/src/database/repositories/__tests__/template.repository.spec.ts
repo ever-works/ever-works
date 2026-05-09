@@ -207,11 +207,7 @@ describe('TemplateRepository', () => {
             repository.exists.mockResolvedValueOnce(false);
 
             await expect(
-                service.hasRecentDiscoveredBuiltInTemplates(
-                    'work',
-                    'ever-works',
-                    new Date(0),
-                ),
+                service.hasRecentDiscoveredBuiltInTemplates('work', 'ever-works', new Date(0)),
             ).resolves.toBe(false);
         });
     });
@@ -219,7 +215,11 @@ describe('TemplateRepository', () => {
     describe('upsert', () => {
         it('upserts on conflictPaths:["id"] then refetches via findOneOrFail', async () => {
             const refetched = { id: 't1', name: 'fresh' } as Template;
-            repository.upsert.mockResolvedValueOnce({ identifiers: [], generatedMaps: [], raw: {} });
+            repository.upsert.mockResolvedValueOnce({
+                identifiers: [],
+                generatedMaps: [],
+                raw: {},
+            });
             repository.findOneOrFail.mockResolvedValueOnce(refetched);
 
             const result = await service.upsert({ id: 't1', name: 'fresh' });
@@ -233,7 +233,11 @@ describe('TemplateRepository', () => {
         });
 
         it('propagates findOneOrFail rejection (e.g. EntityNotFoundError)', async () => {
-            repository.upsert.mockResolvedValueOnce({ identifiers: [], generatedMaps: [], raw: {} });
+            repository.upsert.mockResolvedValueOnce({
+                identifiers: [],
+                generatedMaps: [],
+                raw: {},
+            });
             const boom = new Error('not found after upsert');
             repository.findOneOrFail.mockRejectedValueOnce(boom);
 

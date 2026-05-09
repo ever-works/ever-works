@@ -37,13 +37,19 @@ describe('UserTemplatePreferenceRepository', () => {
 
         it('returns null when no preference exists', async () => {
             repository.findOne.mockResolvedValueOnce(null);
-            await expect(service.findByUserAndKind('u1', 'website' as TemplateKind)).resolves.toBeNull();
+            await expect(
+                service.findByUserAndKind('u1', 'website' as TemplateKind),
+            ).resolves.toBeNull();
         });
     });
 
     describe('upsertDefault', () => {
         it('uses TypeORM upsert with the (userId, kind) conflict path then refetches', async () => {
-            const fetched = { userId: 'u1', kind: 'website', templateId: 't1' } as UserTemplatePreference;
+            const fetched = {
+                userId: 'u1',
+                kind: 'website',
+                templateId: 't1',
+            } as UserTemplatePreference;
             repository.findOneOrFail.mockResolvedValueOnce(fetched);
 
             const result = await service.upsertDefault('u1', 'website' as TemplateKind, 't1');
@@ -53,14 +59,18 @@ describe('UserTemplatePreferenceRepository', () => {
                 { userId: 'u1', kind: 'website', templateId: 't1' },
                 { conflictPaths: ['userId', 'kind'] },
             );
-            expect(repository.findOneOrFail).toHaveBeenCalledWith({ where: { userId: 'u1', kind: 'website' } });
+            expect(repository.findOneOrFail).toHaveBeenCalledWith({
+                where: { userId: 'u1', kind: 'website' },
+            });
         });
 
         it('propagates findOneOrFail rejection (refetch could not locate the just-upserted row)', async () => {
             const boom = new Error('not found');
             repository.findOneOrFail.mockRejectedValueOnce(boom);
 
-            await expect(service.upsertDefault('u1', 'work' as TemplateKind, 't2')).rejects.toBe(boom);
+            await expect(service.upsertDefault('u1', 'work' as TemplateKind, 't2')).rejects.toBe(
+                boom,
+            );
         });
     });
 

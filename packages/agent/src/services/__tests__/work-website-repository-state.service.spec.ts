@@ -17,9 +17,7 @@ describe('WorkWebsiteRepositoryStateService', () => {
         };
         service = new WorkWebsiteRepositoryStateService(gitFacade as any);
         // Silence the warn channel; reassert via the spy where needed.
-        warnSpy = jest
-            .spyOn((service as any).logger, 'warn')
-            .mockImplementation(() => undefined);
+        warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -179,9 +177,7 @@ describe('WorkWebsiteRepositoryStateService', () => {
             const work = buildWork({ userId: 'creator-1' });
             const user = buildUser({ id: 'caller-2' });
             // First user has no creds; second user does.
-            gitFacade.hasValidCredentials
-                .mockResolvedValueOnce(false)
-                .mockResolvedValueOnce(true);
+            gitFacade.hasValidCredentials.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
             gitFacade.repositoryExists.mockResolvedValue(true);
 
             const result = await service.isInitialized(work, user);
@@ -233,9 +229,7 @@ describe('WorkWebsiteRepositoryStateService', () => {
             const work = buildWork({ userId: 'creator-1' });
             const user = buildUser({ id: 'caller-2' });
             gitFacade.hasValidCredentials.mockResolvedValue(true);
-            gitFacade.repositoryExists
-                .mockResolvedValueOnce(false)
-                .mockResolvedValueOnce(true);
+            gitFacade.repositoryExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
             const result = await service.isInitialized(work, user);
 

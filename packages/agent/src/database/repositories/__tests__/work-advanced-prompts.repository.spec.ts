@@ -41,7 +41,11 @@ describe('WorkAdvancedPromptsRepository', () => {
     describe('createOrUpdate', () => {
         it('updates by primary key and refetches when a row already exists for the workId', async () => {
             const existing = { id: 'a', workId: 'w1' } as WorkAdvancedPrompts;
-            const refreshed = { id: 'a', workId: 'w1', categorization: 'p' } as unknown as WorkAdvancedPrompts;
+            const refreshed = {
+                id: 'a',
+                workId: 'w1',
+                categorization: 'p',
+            } as unknown as WorkAdvancedPrompts;
             repository.findOne
                 .mockResolvedValueOnce(existing) // initial findByWorkId
                 .mockResolvedValueOnce(refreshed); // refetch after update
@@ -65,7 +69,10 @@ describe('WorkAdvancedPromptsRepository', () => {
             const result = await service.createOrUpdate('w1', { itemGeneration: 'item' });
 
             expect(result).toBe(saved);
-            expect(repository.create).toHaveBeenCalledWith({ workId: 'w1', itemGeneration: 'item' });
+            expect(repository.create).toHaveBeenCalledWith({
+                workId: 'w1',
+                itemGeneration: 'item',
+            });
             expect(repository.save).toHaveBeenCalledWith(created);
             expect(repository.update).not.toHaveBeenCalled();
         });

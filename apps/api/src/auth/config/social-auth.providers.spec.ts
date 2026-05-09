@@ -1,8 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import {
-    SOCIAL_AUTH_PROVIDERS,
-    getSocialAuthProviderConfig,
-} from './social-auth.providers';
+import { SOCIAL_AUTH_PROVIDERS, getSocialAuthProviderConfig } from './social-auth.providers';
 import { GITHUB_SCOPES } from './github-scopes.config';
 import { AuthProvider } from '../../config/constants';
 
@@ -65,12 +62,8 @@ describe('social-auth.providers', () => {
         it('uses GitHub OAuth URLs and "GitHub" display name', () => {
             expect(provider.id).toBe(AuthProvider.GITHUB);
             expect(provider.displayName).toBe('GitHub');
-            expect(provider.authorizationUrl).toBe(
-                'https://github.com/login/oauth/authorize',
-            );
-            expect(provider.tokenUrl).toBe(
-                'https://github.com/login/oauth/access_token',
-            );
+            expect(provider.authorizationUrl).toBe('https://github.com/login/oauth/authorize');
+            expect(provider.tokenUrl).toBe('https://github.com/login/oauth/access_token');
         });
 
         it('mirrors the shared GITHUB_SCOPES list (preserves order)', () => {
@@ -126,9 +119,7 @@ describe('social-auth.providers', () => {
         it('uses Google OAuth URLs and "Google" display name', () => {
             expect(provider.id).toBe(AuthProvider.GOOGLE);
             expect(provider.displayName).toBe('Google');
-            expect(provider.authorizationUrl).toBe(
-                'https://accounts.google.com/o/oauth2/v2/auth',
-            );
+            expect(provider.authorizationUrl).toBe('https://accounts.google.com/o/oauth2/v2/auth');
             expect(provider.tokenUrl).toBe('https://oauth2.googleapis.com/token');
         });
 
@@ -163,12 +154,8 @@ describe('social-auth.providers', () => {
         it('uses Facebook v23.0 OAuth URLs and "Facebook" display name', () => {
             expect(provider.id).toBe(AuthProvider.FACEBOOK);
             expect(provider.displayName).toBe('Facebook');
-            expect(provider.authorizationUrl).toBe(
-                'https://www.facebook.com/v23.0/dialog/oauth',
-            );
-            expect(provider.tokenUrl).toBe(
-                'https://graph.facebook.com/v23.0/oauth/access_token',
-            );
+            expect(provider.authorizationUrl).toBe('https://www.facebook.com/v23.0/dialog/oauth');
+            expect(provider.tokenUrl).toBe('https://graph.facebook.com/v23.0/oauth/access_token');
         });
 
         it('declares scopes [email, public_profile] (in order)', () => {
@@ -206,9 +193,7 @@ describe('social-auth.providers', () => {
             expect(provider.authorizationUrl).toBe(
                 'https://www.linkedin.com/oauth/v2/authorization',
             );
-            expect(provider.tokenUrl).toBe(
-                'https://www.linkedin.com/oauth/v2/accessToken',
-            );
+            expect(provider.tokenUrl).toBe('https://www.linkedin.com/oauth/v2/accessToken');
         });
 
         it('declares scopes [openid, profile, email] (in order)', () => {
@@ -271,9 +256,7 @@ describe('social-auth.providers', () => {
             // "github-app" is the GitHub App OAuth flow (apps/api/src/integrations/github-app),
             // NOT the social-auth registry. Pin the rejection so a future "consolidate the
             // two flows" refactor breaks loudly here instead of silently aliasing.
-            expect(() => getSocialAuthProviderConfig('github-app')).toThrow(
-                BadRequestException,
-            );
+            expect(() => getSocialAuthProviderConfig('github-app')).toThrow(BadRequestException);
         });
     });
 });

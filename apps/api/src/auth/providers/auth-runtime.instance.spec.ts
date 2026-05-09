@@ -209,13 +209,17 @@ describe('createAuthRuntimeInstance', () => {
 
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
-            expect(getCapturedOptions().baseURL).toBe(`http://localhost:4000${AUTH_RUNTIME_BASE_PATH}`);
+            expect(getCapturedOptions().baseURL).toBe(
+                `http://localhost:4000${AUTH_RUNTIME_BASE_PATH}`,
+            );
         });
 
         it('falls back to port 3100 when neither AUTH_URL nor PORT are set', () => {
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
-            expect(getCapturedOptions().baseURL).toBe(`http://localhost:3100${AUTH_RUNTIME_BASE_PATH}`);
+            expect(getCapturedOptions().baseURL).toBe(
+                `http://localhost:3100${AUTH_RUNTIME_BASE_PATH}`,
+            );
         });
 
         it('always pins basePath to the `AUTH_RUNTIME_BASE_PATH` literal', () => {
@@ -262,7 +266,8 @@ describe('createAuthRuntimeInstance', () => {
         });
 
         it('parses `ALLOWED_ORIGINS` as a comma-separated list and trims whitespace', () => {
-            process.env.ALLOWED_ORIGINS = 'https://a.example, https://b.example , https://c.example';
+            process.env.ALLOWED_ORIGINS =
+                'https://a.example, https://b.example , https://c.example';
 
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 

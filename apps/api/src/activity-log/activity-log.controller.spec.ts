@@ -100,9 +100,7 @@ describe('ActivityLogController', () => {
             resolveFirst();
             await Promise.all([first, second]);
 
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenCalledTimes(1);
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenCalledTimes(1);
         });
 
         it('skips reconcile a second time if the first completed within the 5-second TTL', async () => {
@@ -114,9 +112,7 @@ describe('ActivityLogController', () => {
             jest.setSystemTime(new Date('2026-01-01T00:00:04Z'));
             await controller.getActivities(auth);
 
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenCalledTimes(1);
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenCalledTimes(1);
         });
 
         it('runs reconcile a second time once the 5-second TTL elapses', async () => {
@@ -128,9 +124,7 @@ describe('ActivityLogController', () => {
             jest.setSystemTime(new Date('2026-01-01T00:00:05.001Z'));
             await controller.getActivities(auth);
 
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenCalledTimes(2);
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenCalledTimes(2);
         });
 
         it('still serves the request when reconcile rejects (failure is swallowed)', async () => {
@@ -156,9 +150,7 @@ describe('ActivityLogController', () => {
             await controller.getActivities(auth);
             await controller.getActivities(auth);
 
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenCalledTimes(2);
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenCalledTimes(2);
         });
 
         it('isolates the in-flight Map per user (different userIds run independently)', async () => {
@@ -170,15 +162,15 @@ describe('ActivityLogController', () => {
                 controller.getActivities(otherAuth),
             ]);
 
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenCalledTimes(2);
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenNthCalledWith(1, 'user-1');
-            expect(
-                activityLogService.reconcileStaleGenerationActivities,
-            ).toHaveBeenNthCalledWith(2, 'user-2');
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenCalledTimes(2);
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenNthCalledWith(
+                1,
+                'user-1',
+            );
+            expect(activityLogService.reconcileStaleGenerationActivities).toHaveBeenNthCalledWith(
+                2,
+                'user-2',
+            );
         });
 
         it('reconciles before invoking findAll (ordering pinned)', async () => {
