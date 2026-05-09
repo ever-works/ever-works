@@ -130,7 +130,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent markdown-generator helper-class coverage (+30 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent markdown-generator helper-class coverage (+30 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [#646](https://github.com/ever-works/ever-works/pull/646))**
 
 Closes the markdown-generator helper-class zero-coverage gap. The two helpers in `packages/agent/src/generators/markdown-generator/` that previously had no co-located spec — `readme-builder.ts` (87 LOC) and `markdown-repository.ts` (66 LOC) — are now both pinned. The 508-LOC `markdown-generator.service.ts` orchestrator is deferred to a dedicated follow-up.
 
