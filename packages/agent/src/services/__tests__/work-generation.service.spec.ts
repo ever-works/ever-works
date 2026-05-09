@@ -2383,9 +2383,7 @@ describe('WorkGenerationService', () => {
             // Non-Error truthy values still classify as ERROR (the helper
             // does not require an Error instance — pinned because callers
             // pass `unknown` from generic catch blocks).
-            expect(service.resolveGenerationFinalStatus('boom')).toBe(
-                GenerateStatusType.ERROR,
-            );
+            expect(service.resolveGenerationFinalStatus('boom')).toBe(GenerateStatusType.ERROR);
             expect(service.resolveGenerationFinalStatus({ message: 'boom' })).toBe(
                 GenerateStatusType.ERROR,
             );
@@ -2393,21 +2391,15 @@ describe('WorkGenerationService', () => {
 
         it('returns GENERATED when error is falsy', () => {
             const service = buildService() as any;
-            expect(service.resolveGenerationFinalStatus(null)).toBe(
-                GenerateStatusType.GENERATED,
-            );
+            expect(service.resolveGenerationFinalStatus(null)).toBe(GenerateStatusType.GENERATED);
             expect(service.resolveGenerationFinalStatus(undefined)).toBe(
                 GenerateStatusType.GENERATED,
             );
             // Documented behaviour: 0 / '' are also "no error" because the
             // helper uses truthy-checks. Pinned so a future "must be Error
             // instance" tightening is a deliberate change.
-            expect(service.resolveGenerationFinalStatus(0)).toBe(
-                GenerateStatusType.GENERATED,
-            );
-            expect(service.resolveGenerationFinalStatus('')).toBe(
-                GenerateStatusType.GENERATED,
-            );
+            expect(service.resolveGenerationFinalStatus(0)).toBe(GenerateStatusType.GENERATED);
+            expect(service.resolveGenerationFinalStatus('')).toBe(GenerateStatusType.GENERATED);
         });
     });
 
@@ -2431,9 +2423,7 @@ describe('WorkGenerationService', () => {
             // wording instead.
             const service = buildService() as any;
             const cancelled = createGenerationCancelledError();
-            expect(service.resolveGenerationErrorMessage(cancelled)).toBe(
-                GENERATION_CANCELLED,
-            );
+            expect(service.resolveGenerationErrorMessage(cancelled)).toBe(GENERATION_CANCELLED);
         });
 
         it('falls through to normalizeGeneratorError for other errors', () => {
@@ -2442,9 +2432,9 @@ describe('WorkGenerationService', () => {
             // documented "Repository not found." copy — pinned because
             // the user-facing copy lives in the normaliser, not in the
             // service.
-            expect(
-                service.resolveGenerationErrorMessage(new Error('repository not found')),
-            ).toBe('Repository not found. Please verify the repository exists and try again.');
+            expect(service.resolveGenerationErrorMessage(new Error('repository not found'))).toBe(
+                'Repository not found. Please verify the repository exists and try again.',
+            );
             // Generic message passes through verbatim.
             expect(service.resolveGenerationErrorMessage(new Error('boom'))).toBe('boom');
         });
@@ -2512,19 +2502,13 @@ describe('WorkGenerationService', () => {
             // would mask real config issues during a brand-new work setup.
             const service = buildService() as any;
             expect(
-                service.isNonFatalWebsiteGenerationError(
-                    new Error('repository not found'),
-                    0,
-                    0,
-                ),
+                service.isNonFatalWebsiteGenerationError(new Error('repository not found'), 0, 0),
             ).toBe(false);
         });
 
         it('returns false when items exist but error is not "repository not found"', () => {
             const service = buildService() as any;
-            expect(
-                service.isNonFatalWebsiteGenerationError(new Error('boom'), 1, 0),
-            ).toBe(false);
+            expect(service.isNonFatalWebsiteGenerationError(new Error('boom'), 1, 0)).toBe(false);
         });
 
         it('returns true when items exist AND error is "repository not found"', () => {
@@ -2534,18 +2518,10 @@ describe('WorkGenerationService', () => {
             // their data-side progress.
             const service = buildService() as any;
             expect(
-                service.isNonFatalWebsiteGenerationError(
-                    new Error('Repository not found'),
-                    1,
-                    0,
-                ),
+                service.isNonFatalWebsiteGenerationError(new Error('Repository not found'), 1, 0),
             ).toBe(true);
             expect(
-                service.isNonFatalWebsiteGenerationError(
-                    new Error('repository not found'),
-                    0,
-                    1,
-                ),
+                service.isNonFatalWebsiteGenerationError(new Error('repository not found'), 0, 1),
             ).toBe(true);
         });
 
@@ -2556,11 +2532,7 @@ describe('WorkGenerationService', () => {
             // would silently flip the branch.
             const service = buildService() as any;
             expect(
-                service.isNonFatalWebsiteGenerationError(
-                    new Error('Repository Not Found'),
-                    1,
-                    1,
-                ),
+                service.isNonFatalWebsiteGenerationError(new Error('Repository Not Found'), 1, 1),
             ).toBe(true);
         });
     });
@@ -2606,9 +2578,9 @@ describe('WorkGenerationService', () => {
             // (and the caller's try/catch can record the failure).
             const service = buildService() as any;
             workRepository.updateGenerateStatus.mockRejectedValueOnce(new Error('db down'));
-            await expect(
-                service.markGenerationStarted('work-1', new Date()),
-            ).rejects.toThrow('db down');
+            await expect(service.markGenerationStarted('work-1', new Date())).rejects.toThrow(
+                'db down',
+            );
         });
     });
 
@@ -2663,8 +2635,7 @@ describe('WorkGenerationService', () => {
 
             await service.finalizeCancelledGeneration('work-1', history);
 
-            const [, payload] =
-                generationHistoryRepository.updateEntry.mock.calls[0];
+            const [, payload] = generationHistoryRepository.updateEntry.mock.calls[0];
             expect(payload.durationInSeconds).toBe(0);
         });
 
@@ -2677,10 +2648,10 @@ describe('WorkGenerationService', () => {
 
             await service.finalizeCancelledGeneration('work-1', undefined, 'sched-1');
 
-            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith(
-                'sched-1',
-                { status: 'failed', reason: GENERATION_CANCELLED },
-            );
+            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith('sched-1', {
+                status: 'failed',
+                reason: GENERATION_CANCELLED,
+            });
         });
 
         it('does not touch the schedule when scheduleId is null/undefined', async () => {
@@ -2866,11 +2837,7 @@ describe('WorkGenerationService', () => {
             const service = buildService() as any;
             pluginRegistryService.isPluginEnabledForScope.mockResolvedValue(true);
 
-            await service.ensureProvidersEnabledForWork(
-                { ai: 'openai' },
-                'work-1',
-                'user-1',
-            );
+            await service.ensureProvidersEnabledForWork({ ai: 'openai' }, 'work-1', 'user-1');
 
             expect(pluginRegistryService.isPluginEnabledForScope).toHaveBeenCalledWith(
                 'openai',
@@ -2916,11 +2883,7 @@ describe('WorkGenerationService', () => {
             );
 
             await expect(
-                service.ensureProvidersEnabledForWork(
-                    { search: 'tavily' },
-                    'work-1',
-                    'user-1',
-                ),
+                service.ensureProvidersEnabledForWork({ search: 'tavily' }, 'work-1', 'user-1'),
             ).resolves.toBeUndefined();
         });
 
@@ -2989,28 +2952,20 @@ describe('WorkGenerationService', () => {
             // run validation on a mid-mutation `dto.providers` and could
             // reject providers the auto-enable step would have just deleted.
             const order: string[] = [];
-            pluginRegistryService.isPluginEnabledForScope.mockImplementation(
-                async () => {
-                    order.push('isEnabled');
-                    return true;
-                },
-            );
-            generatorFormSchemaService.validateSelectedProviders.mockImplementation(
-                async () => {
-                    order.push('validateSelectedProviders');
-                },
-            );
-            generatorFormSchemaService.validateFormSchemaPlugins.mockImplementation(
-                async () => {
-                    order.push('validateFormSchemaPlugins');
-                },
-            );
-            generatorFormSchemaService.processFormConfig.mockImplementation(
-                async () => {
-                    order.push('processFormConfig');
-                    return { config: undefined, pluginConfig: undefined };
-                },
-            );
+            pluginRegistryService.isPluginEnabledForScope.mockImplementation(async () => {
+                order.push('isEnabled');
+                return true;
+            });
+            generatorFormSchemaService.validateSelectedProviders.mockImplementation(async () => {
+                order.push('validateSelectedProviders');
+            });
+            generatorFormSchemaService.validateFormSchemaPlugins.mockImplementation(async () => {
+                order.push('validateFormSchemaPlugins');
+            });
+            generatorFormSchemaService.processFormConfig.mockImplementation(async () => {
+                order.push('processFormConfig');
+                return { config: undefined, pluginConfig: undefined };
+            });
 
             const service = buildService() as any;
             const dto: any = {
@@ -3100,9 +3055,7 @@ describe('WorkGenerationService', () => {
             // flip would let internal stack traces leak through.
             const service = buildService() as any;
             const work = buildWork({ slug: 'best-tools' });
-            jest.spyOn(service, 'processGeneration').mockRejectedValue(
-                new Error('boom'),
-            );
+            jest.spyOn(service, 'processGeneration').mockRejectedValue(new Error('boom'));
 
             const promise = service.runInProcessGeneration(work, buildUser(), {} as any);
             await expect(promise).rejects.toBeInstanceOf(BadRequestException);
@@ -3250,10 +3203,10 @@ describe('WorkGenerationService', () => {
                 context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
             });
 
-            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith(
-                'sched-1',
-                { status: 'completed', historyId: 'h-1' },
-            );
+            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith('sched-1', {
+                status: 'completed',
+                historyId: 'h-1',
+            });
         });
 
         it('finalizes the schedule run with status=failed + reason on a failed schedule trigger', async () => {
@@ -3312,7 +3265,7 @@ describe('WorkGenerationService', () => {
     // ════════════════════════════════════════════════════════════════════
     describe('executeGenerationPipeline', () => {
         const buildAcc = () =>
-            ({ stats: null, warnings: undefined } as { stats: any; warnings?: string[] });
+            ({ stats: null, warnings: undefined }) as { stats: any; warnings?: string[] };
 
         beforeEach(() => {
             dataGenerator.initialize = jest.fn();
@@ -3858,10 +3811,7 @@ describe('WorkGenerationService', () => {
             expect(notificationService.notifyGenerationAccountError).not.toHaveBeenCalled();
             // The cancellation path returns BEFORE the "Error during generation"
             // logger.error line, so it must NOT have fired.
-            expect(errSpy).not.toHaveBeenCalledWith(
-                'Error during generation:',
-                cancelled,
-            );
+            expect(errSpy).not.toHaveBeenCalledWith('Error during generation:', cancelled);
         });
 
         it('routes the error through handleErrorNotification on a real failure (and logs the error)', async () => {
