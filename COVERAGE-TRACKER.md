@@ -21,8 +21,23 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~489 across `apps/` + `packages/` (was 487
-  earlier on 2026-05-09; +2 net spec files in the agent
+- **Spec files (`*.spec.ts`)**: ~490 across `apps/` + `packages/` (was 489
+  earlier on 2026-05-09; +1 net spec file in the agent
+  `WebsiteUpdateService` direct-coverage sweep — adds
+  `packages/agent/src/generators/website-generator/website-update.service.spec.ts`
+  (26 tests covering `updateRepository` duplicate-then-template
+  fallback chain w/ wrapped "All update methods failed" rethrow,
+  `options.branch` override + `getLatestCommit` null-coercion +
+  falsy-`branchSync` coercion; `ensureTemplateDefaultBranch`
+  best-effort warn-and-continue across listing-fail / branch-missing
+  / non-Error rejection / `updateRepository`-fail; thin
+  `syncAllBranchesFromTemplate` delegate; `checkForUpdate`
+  four-branch projection w/ beta-branch path; private `updateFork`
+  pinned via reflection; `copyRepositoryFiles` `.git`-skip +
+  recursive subdir mirror w/ rm-rejection swallowed), closing the
+  per-file zero-coverage gap inside
+  `packages/agent/src/generators/website-generator/` for the update
+  surface — see `Done` ledger; +2 net spec files in the prior agent
   markdown-generator helper-class sweep — adds
   `packages/agent/src/generators/markdown-generator/readme-builder.spec.ts`
   (17 tests on the fluent `ReadmeBuilder` builder — `addHeader`/`addSubHeader`/`addParagraph`/`addNewLine` chaining,
@@ -129,6 +144,22 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent WebsiteUpdateService direct coverage (+26 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/generators/website-generator/website-update.service.ts` (400 LOC) — the last public service in the website-generator subdir without a co-located spec. The new file is `packages/agent/src/generators/website-generator/website-update.service.spec.ts` and pins:
+
+- **`updateRepository` (7 tests)** — `NotFoundException("Website repository '<owner>/<repo>' does not exist")` thrown BEFORE any `getLatestCommit`/`cloneOrPull` call when `repositoryExists` returns false; happy path uses the **duplicate** method (`removeLocalDir(template)` → `cloneOrPull(template, branch)` → `switchBranch` → `replaceRemote('origin', targetUrl)` → `push({force:true})`) and returns `{method:'duplicate', message, commitSha, branchSync}`; on `cloneOrPull` rejection in the duplicate path, falls back to the **template** method (`Promise.all` clone of both → `copyRepositoryFiles` → `add` → `commit('Update website from template (<branch>)', committer)` → `push({force:true})`); when BOTH methods exhaust, throws `Error('All update methods failed. Last error: <templateError.message>')` AFTER `logger.error('Template update failed: ...')`; `options.branch` override propagates to `cloneOrPull.branch` AND `switchBranch`; `getLatestCommit` returning `null` → `commitSha:undefined`; falsy `branchSyncService.syncFromTemplate` (e.g. `null`) → `branchSync:undefined`.
+- **`ensureTemplateDefaultBranch` (5 tests, exercised via `updateRepository`)** — best-effort: when remote `listBranches` includes the target branch, calls `gitFacade.updateRepository(owner, repo, {defaultBranch: target}, {userId, providerId, workId})`; when target is missing, warns `Cannot set default branch to '<target>' for <owner>/<repo> because the branch does not exist yet` and skips `updateRepository`; `listBranches` Error rejection → warns `Failed to set default branch for <owner>/<repo>: <error.message>`; non-Error rejection coerced to `String(error)` in the warn copy; even an `updateRepository` rejection is swallowed (only logged) — the overall `WebsiteUpdateService.updateRepository` resolves successfully because default-branch synchronisation is downstream of the actual file update and must NEVER block it.
+- **`syncAllBranchesFromTemplate` (2 tests)** — thin `branchSyncService.syncFromTemplate(work, user)` delegate; passes the summary through verbatim AND forwards a `null` return as-is.
+- **`checkForUpdate` (6 tests)** — `hasValidCredentials:false` → `{updateAvailable:false, branch, error:'Git provider credentials not available'}` with NO `getLatestCommit` call (early return); `getLatestCommit:null` → `{updateAvailable:false, branch}` (no `error` field); differing sha → `updateAvailable:true` with both `latestCommit` and `currentCommit` populated; matching sha → `updateAvailable:false` with both populated; null `work.websiteTemplateLastCommit` → `currentCommit:undefined` via the `|| undefined` coercion; `work.websiteTemplateUseBeta=true` AND `template.betaBranch` set → `getWebsiteTemplateBranch` returns the beta branch and `getLatestCommit` is called with it.
+- **`updateFork` private branch (3 tests, exercised via reflection)** — currently DEAD CODE from `updateRepository`'s perspective (the orchestrator only attempts duplicate→template). Tests pin the existing branches anyway so a future re-wiring is a deliberate change: `hasForkRelationship:true` → returns `true`; `:false` → returns `false`; `cloneOrPull` rejection → returns `false` AND emits `logger.error('Fork update failed: <message>')`.
+- **`copyRepositoryFiles` (2 tests, exercised via the duplicate-fail → template path)** — skips `.git` directories at every recursion level; for each subdirectory entry, calls `fs.rm(target, {recursive:true, force:true})` to clear out stale state (catches the rejection if the dir doesn't exist), then `fs.mkdir(target, {recursive:true})`, then recurses; for files, calls `fs.copyFile(source, target)`. Output paths are normalised to forward slashes in the assertions so the suite passes on both POSIX and Windows (since `path.join` produces `\` on Windows). Even an `fs.rm` rejection is silently caught — the comment `// Work might not exist, which is fine` is pinned via a test that triggers it.
+- **Contracts (1 test)** — `logger` is the standard NestJS `Logger` keyed to the service name.
+
+`node:fs/promises` is mocked at module scope so the suite never touches the real filesystem; `gitFacade`, `branchSyncService`, and `websiteTemplateResolver` are plain `jest.fn()` objects. Total agent-package suite: 3054 → 3080 tests across 141 → 142 suites, all green (counted on top of develop, BEFORE PR #648's MarkdownGeneratorService coverage merges in).
+
+---
 
 **2026-05-09 — packages/agent markdown-generator helper-class coverage (+30 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [#646](https://github.com/ever-works/ever-works/pull/646))**
 
