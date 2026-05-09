@@ -2829,4 +2829,1106 @@ describe('WorkGenerationService', () => {
             expect(notificationService.notifyGenerationAccountError).not.toHaveBeenCalled();
         });
     });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  ensureProvidersEnabledForWork (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('ensureProvidersEnabledForWork', () => {
+        it('is a no-op when providers is undefined', async () => {
+            // Pinned: dto.providers is optional. A future "always send a
+            // providers object" tightening would silently invoke the
+            // per-provider loop with an empty literal — pin the bare-undefined
+            // short-circuit so the early return remains.
+            const service = buildService() as any;
+            await service.ensureProvidersEnabledForWork(undefined, 'work-1', 'user-1');
+
+            expect(pluginRegistryService.isPluginEnabledForScope).not.toHaveBeenCalled();
+            expect(pluginOperationsService.enablePluginForWork).not.toHaveBeenCalled();
+        });
+
+        it('skips falsy provider entries (no pluginId set for that uiKey)', async () => {
+            const service = buildService() as any;
+            await service.ensureProvidersEnabledForWork(
+                { search: undefined, ai: '', screenshot: null as unknown as string },
+                'work-1',
+                'user-1',
+            );
+
+            expect(pluginRegistryService.isPluginEnabledForScope).not.toHaveBeenCalled();
+            expect(pluginOperationsService.enablePluginForWork).not.toHaveBeenCalled();
+        });
+
+        it('auto-enables a configured provider via enablePluginForWork with the resolved capability', async () => {
+            // Pinned: capability resolution maps `ai` uiKey → `ai-provider`
+            // capability via getCapabilityFromUIKey (NOT the literal uiKey).
+            // A future "ship the uiKey straight through" refactor would
+            // mis-tag enable rows in the plugin scope table.
+            const service = buildService() as any;
+            pluginRegistryService.isPluginEnabledForScope.mockResolvedValue(true);
+
+            await service.ensureProvidersEnabledForWork(
+                { ai: 'openai' },
+                'work-1',
+                'user-1',
+            );
+
+            expect(pluginRegistryService.isPluginEnabledForScope).toHaveBeenCalledWith(
+                'openai',
+                'work-1',
+                'user-1',
+            );
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'openai',
+                'user-1',
+                { activeCapability: 'ai-provider' },
+            );
+        });
+
+        it('removes a disabled provider from the dto and warns (so pipeline falls back to default)', async () => {
+            // Pinned: explicit-disable wins. If the plugin was disabled
+            // for this work, do NOT re-enable it via enablePluginForWork —
+            // just delete it from the request so the system default kicks in.
+            // A future "always re-enable on generation" flip would defeat
+            // the user's explicit disable.
+            const service = buildService() as any;
+            warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+            pluginRegistryService.isPluginEnabledForScope.mockResolvedValue(false);
+
+            const providers: any = { search: 'tavily' };
+            await service.ensureProvidersEnabledForWork(providers, 'work-1', 'user-1');
+
+            expect(providers.search).toBeUndefined();
+            expect(pluginOperationsService.enablePluginForWork).not.toHaveBeenCalled();
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('disabled for work'));
+        });
+
+        it('swallows enablePluginForWork failures silently (plugin may already be enabled)', async () => {
+            // Pinned: agent-package consumers may pre-enable plugins via
+            // a different code path; calling enable again can throw a
+            // "duplicate row" error. The catch block must NOT propagate
+            // that error — generation should proceed with the provider
+            // already enabled.
+            const service = buildService() as any;
+            pluginRegistryService.isPluginEnabledForScope.mockResolvedValue(true);
+            pluginOperationsService.enablePluginForWork.mockRejectedValue(
+                new Error('already enabled'),
+            );
+
+            await expect(
+                service.ensureProvidersEnabledForWork(
+                    { search: 'tavily' },
+                    'work-1',
+                    'user-1',
+                ),
+            ).resolves.toBeUndefined();
+        });
+
+        it('processes every selectable category (search/screenshot/ai/contentExtractor/pipeline) when set', async () => {
+            // Pinned: every uiKey from SELECTABLE_PROVIDER_CATEGORIES is
+            // walked. A future addition to that constant must show up
+            // here — if a new category lands without test coverage,
+            // rerunning the loop with all five present should still
+            // succeed AND enable each one through the operations service.
+            const service = buildService() as any;
+            pluginRegistryService.isPluginEnabledForScope.mockResolvedValue(true);
+
+            await service.ensureProvidersEnabledForWork(
+                {
+                    search: 'tavily',
+                    screenshot: 'screenshotone',
+                    ai: 'openai',
+                    contentExtractor: 'firecrawl',
+                    pipeline: 'standard-pipeline',
+                },
+                'work-1',
+                'user-1',
+            );
+
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledTimes(5);
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'tavily',
+                'user-1',
+                { activeCapability: 'search' },
+            );
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'screenshotone',
+                'user-1',
+                { activeCapability: 'screenshot' },
+            );
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'openai',
+                'user-1',
+                { activeCapability: 'ai-provider' },
+            );
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'firecrawl',
+                'user-1',
+                { activeCapability: 'content-extractor' },
+            );
+            expect(pluginOperationsService.enablePluginForWork).toHaveBeenCalledWith(
+                'work-1',
+                'standard-pipeline',
+                'user-1',
+                { activeCapability: 'pipeline' },
+            );
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  prepareProviders (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('prepareProviders', () => {
+        it('runs ensureProvidersEnabledForWork → validateSelectedProviders → validateFormSchemaPlugins → processFormConfig in order', async () => {
+            // Pinned via shared `order` array w/ mockImplementation push.
+            // A future swap (e.g. validate before ensure-enabled) would
+            // run validation on a mid-mutation `dto.providers` and could
+            // reject providers the auto-enable step would have just deleted.
+            const order: string[] = [];
+            pluginRegistryService.isPluginEnabledForScope.mockImplementation(
+                async () => {
+                    order.push('isEnabled');
+                    return true;
+                },
+            );
+            generatorFormSchemaService.validateSelectedProviders.mockImplementation(
+                async () => {
+                    order.push('validateSelectedProviders');
+                },
+            );
+            generatorFormSchemaService.validateFormSchemaPlugins.mockImplementation(
+                async () => {
+                    order.push('validateFormSchemaPlugins');
+                },
+            );
+            generatorFormSchemaService.processFormConfig.mockImplementation(
+                async () => {
+                    order.push('processFormConfig');
+                    return { config: undefined, pluginConfig: undefined };
+                },
+            );
+
+            const service = buildService() as any;
+            const dto: any = {
+                providers: { search: 'tavily' },
+                pluginConfig: undefined,
+            };
+
+            await service.prepareProviders(dto, { workId: 'work-1', userId: 'user-1' });
+
+            expect(order).toEqual([
+                'isEnabled',
+                'validateSelectedProviders',
+                'validateFormSchemaPlugins',
+                'processFormConfig',
+            ]);
+        });
+
+        it('forwards processed config back into the dto (mutates pluginConfig + _processedPluginConfig)', async () => {
+            // Pinned: prepareProviders mutates the input dto in place so
+            // the caller's downstream pipeline sees the canonicalised
+            // config. A future "return a new dto" refactor would silently
+            // pass the un-processed config to the data generator.
+            generatorFormSchemaService.processFormConfig.mockResolvedValue({
+                config: { canonical: true },
+                pluginConfig: { resolved: 'yes' },
+            });
+
+            const service = buildService() as any;
+            const dto: any = { pluginConfig: { raw: true } };
+            await service.prepareProviders(dto, { workId: 'work-1', userId: 'user-1' });
+
+            expect(dto.pluginConfig).toEqual({ canonical: true });
+            expect(dto._processedPluginConfig).toEqual({ resolved: 'yes' });
+        });
+
+        it('forwards (pipelineProviderId, originalPluginConfig, scopeOptions) positionally to processFormConfig', async () => {
+            // Pinned: scopeOptions is the third positional arg, NOT spread
+            // into the second. Mis-positioning would leak the dto's other
+            // keys into pluginConfig and break form-config processing.
+            const service = buildService() as any;
+            const scope = { workId: 'work-1', userId: 'user-1' };
+            const dto: any = {
+                providers: { pipeline: 'standard-pipeline' },
+                pluginConfig: { foo: 'bar' },
+            };
+            await service.prepareProviders(dto, scope);
+
+            expect(generatorFormSchemaService.processFormConfig).toHaveBeenCalledWith(
+                'standard-pipeline',
+                { foo: 'bar' },
+                scope,
+            );
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  runInProcessGeneration (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('runInProcessGeneration', () => {
+        it('returns normally when processGeneration succeeds', async () => {
+            const service = buildService() as any;
+            jest.spyOn(service, 'processGeneration').mockResolvedValue(undefined);
+
+            await expect(
+                service.runInProcessGeneration(buildWork(), buildUser(), {} as any),
+            ).resolves.toBeUndefined();
+        });
+
+        it('rethrows HttpException unchanged so NestJS HTTP semantics are preserved', async () => {
+            // Pinned: HttpException carries an HTTP status code that the
+            // controller layer needs to map to a response. A future
+            // "wrap everything in BadRequest" flip would collapse all
+            // statuses to 400.
+            const service = buildService() as any;
+            const conflict = new ConflictException('already running');
+            jest.spyOn(service, 'processGeneration').mockRejectedValue(conflict);
+
+            await expect(
+                service.runInProcessGeneration(buildWork(), buildUser(), {} as any),
+            ).rejects.toBe(conflict);
+        });
+
+        it('wraps a non-HttpException in BadRequestException with {status:"error", slug, message}', async () => {
+            // Pinned: arbitrary Error instances become a 400 with the
+            // generator-shaped envelope so the API layer can return a
+            // consistent error body. A future "rethrow original error"
+            // flip would let internal stack traces leak through.
+            const service = buildService() as any;
+            const work = buildWork({ slug: 'best-tools' });
+            jest.spyOn(service, 'processGeneration').mockRejectedValue(
+                new Error('boom'),
+            );
+
+            const promise = service.runInProcessGeneration(work, buildUser(), {} as any);
+            await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+            await promise.catch((e: BadRequestException) => {
+                const response = e.getResponse() as any;
+                expect(response).toMatchObject({
+                    status: 'error',
+                    slug: 'best-tools',
+                    message: expect.stringContaining('boom'),
+                });
+            });
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  finalizeGeneration (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('finalizeGeneration', () => {
+        it('writes GENERATED status + clears step on success (no error / no warnings)', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(Date.now() - 1000),
+                history: undefined,
+                error: null,
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'user' },
+            });
+
+            expect(workRepository.updateGenerateStatus).toHaveBeenCalledWith('work-1', {
+                status: GenerateStatusType.GENERATED,
+                step: null,
+                warnings: undefined,
+            });
+            expect(workRepository.recordGenerationFinishTime).toHaveBeenCalledWith(
+                'work-1',
+                expect.any(Date),
+            );
+        });
+
+        it('writes ERROR status + error message + preserves step (no `step: null` clear) when error is present', async () => {
+            // Pinned: on the error path, the step the pipeline crashed
+            // on stays in place so the UI can surface "failed during X".
+            // The conditional `step: null` only fires on the success
+            // path. A future "always clear step" refactor would erase
+            // the failure context.
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(Date.now() - 1000),
+                history: undefined,
+                error: new Error('pipeline crashed'),
+                stats: null,
+                warnings: ['some warning'],
+                context: { triggeredBy: 'user' },
+            });
+
+            const [, payload] = workRepository.updateGenerateStatus.mock.calls[0];
+            expect(payload).toMatchObject({
+                status: GenerateStatusType.ERROR,
+                error: expect.stringContaining('pipeline crashed'),
+                warnings: ['some warning'],
+            });
+            expect(payload).not.toHaveProperty('step');
+        });
+
+        it('writes CANCELLED status + GENERATION_CANCELLED message on cancellation errors', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(Date.now() - 1000),
+                history: undefined,
+                error: createGenerationCancelledError(),
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'user' },
+            });
+
+            expect(workRepository.updateGenerateStatus).toHaveBeenCalledWith(
+                'work-1',
+                expect.objectContaining({
+                    status: GenerateStatusType.CANCELLED,
+                    error: GENERATION_CANCELLED,
+                }),
+            );
+        });
+
+        it('updates the history entry with terminal status + duration + warnings + stats when history is provided', async () => {
+            const service = buildService() as any;
+            const startTime = new Date(Date.now() - 5000);
+            const history: any = { id: 'h-1' };
+            const stats = {
+                newItemsCount: 3,
+                updatedItemsCount: 1,
+                totalItemsCount: 10,
+            };
+
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime,
+                history,
+                error: null,
+                stats,
+                warnings: ['skipped foo'],
+                context: { triggeredBy: 'user' },
+            });
+
+            const [historyId, payload] = generationHistoryRepository.updateEntry.mock.calls[0];
+            expect(historyId).toBe('h-1');
+            expect(payload).toMatchObject({
+                status: GenerateStatusType.GENERATED,
+                warnings: ['skipped foo'],
+                newItemsCount: 3,
+                updatedItemsCount: 1,
+                totalItemsCount: 10,
+            });
+            expect(typeof payload.durationInSeconds).toBe('number');
+            expect(payload.durationInSeconds).toBeGreaterThanOrEqual(0);
+        });
+
+        it('skips the history update when no history is provided', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(),
+                history: undefined,
+                error: null,
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'user' },
+            });
+            expect(generationHistoryRepository.updateEntry).not.toHaveBeenCalled();
+        });
+
+        it('finalizes the schedule run with status=completed + historyId on a successful schedule trigger', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(Date.now() - 1000),
+                history: { id: 'h-1' } as any,
+                error: null,
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+            });
+
+            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith(
+                'sched-1',
+                { status: 'completed', historyId: 'h-1' },
+            );
+        });
+
+        it('finalizes the schedule run with status=failed + reason on a failed schedule trigger', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(Date.now() - 1000),
+                history: undefined,
+                error: new Error('boom'),
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+            });
+
+            const [scheduleId, outcome] = workScheduleService.finalizeScheduleRun.mock.calls[0];
+            expect(scheduleId).toBe('sched-1');
+            expect(outcome).toMatchObject({ status: 'failed' });
+            expect((outcome as any).reason).toContain('boom');
+        });
+
+        it('does not touch the schedule when triggeredBy=user (even with a scheduleId set)', async () => {
+            // Pinned: only schedule-triggered runs report back to the
+            // schedule. A user-triggered run with a stray scheduleId
+            // (defensive coding) must NOT advance the schedule's
+            // failure-counter or completion timestamp.
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(),
+                history: undefined,
+                error: null,
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'user', scheduleId: 'sched-1' },
+            });
+            expect(workScheduleService.finalizeScheduleRun).not.toHaveBeenCalled();
+        });
+
+        it('does not touch the schedule on a schedule trigger with NO scheduleId (resilience)', async () => {
+            const service = buildService() as any;
+            await service.finalizeGeneration({
+                workId: 'work-1',
+                startTime: new Date(),
+                history: undefined,
+                error: null,
+                stats: null,
+                warnings: undefined,
+                context: { triggeredBy: 'schedule' },
+            });
+            expect(workScheduleService.finalizeScheduleRun).not.toHaveBeenCalled();
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  executeGenerationPipeline (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('executeGenerationPipeline', () => {
+        const buildAcc = () =>
+            ({ stats: null, warnings: undefined } as { stats: any; warnings?: string[] });
+
+        beforeEach(() => {
+            dataGenerator.initialize = jest.fn();
+        });
+
+        it('skips markdown + website when initialise returns success=true with zero items and no existing items', async () => {
+            // Pinned: a no-op generation (no new + no updated + no
+            // existing items) means the website repo has nothing to
+            // render, so we skip the markdown + website steps entirely.
+            // A future "always run markdown" tightening would crash on
+            // the empty data set.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+                warnings: ['heads up'],
+            });
+
+            const acc = buildAcc();
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                {} as any,
+                { triggeredBy: 'user' },
+                acc,
+            );
+
+            expect(acc.stats).toEqual({
+                newItemsCount: 0,
+                updatedItemsCount: 0,
+                totalItemsCount: 0,
+            });
+            expect(acc.warnings).toEqual(['heads up']);
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+            expect(websiteGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('runs markdown when newItemsCount > 0 and runs website when hasExistingItems OR newItemsCount > 0', async () => {
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 5, updatedItemsCount: 0, totalItemsCount: 5 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                { generation_method: GenerationMethod.CREATE_UPDATE } as any,
+                { triggeredBy: 'user' },
+                buildAcc(),
+            );
+
+            expect(markdownGenerator.initialize).toHaveBeenCalled();
+            expect(websiteGenerator.initialize).toHaveBeenCalled();
+        });
+
+        it('runs website when hasExistingItems=true even if no new/updated items', async () => {
+            // Pinned: re-running a website regenerate after a no-op data
+            // generation (nothing new on the upstream source) must still
+            // touch the website pipeline so the repo gets rebuilt with
+            // any template/markdown changes.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: true,
+                prUpdate: null,
+            });
+
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                {} as any,
+                { triggeredBy: 'user' },
+                buildAcc(),
+            );
+
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+            expect(websiteGenerator.initialize).toHaveBeenCalled();
+        });
+
+        it('throws error.cause when initialise returns success=false with a cause', async () => {
+            // Pinned: error.cause is the original Error from inside the
+            // pipeline (with a real stack). A future "always synthesise
+            // a fresh Error" refactor would lose the original stack and
+            // make incidents harder to triage.
+            const cause = new Error('clone failed');
+            dataGenerator.initialize.mockResolvedValue({
+                success: false,
+                error: { code: 'CLONE_FAILED', message: 'cant clone', cause },
+            });
+
+            const service = buildService() as any;
+            errorSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+            await expect(
+                service.executeGenerationPipeline(
+                    buildWork(),
+                    buildUser(),
+                    {} as any,
+                    { triggeredBy: 'user' },
+                    buildAcc(),
+                ),
+            ).rejects.toBe(cause);
+        });
+
+        it('throws a fresh Error(message) when initialise fails without a cause', async () => {
+            dataGenerator.initialize.mockResolvedValue({
+                success: false,
+                error: { code: 'GENERATION_FAILED', message: 'pipeline crashed' },
+            });
+
+            const service = buildService() as any;
+            errorSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+            await expect(
+                service.executeGenerationPipeline(
+                    buildWork(),
+                    buildUser(),
+                    {} as any,
+                    { triggeredBy: 'user' },
+                    buildAcc(),
+                ),
+            ).rejects.toThrow('pipeline crashed');
+        });
+
+        it('forwards tryResume=true to dataGenerator.initialize on a schedule trigger', async () => {
+            // Pinned: schedule-triggered generations resume in-progress
+            // pipelines (so a mid-run process restart picks back up).
+            // User-triggered generations always start fresh — pinned via
+            // `tryResume:false` on the user-trigger path below.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                {} as any,
+                { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+                buildAcc(),
+            );
+
+            expect(dataGenerator.initialize).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+                expect.objectContaining({ tryResume: true }),
+            );
+        });
+
+        it('forwards tryResume=false to dataGenerator.initialize on a user trigger', async () => {
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                {} as any,
+                { triggeredBy: 'user' },
+                buildAcc(),
+            );
+
+            expect(dataGenerator.initialize).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+                expect.objectContaining({ tryResume: false }),
+            );
+        });
+
+        it('forwards generated.prUpdate into markdownGenerator.initialize', async () => {
+            const prUpdate = { number: 42 } as any;
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 1, updatedItemsCount: 0, totalItemsCount: 1 },
+                hasExistingItems: false,
+                prUpdate,
+            });
+
+            const service = buildService() as any;
+            await service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                { generation_method: GenerationMethod.CREATE_UPDATE } as any,
+                { triggeredBy: 'user' },
+                buildAcc(),
+            );
+
+            expect(markdownGenerator.initialize).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                expect.objectContaining({ pr_update: prUpdate }),
+            );
+        });
+
+        it('swallows a "repository not found" website failure into a warning when items are present', async () => {
+            // Pinned by isNonFatalWebsiteGenerationError: a missing
+            // website repo on a successful data generation is recoverable
+            // (the user can configure the repo afterwards). A future
+            // "all website failures are fatal" tightening would crash the
+            // generation after the data was already pushed.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 1, updatedItemsCount: 0, totalItemsCount: 1 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+            websiteGenerator.initialize.mockRejectedValue(new Error('Repository not found'));
+
+            const acc = buildAcc();
+            const service = buildService() as any;
+            warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+            await expect(
+                service.executeGenerationPipeline(
+                    buildWork(),
+                    buildUser(),
+                    {} as any,
+                    { triggeredBy: 'user' },
+                    acc,
+                ),
+            ).resolves.toBeUndefined();
+
+            expect(acc.warnings).toEqual(
+                expect.arrayContaining([
+                    expect.stringContaining('Website repository setup skipped'),
+                ]),
+            );
+            expect(warnSpy).toHaveBeenCalled();
+        });
+
+        it('rethrows non-recoverable website failures', async () => {
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 1, updatedItemsCount: 0, totalItemsCount: 1 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+            websiteGenerator.initialize.mockRejectedValue(new Error('Permission denied'));
+
+            const service = buildService() as any;
+            await expect(
+                service.executeGenerationPipeline(
+                    buildWork(),
+                    buildUser(),
+                    {} as any,
+                    { triggeredBy: 'user' },
+                    buildAcc(),
+                ),
+            ).rejects.toThrow('Permission denied');
+        });
+
+        it('aborts the pipeline before the markdown step when the abort signal is already aborted', async () => {
+            // Pinned: throwIfGenerationCancelled fires AFTER data
+            // generation but BEFORE markdown. A future "skip the
+            // mid-pipeline cancel check" refactor would let the markdown
+            // step run on cancelled work.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 5, updatedItemsCount: 0, totalItemsCount: 5 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+
+            const controller = new AbortController();
+            const service = buildService() as any;
+
+            const promise = service.executeGenerationPipeline(
+                buildWork(),
+                buildUser(),
+                {} as any,
+                { triggeredBy: 'user' },
+                buildAcc(),
+                undefined,
+                controller.signal,
+            );
+
+            controller.abort();
+            await expect(promise).rejects.toThrow();
+            // markdown must NOT have run because the cancel check fires first
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  dispatchGenerationTask (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('dispatchGenerationTask', () => {
+        it('marks the work GENERATING immediately for instant UI feedback (does not wait for Trigger.dev)', async () => {
+            // Pinned: the user needs to see "Generating…" the moment they
+            // press the button. A future "wait for trigger ack first"
+            // refactor would leave the UI on the prior status until the
+            // dispatch round-trips.
+            const service = buildService({ withDispatcher: true }) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-1');
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: new Date('2026-01-01T00:00:00.000Z') } as any,
+                { triggeredBy: 'user' },
+            );
+
+            expect(workRepository.recordGenerationStartTime).toHaveBeenCalledWith(
+                'work-1',
+                expect.any(Date),
+            );
+            expect(workRepository.updateGenerateStatus).toHaveBeenCalledWith('work-1', {
+                status: GenerateStatusType.GENERATING,
+            });
+        });
+
+        it('persists triggerRunId on the history entry when the dispatcher returns a run id', async () => {
+            const service = buildService({ withDispatcher: true }) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-42');
+
+            await service.dispatchGenerationTask(
+                'update',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: new Date() } as any,
+                { triggeredBy: 'user' },
+            );
+
+            expect(generationHistoryRepository.updateEntry).toHaveBeenCalledWith('h-1', {
+                triggerRunId: 'run-42',
+            });
+        });
+
+        it('builds the WorkGenerationPayload with mode + workId + userId + dto + historyId + triggerSource + scheduleId', async () => {
+            const service = buildService({ withDispatcher: true }) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-1');
+            const dto = { generation_method: GenerationMethod.CREATE_UPDATE } as any;
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork({ id: 'w-9' }),
+                buildUser({ id: 'u-9' }),
+                dto,
+                'h-9',
+                { id: 'h-9', startedAt: new Date('2026-01-01T00:00:00.000Z') } as any,
+                { triggeredBy: 'schedule', scheduleId: 'sched-7' },
+            );
+
+            const payload = generationDispatcher.dispatchWorkGeneration.mock.calls[0][0];
+            expect(payload).toMatchObject({
+                workId: 'w-9',
+                userId: 'u-9',
+                mode: 'create',
+                dto,
+                historyId: 'h-9',
+                triggerSource: 'schedule',
+                scheduleId: 'sched-7',
+            });
+            expect(typeof payload.historyStartedAt).toBe('string'); // ISO
+        });
+
+        it('falls back to history.createdAt when history.startedAt is missing', async () => {
+            const service = buildService({ withDispatcher: true }) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-1');
+            const createdAt = new Date('2025-12-31T00:00:00.000Z');
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: undefined, createdAt } as any,
+                { triggeredBy: 'user' },
+            );
+
+            const payload = generationDispatcher.dispatchWorkGeneration.mock.calls[0][0];
+            expect(payload.historyStartedAt).toBe(createdAt.toISOString());
+        });
+
+        it('falls back to in-process generation (await) when the dispatcher is unavailable on a schedule trigger', async () => {
+            // Pinned: schedule-triggered fallbacks AWAIT processGeneration
+            // so the cron loop runs sequentially (one work at a time).
+            // Concurrent fallback runs would explode resource usage.
+            const service = buildService({ withDispatcher: false }) as any;
+            const processSpy = jest
+                .spyOn(service, 'processGeneration')
+                .mockResolvedValue(undefined);
+            warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: new Date() } as any,
+                { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+            );
+
+            expect(processSpy).toHaveBeenCalled();
+            expect(warnSpy).toHaveBeenCalled();
+        });
+
+        it('falls back to fire-and-forget processGeneration on a user trigger when no dispatcher is wired', async () => {
+            // Pinned: user-triggered fallbacks DON'T await — the API
+            // controller has already returned to the user with the
+            // GENERATING status. Awaiting here would block the request
+            // for the duration of the entire pipeline.
+            const service = buildService({ withDispatcher: false }) as any;
+            let processResolve: () => void = () => {};
+            const processPromise = new Promise<void>((resolve) => {
+                processResolve = resolve;
+            });
+            const processSpy = jest
+                .spyOn(service, 'processGeneration')
+                .mockReturnValue(processPromise);
+            warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: new Date() } as any,
+                { triggeredBy: 'user' },
+            );
+
+            // dispatchGenerationTask returned WITHOUT awaiting processGeneration
+            expect(processSpy).toHaveBeenCalled();
+            processResolve();
+            await processPromise;
+        });
+
+        it('falls back to fire-and-forget processGeneration when the dispatcher returns null', async () => {
+            // Pinned: a dispatcher that resolved to null (e.g. trigger
+            // disabled at runtime) is treated identically to "no
+            // dispatcher wired" — fall back rather than fail.
+            const service = buildService({ withDispatcher: true }) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue(null);
+            const processSpy = jest
+                .spyOn(service, 'processGeneration')
+                .mockResolvedValue(undefined);
+            warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+
+            await service.dispatchGenerationTask(
+                'create',
+                buildWork(),
+                buildUser(),
+                {} as any,
+                'h-1',
+                { id: 'h-1', startedAt: new Date() } as any,
+                { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+            );
+
+            expect(processSpy).toHaveBeenCalled();
+            // No history.triggerRunId update either, since dispatchedId was null
+            expect(generationHistoryRepository.updateEntry).not.toHaveBeenCalled();
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  processGeneration (private)
+    // ════════════════════════════════════════════════════════════════════
+    describe('processGeneration', () => {
+        beforeEach(() => {
+            dataGenerator.initialize = jest.fn();
+        });
+
+        it('emits WorkGenerationCompletedEvent on the happy path with the refreshed work payload', async () => {
+            // Pinned: the event payload always carries the post-finalisation
+            // work (so listeners see the GENERATED status). A future "emit
+            // the pre-pipeline work" refactor would replay stale state.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+            const refreshed = buildWork({ name: 'Refreshed' });
+            workRepository.findById.mockResolvedValue(refreshed);
+
+            const service = buildService() as any;
+            await service.processGeneration(buildWork(), buildUser(), {} as any);
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                'work.generation.completed',
+                expect.objectContaining({ work: refreshed }),
+            );
+        });
+
+        it('emits with the original work as a fallback when refresh returns null (defence in depth)', async () => {
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+            workRepository.findById.mockResolvedValue(null);
+
+            const original = buildWork({ name: 'Original' });
+            const service = buildService() as any;
+            await service.processGeneration(original, buildUser(), {} as any);
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                'work.generation.completed',
+                expect.objectContaining({ work: original }),
+            );
+        });
+
+        it('returns silently on a cancellation error (no notification, no rethrow, no error log)', async () => {
+            // Pinned: cancellation is intentional, not exceptional. The
+            // error-notification path must NOT fire, and the function
+            // must not rethrow. A future "treat cancellation as failure"
+            // flip would page the user with a generic "generation failed".
+            const cancelled = createGenerationCancelledError();
+            dataGenerator.initialize.mockRejectedValue(cancelled);
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            const service = buildService() as any;
+            const errSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+
+            await expect(
+                service.processGeneration(buildWork(), buildUser(), {} as any),
+            ).resolves.toBeUndefined();
+
+            expect(notificationService.notifyAiCreditsDepleted).not.toHaveBeenCalled();
+            expect(notificationService.notifyAiProviderError).not.toHaveBeenCalled();
+            expect(notificationService.notifyGitAuthExpired).not.toHaveBeenCalled();
+            expect(notificationService.notifyGenerationAccountError).not.toHaveBeenCalled();
+            // The cancellation path returns BEFORE the "Error during generation"
+            // logger.error line, so it must NOT have fired.
+            expect(errSpy).not.toHaveBeenCalledWith(
+                'Error during generation:',
+                cancelled,
+            );
+        });
+
+        it('routes the error through handleErrorNotification on a real failure (and logs the error)', async () => {
+            const failure = new Error('OpenAI insufficient_quota');
+            dataGenerator.initialize.mockRejectedValue(failure);
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            const service = buildService() as any;
+            const errSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+            await service.processGeneration(buildWork(), buildUser({ id: 'u-9' }), {} as any);
+
+            expect(notificationService.notifyAiCreditsDepleted).toHaveBeenCalledWith(
+                'u-9',
+                'OpenAI',
+                'OpenAI insufficient_quota',
+            );
+            expect(errSpy).toHaveBeenCalled();
+        });
+
+        it('rethrows an HttpException after notifying (so the API layer can map the status code)', async () => {
+            const httpError = new BadRequestException('rate limited');
+            dataGenerator.initialize.mockRejectedValue(httpError);
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            const service = buildService() as any;
+            jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+            await expect(
+                service.processGeneration(buildWork(), buildUser(), {} as any),
+            ).rejects.toBe(httpError);
+        });
+
+        it('runs finalizeGeneration even when the pipeline throws (terminal-state guarantee)', async () => {
+            // Pinned: finalize ALWAYS runs (it sits in `finally`). A
+            // future "skip finalize on schedule failures" refactor would
+            // leave the work stuck in GENERATING.
+            dataGenerator.initialize.mockRejectedValue(new Error('boom'));
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            const service = buildService() as any;
+            jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+            await service.processGeneration(buildWork(), buildUser(), {} as any);
+
+            // The finalize step writes ERROR status — pin via that side effect.
+            const calls = workRepository.updateGenerateStatus.mock.calls;
+            const errorWrite = calls.find(
+                ([, payload]: any[]) => payload?.status === GenerateStatusType.ERROR,
+            );
+            expect(errorWrite).toBeTruthy();
+        });
+
+        it('clears the abort controller from the in-memory map after processing', async () => {
+            // Pinned: leaving stale controllers around would leak memory
+            // on a long-lived process and would also let cancelGeneration
+            // for a subsequent run fire on the wrong signal.
+            dataGenerator.initialize.mockResolvedValue({
+                success: true,
+                stats: { newItemsCount: 0, updatedItemsCount: 0, totalItemsCount: 0 },
+                hasExistingItems: false,
+                prUpdate: null,
+            });
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            const service = buildService() as any;
+            const work = buildWork({ id: 'work-9' });
+            await service.processGeneration(work, buildUser(), {} as any);
+
+            expect(service['generationAbortControllers'].has('work-9')).toBe(false);
+        });
+    });
 });
