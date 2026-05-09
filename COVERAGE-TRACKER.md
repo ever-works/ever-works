@@ -21,10 +21,26 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~502 across `apps/` + `packages/` (was 492
-  earlier on 2026-05-09; +10 net spec files in the agent NestJS-module
-  wiring sweep — adds `*.module.spec.ts` for ALL 10 previously-uncovered
-  modules in `packages/agent/src/`: `work-operations`, `notifications`,
+- **Spec files (`*.spec.ts`)**: ~505 across `apps/` + `packages/` (was 502
+  earlier on 2026-05-09; +3 net spec files in the agent
+  database-helpers + enrichment-prompt utility sweep — adds
+  `packages/agent/src/database/utils/helper.spec.ts` (16 tests on
+  `getTlsOptions` + `parseDatabaseUrl`),
+  `packages/agent/src/database/database-config.factory.spec.ts`
+  (27 tests on the 7 documented `DatabaseConfigurations` entries +
+  `createDatabaseModuleWithEnv` env-write contract + cross-config
+  invariant), and `packages/agent/src/import/enrichment-prompt.utils.spec.ts`
+  (21 tests on `buildImportGenerationDto` covering name fallback,
+  hardcoded generation_method/website_repository_creation_method,
+  pluginConfig defaults, providers default-agent-pipeline merging, and
+  the prompt's expansion-factor matrix + four-step header ordering +
+  legal-safety + 30%-cap directives). Closes three previously-uncovered
+  tiny utility files in `packages/agent/src/` covering 279 LOC of
+  source. Total agent-package suite: 3185 → 3249 tests across 154 → 157
+  suites — see `Done` ledger; +10 net spec files in the prior agent
+  NestJS-module wiring sweep — adds `*.module.spec.ts` for ALL 10
+  previously-uncovered modules in `packages/agent/src/`: `work-operations`,
+  `notifications`,
   `activity-log`, `community-pr`, `template-catalog`,
   `comparison-generator`, `pipeline`, `import`,
   `generators/website-generator`, `generators/data-generator`. 50 tests
@@ -174,6 +190,18 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent database helpers + import enrichment-prompt utils (+64 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes three previously-uncovered tiny utility files in `packages/agent/src/`. Each one is a pure-function helper without per-file co-located coverage; together they account for 50 + 137 + 92 = 279 LOC of zero-coverage agent-package source. Three new spec files:
+
+- **`packages/agent/src/database/utils/helper.spec.ts`** (16 tests) — `getTlsOptions` four-branch matrix (`dbSslMode=false` → undefined w/o `console.error` even when a cert is provided; `true` + `undefined` cert → `'DATABASE_CA_CERT is not defined. TLS options cannot be configured.'` console.error + undefined return; `true` + empty-string cert → same console.error path (empty string is falsy); valid base64 → `{rejectUnauthorized:true, ca:<decoded>}` w/o console.error, including a multi-line PEM round-trip; `Buffer.from` rejection swallowed with `'Error decoding DATABASE_CA_CERT:' + error.message` console.error and undefined return — pinned via a `jest.spyOn(Buffer, 'from')` that throws). `parseDatabaseUrl` happy paths (full PostgreSQL URL → `{protocol, username, password, host, port, database, searchParams}` envelope; URL without explicit port → `port: undefined`; MySQL URL with empty password; multiple `&`-joined search params; trailing-slash path → `database: ''`; protocol trailing-colon strip), invalid-URL `null` (both invalid-string and empty-string), and the URL-encoded-credentials passthrough (`us%40er` / `p%40ss` preserved verbatim — caller is responsible for decoding, pinned so a future `decodeURIComponent` wrap is a deliberate change).
+- **`packages/agent/src/database/database-config.factory.spec.ts`** (27 tests) — `createDatabaseModuleWithEnv` (env-write happy path + last-write-wins overwrite + empty-map still returns `DatabaseModule` reference); `DatabaseConfigurations.cli` (`APP_TYPE=cli` + `DATABASE_TYPE=sqlite`); `DatabaseConfigurations.apiDevelopment` (`APP_TYPE=api` + sqlite + `DATABASE_IN_MEMORY=true` + `DATABASE_LOGGING=true`); `DatabaseConfigurations.apiProduction` (no-arg → 4 env vars, no `DATABASE_PATH`; explicit path → `DATABASE_PATH` set; empty-string path → not-set via the `&&`-spread truthy gate); `DatabaseConfigurations.test` (`NODE_ENV=test` + sqlite + logging-off, deliberately does NOT set `DATABASE_IN_MEMORY` so the agent default kicks in); `DatabaseConfigurations.postgres` (url branch sets `DATABASE_URL` and explicitly does NOT also set per-field env vars; logging-omitted → coerced to `'false'`; per-field defaults `localhost`/`5432`/`postgres`/`''`/`ever_works` when no options; per-field overrides land via `String()` on numbers; `port:0` → `'5432'` documenting the `||`-not-`??` semantics so a future `??` widening is a deliberate API change); `DatabaseConfigurations.mysql` (mirror set: url branch with no per-field bleed; logging-off default; per-field defaults `localhost`/`3306`/`root`/`''`/`ever_works`; per-field overrides; `port:0` → `'3306'`); a `cross-configuration contract` `it.each` table pinning that all six configurations return the same `DatabaseModule` reference. The spec mocks `'./database.module'` to a sentinel object so the suite does NOT pull TypeORM/`@nestjs/typeorm` into the JIT and does NOT exercise any module-init side-effect — the factory contract is purely (a) mutate `process.env` and (b) return the static `DatabaseModule` reference. Every spec snapshots/restores 12 tracked env vars in `beforeEach`/`afterEach` so the suite leaves no global state behind.
+- **`packages/agent/src/import/enrichment-prompt.utils.spec.ts`** (21 tests) — `buildImportGenerationDto` envelope (returns a `CreateItemsGeneratorDto` instance, NOT a plain object); name fallback chain (`work.name` truthy wins; `undefined` → `work.slug`; `null` → `work.slug` (`??` not `||` semantics); empty-string `''` → preserved as `''` since `??` does not coerce empty strings — pinned so a future `||` switch is deliberate); hardcoded `generation_method: GenerationMethod.CREATE_UPDATE` and `website_repository_creation_method: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE`; `update_with_pull_request` default-false + explicit-`true` + explicit-`false` (default-arg parameter destructuring contract); `model` verbatim passthrough (undefined or string); `pluginConfig` literal triple `{target_items: 500, max_pages_to_process: 1000, capture_screenshots: true}`; per-call freshness (no shared-mutable-state between two consecutive invocations — both `providers` and `pluginConfig` are fresh objects per call). Providers section: default `{pipeline: 'agent-pipeline'}` when no providers passed; explicit `pipeline` override preserved; passing other keys with no `pipeline` → default-pipeline merged via `??` while sibling keys flow through; full multi-key passthrough preserves `search`/`extract_content`/`ai`. Prompt section: source URL embedded in opening line; default `expansionFactor: 2.5` → `Math.round(100/2.5) = 40` → `'at most 40%'`; custom `expansionFactor: 4` → `25%`; non-integer `expansionFactor: 3` → `Math.round(100/3) = 33` → `'33%'`; all four documented step headers present in document order via `indexOf` ordering check (`## Step 1 — Process source links` → `## Step 2 — Discover more items` → `## Step 3 — Enrich descriptions` → `## Step 4 — Build original taxonomy`); legal-safety guidance present (`'Do NOT copy descriptions or metadata from the source'` + `'legally problematic'`); closing `'Do not stop early'` directive ends with `'exhausted.'`; original-taxonomy 30%-cap directive verbatim. Mocks none — the function is a pure builder; assertions are direct on the returned DTO.
+
+Total agent-package suite: 3185 → 3249 tests across 154 → 157 suites, all green (full run on the branch verified locally before push).
+
+---
 
 **2026-05-09 — packages/agent NestJS-module wiring sweep (+50 tests across 10 new specs, scheduled-task `platform-tests-and-docs` cycle, [#651](https://github.com/ever-works/ever-works/pull/651))**
 
