@@ -21,9 +21,31 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~492 across `apps/` + `packages/` (was 490
-  earlier on 2026-05-09 after the website-update sweep; +2 net spec files
-  in the agent `MarkdownGeneratorService` direct-coverage sweep — adds
+- **Spec files (`*.spec.ts`)**: ~502 across `apps/` + `packages/` (was 492
+  earlier on 2026-05-09; +10 net spec files in the agent NestJS-module
+  wiring sweep — adds `*.module.spec.ts` for ALL 10 previously-uncovered
+  modules in `packages/agent/src/`: `work-operations`, `notifications`,
+  `activity-log`, `community-pr`, `template-catalog`,
+  `comparison-generator`, `pipeline`, `import`,
+  `generators/website-generator`, `generators/data-generator`. 50 tests
+  across the 10 specs pinning the standard `Reflect.getMetadata`-based
+  provider/exports/imports shape (with documented per-module length
+  invariants so a silent extra-import is a deliberate change), plus
+  barrel re-exports where present. Each spec mocks transitive
+  ESM-only / TypeORM-pulling dependencies (`DatabaseModule`,
+  `FacadesModule`, `data-generator.service` w/ `p-map`, etc.) at module
+  scope — same pattern as the existing `markdown-generator.module.spec.ts`
+  / `account-transfer.module.spec.ts` / `subscriptions.module.spec.ts`.
+  This closes the agent-package NestJS-module zero-coverage gap entirely
+  (every `*.module.ts` under `packages/agent/src/` now has a co-located
+  spec). Highlights: `WorkOperationsModule`'s deliberate
+  `DatabaseModule` re-export pinned; `CommunityPrModule`'s
+  `DistributedTaskLockService` provided locally but NOT exported pinned;
+  `DataGeneratorModule`'s `WorksConfigService`/`WorksConfigWriterService`
+  helpers provided but NOT exported pinned; `PipelineModule`'s
+  intentional non-import of `PluginsModule` (which is `forRoot`-global)
+  pinned; — see `Done` ledger; +2 net spec files
+  in the prior agent `MarkdownGeneratorService` direct-coverage sweep — adds
   `packages/agent/src/generators/markdown-generator/markdown-generator.service.spec.ts`
   (49 tests on the 508-LOC orchestrator) and
   `packages/agent/src/generators/markdown-generator/markdown-generator.module.spec.ts`
@@ -152,6 +174,25 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent NestJS-module wiring sweep (+50 tests across 10 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the agent-package NestJS-module zero-coverage gap entirely — every `*.module.ts` under `packages/agent/src/` now has a co-located spec. The 10 new specs follow the established `Reflect.getMetadata` pattern from `markdown-generator.module.spec.ts` / `account-transfer.module.spec.ts` / `subscriptions.module.spec.ts`: each pins the providers/exports/imports shape with a documented per-module length invariant so a future silent extra-import is a deliberate change, plus barrel re-exports where present.
+
+- **`packages/agent/src/work-operations/work-operations.module.spec.ts`** (5 tests) — `WorkOperationsService` provider; `exports` includes BOTH the service AND `DatabaseModule` (re-export pattern pinned so a future "drop the re-export" refactor is a deliberate change); `DatabaseModule` import; barrel re-exports both runtime symbols.
+- **`packages/agent/src/notifications/notifications.module.spec.ts`** (5 tests) — `NotificationService` provider + export, `DatabaseModule` import; barrel re-exports both runtime symbols.
+- **`packages/agent/src/activity-log/activity-log.module.spec.ts`** (5 tests) — `ActivityLogService` provider + export, `DatabaseModule` import; barrel re-exports both runtime symbols.
+- **`packages/agent/src/community-pr/community-pr.module.spec.ts`** (5 tests) — `CommunityPrProcessorService` AND `DistributedTaskLockService` providers (the lock is a peer dep provided locally because the cache module isn't imported globally); `CommunityPrProcessorService` exported but the lock is NOT (pinned via `not.toContain`); `DatabaseModule` + `FacadesModule` imports (length-2 pin); barrel re-exports the processor + module.
+- **`packages/agent/src/template-catalog/template-catalog.module.spec.ts`** (5 tests) — `TemplateCatalogService` provider + export; `DatabaseModule` + `FacadesModule` imports (length-2 pin); barrel re-exports both runtime symbols.
+- **`packages/agent/src/comparison-generator/comparison-generator.module.spec.ts`** (5 tests) — `ComparisonGenerationService` provider + export; `DatabaseModule` + `FacadesModule` imports (length-2 pin); barrel re-exports both runtime symbols.
+- **`packages/agent/src/pipeline/pipeline.module.spec.ts`** (5 tests) — all 5 pipeline services (`PipelineBuilderService` + `StepPipelineExecutorService` + `FullPipelineExecutorService` + `PipelineOrchestratorService` + `PipelineFacadeService`) as providers AND exports (length-5 pin on both); `FacadesModule` import only (length-1 pin) with the source-comment-documented exclusion of `PluginsModule` (registered globally via `forRoot`) explicitly pinned via `not.toContain('PluginsModule')`.
+- **`packages/agent/src/import/import.module.spec.ts`** (4 tests) — three providers (`SourceRepoAnalyzerService` + `ImportExecutorService` + `WorksConfigService`) all exported (length-3 pin); the documented 4 imports (`FacadesModule` + `DataGeneratorModule` + `MarkdownGeneratorModule` + `WebsiteGeneratorModule`, length-4 pin). The two service classes are mocked module-scope to class shells because their real implementations transitively pull in `p-map` (ESM-only) via the generator stack.
+- **`packages/agent/src/generators/website-generator/website-generator.module.spec.ts`** (5 tests) — all 4 services (`WebsiteGeneratorService` + `WebsiteUpdateService` + `BranchSyncService` + `WebsiteTemplateResolverService`) as providers AND exports (length-4 pin on both); `FacadesModule` + `DatabaseModule` imports (length-2 pin); barrel re-exports the module + all 4 service runtime classes.
+- **`packages/agent/src/generators/data-generator/data-generator.module.spec.ts`** (5 tests) — three providers (`DataGeneratorService` + `WorksConfigService` + `WorksConfigWriterService`, length-3 pin); ONLY `DataGeneratorService` is exported (the two `WorksConfig*` helpers stay internal, pinned via `not.toContain` so a future "expose them" refactor is a deliberate change, length-1 pin on exports); the documented 4 imports (`FacadesModule` + `PipelineModule` + `DatabaseModule` + `WorkOperationsModule`, length-4 pin); barrel re-exports `DataGeneratorModule` + the runtime classes `DataRepository` + `GenerationLogCollector`. `data-generator.service` is mocked module-scope (it transitively imports `p-map`).
+
+Total agent-package suite: 3134 → 3249 tests across 144 → 157 suites, all green. The +115 tests / +13 suites delta is bigger than the 50/10 figures above because (a) the work-operations / notifications / activity-log / community-pr / template-catalog / comparison-generator / pipeline / import / website-generator / data-generator module specs land alongside this hour's +26-test `WebsiteUpdateService` row already on develop, and (b) running the full suite picks up the `account-transfer.module.spec.ts` etc. that already shipped earlier this day.
+
+---
 
 **2026-05-09 — packages/agent MarkdownGeneratorService + module coverage (+54 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [#648](https://github.com/ever-works/ever-works/pull/648))**
 
