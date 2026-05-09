@@ -343,7 +343,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent FullPipelineExecutorService direct coverage (+22 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent FullPipelineExecutorService direct coverage (+22 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#674](https://github.com/ever-works/ever-works/pull/674))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/full-pipeline-executor.service.ts` (239 LOC) — the executor that runs self-managed pipeline plugins (e.g. `claude-code`, where the plugin owns step ordering and orchestration internally rather than delegating each step back to the engine). The orchestrator routes self-managed pipelines through this service, so a regression in event emission, validation, or cancellation wiring is invisible to the existing `PipelineOrchestratorService` suite (which mocks the executor).
 
