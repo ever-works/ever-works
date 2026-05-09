@@ -22,16 +22,20 @@
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
 - **Spec files (`*.spec.ts`)**: ~484 across `apps/` + `packages/` (was 483
-  earlier on 2026-05-09; +1 packages/agent service spec landed 2026-05-09
+  earlier on 2026-05-09; +0 net spec files in the WorkGenerationService
+  helpers follow-up sweep — extends the existing
+  `services/__tests__/work-generation.service.spec.ts` from 95 → 126
+  tests, covering 7 of the previously-pending pipeline-orchestrator helpers
+  (`resolveGenerationFinalStatus` / `resolveGenerationErrorMessage` /
+  `buildScheduleRunOutcome` / `isNonFatalWebsiteGenerationError` /
+  `markGenerationStarted` / `finalizeCancelledGeneration` /
+  `handleErrorNotification`); the remaining 7 multi-step orchestrators
+  (`processGeneration` / `executeGenerationPipeline` / `finalizeGeneration` /
+  `runInProcessGeneration` / `prepareProviders` /
+  `ensureProvidersEnabledForWork` / `dispatchGenerationTask`) remain
+  pending a future sweep — see `Done` ledger; +1 packages/agent service spec landed 2026-05-09
   in the small-service coverage sweep #6 — `WorkGenerationService` (focused
-  first sweep covering wrapper / simpler methods; pipeline-orchestrator
-  helpers `processGeneration` / `executeGenerationPipeline` /
-  `finalizeGeneration` / `runInProcessGeneration` / `markGenerationStarted` /
-  `finalizeCancelledGeneration` / `handleErrorNotification` /
-  `prepareProviders` / `ensureProvidersEnabledForWork` /
-  `isNonFatalWebsiteGenerationError` / `resolveGenerationFinalStatus` /
-  `resolveGenerationErrorMessage` / `buildScheduleRunOutcome` remain pending
-  a follow-up sweep) — see `Done` ledger; +1 packages/agent service spec
+  first sweep covering wrapper / simpler methods) — see `Done` ledger; +1 packages/agent service spec
   landed earlier 2026-05-09
   in the small-service coverage sweep #5 — `ItemHealthService` — see
   `Done` ledger;
@@ -80,6 +84,20 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent WorkGenerationService helpers follow-up sweep (private-helper coverage, +31 tests on the existing `work-generation.service.spec.ts`, scheduled-task `platform-tests-and-docs` cycle)**
+
+Closes the bulk of the pipeline-orchestrator helper gap left open by the focused-first sweep #6 (PR [#634](https://github.com/ever-works/ever-works/pull/634)). Adds 7 new top-level `describe` blocks at the bottom of `packages/agent/src/services/__tests__/work-generation.service.spec.ts` covering the simpler / pure private helpers exercised via `(service as any)` cast (TypeScript-private is compile-time only; at runtime the methods are accessible). Suite passes via `pnpm --filter @ever-works/agent test --testPathPattern='services/__tests__/work-generation.service'` in ~15s, total **126** tests in this file (95 → 126); full agent suite **136** suites / 2849 → **2880** tests green. **Helpers covered:**
+
+- `resolveGenerationFinalStatus` (3 tests): CANCELLED branch wins over the generic-error branch (pinned because a future swap would record real ERROR for user-initiated cancels and trigger downstream notifications that should not fire); ERROR for any non-cancelled truthy value incl. non-Error truthies (string, plain object — pinned because callers pass `unknown` from generic catch blocks); GENERATED for falsy values (null/undefined/0/'').
+- `resolveGenerationErrorMessage` (3 tests): undefined for falsy errors; documented `GENERATION_CANCELLED` constant (NOT `Error.message`) for cancelled errors so the UI can show "Generation cancelled." without translating internal wording; falls through to `normalizeGeneratorError` for everything else, pinning the documented "Repository not found." copy substitution.
+- `buildScheduleRunOutcome` (5 tests): `{status:'completed', historyId}` envelope on success; explicit-undefined `historyId` field when not provided (pinned so a future "use spread-when-defined" change is deliberate); `{status:'failed', reason: GENERATION_CANCELLED}` on cancellation; `{status:'failed', reason: <normalized>}` on generic error; **historyId is dropped on the failed branch** (pinned: a downstream consumer `if ('historyId' in outcome)` must NOT misread a failed outcome as a resumable run).
+- `isNonFatalWebsiteGenerationError` (4 tests): false when zero items were generated (pinned: brand-new-work-with-no-items website failure is fatal — masking it would hide real config issues); false for non-"repository not found" errors; true when items exist AND the error matches "repository not found" (data-side progress preserved while website repo is auto-created later); case-insensitive match via `normalizeGeneratorError`'s `.toLowerCase()`.
+- `markGenerationStarted` (3 tests): work-side updates run via `Promise.all` (history untouched when undefined — pinned: legacy direct-generation path); also marks the history entry GENERATING with `startedAt` when history is provided; rejection from either of the two parallel work-side updates rejects the whole call (so the caller's try/catch can record the failure).
+- `finalizeCancelledGeneration` (7 tests): writes CANCELLED status + `GENERATION_CANCELLED` error and clears `step`; updates history with status/finishedAt/duration when provided; **falls back to `finishedAt` for `startedAt` when history is partial — produces 0-second duration, NOT NaN** (pinned: a future "trust startedAt unconditionally" refactor would write NaN into the duration column and break the analytics-summary aggregation); finalizes the schedule as `{status:'failed', reason: GENERATION_CANCELLED}` when `scheduleId` is set (cadence's failure counter advances → pause-on-N-failures still works); does NOT touch the schedule when `scheduleId` is null/undefined; emits `WorkGenerationCompletedEvent` with the FRESHLY-REFETCHED work (pinned via distinct-instance assertion — listeners see the CANCELLED status, not stale GENERATING); skips the event when the refreshed work is missing (deleted-mid-cancel guard prevents the listener queue from crashing on `event.work.X`).
+- `handleErrorNotification` (6 tests): no-op when `NotificationService` is omitted from DI (pinned: agent-package consumers like CLI / internal-cli can opt out — a future "always required" tightening would break headless callers); `ai_credits` classification routes to `notifyAiCreditsDepleted(userId, provider, message)`; `ai_provider` classification routes to `notifyAiProviderError`; `git_auth` classification routes to `notifyGitAuthExpired(userId, provider)` — provider only, no message (pinned: exposing the upstream Git error to the user adds no value and can leak internal hostnames / request IDs); `account_level` classification routes to `notifyGenerationAccountError(userId, workId, workName, message)` carrying the work context; **`unknown` classification does NOT notify the user** (pinned: random pipeline crashes — Zod parse failure on AI output, etc. — are for ops to investigate, not the end-user; a catch-all "tell the user something is wrong" refactor would create alert noise).
+
+Pipeline-orchestrator helpers still pending a follow-up sweep: `processGeneration` (87 lines), `executeGenerationPipeline` (60 lines), `finalizeGeneration` (45 lines), `runInProcessGeneration` (20 lines), `prepareProviders` (21 lines), `ensureProvidersEnabledForWork` (43 lines), `dispatchGenerationTask` (55 lines — partially exercised via generateItems/updateItemsGenerator dispatch path). These multi-step orchestrators require richer mocks for `dataGenerator.initialize` (returns `{success, stats, warnings, prUpdate, hasExistingItems, error}`) and signal-aware `markdownGenerator.initialize` / `websiteGenerator.initialize`, plus exercising the `EventEmitter2` emission of `WorkGenerationCompletedEvent` from the success path. Branch: `tests/work-generation-helpers-coverage`.
 
 **2026-05-09 — packages/agent small-service coverage sweep #6 (1 service — WorkGenerationService, 95 tests in 1 spec file, focused first sweep on wrapper / simpler methods, [#634](https://github.com/ever-works/ever-works/pull/634))**
 
