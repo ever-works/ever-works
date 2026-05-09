@@ -21,8 +21,72 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~518 across `apps/` + `packages/` (was 517
+- **Spec files (`*.spec.ts`)**: ~519 across `apps/` + `packages/` (was 518
   earlier on 2026-05-10; +1 net spec file in the agent
+  `ExecutablePipelineRunner` direct-coverage sweep — adds
+  `packages/agent/src/pipeline/executable-pipeline.class.spec.ts`
+  (49 tests on the 333-LOC runtime wrapper that owns the
+  `PipelineState` mutation flow consumed by the step-pipeline
+  executor — every `running`/`completed`/`failed`/`skipped`
+  transition flows through this class, so a regression here
+  would silently corrupt the run-state observed by both the
+  orchestrator AND the activity-log emitter that reads
+  `runner.getState()`. Pins: `PipelineRuntimeEvents` literal
+  wire format (`pipeline:state-changed` + `pipeline:step-status-changed`
+  — wire-format break is deliberate); the **STATE_CHANGED is
+  declared but NEVER emitted** gotcha (only STEP_STATUS_CHANGED
+  fires today — pinned so a future "wire up state-change events"
+  feature is a deliberate change, not an accident); constructor
+  initialises every step in `pending` status with empty
+  `completedSteps`/`failedSteps` arrays; **duplicate step IDs
+  collapse via Map.set semantics** (the second definition wins —
+  pinned so a future "throw on duplicate id" refactor breaks
+  loudly); zero-step pipeline does not throw; **EventEmitter is
+  optional** (verified across all five status-mutating methods —
+  none throw without an emitter); `getStepDefinition` reads
+  through `pipeline.steps.find` NOT the internal Map (so post-
+  construction mutations to `pipeline.steps` are reflected here
+  but not in `getStepState` — useful invariant for caller code);
+  `startExecution` stamps `state.startedAt` from `Date.now()`
+  AND **preserves `completedSteps`/`failedSteps`** on a second
+  call (no idempotency reset — pinned); `completeExecution`
+  clears `isRunning` + stamps `completedAt` AND preserves
+  `startedAt` (audit trail); `cancelExecution` is the only
+  method that flips `isCancelled` to true; `updateStepStatus`
+  throws verbatim `'Step "<id>" not found in pipeline'` for
+  unknown ids; sets `startedAt` ONLY on `running` and
+  `completedAt` on `completed`/`failed`/`skipped` (not on
+  `pending`/`running`); updates `currentStep` to the running
+  step AND clears it on any other transition that matches the
+  CURRENT step (parallel-step safety: transitioning a different
+  step does NOT clear `currentStep` of an unrelated running
+  step); STEP_STATUS_CHANGED payload shape pinned (`stepId`,
+  `previousStatus` reflects pre-update state, `newStatus`,
+  `timestamp` from `Date.now()`); **`previousStatus` is
+  HARDCODED in `markStepComplete` (always `'running'`) and
+  `markStepFailed` (always `'running'`) and `markStepSkipped`
+  (always `'pending'`) regardless of actual prior state** —
+  pinned so a future "compute previousStatus from state"
+  refactor must update both source and tests deliberately;
+  `markStepComplete` attaches `result.metrics` only when
+  metrics are provided (omits `result` entirely when undefined,
+  does NOT set `{metrics: undefined}`); preserves chronological
+  append order across multiple completions (`['s2','s1','s3']`
+  if completed in that order — no internal sort); `markStepFailed`
+  attaches the `Error` instance verbatim under `stepState.error`
+  AND does NOT add the failed step to `completedSteps`; preserves
+  multiple-failures append order; `markStepSkipped` is the **only
+  asymmetric mutator**: it appends to `completedSteps` (skipped
+  is "done") AND does **NOT clear `currentStep`**, so a step can
+  be skipped while another step is running; full-lifecycle
+  integration test confirms a 3-step pipeline emits exactly 6
+  STEP_STATUS_CHANGED events in `s1:running → s1:completed →
+  s2:running → s2:completed → s3:running → s3:completed` order;
+  mixed lifecycle (completed + failed + skipped) and cancel-
+  mid-flight scenarios both exercised), closing the per-file
+  zero-coverage gap on the runtime-state-machine in
+  `packages/agent/src/pipeline/executable-pipeline.class.ts` —
+  see `Done` ledger; +1 net spec file in the prior agent
   `pipeline-result.validator` direct-coverage sweep — adds
   `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
   (78 tests on the 122-LOC pure-function validator pinning the
@@ -341,7 +405,26 @@ deliberate change),`packages/agent/src/comparison-generator/comparison/prompt-ke
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-10 — packages/agent pipeline-result.validator direct coverage (+78 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-10 — packages/agent ExecutablePipelineRunner direct coverage (+49 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/executable-pipeline.class.ts` (333 LOC) — the runtime wrapper that owns the `PipelineState` mutation flow consumed by the step-pipeline executor (`step-pipeline-executor.service.ts:159` instantiates a fresh `ExecutablePipelineRunner` per pipeline run). Every `running`/`completed`/`failed`/`skipped` transition flows through this class via `startStep`/`markStepComplete`/`markStepFailed`/`markStepSkipped`, and every state read (`getState()`, `getCurrentStep()`, `getStepState()`) returns a snapshot built up here — so a regression in any of the five mutators would silently corrupt the run-state observed by both the orchestrator AND the activity-log emitter. The new file is `packages/agent/src/pipeline/executable-pipeline.class.spec.ts` and pins:
+
+- **`PipelineRuntimeEvents` barrel (2 tests)** — literal wire format `pipeline:state-changed` + `pipeline:step-status-changed` (changing these strings is a wire-format break and must be deliberate). PLUS the **STATE_CHANGED-declared-but-never-emitted gotcha**: today only `STEP_STATUS_CHANGED` fires; `STATE_CHANGED` is reserved/unused. Pinned so a future "wire up state-change events" feature is a deliberate change, not an accident.
+- **Constructor / initial state (5 tests)** — every step starts in `pending` status with empty `completedSteps`/`failedSteps` arrays and undefined `currentStep`/`startedAt`/`completedAt`; `getPipeline()` returns the original reference (no clone); zero-step pipeline does not throw; **duplicate step IDs collapse via Map.set semantics** (the second definition wins — pinned so a future "throw on duplicate id" refactor breaks loudly); EventEmitter is optional (constructor + every mutator works without one).
+- **Read accessors (4 tests)** — `getStepState` returns the stored state by id (undefined for unknown ids); `getStepDefinition` reads through `pipeline.steps.find` NOT the internal Map (so post-construction mutations to `pipeline.steps` are reflected here but NOT in `getStepState` — useful invariant for caller code); `getCurrentStep` is undefined initially, set to the running step id, and cleared on completion; `isRunning`/`isCancelled` reflect `state.isRunning`/`state.isCancelled` accurately across the lifecycle.
+- **`startExecution` (2 tests)** — stamps `state.startedAt` from `Date.now()` AND sets `isRunning=true`; **preserves `completedSteps`/`failedSteps`** on a second call (no idempotency reset — pinned so a future "reset on start" refactor must update this test deliberately).
+- **`completeExecution` (2 tests)** — clears `isRunning` + stamps `completedAt`; preserves `startedAt` for the audit trail.
+- **`cancelExecution` (1 test)** — only method that flips `isCancelled` to `true` (also clears `isRunning` and stamps `completedAt`).
+- **`updateStepStatus` (8 tests)** — throws verbatim `'Step "<id>" not found in pipeline'` for unknown ids; sets `startedAt` ONLY on `running` transition; sets `completedAt` on `completed`/`failed`/`skipped` (not on `pending`/`running`); updates `currentStep` to the new running step AND clears it on any other transition that matches the CURRENT step (**parallel-step safety**: transitioning a different step does NOT clear `currentStep` of an unrelated running step); STEP_STATUS_CHANGED payload shape pinned (`stepId`, `previousStatus` reflects pre-update state, `newStatus`, `timestamp` from `Date.now()`); `previousStatus` reflects the actual prior state (NOT the new status); does NOT emit when constructed without an EventEmitter.
+- **`startStep` convenience (1 test)** — pure delegation to `updateStepStatus(stepId, 'running')`.
+- **`markStepComplete` (7 tests)** — throws verbatim error for unknown step; sets `status=completed`, stamps `completedAt`, appends to `completedSteps`, clears `currentStep`; attaches `result.metrics` ONLY when metrics provided (omits `result` entirely when undefined, does NOT set `{metrics: undefined}`); preserves chronological append order across multiple completions (`['s2','s1','s3']` if completed in that order — no internal sort); **`previousStatus` is HARDCODED to `'running'`** in the emitted event regardless of actual prior state — pinned so a future "compute previousStatus from state" refactor must update both source and tests deliberately; does NOT throw without an EventEmitter.
+- **`markStepFailed` (6 tests)** — throws verbatim error for unknown step; sets `status=failed`, stamps `completedAt`, appends to `failedSteps`, clears `currentStep`; attaches the `Error` instance verbatim under `stepState.error` AND does NOT add the failed step to `completedSteps`; preserves multiple-failures append order; **`previousStatus` is HARDCODED to `'running'`**; does NOT throw without an EventEmitter.
+- **`markStepSkipped` (6 tests)** — throws verbatim error for unknown step; sets `status=skipped`, stamps `completedAt`, appends to `completedSteps` (skipped is "done"); omits `result` when reason undefined; **the only asymmetric mutator — does NOT clear `currentStep`**, so a step can be skipped while another step is running (a future refactor that "unifies" the three methods must be deliberate); **`previousStatus` is HARDCODED to `'pending'`** (distinct from complete/failed which both use `'running'`); does NOT throw without an EventEmitter.
+- **Full lifecycle integration (3 tests)** — a 3-step pipeline emits exactly 6 STEP_STATUS_CHANGED events in `s1:running → s1:completed → s2:running → s2:completed → s3:running → s3:completed` order; mixed lifecycle (completed + failed + skipped) preserves the right step lists; cancellation mid-flight preserves pre-cancel `completedSteps` AND stamps the cancellation timestamp.
+
+Total agent-package suite: 3981 → 4030 tests across 179 → 180 suites, all green. **Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/executable-pipeline.class.ts`** — the remaining pipeline gap is `pipeline/step-pipeline-executor.service.ts` (813 LOC), the richest integration-style target tracked separately.
+
+**2026-05-10 — packages/agent pipeline-result.validator direct coverage (+78 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#682](https://github.com/ever-works/ever-works/pull/682))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/validators/pipeline-result.validator.ts` (122 LOC) — the pure-function shape validator used by the in-process pipeline executors to reject malformed `PipelineResult` envelopes returned from third-party pipeline plugins (e.g. `standard-pipeline`, `agent-pipeline`, the CLI-wrapper plugins like `claude-code` / `codex` / `gemini` / `opencode`). A regression here would let an ill-formed plugin response propagate downstream and crash the orchestrator at a much later (and harder-to-diagnose) call site. The new file is `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts` and pins:
 
