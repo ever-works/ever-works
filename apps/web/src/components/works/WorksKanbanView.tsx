@@ -298,9 +298,7 @@ function KanbanColumn({ col, works }: KanbanColumnProps) {
                         </p>
                     </div>
                 ) : (
-                    visibleWorks.map((work) => (
-                        <KanbanCard key={work.id} work={work} col={col} />
-                    ))
+                    visibleWorks.map((work) => <KanbanCard key={work.id} work={work} col={col} />)
                 )}
             </div>
 
