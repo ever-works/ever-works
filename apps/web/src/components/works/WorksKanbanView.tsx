@@ -13,6 +13,7 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
+    OctagonMinus,
     AlertTriangle,
     ChevronDown,
     type LucideIcon,
@@ -23,7 +24,7 @@ const MAX_VISIBLE = 15;
 
 // ─── Column definitions ────────────────────────────────────────────────────
 
-type ColumnKey = 'not_started' | 'scheduled' | 'generating' | 'completed' | 'failed';
+type ColumnKey = 'not_started' | 'scheduled' | 'generating' | 'completed' | 'failed' | 'cancelled';
 
 interface ColumnDef {
     key: ColumnKey;
@@ -87,6 +88,17 @@ const COLUMNS: ColumnDef[] = [
             'border-red-200/60 dark:border-red-800/30 hover:border-red-300 dark:hover:border-red-700/50',
         iconColorClass: 'text-red-500 dark:text-red-400',
     },
+    {
+        key: 'cancelled',
+        icon: OctagonMinus,
+        dotClass: 'bg-orange-400 dark:bg-orange-400',
+        headerClass:
+            'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/40',
+        countClass: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+        cardBorderClass:
+            'border-orange-200/60 dark:border-orange-800/30 hover:border-orange-300 dark:hover:border-orange-700/50',
+        iconColorClass: 'text-orange-500 dark:text-orange-400',
+    },
 ];
 
 // ─── Work → column assignment ──────────────────────────────────────────────
@@ -97,7 +109,7 @@ function getWorkColumn(work: Work): ColumnKey {
     if (status === GenerateStatusType.GENERATING) return 'generating';
     if (status === GenerateStatusType.GENERATED) return 'completed';
     if (status === GenerateStatusType.ERROR) return 'failed';
-    if (status === GenerateStatusType.CANCELLED) return 'failed';
+    if (status === GenerateStatusType.CANCELLED) return 'cancelled';
     if (work.scheduledStatus === WorkScheduleStatus.ACTIVE) return 'scheduled';
     return 'not_started';
 }

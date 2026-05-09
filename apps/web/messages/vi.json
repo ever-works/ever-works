@@ -653,7 +653,8 @@
                     "scheduled": "Đã lên lịch",
                     "generating": "Đang tiến hành",
                     "completed": "Hoàn thành",
-                    "failed": "Thất bại"
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
                 },
                 "status": {
                     "notStarted": "Chưa bắt đầu",

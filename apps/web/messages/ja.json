@@ -653,7 +653,8 @@
                     "scheduled": "スケジュール済み",
                     "generating": "進行中",
                     "completed": "完了",
-                    "failed": "失敗"
+                    "failed": "失敗",
+                    "cancelled": "キャンセル"
                 },
                 "status": {
                     "notStarted": "未開始",

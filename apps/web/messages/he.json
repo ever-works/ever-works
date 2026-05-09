@@ -653,7 +653,8 @@
                     "scheduled": "מתוזמן",
                     "generating": "בתהליך",
                     "completed": "הושלם",
-                    "failed": "נכשל"
+                    "failed": "נכשל",
+                    "cancelled": "בוטל"
                 },
                 "status": {
                     "notStarted": "לא התחיל",

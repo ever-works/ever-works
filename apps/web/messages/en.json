@@ -654,7 +654,8 @@
                     "scheduled": "Scheduled",
                     "generating": "In Progress",
                     "completed": "Completed",
-                    "failed": "Failed"
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
                 },
                 "status": {
                     "notStarted": "Not started",

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 300;
+const KANBAN_LIMIT = 500;
 
 interface WorksClientProps {
     initialWorks: Work[];
@@ -40,6 +41,9 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
     const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
     const [page, setPage] = useState(1);
     const [stats, setStats] = useState(initialStats);
+    const [kanbanWorks, setKanbanWorks] = useState<Work[]>([]);
+    const [kanbanLoading, setKanbanLoading] = useState(false);
+    const kanbanRequestIdRef = useRef(0);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -123,6 +127,33 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
         }
     }, []);
 
+    const fetchKanbanWorks = useCallback(
+        async (query: string) => {
+            const currentRequestId = ++kanbanRequestIdRef.current;
+            setKanbanLoading(true);
+            try {
+                const response = await getWorks({
+                    search: query || undefined,
+                    limit: KANBAN_LIMIT,
+                    offset: 0,
+                });
+                if (currentRequestId === kanbanRequestIdRef.current && response.success) {
+                    setKanbanWorks(response.works);
+                }
+            } catch (error) {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    console.error('Failed to fetch kanban works:', error);
+                    toast.error(t('searchFailed'));
+                }
+            } finally {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    setKanbanLoading(false);
+                }
+            }
+        },
+        [t],
+    );
+
     // Debounce search query
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -146,6 +177,12 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
             performSearch(debouncedQuery, 1);
         }
     }, [debouncedQuery, performSearch]);
+
+    useEffect(() => {
+        if (viewMode === 'kanban') {
+            void fetchKanbanWorks(debouncedQuery);
+        }
+    }, [viewMode, debouncedQuery, fetchKanbanWorks]);
 
     const handlePageChange = async (newPage: number) => {
         setPage(newPage);
@@ -305,7 +342,13 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
             ) : hasWorks ? (
                 <>
                     {viewMode === 'kanban' ? (
-                        <WorksKanbanView works={works} />
+                        kanbanLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            </div>
+                        ) : (
+                            <WorksKanbanView works={kanbanWorks} />
+                        )
                     ) : (
                         <WorkList
                             initialWorks={works}

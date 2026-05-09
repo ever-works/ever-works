@@ -653,7 +653,8 @@
                     "scheduled": "Gepland",
                     "generating": "Bezig",
                     "completed": "Voltooid",
-                    "failed": "Mislukt"
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
                 },
                 "status": {
                     "notStarted": "Niet gestart",

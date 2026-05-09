@@ -653,7 +653,8 @@
                     "scheduled": "Agendado",
                     "generating": "Em andamento",
                     "completed": "Concluído",
-                    "failed": "Falhou"
+                    "failed": "Falhou",
+                    "cancelled": "Cancelado"
                 },
                 "status": {
                     "notStarted": "Não iniciado",

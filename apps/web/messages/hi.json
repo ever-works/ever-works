@@ -653,7 +653,8 @@
                     "scheduled": "निर्धारित",
                     "generating": "प्रगति में",
                     "completed": "पूर्ण",
-                    "failed": "विफल"
+                    "failed": "विफल",
+                    "cancelled": "रद्द"
                 },
                 "status": {
                     "notStarted": "शुरू नहीं",

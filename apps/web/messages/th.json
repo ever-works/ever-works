@@ -653,7 +653,8 @@
                     "scheduled": "กำหนดการ",
                     "generating": "กำลังดำเนินการ",
                     "completed": "เสร็จสิ้น",
-                    "failed": "ล้มเหลว"
+                    "failed": "ล้มเหลว",
+                    "cancelled": "ยกเลิก"
                 },
                 "status": {
                     "notStarted": "ยังไม่เริ่ม",

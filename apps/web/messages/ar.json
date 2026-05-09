@@ -653,7 +653,8 @@
                     "scheduled": "مجدول",
                     "generating": "قيد التنفيذ",
                     "completed": "مكتمل",
-                    "failed": "فشل"
+                    "failed": "فشل",
+                    "cancelled": "ملغي"
                 },
                 "status": {
                     "notStarted": "لم يبدأ",

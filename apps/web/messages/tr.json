@@ -653,7 +653,8 @@
                     "scheduled": "Planlandı",
                     "generating": "Devam Ediyor",
                     "completed": "Tamamlandı",
-                    "failed": "Başarısız"
+                    "failed": "Başarısız",
+                    "cancelled": "İptal edildi"
                 },
                 "status": {
                     "notStarted": "Başlamadı",

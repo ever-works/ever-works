@@ -653,7 +653,8 @@
                     "scheduled": "Terjadwal",
                     "generating": "Sedang Berjalan",
                     "completed": "Selesai",
-                    "failed": "Gagal"
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
                 },
                 "status": {
                     "notStarted": "Belum dimulai",

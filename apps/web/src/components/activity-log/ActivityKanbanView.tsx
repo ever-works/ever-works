@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { Link } from '@/i18n/navigation';
-import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import {
@@ -18,6 +16,7 @@ import {
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
+import { ActivityDetailModal } from './ActivityDetailModal';
 
 const MAX_VISIBLE = 15;
 
@@ -111,9 +110,10 @@ const formatDate = (date: string, locale: string) =>
 interface ActivityCardProps {
     entry: ActivityLogEntry;
     col: ColumnDef;
+    onSelect: (entry: ActivityLogEntry) => void;
 }
 
-function ActivityCard({ entry, col }: ActivityCardProps) {
+function ActivityCard({ entry, col, onSelect }: ActivityCardProps) {
     const t = useTranslations('dashboard.activity.kanban');
     const isInProgress = entry.status === 'in_progress';
     const Icon = col.icon;
@@ -176,15 +176,11 @@ function ActivityCard({ entry, col }: ActivityCardProps) {
         </div>
     );
 
-    if (entry.workId) {
-        return (
-            <Link href={ROUTES.DASHBOARD_WORK(entry.workId)} className="block">
-                {cardContent}
-            </Link>
-        );
-    }
-
-    return cardContent;
+    return (
+        <button type="button" onClick={() => onSelect(entry)} className="block w-full text-left cursor-pointer">
+            {cardContent}
+        </button>
+    );
 }
 
 // ─── Column ────────────────────────────────────────────────────────────────
@@ -192,9 +188,10 @@ function ActivityCard({ entry, col }: ActivityCardProps) {
 interface ActivityColumnProps {
     col: ColumnDef;
     entries: ActivityLogEntry[];
+    onSelect: (entry: ActivityLogEntry) => void;
 }
 
-function ActivityColumn({ col, entries }: ActivityColumnProps) {
+function ActivityColumn({ col, entries, onSelect }: ActivityColumnProps) {
     const [visibleCount, setVisibleCount] = useState(MAX_VISIBLE);
     const t = useTranslations('dashboard.activity.kanban');
     const tCols = useTranslations('dashboard.activity.kanban.columns');
@@ -246,7 +243,7 @@ function ActivityColumn({ col, entries }: ActivityColumnProps) {
                     </div>
                 ) : (
                     visibleEntries.map((entry) => (
-                        <ActivityCard key={entry.id} entry={entry} col={col} />
+                        <ActivityCard key={entry.id} entry={entry} col={col} onSelect={onSelect} />
                     ))
                 )}
             </div>
@@ -276,9 +273,12 @@ function ActivityColumn({ col, entries }: ActivityColumnProps) {
 
 interface ActivityKanbanViewProps {
     activities: ActivityLogEntry[];
+    onStopRequested?: () => void;
 }
 
-export function ActivityKanbanView({ activities }: ActivityKanbanViewProps) {
+export function ActivityKanbanView({ activities, onStopRequested }: ActivityKanbanViewProps) {
+    const [selectedEntry, setSelectedEntry] = useState<ActivityLogEntry | null>(null);
+
     const grouped = useMemo(() => {
         const map = new Map<ColumnKey, ActivityLogEntry[]>(COLUMNS.map((c) => [c.key, []]));
         for (const entry of activities) {
@@ -289,12 +289,24 @@ export function ActivityKanbanView({ activities }: ActivityKanbanViewProps) {
     }, [activities]);
 
     return (
-        <div className="w-full overflow-x-auto pb-2">
-            <div className="flex gap-3 min-w-[900px]">
-                {COLUMNS.map((col) => (
-                    <ActivityColumn key={col.key} col={col} entries={grouped.get(col.key)!} />
-                ))}
+        <>
+            <div className="w-full overflow-x-auto pb-2">
+                <div className="flex gap-3 min-w-[900px]">
+                    {COLUMNS.map((col) => (
+                        <ActivityColumn
+                            key={col.key}
+                            col={col}
+                            entries={grouped.get(col.key)!}
+                            onSelect={setSelectedEntry}
+                        />
+                    ))}
+                </div>
             </div>
-        </div>
+            <ActivityDetailModal
+                entry={selectedEntry}
+                onClose={() => setSelectedEntry(null)}
+                onStopRequested={onStopRequested}
+            />
+        </>
     );
 }

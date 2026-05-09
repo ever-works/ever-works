@@ -17,8 +17,8 @@ interface ViewModeSwitchProps {
 export function ViewModeSwitch({
     mode,
     onChange,
-    cardLabel = 'Cards',
-    kanbanLabel = 'Kanban',
+    cardLabel = '',
+    kanbanLabel = '',
 }: ViewModeSwitchProps) {
     return (
         <div className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5">

@@ -15,6 +15,7 @@ import { Download, Loader2 } from 'lucide-react';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
+const KANBAN_LIMIT = 500;
 
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
@@ -48,7 +49,11 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         cancelled: 0,
     });
 
+    const [kanbanActivities, setKanbanActivities] = useState<ActivityLogEntry[]>([]);
+    const [kanbanLoading, setKanbanLoading] = useState(false);
+
     const requestIdRef = useRef(0);
+    const kanbanRequestIdRef = useRef(0);
     const hasMountedRef = useRef(false);
     const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -119,6 +124,34 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         [t],
     );
 
+    const fetchKanbanActivities = useCallback(
+        async (filters: { actionType: string; status: string; search: string }) => {
+            const currentRequestId = ++kanbanRequestIdRef.current;
+            setKanbanLoading(true);
+            try {
+                const response = await getActivityLog({
+                    actionType: filters.actionType || undefined,
+                    status: filters.status || undefined,
+                    search: filters.search || undefined,
+                    limit: KANBAN_LIMIT,
+                    offset: 0,
+                });
+                if (currentRequestId === kanbanRequestIdRef.current && response.success) {
+                    setKanbanActivities(response.activities);
+                }
+            } catch (error) {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    console.error('Failed to fetch kanban activities:', error);
+                }
+            } finally {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    setKanbanLoading(false);
+                }
+            }
+        },
+        [],
+    );
+
     const fetchSummary = useCallback(async () => {
         const response = await getActivitySummary();
         if (response.success) {
@@ -147,6 +180,13 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     useEffect(() => {
         void fetchSummary();
     }, [fetchSummary]);
+
+    // Fetch all activities for kanban view (no pagination)
+    useEffect(() => {
+        if (viewMode === 'kanban') {
+            void fetchKanbanActivities({ actionType, status, search: debouncedSearch });
+        }
+    }, [viewMode, actionType, status, debouncedSearch, fetchKanbanActivities]);
 
     // Polling — silent refresh, paused when tab is hidden
     useEffect(() => {
@@ -378,7 +418,16 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             ) : (
                 <>
                     {viewMode === 'kanban' ? (
-                        <ActivityKanbanView activities={activities} />
+                        kanbanLoading ? (
+                            <div className="flex justify-center py-16">
+                                <Loader2 className="w-6 h-6 animate-spin text-text-muted dark:text-text-muted-dark" />
+                            </div>
+                        ) : (
+                            <ActivityKanbanView
+                                activities={kanbanActivities}
+                                onStopRequested={refreshCurrentPage}
+                            />
+                        )
                     ) : (
                         <ActivityTable
                             activities={activities}

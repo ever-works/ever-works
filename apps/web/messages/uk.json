@@ -653,7 +653,8 @@
                     "scheduled": "Заплановано",
                     "generating": "У процесі",
                     "completed": "Завершено",
-                    "failed": "Помилка"
+                    "failed": "Помилка",
+                    "cancelled": "Скасовано"
                 },
                 "status": {
                     "notStarted": "Не розпочато",

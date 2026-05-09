@@ -653,7 +653,8 @@
                     "scheduled": "예약됨",
                     "generating": "진행 중",
                     "completed": "완료",
-                    "failed": "실패"
+                    "failed": "실패",
+                    "cancelled": "취소됨"
                 },
                 "status": {
                     "notStarted": "시작 안 됨",
