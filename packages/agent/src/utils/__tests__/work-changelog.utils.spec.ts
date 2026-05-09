@@ -4,9 +4,7 @@ import type {
     WorkHistoryChangeEntry,
 } from '@ever-works/contracts/api';
 
-const entry = (
-    overrides: Partial<WorkHistoryChangeEntry> = {},
-): WorkHistoryChangeEntry => ({
+const entry = (overrides: Partial<WorkHistoryChangeEntry> = {}): WorkHistoryChangeEntry => ({
     entityType: 'item',
     action: 'added',
     name: 'Sample',
@@ -43,9 +41,7 @@ describe('buildWorkChangelog', () => {
         });
 
         it('zero counts on dimensions that have no entries', () => {
-            const result = buildWorkChangelog([
-                entry({ action: 'added', name: 'A' }),
-            ]);
+            const result = buildWorkChangelog([entry({ action: 'added', name: 'A' })]);
 
             expect(result?.addedCount).toBe(1);
             expect(result?.updatedCount).toBe(0);
@@ -68,10 +64,7 @@ describe('buildWorkChangelog', () => {
 
     describe('summary override (caller-supplied)', () => {
         it('uses the explicit summary verbatim when non-null', () => {
-            const result = buildWorkChangelog(
-                [entry({ action: 'added' })],
-                'Custom summary text',
-            );
+            const result = buildWorkChangelog([entry({ action: 'added' })], 'Custom summary text');
 
             expect(result?.summary).toBe('Custom summary text');
         });
@@ -85,18 +78,13 @@ describe('buildWorkChangelog', () => {
         });
 
         it('falls back to the default builder when summary is undefined', () => {
-            const result = buildWorkChangelog([
-                entry({ action: 'added' }),
-            ]);
+            const result = buildWorkChangelog([entry({ action: 'added' })]);
 
             expect(result?.summary).toBe('1 item added');
         });
 
         it('falls back to the default builder when summary is null', () => {
-            const result = buildWorkChangelog(
-                [entry({ action: 'added' })],
-                null,
-            );
+            const result = buildWorkChangelog([entry({ action: 'added' })], null);
 
             expect(result?.summary).toBe('1 item added');
         });
@@ -104,9 +92,7 @@ describe('buildWorkChangelog', () => {
 
     describe('default summary — pluralisation', () => {
         it('singular form for count of 1', () => {
-            const result = buildWorkChangelog([
-                entry({ action: 'added', name: 'A' }),
-            ]);
+            const result = buildWorkChangelog([entry({ action: 'added', name: 'A' })]);
 
             expect(result?.summary).toBe('1 item added');
         });
@@ -127,9 +113,7 @@ describe('buildWorkChangelog', () => {
                 entry({ action: 'removed', name: 'R' }),
             ]);
 
-            expect(result?.summary).toBe(
-                '1 item added, 1 item updated, 1 item removed',
-            );
+            expect(result?.summary).toBe('1 item added, 1 item updated, 1 item removed');
         });
 
         it('omits zero-count parts entirely (no "0 items …" segments)', () => {
@@ -151,9 +135,7 @@ describe('buildWorkChangelog', () => {
                 entry({ action: 'removed', name: 'R2' }),
             ]);
 
-            expect(result?.summary).toBe(
-                '3 items added, 1 item updated, 2 items removed',
-            );
+            expect(result?.summary).toBe('3 items added, 1 item updated, 2 items removed');
         });
     });
 
@@ -165,14 +147,12 @@ describe('buildWorkChangelog', () => {
             ['tag', 'tag'],
             ['collection', 'collection'],
         ])('uses "%s" label for entityType=%s', (entityType, label) => {
-            const result = buildWorkChangelog([
-                entry({ entityType, action: 'added' }),
-            ]);
+            const result = buildWorkChangelog([entry({ entityType, action: 'added' })]);
 
             expect(result?.summary).toBe(`1 ${label} added`);
         });
 
-        it('reads entityType from the FIRST entry only (mixed entries are summarised under entries[0]\'s label)', () => {
+        it("reads entityType from the FIRST entry only (mixed entries are summarised under entries[0]'s label)", () => {
             // Pin the documented behaviour: the function does NOT scan every
             // entry to pick a label — it takes entries[0].entityType. A future
             // refactor that switches to "most-common label" or "use the per-entry
@@ -192,7 +172,10 @@ describe('buildWorkChangelog', () => {
             // Caller-built entries can omit entityType in JS-land even though
             // TS forbids it; pin the runtime fallback so the function stays
             // robust to legacy/lenient callers.
-            const malformed = { action: 'added', name: 'Legacy' } as unknown as WorkHistoryChangeEntry;
+            const malformed = {
+                action: 'added',
+                name: 'Legacy',
+            } as unknown as WorkHistoryChangeEntry;
 
             const result = buildWorkChangelog([malformed]);
 
@@ -203,7 +186,11 @@ describe('buildWorkChangelog', () => {
             // The switch has a `case 'item'` AND a `default` falling through
             // to 'item'. Pin the unknown-literal path so a future enum
             // expansion has to update the switch deliberately.
-            const futureType = { entityType: 'unknown-future-type', action: 'added', name: 'Future' } as unknown as WorkHistoryChangeEntry;
+            const futureType = {
+                entityType: 'unknown-future-type',
+                action: 'added',
+                name: 'Future',
+            } as unknown as WorkHistoryChangeEntry;
 
             const result = buildWorkChangelog([futureType]);
 
@@ -213,9 +200,7 @@ describe('buildWorkChangelog', () => {
 
     describe('envelope shape', () => {
         it('returns the documented 5-field shape (summary, addedCount, updatedCount, removedCount, entries)', () => {
-            const entries: WorkHistoryChangeEntry[] = [
-                entry({ action: 'added', name: 'A' }),
-            ];
+            const entries: WorkHistoryChangeEntry[] = [entry({ action: 'added', name: 'A' })];
 
             const result = buildWorkChangelog(entries);
 
