@@ -21,8 +21,47 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~510 across `apps/` + `packages/` (was 507
-  earlier on 2026-05-09; +3 net spec files in the agent tiny-utility
+- **Spec files (`*.spec.ts`)**: ~513 across `apps/` + `packages/` (was 510
+  earlier on 2026-05-09; +3 net spec files in the security + utility
+  coverage sweep #7 — adds
+  `packages/agent/src/utils/__tests__/work-changelog.utils.spec.ts`
+  (23 tests on `buildWorkChangelog` covering the empty-input null
+  contract, count partitioning, entries reference passthrough,
+  summary-override semantics including the empty-string preservation
+  vs `??`-fallback gotcha, default-summary builder pluralisation +
+  fixed `, ` join order + zero-count omission, entityType label
+  resolution across all 5 documented literals (`item`/`comparison`/
+  `category`/`tag`/`collection`) with `entries[0]`-only derivation
+  pinned, `?? 'item'` fallback for malformed entries, and the exact
+  5-field envelope shape with no extra keys),
+  `packages/agent/src/utils/__tests__/github-app.utils.spec.ts`
+  (30 tests on the security-critical 105-LOC GitHub-App utility —
+  RS256 JWT generation w/ public-key round-trip verification +
+  `iat = now-60` / `exp = now+9*60` / `iss = appId` payload pinning +
+  base64url segment shape + appId verbatim-passthrough; `Bearer`
+  header construction; `requestGitHubAppInstallationAccessToken*`
+  fetch URL/method/headers shape + `expires_at ?? null` coercion +
+  non-OK error message format + missing/empty-token rejection;
+  `verifyGitHubWebhookSignature` constant-time compare with the
+  explicit length-guard pinned ahead of `timingSafeEqual` to avoid
+  the RangeError it throws on mismatched-length inputs, plus
+  scheme-prefix strict-equality check, secret-dependence check,
+  body-dependence check, and empty-body happy-path), and
+  `packages/agent/src/pipeline/__tests__/pipeline-result.validator.spec.ts`
+  (53 tests on `validatePipelineResult` + `validatePipelineResultOrThrow` —
+  the type-checker every pipeline plugin output passes through —
+  covering the non-object short-circuit, happy-path reference
+  passthrough, all top-level scalar typeof checks, the
+  `outputs`-null guard that prevents child-error cascading, all 5
+  output-array fields independently rejected when missing/non-array,
+  `state` (optional) three-way branch (missing → pass /
+  explicitly-null → error + skip children / non-object → error),
+  `error` accepting string OR `Error` instance, `failedStep`
+  typeof-string only, declaration-order error accumulation, and
+  the throwing variant's `pluginId` interpolation including the
+  empty-string-as-no-plugin behaviour pinning the
+  `pluginId ? ...` falsy branch). Earlier on 2026-05-09 was 507;
+  +3 net spec files in the agent tiny-utility
   coverage sweep — adds
   `packages/agent/src/activity-log/activity-log-analytics-dispatcher.spec.ts`
   (7 tests on the string DI-token literal + `ActivityLogAnalyticsDispatcher`
@@ -261,6 +300,17 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — security + utility coverage sweep #7 (+106 tests across 3 new specs + 1 flake-fix, scheduled-task `platform-tests-and-docs` cycle, [#660](https://github.com/ever-works/ever-works/pull/660) / [#661](https://github.com/ever-works/ever-works/pull/661) / [#662](https://github.com/ever-works/ever-works/pull/662) / [#663](https://github.com/ever-works/ever-works/pull/663) — pending merge)**
+
+Three previously-uncovered agent-package utility files plus an unrelated CI-blocking flake fix in the `gemini-plugin` test suite:
+
+- **`packages/agent/src/utils/__tests__/work-changelog.utils.spec.ts`** (23 tests, [#661](https://github.com/ever-works/ever-works/pull/661)) — `buildWorkChangelog` (the single producer of the `WorkChangelog` envelope written into `work_generation_history` rows and surfaced in API responses). Pins: empty-input contract (returns `null` even when an explicit summary is supplied — length-zero gate runs first), count partitioning (`entries.filter(e => e.action === ...).length` for added/updated/removed independently), entries reference passthrough, summary override (explicit summary wins; empty-string preserved because `??` only short-circuits null/undefined; null/undefined fall back to default builder), default summary builder (per-part pluralisation `item` vs `items`, fixed `, ` join order added → updated → removed, zero-count parts omitted entirely), entityType label resolution across all 5 documented literals (`item`/`comparison`/`category`/`tag`/`collection`) with `entries[0]`-only derivation pinned (mixed-type lists are summarised under the first entry's label — a future "scan all entries" refactor breaks deliberately), `?? 'item'` fallback for malformed entries, default-branch fallback for unknown literals, and the exact 5-field envelope shape `{summary, addedCount, updatedCount, removedCount, entries}` with no extra keys.
+- **`packages/agent/src/utils/__tests__/github-app.utils.spec.ts`** (30 tests, [#662](https://github.com/ever-works/ever-works/pull/662)) — security-critical 105-LOC utility. `createGitHubAppJwt` 3-part dotted JWT shape, documented RS256 header `{alg,typ}`, payload `iat = now-60` / `exp = now+9*60` / `iss = appId` (seconds, fake-timer pinned), signature actually RSA-SHA256-verifiable against the matching public key (round-trip via `crypto.createVerify` confirms the sign actually works — not just that the function returns a string), `appId` forwarded verbatim into `iss` (numeric-string + leading-zero preservation pinned), malformed key surfaces underlying Node crypto error rather than being swallowed. `createGitHubAppHeaders` / `createGitHubOAuthHeaders` exact 4-header shape (`Accept`/`Authorization`/`User-Agent`/`X-GitHub-Api-Version: '2022-11-28'`), token forwarded verbatim into `Authorization`, fresh object per call. `requestGitHubAppInstallationAccessTokenDetails` POST to `/app/installations/<id>/access_tokens` with App-JWT headers, `{token, expiresAt}` envelope on 200, `expires_at` missing/null coerced to `expiresAt: null` (?? null fallback), non-OK throws `"Failed to create GitHub App installation token: <status> <statusText>"`, OK-but-missing-token throws "did not include a token", OK-but-empty-string-token throws via the same falsy guard, fetch rejection propagates verbatim. `requestGitHubAppInstallationAccessToken` thin wrapper returning `data.token` only; rejection propagates from the underlying details call. **`verifyGitHubWebhookSignature`** — security-critical: returns true on canonical `sha256=<hex>` matching secret+body; returns false on undefined / empty-string header, missing/wrong scheme prefix (`sha1=`, no scheme, `SHA256=` case-mismatch — strict equality, NOT case-insensitive), wrong-length signature (pinning the explicit length-guard that runs **before** `timingSafeEqual` to avoid the RangeError it throws on mismatched-length inputs — without this guard a malformed/truncated header would crash instead of returning false), same-length-but-wrong-bytes (constant-time compare actually rejects), wrong secret (verifies the HMAC actually depends on the secret), tampered body (verifies the HMAC actually depends on body); also pins the empty-body happy path.
+- **`packages/agent/src/pipeline/__tests__/pipeline-result.validator.spec.ts`** (53 tests, [#663](https://github.com/ever-works/ever-works/pull/663)) — type-checker for pipeline plugin outputs. Every plugin returning a `PipelineResult` is gated through `validatePipelineResult` (or the throwing variant) before downstream consumers trust the shape. Pins the non-object short-circuit (null/undefined/string/number/boolean → SINGLE error `"Result must be an object"`, no other errors leak, `result` field omitted), happy path (same object reference forwarded as `result`), top-level scalar typeof checks (`success` / `stepsCompleted` / `totalSteps` / `duration` — zero valid, negatives accepted, missing rejected), `duration` treated as **required** despite being JSDoc'd as "Optional fields" (the doc-vs-impl mismatch is now observable), outputs object cascading-error guard (when `outputs` is null/non-object, the per-array child errors are NOT also emitted — single-error wins), each of `items`/`categories`/`tags`/`collections`/`brands` rejected when missing or non-array, `state` (optional) three-way branch (missing → pass; explicitly-null → "Invalid state" + child checks skipped; non-object scalar → "Invalid state"; valid object → child fields validated), `error` field accepts string OR `Error` instance (instanceof branch) but rejects plain objects/numbers, `failedStep` typeof-string only, error accumulation order (top-level: success → outputs.items → stepsCompleted → totalSteps → duration; outputs children: items → categories → tags → collections → brands), `validatePipelineResultOrThrow` returns same reference passthrough on success, throws an `Error` instance (not a string — caller code uses `instanceof`), `"Invalid pipeline result: <errors>"` prefix when no `pluginId`, `"Invalid pipeline result from plugin '<id>': <errors>"` with `pluginId` (single-quoted), empty-string `pluginId` treated as no-plugin (the `pluginId ? ...` falsy branch — a switch to `pluginId !== undefined` would break this assertion deliberately), multiple errors joined with `"; "`.
+- **`packages/plugins/gemini/src/__tests__/taxonomy-watcher.spec.ts`** (flake fix, [#660](https://github.com/ever-works/ever-works/pull/660)) — the `"should serialize taxonomy sync for rapid successive writes"` test issued two concurrent `writeFile` calls via `Promise.all` and then asserted a specific order on the resulting `_meta/{categories,tags}.json` arrays. `fs.watch` event ordering is non-deterministic for concurrent writes, so the second write occasionally surfaced first on CI — blocking PR [#658](https://github.com/ever-works/ever-works/pull/658) and any subsequent PR that re-runs the gemini-plugin test suite. Switched to set-membership assertions (`toHaveLength` + `expect.arrayContaining`); serialization (no entries lost / no duplicates), not insertion order, is the invariant this particular test cares about.
+
+---
 
 **2026-05-09 — packages/agent tiny-utility coverage sweep (+37 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [#658](https://github.com/ever-works/ever-works/pull/658))**
 
