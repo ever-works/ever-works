@@ -326,7 +326,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent PipelineOrchestratorService + comparison/types direct coverage (+44 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent PipelineOrchestratorService + comparison/types direct coverage (+44 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [#668](https://github.com/ever-works/ever-works/pull/668))**
 
 Two previously-uncovered files in the agent package closed in a single sweep (the parallel scheduled-task run combined them on a shared branch):
 
