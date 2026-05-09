@@ -967,25 +967,23 @@ describe('MarkdownGeneratorService', () => {
             fsMock.readdir.mockResolvedValueOnce(['a', 'b']);
             mountDataRepoMock({
                 getMarkdown: jest.fn().mockResolvedValue(undefined),
-                getItem: jest
-                    .fn()
-                    .mockImplementation((slug: string) =>
-                        slug === 'a'
-                            ? {
-                                  slug: 'a',
-                                  name: 'A',
-                                  description: '',
-                                  category: 'misc',
-                                  featured: false,
-                              }
-                            : {
-                                  slug: 'b',
-                                  name: 'B',
-                                  description: '',
-                                  category: 'misc',
-                                  featured: true,
-                              },
-                    ),
+                getItem: jest.fn().mockImplementation((slug: string) =>
+                    slug === 'a'
+                        ? {
+                              slug: 'a',
+                              name: 'A',
+                              description: '',
+                              category: 'misc',
+                              featured: false,
+                          }
+                        : {
+                              slug: 'b',
+                              name: 'B',
+                              description: '',
+                              category: 'misc',
+                              featured: true,
+                          },
+                ),
             });
 
             const service = new MarkdownGeneratorService(gitFacade, workOps);
