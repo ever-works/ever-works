@@ -623,6 +623,31 @@
                     "withSearch": "Try adjusting your search terms",
                     "withoutSearch": "Create your first AI-powered Work to get started"
                 }
+            },
+            "viewMode": {
+                "card": "Cards",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} items",
+                "noDescription": "No description",
+                "empty": "No works here",
+                "columns": {
+                    "not_started": "Not Started",
+                    "scheduled": "Scheduled",
+                    "generating": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed"
+                },
+                "status": {
+                    "notStarted": "Not started",
+                    "scheduled": "Scheduled",
+                    "generating": "Generating",
+                    "completed": "Completed",
+                    "completedWithWarnings": "Completed with warnings",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
             }
         },
         "settings": {

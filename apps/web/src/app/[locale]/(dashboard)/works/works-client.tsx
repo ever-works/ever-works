@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Work } from '@/lib/api/work';
 import { WorkList } from '@/components/works/WorkList';
+import { WorksKanbanView } from '@/components/works/WorksKanbanView';
+import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -40,6 +42,15 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
     const [stats, setStats] = useState(initialStats);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
+        if (typeof window === 'undefined') return 'card';
+        return (localStorage.getItem('works-view-mode') as ViewMode) || 'card';
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem('works-view-mode', mode);
+    };
 
     // Handle query params: ?focus=search or ?q=searchterm
     useEffect(() => {
@@ -271,27 +282,34 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 </Link>
             </div>
 
-            {/* Work Count */}
+            {/* Work Count + View Mode Switch */}
             {total > 0 && (
-                <div className="mb-4 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('showing', { current: works.length, total })}
+                <div className="mb-4 flex items-center justify-between gap-2">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('showing', { current: works.length, total })}
+                    </p>
+                    <ViewModeSwitch mode={viewMode} onChange={handleViewModeChange} />
                 </div>
             )}
 
-            {/* Works List */}
+            {/* Works List / Kanban */}
             {loading ? (
                 <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : hasWorks ? (
                 <>
-                    <WorkList
-                        initialWorks={works}
-                        onUpdate={(updatedWorks) => setWorks(updatedWorks)}
-                    />
+                    {viewMode === 'kanban' ? (
+                        <WorksKanbanView works={works} />
+                    ) : (
+                        <WorkList
+                            initialWorks={works}
+                            onUpdate={(updatedWorks) => setWorks(updatedWorks)}
+                        />
+                    )}
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
+                    {/* Pagination — hidden in kanban mode */}
+                    {viewMode !== 'kanban' && totalPages > 1 && (
                         <div className="mt-8 flex justify-center">
                             <nav className="flex gap-2">
                                 <button
