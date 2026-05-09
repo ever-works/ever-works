@@ -115,14 +115,23 @@ describe('taxonomy-watcher', () => {
 			const categories = JSON.parse(await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8'));
 			const tags = JSON.parse(await rf(join(workspacePath, '_meta', 'tags.json'), 'utf-8'));
 
-			expect(categories).toEqual([
-				{ id: 'category-one', name: 'Category One' },
-				{ id: 'category-two', name: 'Category Two' }
-			]);
-			expect(tags).toEqual([
-				{ id: 'alpha', name: 'Alpha' },
-				{ id: 'beta', name: 'Beta' }
-			]);
+			// File-system event ordering is non-deterministic for concurrent writes —
+			// assert set membership (the serialization invariant the test cares about)
+			// rather than insertion order.
+			expect(categories).toHaveLength(2);
+			expect(categories).toEqual(
+				expect.arrayContaining([
+					{ id: 'category-one', name: 'Category One' },
+					{ id: 'category-two', name: 'Category Two' }
+				])
+			);
+			expect(tags).toHaveLength(2);
+			expect(tags).toEqual(
+				expect.arrayContaining([
+					{ id: 'alpha', name: 'Alpha' },
+					{ id: 'beta', name: 'Beta' }
+				])
+			);
 		} finally {
 			watcher.stop();
 		}

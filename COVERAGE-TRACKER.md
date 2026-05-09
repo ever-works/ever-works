@@ -262,7 +262,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent tiny-utility coverage sweep (+37 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent tiny-utility coverage sweep (+37 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [#658](https://github.com/ever-works/ever-works/pull/658))**
 
 Closes three previously-uncovered small files in `packages/agent/src/` — each a contracts-only / pure-function surface that fell through prior sweeps because the consumer files (`activity-log.service.ts` / `comparison-writer.ts` / `plugin-operations.service.ts` / `generator-form-schema.service.ts`) cover them only indirectly. The three new spec files:
 
