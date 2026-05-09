@@ -21,8 +21,22 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~506 across `apps/` + `packages/` (was 505
-  earlier on 2026-05-09; +1 net spec file in the agent `sanitize.util`
+- **Spec files (`*.spec.ts`)**: ~509 across `apps/` + `packages/` (was 506
+  earlier on 2026-05-09; +3 net spec files in the agent pipeline-result
+  validator + comparison-generator types/prompt-keys sweep — adds
+  `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
+  (49 tests on the 122-LOC pure-function validator — every top-level guard
+  + every per-field branch + the aggregate-errors contract + the
+  `validatePipelineResultOrThrow` plugin-id-segment / falsy-empty-string
+  branch),
+  `packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`
+  (5 tests pinning the three `comparison.<name>` wire strings consumed by
+  Langfuse + the writer fallback), and
+  `packages/agent/src/comparison-generator/comparison/types.spec.ts`
+  (26 tests pinning `DEFAULT_COMPARISON_SETTINGS` four-key literal +
+  deliberate optional-field omission + module-singleton identity +
+  `ComparisonProgressStage` exhaustive-union runtime tuple); +1 net spec
+  file in the prior agent `sanitize.util`
   direct-coverage sweep — adds
   `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` (54 tests
   on the security-critical 213-LOC sanitization utility — `sanitizeText`
@@ -205,6 +219,18 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent pipeline-result validator + comparison-generator types/prompt-keys direct coverage (+80 tests across 3 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes three small per-file zero-coverage gaps in `packages/agent/src/`:
+
+- **`packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`** (49 tests on the 122-LOC pure-function validator). Pins `validatePipelineResult` top-level guards (null/undefined/primitive → single `'Result must be an object'` short-circuit; arrays fall THROUGH the top-level guard because `typeof [] === 'object'` and `[] !== null`, so per-field checks run instead — pinned so a future `Array.isArray` tightening is a deliberate change), happy-path return shape (returns `{valid:true, errors:[], result: <input>}` by identity NOT clone), every per-field branch (`success` strict-typeof boolean check rejects `0`/`1`/`'true'`; `outputs` null/missing/non-object short-circuits the inner array checks via the explicit `=== null` guard so per-array errors are NOT accumulated; `outputs.items`/`categories`/`tags`/`collections`/`brands` each independently flagged when missing or non-array; `stepsCompleted`/`totalSteps`/`duration` strict-typeof number check rejects string-shaped numbers but ACCEPTS `NaN` and negative numbers — pinned current contract; `state` optional-when-omitted but flagged when provided non-object incl. null at the OUTER guard preventing the inner per-field checks from running; `state.isRunning`/`isCancelled` boolean checks; `state.completedSteps`/`failedSteps` array checks; tolerates extra keys on `state`; `error` accepts `undefined`/string/Error subclass (`TypeError instanceof Error`), rejects null/number/plain-object; `failedStep` accepts `undefined` and empty string, rejects null/number), and the aggregate-errors contract (no early-exit — five top-level errors all surface for `{}` input). `validatePipelineResultOrThrow` (10 tests): returns input by identity on success; throws `Error` with `'Invalid pipeline result: <errors-joined-by-"; ">'` prefix; embeds `from plugin '<id>'` segment when `pluginId` set; treats empty-string `pluginId` as falsy (omits the segment — pinned because the source uses `pluginId ? … : ''`); the optional-state-omitted path does not throw.
+- **`packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`** (5 tests on the 14-LOC `PROMPT_KEYS` constant). Pins all three documented keys (`STRUCTURE`/`MARKDOWN`/`EXTENDED_ANALYSIS`) with their literal `comparison.<name>` wire strings (`comparison.structure`/`comparison.markdown`/`comparison.extended-analysis`), uniqueness across values, the `comparison.` namespace prefix invariant, and the runtime non-frozen contract (the `as const` assertion is purely type-level — pinned via `Object.isFrozen(PROMPT_KEYS) === false` so a future `Object.freeze` call is a deliberate behavioural change). The Langfuse + comparison-writer fallback consumers depend on these literal strings; renaming one would silently detach external prompts from their consumers.
+- **`packages/agent/src/comparison-generator/comparison/types.spec.ts`** (26 tests on the 60-LOC types/constants module). Pins `DEFAULT_COMPARISON_SETTINGS` four-key default literal (`cadence_override:'use_work'`/`max_comparisons_mode:'custom'`/`max_comparisons:50`/`min_items_for_comparison:3`), the deliberate omission of all four optional fields (`ai_provider`/`ai_model`/`custom_prompt`/`extended_analysis`) from the default so consumers can detect "user has not configured this" via `hasOwnProperty` — pinned via length-4 guard so a future "always-emit-defaults" refactor breaks loudly, and the module-singleton identity contract (the constant is the same reference across `require`-loops). The `ComparisonProgressStage` union (`researching`/`analyzing`/`writing`/`writing_extended`/`saving`) is exhaustively pinned via a runtime tuple so a new stage forces a corresponding test addition. Minimal object-literal type-checks for `ComparisonPair`, `ComparisonResearch`, `ComparisonGenerationResult` (with optional `extendedAnalysisMarkdown`), `ComparisonProgressCallback` (accepts every documented stage), and `ComparisonProgressInfo` (all four required fields including ISO `startedAt`).
+
+Total agent-package suite: 3303 → 3383 tests across 158 → 161 suites, all green.
+
+---
 
 **2026-05-09 — packages/agent sanitize.util direct coverage (+54 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#654](https://github.com/ever-works/ever-works/pull/654))**
 
