@@ -146,7 +146,10 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
         fetchSpy?.mockRestore();
     });
 
-    const makeResponse = (body: unknown, init: { ok?: boolean; status?: number; statusText?: string } = {}): Response =>
+    const makeResponse = (
+        body: unknown,
+        init: { ok?: boolean; status?: number; statusText?: string } = {},
+    ): Response =>
         ({
             ok: init.ok ?? true,
             status: init.status ?? 200,
@@ -157,7 +160,9 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
     it('POSTs to /app/installations/<id>/access_tokens with App-JWT headers', async () => {
         fetchSpy = jest
             .spyOn(globalThis, 'fetch')
-            .mockResolvedValue(makeResponse({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }));
+            .mockResolvedValue(
+                makeResponse({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }),
+            );
 
         await requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials);
 
@@ -168,7 +173,9 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
         expect(init.method).toBe('POST');
         expect(init.headers).toEqual({
             Accept: 'application/vnd.github+json',
-            Authorization: expect.stringMatching(/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
+            Authorization: expect.stringMatching(
+                /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+            ),
             'User-Agent': 'Ever Works',
             'X-GitHub-Api-Version': '2022-11-28',
         });
@@ -177,7 +184,9 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
     it('returns { token, expiresAt } when GitHub responds 200 with both fields', async () => {
         fetchSpy = jest
             .spyOn(globalThis, 'fetch')
-            .mockResolvedValue(makeResponse({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }));
+            .mockResolvedValue(
+                makeResponse({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }),
+            );
 
         const result = await requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials);
 
@@ -207,7 +216,9 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
     it('throws "Failed to create GitHub App installation token: <status> <statusText>" on non-OK', async () => {
         fetchSpy = jest
             .spyOn(globalThis, 'fetch')
-            .mockResolvedValue(makeResponse({}, { ok: false, status: 401, statusText: 'Unauthorized' }));
+            .mockResolvedValue(
+                makeResponse({}, { ok: false, status: 401, statusText: 'Unauthorized' }),
+            );
 
         await expect(
             requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials),
@@ -235,9 +246,7 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
     });
 
     it('propagates fetch rejections (network failure → caller decides retry policy)', async () => {
-        fetchSpy = jest
-            .spyOn(globalThis, 'fetch')
-            .mockRejectedValue(new Error('ECONNRESET'));
+        fetchSpy = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNRESET'));
 
         await expect(
             requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials),
@@ -258,7 +267,9 @@ describe('requestGitHubAppInstallationAccessToken (token-only thin wrapper)', ()
             ok: true,
             status: 200,
             statusText: 'OK',
-            json: jest.fn().mockResolvedValue({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }),
+            json: jest
+                .fn()
+                .mockResolvedValue({ token: 'ghs_xxx', expires_at: '2026-01-01T00:00:00Z' }),
         } as unknown as Response);
 
         const token = await requestGitHubAppInstallationAccessToken('inst-77', credentials);
@@ -276,7 +287,9 @@ describe('requestGitHubAppInstallationAccessToken (token-only thin wrapper)', ()
 
         await expect(
             requestGitHubAppInstallationAccessToken('inst-77', credentials),
-        ).rejects.toThrow('Failed to create GitHub App installation token: 500 Internal Server Error');
+        ).rejects.toThrow(
+            'Failed to create GitHub App installation token: 500 Internal Server Error',
+        );
     });
 });
 
@@ -311,7 +324,9 @@ describe('verifyGitHubWebhookSignature', () => {
         // Without the guard, a malformed/truncated header would crash instead of
         // returning false.
         expect(verifyGitHubWebhookSignature(body, secret, 'sha256=tooshort')).toBe(false);
-        expect(verifyGitHubWebhookSignature(body, secret, `sha256=${validHex}deadbeef`)).toBe(false);
+        expect(verifyGitHubWebhookSignature(body, secret, `sha256=${validHex}deadbeef`)).toBe(
+            false,
+        );
     });
 
     it('returns false when signature length matches but bytes differ (constant-time compare actually rejects)', () => {
@@ -322,9 +337,7 @@ describe('verifyGitHubWebhookSignature', () => {
 
     it('returns false when secret differs (verifies the HMAC actually depends on the secret)', () => {
         const wrongSecretSig = createHmac('sha256', 'different-secret').update(body).digest('hex');
-        expect(
-            verifyGitHubWebhookSignature(body, secret, `sha256=${wrongSecretSig}`),
-        ).toBe(false);
+        expect(verifyGitHubWebhookSignature(body, secret, `sha256=${wrongSecretSig}`)).toBe(false);
     });
 
     it('returns false when body differs (verifies the HMAC actually depends on body)', () => {
