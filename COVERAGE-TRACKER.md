@@ -21,117 +21,139 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~519 across `apps/` + `packages/` (was 518
-  earlier on 2026-05-10; +1 net spec file in the agent
-  `ExecutablePipelineRunner` direct-coverage sweep — adds
-  `packages/agent/src/pipeline/executable-pipeline.class.spec.ts`
-  (49 tests on the 333-LOC runtime wrapper that owns the
-  `PipelineState` mutation flow consumed by the step-pipeline
-  executor — every `running`/`completed`/`failed`/`skipped`
-  transition flows through this class, so a regression here
-  would silently corrupt the run-state observed by both the
-  orchestrator AND the activity-log emitter that reads
-  `runner.getState()`. Pins: `PipelineRuntimeEvents` literal
-  wire format (`pipeline:state-changed` + `pipeline:step-status-changed`
-  — wire-format break is deliberate); the **STATE_CHANGED is
-  declared but NEVER emitted** gotcha (only STEP_STATUS_CHANGED
-  fires today — pinned so a future "wire up state-change events"
-  feature is a deliberate change, not an accident); constructor
-  initialises every step in `pending` status with empty
-  `completedSteps`/`failedSteps` arrays; **duplicate step IDs
-  collapse via Map.set semantics** (the second definition wins —
-  pinned so a future "throw on duplicate id" refactor breaks
-  loudly); zero-step pipeline does not throw; **EventEmitter is
-  optional** (verified across all five status-mutating methods —
-  none throw without an emitter); `getStepDefinition` reads
-  through `pipeline.steps.find` NOT the internal Map (so post-
-  construction mutations to `pipeline.steps` are reflected here
-  but not in `getStepState` — useful invariant for caller code);
-  `startExecution` stamps `state.startedAt` from `Date.now()`
-  AND **preserves `completedSteps`/`failedSteps`** on a second
-  call (no idempotency reset — pinned); `completeExecution`
-  clears `isRunning` + stamps `completedAt` AND preserves
-  `startedAt` (audit trail); `cancelExecution` is the only
-  method that flips `isCancelled` to true; `updateStepStatus`
-  throws verbatim `'Step "<id>" not found in pipeline'` for
-  unknown ids; sets `startedAt` ONLY on `running` and
-  `completedAt` on `completed`/`failed`/`skipped` (not on
-  `pending`/`running`); updates `currentStep` to the running
-  step AND clears it on any other transition that matches the
-  CURRENT step (parallel-step safety: transitioning a different
-  step does NOT clear `currentStep` of an unrelated running
-  step); STEP_STATUS_CHANGED payload shape pinned (`stepId`,
-  `previousStatus` reflects pre-update state, `newStatus`,
-  `timestamp` from `Date.now()`); **`previousStatus` is
-  HARDCODED in `markStepComplete` (always `'running'`) and
-  `markStepFailed` (always `'running'`) and `markStepSkipped`
-  (always `'pending'`) regardless of actual prior state** —
-  pinned so a future "compute previousStatus from state"
-  refactor must update both source and tests deliberately;
-  `markStepComplete` attaches `result.metrics` only when
-  metrics are provided (omits `result` entirely when undefined,
-  does NOT set `{metrics: undefined}`); preserves chronological
-  append order across multiple completions (`['s2','s1','s3']`
-  if completed in that order — no internal sort); `markStepFailed`
-  attaches the `Error` instance verbatim under `stepState.error`
-  AND does NOT add the failed step to `completedSteps`; preserves
-  multiple-failures append order; `markStepSkipped` is the **only
-  asymmetric mutator**: it appends to `completedSteps` (skipped
-  is "done") AND does **NOT clear `currentStep`**, so a step can
-  be skipped while another step is running; full-lifecycle
-  integration test confirms a 3-step pipeline emits exactly 6
-  STEP_STATUS_CHANGED events in `s1:running → s1:completed →
+- **Spec files (`*.spec.ts`)**: ~521 across `apps/` + `packages/` (was 519
+  earlier on 2026-05-10; +2 net spec files in the agent entities-types
+  contract sweep — adds
+  `packages/agent/src/entities/__tests__/activity-log.types.spec.ts`
+  (45 tests pinning the 96-LOC contract module: every one of the 36
+  documented `ActivityActionType` literals enumerated by name with
+  `it.each` — these strings are persisted in `activity_log` rows and
+  matched via string equality across the codebase; total-count +
+  uniqueness + lowercase-snake_case format invariants pinned to catch
+  silent additions; every `ActivityStatus` literal pinned;
+  `CreateActivityLogDto` + `ActivityLogQueryOptions` minimal-and-
+  maximal literal shapes type-check) and
+  `packages/agent/src/entities/__tests__/types.spec.ts` (36 tests
+  pinning the 91-LOC contract module: `SubscriptionPlanCode` 3 codes
+  in ascending tier order; `WorkMemberRole` 4 roles + uniqueness;
+  `ASSIGNABLE_MEMBER_ROLES` excludes OWNER (creator-only role
+  contract pinned via `not.toContain`); `DomainEnvironment` 3 envs;
+  smoke-checks on the 4 re-exports from `@ever-works/contracts/api`;
+  `GenerateStatus` + `CommunityPrState` minimal-and-maximal shapes
+    - `lastError: null` explicit-clear acceptance + `processedPrs.outcome`
+      restricted to `'applied'`/`'ignored'`; `ClassToObject<T>` mapped-
+      type acceptance; `ProvidersDto` empty-literal acceptance), closing
+      the per-file zero-coverage gap on the two entities-level contract
+      modules — see `Done` ledger; +1 net spec file in the prior agent
+      `ExecutablePipelineRunner` direct-coverage sweep — adds
+      `packages/agent/src/pipeline/executable-pipeline.class.spec.ts`
+      (49 tests on the 333-LOC runtime wrapper that owns the
+      `PipelineState` mutation flow consumed by the step-pipeline
+      executor — every `running`/`completed`/`failed`/`skipped`
+      transition flows through this class, so a regression here
+      would silently corrupt the run-state observed by both the
+      orchestrator AND the activity-log emitter that reads
+      `runner.getState()`. Pins: `PipelineRuntimeEvents` literal
+      wire format (`pipeline:state-changed` + `pipeline:step-status-changed`
+      — wire-format break is deliberate); the **STATE_CHANGED is
+      declared but NEVER emitted** gotcha (only STEP_STATUS_CHANGED
+      fires today — pinned so a future "wire up state-change events"
+      feature is a deliberate change, not an accident); constructor
+      initialises every step in `pending` status with empty
+      `completedSteps`/`failedSteps` arrays; **duplicate step IDs
+      collapse via Map.set semantics** (the second definition wins —
+      pinned so a future "throw on duplicate id" refactor breaks
+      loudly); zero-step pipeline does not throw; **EventEmitter is
+      optional** (verified across all five status-mutating methods —
+      none throw without an emitter); `getStepDefinition` reads
+      through `pipeline.steps.find` NOT the internal Map (so post-
+      construction mutations to `pipeline.steps` are reflected here
+      but not in `getStepState` — useful invariant for caller code);
+      `startExecution` stamps `state.startedAt` from `Date.now()`
+      AND **preserves `completedSteps`/`failedSteps`** on a second
+      call (no idempotency reset — pinned); `completeExecution`
+      clears `isRunning` + stamps `completedAt` AND preserves
+      `startedAt` (audit trail); `cancelExecution` is the only
+      method that flips `isCancelled` to true; `updateStepStatus`
+      throws verbatim `'Step "<id>" not found in pipeline'` for
+      unknown ids; sets `startedAt` ONLY on `running` and
+      `completedAt` on `completed`/`failed`/`skipped` (not on
+      `pending`/`running`); updates `currentStep` to the running
+      step AND clears it on any other transition that matches the
+      CURRENT step (parallel-step safety: transitioning a different
+      step does NOT clear `currentStep` of an unrelated running
+      step); STEP_STATUS_CHANGED payload shape pinned (`stepId`,
+      `previousStatus` reflects pre-update state, `newStatus`,
+      `timestamp` from `Date.now()`); **`previousStatus` is
+      HARDCODED in `markStepComplete` (always `'running'`) and
+      `markStepFailed` (always `'running'`) and `markStepSkipped`
+      (always `'pending'`) regardless of actual prior state** —
+      pinned so a future "compute previousStatus from state"
+      refactor must update both source and tests deliberately;
+      `markStepComplete` attaches `result.metrics` only when
+      metrics are provided (omits `result` entirely when undefined,
+      does NOT set `{metrics: undefined}`); preserves chronological
+      append order across multiple completions (`['s2','s1','s3']`
+      if completed in that order — no internal sort); `markStepFailed`
+      attaches the `Error` instance verbatim under `stepState.error`
+      AND does NOT add the failed step to `completedSteps`; preserves
+      multiple-failures append order; `markStepSkipped` is the **only
+      asymmetric mutator**: it appends to `completedSteps` (skipped
+      is "done") AND does **NOT clear `currentStep`**, so a step can
+      be skipped while another step is running; full-lifecycle
+      integration test confirms a 3-step pipeline emits exactly 6
+      STEP_STATUS_CHANGED events in `s1:running → s1:completed →
   s2:running → s2:completed → s3:running → s3:completed` order;
-  mixed lifecycle (completed + failed + skipped) and cancel-
-  mid-flight scenarios both exercised), closing the per-file
-  zero-coverage gap on the runtime-state-machine in
-  `packages/agent/src/pipeline/executable-pipeline.class.ts` —
-  see `Done` ledger; +1 net spec file in the prior agent
-  `pipeline-result.validator` direct-coverage sweep — adds
-  `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
-  (78 tests on the 122-LOC pure-function validator pinning the
-  `validatePipelineResult(unknown) → {valid, errors[], result?}` envelope
-  used by the in-process pipeline executors to reject malformed
-  PipelineResult shapes returned from third-party plugins: the
-  early-return short-circuit on non-object inputs (null/undefined/
-  number/string/boolean) yielding the single-message
-  `['Result must be an object']` envelope vs. the per-field accumulator
-  branch that runs for arrays-as-objects (typeof [] === 'object', so
-  arrays fall through to per-field checks instead of short-circuiting —
-  pinned because a future `Array.isArray` short-circuit refactor would
-  silently change behaviour); the eight per-field check ORDER pinned
-  (success → outputs → stepsCompleted → totalSteps → state → duration →
-  error → failedStep) so a reorder of the validator breaks loudly; the
-  outputs object's five required arrays (items/categories/tags/
-  collections/brands) AND the documented short-circuit where the nested
-  array checks DO NOT run when outputs itself is missing/null/non-object
-  (single-envelope-error policy, no error-spam); the state object's
-  partial-optional shape — `state===undefined` skips ALL nested checks,
-  `state===null/non-object` produces a SINGLE envelope error and skips
-  the four nested checks, but `state===object` runs all four nested
-  checks (isRunning bool / isCancelled bool / completedSteps array /
-  failedSteps array); the documented gotcha that `duration` is labelled
-  "Optional fields validation" in the source comment block but is
-  ACTUALLY required (no `r.duration !== undefined` gate before the
-  typeof check) — pinned by an explicit "duration is NOT optional"
-  describe block that fails if a future "make duration truly optional"
-  refactor lands without updating callers; the truly-optional `error`
-  field accepting `undefined`, `string`, AND `instanceof Error` (incl.
-  TypeError as Error subclass) but rejecting null/number/plain-object;
-  the truly-optional `failedStep` field accepting `undefined` and
-  `string` but rejecting null/number; the "no range check" semantics for
-  `duration` (negative numbers pass — pinned because a future `>= 0`
-  guard would change behaviour); NaN-passes-typeof-number gotcha pinned
-  for `stepsCompleted` (a future switch to `Number.isFinite` should be
-  deliberate); result envelope shape (`result.result === input` on
-  success, `result.result === undefined` on failure, no clone); plus
-  the `validatePipelineResultOrThrow(unknown, pluginId?)` thin wrapper —
-  reuses the validator and projects the errors[] into a single Error
-  message via `errors.join('; ')`, with the documented two-format
-  string `Invalid pipeline result${pluginId ? \` from plugin '<id>'\`
-  : ''}: <joined errors>`pinned for both no-plugin-id AND with-plugin-id
+      mixed lifecycle (completed + failed + skipped) and cancel-
+      mid-flight scenarios both exercised), closing the per-file
+      zero-coverage gap on the runtime-state-machine in
+      `packages/agent/src/pipeline/executable-pipeline.class.ts` —
+      see `Done` ledger; +1 net spec file in the prior agent
+      `pipeline-result.validator` direct-coverage sweep — adds
+      `packages/agent/src/pipeline/validators/pipeline-result.validator.spec.ts`
+      (78 tests on the 122-LOC pure-function validator pinning the
+      `validatePipelineResult(unknown) → {valid, errors[], result?}` envelope
+      used by the in-process pipeline executors to reject malformed
+      PipelineResult shapes returned from third-party plugins: the
+      early-return short-circuit on non-object inputs (null/undefined/
+      number/string/boolean) yielding the single-message
+      `['Result must be an object']` envelope vs. the per-field accumulator
+      branch that runs for arrays-as-objects (typeof [] === 'object', so
+      arrays fall through to per-field checks instead of short-circuiting —
+      pinned because a future `Array.isArray` short-circuit refactor would
+      silently change behaviour); the eight per-field check ORDER pinned
+      (success → outputs → stepsCompleted → totalSteps → state → duration →
+      error → failedStep) so a reorder of the validator breaks loudly; the
+      outputs object's five required arrays (items/categories/tags/
+      collections/brands) AND the documented short-circuit where the nested
+      array checks DO NOT run when outputs itself is missing/null/non-object
+      (single-envelope-error policy, no error-spam); the state object's
+      partial-optional shape — `state===undefined` skips ALL nested checks,
+      `state===null/non-object` produces a SINGLE envelope error and skips
+      the four nested checks, but `state===object` runs all four nested
+      checks (isRunning bool / isCancelled bool / completedSteps array /
+      failedSteps array); the documented gotcha that `duration` is labelled
+      "Optional fields validation" in the source comment block but is
+      ACTUALLY required (no `r.duration !== undefined` gate before the
+      typeof check) — pinned by an explicit "duration is NOT optional"
+      describe block that fails if a future "make duration truly optional"
+      refactor lands without updating callers; the truly-optional `error`
+      field accepting `undefined`, `string`, AND `instanceof Error` (incl.
+      TypeError as Error subclass) but rejecting null/number/plain-object;
+      the truly-optional `failedStep` field accepting `undefined` and
+      `string` but rejecting null/number; the "no range check" semantics for
+      `duration` (negative numbers pass — pinned because a future `>= 0`
+      guard would change behaviour); NaN-passes-typeof-number gotcha pinned
+      for `stepsCompleted` (a future switch to `Number.isFinite` should be
+      deliberate); result envelope shape (`result.result === input` on
+      success, `result.result === undefined` on failure, no clone); plus
+      the `validatePipelineResultOrThrow(unknown, pluginId?)` thin wrapper —
+      reuses the validator and projects the errors[] into a single Error
+      message via `errors.join('; ')`, with the documented two-format
+      string `Invalid pipeline result${pluginId ? \` from plugin '<id>'\`
+      : ''}: <joined errors>`pinned for both no-plugin-id AND with-plugin-id
 cases, the empty-string-pluginId-treated-as-falsy case (no`from
-  plugin '...'`segment), the whitespace-only-pluginId-treated-as-truthy
+      plugin '...'`segment), the whitespace-only-pluginId-treated-as-truthy
 case (no implicit`.trim()`, included verbatim — pinned so a future
 trim refactor breaks loudly), success-on-failed-run (`success: false`with an`error`field is a perfectly valid PipelineResult SHAPE — the
 wrapper only throws when the shape is wrong, not when the run itself
@@ -380,7 +402,7 @@ deliberate change),`packages/agent/src/comparison-generator/comparison/prompt-ke
                   the prior sweep — subscription-plan + work-advanced-prompts +
                   user-template-preference + user-subscription + usage-ledger +
                   webhook-subscription + refresh-token + onboarding-request. See`Done`
-  for the running ledger).
+      for the running ledger).
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
 - **API source spec count**: **101** specs inside `apps/api/src/` (was 95
   earlier on 2026-05-09; +6 small-utility DTO specs landed in the
@@ -404,6 +426,33 @@ deliberate change),`packages/agent/src/comparison-generator/comparison/prompt-ke
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-10 — packages/agent entities-types contract coverage (+81 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on the two entities-level contract modules `packages/agent/src/entities/activity-log.types.ts` (96 LOC) and `packages/agent/src/entities/types.ts` (91 LOC). Every literal pinned by these specs is a documented runtime contract — persisted in DB rows, matched via string equality across listener filter chains, DB queries, API DTOs, and consumer plugin code. A silent rename to ANY of these literals is a backwards-incompat break for every persisted row.
+
+### `packages/agent/src/entities/__tests__/activity-log.types.spec.ts` (45 tests)
+
+- **`ActivityActionType` (39 tests)** — every one of the 36 documented literals enumerated by name with a per-literal `it.each` assertion (`'GENERATION' → 'generation'`, `'COMPARISON_GENERATION' → 'comparison_generation'`, ... `'COMMUNITY_PR_MERGED' → 'community_pr_merged'`). Plus three structural invariants pinned: total-count of 36 literals (catches silent additions); uniqueness across the literal set; format regex `/^[a-z][a-z0-9_]*$/` (lowercase snake_case, no UPPER, no kebab) — pinned because the listener side of the activity-log pipeline lowercases incoming strings before matching, so a future "let's use kebab-case for plugin actions" addition would silently route to the default branch.
+- **`ActivityStatus` (7 tests)** — every documented literal (`PENDING`/`IN_PROGRESS`/`COMPLETED`/`FAILED`/`CANCELLED`); total-count of 5 + uniqueness invariants.
+- **`CreateActivityLogDto` (3 tests)** — minimal shape with the 5 required fields; maximal shape with every documented optional field (`workId`/`details`/`metadata`/`ipAddress`/`userAgent`); runtime check that `actionType` is a valid enum member.
+- **`ActivityLogQueryOptions` (2 tests)** — minimal `{userId}` shape; maximal shape with every optional filter (`actionType`/`workId`/`status`/`dateFrom`/`dateTo`/`search`/`limit`/`offset`).
+
+### `packages/agent/src/entities/__tests__/types.spec.ts` (36 tests)
+
+- **`SubscriptionPlanCode` (4 tests)** — pinned 3 codes (`FREE`/`STANDARD`/`PREMIUM`); total-count + ascending tier order pinned via `toEqual(['free', 'standard', 'premium'])` so the ordering invariant is observable in test diffs.
+- **`WorkMemberRole` (6 tests)** — pinned 4 roles (`OWNER`/`MANAGER`/`EDITOR`/`VIEWER`); total-count + uniqueness invariants.
+- **`ASSIGNABLE_MEMBER_ROLES` (4 tests)** — contains MANAGER + EDITOR + VIEWER (in that order); explicitly EXCLUDES OWNER pinned via `not.toContain` (the creator-only role contract documented in the JSDoc — pinned because the role-assignment endpoints reject OWNER specifically); `AssignableMemberRole` type union derived from the array members.
+- **`DomainEnvironment` (4 tests)** — pinned 3 envs (`PRODUCTION`/`STAGING`/`DEVELOPMENT`); total-count.
+- **`@ever-works/contracts/api` re-exports (4 tests)** — defensive smoke-checks that `GenerateStatusType`/`WorkScheduleCadence`/`WorkScheduleStatus`/`WorkScheduleBillingMode` are objects with at least one string member (the contracts package owns the literal set; the agent's job here is just to make sure the re-export chain hasn't been accidentally severed).
+- **`GenerateStatus` (2 tests)** — minimal shape with only the required `status` field; maximal shape with every optional field (`step`/`stepName`/`stepIndex`/`totalSteps`/`progress`/`itemsProcessed`/`error`/`warnings`/`recentLogs`).
+- **`CommunityPrState` (4 tests)** — minimal shape (only `processedPrNumbers` required); maximal shape with every optional field; `lastError: null` explicit-clear acceptance pinned (the type allows `string | null` so the listener can clear the field without omitting it); `processedPrs.outcome` restricted to `'applied'`/`'ignored'` literals (compile-time check via type-asserted variables).
+- **`ClassToObject<T>` mapped-type (1 test)** — verifies that an object-literal mirror of a class shape type-checks.
+- **`ProvidersDto` re-export (1 test)** — empty-literal `{}` accepted (every field is optional).
+
+Total agent-package suite: 4040 → 4121 tests across 181 → 183 suites, all green.
+
+---
 
 **2026-05-10 — packages/agent ExecutablePipelineRunner direct coverage (+49 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
 
