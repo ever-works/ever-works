@@ -2357,4 +2357,476 @@ describe('WorkGenerationService', () => {
             });
         });
     });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  resolveGenerationFinalStatus (private helper, exercised via cast)
+    // ════════════════════════════════════════════════════════════════════
+    describe('resolveGenerationFinalStatus', () => {
+        it('returns CANCELLED for a generation-cancelled error', () => {
+            // Pinned: the cancellation branch must come BEFORE the
+            // generic-error branch — a future swap would record a real
+            // ERROR for a user-initiated cancel and trigger downstream
+            // notifications that should not fire on cancellation.
+            const service = buildService() as any;
+            const cancelled = createGenerationCancelledError();
+            expect(service.resolveGenerationFinalStatus(cancelled)).toBe(
+                GenerateStatusType.CANCELLED,
+            );
+            expect(isGenerationCancelledError(cancelled)).toBe(true);
+        });
+
+        it('returns ERROR for any non-cancelled truthy error', () => {
+            const service = buildService() as any;
+            expect(service.resolveGenerationFinalStatus(new Error('boom'))).toBe(
+                GenerateStatusType.ERROR,
+            );
+            // Non-Error truthy values still classify as ERROR (the helper
+            // does not require an Error instance — pinned because callers
+            // pass `unknown` from generic catch blocks).
+            expect(service.resolveGenerationFinalStatus('boom')).toBe(
+                GenerateStatusType.ERROR,
+            );
+            expect(service.resolveGenerationFinalStatus({ message: 'boom' })).toBe(
+                GenerateStatusType.ERROR,
+            );
+        });
+
+        it('returns GENERATED when error is falsy', () => {
+            const service = buildService() as any;
+            expect(service.resolveGenerationFinalStatus(null)).toBe(
+                GenerateStatusType.GENERATED,
+            );
+            expect(service.resolveGenerationFinalStatus(undefined)).toBe(
+                GenerateStatusType.GENERATED,
+            );
+            // Documented behaviour: 0 / '' are also "no error" because the
+            // helper uses truthy-checks. Pinned so a future "must be Error
+            // instance" tightening is a deliberate change.
+            expect(service.resolveGenerationFinalStatus(0)).toBe(
+                GenerateStatusType.GENERATED,
+            );
+            expect(service.resolveGenerationFinalStatus('')).toBe(
+                GenerateStatusType.GENERATED,
+            );
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  resolveGenerationErrorMessage (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('resolveGenerationErrorMessage', () => {
+        it('returns undefined when error is falsy', () => {
+            const service = buildService() as any;
+            expect(service.resolveGenerationErrorMessage(null)).toBeUndefined();
+            expect(service.resolveGenerationErrorMessage(undefined)).toBeUndefined();
+            expect(service.resolveGenerationErrorMessage(0)).toBeUndefined();
+            expect(service.resolveGenerationErrorMessage('')).toBeUndefined();
+        });
+
+        it('returns the GENERATION_CANCELLED constant for a cancelled error', () => {
+            // Pinned: the cancelled branch must return the human-facing
+            // constant verbatim (so the UI can show "Generation cancelled."
+            // without translating an Error.message). A future "use the
+            // Error.message directly" refactor would surface internal
+            // wording instead.
+            const service = buildService() as any;
+            const cancelled = createGenerationCancelledError();
+            expect(service.resolveGenerationErrorMessage(cancelled)).toBe(
+                GENERATION_CANCELLED,
+            );
+        });
+
+        it('falls through to normalizeGeneratorError for other errors', () => {
+            const service = buildService() as any;
+            // normalizeGeneratorError converts "not found" into the
+            // documented "Repository not found." copy — pinned because
+            // the user-facing copy lives in the normaliser, not in the
+            // service.
+            expect(
+                service.resolveGenerationErrorMessage(new Error('repository not found')),
+            ).toBe('Repository not found. Please verify the repository exists and try again.');
+            // Generic message passes through verbatim.
+            expect(service.resolveGenerationErrorMessage(new Error('boom'))).toBe('boom');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  buildScheduleRunOutcome (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('buildScheduleRunOutcome', () => {
+        it('returns {status: completed, historyId} when error is falsy', () => {
+            const service = buildService() as any;
+            expect(service.buildScheduleRunOutcome(null, 'h-1')).toEqual({
+                status: 'completed',
+                historyId: 'h-1',
+            });
+        });
+
+        it('omits historyId when not provided on success', () => {
+            // Pinned: the {historyId} field is optional. Generated outcome
+            // must not carry an explicit `undefined` field — a downstream
+            // consumer that does `if ('historyId' in outcome)` would
+            // misread an explicit-undefined as "set but empty".
+            const service = buildService() as any;
+            const result = service.buildScheduleRunOutcome(null);
+            expect(result).toEqual({ status: 'completed', historyId: undefined });
+        });
+
+        it('returns {status: failed, reason: GENERATION_CANCELLED} on a cancelled error', () => {
+            const service = buildService() as any;
+            const cancelled = createGenerationCancelledError();
+            expect(service.buildScheduleRunOutcome(cancelled, 'h-1')).toEqual({
+                status: 'failed',
+                reason: GENERATION_CANCELLED,
+            });
+        });
+
+        it('returns {status: failed, reason: <normalized>} on a generic error', () => {
+            const service = buildService() as any;
+            expect(service.buildScheduleRunOutcome(new Error('boom'), 'h-1')).toEqual({
+                status: 'failed',
+                reason: 'boom',
+            });
+        });
+
+        it('drops historyId on a failed outcome (failure wins, no historyId leak)', () => {
+            // Pinned: when the schedule run failed, the outcome envelope
+            // is `{status:'failed', reason}` — the historyId arg is
+            // intentionally NOT propagated because it would mislead a
+            // consumer into treating the failed run as a successful one
+            // they could resume.
+            const service = buildService() as any;
+            const result = service.buildScheduleRunOutcome(new Error('boom'), 'h-1');
+            expect(result).not.toHaveProperty('historyId');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  isNonFatalWebsiteGenerationError (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('isNonFatalWebsiteGenerationError', () => {
+        it('returns false when no items were generated', () => {
+            // Pinned: with zero new+updated items, a website-gen failure
+            // is fatal — there is nothing to publish, so we surface the
+            // error. A future "always swallow website failures" refactor
+            // would mask real config issues during a brand-new work setup.
+            const service = buildService() as any;
+            expect(
+                service.isNonFatalWebsiteGenerationError(
+                    new Error('repository not found'),
+                    0,
+                    0,
+                ),
+            ).toBe(false);
+        });
+
+        it('returns false when items exist but error is not "repository not found"', () => {
+            const service = buildService() as any;
+            expect(
+                service.isNonFatalWebsiteGenerationError(new Error('boom'), 1, 0),
+            ).toBe(false);
+        });
+
+        it('returns true when items exist AND error is "repository not found"', () => {
+            // Documented behaviour: data-gen succeeded (items exist) but
+            // the website repo is missing — we attach the warning rather
+            // than failing the whole pipeline so the user can still see
+            // their data-side progress.
+            const service = buildService() as any;
+            expect(
+                service.isNonFatalWebsiteGenerationError(
+                    new Error('Repository not found'),
+                    1,
+                    0,
+                ),
+            ).toBe(true);
+            expect(
+                service.isNonFatalWebsiteGenerationError(
+                    new Error('repository not found'),
+                    0,
+                    1,
+                ),
+            ).toBe(true);
+        });
+
+        it('matches via normalizeGeneratorError (which lower-cases)', () => {
+            // Pinned: the helper lowercases AFTER normaliser runs, so
+            // mixed-case "Repository Not Found" still matches. Without
+            // this the case-sensitivity of upstream Git error messages
+            // would silently flip the branch.
+            const service = buildService() as any;
+            expect(
+                service.isNonFatalWebsiteGenerationError(
+                    new Error('Repository Not Found'),
+                    1,
+                    1,
+                ),
+            ).toBe(true);
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  markGenerationStarted (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('markGenerationStarted', () => {
+        it('records start time + sets GENERATING in parallel without touching history', async () => {
+            // Pinned: when `history` is undefined (legacy path / direct
+            // generation w/o history record), only the work-side updates
+            // run. A future "always require history" tightening would
+            // break the legacy direct-generation path silently.
+            const service = buildService() as any;
+            const startTime = new Date('2026-01-01T00:00:00.000Z');
+            await service.markGenerationStarted('work-1', startTime);
+
+            expect(workRepository.recordGenerationStartTime).toHaveBeenCalledWith(
+                'work-1',
+                startTime,
+            );
+            expect(workRepository.updateGenerateStatus).toHaveBeenCalledWith('work-1', {
+                status: GenerateStatusType.GENERATING,
+            });
+            expect(generationHistoryRepository.updateEntry).not.toHaveBeenCalled();
+        });
+
+        it('also marks the history entry GENERATING when history is provided', async () => {
+            const service = buildService() as any;
+            const startTime = new Date('2026-01-01T00:00:00.000Z');
+            const history = { id: 'h-1' } as any;
+            await service.markGenerationStarted('work-1', startTime, history);
+
+            expect(generationHistoryRepository.updateEntry).toHaveBeenCalledWith('h-1', {
+                startedAt: startTime,
+                status: GenerateStatusType.GENERATING,
+            });
+        });
+
+        it('runs work-side updates via Promise.all (one rejection rejects the call)', async () => {
+            // Pinned via Promise.all rejection semantics: if either of
+            // the two work-side updates throws, the helper rejects
+            // (and the caller's try/catch can record the failure).
+            const service = buildService() as any;
+            workRepository.updateGenerateStatus.mockRejectedValueOnce(new Error('db down'));
+            await expect(
+                service.markGenerationStarted('work-1', new Date()),
+            ).rejects.toThrow('db down');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  finalizeCancelledGeneration (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('finalizeCancelledGeneration', () => {
+        it('writes CANCELLED status + GENERATION_CANCELLED error and clears step', async () => {
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            await service.finalizeCancelledGeneration('work-1');
+
+            expect(workRepository.recordGenerationFinishTime).toHaveBeenCalledWith(
+                'work-1',
+                expect.any(Date),
+            );
+            expect(workRepository.updateGenerateStatus).toHaveBeenCalledWith('work-1', {
+                status: GenerateStatusType.CANCELLED,
+                error: GENERATION_CANCELLED,
+                step: null,
+            });
+        });
+
+        it('updates history entry with CANCELLED + duration when history is provided', async () => {
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(buildWork());
+            const startedAt = new Date(Date.now() - 5000);
+            const history = { id: 'h-1', startedAt } as any;
+
+            await service.finalizeCancelledGeneration('work-1', history);
+
+            const [historyId, payload] = generationHistoryRepository.updateEntry.mock.calls[0];
+            expect(historyId).toBe('h-1');
+            expect(payload).toMatchObject({
+                status: GenerateStatusType.CANCELLED,
+                errorMessage: GENERATION_CANCELLED,
+            });
+            expect(payload.finishedAt).toBeInstanceOf(Date);
+            expect(typeof payload.durationInSeconds).toBe('number');
+            expect(payload.durationInSeconds).toBeGreaterThanOrEqual(0);
+        });
+
+        it('falls back to finishedAt for startedAt when history.startedAt is missing', async () => {
+            // Pinned: a partial history row (no startedAt) must not
+            // produce a NaN duration — the fallback uses finishedAt so
+            // the duration is exactly zero. A future "trust startedAt"
+            // refactor would write NaN into the duration column.
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(buildWork());
+            const history = { id: 'h-1' } as any; // startedAt undefined
+
+            await service.finalizeCancelledGeneration('work-1', history);
+
+            const [, payload] =
+                generationHistoryRepository.updateEntry.mock.calls[0];
+            expect(payload.durationInSeconds).toBe(0);
+        });
+
+        it('finalizes the schedule run with status=failed + GENERATION_CANCELLED reason when scheduleId is set', async () => {
+            // Pinned: cancellation propagates to the schedule as a
+            // failure (not a completion) so the cadence's failure
+            // counter advances and pause-on-N-failures still works.
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            await service.finalizeCancelledGeneration('work-1', undefined, 'sched-1');
+
+            expect(workScheduleService.finalizeScheduleRun).toHaveBeenCalledWith(
+                'sched-1',
+                { status: 'failed', reason: GENERATION_CANCELLED },
+            );
+        });
+
+        it('does not touch the schedule when scheduleId is null/undefined', async () => {
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(buildWork());
+
+            await service.finalizeCancelledGeneration('work-1', undefined, null);
+            await service.finalizeCancelledGeneration('work-1', undefined, undefined);
+
+            expect(workScheduleService.finalizeScheduleRun).not.toHaveBeenCalled();
+        });
+
+        it('emits WorkGenerationCompletedEvent with the refreshed work after finalisation', async () => {
+            // Pinned: the event payload uses the freshly-refetched work
+            // (so listeners see the CANCELLED status and downstream
+            // observers don't replay stale GENERATING state). Pinned via
+            // a `findById`-returns-distinct-instance assertion.
+            const service = buildService() as any;
+            const refreshed = buildWork({ id: 'work-1', name: 'After Cancel' });
+            workRepository.findById.mockResolvedValue(refreshed);
+
+            await service.finalizeCancelledGeneration('work-1');
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                'work.generation.completed',
+                expect.objectContaining({ work: refreshed }),
+            );
+        });
+
+        it('skips the event when the refreshed work is missing', async () => {
+            // Pinned: a deleted-mid-cancel work must NOT emit the event
+            // with a null payload — listeners that destructure
+            // `event.work.X` would crash and crash the listener queue.
+            const service = buildService() as any;
+            workRepository.findById.mockResolvedValue(null);
+
+            await service.finalizeCancelledGeneration('work-1');
+
+            expect(eventEmitter.emit).not.toHaveBeenCalled();
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    //  handleErrorNotification (private helper)
+    // ════════════════════════════════════════════════════════════════════
+    describe('handleErrorNotification', () => {
+        it('is a no-op when no NotificationService is wired', async () => {
+            // Pinned: agent-package consumers can opt out of in-app
+            // notifications by omitting the service from the DI graph.
+            // A future "always required" tightening would break those
+            // headless callers (CLI, internal-cli runs).
+            const service = buildService({ withNotifications: false }) as any;
+            await expect(
+                service.handleErrorNotification(
+                    new Error('insufficient_quota'),
+                    buildUser(),
+                    buildWork(),
+                ),
+            ).resolves.toBeUndefined();
+
+            // None of the four notify methods were created (no service);
+            // assert via `notificationService` mock that nothing fired.
+            expect(notificationService.notifyAiCreditsDepleted).not.toHaveBeenCalled();
+        });
+
+        it('routes ai_credits classification to notifyAiCreditsDepleted', async () => {
+            const service = buildService() as any;
+            await service.handleErrorNotification(
+                new Error('OpenAI insufficient_quota'),
+                buildUser({ id: 'user-9' }),
+                buildWork(),
+            );
+
+            expect(notificationService.notifyAiCreditsDepleted).toHaveBeenCalledWith(
+                'user-9',
+                'OpenAI',
+                'OpenAI insufficient_quota',
+            );
+        });
+
+        it('routes ai_provider classification to notifyAiProviderError', async () => {
+            const service = buildService() as any;
+            await service.handleErrorNotification(
+                new Error('Anthropic invalid_api_key'),
+                buildUser({ id: 'user-9' }),
+                buildWork(),
+            );
+
+            expect(notificationService.notifyAiProviderError).toHaveBeenCalledWith(
+                'user-9',
+                'Anthropic',
+                'Anthropic invalid_api_key',
+            );
+        });
+
+        it('routes git_auth classification to notifyGitAuthExpired (provider only, no message)', async () => {
+            // Pinned: git-auth notifications carry the provider but NOT
+            // the raw error string — exposing the upstream error to the
+            // user adds no value and can leak internal hostnames /
+            // request IDs.
+            const service = buildService() as any;
+            await service.handleErrorNotification(
+                new Error('GitHub token expired'),
+                buildUser({ id: 'user-9' }),
+                buildWork(),
+            );
+
+            expect(notificationService.notifyGitAuthExpired).toHaveBeenCalledWith(
+                'user-9',
+                'GitHub',
+            );
+        });
+
+        it('routes account_level classification to notifyGenerationAccountError with workId+name', async () => {
+            const service = buildService() as any;
+            await service.handleErrorNotification(
+                new Error('Subscription not configured'),
+                buildUser({ id: 'user-9' }),
+                buildWork({ id: 'w-9', name: 'My Site' }),
+            );
+
+            expect(notificationService.notifyGenerationAccountError).toHaveBeenCalledWith(
+                'user-9',
+                'w-9',
+                'My Site',
+                'Subscription not configured',
+            );
+        });
+
+        it('does NOT notify on unknown classification', async () => {
+            // Pinned: an "unknown" error must not page the user — random
+            // pipeline crashes (e.g. Zod parse failure on AI output) are
+            // for ops to investigate, not the end-user. A future
+            // catch-all "tell the user something is wrong" refactor
+            // would create alert noise.
+            const service = buildService() as any;
+            await service.handleErrorNotification(
+                new Error('TypeError: Cannot read property foo of undefined'),
+                buildUser(),
+                buildWork(),
+            );
+
+            expect(notificationService.notifyAiCreditsDepleted).not.toHaveBeenCalled();
+            expect(notificationService.notifyAiProviderError).not.toHaveBeenCalled();
+            expect(notificationService.notifyGitAuthExpired).not.toHaveBeenCalled();
+            expect(notificationService.notifyGenerationAccountError).not.toHaveBeenCalled();
+        });
+    });
 });
