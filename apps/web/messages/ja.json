@@ -594,6 +594,21 @@
                 "previous": "前へ",
                 "next": "次へ",
                 "pageOf": "{total} ページ中 {page} ページ"
+            },
+            "viewMode": {
+                "table": "テーブル",
+                "board": "ボード"
+            },
+            "kanban": {
+                "empty": "ここにアクティビティはありません",
+                "noWork": "作業なし",
+                "columns": {
+                    "pending": "保留中",
+                    "in_progress": "進行中",
+                    "completed": "完了",
+                    "failed": "失敗",
+                    "cancelled": "キャンセル"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "ワークが見つかりません",
                     "withSearch": "検索語を調整してみてください",
                     "withoutSearch": "開始するために最初の AI 駆動ワークを作成してください"
+                }
+            },
+            "viewMode": {
+                "card": "カード",
+                "kanban": "カンバン"
+            },
+            "kanban": {
+                "items": "{count} アイテム",
+                "noDescription": "説明なし",
+                "empty": "ここに作業はありません",
+                "columns": {
+                    "not_started": "未開始",
+                    "scheduled": "スケジュール済み",
+                    "generating": "進行中",
+                    "completed": "完了",
+                    "failed": "失敗"
+                },
+                "status": {
+                    "notStarted": "未開始",
+                    "scheduled": "スケジュール済み",
+                    "generating": "生成中",
+                    "completed": "完了",
+                    "completedWithWarnings": "警告付きで完了",
+                    "failed": "失敗",
+                    "cancelled": "キャンセル"
                 }
             }
         },

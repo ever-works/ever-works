@@ -594,6 +594,21 @@
                 "previous": "Précédent",
                 "next": "Suivant",
                 "pageOf": "Page {page} sur {total}"
+            },
+            "viewMode": {
+                "table": "Tableau",
+                "board": "Tableau Kanban"
+            },
+            "kanban": {
+                "empty": "Aucune activité ici",
+                "noWork": "Aucun travail",
+                "columns": {
+                    "pending": "En attente",
+                    "in_progress": "En cours",
+                    "completed": "Terminé",
+                    "failed": "Échoué",
+                    "cancelled": "Annulé"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "Aucun travail trouvé",
                     "withSearch": "Essayez d'ajuster vos termes de recherche",
                     "withoutSearch": "Créez votre premier travail alimenté par l'IA pour commencer"
+                }
+            },
+            "viewMode": {
+                "card": "Cartes",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} éléments",
+                "noDescription": "Aucune description",
+                "empty": "Aucun travail ici",
+                "columns": {
+                    "not_started": "Non démarré",
+                    "scheduled": "Planifié",
+                    "generating": "En cours",
+                    "completed": "Terminé",
+                    "failed": "Échoué"
+                },
+                "status": {
+                    "notStarted": "Non démarré",
+                    "scheduled": "Planifié",
+                    "generating": "Génération en cours",
+                    "completed": "Terminé",
+                    "completedWithWarnings": "Terminé avec des avertissements",
+                    "failed": "Échoué",
+                    "cancelled": "Annulé"
                 }
             }
         },

@@ -594,6 +594,21 @@
                 "previous": "Previous",
                 "next": "Next",
                 "pageOf": "Page {page} of {total}"
+            },
+            "viewMode": {
+                "table": "Table",
+                "board": "Board"
+            },
+            "kanban": {
+                "empty": "No activities here",
+                "noWork": "No work",
+                "columns": {
+                    "pending": "Pending",
+                    "in_progress": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
             }
         },
         "works": {

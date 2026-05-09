@@ -8,6 +8,8 @@ import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
+import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
+import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { toast } from 'sonner';
 import { Download, Loader2 } from 'lucide-react';
 
@@ -49,6 +51,15 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     const requestIdRef = useRef(0);
     const hasMountedRef = useRef(false);
     const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
+        if (typeof window === 'undefined') return 'card';
+        return (localStorage.getItem('activity-view-mode') as ViewMode) || 'card';
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem('activity-view-mode', mode);
+    };
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync filters → URL query params
@@ -288,13 +299,21 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                         {t('subtitle')}
                     </p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                >
-                    <Download className="w-3.5 h-3.5" />
-                    {t('actions.export')}
-                </button>
+                <div className="flex items-center gap-2">
+                    <ViewModeSwitch
+                        mode={viewMode}
+                        onChange={handleViewModeChange}
+                        cardLabel={t('viewMode.table')}
+                        kanbanLabel={t('viewMode.board')}
+                    />
+                    <button
+                        onClick={handleExport}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        {t('actions.export')}
+                    </button>
+                </div>
             </div>
 
             <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
@@ -358,13 +377,18 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 />
             ) : (
                 <>
-                    <ActivityTable
-                        activities={activities}
-                        loading={loading}
-                        onStopRequested={refreshCurrentPage}
-                    />
+                    {viewMode === 'kanban' ? (
+                        <ActivityKanbanView activities={activities} />
+                    ) : (
+                        <ActivityTable
+                            activities={activities}
+                            loading={loading}
+                            onStopRequested={refreshCurrentPage}
+                        />
+                    )}
 
-                    {totalPages > 1 && (
+                    {/* Pagination + view mode switch — hidden in kanban mode */}
+                    {viewMode !== 'kanban' && totalPages > 1 && (
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {t('showing', {

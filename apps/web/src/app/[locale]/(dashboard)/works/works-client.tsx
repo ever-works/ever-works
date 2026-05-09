@@ -288,7 +288,12 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                         {t('showing', { current: works.length, total })}
                     </p>
-                    <ViewModeSwitch mode={viewMode} onChange={handleViewModeChange} />
+                    <ViewModeSwitch
+                        mode={viewMode}
+                        onChange={handleViewModeChange}
+                        cardLabel={t('viewMode.card')}
+                        kanbanLabel={t('viewMode.kanban')}
+                    />
                 </div>
             )}
 

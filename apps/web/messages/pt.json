@@ -594,6 +594,21 @@
                 "previous": "Anterior",
                 "next": "Próximo",
                 "pageOf": "Página {page} de {total}"
+            },
+            "viewMode": {
+                "table": "Tabela",
+                "board": "Quadro"
+            },
+            "kanban": {
+                "empty": "Sem atividades aqui",
+                "noWork": "Sem trabalho",
+                "columns": {
+                    "pending": "Pendente",
+                    "in_progress": "Em andamento",
+                    "completed": "Concluído",
+                    "failed": "Falhou",
+                    "cancelled": "Cancelado"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "Nenhum trabalho encontrado",
                     "withSearch": "Tente ajustar seus termos de pesquisa",
                     "withoutSearch": "Crie seu primeiro trabalho alimentado por IA para começar"
+                }
+            },
+            "viewMode": {
+                "card": "Cartões",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} itens",
+                "noDescription": "Sem descrição",
+                "empty": "Sem trabalhos aqui",
+                "columns": {
+                    "not_started": "Não iniciado",
+                    "scheduled": "Agendado",
+                    "generating": "Em andamento",
+                    "completed": "Concluído",
+                    "failed": "Falhou"
+                },
+                "status": {
+                    "notStarted": "Não iniciado",
+                    "scheduled": "Agendado",
+                    "generating": "Gerando",
+                    "completed": "Concluído",
+                    "completedWithWarnings": "Concluído com avisos",
+                    "failed": "Falhou",
+                    "cancelled": "Cancelado"
                 }
             }
         },

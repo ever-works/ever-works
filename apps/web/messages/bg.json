@@ -594,6 +594,21 @@
                 "previous": "Предишна",
                 "next": "Следваща",
                 "pageOf": "Страница {page} от {total}"
+            },
+            "viewMode": {
+                "table": "Таблица",
+                "board": "Табло"
+            },
+            "kanban": {
+                "empty": "Няма дейности тук",
+                "noWork": "Без работа",
+                "columns": {
+                    "pending": "В изчакване",
+                    "in_progress": "В процес",
+                    "completed": "Завършено",
+                    "failed": "Неуспешно",
+                    "cancelled": "Отменено"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "Не са намерени работи",
                     "withSearch": "Опитайте да коригирате търсачките си",
                     "withoutSearch": "Създайте първата си AI-работа, за да започнете"
+                }
+            },
+            "viewMode": {
+                "card": "Карти",
+                "kanban": "Канбан"
+            },
+            "kanban": {
+                "items": "{count} елемента",
+                "noDescription": "Без описание",
+                "empty": "Няма работи тук",
+                "columns": {
+                    "not_started": "Не е започнало",
+                    "scheduled": "Планирано",
+                    "generating": "В процес",
+                    "completed": "Завършено",
+                    "failed": "Неуспешно"
+                },
+                "status": {
+                    "notStarted": "Не е започнало",
+                    "scheduled": "Планирано",
+                    "generating": "Генерира се",
+                    "completed": "Завършено",
+                    "completedWithWarnings": "Завършено с предупреждения",
+                    "failed": "Неуспешно",
+                    "cancelled": "Отменено"
                 }
             }
         },

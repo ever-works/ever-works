@@ -594,6 +594,21 @@
                 "previous": "Vorherige",
                 "next": "Nächste",
                 "pageOf": "Seite {page} von {total}"
+            },
+            "viewMode": {
+                "table": "Tabelle",
+                "board": "Board"
+            },
+            "kanban": {
+                "empty": "Keine Aktivitäten hier",
+                "noWork": "Keine Arbeit",
+                "columns": {
+                    "pending": "Ausstehend",
+                    "in_progress": "In Bearbeitung",
+                    "completed": "Abgeschlossen",
+                    "failed": "Fehlgeschlagen",
+                    "cancelled": "Abgebrochen"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "Keine Werke gefunden",
                     "withSearch": "Versuchen Sie, Ihre Suchbegriffe anzupassen",
                     "withoutSearch": "Erstellen Sie Ihr erstes KI-gestütztes Werk, um loszulegen"
+                }
+            },
+            "viewMode": {
+                "card": "Karten",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} Elemente",
+                "noDescription": "Keine Beschreibung",
+                "empty": "Keine Arbeiten hier",
+                "columns": {
+                    "not_started": "Nicht begonnen",
+                    "scheduled": "Geplant",
+                    "generating": "In Bearbeitung",
+                    "completed": "Abgeschlossen",
+                    "failed": "Fehlgeschlagen"
+                },
+                "status": {
+                    "notStarted": "Nicht begonnen",
+                    "scheduled": "Geplant",
+                    "generating": "Wird generiert",
+                    "completed": "Abgeschlossen",
+                    "completedWithWarnings": "Abgeschlossen mit Warnungen",
+                    "failed": "Fehlgeschlagen",
+                    "cancelled": "Abgebrochen"
                 }
             }
         },

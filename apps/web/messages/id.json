@@ -594,6 +594,21 @@
                 "previous": "Sebelumnya",
                 "next": "Berikutnya",
                 "pageOf": "Halaman {page} dari {total}"
+            },
+            "viewMode": {
+                "table": "Tabel",
+                "board": "Papan"
+            },
+            "kanban": {
+                "empty": "Tidak ada aktivitas di sini",
+                "noWork": "Tidak ada pekerjaan",
+                "columns": {
+                    "pending": "Tertunda",
+                    "in_progress": "Sedang Berjalan",
+                    "completed": "Selesai",
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
+                }
             }
         },
         "works": {
@@ -622,6 +637,31 @@
                     "title": "Tidak ditemukan karya",
                     "withSearch": "Coba sesuaikan istilah pencarian Anda",
                     "withoutSearch": "Buat karya bertenaga AI pertama Anda untuk memulai"
+                }
+            },
+            "viewMode": {
+                "card": "Kartu",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} item",
+                "noDescription": "Tidak ada deskripsi",
+                "empty": "Tidak ada pekerjaan di sini",
+                "columns": {
+                    "not_started": "Belum Dimulai",
+                    "scheduled": "Terjadwal",
+                    "generating": "Sedang Berjalan",
+                    "completed": "Selesai",
+                    "failed": "Gagal"
+                },
+                "status": {
+                    "notStarted": "Belum dimulai",
+                    "scheduled": "Terjadwal",
+                    "generating": "Sedang Membuat",
+                    "completed": "Selesai",
+                    "completedWithWarnings": "Selesai dengan peringatan",
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
                 }
             }
         },
