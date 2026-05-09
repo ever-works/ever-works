@@ -85,7 +85,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent WorkGenerationService helpers follow-up sweep (private-helper coverage, +31 tests on the existing `work-generation.service.spec.ts`, scheduled-task `platform-tests-and-docs` cycle)**
+**2026-05-09 — packages/agent WorkGenerationService helpers follow-up sweep (private-helper coverage, +31 tests on the existing `work-generation.service.spec.ts`, scheduled-task `platform-tests-and-docs` cycle, [#637](https://github.com/ever-works/ever-works/pull/637))**
 
 Closes the bulk of the pipeline-orchestrator helper gap left open by the focused-first sweep #6 (PR [#634](https://github.com/ever-works/ever-works/pull/634)). Adds 7 new top-level `describe` blocks at the bottom of `packages/agent/src/services/__tests__/work-generation.service.spec.ts` covering the simpler / pure private helpers exercised via `(service as any)` cast (TypeScript-private is compile-time only; at runtime the methods are accessible). Suite passes via `pnpm --filter @ever-works/agent test --testPathPattern='services/__tests__/work-generation.service'` in ~15s, total **126** tests in this file (95 → 126); full agent suite **136** suites / 2849 → **2880** tests green. **Helpers covered:**
 
