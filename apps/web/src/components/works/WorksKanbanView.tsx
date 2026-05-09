@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -14,9 +14,12 @@ import {
     CheckCircle2,
     XCircle,
     AlertTriangle,
+    ChevronDown,
     type LucideIcon,
 } from 'lucide-react';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+
+const MAX_VISIBLE = 15;
 
 // ─── Column definitions ────────────────────────────────────────────────────
 
@@ -164,10 +167,7 @@ function KanbanCard({ work, col }: KanbanCardProps) {
 
             {/* Footer */}
             <div className="flex items-center justify-between pt-2 border-t border-border dark:border-border-dark mt-auto">
-                {/* Status badge */}
                 <StatusBadge work={work} col={col} />
-
-                {/* Timestamp */}
                 {work.updatedAt && (
                     <span className="text-[10px] text-text-muted dark:text-text-muted-dark shrink-0 ml-2">
                         <ShowDateTime value={work.updatedAt} customFormatter={formatDate} />
@@ -188,7 +188,7 @@ function KanbanCard({ work, col }: KanbanCardProps) {
     );
 }
 
-// ─── Status badge (inside card) ────────────────────────────────────────────
+// ─── Status badge ──────────────────────────────────────────────────────────
 
 interface StatusBadgeProps {
     work: Work;
@@ -203,10 +203,7 @@ function StatusBadge({ work, col }: StatusBadgeProps) {
     const Icon = col.icon;
 
     const label = (() => {
-        if (isGenerating) {
-            const step = work.generateStatus?.stepName;
-            return step ? step : t('generating');
-        }
+        if (isGenerating) return work.generateStatus?.stepName ?? t('generating');
         if (status === GenerateStatusType.GENERATED)
             return hasWarnings ? t('completedWithWarnings') : t('completed');
         if (status === GenerateStatusType.ERROR) return t('failed');
@@ -251,9 +248,14 @@ interface KanbanColumnProps {
 }
 
 function KanbanColumn({ col, works }: KanbanColumnProps) {
+    const [visibleCount, setVisibleCount] = useState(MAX_VISIBLE);
     const t = useTranslations('dashboard.works.kanban');
     const tCols = useTranslations('dashboard.works.kanban.columns');
     const Icon = col.icon;
+
+    const visibleWorks = works.slice(0, visibleCount);
+    const remaining = works.length - visibleCount;
+    const hasMore = remaining > 0;
 
     return (
         <div className="flex flex-col min-w-[220px] w-full flex-1">
@@ -279,13 +281,14 @@ function KanbanColumn({ col, works }: KanbanColumnProps) {
                 </span>
             </div>
 
-            {/* Card list */}
+            {/* Card list — fixed height, scrollable */}
             <div
                 className={cn(
-                    'flex-1 flex flex-col gap-2 p-2 rounded-b-lg border overflow-y-auto',
+                    'flex flex-col gap-2 p-2 overflow-y-auto border border-t-0',
                     'border-slate-200/60 dark:border-white/8',
                     'bg-slate-50/50 dark:bg-white/[0.015]',
-                    'min-h-[120px] max-h-[calc(100vh-320px)]',
+                    'min-h-[120px] h-[600px]',
+                    !hasMore && 'rounded-b-lg',
                 )}
             >
                 {works.length === 0 ? (
@@ -295,9 +298,29 @@ function KanbanColumn({ col, works }: KanbanColumnProps) {
                         </p>
                     </div>
                 ) : (
-                    works.map((work) => <KanbanCard key={work.id} work={work} col={col} />)
+                    visibleWorks.map((work) => (
+                        <KanbanCard key={work.id} work={work} col={col} />
+                    ))
                 )}
             </div>
+
+            {/* Load more button */}
+            {hasMore && (
+                <button
+                    onClick={() => setVisibleCount((v) => v + MAX_VISIBLE)}
+                    className={cn(
+                        'flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-b-lg border border-t-0',
+                        'border-slate-200/60 dark:border-white/8',
+                        'bg-slate-50 dark:bg-white/[0.02]',
+                        'text-[11px] font-medium text-text-muted dark:text-text-muted-dark',
+                        'hover:bg-slate-100 dark:hover:bg-white/[0.04] hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                        'transition-colors',
+                    )}
+                >
+                    <ChevronDown className="w-3 h-3" />
+                    {t('loadMore', { count: Math.min(remaining, MAX_VISIBLE) })}
+                </button>
+            )}
         </div>
     );
 }

@@ -608,7 +608,8 @@
                     "completed": "Completado",
                     "failed": "Fallido",
                     "cancelled": "Cancelado"
-                }
+                },
+                "loadMore": "Cargar {count} más"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "Completado con advertencias",
                     "failed": "Fallido",
                     "cancelled": "Cancelado"
-                }
+                },
+                "loadMore": "Cargar {count} más"
             }
         },
         "settings": {

@@ -602,6 +602,7 @@
             "kanban": {
                 "empty": "No activities here",
                 "noWork": "No work",
+                "loadMore": "Load {count} more",
                 "columns": {
                     "pending": "Pending",
                     "in_progress": "In Progress",
@@ -647,6 +648,7 @@
                 "items": "{count} items",
                 "noDescription": "No description",
                 "empty": "No works here",
+                "loadMore": "Load {count} more",
                 "columns": {
                     "not_started": "Not Started",
                     "scheduled": "Scheduled",

@@ -608,7 +608,8 @@
                     "completed": "مكتمل",
                     "failed": "فشل",
                     "cancelled": "ملغي"
-                }
+                },
+                "loadMore": "تحميل {count} المزيد"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "مكتمل مع تحذيرات",
                     "failed": "فشل",
                     "cancelled": "ملغي"
-                }
+                },
+                "loadMore": "تحميل {count} المزيد"
             }
         },
         "settings": {

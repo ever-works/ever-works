@@ -608,7 +608,8 @@
                     "completed": "Завършено",
                     "failed": "Неуспешно",
                     "cancelled": "Отменено"
-                }
+                },
+                "loadMore": "Зареди още {count}"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "Завършено с предупреждения",
                     "failed": "Неуспешно",
                     "cancelled": "Отменено"
-                }
+                },
+                "loadMore": "Зареди още {count}"
             }
         },
         "settings": {

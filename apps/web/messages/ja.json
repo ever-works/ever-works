@@ -608,7 +608,8 @@
                     "completed": "完了",
                     "failed": "失敗",
                     "cancelled": "キャンセル"
-                }
+                },
+                "loadMore": "さらに{count}件読み込む"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "警告付きで完了",
                     "failed": "失敗",
                     "cancelled": "キャンセル"
-                }
+                },
+                "loadMore": "さらに{count}件読み込む"
             }
         },
         "settings": {

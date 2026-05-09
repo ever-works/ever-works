@@ -608,7 +608,8 @@
                     "completed": "Hoàn thành",
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
-                }
+                },
+                "loadMore": "Tải thêm {count}"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "Hoàn thành với cảnh báo",
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
-                }
+                },
+                "loadMore": "Tải thêm {count}"
             }
         },
         "settings": {

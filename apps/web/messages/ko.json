@@ -608,7 +608,8 @@
                     "completed": "완료",
                     "failed": "실패",
                     "cancelled": "취소됨"
-                }
+                },
+                "loadMore": "{count}개 더 불러오기"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "경고와 함께 완료",
                     "failed": "실패",
                     "cancelled": "취소됨"
-                }
+                },
+                "loadMore": "{count}개 더 불러오기"
             }
         },
         "settings": {

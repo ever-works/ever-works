@@ -608,7 +608,8 @@
                     "completed": "已完成",
                     "failed": "失败",
                     "cancelled": "已取消"
-                }
+                },
+                "loadMore": "加载更多 {count} 项"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "完成但有警告",
                     "failed": "失败",
                     "cancelled": "已取消"
-                }
+                },
+                "loadMore": "加载更多 {count} 项"
             }
         },
         "settings": {

@@ -1,15 +1,25 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
-import { Clock, Loader2, CheckCircle2, XCircle, OctagonMinus, type LucideIcon } from 'lucide-react';
+import {
+    Clock,
+    Loader2,
+    CheckCircle2,
+    XCircle,
+    OctagonMinus,
+    ChevronDown,
+    type LucideIcon,
+} from 'lucide-react';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
+
+const MAX_VISIBLE = 15;
 
 // ─── Column definitions ────────────────────────────────────────────────────
 
@@ -185,9 +195,14 @@ interface ActivityColumnProps {
 }
 
 function ActivityColumn({ col, entries }: ActivityColumnProps) {
+    const [visibleCount, setVisibleCount] = useState(MAX_VISIBLE);
     const t = useTranslations('dashboard.activity.kanban');
     const tCols = useTranslations('dashboard.activity.kanban.columns');
     const Icon = col.icon;
+
+    const visibleEntries = entries.slice(0, visibleCount);
+    const remaining = entries.length - visibleCount;
+    const hasMore = remaining > 0;
 
     return (
         <div className="flex flex-col min-w-[220px] w-full flex-1">
@@ -213,13 +228,14 @@ function ActivityColumn({ col, entries }: ActivityColumnProps) {
                 </span>
             </div>
 
-            {/* Card list */}
+            {/* Card list — fixed height, scrollable */}
             <div
                 className={cn(
-                    'flex-1 flex flex-col gap-2 p-2 rounded-b-lg border overflow-y-auto',
+                    'flex flex-col gap-2 p-2 overflow-y-auto border border-t-0',
                     'border-slate-200/60 dark:border-white/8',
                     'bg-slate-50/50 dark:bg-white/[0.015]',
-                    'min-h-[120px] max-h-[calc(100vh-360px)]',
+                    'min-h-[120px] h-[600px]',
+                    !hasMore && 'rounded-b-lg',
                 )}
             >
                 {entries.length === 0 ? (
@@ -229,9 +245,29 @@ function ActivityColumn({ col, entries }: ActivityColumnProps) {
                         </p>
                     </div>
                 ) : (
-                    entries.map((entry) => <ActivityCard key={entry.id} entry={entry} col={col} />)
+                    visibleEntries.map((entry) => (
+                        <ActivityCard key={entry.id} entry={entry} col={col} />
+                    ))
                 )}
             </div>
+
+            {/* Load more button */}
+            {hasMore && (
+                <button
+                    onClick={() => setVisibleCount((v) => v + MAX_VISIBLE)}
+                    className={cn(
+                        'flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-b-lg border border-t-0',
+                        'border-slate-200/60 dark:border-white/8',
+                        'bg-slate-50 dark:bg-white/2',
+                        'text-[11px] font-medium text-text-muted dark:text-text-muted-dark',
+                        'hover:bg-slate-100 dark:hover:bg-white/4 hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                        'transition-colors',
+                    )}
+                >
+                    <ChevronDown className="w-3 h-3" />
+                    {t('loadMore', { count: Math.min(remaining, MAX_VISIBLE) })}
+                </button>
+            )}
         </div>
     );
 }

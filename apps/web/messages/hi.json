@@ -608,7 +608,8 @@
                     "completed": "पूर्ण",
                     "failed": "विफल",
                     "cancelled": "रद्द"
-                }
+                },
+                "loadMore": "{count} और लोड करें"
             }
         },
         "works": {
@@ -662,7 +663,8 @@
                     "completedWithWarnings": "चेतावनियों के साथ पूर्ण",
                     "failed": "विफल",
                     "cancelled": "रद्द"
-                }
+                },
+                "loadMore": "{count} और लोड करें"
             }
         },
         "settings": {
