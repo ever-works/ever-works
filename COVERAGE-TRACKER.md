@@ -21,9 +21,34 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~513 across `apps/` + `packages/` (was 510
-  earlier on 2026-05-09; +3 net spec files in the security + utility
-  coverage sweep #7 — adds
+- **Spec files (`*.spec.ts`)**: ~515 across `apps/` + `packages/` (was 513
+  earlier on 2026-05-09; +2 net spec files in the agent
+  `PipelineOrchestratorService` + `comparison/types` direct-coverage sweep
+  — adds `packages/agent/src/comparison-generator/comparison/types.spec.ts`
+  (11 tests on the 60-LOC contracts module pinning
+  `DEFAULT_COMPARISON_SETTINGS` four-default merge target +
+  `ComparisonProgressStage` literal union + minimal-and-maximal type
+  literals for every documented `Comparison*` envelope) and
+  `packages/agent/src/pipeline/pipeline-orchestrator.service.spec.ts`
+  (33 tests on the 262-LOC routing service: `execute` step-vs-full
+  routing via `isStepOrchestratablePipeline`; `executeWithMode` forced
+  step / forced full / full→step fallback w/ warn when no self-managed
+  plugin exists; `getRecommendedMode` four-branch projection;
+  `hasFullPipelinePlugin` boolean; `getAvailablePipelinePlugins`
+  registry filter chain (`PIPELINE` capability + state===loaded +
+  `isPipelinePlugin` shape filter); `resumeFromCheckpoint` proxy
+  forwarding incl. null-passthrough; `clearCheckpoint` proxy;
+  `resumeOrExecute` resume-then-fallback w/ self-managed plugins
+  skipping resume entirely; `resolvePipelinePlugin` private 3-level
+  priority chain (explicit id w/ `registry.get` + state + scope check
+  → `defaultForCapabilities` pass → first-loaded-and-enabled fallback
+  → throws when none available), incl. null-pipelineId vs
+  string-pipelineId branch, wrong-capabilities skip via
+  `isPipelinePlugin`, `work.user` undefined → undefined userId
+  forwarding to `isPluginEnabledForScope`. Total agent-package suite:
+  3474 → 3507 tests across 165 → 166 suites — see `Done` ledger;
+  +3 net spec files in the prior security + utility coverage sweep
+  #7 — adds
   `packages/agent/src/utils/__tests__/work-changelog.utils.spec.ts`
   (23 tests on `buildWorkChangelog` covering the empty-input null
   contract, count partitioning, entries reference passthrough,
@@ -301,11 +326,19 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent PipelineOrchestratorService direct coverage (+33 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent PipelineOrchestratorService + comparison/types direct coverage (+44 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Two previously-uncovered files in the agent package closed in a single sweep (the parallel scheduled-task run combined them on a shared branch):
+
+### `packages/agent/src/comparison-generator/comparison/types.spec.ts` (11 tests)
+
+Type-/contract-level coverage for `comparison/types.ts` (60 LOC) — the contracts module that declares the runtime `DEFAULT_COMPARISON_SETTINGS` constant plus the `ComparisonProgressStage` literal union, `ComparisonPair`, `ComparisonResearch`, `ComparisonGenerationResult`, `ComparisonProgressInfo`, `ComparisonProgressCallback`, and `ComparisonPluginSettings` types consumed across the comparison-generator sub-module. Pins: every documented field of `DEFAULT_COMPARISON_SETTINGS`; the four required defaults (silent change of any one would alter behaviour on every existing work) — `temperature`/`itemsPerCategory`/`maxComparisons`/`category` defaults; the `as const`-narrowed `ComparisonProgressStage` union (every documented stage literal accepted by a `ComparisonProgressCallback` parametric in the union); minimal-and-maximal `ComparisonPair` / `ComparisonResearch` / `ComparisonGenerationResult` / `ComparisonProgressInfo` literal shapes type-check; optional `extendedAnalysisMarkdown` accepted on the result; pluginSettings shape with the documented optional fields.
+
+### `packages/agent/src/pipeline/pipeline-orchestrator.service.spec.ts` (33 tests)
 
 Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/pipeline-orchestrator.service.ts` (262 LOC) — the central routing service that picks between step-orchestrated (e.g. `standard-pipeline`) and self-managed (e.g. `claude-code`) pipeline plugins. Every entry-point through which the API or scheduler executes a generation flows through this orchestrator's resolution + dispatch logic, so a regression in routing or auto-detect priority is invisible to the existing `WorkGenerationService` suite (which mocks the orchestrator).
 
-The new file is `packages/agent/src/pipeline/pipeline-orchestrator.service.spec.ts` and pins:
+Pins:
 
 - **`execute` (4 tests)** — step-orchestratable plugin → `stepExecutor.execute(plugin, work, request, existing, options, onProgress)` w/ exact positional shape; self-managed plugin → `fullExecutor.execute(...)` (mutually exclusive — neither executor is double-called); `request.providers.pipeline` honoured as the explicit pipeline id (wins over `defaultForCapabilities`); `options` + `onProgress` callback forwarded verbatim into the chosen executor.
 - **`executeWithMode` (3 tests)** — forced step mode resolves through `resolvePipelinePlugin` auto-detect chain (NOT the explicit-id branch); forced full mode finds the **first** self-managed (non-step-orchestratable) plugin in the registry and routes to `fullExecutor`; full→step fallback w/ `logger.warn('Full mode requested but no self-managed pipeline available, falling back to step mode')` when no self-managed plugin exists.
