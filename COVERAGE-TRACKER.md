@@ -343,7 +343,29 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent PluginRepository direct coverage (+37 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent WorkPluginRepository direct coverage (+38 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/plugins/repositories/work-plugin.repository.ts` (272 LOC) — the TypeORM-wrapper repository for `work_plugins` rows (the per-work analogue of `user_plugins`, holding per-work plugin enable state + scoped settings + active-capability assignments). The repository owns the **single-active-plugin-per-capability** invariant: a work can have many plugins enabled but only one active for each capability (e.g. one search provider out of `tavily` / `brave` / `linkup` ...). The new file is `packages/agent/src/plugins/repositories/work-plugin.repository.spec.ts` and pins:
+
+- **`create` / `findByWorkAndPlugin` / `findById` (4 tests)** — `create+save` proxy; composite-key `where: { workId, pluginId }` + `pluginEntity` relation; null passthrough for both.
+- **`findByWork` mixed sort (1 test)** — `order: { priority: 'ASC', createdAt: 'DESC' }` (a stable mixed sort: explicit operator priority wins, ties break newest-first — pinned so a future "createdAt only" tweak is deliberate).
+- **`findEnabledByWork` distinct ordering (1 test)** — `priority: 'ASC'` only (NO `createdAt` tie-breaker — pinned distinct from `findByWork` because the runtime-registry consumer doesn't need the tie-breaker; caller-side capability resolution handles ties).
+- **`findActiveByCapability` driver-agnostic filter (3 tests)** — queries `find` for `enabled: true` rows + `pluginEntity` relation, then filters in JS via `hasActiveCapability` (driver-agnostic — same reason as `PluginRepository.findByCapability`); null passthrough; `Array.find` first-match semantics pinned (two plugins claiming the same active capability is an invariant violation but the method returns the first one — pinned so a future "all-matches" refactor is deliberate).
+- **`findByPlugin` / `findEnabledByPlugin` (2 tests)** — `findByPlugin` includes the `work` relation (inverse load); `findEnabledByPlugin` does NOT load relations (the lifecycle manager consumer doesn't need them — pinned so a future "always include work" tweak is deliberate).
+- **`update` / `updateByWorkAndPlugin` / `updateSettings` (4 tests)** — UPDATE + refetch pattern (TypeORM update has no entity payload); `updateSettings` empty-object secretSettings forwarded verbatim, NOT collapsed to undefined (predicate `!== undefined`, matching `UserPluginRepository`); `secretSettings` omitted when undefined.
+- **`setActiveCapability` (4 tests)** — null passthrough when row doesn't exist (NO UPDATE issued, defensive); `capability === null` clears `activeCapabilities` to `[]` (empty array, NOT undefined — pinned so the field is reset rather than left with old value); appends to existing list via `addActiveCapability` (Set-deduped); idempotent when capability already present.
+- **`clearActiveCapability` (3 tests)** — finds all rows for the work and removes the capability ONLY from rows that had it; row-count return value (NOT boolean); fast path (NO `relations` hint on the find — clear-only doesn't need the join, pinned distinct from the regular finders).
+- **`setAsActiveForCapability` two-step ordering (1 test)** — runs `clearActiveCapability` BEFORE `setActiveCapability` (verified via shared `callOrder` array — the clear's `find`+`save` calls must precede the set's `update` call). This ordering enforces the single-active-plugin-per-capability invariant: if `setActiveCapability` fails after `clearActiveCapability`, the work is left with NO active plugin for that capability (preferable to two simultaneously-active providers).
+- **`setEnabled` / `setPriority` (4 tests)** — UPDATE by composite key + `(affected ?? 0) > 0` predicate; both methods return false on undefined affected.
+- **`delete*` family (5 tests)** — `delete` by id + `deleteByWorkAndPlugin` return boolean; `deleteByWork` and `deleteByPlugin` return integer count (NOT boolean — pinned distinct because the work-deletion / plugin-uninstall flows log how many rows were swept); 0 fallback on undefined affected.
+- **`exists` (3 tests)** — `count` (cheaper than findOne) + `> 0` predicate (NOT `=== 1`).
+- **`upsert` (2 tests)** — finds existing → UPDATE + refetch (NO `create`/`save` call); finds none → `create` + `save` (NO `update` call).
+
+Total agent-package suite: +38 tests across 1 new suite, all green.
+
+---
+
+**2026-05-09 — packages/agent PluginRepository direct coverage (+37 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#678](https://github.com/ever-works/ever-works/pull/678))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/plugins/repositories/plugin.repository.ts` (183 LOC) — the TypeORM-wrapper repository for `plugins` rows (the `pluginId`-unique catalogue of installed plugin entities + their lifecycle state + scoped settings). The repository is consumed across `PluginRegistryService`, `PluginLifecycleManagerService`, `PluginSettingsService`, and the `apps/api` plugins controllers; pinning the query shape protects every downstream caller from a silent driver swap or a relation-key change. The new file is `packages/agent/src/plugins/repositories/plugin.repository.spec.ts` and pins:
 
