@@ -21,9 +21,30 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~516 across `apps/` + `packages/` (was 515
-  earlier on 2026-05-09; +1 net spec file in the agent
-  `FullPipelineExecutorService` direct-coverage sweep — adds
+- **Spec files (`*.spec.ts`)**: ~517 across `apps/` + `packages/` (was 516
+  earlier on 2026-05-10; +1 net spec file in the agent
+  `PipelineFacadeService` direct-coverage sweep — adds
+  `packages/agent/src/pipeline/pipeline-facade.service.spec.ts`
+  (30 tests on the 300-LOC facade-binding service that creates the
+  `StepExecutionContext` consumed by both pipeline executors:
+  guard-rails (throws on missing `work.user` / empty `user.id`);
+  logger prefix `[work.slug]` applied to every log/debug/warn/error/
+  verbose call w/ `verbose?.()` optional-chain tolerating undefined;
+  bound AI facade w/ `aiModelOverride` defaulting into
+  `options.routing.modelOverride` and `options.model` via `??`-
+  precedence (caller-supplied override wins); bound search /
+  screenshot / content-extractor facades each forwarding their
+  `providerOverrides.<key>` into the underlying call; bound prompt
+  facade carrying NO providerOverride field (workId+userId only);
+  bound data-source facade w/ caller workId/userId OVERWRITTEN by
+  binding (spread runs first), `getEnabledSources` `||`-fallback on
+  falsy userId; optional data-source dep undefined when not provided;
+  binding context shape — non-AI facades do NOT carry
+  `aiModelOverride`), closing the per-file zero-coverage gap on the
+  third pipeline service in `packages/agent/src/pipeline/` after the
+  orchestrator + full executor — see `Done` ledger; +1 net spec file
+  in the prior agent `FullPipelineExecutorService` direct-coverage
+  sweep — adds
   `packages/agent/src/pipeline/full-pipeline-executor.service.spec.ts`
   (22 tests on the 239-LOC self-managed-pipeline executor: `execute`
   STARTED→plugin.execute→COMPLETED w/ wrapper-measured duration
@@ -437,6 +458,26 @@ Closes the per-file zero-coverage gap on `packages/agent/src/plugins/plugins.con
 - **Barrel re-exports (1 test)** — pins that `plugins/index.ts` re-exports every documented runtime symbol so deleting the `export * from './plugins.constants'` line is a loud diff.
 
 Total agent-package suite: 3693 → 3728 tests across 171 → 172 suites, all green. **Closes the smallest non-DTO/entity uncovered file in the `plugins/` subdirectory.**
+
+---
+
+**2026-05-10 — packages/agent PipelineFacadeService direct coverage (+30 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/pipeline/pipeline-facade.service.ts` (300 LOC) — the facade-binding service that creates the `StepExecutionContext` consumed by both pipeline executors (`StepPipelineExecutorService` and `FullPipelineExecutorService`). Every pipeline-step plugin call goes through one of the bound facades produced here, so a regression in the `aiModelOverride` precedence rules or `providerOverrides` plumbing would silently route every step through the wrong provider.
+
+The new file is `packages/agent/src/pipeline/pipeline-facade.service.spec.ts` and pins:
+
+- **Guard rails (4 tests)** — throws `'User context is required for pipeline execution. Ensure WorkReference includes a user with an id.'` when `work.user` is undefined OR `work.user.id` is empty/falsy; happy path returns the documented 10-key envelope (6 bound facades + `logger` + `work` + `user` + `signal`); `signal` forwarded verbatim (undefined preserved, NOT coerced to `null`).
+- **Logger prefix (2 tests)** — every `log`/`debug`/`warn`/`error`/`verbose` call wrapped with `[work.slug] ` prefix; `verbose?.()` optional-chain tolerates an undefined `logger.verbose` method (so a Logger implementation that doesn't expose `verbose` doesn't crash).
+- **Bound AI facade (9 tests)** — `askJson` forwards `(promptTemplate, schema, options, {workId, userId, providerOverride: ai})`; CRITICAL contract: `aiModelOverride` defaults into `options.routing.modelOverride` via `??`-precedence — a caller-supplied override **wins** over the binding-context default (a future "binding wins" refactor breaks deliberately); `createChatCompletion` defaults `options.model` to `aiModelOverride` via the same `??`-rule; `createStreamingChatCompletion` applies the same defaulting; `isConfigured` proxies through with NO arg (the bound version drops the `_facadeOptions` param at the call site); `testConnection` / `getAvailableModels` / `getProviderConfig` / `resolveModelMetadata` / `resolveModelContextLength` all forward bound options.
+- **Bound search facade (3 tests)** — `search(query, options, ...)` forwards `{userId, workId, providerOverride: providerOverrides?.search}`; `providerOverride: undefined` when no override; `isConfigured` no-arg passthrough.
+- **Bound screenshot facade (2 tests)** — `capture` / `getSmartImage` / `getScreenshotUrl` all forward `{workId, userId, providerOverride: providerOverrides?.screenshot}`; `isAvailable` + `isConfigured` no-arg passthrough.
+- **Bound content-extractor facade (2 tests)** — `extractContent` + `extractContentWithDiagnostics` forward `{userId, workId, providerOverride: providerOverrides?.contentExtractor}`; `isConfigured` no-arg passthrough.
+- **Bound prompt facade (2 tests)** — `getPrompt(key, defaultPrompt, ...)` forwards bound options w/ NO `providerOverride` field (prompts have no per-provider-override semantics); `isConfigured` no-arg passthrough.
+- **Bound data-source facade (5 tests)** — `queryAll` spread-order pin: caller-supplied `workId`/`userId` is OVERWRITTEN by the binding because the wrapper spreads caller options FIRST then sets `workId`/`userId` last (a future "trust the caller" refactor breaks deliberately); `getEnabledSources(workId, userId)` accepts caller `userId` when truthy but falls back to bound `userId` when caller passes `''`/`null`/`undefined` (the `userId || ctx.userId` branch); `isConfigured` no-arg passthrough; the `@Optional()` data-source dep — when undefined, the bound `dataSourceFacade` field on the returned context is also `undefined`.
+- **Binding context shape (1 test)** — non-AI bound facades do NOT carry `aiModelOverride` into the underlying facade-options call (only the AI facade applies that field via the `routing.modelOverride` path).
+
+Total agent-package suite: 3873 → 3903 tests across 177 → 178 suites, all green. **The `packages/agent/src/pipeline/` zero-coverage gap is now empty for service-level files** (orchestrator + step + full + facade all covered; only the `executable-pipeline.class.ts` and `step-pipeline-executor.service.ts` private internals remain).
 
 ---
 
