@@ -206,7 +206,7 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent sanitize.util direct coverage (+54 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent sanitize.util direct coverage (+54 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#654](https://github.com/ever-works/ever-works/pull/654))**
 
 Closes the per-file zero-coverage gap on the security-critical `packages/agent/src/utils/sanitize.util.ts` (213 LOC) — the most heavily-imported utility in the agent package. The sanitiser is consumed by every DTO `@Transform` decorator (truncating user-supplied `name`/`description`/`prompt` BEFORE class-validator's `@MaxLength` runs, which is the documented contract that pins the silent-truncate behaviour throughout the agent-package DTO suite). The new file is `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` and pins:
 
