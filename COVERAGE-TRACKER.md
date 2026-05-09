@@ -343,7 +343,20 @@
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
 
-**2026-05-09 — packages/agent plugins.constants direct coverage (+35 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+**2026-05-09 — packages/agent DatabaseModule decorator-metadata coverage (+15 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/database/database.module.ts` (96 LOC) — the central NestJS module that all `packages/agent` and `apps/api` feature modules import to resolve TypeORM-backed repositories. `database-config.factory.spec.ts` and `database.config.spec.ts` already cover the connection-options factory and entities list; this new spec restricts itself to the static `@Module()` decorator metadata so the wire surface (imports / providers / exports lists) is pinned regardless of the runtime DataSource. The new file is `packages/agent/src/database/database.module.spec.ts` and pins:
+
+- **`@Module() providers` (4 tests)** — every documented repository class is present in the providers list (23 of them, kept in a typed `REPOSITORY_PROVIDERS` constant in the spec so adding/removing a repository is an explicit, type-checked update); EXACTLY 23 providers (regression guard against silent additions); every provider is a class constructor (function with prototype) — pinned so a future `useClass`/`useFactory` swap is deliberate; `DataSource`/`EntityManager` are NOT directly provided (consumers depend on the typed wrappers).
+- **`@Module() exports` (4 tests)** — `TypeOrmModule` is exported (so consumers can `@InjectRepository(...)` even though the binding lives in this module's scope); every documented repository is exported; exactly 24 symbols (TypeOrmModule + 23 repositories); the providers-superset-of-exports invariant pinned (every provider is also exported — no "private helper" repositories silently held back).
+- **`@Module() imports` (5 tests)** — exactly 2 TypeOrmModule entries (the `forRootAsync` connection + the `forFeature(ENTITIES)` per-entity binding); exactly 1 `ConfigModule.forFeature(databaseConfig)` entry (pinned because `config.get('database')` depends on the forFeature scoping); exactly 3 imports total (regression guard); the `forRootAsync` DynamicModule wraps a single ConfigModule import so the inner factory can resolve `ConfigService` (a future "drop the imports forwarding" tweak would break the inner factory loudly); the `forFeature` DynamicModule binds providers + exports (pinned so a future "stop calling forFeature" tweak that orphans every `@InjectRepository(...)` consumer is a deliberate diff).
+- **Class identity (2 tests)** — `DatabaseModule` is a class function (so DI-resolution by class identity works); the documented class name `'DatabaseModule'` is preserved (so a string-based registry would still find it).
+
+Total agent-package suite: +15 tests across 1 new suite, all green.
+
+---
+
+**2026-05-09 — packages/agent plugins.constants direct coverage (+35 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#672](https://github.com/ever-works/ever-works/pull/672))**
 
 Closes the per-file zero-coverage gap on `packages/agent/src/plugins/plugins.constants.ts` (66 LOC) — a contracts-only surface that declares the `PLUGINS_MODULE_OPTIONS` DI token, the `DEFAULT_PLUGIN_PATHS` discovery list, the `DEFAULT_PLATFORM_VERSION` fallback, the `PluginStates` literal map (5 lifecycle states), the `VALID_STATE_TRANSITIONS` adjacency map (the lifecycle state machine), the `PluginEvents` EventEmitter2 event registry (7 events) consumed across `plugin-registry.service`, `plugin-lifecycle-manager.service`, and `plugin-settings.service`, and the four-tier `SETTING_SOURCE_PRIORITY` cascade enforced by `plugin-settings.service`. Every value here is read in production by string-match (`PluginEvents.LOADED` → `'plugin:loaded'`); silently changing one literal would orphan every existing listener / persisted state row. The new file is `packages/agent/src/plugins/__tests__/plugins.constants.spec.ts` and pins:
 
