@@ -21,68 +21,91 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~487 across `apps/` + `packages/` (was 486
-  earlier on 2026-05-09; +1 net spec file in the agent
-  `BranchSyncService` direct-coverage sweep — adds
-  `packages/agent/src/generators/website-generator/branch-sync.service.spec.ts`
-  (24 tests covering `syncBranch` clone-rename-replaceRemote-push-cleanup
-  pipeline + temp-dir cleanup on failure paths, `syncAllBranches`
-  branch-mapping expansion + skip-mapped-target rule + sequential
-  `MAX_CONCURRENT_SYNCS=1` semantics + per-batch 1000ms inter-batch
-  delay + `Promise.allSettled` rejection-to-error-result coercion +
-  optional `cleanupExtraBranches` purge w/ swallowed delete failures
-    - warn-and-return-early on `listBranches` failure, `syncFromTemplate`
-      beta-branch-mapping construction + outer try/catch null fallback +
-      resolveForWork-rethrow pin), closing the per-file zero-coverage gap
-      inside `packages/agent/src/generators/website-generator/` for the
-      branch-sync surface — see `Done` ledger; +2 net spec files in the
-      earlier agent `BaseFacadeService`/`FacadesModule` direct-coverage
-      sweep — adds
-      `packages/agent/src/facades/__tests__/base.facade.spec.ts` (66 tests
-      on the abstract base via a `TestFacadeService extends BaseFacadeService`
-      re-exposer) and `packages/agent/src/facades/__tests__/facades.module.spec.ts`
-      (9 tests pinning the module providers/exports + barrel runtime symbols),
-      closing the per-file zero-coverage gap inside `packages/agent/src/facades/`
-      — see `Done` ledger; +0 net spec files in the WorkGenerationService
-      orchestrators follow-up sweep — extends the existing
-      `services/__tests__/work-generation.service.spec.ts` from 126 → 172
-      tests, closing the previously-pending 7 multi-step pipeline orchestrators
-      (`processGeneration` / `executeGenerationPipeline` / `finalizeGeneration` /
-      `runInProcessGeneration` / `prepareProviders` /
-      `ensureProvidersEnabledForWork` / `dispatchGenerationTask`) — see `Done`
-      ledger; **the WorkGenerationService private-orchestrator zero-coverage
-      gap is now empty.** The earlier 2026-05-09 sweep covered 7 simpler
-      helpers: `resolveGenerationFinalStatus` / `resolveGenerationErrorMessage` /
-      `buildScheduleRunOutcome` / `isNonFatalWebsiteGenerationError` /
-      `markGenerationStarted` / `finalizeCancelledGeneration` /
-      `handleErrorNotification`; +1 packages/agent service spec landed 2026-05-09
-      in the small-service coverage sweep #6 — `WorkGenerationService` (focused
-      first sweep covering wrapper / simpler methods) — see `Done` ledger; +1 packages/agent service spec
-      landed earlier 2026-05-09
-      in the small-service coverage sweep #5 — `ItemHealthService` — see
-      `Done` ledger;
-      +1 packages/agent service spec landed earlier 2026-05-09
-      in the small-service coverage sweep #4 — `WorkTaxonomyService` — see
-      `Done` ledger;
-      +1 packages/agent service spec landed earlier 2026-05-09
-      in the small-service coverage sweep #3 — `WorkMemberService` — see
-      `Done` ledger;
-      +3 packages/agent service specs landed earlier 2026-05-09
-      in the small-service coverage sweep #2 — `ItemSourceValidationSchedulerService` +
-      `WorkDetailService` + `RepositoryManagementService` — see `Done` ledger;
-      +2 packages/agent service specs landed earlier 2026-05-09
-      in the small-service coverage sweep — `WorkAdvancedPromptsService` +
-      `WorkWebsiteRepositoryStateService` — see `Done` ledger;
-      +1 prior packages/agent service spec landed 2026-05-09
-      in the WorkOwnershipService sweep — see `Done` ledger; +4 packages/agent
-      repository specs landed earlier 2026-05-09
-      in sweep #3: activity-log + notification + work-member + work — closing the
-      agent-package repository zero-coverage gap entirely; +4 in the previous
-      sweep #2: work-custom-domain + user + conversation + template; +8 in
-      the prior sweep — subscription-plan + work-advanced-prompts +
-      user-template-preference + user-subscription + usage-ledger +
-      webhook-subscription + refresh-token + onboarding-request. See `Done`
-      for the running ledger).
+- **Spec files (`*.spec.ts`)**: ~489 across `apps/` + `packages/` (was 487
+  earlier on 2026-05-09; +2 net spec files in the agent
+  markdown-generator helper-class sweep — adds
+  `packages/agent/src/generators/markdown-generator/readme-builder.spec.ts`
+  (17 tests on the fluent `ReadmeBuilder` builder — `addHeader`/`addSubHeader`/`addParagraph`/`addNewLine` chaining,
+  `enableToC()` opt-in rendering w/ `## 📑 Table of Contents`
+    - en-US-formatted counts + duplicate-slug `-1`/`-2` disambiguation
+      via github-slugger + `0` rendered as `(0)` not omitted, `addItem`
+      format `- [name](url) - description` + optional `([Read more](/details/<slug>.md))` + backtick-wrapped tag
+      list joined w/ spaces, end-to-end document shape) and
+      `packages/agent/src/generators/markdown-generator/markdown-repository.spec.ts`
+      (13 tests on the on-disk repository helper — `cleanup` recursive
+      `rm`, `resetFiles` allowlist (`.git`, `.gitignore`, `.github`,
+      `.vscode`, `.env`, `.nvmrc`, plus every dotfile starting with
+      `.git`) + sequential await-per-iteration removal order +
+      `readdir`-failure short-circuit, `ensureWorksExist` recursive
+      mkdir of `details/`, `writeReadme`/`writeDetails`/`writeLicense`
+      utf-8 writes, `removeDetails` rm with `force:true` only — NOT
+      recursive, the public readonly `dir` field, and the `dir` →
+      `dir/details` derivation contract — `node:fs/promises` is mocked at
+      module scope so the suite never touches the real filesystem),
+      closing the markdown-generator helper-class zero-coverage gap (the
+      remaining file in the subdir is `markdown-generator.service.ts`,
+      508 LOC, deferred to a dedicated follow-up) — see `Done` ledger;
+      +1 net spec file in the prior agent
+      `BranchSyncService` direct-coverage sweep — adds
+      `packages/agent/src/generators/website-generator/branch-sync.service.spec.ts`
+      (24 tests covering `syncBranch` clone-rename-replaceRemote-push-cleanup
+      pipeline + temp-dir cleanup on failure paths, `syncAllBranches`
+      branch-mapping expansion + skip-mapped-target rule + sequential
+      `MAX_CONCURRENT_SYNCS=1` semantics + per-batch 1000ms inter-batch
+      delay + `Promise.allSettled` rejection-to-error-result coercion +
+      optional `cleanupExtraBranches` purge w/ swallowed delete failures
+        - warn-and-return-early on `listBranches` failure, `syncFromTemplate`
+          beta-branch-mapping construction + outer try/catch null fallback +
+          resolveForWork-rethrow pin), closing the per-file zero-coverage gap
+          inside `packages/agent/src/generators/website-generator/` for the
+          branch-sync surface — see `Done` ledger; +2 net spec files in the
+          earlier agent `BaseFacadeService`/`FacadesModule` direct-coverage
+          sweep — adds
+          `packages/agent/src/facades/__tests__/base.facade.spec.ts` (66 tests
+          on the abstract base via a `TestFacadeService extends BaseFacadeService`
+          re-exposer) and `packages/agent/src/facades/__tests__/facades.module.spec.ts`
+          (9 tests pinning the module providers/exports + barrel runtime symbols),
+          closing the per-file zero-coverage gap inside `packages/agent/src/facades/`
+          — see `Done` ledger; +0 net spec files in the WorkGenerationService
+          orchestrators follow-up sweep — extends the existing
+          `services/__tests__/work-generation.service.spec.ts` from 126 → 172
+          tests, closing the previously-pending 7 multi-step pipeline orchestrators
+          (`processGeneration` / `executeGenerationPipeline` / `finalizeGeneration` /
+          `runInProcessGeneration` / `prepareProviders` /
+          `ensureProvidersEnabledForWork` / `dispatchGenerationTask`) — see `Done`
+          ledger; **the WorkGenerationService private-orchestrator zero-coverage
+          gap is now empty.** The earlier 2026-05-09 sweep covered 7 simpler
+          helpers: `resolveGenerationFinalStatus` / `resolveGenerationErrorMessage` /
+          `buildScheduleRunOutcome` / `isNonFatalWebsiteGenerationError` /
+          `markGenerationStarted` / `finalizeCancelledGeneration` /
+          `handleErrorNotification`; +1 packages/agent service spec landed 2026-05-09
+          in the small-service coverage sweep #6 — `WorkGenerationService` (focused
+          first sweep covering wrapper / simpler methods) — see `Done` ledger; +1 packages/agent service spec
+          landed earlier 2026-05-09
+          in the small-service coverage sweep #5 — `ItemHealthService` — see
+          `Done` ledger;
+          +1 packages/agent service spec landed earlier 2026-05-09
+          in the small-service coverage sweep #4 — `WorkTaxonomyService` — see
+          `Done` ledger;
+          +1 packages/agent service spec landed earlier 2026-05-09
+          in the small-service coverage sweep #3 — `WorkMemberService` — see
+          `Done` ledger;
+          +3 packages/agent service specs landed earlier 2026-05-09
+          in the small-service coverage sweep #2 — `ItemSourceValidationSchedulerService` +
+          `WorkDetailService` + `RepositoryManagementService` — see `Done` ledger;
+          +2 packages/agent service specs landed earlier 2026-05-09
+          in the small-service coverage sweep — `WorkAdvancedPromptsService` +
+          `WorkWebsiteRepositoryStateService` — see `Done` ledger;
+          +1 prior packages/agent service spec landed 2026-05-09
+          in the WorkOwnershipService sweep — see `Done` ledger; +4 packages/agent
+          repository specs landed earlier 2026-05-09
+          in sweep #3: activity-log + notification + work-member + work — closing the
+          agent-package repository zero-coverage gap entirely; +4 in the previous
+          sweep #2: work-custom-domain + user + conversation + template; +8 in
+          the prior sweep — subscription-plan + work-advanced-prompts +
+          user-template-preference + user-subscription + usage-ledger +
+          webhook-subscription + refresh-token + onboarding-request. See `Done`
+          for the running ledger).
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
 - **API source spec count**: **101** specs inside `apps/api/src/` (was 95
   earlier on 2026-05-09; +6 small-utility DTO specs landed in the
@@ -106,6 +129,17 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent markdown-generator helper-class coverage (+30 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the markdown-generator helper-class zero-coverage gap. The two helpers in `packages/agent/src/generators/markdown-generator/` that previously had no co-located spec — `readme-builder.ts` (87 LOC) and `markdown-repository.ts` (66 LOC) — are now both pinned. The 508-LOC `markdown-generator.service.ts` orchestrator is deferred to a dedicated follow-up.
+
+- **`packages/agent/src/generators/markdown-generator/readme-builder.spec.ts`** (17 tests) — `build()` envelope shape (header + body + footer separator, multi-line header/footer preserved verbatim); `addHeader` H1 + double-newline; `addSubHeader` H2 + ToC entry registration + chainability; `addParagraph` + `addNewLine` newline composition; `enableToC()` opt-in (default-omitted vs explicit-rendered with `## 📑 Table of Contents` header), en-US-formatted counts (`1234 → "1,234"`, `0 → "0"` not omitted, `undefined → omitted entirely`), github-slugger duplicate-slug `-1`/`-2`/... disambiguation (which forced a per-test `jest.isolateModules()` reload because the source module instantiates the slugger at top-level and never resets it — the spec pins this current behavior so a future module-level `slugger.reset()` call would be a deliberate change); `addItem` line format `- [name](url) - description` with optional `([Read more](/details/<slug>.md))` suffix, backtick-wrapped tag list joined w/ spaces, BOTH-suffixes ordering (details link THEN tags), missing-tags-or-empty-array no-suffix path; end-to-end document shape (header → ToC → sub-header → items → footer). `github-slugger` is mocked at module scope (it ships ESM-only and Jest's CJS pipeline cannot import it; the mock is a deterministic `lowercase + non-alphanum→'-' + start/end-trim + count++` slugger with the same dedup contract).
+- **`packages/agent/src/generators/markdown-generator/markdown-repository.spec.ts`** (13 tests) — `cleanup` calls `fs.rm(dir, {recursive:true, force:true})` once; `resetFiles` removes every non-allowlisted entry (`README.md`, ad-hoc files, even the `details/` directory itself) then re-creates it via `ensureWorksExist`, with the standard allowlist preserved (`.git`, `.gitignore`, `.github`, `.vscode`, `.env`, `.nvmrc`) PLUS every dotfile starting with `.git` (covers `.gitattributes`, `.gitkeep`, etc. via the `startsWith('.git')` branch), sequential await-per-iteration removal order pinned via shared `order` array, empty-`readdir` still calls `mkdir(details/, recursive:true)`, `readdir`-failure short-circuits without calling `mkdir` or `rm`; `ensureWorksExist` calls `mkdir(detailsPath, {recursive:true})`; `writeReadme`/`writeDetails`/`writeLicense` write `dir/README.md`/`dir/details/<slug>.md`/`dir/LICENSE.md` respectively with `'utf-8'` encoding; `removeDetails` calls `fs.rm` with `{force:true}` ONLY (NOT `recursive:true` — the spec explicitly pins that detail-removal is a file-only operation, not a directory delete); `dir` is exposed as a public readonly property and the `dir → dir/details` derivation is pinned via a custom-dir test. `node:fs/promises` is mocked at module scope so the suite never touches the real filesystem.
+
+Total agent-package suite: 3024 → 3054 tests across 139 → 141 suites, all green.
+
+---
 
 **2026-05-09 — packages/agent BranchSyncService direct coverage (+24 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#644](https://github.com/ever-works/ever-works/pull/644))**
 
