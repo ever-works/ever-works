@@ -13,7 +13,6 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
-    FolderClosed,
     AlertTriangle,
     type LucideIcon,
 } from 'lucide-react';
@@ -30,7 +29,6 @@ interface ColumnDef {
     headerClass: string;
     countClass: string;
     cardBorderClass: string;
-    iconBgClass: string;
     iconColorClass: string;
 }
 
@@ -44,7 +42,6 @@ const COLUMNS: ColumnDef[] = [
         countClass:
             'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400',
         cardBorderClass: 'border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/14',
-        iconBgClass: 'bg-slate-100 dark:bg-white/5',
         iconColorClass: 'text-slate-400 dark:text-slate-500',
     },
     {
@@ -56,7 +53,6 @@ const COLUMNS: ColumnDef[] = [
         countClass:
             'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
         cardBorderClass: 'border-blue-200/60 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700/50',
-        iconBgClass: 'bg-blue-100 dark:bg-blue-900/20',
         iconColorClass: 'text-blue-500 dark:text-blue-400',
     },
     {
@@ -68,7 +64,6 @@ const COLUMNS: ColumnDef[] = [
         countClass:
             'bg-gray-100 dark:bg-white/8 text-gray-700 dark:text-white/70',
         cardBorderClass: 'border-primary/20 dark:border-white/10 hover:border-primary/40 dark:hover:border-white/20',
-        iconBgClass: 'bg-gray-100 dark:bg-white/8',
         iconColorClass: 'text-gray-500 dark:text-white/60',
     },
     {
@@ -80,7 +75,6 @@ const COLUMNS: ColumnDef[] = [
         countClass:
             'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
         cardBorderClass: 'border-emerald-200/60 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700/50',
-        iconBgClass: 'bg-emerald-50 dark:bg-emerald-900/20',
         iconColorClass: 'text-emerald-500 dark:text-emerald-400',
     },
     {
@@ -92,7 +86,6 @@ const COLUMNS: ColumnDef[] = [
         countClass:
             'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
         cardBorderClass: 'border-red-200/60 dark:border-red-800/30 hover:border-red-300 dark:hover:border-red-700/50',
-        iconBgClass: 'bg-red-50 dark:bg-red-900/20',
         iconColorClass: 'text-red-500 dark:text-red-400',
     },
 ];
@@ -146,17 +139,6 @@ function KanbanCard({ work, col }: KanbanCardProps) {
         >
             {/* Header row */}
             <div className="flex items-start gap-2.5">
-                <div
-                    className={cn(
-                        'shrink-0 w-7 h-7 rounded-md flex items-center justify-center',
-                        col.iconBgClass,
-                    )}
-                >
-                    <FolderClosed
-                        strokeWidth={1.2}
-                        className={cn('w-3.5 h-3.5', col.iconColorClass)}
-                    />
-                </div>
                 <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
                         {work.name}
