@@ -21,8 +21,15 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~484 across `apps/` + `packages/` (was 483
-  earlier on 2026-05-09; +0 net spec files in the WorkGenerationService
+- **Spec files (`*.spec.ts`)**: ~486 across `apps/` + `packages/` (was 484
+  earlier on 2026-05-09; +2 net spec files in the agent
+  `BaseFacadeService`/`FacadesModule` direct-coverage sweep — adds
+  `packages/agent/src/facades/__tests__/base.facade.spec.ts` (66 tests
+  on the abstract base via a `TestFacadeService extends BaseFacadeService`
+  re-exposer) and `packages/agent/src/facades/__tests__/facades.module.spec.ts`
+  (9 tests pinning the module providers/exports + barrel runtime symbols),
+  closing the per-file zero-coverage gap inside `packages/agent/src/facades/`
+  — see `Done` ledger; +0 net spec files in the WorkGenerationService
   orchestrators follow-up sweep — extends the existing
   `services/__tests__/work-generation.service.spec.ts` from 126 → 172
   tests, closing the previously-pending 7 multi-step pipeline orchestrators
@@ -85,6 +92,31 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent BaseFacadeService + FacadesModule direct coverage (+75 tests across 2 new specs, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the last per-file coverage gap inside `packages/agent/src/facades/`. Before this sweep the abstract `BaseFacadeService` (291 LOC), `facades.module.ts` (53 LOC), and `index.ts` barrel were exercised only indirectly via the nine concrete-facade specs — meaning the resolution ladder, settings-typing helpers, and FacadeError hierarchy had no targeted unit. Two new files now pin the lot:
+
+- `packages/agent/src/facades/__tests__/base.facade.spec.ts` — **66 tests** built on a thin `TestFacadeService extends BaseFacadeService` that re-exposes every protected helper. Covers:
+    - `FacadeError` hierarchy: 4 tests pinning `name="FacadeError"|"NoProviderError"|"ProviderNotFoundError"`, `operation="getPlugin"` literal on the two derived classes, capability-templated `message` strings (`"No <cap> provider configured or available"`, `"<cap> provider not found: <id>"`), instance-of `FacadeError` chain, and the deliberate `provider:undefined` slot on `NoProviderError` (since the whole point is "no provider").
+    - `isConfigured`: 3 tests — true when ≥1 capability plugin in `state="loaded"`, false on empty list, false on plugins-but-none-loaded; pins the `state==="loaded"` strict-equal check via an `error`-state plugin.
+    - `getAvailableProviders`: 3 tests — `{id, name, enabled}` shape with `enabled := state==="loaded"`, empty-array path, `getProviderName` fallback chain (providerName → sourceName → plugin.name) flowing through.
+    - `getActiveProviderName`: 3 tests — happy path returns name, null when no provider, `facadeOptions.workId/userId` forwarded into `getDefaultProvider` (asserted via the `findActiveByCapability` call).
+    - `getDefaultProvider` (the work-active branch is the most-branchy method on the class, 5 distinct paths): 7 tests — work-active wins and short-circuits the `getByCapability` fallback (asserted via `not.toHaveBeenCalled()`); fall-through when state≠loaded; fall-through when `isPluginEnabledForScope` rejects; `try/catch` swallows `findActiveByCapability` rejection silently (a future "rethrow on db failure" tightening would now break this test); `workId === undefined` skips the work-active branch entirely; missing `workPluginRepository` (DI optional) skips the work-active branch entirely; null-when-no-active-AND-no-enabled.
+    - `getEnabledPlugins`: 5 tests — `state≠loaded` filtered BEFORE the `isPluginEnabledForScope` call (asserted via call-count = 1), `isPluginEnabledForScope=false` drops the plugin, `manifest.defaultForCapabilities` containing the CAPABILITY sorts that plugin first, missing `defaultForCapabilities` is treated as "not default" (no crash, stable sort), empty input → `[]` with no `isPluginEnabledForScope` call.
+    - `isPluginEnabled` passthrough: 1 test — verbatim `(pluginId, workId, userId)` positional shape into `registry.isPluginEnabledForScope`.
+    - `getResolvedSettings`: 2 tests — `{userId, workId, includeSecrets:true}` envelope (pinned: secrets ARE pulled at the facade boundary by design — a future "default to false" flip would change which settings flow into AI providers); `{}` returned with NO settings-service call when DI omitted.
+    - `getProviderName`: 4 tests — providerName preferred, sourceName fallback, plugin.name fallback, empty-string providerName treated as falsy and falls through to sourceName.
+    - `getSettingTyped`: 6 tests — `undefined`/`null` short-circuit (no warn), every primitive happy path, object-vs-array distinguished via `Array.isArray` (an array MUST NOT match `expectedType="object"` and a plain object MUST NOT match `expectedType="array"` — pinned both directions), type-mismatch warns AND returns undefined, missing values do NOT warn (no false-positive log noise).
+    - `getSettingRequired`: 3 tests — happy path, throws "Required setting `<key>` is missing or has wrong type" on undefined, includes "for plugin `<id>`" qualifier when pluginId arg supplied.
+    - `getSettingWithDefault`: 6 tests — happy path; default on missing; default on null; default on type mismatch (warns first); the critical `false`/`0`/`""` falsy-but-defined preservation tests pinned via `??` (a future "use ||" refactor would silently coerce a configured `false` boolean to `true`, a configured `0` to a non-zero default, and a configured `""` to a non-empty default).
+    - `findActivePluginForWork`: 6 tests — happy path, unregistered → null, registered-but-unloaded → null, no active row → null (no `registry.get` call), `try/catch` swallows repo rejection, missing repository (DI optional) → null.
+    - `resolvePlugin`: 9 tests — providerOverride happy path; ProviderNotFoundError when override unknown; ProviderNotFoundError when override registered but capability-mismatched; ProviderNotFoundError when override registered+capability but state≠loaded (and the enable-check is skipped — pinned via `not.toHaveBeenCalled()`); ProviderNotFoundError when override fails the enable check; no-override + work-active wins (skips the capability scan — pinned); no-override + no-work-active falls through to first-enabled with sort; NoProviderError when no work-active AND no enabled plugins; `workId=undefined` skips the work-active branch entirely.
+    - `FacadesModule` re-exports sanity: 1 test — `BaseFacadeService` + the three error classes are reachable via the barrel index (so a future barrel-cleanup that removes them would surface here).
+
+- `packages/agent/src/facades/__tests__/facades.module.spec.ts` — **9 tests** pinning the wire-format-stable surface of the agent's `FacadesModule`. `apps/api/src/plugins-capabilities/*` and the agent pipeline steps import the same nine facade classes by name, so a silent removal/rename here would change which provider Nest hands consumers. Tests cover: `imports` contains `DatabaseModule` by name (pinned by name not constructor identity to avoid coupling to its export path); `providers` contains all nine facade classes one-to-one with no extras (`toHaveLength(9)`); `exports` mirrors `providers` exactly (since the module body is `providers: FACADES, exports: FACADES`); a single shared `FACADES` array (pin via `expect(providers).toEqual(exports)` so a future split silently making some facades private surfaces here); barrel re-exports each of the nine facade-service classes verbatim (`toBe` identity, not `typeof` so a re-export-via-renamed-shim would fail); barrel re-exports the 15 facade-specific error classes (`AiFacadeError`/`SearchFacadeError`/…/`OAuthNotSupportedError`/`NoDeployCredentialsError`); barrel re-exports the shared `BaseFacadeService` + `FacadeError` + `NoProviderError` + `ProviderNotFoundError`; an exact-runtime-keys regression guard pinning the 33 documented runtime symbols and explicitly listing the 13 type-only re-exports that MUST NOT appear (`DefaultProviderInfo`, `FacadeOptions`, `SearchFacadeOptions`, `FacadeExtractionOptions`, `FacadeExtractedContent`, `GitFacadeOptions`, `GitProviderInfo`, `FacadeCloneOptions`, `FacadePushOptions`, `DataSourceFacadeOptions`, `DataSourceFacadeResult`, `EnabledDataSource`, `DeployFacadeFullOptions`) — a future "convert to runtime export" would surface here so the type-vs-runtime contract is deliberate.
+
+Suite passes via `pnpm --filter @ever-works/agent test --testPathPattern='facades/__tests__/(base|facades)'` in ~22s. Full agent suite **138** suites / 2926 → **3001** tests green.
 
 **2026-05-09 — packages/agent WorkGenerationService orchestrators sweep (multi-step pipeline-orchestrator coverage, +46 tests on the existing `work-generation.service.spec.ts`, scheduled-task `platform-tests-and-docs` cycle, [#639](https://github.com/ever-works/ever-works/pull/639))**
 
