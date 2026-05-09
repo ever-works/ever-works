@@ -192,13 +192,9 @@ export function ActivityDetailModal({ entry, onClose, onStopRequested }: Activit
 
     const liveLogs = activity?.details?.liveLogs as GenerationStepLog[] | undefined;
     const detailsWithoutLiveLogs = activity?.details
-        ? Object.fromEntries(
-              Object.entries(activity.details).filter(([key]) => key !== 'liveLogs'),
-          )
+        ? Object.fromEntries(Object.entries(activity.details).filter(([key]) => key !== 'liveLogs'))
         : undefined;
-    const resolvedSummary = activity
-        ? formatActivitySummary(activity, tSummary)
-        : '';
+    const resolvedSummary = activity ? formatActivitySummary(activity, tSummary) : '';
 
     return (
         <Dialog open={entry !== null} onOpenChange={(open) => !open && onClose()}>
@@ -212,12 +208,8 @@ export function ActivityDetailModal({ entry, onClose, onStopRequested }: Activit
                             {t('detail.title')}
                         </DialogTitle>
                         <div className="flex items-center gap-2 flex-wrap">
-                            {activity && (
-                                <ActivityTypeBadge actionType={activity.actionType} />
-                            )}
-                            {activity && (
-                                <ActivityStatusBadge status={activity.status} />
-                            )}
+                            {activity && <ActivityTypeBadge actionType={activity.actionType} />}
+                            {activity && <ActivityStatusBadge status={activity.status} />}
                             {activity?.work && (
                                 <Link
                                     href={ROUTES.DASHBOARD_WORK(activity.work.id)}
@@ -314,10 +306,7 @@ export function ActivityDetailModal({ entry, onClose, onStopRequested }: Activit
                             title={t('detail.fields')}
                             data={detailsWithoutLiveLogs}
                         />
-                        <StructuredSection
-                            title={t('detail.metadata')}
-                            data={activity.metadata}
-                        />
+                        <StructuredSection title={t('detail.metadata')} data={activity.metadata} />
                         <RawJsonPanel
                             title={t('detail.rawJson')}
                             details={detailsWithoutLiveLogs}

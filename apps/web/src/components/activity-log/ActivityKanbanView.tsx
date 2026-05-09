@@ -177,7 +177,11 @@ function ActivityCard({ entry, col, onSelect }: ActivityCardProps) {
     );
 
     return (
-        <button type="button" onClick={() => onSelect(entry)} className="block w-full text-left cursor-pointer">
+        <button
+            type="button"
+            onClick={() => onSelect(entry)}
+            className="block w-full text-left cursor-pointer"
+        >
             {cardContent}
         </button>
     );
