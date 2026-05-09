@@ -773,13 +773,14 @@ describe('BaseFacadeService', () => {
         });
     });
 
-    describe('FacadesModule re-exports (sanity)', () => {
-        it('exposes BaseFacadeService + the three error classes via the package barrel', async () => {
-            const mod: typeof import('../index') = await import('../index');
-            expect(typeof mod.BaseFacadeService).toBe('function');
-            expect(typeof mod.FacadeError).toBe('function');
-            expect(typeof mod.NoProviderError).toBe('function');
-            expect(typeof mod.ProviderNotFoundError).toBe('function');
-        });
-    });
+    // NOTE: a barrel re-export sanity check for `BaseFacadeService` +
+    // `FacadeError` / `NoProviderError` / `ProviderNotFoundError` lives in
+    // `facades.module.spec.ts` (in the "barrel re-exports" block — see
+    // `re-exports the shared FacadeError + base classes (...)`). It is not
+    // duplicated here because a dynamic `await import('../index')` trips
+    // TS2835 under the agent package's `module: "NodeNext"` tsconfig (the
+    // build runs `tsc -p tsconfig.types.json` over `src/**/*.ts` so spec
+    // files participate in the type-check), while a static `import * as`
+    // would create a confusingly-shaped module-scope side-effect inside a
+    // file that is otherwise self-contained.
 });
