@@ -21,8 +21,33 @@
 
 ## Inventory snapshot (2026-05-07, refreshed 2026-05-09)
 
-- **Spec files (`*.spec.ts`)**: ~506 across `apps/` + `packages/` (was 505
-  earlier on 2026-05-09; +1 net spec file in the agent `sanitize.util`
+- **Spec files (`*.spec.ts`)**: ~507 across `apps/` + `packages/` (was 506
+  earlier on 2026-05-09; +1 net spec file in the agent `database.config`
+  direct-coverage sweep — adds
+  `packages/agent/src/database/database.config.spec.ts` (28 tests on
+  the 201-LOC config registrar covering: `ENTITIES` list shape
+  invariants (>20 entities, all functions, no duplicates); SQLite
+  branch matrix (test env → `:memory:`; CLI app type →
+  `~/.ever-works/ever-works.db`; API+development w/ in-memory=false →
+  `tmpdir/ever-works-api.db`; API+development w/ in-memory=true →
+  `:memory:`; falsy `getEnvironment` → development fallback; falsy
+  `getAppType` → API fallback; sqlite/sqlite3 alias coercion to
+  better-sqlite3; `:`-prefix path skips mkdir; mkdir-on-missing-dir
+  vs no-mkdir-on-existing); SSL mode (sslMode=true → `getTlsOptions`
+  call; sslMode=false → `ssl` field omitted; autoMigrate→synchronize;
+  loggingEnabled passthrough); DATABASE_URL branch (parser invoked,
+  url+database both forwarded; null parser → undefined database;
+  honoured even for mysql); Postgres host defaults (localhost / 5432 /
+  postgres / "" / ever_works) + every override; parseInt port coercion;
+  MySQL/MariaDB alias normalisation to `mysql` driver + 3306 / root /
+  ever_works defaults + overrides; unknown-type fallback to
+  `better-sqlite3 :memory:`; `getDatabaseConfig` wrapper proxy. Mocks
+  the entity barrels at module scope to empty class shells so the
+  TypeORM CJS init never loads — sidesteps the known
+  `path-scurry` initialization bug under Jest), closing the per-file
+  zero-coverage gap on the only `database/*.ts` file outside the
+  repository sub-tree that lacked direct unit coverage — see `Done`
+  ledger; +1 net spec file in the prior agent `sanitize.util`
   direct-coverage sweep — adds
   `packages/agent/src/utils/__tests__/sanitize.util.spec.ts` (54 tests
   on the security-critical 213-LOC sanitization utility — `sanitizeText`
@@ -205,6 +230,25 @@
 ## Done
 
 > Most-recent first. The 2026-05-08 row for the agent `config` + `constants` + `onboarding` submodules sits above the existing header so it is rendered as plain text rather than a misaligned table cell — the table that follows is unchanged.
+
+**2026-05-09 — packages/agent database.config direct coverage (+28 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [PR pending])**
+
+Closes the per-file zero-coverage gap on `packages/agent/src/database/database.config.ts` (201 LOC) — the TypeORM `registerAs('database', ...)` factory that resolves the runtime database driver, host, credentials, and SSL settings. The new file is `packages/agent/src/database/database.config.spec.ts` and pins:
+
+- **`ENTITIES` list (1 test)** — shape invariants pinned (>20 entries, all `typeof === 'function'`, no duplicate registrations) without coupling to specific entity-class identities so a future entity addition is automatically green; pinning the duplicate-free invariant catches the easy "accidentally added Work twice" mistake.
+- **SQLite branch (12 tests)** — test environment + no `DATABASE_PATH` → `:memory:`; explicit `DATABASE_PATH` honoured literally; CLI app type composes `~/.ever-works/ever-works.db` via `path.join(os.homedir(), '.ever-works', 'ever-works.db')`; API + development + `DATABASE_IN_MEMORY=false` → `tmpdir/ever-works-api.db`; API + development + `DATABASE_IN_MEMORY=true` → `:memory:`; falsy `getEnvironment()` falls back to `'development'` semantics (the `|| 'development'` branch); falsy `getAppType()` falls back to `'api'` semantics (the `|| 'api'` branch); `sqlite` and `sqlite3` type aliases both coerced to `better-sqlite3`; `mkdir` only fires when parent dir doesn't exist; `:memory:` AND every other `:`-prefixed path skips both `existsSync` and `mkdirSync` (defence beyond the literal `:memory:` check via the `database.startsWith(':')` clause).
+- **SSL mode (4 tests)** — `sslMode=true` → `getTlsOptions(true, dbCaCert)` call + `ssl` field attached; `sslMode=false` → no `getTlsOptions` call AND no `ssl` field; `autoMigrate=false` → `synchronize: false`; `loggingEnabled=true` propagates.
+- **DATABASE_URL branch (3 tests)** — when set, `parseDatabaseUrl(url)` is invoked and BOTH `url` (the raw string) AND `database` (the parsed name) are forwarded into the TypeORM options; null parser return → `database: undefined` passthrough; URL beats type detection (works for `mysql://...` too).
+- **PostgreSQL host config (3 tests)** — documented `localhost / 5432 / postgres / "" / ever_works` defaults applied when env getters return `undefined`; every default overrideable via `getHost`/`getPort`/`getUsername`/`getPassword`/`getDatabaseName`; `parseInt(port)` accepts trailing-non-digits (`'5433x'` → `5433`).
+- **MySQL/MariaDB host config (3 tests)** — `mariadb` type alias normalised to `mysql` driver in TypeORM options; documented `localhost / 3306 / root / "" / ever_works` defaults; full override matrix.
+- **Unknown-type fallback (1 test)** — any unrecognised `DATABASE_TYPE` (e.g. `'cassandra'`) silently falls back to `better-sqlite3 :memory:` rather than throwing.
+- **`getDatabaseConfig` wrapper (1 test)** — proxies to the registered factory and returns a TypeORM-compatible options object.
+
+Mocks the entity barrels (`'../entities'`, `'../entities/cache.entity'`, `'../plugins/entities'`, `'../account-transfer/entities/user-sync-config.entity'`) at module scope to empty class shells so the TypeORM CJS init never loads — sidesteps the known `path-scurry` initialization bug under Jest (`Cannot read properties of undefined (reading 'native')`). The `@src/config` module + `fs` + `./utils` (TLS helper + URL parser) are all mocked as well so the suite never touches real env vars or filesystem.
+
+Total agent-package suite: 3303 → 3331 tests across 158 → 159 suites, all green.
+
+---
 
 **2026-05-09 — packages/agent sanitize.util direct coverage (+54 tests across 1 new spec, scheduled-task `platform-tests-and-docs` cycle, [#654](https://github.com/ever-works/ever-works/pull/654))**
 
