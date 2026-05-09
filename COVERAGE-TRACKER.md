@@ -65,126 +65,85 @@
   reuses the validator and projects the errors[] into a single Error
   message via `errors.join('; ')`, with the documented two-format
   string `Invalid pipeline result${pluginId ? \` from plugin '<id>'\`
-  : ''}: <joined errors>` pinned for both no-plugin-id AND with-plugin-id
-  cases, the empty-string-pluginId-treated-as-falsy case (no `from
-  plugin '...'` segment), the whitespace-only-pluginId-treated-as-truthy
-  case (no implicit `.trim()`, included verbatim — pinned so a future
-  trim refactor breaks loudly), success-on-failed-run (`success: false`
-  with an `error` field is a perfectly valid PipelineResult SHAPE — the
-  wrapper only throws when the shape is wrong, not when the run itself
-  failed), and the per-call fresh-Error-instance contract); +1 net spec
-  file in the prior agent `PipelineFacadeService` direct-coverage sweep
-  — adds `packages/agent/src/pipeline/pipeline-facade.service.spec.ts`
-  (30 tests on the 300-LOC facade-binding service that creates the
-  `StepExecutionContext` consumed by both pipeline executors:
-  guard-rails (throws on missing `work.user` / empty `user.id`);
-  logger prefix `[work.slug]` applied to every log/debug/warn/error/
-  verbose call w/ `verbose?.()` optional-chain tolerating undefined;
-  bound AI facade w/ `aiModelOverride` defaulting into
-  `options.routing.modelOverride` and `options.model` via `??`-
-  precedence (caller-supplied override wins); bound search /
-  screenshot / content-extractor facades each forwarding their
-  `providerOverrides.<key>` into the underlying call; bound prompt
-  facade carrying NO providerOverride field (workId+userId only);
-  bound data-source facade w/ caller workId/userId OVERWRITTEN by
-  binding (spread runs first), `getEnabledSources` `||`-fallback on
-  falsy userId; optional data-source dep undefined when not provided;
-  binding context shape — non-AI facades do NOT carry
-  `aiModelOverride`), closing the per-file zero-coverage gap on the
-  third pipeline service in `packages/agent/src/pipeline/` after the
-  orchestrator + full executor — see `Done` ledger; +1 net spec file
-  in the prior agent `FullPipelineExecutorService` direct-coverage
-  sweep — adds
-  `packages/agent/src/pipeline/full-pipeline-executor.service.spec.ts`
-  (22 tests on the 239-LOC self-managed-pipeline executor: `execute`
-  STARTED→plugin.execute→COMPLETED w/ wrapper-measured duration
-  override; full signal/options/onProgress forwarding; log-interceptor
-  lifecycle (attached on `onLogEntry`, routed into the documented
-  envelope, removed in finally on both success AND throw); invalid-
-  result handling (non-object single error, multi-error `'; '` join,
-  FAILED emitted exactly ONCE); plugin.execute rejection →
-  `buildErrorPipelineResult` envelope w/ `totalSteps` from
-  `plugin.getStepDefinitions().length`; `executeWithCancellation`
-  abort wiring + listener removal in finally on success AND throw +
-  cancel-rejection swallowed + skip-when-plugin-lacks-cancel;
-  `getPluginState` null-safe wrapper; private emitter helpers
-  envelope shapes), closing the per-file zero-coverage gap on the
-  second of three pipeline executors — see `Done` ledger; +2 net
-  spec files in the prior agent `PipelineOrchestratorService` +
-  `comparison/types` direct-coverage sweep
-  — adds `packages/agent/src/comparison-generator/comparison/types.spec.ts`
-  (11 tests on the 60-LOC contracts module pinning
-  `DEFAULT_COMPARISON_SETTINGS` four-default merge target +
-  `ComparisonProgressStage` literal union + minimal-and-maximal type
-  literals for every documented `Comparison*` envelope) and
-  `packages/agent/src/pipeline/pipeline-orchestrator.service.spec.ts`
-  (33 tests on the 262-LOC routing service: `execute` step-vs-full
-  routing via `isStepOrchestratablePipeline`; `executeWithMode` forced
-  step / forced full / full→step fallback w/ warn when no self-managed
-  plugin exists; `getRecommendedMode` four-branch projection;
-  `hasFullPipelinePlugin` boolean; `getAvailablePipelinePlugins`
-  registry filter chain (`PIPELINE` capability + state===loaded +
-  `isPipelinePlugin` shape filter); `resumeFromCheckpoint` proxy
-  forwarding incl. null-passthrough; `clearCheckpoint` proxy;
-  `resumeOrExecute` resume-then-fallback w/ self-managed plugins
-  skipping resume entirely; `resolvePipelinePlugin` private 3-level
-  priority chain (explicit id w/ `registry.get` + state + scope check
-  → `defaultForCapabilities` pass → first-loaded-and-enabled fallback
-  → throws when none available), incl. null-pipelineId vs
-  string-pipelineId branch, wrong-capabilities skip via
-  `isPipelinePlugin`, `work.user` undefined → undefined userId
-  forwarding to `isPluginEnabledForScope`. Total agent-package suite:
-  3474 → 3507 tests across 165 → 166 suites — see `Done` ledger;
-  +3 net spec files in the prior security + utility coverage sweep
-  #7 — adds
-  `packages/agent/src/utils/__tests__/work-changelog.utils.spec.ts`
-  (23 tests on `buildWorkChangelog` covering the empty-input null
-  contract, count partitioning, entries reference passthrough,
-  summary-override semantics including the empty-string preservation
-  vs `??`-fallback gotcha, default-summary builder pluralisation +
-  fixed `, ` join order + zero-count omission, entityType label
-  resolution across all 5 documented literals (`item`/`comparison`/
-  `category`/`tag`/`collection`) with `entries[0]`-only derivation
-  pinned, `?? 'item'` fallback for malformed entries, and the exact
-  5-field envelope shape with no extra keys),
-  `packages/agent/src/utils/__tests__/github-app.utils.spec.ts`
-  (30 tests on the security-critical 105-LOC GitHub-App utility —
-  RS256 JWT generation w/ public-key round-trip verification +
-  `iat = now-60` / `exp = now+9*60` / `iss = appId` payload pinning +
-  base64url segment shape + appId verbatim-passthrough; `Bearer`
-  header construction; `requestGitHubAppInstallationAccessToken*`
-  fetch URL/method/headers shape + `expires_at ?? null` coercion +
-  non-OK error message format + missing/empty-token rejection;
-  `verifyGitHubWebhookSignature` constant-time compare with the
-  explicit length-guard pinned ahead of `timingSafeEqual` to avoid
-  the RangeError it throws on mismatched-length inputs, plus
-  scheme-prefix strict-equality check, secret-dependence check,
-  body-dependence check, and empty-body happy-path), and
-  `packages/agent/src/pipeline/__tests__/pipeline-result.validator.spec.ts`
-  (53 tests on `validatePipelineResult` + `validatePipelineResultOrThrow` —
-  the type-checker every pipeline plugin output passes through —
-  covering the non-object short-circuit, happy-path reference
-  passthrough, all top-level scalar typeof checks, the
-  `outputs`-null guard that prevents child-error cascading, all 5
-  output-array fields independently rejected when missing/non-array,
-  `state` (optional) three-way branch (missing → pass /
-  explicitly-null → error + skip children / non-object → error),
-  `error` accepting string OR `Error` instance, `failedStep`
-  typeof-string only, declaration-order error accumulation, and
-  the throwing variant's `pluginId` interpolation including the
-  empty-string-as-no-plugin behaviour pinning the
-  `pluginId ? ...` falsy branch). Earlier on 2026-05-09 was 507;
-  +3 net spec files in the agent tiny-utility
-  coverage sweep — adds
-  `packages/agent/src/activity-log/activity-log-analytics-dispatcher.spec.ts`
-  (7 tests on the string DI-token literal + `ActivityLogAnalyticsDispatcher`
-  interface + barrel re-export — pins the string-vs-Symbol-token shape so
-  a future swap to `Symbol(...)` (which would silently break every
-  cross-module `@Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)` binding) is a
-  deliberate change),
-  `packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`
-  (8 tests on the three documented Langfuse-facing prompt keys
-  `comparison.structure` / `comparison.markdown` / `comparison.extended-analysis`
+  : ''}: <joined errors>`pinned for both no-plugin-id AND with-plugin-id
+cases, the empty-string-pluginId-treated-as-falsy case (no`from
+  plugin '...'`segment), the whitespace-only-pluginId-treated-as-truthy
+case (no implicit`.trim()`, included verbatim — pinned so a future
+trim refactor breaks loudly), success-on-failed-run (`success: false`with an`error`field is a perfectly valid PipelineResult SHAPE — the
+wrapper only throws when the shape is wrong, not when the run itself
+failed), and the per-call fresh-Error-instance contract); +1 net spec
+file in the prior agent`PipelineFacadeService`direct-coverage sweep
+— adds`packages/agent/src/pipeline/pipeline-facade.service.spec.ts`(30 tests on the 300-LOC facade-binding service that creates the`StepExecutionContext`consumed by both pipeline executors:
+guard-rails (throws on missing`work.user`/ empty`user.id`);
+logger prefix `[work.slug]`applied to every log/debug/warn/error/
+verbose call w/`verbose?.()`optional-chain tolerating undefined;
+bound AI facade w/`aiModelOverride`defaulting into`options.routing.modelOverride`and`options.model`via`??`-
+precedence (caller-supplied override wins); bound search /
+screenshot / content-extractor facades each forwarding their
+`providerOverrides.<key>`into the underlying call; bound prompt
+facade carrying NO providerOverride field (workId+userId only);
+bound data-source facade w/ caller workId/userId OVERWRITTEN by
+binding (spread runs first),`getEnabledSources` `||`-fallback on
+falsy userId; optional data-source dep undefined when not provided;
+binding context shape — non-AI facades do NOT carry
+`aiModelOverride`), closing the per-file zero-coverage gap on the
+third pipeline service in `packages/agent/src/pipeline/`after the
+orchestrator + full executor — see`Done`ledger; +1 net spec file
+in the prior agent`FullPipelineExecutorService`direct-coverage
+sweep — adds`packages/agent/src/pipeline/full-pipeline-executor.service.spec.ts`(22 tests on the 239-LOC self-managed-pipeline executor:`execute`STARTED→plugin.execute→COMPLETED w/ wrapper-measured duration
+override; full signal/options/onProgress forwarding; log-interceptor
+lifecycle (attached on`onLogEntry`, routed into the documented
+envelope, removed in finally on both success AND throw); invalid-
+result handling (non-object single error, multi-error `'; '`join,
+FAILED emitted exactly ONCE); plugin.execute rejection →`buildErrorPipelineResult`envelope w/`totalSteps`from`plugin.getStepDefinitions().length`; `executeWithCancellation`abort wiring + listener removal in finally on success AND throw +
+cancel-rejection swallowed + skip-when-plugin-lacks-cancel;`getPluginState`null-safe wrapper; private emitter helpers
+envelope shapes), closing the per-file zero-coverage gap on the
+second of three pipeline executors — see`Done`ledger; +2 net
+spec files in the prior agent`PipelineOrchestratorService`+`comparison/types`direct-coverage sweep
+— adds`packages/agent/src/comparison-generator/comparison/types.spec.ts`(11 tests on the 60-LOC contracts module pinning`DEFAULT_COMPARISON_SETTINGS`four-default merge target +`ComparisonProgressStage`literal union + minimal-and-maximal type
+literals for every documented`Comparison*`envelope) and`packages/agent/src/pipeline/pipeline-orchestrator.service.spec.ts`(33 tests on the 262-LOC routing service:`execute`step-vs-full
+routing via`isStepOrchestratablePipeline`; `executeWithMode`forced
+step / forced full / full→step fallback w/ warn when no self-managed
+plugin exists;`getRecommendedMode`four-branch projection;`hasFullPipelinePlugin`boolean;`getAvailablePipelinePlugins`
+registry filter chain (`PIPELINE`capability + state===loaded +`isPipelinePlugin`shape filter);`resumeFromCheckpoint`proxy
+forwarding incl. null-passthrough;`clearCheckpoint`proxy;`resumeOrExecute`resume-then-fallback w/ self-managed plugins
+skipping resume entirely;`resolvePipelinePlugin`private 3-level
+priority chain (explicit id w/`registry.get`+ state + scope check
+→`defaultForCapabilities`pass → first-loaded-and-enabled fallback
+→ throws when none available), incl. null-pipelineId vs
+string-pipelineId branch, wrong-capabilities skip via`isPipelinePlugin`, `work.user`undefined → undefined userId
+forwarding to`isPluginEnabledForScope`. Total agent-package suite:
+3474 → 3507 tests across 165 → 166 suites — see `Done`ledger;
++3 net spec files in the prior security + utility coverage sweep
+#7 — adds`packages/agent/src/utils/**tests**/work-changelog.utils.spec.ts`(23 tests on`buildWorkChangelog`covering the empty-input null
+contract, count partitioning, entries reference passthrough,
+summary-override semantics including the empty-string preservation
+vs`??`-fallback gotcha, default-summary builder pluralisation +
+fixed `, ` join order + zero-count omission, entityType label
+resolution across all 5 documented literals (`item`/`comparison`/
+`category`/`tag`/`collection`) with `entries[0]`-only derivation
+pinned, `?? 'item'`fallback for malformed entries, and the exact
+5-field envelope shape with no extra keys),`packages/agent/src/utils/**tests**/github-app.utils.spec.ts`(30 tests on the security-critical 105-LOC GitHub-App utility —
+RS256 JWT generation w/ public-key round-trip verification +`iat = now-60`/`exp = now+9*60`/`iss = appId`payload pinning +
+base64url segment shape + appId verbatim-passthrough;`Bearer`header construction;`requestGitHubAppInstallationAccessToken\*`fetch URL/method/headers shape +`expires_at ?? null`coercion +
+non-OK error message format + missing/empty-token rejection;`verifyGitHubWebhookSignature`constant-time compare with the
+explicit length-guard pinned ahead of`timingSafeEqual`to avoid
+the RangeError it throws on mismatched-length inputs, plus
+scheme-prefix strict-equality check, secret-dependence check,
+body-dependence check, and empty-body happy-path), and`packages/agent/src/pipeline/**tests**/pipeline-result.validator.spec.ts`(53 tests on`validatePipelineResult`+`validatePipelineResultOrThrow`—
+the type-checker every pipeline plugin output passes through —
+covering the non-object short-circuit, happy-path reference
+passthrough, all top-level scalar typeof checks, the`outputs`-null guard that prevents child-error cascading, all 5
+output-array fields independently rejected when missing/non-array,
+`state`(optional) three-way branch (missing → pass /
+explicitly-null → error + skip children / non-object → error),`error`accepting string OR`Error`instance,`failedStep`typeof-string only, declaration-order error accumulation, and
+the throwing variant's`pluginId`interpolation including the
+empty-string-as-no-plugin behaviour pinning the`pluginId ? ...`falsy branch). Earlier on 2026-05-09 was 507;
++3 net spec files in the agent tiny-utility
+coverage sweep — adds`packages/agent/src/activity-log/activity-log-analytics-dispatcher.spec.ts`(7 tests on the string DI-token literal +`ActivityLogAnalyticsDispatcher`interface + barrel re-export — pins the string-vs-Symbol-token shape so
+a future swap to`Symbol(...)`(which would silently break every
+cross-module`@Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)`binding) is a
+deliberate change),`packages/agent/src/comparison-generator/comparison/prompt-keys.spec.ts`(8 tests on the three documented Langfuse-facing prompt keys`comparison.structure`/`comparison.markdown`/`comparison.extended-analysis`
     - dotted-namespace regex + uniqueness + `as const` JSON-roundtrip
     - barrel `COMPARISON_PROMPT_KEYS`-rename pin — pinned so the
       agent-package keys stay aligned with the Langfuse UI), and
