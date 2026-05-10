@@ -594,6 +594,22 @@
                 "previous": "Trước",
                 "next": "Tiếp theo",
                 "pageOf": "Trang {page} trong {total}"
+            },
+            "viewMode": {
+                "table": "Bảng",
+                "board": "Bảng Kanban"
+            },
+            "kanban": {
+                "empty": "Không có hoạt động ở đây",
+                "noWork": "Không có công việc",
+                "columns": {
+                    "pending": "Đang chờ",
+                    "in_progress": "Đang tiến hành",
+                    "completed": "Hoàn thành",
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
+                },
+                "loadMore": "Tải thêm {count}"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Hãy thử điều chỉnh từ khóa tìm kiếm",
                     "withoutSearch": "Tạo công việc được hỗ trợ bởi AI đầu tiên để bắt đầu"
                 }
+            },
+            "viewMode": {
+                "card": "Thẻ",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} mục",
+                "noDescription": "Không có mô tả",
+                "empty": "Không có công việc ở đây",
+                "columns": {
+                    "not_started": "Chưa bắt đầu",
+                    "scheduled": "Đã lên lịch",
+                    "generating": "Đang tiến hành",
+                    "completed": "Hoàn thành",
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
+                },
+                "status": {
+                    "notStarted": "Chưa bắt đầu",
+                    "scheduled": "Đã lên lịch",
+                    "generating": "Đang tạo",
+                    "completed": "Hoàn thành",
+                    "completedWithWarnings": "Hoàn thành với cảnh báo",
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
+                },
+                "loadMore": "Tải thêm {count}"
             }
         },
         "settings": {

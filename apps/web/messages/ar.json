@@ -594,6 +594,22 @@
                 "previous": "السابق",
                 "next": "التالي",
                 "pageOf": "صفحة {page} من {total}"
+            },
+            "viewMode": {
+                "table": "جدول",
+                "board": "لوحة"
+            },
+            "kanban": {
+                "empty": "لا توجد أنشطة هنا",
+                "noWork": "لا يوجد عمل",
+                "columns": {
+                    "pending": "قيد الانتظار",
+                    "in_progress": "قيد التنفيذ",
+                    "completed": "مكتمل",
+                    "failed": "فشل",
+                    "cancelled": "ملغي"
+                },
+                "loadMore": "تحميل {count} المزيد"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "جرب تعديل مصطلحات البحث",
                     "withoutSearch": "أنشئ عملك الأول المدعوم بالذكاء الاصطناعي لبدء العمل"
                 }
+            },
+            "viewMode": {
+                "card": "البطاقات",
+                "kanban": "كانبان"
+            },
+            "kanban": {
+                "items": "{count} عناصر",
+                "noDescription": "لا يوجد وصف",
+                "empty": "لا توجد أعمال هنا",
+                "columns": {
+                    "not_started": "لم يبدأ",
+                    "scheduled": "مجدول",
+                    "generating": "قيد التنفيذ",
+                    "completed": "مكتمل",
+                    "failed": "فشل",
+                    "cancelled": "ملغي"
+                },
+                "status": {
+                    "notStarted": "لم يبدأ",
+                    "scheduled": "مجدول",
+                    "generating": "جاري الإنشاء",
+                    "completed": "مكتمل",
+                    "completedWithWarnings": "مكتمل مع تحذيرات",
+                    "failed": "فشل",
+                    "cancelled": "ملغي"
+                },
+                "loadMore": "تحميل {count} المزيد"
             }
         },
         "settings": {

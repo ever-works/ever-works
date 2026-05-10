@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Work } from '@/lib/api/work';
 import { WorkList } from '@/components/works/WorkList';
+import { WorksKanbanView } from '@/components/works/WorksKanbanView';
+import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -15,6 +17,7 @@ import { toast } from 'sonner';
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 300;
+const KANBAN_LIMIT = 500;
 
 interface WorksClientProps {
     initialWorks: Work[];
@@ -38,8 +41,20 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
     const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
     const [page, setPage] = useState(1);
     const [stats, setStats] = useState(initialStats);
+    const [kanbanWorks, setKanbanWorks] = useState<Work[]>([]);
+    const [kanbanLoading, setKanbanLoading] = useState(false);
+    const kanbanRequestIdRef = useRef(0);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
+        if (typeof window === 'undefined') return 'card';
+        return (localStorage.getItem('works-view-mode') as ViewMode) || 'card';
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem('works-view-mode', mode);
+    };
 
     // Handle query params: ?focus=search or ?q=searchterm
     useEffect(() => {
@@ -112,6 +127,33 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
         }
     }, []);
 
+    const fetchKanbanWorks = useCallback(
+        async (query: string) => {
+            const currentRequestId = ++kanbanRequestIdRef.current;
+            setKanbanLoading(true);
+            try {
+                const response = await getWorks({
+                    search: query || undefined,
+                    limit: KANBAN_LIMIT,
+                    offset: 0,
+                });
+                if (currentRequestId === kanbanRequestIdRef.current && response.success) {
+                    setKanbanWorks(response.works);
+                }
+            } catch (error) {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    console.error('Failed to fetch kanban works:', error);
+                    toast.error(t('searchFailed'));
+                }
+            } finally {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    setKanbanLoading(false);
+                }
+            }
+        },
+        [t],
+    );
+
     // Debounce search query
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -135,6 +177,12 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
             performSearch(debouncedQuery, 1);
         }
     }, [debouncedQuery, performSearch]);
+
+    useEffect(() => {
+        if (viewMode === 'kanban') {
+            void fetchKanbanWorks(debouncedQuery);
+        }
+    }, [viewMode, debouncedQuery, fetchKanbanWorks]);
 
     const handlePageChange = async (newPage: number) => {
         setPage(newPage);
@@ -271,27 +319,45 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 </Link>
             </div>
 
-            {/* Work Count */}
+            {/* Work Count + View Mode Switch */}
             {total > 0 && (
-                <div className="mb-4 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('showing', { current: works.length, total })}
+                <div className="mb-4 flex items-center justify-between gap-2">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('showing', { current: works.length, total })}
+                    </p>
+                    <ViewModeSwitch
+                        mode={viewMode}
+                        onChange={handleViewModeChange}
+                        cardLabel={t('viewMode.card')}
+                        kanbanLabel={t('viewMode.kanban')}
+                    />
                 </div>
             )}
 
-            {/* Works List */}
+            {/* Works List / Kanban */}
             {loading ? (
                 <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : hasWorks ? (
                 <>
-                    <WorkList
-                        initialWorks={works}
-                        onUpdate={(updatedWorks) => setWorks(updatedWorks)}
-                    />
+                    {viewMode === 'kanban' ? (
+                        kanbanLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            </div>
+                        ) : (
+                            <WorksKanbanView works={kanbanWorks} />
+                        )
+                    ) : (
+                        <WorkList
+                            initialWorks={works}
+                            onUpdate={(updatedWorks) => setWorks(updatedWorks)}
+                        />
+                    )}
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
+                    {/* Pagination — hidden in kanban mode */}
+                    {viewMode !== 'kanban' && totalPages > 1 && (
                         <div className="mt-8 flex justify-center">
                             <nav className="flex gap-2">
                                 <button

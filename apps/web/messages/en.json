@@ -594,6 +594,22 @@
                 "previous": "Previous",
                 "next": "Next",
                 "pageOf": "Page {page} of {total}"
+            },
+            "viewMode": {
+                "table": "Table",
+                "board": "Board"
+            },
+            "kanban": {
+                "empty": "No activities here",
+                "noWork": "No work",
+                "loadMore": "Load {count} more",
+                "columns": {
+                    "pending": "Pending",
+                    "in_progress": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
             }
         },
         "works": {
@@ -622,6 +638,33 @@
                     "title": "No works found",
                     "withSearch": "Try adjusting your search terms",
                     "withoutSearch": "Create your first AI-powered Work to get started"
+                }
+            },
+            "viewMode": {
+                "card": "Cards",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} items",
+                "noDescription": "No description",
+                "empty": "No works here",
+                "loadMore": "Load {count} more",
+                "columns": {
+                    "not_started": "Not Started",
+                    "scheduled": "Scheduled",
+                    "generating": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                },
+                "status": {
+                    "notStarted": "Not started",
+                    "scheduled": "Scheduled",
+                    "generating": "Generating",
+                    "completed": "Completed",
+                    "completedWithWarnings": "Completed with warnings",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
                 }
             }
         },
