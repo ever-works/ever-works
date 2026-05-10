@@ -589,11 +589,13 @@ export function TemplatesCatalog({
                 </div>
 
                 <div className="inline-flex items-center self-start p-[3px] rounded-lg bg-surface dark:bg-white/[0.04] border border-border dark:border-white/[0.08] gap-0.5">
-                    {([
-                        { mode: 'all', label: t('filters.all'), count: templates.length },
-                        { mode: 'built_in', label: t('filters.builtIn'), count: builtInCount },
-                        { mode: 'custom', label: t('filters.custom'), count: customCount },
-                    ] as const).map(({ mode, label, count }) => (
+                    {(
+                        [
+                            { mode: 'all', label: t('filters.all'), count: templates.length },
+                            { mode: 'built_in', label: t('filters.builtIn'), count: builtInCount },
+                            { mode: 'custom', label: t('filters.custom'), count: customCount },
+                        ] as const
+                    ).map(({ mode, label, count }) => (
                         <button
                             key={mode}
                             type="button"
