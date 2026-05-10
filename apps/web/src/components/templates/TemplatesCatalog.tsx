@@ -158,7 +158,7 @@ function TemplateCard({
                     </div>
                 )}
                 {isDefault && (
-                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-black/50 text-white backdrop-blur-sm">
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-black/50 text-white dark:text-white backdrop-blur-sm">
                         <Star className="w-2.5 h-2.5 fill-current" />
                         {t('card.default')}
                     </span>
