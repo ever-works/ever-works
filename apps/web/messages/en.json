@@ -1046,6 +1046,14 @@
                     "submit": "Send Invite",
                     "cancel": "Cancel",
                     "success": "Member invited successfully.",
+                    "modes": {
+                        "direct": {
+                            "description": "Add an existing user as a member right away by their email. They get the assigned role immediately."
+                        },
+                        "link": {
+                            "description": "Generate a single-use link to share. The recipient redeems it to join — or claim ownership, if you create an owner-claim link."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Email address is required.",
                         "failed": "Failed to invite member. Please try again."

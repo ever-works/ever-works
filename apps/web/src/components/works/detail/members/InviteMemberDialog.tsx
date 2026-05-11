@@ -209,6 +209,14 @@ export function InviteMemberDialog({
                     ))}
                 </div>
 
+                {!claimUrl ? (
+                    <p className="mt-3 text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {mode === 'direct'
+                            ? t('invite.modes.direct.description')
+                            : t('invite.modes.link.description')}
+                    </p>
+                ) : null}
+
                 {claimUrl ? (
                     <div className="space-y-3 mt-4">
                         <div className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 p-3 text-sm">
