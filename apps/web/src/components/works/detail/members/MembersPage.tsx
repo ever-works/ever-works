@@ -7,7 +7,6 @@ import type { WorkInvitation } from '@/lib/api/invitations';
 import { MembersList } from './MembersList';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { PendingInvitationsSection } from './PendingInvitationsSection';
-import { CreateInvitationCard } from './CreateInvitationCard';
 import { Button } from '@/components/ui/button';
 import { canManageMembers } from '@/lib/permissions';
 
@@ -77,15 +76,12 @@ export function MembersPage({
                 />
             ) : null}
 
-            {canInvite ? (
-                <CreateInvitationCard workId={work.id} isOwner={currentUserIsOwner} />
-            ) : null}
-
             <InviteMemberDialog
                 workId={work.id}
                 open={inviteDialogOpen}
                 onOpenChange={setInviteDialogOpen}
                 onMemberAdded={handleMemberAdded}
+                isOwner={currentUserIsOwner}
             />
         </div>
     );
