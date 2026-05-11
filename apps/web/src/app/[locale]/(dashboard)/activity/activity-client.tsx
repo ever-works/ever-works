@@ -8,11 +8,14 @@ import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
+import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
+import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { toast } from 'sonner';
 import { Download, Loader2 } from 'lucide-react';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
+const KANBAN_LIMIT = 500;
 
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
@@ -46,9 +49,22 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         cancelled: 0,
     });
 
+    const [kanbanActivities, setKanbanActivities] = useState<ActivityLogEntry[]>([]);
+    const [kanbanLoading, setKanbanLoading] = useState(false);
+
     const requestIdRef = useRef(0);
+    const kanbanRequestIdRef = useRef(0);
     const hasMountedRef = useRef(false);
     const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
+        if (typeof window === 'undefined') return 'card';
+        return (localStorage.getItem('activity-view-mode') as ViewMode) || 'card';
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem('activity-view-mode', mode);
+    };
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync filters → URL query params
@@ -108,6 +124,34 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         [t],
     );
 
+    const fetchKanbanActivities = useCallback(
+        async (filters: { actionType: string; status: string; search: string }) => {
+            const currentRequestId = ++kanbanRequestIdRef.current;
+            setKanbanLoading(true);
+            try {
+                const response = await getActivityLog({
+                    actionType: filters.actionType || undefined,
+                    status: filters.status || undefined,
+                    search: filters.search || undefined,
+                    limit: KANBAN_LIMIT,
+                    offset: 0,
+                });
+                if (currentRequestId === kanbanRequestIdRef.current && response.success) {
+                    setKanbanActivities(response.activities);
+                }
+            } catch (error) {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    console.error('Failed to fetch kanban activities:', error);
+                }
+            } finally {
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    setKanbanLoading(false);
+                }
+            }
+        },
+        [],
+    );
+
     const fetchSummary = useCallback(async () => {
         const response = await getActivitySummary();
         if (response.success) {
@@ -136,6 +180,13 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     useEffect(() => {
         void fetchSummary();
     }, [fetchSummary]);
+
+    // Fetch all activities for kanban view (no pagination)
+    useEffect(() => {
+        if (viewMode === 'kanban') {
+            void fetchKanbanActivities({ actionType, status, search: debouncedSearch });
+        }
+    }, [viewMode, actionType, status, debouncedSearch, fetchKanbanActivities]);
 
     // Polling — silent refresh, paused when tab is hidden
     useEffect(() => {
@@ -288,13 +339,21 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                         {t('subtitle')}
                     </p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                >
-                    <Download className="w-3.5 h-3.5" />
-                    {t('actions.export')}
-                </button>
+                <div className="flex items-center gap-2">
+                    <ViewModeSwitch
+                        mode={viewMode}
+                        onChange={handleViewModeChange}
+                        cardLabel={t('viewMode.table')}
+                        kanbanLabel={t('viewMode.board')}
+                    />
+                    <button
+                        onClick={handleExport}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        {t('actions.export')}
+                    </button>
+                </div>
             </div>
 
             <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
@@ -358,13 +417,27 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 />
             ) : (
                 <>
-                    <ActivityTable
-                        activities={activities}
-                        loading={loading}
-                        onStopRequested={refreshCurrentPage}
-                    />
+                    {viewMode === 'kanban' ? (
+                        kanbanLoading ? (
+                            <div className="flex justify-center py-16">
+                                <Loader2 className="w-6 h-6 animate-spin text-text-muted dark:text-text-muted-dark" />
+                            </div>
+                        ) : (
+                            <ActivityKanbanView
+                                activities={kanbanActivities}
+                                onStopRequested={refreshCurrentPage}
+                            />
+                        )
+                    ) : (
+                        <ActivityTable
+                            activities={activities}
+                            loading={loading}
+                            onStopRequested={refreshCurrentPage}
+                        />
+                    )}
 
-                    {totalPages > 1 && (
+                    {/* Pagination + view mode switch — hidden in kanban mode */}
+                    {viewMode !== 'kanban' && totalPages > 1 && (
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {t('showing', {

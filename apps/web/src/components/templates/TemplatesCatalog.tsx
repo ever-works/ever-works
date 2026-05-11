@@ -158,8 +158,8 @@ function TemplateCard({
                     </div>
                 )}
                 {isDefault && (
-                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-primary/90 text-primary-foreground backdrop-blur-sm">
-                        <Star className="w-3 h-3 fill-current" />
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-black/50 text-white dark:text-white backdrop-blur-sm">
+                        <Star className="w-2.5 h-2.5 fill-current" />
                         {t('card.default')}
                     </span>
                 )}
@@ -227,7 +227,7 @@ function TemplateCard({
                                 loading={forkLoading}
                                 disabled={loading || forkLoading}
                                 onClick={() => onFork(template)}
-                                className="whitespace-nowrap"
+                                className="whitespace-nowrap text-xs"
                             >
                                 <GitFork className="h-3.5 w-3.5" />
                                 {t('card.fork')}
@@ -240,6 +240,7 @@ function TemplateCard({
                                     disabled={loading || archiveLoading}
                                     onClick={() => onEdit(template)}
                                     title={t('card.edit')}
+                                    className="text-xs"
                                 >
                                     <PencilLine className="h-3.5 w-3.5" />
                                 </Button>
@@ -250,7 +251,7 @@ function TemplateCard({
                                     disabled={loading || archiveLoading}
                                     onClick={() => onArchive(template)}
                                     title={t('card.archive')}
-                                    className="text-destructive hover:text-destructive"
+                                    className="text-destructive hover:text-destructive text-xs"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -262,7 +263,7 @@ function TemplateCard({
                             loading={loading}
                             disabled={isDefault || loading}
                             onClick={() => onSetDefault(template.id)}
-                            className="whitespace-nowrap"
+                            className="whitespace-nowrap text-xs"
                         >
                             {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
                         </Button>
@@ -556,47 +557,69 @@ export function TemplatesCatalog({
                 </div>
             </div>
 
-            <div className="flex flex-col @sm/main:flex-row gap-4 mb-6">
-                <div className="flex-1">
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-text-muted-dark" />
-                        <Input
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            placeholder={t('filters.searchPlaceholder')}
-                            className="pl-10"
-                        />
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex flex-col @sm/main:flex-row gap-3">
+                    <div className="flex-1">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                            <Input
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                                placeholder={t('filters.searchPlaceholder')}
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRefreshTemplates}
+                            loading={isRefreshingTemplates}
+                            title={t('actions.refreshTemplates')}
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" onClick={() => setDialogOpen(true)}>
+                            <Plus className="h-4 w-4" />
+                            {t('actions.addTemplate')}
+                        </Button>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {(['all', 'built_in', 'custom'] as const).map((mode) => (
-                        <Button
+                <div className="inline-flex items-center self-start p-[3px] rounded-lg bg-surface dark:bg-white/[0.04] border border-border dark:border-white/[0.08] gap-0.5">
+                    {(
+                        [
+                            { mode: 'all', label: t('filters.all'), count: templates.length },
+                            { mode: 'built_in', label: t('filters.builtIn'), count: builtInCount },
+                            { mode: 'custom', label: t('filters.custom'), count: customCount },
+                        ] as const
+                    ).map(({ mode, label, count }) => (
+                        <button
                             key={mode}
-                            variant={filterMode === mode ? 'primary' : 'ghost'}
-                            size="sm"
+                            type="button"
                             onClick={() => setFilterMode(mode)}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                                filterMode === mode
+                                    ? 'bg-white dark:bg-white/10 text-text dark:text-text-dark shadow-xs border border-border dark:border-white/10'
+                                    : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-black/[0.03] dark:hover:bg-white/[0.06]',
+                            )}
                         >
-                            {mode === 'all'
-                                ? t('filters.all')
-                                : mode === 'built_in'
-                                  ? t('filters.builtIn')
-                                  : t('filters.custom')}
-                        </Button>
+                            {label}
+                            <span
+                                className={cn(
+                                    'inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-semibold tabular-nums transition-colors duration-150',
+                                    filterMode === mode
+                                        ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                                        : 'bg-black/6 dark:bg-white/8 text-text-muted dark:text-white/80',
+                                )}
+                            >
+                                {count}
+                            </span>
+                        </button>
                     ))}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRefreshTemplates}
-                        loading={isRefreshingTemplates}
-                        title={t('actions.refreshTemplates')}
-                    >
-                        <RefreshCw className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" onClick={() => setDialogOpen(true)}>
-                        <Plus className="h-4 w-4" />
-                        {t('actions.addTemplate')}
-                    </Button>
                 </div>
             </div>
 

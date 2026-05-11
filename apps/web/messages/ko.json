@@ -594,6 +594,22 @@
                 "previous": "이전",
                 "next": "다음",
                 "pageOf": "{page}/{total} 페이지"
+            },
+            "viewMode": {
+                "table": "테이블",
+                "board": "보드"
+            },
+            "kanban": {
+                "empty": "여기에 활동이 없습니다",
+                "noWork": "작업 없음",
+                "columns": {
+                    "pending": "대기 중",
+                    "in_progress": "진행 중",
+                    "completed": "완료",
+                    "failed": "실패",
+                    "cancelled": "취소됨"
+                },
+                "loadMore": "{count}개 더 불러오기"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "검색어를 조정해 보세요",
                     "withoutSearch": "시작하려면 첫 번째 AI 기반 워크를 생성하세요"
                 }
+            },
+            "viewMode": {
+                "card": "카드",
+                "kanban": "칸반"
+            },
+            "kanban": {
+                "items": "{count} 항목",
+                "noDescription": "설명 없음",
+                "empty": "여기에 작업이 없습니다",
+                "columns": {
+                    "not_started": "시작 안 됨",
+                    "scheduled": "예약됨",
+                    "generating": "진행 중",
+                    "completed": "완료",
+                    "failed": "실패",
+                    "cancelled": "취소됨"
+                },
+                "status": {
+                    "notStarted": "시작 안 됨",
+                    "scheduled": "예약됨",
+                    "generating": "생성 중",
+                    "completed": "완료",
+                    "completedWithWarnings": "경고와 함께 완료",
+                    "failed": "실패",
+                    "cancelled": "취소됨"
+                },
+                "loadMore": "{count}개 더 불러오기"
             }
         },
         "settings": {

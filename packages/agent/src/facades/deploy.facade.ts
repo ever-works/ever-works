@@ -348,6 +348,26 @@ export class DeployFacadeService implements IDeployFacade {
         return { ...result, settings };
     }
 
+    /**
+     * Resolve another plugin's user-scoped settings for the same deploy
+     * request. The k8s deploy needs to read the GitHub plugin's
+     * `readPackagesPat` to mint an imagePullSecret for private GHCR — but
+     * the k8s plugin itself has no cross-plugin access. The deploy
+     * orchestrator is the right layer to do this stitching, so this method
+     * exposes the (already-injected) settings service in a controlled,
+     * secret-including form.
+     */
+    async getOtherPluginSettings(
+        pluginId: string,
+        options: DeployFacadeOptions,
+    ): Promise<Record<string, unknown>> {
+        return this.settingsService.getSettings(pluginId, {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets: true,
+        });
+    }
+
     // Domain management methods
     // DB is the primary source of truth; provider APIs are used for sync and verification.
 

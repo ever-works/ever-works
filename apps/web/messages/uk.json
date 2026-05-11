@@ -594,6 +594,22 @@
                 "previous": "Попередня",
                 "next": "Наступна",
                 "pageOf": "Сторінка {page} з {total}"
+            },
+            "viewMode": {
+                "table": "Таблиця",
+                "board": "Дошка"
+            },
+            "kanban": {
+                "empty": "Тут немає активності",
+                "noWork": "Немає роботи",
+                "columns": {
+                    "pending": "В очікуванні",
+                    "in_progress": "У процесі",
+                    "completed": "Завершено",
+                    "failed": "Помилка",
+                    "cancelled": "Скасовано"
+                },
+                "loadMore": "Завантажити ще {count}"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Спробуйте змінити умови пошуку",
                     "withoutSearch": "Створіть свій перший робота на базі ШІ, щоб розпочати"
                 }
+            },
+            "viewMode": {
+                "card": "Картки",
+                "kanban": "Канбан"
+            },
+            "kanban": {
+                "items": "{count} елементів",
+                "noDescription": "Немає опису",
+                "empty": "Тут немає робіт",
+                "columns": {
+                    "not_started": "Не розпочато",
+                    "scheduled": "Заплановано",
+                    "generating": "У процесі",
+                    "completed": "Завершено",
+                    "failed": "Помилка",
+                    "cancelled": "Скасовано"
+                },
+                "status": {
+                    "notStarted": "Не розпочато",
+                    "scheduled": "Заплановано",
+                    "generating": "Генерація",
+                    "completed": "Завершено",
+                    "completedWithWarnings": "Завершено з попередженнями",
+                    "failed": "Помилка",
+                    "cancelled": "Скасовано"
+                },
+                "loadMore": "Завантажити ще {count}"
             }
         },
         "settings": {

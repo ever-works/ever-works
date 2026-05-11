@@ -38,6 +38,10 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         token?: string;
         settings?: Record<string, unknown>;
         deployProvider?: string;
+        /** Settings returned by deployFacade.getOtherPluginSettings('github', ...).
+         *  Defaults to an empty object (no PAT saved). Tests for the GHCR PAT
+         *  flow override this with `{ readPackagesPat: '...' }`. */
+        githubPluginSettings?: Record<string, unknown>;
     }) => {
         const work = {
             id: 'work-1',
@@ -59,6 +63,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 work,
                 settings: overrides.settings ?? {},
             }),
+            getOtherPluginSettings: jest
+                .fn()
+                .mockResolvedValue(overrides.githubPluginSettings ?? {}),
         };
 
         const gitFacade = {
@@ -243,6 +250,109 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         // Vars never carry the kubeconfig.
         const allVarValues = variables.map((v: any) => v.value).join('\n');
         expect(allVarValues).not.toContain('leaked-12345');
+    });
+
+    describe('Kubernetes GHCR pull token (bug D)', () => {
+        it('pushes GITHUB_READ_PACKAGES_TOKEN when deployProvider=k8s and the user has saved a PAT', async () => {
+            const { service, githubPlugin, deployFacade } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: { readPackagesPat: 'ghp_fine_grained_pat_value' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            // The facade was asked for the GitHub plugin's settings, not just
+            // the deploy plugin's — that's the cross-plugin read this flow
+            // requires.
+            expect(deployFacade.getOtherPluginSettings).toHaveBeenCalledWith('github', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            const { secrets } = captureCalls(githubPlugin);
+            const pat = secrets.find((s: any) => s.key === 'GITHUB_READ_PACKAGES_TOKEN');
+            expect(pat?.value).toBe('ghp_fine_grained_pat_value');
+        });
+
+        it('does NOT push GITHUB_READ_PACKAGES_TOKEN when no PAT is saved', async () => {
+            const { service, githubPlugin, deployFacade } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: {},
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(deployFacade.getOtherPluginSettings).toHaveBeenCalledTimes(1);
+            const { secrets } = captureCalls(githubPlugin);
+            expect(
+                secrets.find((s: any) => s.key === 'GITHUB_READ_PACKAGES_TOKEN'),
+            ).toBeUndefined();
+        });
+
+        it('skips the cross-plugin read entirely for non-k8s providers', async () => {
+            const { service, githubPlugin, deployFacade } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: { readPackagesPat: 'should-not-be-pushed' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            // Vercel doesn't need a packages PAT — the cross-plugin read is
+            // a no-op for non-k8s flows so we don't even ask.
+            expect(deployFacade.getOtherPluginSettings).not.toHaveBeenCalled();
+            const { secrets } = captureCalls(githubPlugin);
+            expect(
+                secrets.find((s: any) => s.key === 'GITHUB_READ_PACKAGES_TOKEN'),
+            ).toBeUndefined();
+        });
+
+        it('does not block the deploy when the GitHub plugin settings lookup throws', async () => {
+            const { service, githubPlugin, deployFacade } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+            deployFacade.getOtherPluginSettings.mockRejectedValueOnce(new Error('boom'));
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+
+            // Deploy still ran — the standard k8s secrets were pushed.
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')).toBeDefined();
+        });
+
+        it('trims whitespace and treats blank/whitespace-only PATs as missing', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: { readPackagesPat: '   \n\t ' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(
+                secrets.find((s: any) => s.key === 'GITHUB_READ_PACKAGES_TOKEN'),
+            ).toBeUndefined();
+        });
     });
 
     it('emits DeploymentDispatchedEvent after a successful dispatch', async () => {

@@ -594,6 +594,22 @@
                 "previous": "Предыдущая",
                 "next": "Следующая",
                 "pageOf": "Страница {page} из {total}"
+            },
+            "viewMode": {
+                "table": "Таблица",
+                "board": "Доска"
+            },
+            "kanban": {
+                "empty": "Нет активности здесь",
+                "noWork": "Нет работы",
+                "columns": {
+                    "pending": "В ожидании",
+                    "in_progress": "В процессе",
+                    "completed": "Завершено",
+                    "failed": "Ошибка",
+                    "cancelled": "Отменено"
+                },
+                "loadMore": "Загрузить ещё {count}"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Попробуйте изменить запрос поиска",
                     "withoutSearch": "Создайте первый AI-работа, чтобы начать"
                 }
+            },
+            "viewMode": {
+                "card": "Карточки",
+                "kanban": "Канбан"
+            },
+            "kanban": {
+                "items": "{count} элементов",
+                "noDescription": "Нет описания",
+                "empty": "Здесь нет работ",
+                "columns": {
+                    "not_started": "Не начато",
+                    "scheduled": "Запланировано",
+                    "generating": "В процессе",
+                    "completed": "Завершено",
+                    "failed": "Ошибка",
+                    "cancelled": "Отменено"
+                },
+                "status": {
+                    "notStarted": "Не начато",
+                    "scheduled": "Запланировано",
+                    "generating": "Генерация",
+                    "completed": "Завершено",
+                    "completedWithWarnings": "Завершено с предупреждениями",
+                    "failed": "Ошибка",
+                    "cancelled": "Отменено"
+                },
+                "loadMore": "Загрузить ещё {count}"
             }
         },
         "settings": {

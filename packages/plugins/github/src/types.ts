@@ -2,6 +2,11 @@ export interface GitHubSettings {
 	readonly clientId?: string;
 	readonly clientSecret?: string;
 	readonly apiBaseUrl?: string;
+	/** Fine-grained GitHub PAT with `read:packages` scope.
+	 * Used by the Kubernetes deploy provider to mint an imagePullSecret
+	 * for private GHCR images. Optional — only required when the
+	 * generated website repo (and therefore its GHCR image) is private. */
+	readonly readPackagesPat?: string;
 }
 
 export interface GitHubWorkflow {

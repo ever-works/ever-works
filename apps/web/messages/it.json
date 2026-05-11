@@ -594,6 +594,22 @@
                 "previous": "Precedente",
                 "next": "Successivo",
                 "pageOf": "Pagina {page} di {total}"
+            },
+            "viewMode": {
+                "table": "Tabella",
+                "board": "Bacheca"
+            },
+            "kanban": {
+                "empty": "Nessuna attività qui",
+                "noWork": "Nessun lavoro",
+                "columns": {
+                    "pending": "In attesa",
+                    "in_progress": "In corso",
+                    "completed": "Completato",
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
+                },
+                "loadMore": "Carica altri {count}"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Prova a modificare i termini di ricerca",
                     "withoutSearch": "Crea la tua prima lavori con IA per iniziare"
                 }
+            },
+            "viewMode": {
+                "card": "Schede",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} elementi",
+                "noDescription": "Nessuna descrizione",
+                "empty": "Nessun lavoro qui",
+                "columns": {
+                    "not_started": "Non avviato",
+                    "scheduled": "Pianificato",
+                    "generating": "In corso",
+                    "completed": "Completato",
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
+                },
+                "status": {
+                    "notStarted": "Non avviato",
+                    "scheduled": "Pianificato",
+                    "generating": "In generazione",
+                    "completed": "Completato",
+                    "completedWithWarnings": "Completato con avvisi",
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
+                },
+                "loadMore": "Carica altri {count}"
             }
         },
         "settings": {

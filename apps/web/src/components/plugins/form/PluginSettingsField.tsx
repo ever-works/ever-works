@@ -21,6 +21,16 @@ interface PluginSettingsFieldProps {
     required?: boolean;
     onChange: (value: unknown) => void;
     pluginId?: string;
+    /** Plugin-validation result (e.g. detected IngressClass list for the
+     *  k8s plugin). Custom widgets read fields off this. */
+    validationDetails?: Record<string, unknown> | null;
+}
+
+interface ClusterIngressClassDescriptor {
+    name: string;
+    controller?: string;
+    isDefault?: boolean;
+    hasStrategy?: boolean;
 }
 
 export function PluginSettingsField({
@@ -30,6 +40,7 @@ export function PluginSettingsField({
     required,
     onChange,
     pluginId,
+    validationDetails,
 }: PluginSettingsFieldProps) {
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
@@ -84,6 +95,7 @@ export function PluginSettingsField({
                     value={(value as Record<string, unknown>) || {}}
                     onChange={onChange}
                     pluginId={pluginId}
+                    validationDetails={validationDetails}
                 />
             );
         }
@@ -98,6 +110,64 @@ export function PluginSettingsField({
                     onChange={onChange}
                     pluginId={pluginId}
                 />
+            );
+        }
+
+        // Cluster IngressClass select — populated from the most recent
+        // validateConnection result. Three states:
+        //   1. No validation yet (`validationDetails == null`): plain text
+        //      input. No warning — we haven't checked anything yet, so
+        //      saying "no controller detected" would be alarming/incorrect.
+        //   2. Validation ran, cluster has no detected classes: text input +
+        //      warning hint (rendered below renderInput) telling the user to
+        //      install nginx/Traefik.
+        //   3. Validation ran, classes detected: dropdown populated from the
+        //      detected list (sorted default-first, strategy-known-second).
+        if (schema.widget === 'cluster-ingress-class') {
+            const rawList = (validationDetails?.ingressClasses ?? []) as unknown;
+            const classes: ClusterIngressClassDescriptor[] = Array.isArray(rawList)
+                ? (rawList as ClusterIngressClassDescriptor[]).filter(
+                      (c) => c && typeof c.name === 'string',
+                  )
+                : [];
+            if (classes.length === 0) {
+                return (
+                    <Input
+                        type="text"
+                        value={String(value ?? schema.default ?? '')}
+                        onChange={(e) => onChange(e.currentTarget.value || null)}
+                        placeholder={t('clusterIngressClassPlaceholder')}
+                        variant="form"
+                    />
+                );
+            }
+            const sorted = [...classes].sort((a, b) => {
+                if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+                if (a.hasStrategy !== b.hasStrategy) return a.hasStrategy ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+            const currentValue = String(value ?? schema.default ?? '') || '__cluster_default__';
+            return (
+                <Select
+                    value={currentValue}
+                    onValueChange={(v) => onChange(v === '__cluster_default__' ? null : v)}
+                >
+                    <option value="__cluster_default__">
+                        {t('clusterIngressClassUseDefault')}
+                    </option>
+                    {sorted.map((c) => {
+                        const labelParts = [c.name];
+                        if (c.controller) labelParts.push(`(${c.controller})`);
+                        if (c.isDefault) labelParts.push(`— ${t('clusterIngressClassDefault')}`);
+                        if (c.hasStrategy === false)
+                            labelParts.push(`— ${t('clusterIngressClassUnknown')}`);
+                        return (
+                            <option key={c.name} value={c.name}>
+                                {labelParts.join(' ')}
+                            </option>
+                        );
+                    })}
+                </Select>
             );
         }
 
@@ -299,6 +369,28 @@ export function PluginSettingsField({
             {description && (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{description}</p>
             )}
+
+            {schema.widget === 'cluster-ingress-class' &&
+                (() => {
+                    if (!validationDetails) {
+                        // Pre-validation: neutral hint, no warning.
+                        return (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('clusterIngressClassPreVerify')}
+                            </p>
+                        );
+                    }
+                    const list = validationDetails.ingressClasses;
+                    if (!Array.isArray(list) || list.length === 0) {
+                        // Post-validation, cluster has no controllers: warn.
+                        return (
+                            <p className="text-xs text-warning dark:text-warning">
+                                {t('clusterIngressClassEmpty')}
+                            </p>
+                        );
+                    }
+                    return null;
+                })()}
 
             {isSecret && (
                 <p className="text-xs text-warning dark:text-warning items-center gap-1 hidden">

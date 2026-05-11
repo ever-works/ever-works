@@ -594,6 +594,22 @@
                 "previous": "上一页",
                 "next": "下一页",
                 "pageOf": "第 {page} 页，共 {total} 页"
+            },
+            "viewMode": {
+                "table": "表格",
+                "board": "看板"
+            },
+            "kanban": {
+                "empty": "此处无活动",
+                "noWork": "无工作",
+                "columns": {
+                    "pending": "待处理",
+                    "in_progress": "进行中",
+                    "completed": "已完成",
+                    "failed": "失败",
+                    "cancelled": "已取消"
+                },
+                "loadMore": "加载更多 {count} 项"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "尝试调整搜索词",
                     "withoutSearch": "创建您的第一个 AI 驱动作品以开始使用"
                 }
+            },
+            "viewMode": {
+                "card": "卡片",
+                "kanban": "看板"
+            },
+            "kanban": {
+                "items": "{count} 个项目",
+                "noDescription": "暂无描述",
+                "empty": "此处无工作",
+                "columns": {
+                    "not_started": "未开始",
+                    "scheduled": "已计划",
+                    "generating": "进行中",
+                    "completed": "已完成",
+                    "failed": "失败",
+                    "cancelled": "已取消"
+                },
+                "status": {
+                    "notStarted": "未开始",
+                    "scheduled": "已计划",
+                    "generating": "生成中",
+                    "completed": "已完成",
+                    "completedWithWarnings": "完成但有警告",
+                    "failed": "失败",
+                    "cancelled": "已取消"
+                },
+                "loadMore": "加载更多 {count} 项"
             }
         },
         "settings": {
