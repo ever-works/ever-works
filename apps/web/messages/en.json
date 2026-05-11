@@ -1888,6 +1888,11 @@
                 "stopFailed": "Failed to cancel generation"
             },
             "settings": {
+                "tabs": {
+                    "general": "General",
+                    "members": "Members",
+                    "navigationLabel": "Settings tabs"
+                },
                 "sourceSettings": "Source Repository",
                 "originalSource": "Original Source",
                 "syncEnabled": "Sync Enabled",
