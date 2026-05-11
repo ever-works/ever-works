@@ -77,12 +77,12 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			},
 			readPackagesPat: {
 				type: 'string',
-				title: 'Read packages PAT (optional)',
+				title: 'Read packages PAT',
 				description:
-					'Fine-grained GitHub PAT with `read:packages` scope. Used by the Kubernetes deploy provider to pull private GHCR images from your cluster. Leave blank if your generated website repo is public.',
+					'Used by the Kubernetes deploy provider to pull private GHCR images. Click "Connect" to authorize via GitHub (recommended — least-privilege token with `read:packages` + `write:packages` only) or paste a fine-grained PAT manually. Leave blank if your generated website repo is public.',
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-widget': 'password'
+				'x-widget': 'github-packages-oauth'
 			}
 		}
 	};
