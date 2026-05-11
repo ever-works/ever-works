@@ -16,6 +16,27 @@ export class MemberInvitedEvent {
     ) {}
 }
 
+/**
+ * Fired when a tokenised WorkInvitation is created. Email sender uses
+ * `claimUrl` (path-style: app.ever.works/claim/<token>). The raw token
+ * never leaves the issuing controller — it's embedded in the URL only.
+ */
+export class WorkInvitationIssuedEvent {
+    static EVENT_NAME = 'work.invitation_issued';
+
+    constructor(
+        public inviter: User,
+        public work: Work,
+        public role: string,
+        public claimUrl: string,
+        /** Recipient email — null only for operator-deliver flows. */
+        public recipientEmail: string | null,
+        public expiresAt: Date,
+        /** owner-claim only: provider login that must match at accept. */
+        public expectedProviderUsername: string | null,
+    ) {}
+}
+
 export class UserCreatedEvent extends BaseUserEvent {
     static EVENT_NAME = 'user.created';
 
