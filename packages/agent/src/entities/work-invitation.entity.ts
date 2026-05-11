@@ -16,6 +16,7 @@ import {
     WorkInvitationStatus,
     WorkInvitationTransferState,
 } from './types';
+import { PortableDateColumn } from './_types';
 
 export type WorkInvitationMetadata = {
     /** GitHub/GitLab/Bitbucket login the claimant must match (owner-claim only). */
@@ -48,7 +49,7 @@ export class WorkInvitation {
     @Column({ type: 'varchar', length: 64 })
     tokenHash: string;
 
-    @Column({ type: 'timestamp with time zone' })
+    @PortableDateColumn()
     tokenExpiresAt: Date;
 
     @Column()
@@ -68,7 +69,7 @@ export class WorkInvitation {
     @JoinColumn({ name: 'acceptedByUserId' })
     acceptedBy: ClassToObject<User> | null;
 
-    @Column({ type: 'timestamp with time zone', nullable: true })
+    @PortableDateColumn({ nullable: true })
     acceptedAt: Date | null;
 
     @Column({ type: 'simple-json', nullable: true })
