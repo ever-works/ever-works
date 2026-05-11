@@ -76,7 +76,7 @@ describe('GitHubPlugin', () => {
 			expect(props.readPackagesPat).toBeDefined();
 			expect(props.readPackagesPat['x-secret']).toBe(true);
 			expect(props.readPackagesPat['x-scope']).toBe('user');
-			expect(props.readPackagesPat['x-widget']).toBe('password');
+			expect(props.readPackagesPat['x-widget']).toBe('github-packages-oauth');
 		});
 	});
 

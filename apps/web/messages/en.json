@@ -2965,7 +2965,9 @@
                 "clusterIngressClassDefault": "default",
                 "clusterIngressClassUnknown": "unknown controller",
                 "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
-                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list."
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
+                "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually."
             },
             "oauth": {
                 "title": "Account Connection",

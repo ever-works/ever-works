@@ -119,6 +119,7 @@ export const ROUTES = {
     API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
+    API_OAUTH_READ_PACKAGES_CALLBACK: '/api/oauth/:providerId/read-packages/callback/plugins',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {
