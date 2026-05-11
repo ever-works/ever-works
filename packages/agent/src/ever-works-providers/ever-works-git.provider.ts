@@ -111,8 +111,7 @@ export class EverWorksGitProvider {
             throw new EverWorksGitMisconfiguredError('customer GitHub PAT is empty');
         }
 
-        const visibility =
-            options.visibilityOverride ?? config.everWorks.git.getVisibility();
+        const visibility = options.visibilityOverride ?? config.everWorks.git.getVisibility();
         const fetchImpl = options.fetchImpl ?? fetch;
 
         const firstName = this.buildRepoName(options.work);

@@ -180,7 +180,10 @@ export class WorkRepository {
      * not `DELETED` and the work has not been soft-archived. Used by the
      * Ever Works Deploy quota check.
      */
-    async countActiveByDeployProvider(userId: string, deployProvider = 'ever-works'): Promise<number> {
+    async countActiveByDeployProvider(
+        userId: string,
+        deployProvider = 'ever-works',
+    ): Promise<number> {
         const all = await this.repository.find({
             where: { userId, deployProvider },
             select: { id: true, generateStatus: true } as never,

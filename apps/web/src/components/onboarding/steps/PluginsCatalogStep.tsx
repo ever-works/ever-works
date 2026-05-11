@@ -8,9 +8,7 @@ import { Link } from '@/i18n/navigation';
 import { OnboardingPluginStep } from '../OnboardingPluginStep';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import type {
-    OnboardingPluginCard,
-} from '@ever-works/contracts/api';
+import type { OnboardingPluginCard } from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 
 export interface PluginsCatalogStepProps {
@@ -26,11 +24,7 @@ export interface PluginsCatalogStepProps {
  * makes "Skip — set up later" prominent because 99% of new users won't
  * recognise these names yet.
  */
-export function PluginsCatalogStep({
-    cards,
-    pluginsById,
-    onExpand,
-}: PluginsCatalogStepProps) {
+export function PluginsCatalogStep({ cards, pluginsById, onExpand }: PluginsCatalogStepProps) {
     const [openId, setOpenId] = useState<string | null>(null);
 
     return (
@@ -41,10 +35,7 @@ export function PluginsCatalogStep({
                 </h3>
                 <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
                     Most people skip this. You can wire any of these later from{' '}
-                    <Link
-                        href={ROUTES.DASHBOARD_PLUGINS}
-                        className="underline hover:text-primary"
-                    >
+                    <Link href={ROUTES.DASHBOARD_PLUGINS} className="underline hover:text-primary">
                         Settings → Plugins
                     </Link>
                     . Click a card if you want a peek now.

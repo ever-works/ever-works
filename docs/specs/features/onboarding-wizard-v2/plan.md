@@ -59,21 +59,21 @@ flowchart TB
 
 ## 2. Tech choices
 
-| Concern | Choice | Rationale |
-|---|---|---|
-| State persistence | TypeORM columns on `users`; jsonb for `onboarding_state` | Matches existing user-scoped flag pattern; jsonb avoids a side table |
-| State API | New `apps/api/src/onboarding/` Nest module with `OnboardingStateController` | Follows existing per-feature module structure |
-| Catalog API | Same controller, `GET /api/onboarding/catalog` reads env-flag status server-side | Server is authoritative on which Ever Works defaults are enabled |
-| Wizard state hook | Custom `useOnboardingFlow` using `useReducer` + SWR for state sync | Avoids adding a new dep; SWR already in apps/web for similar patterns |
-| Telemetry | Server action calling `@ever-works/monitoring` `AnalyticsService.track` | Reuses server-side PostHog client; no `posthog-js` bundle growth |
-| Ever Works Git auth | Octokit with PAT from `EVER_WORKS_CUSTOMERS_GITHUB_PAT` env var | Same library the github plugin already uses |
-| Ever Works Deploy auth | Build a `k8s` plugin config object at call time from env vars; pass to existing k8s deploy primitives | Reuses validated k8s plugin code; no kubeconfig persisted per user |
-| Quota check | Indexed `COUNT(*)` on `works` where `user_id = ?` AND `deploy_provider = 'ever-works'` AND `status NOT IN ('deleted','archived')` | One round-trip; explicit non-negotiable index on (user_id, deploy_provider) |
-| Grok integration | LangChain `@langchain/openai` with `baseURL: https://api.x.ai/v1/` | xAI is OpenAI-API-compatible; matches how `groq` plugin works |
-| Gemini API key surfacing | Add optional `apiKey` field to existing plugin schema; CLI path unchanged when empty | Minimum-diff; matches FR-27 expectation |
-| Logos | Vendor official SVG marks under `apps/web/public/logos/` (Apache/CC0 sources) | Static, predictable, no third-party fetch |
-| Tests (agent) | Jest, mocking Octokit + k8s plugin entrypoints | Matches existing pattern in `packages/agent/src/__tests__/` |
-| Tests (web) | Vitest for hook unit tests; Playwright for the end-to-end happy path | Matches existing split between web unit and e2e tests |
+| Concern                  | Choice                                                                                                                            | Rationale                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| State persistence        | TypeORM columns on `users`; jsonb for `onboarding_state`                                                                          | Matches existing user-scoped flag pattern; jsonb avoids a side table        |
+| State API                | New `apps/api/src/onboarding/` Nest module with `OnboardingStateController`                                                       | Follows existing per-feature module structure                               |
+| Catalog API              | Same controller, `GET /api/onboarding/catalog` reads env-flag status server-side                                                  | Server is authoritative on which Ever Works defaults are enabled            |
+| Wizard state hook        | Custom `useOnboardingFlow` using `useReducer` + SWR for state sync                                                                | Avoids adding a new dep; SWR already in apps/web for similar patterns       |
+| Telemetry                | Server action calling `@ever-works/monitoring` `AnalyticsService.track`                                                           | Reuses server-side PostHog client; no `posthog-js` bundle growth            |
+| Ever Works Git auth      | Octokit with PAT from `EVER_WORKS_CUSTOMERS_GITHUB_PAT` env var                                                                   | Same library the github plugin already uses                                 |
+| Ever Works Deploy auth   | Build a `k8s` plugin config object at call time from env vars; pass to existing k8s deploy primitives                             | Reuses validated k8s plugin code; no kubeconfig persisted per user          |
+| Quota check              | Indexed `COUNT(*)` on `works` where `user_id = ?` AND `deploy_provider = 'ever-works'` AND `status NOT IN ('deleted','archived')` | One round-trip; explicit non-negotiable index on (user_id, deploy_provider) |
+| Grok integration         | LangChain `@langchain/openai` with `baseURL: https://api.x.ai/v1/`                                                                | xAI is OpenAI-API-compatible; matches how `groq` plugin works               |
+| Gemini API key surfacing | Add optional `apiKey` field to existing plugin schema; CLI path unchanged when empty                                              | Minimum-diff; matches FR-27 expectation                                     |
+| Logos                    | Vendor official SVG marks under `apps/web/public/logos/` (Apache/CC0 sources)                                                     | Static, predictable, no third-party fetch                                   |
+| Tests (agent)            | Jest, mocking Octokit + k8s plugin entrypoints                                                                                    | Matches existing pattern in `packages/agent/src/__tests__/`                 |
+| Tests (web)              | Vitest for hook unit tests; Playwright for the end-to-end happy path                                                              | Matches existing split between web unit and e2e tests                       |
 
 ## 3. Data model
 
@@ -177,11 +177,11 @@ Add a `storageProvider` branch in `createRepository`:
 
 ```ts
 switch (work.storageProvider) {
-  case 'ever-works-git':
-    return this.everWorksGit.createRepository(work);
-  case 'user-github':
-  default:
-    return this.userGithub.createRepository(work, /* organization */);
+	case 'ever-works-git':
+		return this.everWorksGit.createRepository(work);
+	case 'user-github':
+	default:
+		return this.userGithub.createRepository(work /* organization */);
 }
 ```
 
@@ -189,7 +189,7 @@ switch (work.storageProvider) {
 
 - Read `users.onboarding_state` for the current user.
 - Set `work.storageProvider = onboardingState.storage.choice` (default `user-github` if no state).
-- Set `work.deployProvider  = onboardingState.deploy.choice`  (default `vercel`).
+- Set `work.deployProvider  = onboardingState.deploy.choice` (default `vercel`).
 - If `deployProvider === 'ever-works'` AND `DEPLOY_EVER_WORKS_ENABLED`,
   call `EverWorksK8sDeployProvider.checkQuota(userId)` before persisting.
 
@@ -252,36 +252,36 @@ add `onboardingPriority: 4` and `onboardingDescription`. No code changes.
 
 ## 8. Telemetry events
 
-| Event | Required props | When |
-|---|---|---|
-| `onboarding_opened` | `trigger: 'auto'|'badge'|'help'` | First render with wizard open |
-| `onboarding_closed` | `completed: bool`, `lastStepIndex` | Modal closes |
-| `onboarding_completed` | none beyond defaults | Server flag flipped |
-| `onboarding_step_viewed` | `stepKind`, `stepIndex`, `pluginId?` | Step paints |
-| `onboarding_step_next` / `_back` / `_skipped` | `stepKind` | Footer action |
-| `onboarding_ai_choice_selected` | `choice` | AI step Next/Skip |
-| `onboarding_storage_choice_selected` | `choice` | Storage step Next/Skip |
-| `onboarding_deploy_choice_selected` | `choice` | Deploy step Next/Skip |
-| `onboarding_plugin_connected` | `pluginId`, `via: 'oauth'|'fields'|'device-auth'` | A config step reports success |
-| `onboarding_plugin_refresh_clicked` | `pluginId` | Refresh button on a config step |
-| `onboarding_planned_card_clicked` | `card` | Click on a greyed Planned card |
-| `onboarding_byok_skipped` | `choice` | Skip on a BYOK config step |
-| `onboarding_plugins_step_expanded` | `pluginId` | A card opens its inline form |
-| `onboarding_plugins_step_skipped` / `_advanced` | none | Step 8 exit path |
-| `onboarding_ever_works_quota_blocked` | `limit` | API returns `quota_exceeded` |
+| Event                                           | Required props                       | When                            |
+| ----------------------------------------------- | ------------------------------------ | ------------------------------- | -------------- | ----------------------------- |
+| `onboarding_opened`                             | `trigger: 'auto'                     | 'badge'                         | 'help'`        | First render with wizard open |
+| `onboarding_closed`                             | `completed: bool`, `lastStepIndex`   | Modal closes                    |
+| `onboarding_completed`                          | none beyond defaults                 | Server flag flipped             |
+| `onboarding_step_viewed`                        | `stepKind`, `stepIndex`, `pluginId?` | Step paints                     |
+| `onboarding_step_next` / `_back` / `_skipped`   | `stepKind`                           | Footer action                   |
+| `onboarding_ai_choice_selected`                 | `choice`                             | AI step Next/Skip               |
+| `onboarding_storage_choice_selected`            | `choice`                             | Storage step Next/Skip          |
+| `onboarding_deploy_choice_selected`             | `choice`                             | Deploy step Next/Skip           |
+| `onboarding_plugin_connected`                   | `pluginId`, `via: 'oauth'            | 'fields'                        | 'device-auth'` | A config step reports success |
+| `onboarding_plugin_refresh_clicked`             | `pluginId`                           | Refresh button on a config step |
+| `onboarding_planned_card_clicked`               | `card`                               | Click on a greyed Planned card  |
+| `onboarding_byok_skipped`                       | `choice`                             | Skip on a BYOK config step      |
+| `onboarding_plugins_step_expanded`              | `pluginId`                           | A card opens its inline form    |
+| `onboarding_plugins_step_skipped` / `_advanced` | none                                 | Step 8 exit path                |
+| `onboarding_ever_works_quota_blocked`           | `limit`                              | API returns `quota_exceeded`    |
 
 All events carry `userId` and `wizardVersion: 'v2'`.
 
 ## 9. Failure modes
 
-| Scenario | Behaviour |
-|---|---|
-| `/api/onboarding/state` GET fails | Wizard renders with defaults; sets a banner; localStorage cache used if present |
-| `PATCH /api/onboarding/state` fails | UI keeps progress locally; retries on next step transition; toast on permanent failure |
-| Telemetry call fails | Logged server-side; never blocks UI |
+| Scenario                                             | Behaviour                                                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `/api/onboarding/state` GET fails                    | Wizard renders with defaults; sets a banner; localStorage cache used if present                                  |
+| `PATCH /api/onboarding/state` fails                  | UI keeps progress locally; retries on next step transition; toast on permanent failure                           |
+| Telemetry call fails                                 | Logged server-side; never blocks UI                                                                              |
 | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` invalid at runtime | API returns `storage_provider_misconfigured`; UI surfaces "We're working on it" toast; user can pick Your GitHub |
-| Quota check race (two concurrent Work creates) | DB-level guard via `INSERT … WHERE COUNT(active) < cap` (or row-level lock on `users`) ensures one wins |
-| `k8s` env config invalid | Boot-time validation rejects; deploy never starts |
+| Quota check race (two concurrent Work creates)       | DB-level guard via `INSERT … WHERE COUNT(active) < cap` (or row-level lock on `users`) ensures one wins          |
+| `k8s` env config invalid                             | Boot-time validation rejects; deploy never starts                                                                |
 
 ## 10. Rollout
 

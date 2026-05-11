@@ -64,9 +64,7 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         updateGenerateStatus: jest.fn().mockResolvedValue(undefined),
     };
     const userRepo = {
-        findById: jest
-            .fn()
-            .mockResolvedValue({ id: baseUser.id, onboardingState }),
+        findById: jest.fn().mockResolvedValue({ id: baseUser.id, onboardingState }),
     };
     const dataGenerator = { getItems: jest.fn().mockResolvedValue([]) };
     const ownership = {};

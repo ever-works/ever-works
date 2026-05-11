@@ -26,10 +26,7 @@ export class OnboardingTelemetryController {
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Relay an onboarding wizard telemetry event' })
     @ApiResponse({ status: 204, description: 'Event accepted' })
-    track(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body() body: OnboardingTelemetryBodyDto,
-    ): void {
+    track(@CurrentUser() auth: AuthenticatedUser, @Body() body: OnboardingTelemetryBodyDto): void {
         try {
             this.analytics.track(auth.userId, body.event, {
                 ...(body.properties ?? {}),

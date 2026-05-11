@@ -17,10 +17,7 @@ import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
 import { dismissOnboarding } from '@/app/actions/onboarding/state';
-import type {
-    OnboardingCatalogResponse,
-    OnboardingStateResponse,
-} from '@ever-works/contracts/api';
+import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';

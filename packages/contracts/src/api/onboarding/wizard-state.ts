@@ -6,19 +6,9 @@
  * transition so progress survives a cookie wipe or device switch.
  */
 
-export type OnboardingAiChoice =
-	| 'ever-works'
-	| 'openrouter'
-	| 'claude-code'
-	| 'codex'
-	| 'gemini'
-	| 'grok';
+export type OnboardingAiChoice = 'ever-works' | 'openrouter' | 'claude-code' | 'codex' | 'gemini' | 'grok';
 
-export type OnboardingStorageChoice =
-	| 'ever-works-git'
-	| 'user-github'
-	| 'user-gitlab'
-	| 'user-git';
+export type OnboardingStorageChoice = 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git';
 
 export type OnboardingDeployChoice = 'ever-works' | 'vercel' | 'k8s';
 

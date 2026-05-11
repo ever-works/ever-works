@@ -27,12 +27,7 @@ export function ChoiceCardGrid<Choice extends string>({
     onPlannedClick,
 }: ChoiceCardGridProps<Choice>) {
     return (
-        <div
-            className={cn(
-                'grid gap-3',
-                columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
-            )}
-        >
+        <div className={cn('grid gap-3', columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
             {cards.map((card) => (
                 <ChoiceCard
                     key={card.choice}

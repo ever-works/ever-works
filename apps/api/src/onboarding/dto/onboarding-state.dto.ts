@@ -56,8 +56,7 @@ class DeployChoicePatchDto {
 
 export class OnboardingStatePatchBodyDto {
     @ApiPropertyOptional({
-        description:
-            'Partial state update. Server deep-merges with persisted version-2 shape.',
+        description: 'Partial state update. Server deep-merges with persisted version-2 shape.',
     })
     @IsOptional()
     @ValidateNested()

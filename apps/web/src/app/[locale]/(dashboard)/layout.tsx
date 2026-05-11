@@ -6,10 +6,7 @@ import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { onboardingAPI } from '@/lib/api/onboarding';
 import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
-import type {
-    OnboardingCatalogResponse,
-    OnboardingStateResponse,
-} from '@ever-works/contracts/api';
+import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';

@@ -34,7 +34,12 @@ function EverWorksAiMark() {
             aria-hidden="true"
             fill="currentColor"
         >
-            <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07L19.07 4.93" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path
+                d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07L19.07 4.93"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+            />
         </svg>
     );
 }

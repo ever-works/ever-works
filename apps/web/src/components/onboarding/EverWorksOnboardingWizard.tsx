@@ -14,10 +14,7 @@ import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { AI_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
 import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
-import {
-    completeOnboarding,
-    patchOnboardingState,
-} from '@/app/actions/onboarding/state';
+import { completeOnboarding, patchOnboardingState } from '@/app/actions/onboarding/state';
 import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
 import type {
     OnboardingAiChoice,
@@ -88,9 +85,7 @@ export function EverWorksOnboardingWizard({
     });
 
     const refreshConnections = async (pluginId?: string) => {
-        const target = pluginId
-            ? plugins.filter((p) => p.pluginId === pluginId)
-            : plugins;
+        const target = pluginId ? plugins.filter((p) => p.pluginId === pluginId) : plugins;
         if (target.length === 0) return;
         setIsStatusLoading(true);
         try {
@@ -331,9 +326,7 @@ function StepBody({
                     cards={catalog.storage}
                     selected={flow.state.storage.choice}
                     icons={STORAGE_ICONS}
-                    onSelect={(choice) =>
-                        flow.setStorageChoice(choice as OnboardingStorageChoice)
-                    }
+                    onSelect={(choice) => flow.setStorageChoice(choice as OnboardingStorageChoice)}
                     onPlannedClick={(c) => flow.notePlannedClick('storage', c)}
                 />
             );
@@ -359,9 +352,7 @@ function StepBody({
                     selected={flow.state.deploy.choice}
                     columns={3}
                     icons={DEPLOY_ICONS}
-                    onSelect={(choice) =>
-                        flow.setDeployChoice(choice as OnboardingDeployChoice)
-                    }
+                    onSelect={(choice) => flow.setDeployChoice(choice as OnboardingDeployChoice)}
                     onPlannedClick={(c) => flow.notePlannedClick('deploy', c)}
                 />
             );

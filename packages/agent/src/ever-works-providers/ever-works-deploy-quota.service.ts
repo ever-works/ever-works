@@ -1,9 +1,6 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { config } from '../config';
-import {
-    EverWorksDeployQuotaExceededError,
-    type EverWorksDeployQuotaCounter,
-} from './types';
+import { EverWorksDeployQuotaExceededError, type EverWorksDeployQuotaCounter } from './types';
 
 /** DI token for the active-deploys counter implementation. */
 export const EVER_WORKS_DEPLOY_QUOTA_COUNTER = Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER');

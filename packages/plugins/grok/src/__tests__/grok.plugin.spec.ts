@@ -217,7 +217,9 @@ describe('GrokPlugin', () => {
 
 	describe('embeddings', () => {
 		it('should reject embedding calls', async () => {
-			await expect(plugin.createEmbedding({ input: 'hi' } as never)).rejects.toThrow('Embeddings not supported by Grok');
+			await expect(plugin.createEmbedding({ input: 'hi' } as never)).rejects.toThrow(
+				'Embeddings not supported by Grok'
+			);
 		});
 	});
 });

@@ -18,9 +18,9 @@ export function WelcomeStep() {
                         Welcome to Ever Works
                     </h3>
                     <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                        Build AI-powered directories without leaving your browser. We&apos;ll
-                        walk you through three quick choices (AI, Storage, Deployment) before
-                        you create your first work.
+                        Build AI-powered directories without leaving your browser. We&apos;ll walk
+                        you through three quick choices (AI, Storage, Deployment) before you create
+                        your first work.
                     </p>
                 </div>
             </div>

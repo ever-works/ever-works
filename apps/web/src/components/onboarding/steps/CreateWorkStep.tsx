@@ -25,8 +25,8 @@ export function CreateWorkStep({ onLeave }: CreateWorkStepProps) {
                         Create your first work
                     </h3>
                     <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                        You&apos;re all set. Hit the button below to start building — your
-                        choices above are saved and any new work will pick them up.
+                        You&apos;re all set. Hit the button below to start building — your choices
+                        above are saved and any new work will pick them up.
                     </p>
                 </div>
             </div>

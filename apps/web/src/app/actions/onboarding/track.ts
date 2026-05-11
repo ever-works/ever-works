@@ -22,8 +22,6 @@ export async function trackOnboardingEvent(
         await onboardingAPI.track(event, properties);
     } catch (cause) {
         // eslint-disable-next-line no-console -- intentional: telemetry is best-effort
-        console.warn(
-            `trackOnboardingEvent(${event}) failed: ${(cause as Error).message}`,
-        );
+        console.warn(`trackOnboardingEvent(${event}) failed: ${(cause as Error).message}`);
     }
 }

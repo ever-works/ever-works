@@ -187,10 +187,7 @@ export interface UseOnboardingFlowResult {
     readonly refresh: () => void;
     readonly jumpTo: (index: number) => void;
     readonly finish: (options?: { dismissed?: boolean }) => void;
-    readonly notePlannedClick: (
-        bucket: 'ai' | 'storage' | 'deploy',
-        choice: string,
-    ) => void;
+    readonly notePlannedClick: (bucket: 'ai' | 'storage' | 'deploy', choice: string) => void;
 }
 
 /**
@@ -305,7 +302,10 @@ export function useOnboardingFlow({
     const finish = useCallback(
         (options?: { dismissed?: boolean }) => {
             if (options?.dismissed) {
-                trackEvent('onboarding_closed', { completed: false, lastStepIndex: reducerState.stepIndex });
+                trackEvent('onboarding_closed', {
+                    completed: false,
+                    lastStepIndex: reducerState.stepIndex,
+                });
             } else {
                 trackEvent('onboarding_completed', {});
                 markCompleted();

@@ -122,9 +122,7 @@ describe('EverWorksGitProvider', () => {
             const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
             expect(url).toBe('https://api.github.com/orgs/ever-works-cloud/repos');
             expect(init.method).toBe('POST');
-            expect((init.headers as Record<string, string>).authorization).toBe(
-                'Bearer ghp_test',
-            );
+            expect((init.headers as Record<string, string>).authorization).toBe('Bearer ghp_test');
             const body = JSON.parse(init.body as string);
             expect(body).toMatchObject({
                 name: 'evereq-my-tools',
@@ -149,15 +147,17 @@ describe('EverWorksGitProvider', () => {
                     mkResponse(422, {
                         message: 'Validation Failed',
                         errors: [
-                            { resource: 'Repository', code: 'custom', field: 'name', message: 'name already exists on this account' },
+                            {
+                                resource: 'Repository',
+                                code: 'custom',
+                                field: 'name',
+                                message: 'name already exists on this account',
+                            },
                         ],
                     }),
                 )
                 .mockResolvedValueOnce(
-                    mkResponse(
-                        201,
-                        mkRepoBody('evereq-my-tools-b8a4f8e', 'ever-works-cloud'),
-                    ),
+                    mkResponse(201, mkRepoBody('evereq-my-tools-b8a4f8e', 'ever-works-cloud')),
                 );
 
             const p = new EverWorksGitProvider();
@@ -194,9 +194,7 @@ describe('EverWorksGitProvider', () => {
         it('throws EverWorksGitRequestError on a non-2xx response that is not a name collision', async () => {
             const fetchImpl = jest
                 .fn()
-                .mockResolvedValueOnce(
-                    mkResponse(401, { message: 'Bad credentials' }),
-                );
+                .mockResolvedValueOnce(mkResponse(401, { message: 'Bad credentials' }));
 
             const p = new EverWorksGitProvider();
             let caught: unknown;
@@ -227,9 +225,7 @@ describe('EverWorksGitProvider', () => {
                 visibilityOverride: 'public',
             });
             const url = fetchImpl.mock.calls[0][0] as string;
-            const body = JSON.parse(
-                (fetchImpl.mock.calls[0][1] as RequestInit).body as string,
-            );
+            const body = JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string);
             expect(url).toContain('/orgs/custom-org/repos');
             expect(body.private).toBe(false);
             expect(repo.privateRepo).toBe(false);

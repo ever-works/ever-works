@@ -257,9 +257,7 @@ export const config = {
                 return process.env.EVER_WORKS_DEPLOY_NAMESPACE || 'ever-works-tenants';
             },
             getIngressHostTemplate() {
-                return (
-                    process.env.EVER_WORKS_DEPLOY_INGRESS_HOST_TEMPLATE || '{slug}.ever.works'
-                );
+                return process.env.EVER_WORKS_DEPLOY_INGRESS_HOST_TEMPLATE || '{slug}.ever.works';
             },
             getIngressClass() {
                 return process.env.EVER_WORKS_DEPLOY_INGRESS_CLASS || 'nginx';
@@ -271,10 +269,7 @@ export const config = {
                 return process.env.EVER_WORKS_DEPLOY_REGISTRY || '';
             },
             getMaxWorksPerUser() {
-                const raw = parseInt(
-                    process.env.EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER || '3',
-                    10,
-                );
+                const raw = parseInt(process.env.EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER || '3', 10);
                 return Number.isFinite(raw) && raw > 0 ? raw : 3;
             },
         },

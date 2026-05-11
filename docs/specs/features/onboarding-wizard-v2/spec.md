@@ -296,10 +296,10 @@ A reviewer can sign this spec off once they have confirmed each item:
 
 - [ ] Every functional requirement maps to at least one user scenario in §2.
 - [ ] Every "Ever Works default" path has a fallback when the corresponding env
-  flag is disabled.
+      flag is disabled.
 - [ ] The wizard never gets the user stuck — every step has a skip path.
 - [ ] State survives a localStorage wipe (cookies cleared) without resetting.
 - [ ] Existing per-plugin onboarding UIs (PluginOnboardingWizard,
-  OnboardingPluginStep) are reused, not duplicated.
+      OnboardingPluginStep) are reused, not duplicated.
 - [ ] The Ever Works Git PAT and Ever Works Deploy kubeconfig are read from
-  env only; nothing is committed to the repo.
+      env only; nothing is committed to the repo.

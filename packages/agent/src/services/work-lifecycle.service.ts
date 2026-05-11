@@ -75,8 +75,7 @@ export class WorkLifecycleService {
         return {
             storageProvider:
                 dto.storageProvider ?? onboardingState?.storage?.choice ?? 'user-github',
-            deployProvider:
-                dto.deployProvider ?? onboardingState?.deploy?.choice ?? 'vercel',
+            deployProvider: dto.deployProvider ?? onboardingState?.deploy?.choice ?? 'vercel',
         };
     }
 

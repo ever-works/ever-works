@@ -15,8 +15,8 @@ if (typeof window !== 'undefined') {
                 removeListener: () => undefined,
                 addEventListener: () => undefined,
                 removeEventListener: () => undefined,
-                dispatchEvent: () => false
-            })
+                dispatchEvent: () => false,
+            }),
         });
     }
 
@@ -28,7 +28,7 @@ if (typeof window !== 'undefined') {
     const mkObserver = (): MinimalObserver => ({
         observe: () => undefined,
         unobserve: () => undefined,
-        disconnect: () => undefined
+        disconnect: () => undefined,
     });
 
     if (!('IntersectionObserver' in window)) {

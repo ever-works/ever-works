@@ -35,10 +35,7 @@ describe('OnboardingStateService', () => {
 
     async function makeSvc() {
         const moduleRef = await Test.createTestingModule({
-            providers: [
-                OnboardingStateService,
-                { provide: UserRepository, useValue: repo },
-            ],
+            providers: [OnboardingStateService, { provide: UserRepository, useValue: repo }],
         }).compile();
         svc = moduleRef.get(OnboardingStateService);
     }
@@ -99,9 +96,7 @@ describe('OnboardingStateService', () => {
             });
             expect(first.state.ai.choice).toBe('gemini');
             expect(first.state.lastStep).toBe(2);
-            expect(first.state.storage.choice).toBe(
-                ONBOARDING_DEFAULT_STATE.storage.choice,
-            );
+            expect(first.state.storage.choice).toBe(ONBOARDING_DEFAULT_STATE.storage.choice);
             expect(repo.update).toHaveBeenCalledTimes(1);
 
             const second = await svc.patchState('u1', {

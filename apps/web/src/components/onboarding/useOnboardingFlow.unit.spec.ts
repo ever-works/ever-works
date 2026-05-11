@@ -14,7 +14,7 @@ function initialReducerState() {
         state: ONBOARDING_DEFAULT_STATE,
         history: [] as number[],
         stepIndex: 0,
-        refreshNonce: 0
+        refreshNonce: 0,
     };
 }
 
@@ -27,7 +27,7 @@ describe('computeStepList', () => {
             'storage-choice',
             'deploy-choice',
             'plugins-catalog',
-            'create-work'
+            'create-work',
         ]);
     });
 
@@ -49,14 +49,14 @@ describe('computeStepList', () => {
     });
 
     it('inserts deploy-config for vercel and k8s but not for ever-works', () => {
-        expect(computeStepList(defaultsWith({ deploy: { choice: 'vercel' } })).map((s) => s.kind)).toContain(
-            'deploy-config'
-        );
-        expect(computeStepList(defaultsWith({ deploy: { choice: 'k8s' } })).map((s) => s.kind)).toContain(
-            'deploy-config'
-        );
+        expect(
+            computeStepList(defaultsWith({ deploy: { choice: 'vercel' } })).map((s) => s.kind),
+        ).toContain('deploy-config');
+        expect(
+            computeStepList(defaultsWith({ deploy: { choice: 'k8s' } })).map((s) => s.kind),
+        ).toContain('deploy-config');
         expect(computeStepList(ONBOARDING_DEFAULT_STATE).map((s) => s.kind)).not.toContain(
-            'deploy-config'
+            'deploy-config',
         );
     });
 
@@ -65,8 +65,8 @@ describe('computeStepList', () => {
             defaultsWith({
                 ai: { choice: 'claude-code' },
                 storage: { choice: 'user-github' },
-                deploy: { choice: 'vercel' }
-            })
+                deploy: { choice: 'vercel' },
+            }),
         );
         expect(list).toHaveLength(9);
         expect(list.map((s) => s.kind)).toEqual([
@@ -78,7 +78,7 @@ describe('computeStepList', () => {
             'deploy-choice',
             'deploy-config',
             'plugins-catalog',
-            'create-work'
+            'create-work',
         ]);
     });
 
@@ -96,7 +96,7 @@ describe('clampToSteps', () => {
 
     it('clamps above the step list to the last index', () => {
         expect(clampToSteps(99, ONBOARDING_DEFAULT_STATE)).toBe(
-            computeStepList(ONBOARDING_DEFAULT_STATE).length - 1
+            computeStepList(ONBOARDING_DEFAULT_STATE).length - 1,
         );
     });
 
@@ -122,7 +122,7 @@ describe('reduce', () => {
 
     it('goBack pops the most recent index from history', () => {
         const after = reduce(reduce(initialReducerState(), { type: 'goNext' }), {
-            type: 'goNext'
+            type: 'goNext',
         });
         const back = reduce(after, { type: 'goBack' });
         expect(back.stepIndex).toBe(1);
@@ -143,7 +143,7 @@ describe('reduce', () => {
     it('setStorageChoice replaces the storage choice', () => {
         const next = reduce(initialReducerState(), {
             type: 'setStorageChoice',
-            value: 'user-github'
+            value: 'user-github',
         });
         expect(next.state.storage.choice).toBe('user-github');
     });
@@ -169,11 +169,11 @@ describe('reduce', () => {
         const start = { ...initialReducerState(), stepIndex: 8 };
         const next = reduce(start, {
             type: 'mergeServerState',
-            value: ONBOARDING_DEFAULT_STATE
+            value: ONBOARDING_DEFAULT_STATE,
         });
         expect(next.state).toBe(ONBOARDING_DEFAULT_STATE);
         expect(next.stepIndex).toBeLessThanOrEqual(
-            computeStepList(ONBOARDING_DEFAULT_STATE).length - 1
+            computeStepList(ONBOARDING_DEFAULT_STATE).length - 1,
         );
     });
 

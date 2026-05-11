@@ -13,7 +13,7 @@ describe('ChoiceCard', () => {
                 available
                 badges={['byok']}
                 onSelect={() => undefined}
-            />
+            />,
         );
         expect(screen.getByText('OpenRouter')).toBeInTheDocument();
         expect(screen.getByText('Route AI calls with your own key')).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe('ChoiceCard', () => {
                 available
                 badges={[]}
                 onSelect={onSelect}
-            />
+            />,
         );
         await userEvent.click(screen.getByRole('button', { name: /openrouter/i }));
         expect(onSelect).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe('ChoiceCard', () => {
                 available={false}
                 badges={['planned']}
                 onSelect={onSelect}
-            />
+            />,
         );
         const btn = screen.getByRole('button', { name: /gitlab/i });
         expect(btn).toBeDisabled();
@@ -64,7 +64,7 @@ describe('ChoiceCard', () => {
                 available
                 badges={['default']}
                 onSelect={() => undefined}
-            />
+            />,
         );
         const btn = screen.getByRole('button', { name: /openrouter/i });
         expect(btn).toHaveAttribute('aria-pressed', 'true');

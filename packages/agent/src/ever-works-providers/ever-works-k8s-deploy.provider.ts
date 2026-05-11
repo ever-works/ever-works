@@ -67,8 +67,7 @@ export class EverWorksK8sDeployProvider {
      * `{user}` when present) in the env template.
      */
     resolveIngressHost(work: EverWorksProviderWorkRef, templateOverride?: string): string {
-        const template =
-            templateOverride ?? config.everWorks.deploy.getIngressHostTemplate();
+        const template = templateOverride ?? config.everWorks.deploy.getIngressHostTemplate();
         const userPart = (work.userSlug ?? '').trim() || work.userId.slice(0, 8);
         return template
             .replace(/\{slug\}/g, work.slug)
@@ -88,10 +87,8 @@ export class EverWorksK8sDeployProvider {
             throw new EverWorksDeployDisabledError();
         }
 
-        const inlineKubeconfig =
-            env?.kubeconfig ?? config.everWorks.deploy.getKubeconfig();
-        const pathKubeconfig =
-            env?.kubeconfigPath ?? config.everWorks.deploy.getKubeconfigPath();
+        const inlineKubeconfig = env?.kubeconfig ?? config.everWorks.deploy.getKubeconfig();
+        const pathKubeconfig = env?.kubeconfigPath ?? config.everWorks.deploy.getKubeconfigPath();
 
         let kubeconfig = inlineKubeconfig;
         if (!kubeconfig && pathKubeconfig) {

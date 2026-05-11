@@ -260,8 +260,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			uiHints: {
 				includeInOnboarding: true,
 				onboardingPriority: 4,
-				onboardingDescription:
-					'Deploy your works to your own Kubernetes cluster by pasting your kubeconfig',
+				onboardingDescription: 'Deploy your works to your own Kubernetes cluster by pasting your kubeconfig',
 				completionFields: ['kubeconfig'],
 				verifiesOnSave: true
 			},

@@ -58,10 +58,10 @@ While signed in as **`evereq`** (the org owner):
 5. **Repository access**: **All repositories** under `ever-works-cloud`.
 6. **Permissions** (these map to fine-grained scopes; choose **Read &
    write** for each unless noted):
-   - **Repository → Administration** — for repo creation/deletion.
-   - **Repository → Contents** — for pushing generated Work content.
-   - **Repository → Workflows** — only if the manifests reference one.
-   - **Repository → Metadata** — auto-included by GitHub.
+    - **Repository → Administration** — for repo creation/deletion.
+    - **Repository → Contents** — for pushing generated Work content.
+    - **Repository → Workflows** — only if the manifests reference one.
+    - **Repository → Metadata** — auto-included by GitHub.
 7. **Generate token** and copy the resulting `github_pat_*` string.
 
 The token is org-scoped: it can only operate on `ever-works-cloud`
@@ -72,11 +72,11 @@ accidentally touch the `ever-works` source org.
 
 Three deployment surfaces need the value:
 
-| Surface | Where | Key |
-|---|---|---|
-| DigitalOcean k8s `default` namespace, `do-sfo2-k8s-gauzy` | Secret `ever-works-secrets` (used by the `ever-works-api-*` deployments) | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
-| GitHub Actions repo secrets (for CI deploys that template the manifests) | `https://github.com/ever-works/ever-works/settings/secrets/actions` | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
-| Local `.env` for ad-hoc dev | `C:/Coding/Workspace/.config/ever-works.env` (gitignored) | same |
+| Surface                                                                  | Where                                                                    | Key                               |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------- |
+| DigitalOcean k8s `default` namespace, `do-sfo2-k8s-gauzy`                | Secret `ever-works-secrets` (used by the `ever-works-api-*` deployments) | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
+| GitHub Actions repo secrets (for CI deploys that template the manifests) | `https://github.com/ever-works/ever-works/settings/secrets/actions`      | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
+| Local `.env` for ad-hoc dev                                              | `C:/Coding/Workspace/.config/ever-works.env` (gitignored)                | same                              |
 
 ```powershell
 # DO k8s secret update (Windows shell)
@@ -122,10 +122,10 @@ We already operate two managed DO clusters in `sfo2`
 (see [`EVER_WORKS_K8S.md`](../../../../../Workspace/knowledge/infrastructure/EVER_WORKS_K8S.md)
 in the operator workspace):
 
-| Cluster | Purpose today | Suitability for Ever Works Deploy |
-|---|---|---|
-| `do-sfo2-k8s-gauzy` | The Ever Works platform itself (web / api / mcp) + Gauzy + Teams + Rec + CLOC + … | OK but already busy. Mixing user-workloads with platform workloads is risky. |
-| `do-sfo2-k8s-ever` | CMS / marketing sites (`website-cms.*.ever.works`, etc.) | **Recommended.** Already serves `*.ever.works` subdomains, same naming pattern user Works will produce. Light load, fits the directory-web-template profile. |
+| Cluster             | Purpose today                                                                     | Suitability for Ever Works Deploy                                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `do-sfo2-k8s-gauzy` | The Ever Works platform itself (web / api / mcp) + Gauzy + Teams + Rec + CLOC + … | OK but already busy. Mixing user-workloads with platform workloads is risky.                                                                                 |
+| `do-sfo2-k8s-ever`  | CMS / marketing sites (`website-cms.*.ever.works`, etc.)                          | **Recommended.** Already serves `*.ever.works` subdomains, same naming pattern user Works will produce. Light load, fits the directory-web-template profile. |
 
 **Decision**: use `do-sfo2-k8s-ever` as the tenant cluster for Ever
 Works Deploy. Works will land alongside the marketing-site CMSs they
@@ -209,16 +209,16 @@ that the API surfaces as `429 quota_exceeded`.
 After flipping both flags:
 
 - [ ] `GET /api/onboarding/catalog` returns `ai/storage/deploy[i].available = true`
-  for `ever-works-git` and `ever-works`.
+      for `ever-works-git` and `ever-works`.
 - [ ] Wizard side-bar shows **Ever Works Git** and **Ever Works** as the
-  default selected cards (no "Coming soon" badge).
+      default selected cards (no "Coming soon" badge).
 - [ ] Create a Work as a test user with the defaults — verify a repo
-  appears in `https://github.com/ever-works-cloud/<user-slug>-<work-slug>`.
+      appears in `https://github.com/ever-works-cloud/<user-slug>-<work-slug>`.
 - [ ] Verify the Work deploys to `<work-slug>.ever.works` and the cert
-  provisions inside 2 minutes.
+      provisions inside 2 minutes.
 - [ ] Create 3 more Works as the same user — fourth attempt with
-  `ever-works` deploy returns 429 `quota_exceeded`. Switching to Vercel
-  for the fourth succeeds.
+      `ever-works` deploy returns 429 `quota_exceeded`. Switching to Vercel
+      for the fourth succeeds.
 
 ## 4. Roll-back
 

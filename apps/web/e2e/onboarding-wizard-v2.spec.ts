@@ -24,13 +24,15 @@ test.describe('Onboarding wizard v2 — choice-driven flow', () => {
                     storage: { choice: 'ever-works-git' },
                     deploy: { choice: 'ever-works' },
                     skippedSteps: [],
-                    pluginsReviewed: false
-                }
-            }
+                    pluginsReviewed: false,
+                },
+            },
         });
     });
 
-    test('catalog endpoint returns the six AI cards with Ever Works as default', async ({ page }) => {
+    test('catalog endpoint returns the six AI cards with Ever Works as default', async ({
+        page,
+    }) => {
         const res = await page.request.get('/api/onboarding/catalog');
         expect(res.ok()).toBe(true);
         const body = (await res.json()) as {
@@ -43,7 +45,7 @@ test.describe('Onboarding wizard v2 — choice-driven flow', () => {
 
     test('state endpoint round-trips a partial PATCH', async ({ page }) => {
         const patch = await page.request.patch('/api/onboarding/state', {
-            data: { state: { ai: { choice: 'openrouter' }, lastStep: 2 } }
+            data: { state: { ai: { choice: 'openrouter' }, lastStep: 2 } },
         });
         expect(patch.ok()).toBe(true);
 
@@ -57,14 +59,14 @@ test.describe('Onboarding wizard v2 — choice-driven flow', () => {
 
     test('rejects an invalid AI choice with a 400', async ({ page }) => {
         const res = await page.request.patch('/api/onboarding/state', {
-            data: { state: { ai: { choice: 'not-a-real-provider' } } }
+            data: { state: { ai: { choice: 'not-a-real-provider' } } },
         });
         expect(res.status()).toBe(400);
     });
 
     test('telemetry endpoint accepts an allow-listed event', async ({ page }) => {
         const res = await page.request.post('/api/onboarding/telemetry', {
-            data: { event: 'onboarding_opened', properties: { trigger: 'auto' } }
+            data: { event: 'onboarding_opened', properties: { trigger: 'auto' } },
         });
         // 204 No Content on success
         expect(res.status()).toBe(204);
@@ -72,7 +74,7 @@ test.describe('Onboarding wizard v2 — choice-driven flow', () => {
 
     test('telemetry endpoint rejects an unknown event', async ({ page }) => {
         const res = await page.request.post('/api/onboarding/telemetry', {
-            data: { event: 'definitely_not_in_allowlist', properties: {} }
+            data: { event: 'definitely_not_in_allowlist', properties: {} },
         });
         expect(res.status()).toBe(400);
     });

@@ -303,10 +303,10 @@ import { __test__ } from './useOnboardingFlow';
 const { reduce, computeStepList } = __test__;
 
 describe('reduce', () => {
-    it('goNext advances and pushes history', () => {
-        const next = reduce(/* … */);
-        expect(next.stepIndex).toBe(1);
-    });
+	it('goNext advances and pushes history', () => {
+		const next = reduce(/* … */);
+		expect(next.stepIndex).toBe(1);
+	});
 });
 ```
 
@@ -339,11 +339,11 @@ in a `beforeEach`.
 
 ## CI Workflows
 
-| Workflow | File | Triggers | What it runs |
-|---|---|---|---|
-| Lint, build, unit + integration tests | `.github/workflows/ci.yml` | every push + every PR to `main` / `develop` / `stage` | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**) |
-| Playwright e2e | `.github/workflows/e2e.yml` | push to `develop` / `stage` / `main` + manual `workflow_dispatch` | Boots a dev API + Web, then runs every spec under `apps/web/e2e/` |
-| k8s plugin e2e | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s` | k8s-specific provider tests |
+| Workflow                              | File                            | Triggers                                                          | What it runs                                                                                                                                                    |
+| ------------------------------------- | ------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lint, build, unit + integration tests | `.github/workflows/ci.yml`      | every push + every PR to `main` / `develop` / `stage`             | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**) |
+| Playwright e2e                        | `.github/workflows/e2e.yml`     | push to `develop` / `stage` / `main` + manual `workflow_dispatch` | Boots a dev API + Web, then runs every spec under `apps/web/e2e/`                                                                                               |
+| k8s plugin e2e                        | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s`                      | k8s-specific provider tests                                                                                                                                     |
 
 The Playwright workflow is deliberately gated to long-lived branches and
 manual dispatch because a full run takes ~30 min on `ubicloud-standard-8`.
