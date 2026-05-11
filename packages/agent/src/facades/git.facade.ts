@@ -14,6 +14,8 @@ import type {
     MergeOptions,
     MergeResult,
     ForkRepositoryOptions,
+    TransferRepoOptions,
+    TransferRepoResult,
     GitRepositoryWithPermissions,
     ListRepositoriesOptions,
     ListPullRequestsOptions,
@@ -405,6 +407,23 @@ export class GitFacadeService implements IGitFacade {
         throw new GitFacadeError(
             'Fork repository not supported by this provider',
             'forkRepository',
+            plugin.id,
+        );
+    }
+
+    async transferRepository(
+        owner: string,
+        repo: string,
+        transferOptions: TransferRepoOptions,
+        options: GitFacadeOptions,
+    ): Promise<TransferRepoResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.transferRepository) {
+            return plugin.transferRepository(owner, repo, transferOptions, token);
+        }
+        throw new GitFacadeError(
+            'Transfer repository not supported by this provider',
+            'transferRepository',
             plugin.id,
         );
     }
