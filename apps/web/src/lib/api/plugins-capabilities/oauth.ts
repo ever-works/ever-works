@@ -83,7 +83,7 @@ export const oauthAPI = {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
         return serverFetch<{ providerId: string; connected: true }>(
-            `/oauth/${providerId}/read-packages/callback/plugins?${params.toString()}`,
+            `/oauth/${providerId}/callback/plugins/read-packages?${params.toString()}`,
         );
     },
 
