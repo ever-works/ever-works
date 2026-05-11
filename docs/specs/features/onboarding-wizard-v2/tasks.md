@@ -141,9 +141,22 @@
 - [ ] **T58**. Open PR `feat/ew-onboarding-wizard-v2` → `develop`. Body links this spec; tracks Jira ticket `[EW-XXX]` (added by owner when ticket is created).
 - [ ] **T59**. Follow develop → stage → main after CI green, per release-flow memory.
 
-## Phase 5 — Post-merge follow-ups (separate tickets, not blocking)
+## Phase 5 — Post-merge follow-ups
 
-- [ ] **T60**. Provision `ever-works-cloud` GitHub org PAT + repo-creation permissions; flip `STORAGE_EVER_WORKS_GIT_ENABLED=true` in dev/stage envs.
-- [ ] **T61**. Provision the Ever Works tenant k8s cluster + ingress host template; flip `DEPLOY_EVER_WORKS_ENABLED=true` in dev/stage envs.
-- [ ] **T62**. Add admin override for the 3-Work cap.
-- [ ] **T63**. Add cost reporting / per-user usage panel for Ever Works Deploy (out of scope of this feature).
+The original "deferred" set landed in the same PR after the user pulled
+them forward (apps/web Vitest runner, Playwright wizard spec, brand SVGs,
+`WorksService.create` wire-up). Items still requiring ops action are
+documented in [`./deployment.md`](./deployment.md):
+
+- [ ] **T60**. Create the `ever-works-cloud` GitHub PAT (manual web-UI
+  step — GitHub disallows API creation; see deployment.md §1.3); store
+  in k8s + GH-Actions secrets; flip `STORAGE_EVER_WORKS_GIT_ENABLED=true`.
+- [ ] **T61**. Push the `do-sfo2-k8s-ever` kubeconfig into the API
+  deployment secret as `EVER_WORKS_DEPLOY_KUBECONFIG`; flip
+  `DEPLOY_EVER_WORKS_ENABLED=true` (see deployment.md §2).
+- [ ] **T62**. Admin override for the 3-Work cap (lifts the limit for a
+  specific user — useful for internal Ever Works staff demoing the flow).
+- [ ] **T63**. Cost reporting / per-user usage panel for Ever Works Deploy.
+- [ ] **T64**. Migrate `EverWorksGitProvider` to the GitHub App
+  installation-token path so we don't rely on a long-lived PAT (the App
+  is already installed for user GitHub flows).
