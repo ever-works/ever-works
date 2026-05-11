@@ -63,6 +63,11 @@ interface Stubs {
     activityLogService: { log: Mock };
     templateCatalogService: Record<string, never>;
     itemExportService: { exportItems: Mock };
+    itemImportService: {
+        parseCSV: Mock;
+        parseXLSX: Mock;
+        validateRows: Mock;
+    };
 }
 
 function makeStubs(): Stubs {
@@ -97,6 +102,11 @@ function makeStubs(): Stubs {
         itemExportService: {
             exportItems: jest.fn(),
         },
+        itemImportService: {
+            parseCSV: jest.fn(),
+            parseXLSX: jest.fn(),
+            validateRows: jest.fn(),
+        },
     };
 }
 
@@ -125,6 +135,7 @@ function makeController(s: Stubs): WorksController {
         s.activityLogService as any,
         s.templateCatalogService as any,
         s.itemExportService as any,
+        s.itemImportService as any,
     );
 }
 
@@ -249,6 +260,211 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
             const res = makeResponse();
             await controller.exportWorkItems(auth, 'w-1', 'csv', res);
             expect(s.itemExportService.exportItems).toHaveBeenCalledWith([], 'csv');
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Import (EW-533 Phase 2): settings probe + sample + validate (dry-run)
+    // -----------------------------------------------------------------------
+
+    describe('getImportItemsSettings', () => {
+        it('returns the flag and cap from settings when both are set', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 1000 } },
+            });
+            const result = await controller.getImportItemsSettings(auth, 'w-1');
+            expect(result).toEqual({ import_enabled: true, import_max_rows: 1000 });
+        });
+
+        it('falls back to 500 when import_max_rows is missing', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            const result = await controller.getImportItemsSettings(auth, 'w-1');
+            expect(result).toEqual({ import_enabled: true, import_max_rows: 500 });
+        });
+
+        it('returns import_enabled = false when config is null', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({ status: 'success', config: null });
+            const result = await controller.getImportItemsSettings(auth, 'w-1');
+            expect(result).toEqual({ import_enabled: false, import_max_rows: 500 });
+        });
+    });
+
+    describe('getImportItemsSample', () => {
+        it('rejects an unsupported format with BadRequest', async () => {
+            const res = makeResponse();
+            await expect(
+                controller.getImportItemsSample(auth, 'w-1', 'json', res),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(s.itemExportService.exportItems).not.toHaveBeenCalled();
+            expect(res.send).not.toHaveBeenCalled();
+        });
+
+        it('returns 404 when import is not enabled', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: false } },
+            });
+            const res = makeResponse();
+            await expect(
+                controller.getImportItemsSample(auth, 'w-1', 'csv', res),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('streams a sample template when enabled', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            // generateSample lives on itemExportService — the import route
+            // re-uses it because the column contract is shared.
+            (s.itemExportService as unknown as { generateSample: jest.Mock }).generateSample =
+                jest.fn().mockResolvedValue({
+                    data: 'name,description\r\n',
+                    contentType: 'text/csv; charset=utf-8',
+                    filename: 'items-import-template.csv',
+                });
+            const res = makeResponse();
+            await controller.getImportItemsSample(auth, 'w-1', 'csv', res);
+            expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
+            expect(res.setHeader).toHaveBeenCalledWith(
+                'Content-Disposition',
+                'attachment; filename="items-import-template.csv"',
+            );
+            expect(res.send).toHaveBeenCalledWith('name,description\r\n');
+        });
+    });
+
+    describe('validateImportItems', () => {
+        const csvFile = (): Express.Multer.File =>
+            ({
+                buffer: Buffer.from('name,description,source_url,category\nA,d,https://a.test,T'),
+                originalname: 'items.csv',
+                mimetype: 'text/csv',
+            }) as Express.Multer.File;
+
+        it('rejects when no file is uploaded', async () => {
+            await expect(
+                controller.validateImportItems(auth, 'w-1', undefined, undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('returns 404 when import is not enabled', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: false } },
+            });
+            await expect(
+                controller.validateImportItems(auth, 'w-1', csvFile(), undefined),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('rejects files with a non-csv/xlsx extension', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            const file = {
+                buffer: Buffer.from('x'),
+                originalname: 'notes.txt',
+                mimetype: 'text/plain',
+            } as Express.Multer.File;
+            await expect(
+                controller.validateImportItems(auth, 'w-1', file, undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('rejects files that exceed the per-directory max-rows cap', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 1 } },
+            });
+            s.itemImportService.parseCSV.mockReturnValue({
+                headers: ['name'],
+                rows: [{ name: 'a' }, { name: 'b' }],
+            });
+            await expect(
+                controller.validateImportItems(auth, 'w-1', csvFile(), undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('parses + validates the file and returns the service response', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 500 } },
+            });
+            s.itemImportService.parseCSV.mockReturnValue({
+                headers: ['name', 'description', 'source_url', 'category'],
+                rows: [
+                    { name: 'A', description: 'd', source_url: 'https://a.test', category: 'T' },
+                ],
+            });
+            s.workQueryService.workItems.mockResolvedValue({
+                status: 'success',
+                items: [{ slug: 'existing', source_url: 'https://existing.test' }],
+            });
+            const validationResponse = {
+                headers: ['name', 'description', 'source_url', 'category'],
+                suggestedMapping: {},
+                validationResults: [],
+                summary: { total: 1, valid: 1, invalid: 0, duplicates: 0 },
+            };
+            s.itemImportService.validateRows.mockReturnValue(validationResponse);
+
+            const result = await controller.validateImportItems(auth, 'w-1', csvFile(), undefined);
+            expect(s.itemImportService.parseCSV).toHaveBeenCalled();
+            expect(s.itemImportService.validateRows).toHaveBeenCalledWith(
+                expect.any(Object),
+                {},
+                [{ slug: 'existing', source_url: 'https://existing.test' }],
+            );
+            expect(result).toBe(validationResponse);
+        });
+
+        it('decodes a JSON `mapping` form field and passes it to the service', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 500 } },
+            });
+            s.itemImportService.parseCSV.mockReturnValue({ headers: [], rows: [] });
+            s.workQueryService.workItems.mockResolvedValue({ status: 'success', items: [] });
+            s.itemImportService.validateRows.mockReturnValue({
+                headers: [],
+                suggestedMapping: {},
+                validationResults: [],
+                summary: { total: 0, valid: 0, invalid: 0, duplicates: 0 },
+            });
+            const mappingJson = JSON.stringify({ 'Item Name': 'name', URL: 'source_url' });
+            await controller.validateImportItems(auth, 'w-1', csvFile(), mappingJson);
+            expect(s.itemImportService.validateRows).toHaveBeenCalledWith(
+                expect.any(Object),
+                { 'Item Name': 'name', URL: 'source_url' },
+                [],
+            );
+        });
+
+        it('falls back to an empty mapping when the form field is invalid JSON', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 500 } },
+            });
+            s.itemImportService.parseCSV.mockReturnValue({ headers: [], rows: [] });
+            s.workQueryService.workItems.mockResolvedValue({ status: 'success', items: [] });
+            s.itemImportService.validateRows.mockReturnValue({
+                headers: [],
+                suggestedMapping: {},
+                validationResults: [],
+                summary: { total: 0, valid: 0, invalid: 0, duplicates: 0 },
+            });
+            await controller.validateImportItems(auth, 'w-1', csvFile(), 'not-json');
+            expect(s.itemImportService.validateRows).toHaveBeenCalledWith(
+                expect.any(Object),
+                {},
+                [],
+            );
         });
     });
 });

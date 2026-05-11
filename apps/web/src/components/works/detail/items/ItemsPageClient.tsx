@@ -11,6 +11,7 @@ import {
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
 import { ItemsExportButton } from './ItemsExportButton';
+import { ItemsImportButton } from './ItemsImportButton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -140,6 +141,7 @@ export function ItemsPageClient({
                     {activeTab === 'items' && (
                         <div className="flex items-center gap-2">
                             <ItemsExportButton workId={workId} />
+                            {permissions.canEdit && <ItemsImportButton workId={workId} />}
                             {permissions.canEdit && (
                                 <Button
                                     variant="primary"

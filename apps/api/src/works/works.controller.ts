@@ -15,7 +15,10 @@ import {
     Res,
     Logger,
     UseGuards,
+    UseInterceptors,
+    UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
     ApiTags,
     ApiBearerAuth,
@@ -53,9 +56,12 @@ import {
     CheckItemHealthDto,
     CheckItemHealthResponseDto,
     ItemExportService,
+    ItemImportService,
     EXPORT_FORMATS,
     type ExportFormat,
     type ExportSettingsResponse,
+    type ColumnMapping,
+    type ImportValidationResponse,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -113,6 +119,26 @@ import {
 } from './work-cache.constants';
 
 /**
+ * Parses the `mapping` form-data field on the import-validate endpoint.
+ * Accepts either a JSON-encoded object or undefined; returns an empty
+ * mapping on any parse error so the service falls back to auto-inference.
+ */
+function parseMappingField(value: string | undefined): ColumnMapping {
+    if (!value) {
+        return {};
+    }
+    try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed as ColumnMapping;
+        }
+    } catch {
+        // Fall through to empty mapping.
+    }
+    return {};
+}
+
+/**
  * Minimal Express response surface used by file-download endpoints.
  * Mirrors the local style established in `activity-log.controller.ts`.
  */
@@ -152,6 +178,7 @@ export class WorksController {
         private readonly activityLogService: ActivityLogService,
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly itemExportService: ItemExportService,
+        private readonly itemImportService: ItemImportService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -363,6 +390,134 @@ export class WorksController {
                 summary: `Exported ${items.length} items as ${format.toUpperCase()}`,
             })
             .catch(() => {});
+    }
+
+    @Get('works/:id/import-items/settings')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get import-items feature flag',
+        description:
+            'Returns whether CSV/Excel item import is enabled for this directory, plus the per-directory max-rows cap. The UI uses this to hide the import button and to validate file size client-side.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Import feature flag + max rows' })
+    async getImportItemsSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<{ import_enabled: boolean; import_max_rows: number }> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.workQueryService.workConfig(id, user);
+        const settings = result.config?.settings;
+        return {
+            import_enabled: !!settings?.import_enabled,
+            import_max_rows:
+                typeof settings?.import_max_rows === 'number' ? settings.import_max_rows : 500,
+        };
+    }
+
+    @Get('works/:id/import-items/sample')
+    @ApiOperation({
+        summary: 'Download an item import template',
+        description:
+            'Returns a sample CSV / XLSX template the user can fill in and upload via the import wizard. Same column contract as export.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiQuery({ name: 'format', enum: EXPORT_FORMATS, description: 'csv or xlsx' })
+    @ApiResponse({ status: 200, description: 'Sample template download' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    async getImportItemsSample(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('format') formatParam: string | undefined,
+        @Res() res: DownloadResponse,
+    ): Promise<void> {
+        const format = (formatParam ?? '').toLowerCase();
+        if (format !== 'csv' && format !== 'xlsx') {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Query parameter 'format' must be 'csv' or 'xlsx'",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        if (!configResult.config?.settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const payload = await this.itemExportService.generateSample(format as ExportFormat);
+        res.setHeader('Content-Type', payload.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${payload.filename}"`);
+        res.send(payload.data);
+    }
+
+    @Post('works/:id/import-items/validate')
+    @HttpCode(HttpStatus.OK)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    @ApiOperation({
+        summary: 'Parse + validate an item import file (dry-run, no writes)',
+        description:
+            'Accepts a multipart CSV/XLSX upload, parses it, applies the user-supplied column mapping (or auto-infers one), validates each row against the column contract, and detects duplicates against existing items. Performs no writes — Phase 3 will add the execute endpoint.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Per-row validation result + summary' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    @ApiResponse({ status: 413, description: 'File exceeds per-directory row cap' })
+    async validateImportItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body('mapping') mappingJson: string | undefined,
+    ): Promise<ImportValidationResponse> {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        const settings = configResult.config?.settings;
+        if (!settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const maxRows =
+            typeof settings.import_max_rows === 'number' ? settings.import_max_rows : 500;
+
+        const filename = (file.originalname ?? '').toLowerCase();
+        const isXlsx = filename.endsWith('.xlsx') || filename.endsWith('.xls');
+        const isCsv = filename.endsWith('.csv') || file.mimetype === 'text/csv';
+        if (!isXlsx && !isCsv) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'File must be .csv, .xls, or .xlsx',
+            });
+        }
+
+        const parsed = isXlsx
+            ? await this.itemImportService.parseXLSX(file.buffer)
+            : this.itemImportService.parseCSV(file.buffer);
+
+        if (parsed.rows.length > maxRows) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'RowCountExceeded',
+                message: `File has ${parsed.rows.length} rows; the per-directory cap is ${maxRows}`,
+            });
+        }
+
+        const mapping = parseMappingField(mappingJson);
+        const itemsResult = await this.workQueryService.workItems(id, user);
+        const existingItems = (itemsResult.items ?? []).map((item) => ({
+            slug: item.slug,
+            source_url: item.source_url,
+        }));
+
+        return this.itemImportService.validateRows(parsed, mapping, existingItems);
     }
 
     @Get('works/:id/config')

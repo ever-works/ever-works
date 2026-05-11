@@ -1,6 +1,7 @@
 export * from './dto';
 export * from './item-submission.service';
 export * from './item-export.service';
+export * from './item-import.service';
 export * from './items-generator.module';
 export * from './schemas/item-extraction.schemas';
 export * from './column-mapping';
