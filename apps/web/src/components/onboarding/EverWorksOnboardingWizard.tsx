@@ -1,100 +1,133 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
-import {
-    ArrowRight,
-    BookOpen,
-    CheckCircle2,
-    FolderPlus,
-    Shield,
-    Sparkles,
-    Zap,
-} from 'lucide-react';
-import { ROUTES } from '@/lib/constants';
-import { Dialog, DialogContent, DialogDescription, DialogHeader } from '@/components/ui/dialog';
+import { useMemo, useState } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-import { Link } from '@/i18n/navigation';
-import { PluginIcon } from '@/components/plugins/PluginIcon';
-import { OnboardingPluginStep } from './OnboardingPluginStep';
 import { useMounted } from '@/lib/hooks/use-mounted';
-import type { OnboardingState } from './use-onboarding-state';
+import { useOnboardingFlow, type WizardStep } from './useOnboardingFlow';
+import { WizardFooter } from './WizardFooter';
+import { WelcomeStep } from './steps/WelcomeStep';
+import { ChoiceStep } from './steps/ChoiceStep';
+import { ConfigStep } from './steps/ConfigStep';
+import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
+import { CreateWorkStep } from './steps/CreateWorkStep';
+import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
+import {
+    completeOnboarding,
+    patchOnboardingState,
+} from '@/app/actions/onboarding/state';
+import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
+import type {
+    OnboardingAiChoice,
+    OnboardingCatalogResponse,
+    OnboardingDeployChoice,
+    OnboardingStateResponse,
+    OnboardingStorageChoice,
+} from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
-interface EverWorksOnboardingWizardProps {
-    open: boolean;
-    state: OnboardingState;
-    plugins: UserPlugin[];
-    connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
-    deviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
-    isStatusLoading?: boolean;
-    onStateChange: (state: OnboardingState) => void;
-    onClose: () => void;
+export interface EverWorksOnboardingWizardProps {
+    readonly open: boolean;
+    readonly initialState: OnboardingStateResponse;
+    readonly catalog: OnboardingCatalogResponse;
+    readonly plugins: ReadonlyArray<UserPlugin>;
+    readonly initialConnections: Record<
+        string,
+        OAuthConnectionInfo | GitProviderConnectionInfo | null
+    >;
+    readonly initialDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    readonly onClose: () => void;
 }
 
-type WizardStep = { kind: 'welcome' } | { kind: 'plugin'; plugin: UserPlugin } | { kind: 'work' };
-
-function isPluginConnected(
-    plugin: UserPlugin,
-    connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>,
-): boolean {
-    if (plugin.capabilities.includes('git-provider') || plugin.capabilities.includes('oauth')) {
-        return connections[plugin.pluginId]?.connected === true;
-    }
-    if (plugin.connectionStatus) {
-        return plugin.connectionStatus.connected === true;
-    }
-    const fields = plugin.uiHints?.completionFields;
-    if (fields && fields.length > 0) {
-        return fields.every((f) => {
-            const v = plugin.settings?.[f];
-            return v !== undefined && v !== null && v !== '';
-        });
-    }
-    return plugin.enabled;
-}
-
+/**
+ * v2 onboarding wizard — choice-driven flow (Welcome → AI → Storage →
+ * Deploy → Plugins → Create Work). Server-authoritative state, telemetry
+ * via server action, Back / Skip / Refresh footer controls.
+ */
 export function EverWorksOnboardingWizard({
     open,
-    state,
+    initialState,
+    catalog,
     plugins,
-    connections,
-    deviceAuthStatuses,
-    isStatusLoading = false,
-    onStateChange,
+    initialConnections,
+    initialDeviceAuthStatuses,
     onClose,
 }: EverWorksOnboardingWizardProps) {
-    const t = useTranslations('onboarding');
     const mounted = useMounted();
 
-    const steps = useMemo<WizardStep[]>(
-        () => [
-            { kind: 'welcome' },
-            ...plugins.map((p) => ({ kind: 'plugin' as const, plugin: p })),
-            { kind: 'work' },
-        ],
-        [plugins],
-    );
+    const pluginsById = useMemo(() => {
+        const map: Record<string, UserPlugin> = {};
+        plugins.forEach((p) => {
+            map[p.pluginId] = p;
+        });
+        return map;
+    }, [plugins]);
 
-    const activeStep = Math.min(state.step, steps.length - 1);
-    const isLastStep = activeStep === steps.length - 1;
+    const [connections, setConnections] = useState(initialConnections);
+    const [deviceAuthStatuses, setDeviceAuthStatuses] = useState(initialDeviceAuthStatuses);
+    const [isStatusLoading, setIsStatusLoading] = useState(false);
 
-    const setStep = (index: number) => onStateChange({ ...state, step: index });
-    const goNext = () => setStep(Math.min(activeStep + 1, steps.length - 1));
+    const flow = useOnboardingFlow({
+        initial: initialState,
+        catalog,
+        patchState: async (patch) => {
+            await patchOnboardingState(patch);
+        },
+        trackEvent: (event, props) => {
+            void trackOnboardingEvent(event, props);
+        },
+        onClose,
+        markCompleted: () => {
+            void completeOnboarding();
+        },
+    });
+
+    const refreshConnections = async (pluginId?: string) => {
+        const target = pluginId
+            ? plugins.filter((p) => p.pluginId === pluginId)
+            : plugins;
+        if (target.length === 0) return;
+        setIsStatusLoading(true);
+        try {
+            const result = await getOnboardingPluginStatuses(
+                target.map((p) => ({ pluginId: p.pluginId, capabilities: p.capabilities })),
+            );
+            if (result.success && result.data) {
+                setConnections((prev) => ({ ...prev, ...result.data!.connections }));
+                setDeviceAuthStatuses((prev) => ({
+                    ...prev,
+                    ...result.data!.deviceAuthStatuses,
+                }));
+            }
+        } finally {
+            setIsStatusLoading(false);
+        }
+    };
 
     if (!mounted || !open) return null;
 
-    const currentStep = steps[activeStep];
-    const progressPercent = Math.round(((activeStep + 1) / steps.length) * 100);
+    const stepIndex = flow.stepIndex;
+    const progressPercent = Math.round(((stepIndex + 1) / flow.steps.length) * 100);
+    const currentStep = flow.currentStep;
+    const isConfigStep = isConfigKind(currentStep.kind);
+
+    const skipLabel = isConfigStep
+        ? 'Skip step'
+        : currentStep.kind === 'plugins-catalog'
+          ? 'Skip — set up later'
+          : flow.isLastStep
+            ? 'Finish later'
+            : 'Skip step';
+
+    const nextLabel = flow.isLastStep ? 'Finish' : 'Next';
 
     return (
-        <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-lg shadow-2xl">
-                {/* Top progress bar */}
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-border dark:bg-border-dark z-10 rounded-t-lg">
                     <div
                         className="h-full bg-text dark:bg-white/70 transition-all duration-500 ease-out rounded-t-2xl"
@@ -102,269 +135,297 @@ export function EverWorksOnboardingWizard({
                     />
                 </div>
 
-                <div className="grid gap-0 md:grid-cols-[260px_1fr] min-h-[90dvh]">
-                    {/* ── Sidebar ── */}
-                    <aside className="relative flex flex-col bg-surface-secondary/50 dark:bg-surface-secondary-dark/60 border-r border-border dark:border-border-dark">
-                        {/* Brand header */}
-                        <div className="px-5 pt-8 pb-5">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-white/5 px-2.5 py-1 rounded-full mb-3">
-                                {t('label')}
-                            </span>
-                            <DialogHeader className="mt-2 space-y-1">
-                                <h2 className="text-sm font-semibold text-text dark:text-text-dark leading-snug">
-                                    {t('title')}
-                                </h2>
-                                <DialogDescription className="text-[11px] leading-relaxed">
-                                    {t('subtitle')}
-                                </DialogDescription>
-                            </DialogHeader>
-                        </div>
+                <div className="grid gap-0 md:grid-cols-[260px_1fr] min-h-[88dvh]">
+                    <SideNav
+                        steps={flow.steps}
+                        activeIndex={stepIndex}
+                        onJump={flow.jumpTo}
+                        onClose={onClose}
+                    />
 
-                        {/* Step list */}
-                        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-                            {steps.map((step, index) => {
-                                const isActive = index === activeStep;
-                                const isDone = (() => {
-                                    if (step.kind === 'plugin') {
-                                        return isPluginConnected(step.plugin, connections);
-                                    }
-                                    return false;
-                                })();
-                                const isPast = index < activeStep;
-
-                                const label = (() => {
-                                    if (step.kind === 'welcome') return t('steps.welcome.title');
-                                    if (step.kind === 'work') return t('steps.work.title');
-                                    return step.plugin.name;
-                                })();
-
-                                return (
-                                    <button
-                                        key={index}
-                                        type="button"
-                                        onClick={() => setStep(index)}
-                                        className={cn(
-                                            'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all',
-                                            isActive
-                                                ? 'bg-surface dark:bg-white/5'
-                                                : 'hover:bg-surface dark:hover:bg-surface-dark',
-                                        )}
-                                    >
-                                        {/* Numbered / check badge */}
-                                        <span
-                                            className={cn(
-                                                'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all',
-                                                isDone
-                                                    ? 'bg-success text-white'
-                                                    : isActive
-                                                      ? 'bg-text dark:bg-white text-white dark:text-black'
-                                                      : isPast
-                                                        ? 'bg-border dark:bg-border-dark text-text-muted dark:text-text-muted-dark'
-                                                        : 'border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark',
-                                            )}
-                                        >
-                                            {isDone ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                            ) : (
-                                                index + 1
-                                            )}
-                                        </span>
-
-                                        <span
-                                            className={cn(
-                                                'text-sm truncate transition-colors',
-                                                isDone
-                                                    ? 'text-success'
-                                                    : isActive
-                                                      ? 'font-medium text-text dark:text-text-dark'
-                                                      : 'text-text-secondary dark:text-text-secondary-dark',
-                                            )}
-                                        >
-                                            {label}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </nav>
-
-                        {/* Skip button */}
-                        <div className="px-3 py-2 mt-auto border-t border-border dark:border-border-dark">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onClose}
-                                className="w-4/5 mx-auto text-xs py-2.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
-                            >
-                                {t('skipButton')}
-                            </Button>
-                        </div>
-                    </aside>
-
-                    {/* ── Main content ── */}
                     <section className="flex flex-col">
                         <div className="flex-1 overflow-y-auto px-8 pt-10 pb-6">
-                            {/* Welcome */}
-                            {currentStep.kind === 'welcome' && (
-                                <div className="space-y-6 max-w-2xl">
-                                    <div className="flex items-start gap-4">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">
-                                            <BookOpen className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {t('steps.welcome.title')}
-                                            </h3>
-                                            <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                                                {t('steps.welcome.description')}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
-                                        {t('steps.welcome.detail')}
-                                    </p>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        {[
-                                            {
-                                                Icon: Sparkles,
-                                                title: t('steps.welcome.feature1.title'),
-                                                description: t(
-                                                    'steps.welcome.feature1.description',
-                                                ),
-                                            },
-                                            {
-                                                Icon: Zap,
-                                                title: t('steps.welcome.feature2.title'),
-                                                description: t(
-                                                    'steps.welcome.feature2.description',
-                                                ),
-                                            },
-                                            {
-                                                Icon: Shield,
-                                                title: t('steps.welcome.feature3.title'),
-                                                description: t(
-                                                    'steps.welcome.feature3.description',
-                                                ),
-                                            },
-                                        ].map((feature) => (
-                                            <div
-                                                key={feature.title}
-                                                className="rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 hover:border-border-secondary dark:hover:border-white/20 hover:bg-surface-secondary dark:hover:bg-white/5 transition-all"
-                                            >
-                                                <feature.Icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark mb-2.5" />
-                                                <p className="text-xs font-semibold text-text dark:text-text-dark mb-1">
-                                                    {feature.title}
-                                                </p>
-                                                <p className="text-xs text-text-muted dark:text-text-muted-dark leading-relaxed">
-                                                    {feature.description}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Plugin */}
-                            {currentStep.kind === 'plugin' && (
-                                <div className="space-y-5 max-w-2xl">
-                                    <div className="flex items-start gap-4">
-                                        <PluginIcon
-                                            icon={currentStep.plugin.icon}
-                                            name={currentStep.plugin.name}
-                                            size={44}
-                                            className="rounded-xl shrink-0"
-                                        />
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {currentStep.plugin.name}
-                                            </h3>
-                                            <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                                                {currentStep.plugin.uiHints
-                                                    ?.onboardingDescription ??
-                                                    currentStep.plugin.description}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <OnboardingPluginStep
-                                        plugin={currentStep.plugin}
-                                        connection={connections[currentStep.plugin.pluginId]}
-                                        deviceAuthStatus={
-                                            deviceAuthStatuses[currentStep.plugin.pluginId]
-                                        }
-                                        isStatusLoading={isStatusLoading}
-                                        returnPath={ROUTES.DASHBOARD}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Work */}
-                            {currentStep.kind === 'work' && (
-                                <div className="space-y-5 max-w-lg">
-                                    <div className="flex items-start gap-4">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">
-                                            <FolderPlus className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {t('steps.work.title')}
-                                            </h3>
-                                            <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                                                {t('steps.work.description')}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-5 space-y-4">
-                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
-                                            {t('steps.work.detail')}
-                                        </p>
-                                        <Link
-                                            href={ROUTES.DASHBOARD_WORKS_NEW}
-                                            className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
-                                            onClick={onClose}
-                                        >
-                                            {t('steps.work.action')}
-                                            <ArrowRight className="w-4 h-4" />
-                                        </Link>
-                                    </div>
-                                </div>
-                            )}
+                            <StepBody
+                                step={currentStep}
+                                flow={flow}
+                                catalog={catalog}
+                                pluginsById={pluginsById}
+                                connections={connections}
+                                deviceAuthStatuses={deviceAuthStatuses}
+                                isStatusLoading={isStatusLoading}
+                            />
                         </div>
-
-                        {/* Footer with dot stepper */}
-                        <div className="flex items-center justify-between px-8 py-2 border-t border-border dark:border-border-dark bg-surface-secondary dark:bg-surface-secondary-dark/30">
-                            <div className="flex items-center gap-1.5">
-                                {steps.map((_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        onClick={() => setStep(i)}
-                                        aria-label={`Go to step ${i + 1}`}
-                                        className={cn(
-                                            'rounded-full transition-all duration-200',
-                                            i === activeStep
-                                                ? 'w-5 h-1.5 bg-text dark:bg-white'
-                                                : i < activeStep
-                                                  ? 'w-1.5 h-1.5 bg-border-secondary dark:bg-white/20'
-                                                  : 'w-1.5 h-1.5 bg-border dark:bg-border-dark',
-                                        )}
-                                    />
-                                ))}
-                                <span className="ml-2 text-xs text-text-muted dark:text-text-muted-dark tabular-nums">
-                                    {t('stepIndex', { index: activeStep + 1 })} / {steps.length}
-                                </span>
-                            </div>
-
-                            {!isLastStep && (
-                                <Button variant="primary" size="sm" onClick={goNext}>
-                                    {t('nextButton')}
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                </Button>
-                            )}
-                        </div>
+                        <WizardFooter
+                            stepIndex={stepIndex}
+                            totalSteps={flow.steps.length}
+                            canGoBack={flow.canGoBack}
+                            nextLabel={nextLabel}
+                            skipLabel={skipLabel}
+                            showSkip={!flow.isLastStep || isConfigStep}
+                            showNext={!flow.isLastStep}
+                            showRefresh={isConfigStep}
+                            refreshing={isStatusLoading}
+                            onBack={flow.goBack}
+                            onSkip={() => {
+                                if (flow.isLastStep) {
+                                    flow.finish({ dismissed: true });
+                                    return;
+                                }
+                                flow.skip();
+                            }}
+                            onRefresh={() => {
+                                flow.refresh();
+                                const pluginId = pluginIdForStep(currentStep, flow.state);
+                                void refreshConnections(pluginId);
+                            }}
+                            onNext={() => {
+                                if (flow.isLastStep) {
+                                    flow.finish();
+                                    return;
+                                }
+                                flow.goNext();
+                            }}
+                        />
                     </section>
                 </div>
             </DialogContent>
         </Dialog>
     );
+}
+
+// ─── Subcomponents ─────────────────────────────────────────────────────────
+
+function SideNav({
+    steps,
+    activeIndex,
+    onJump,
+    onClose,
+}: {
+    steps: WizardStep[];
+    activeIndex: number;
+    onJump: (index: number) => void;
+    onClose: () => void;
+}) {
+    return (
+        <aside className="relative flex flex-col bg-surface-secondary/50 dark:bg-surface-secondary-dark/60 border-r border-border dark:border-border-dark">
+            <div className="px-5 pt-8 pb-5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-white/5 px-2.5 py-1 rounded-full mb-3">
+                    Setup
+                </span>
+                <h2 className="text-sm font-semibold text-text dark:text-text-dark leading-snug">
+                    Get started with Ever Works
+                </h2>
+                <p className="text-[11px] leading-relaxed mt-1 text-text-muted dark:text-text-muted-dark">
+                    A guided 9-step walkthrough. You can change any choice later from Settings.
+                </p>
+            </div>
+            <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+                {steps.map((step, index) => {
+                    const isActive = index === activeIndex;
+                    const isPast = index < activeIndex;
+                    return (
+                        <button
+                            key={step.id}
+                            type="button"
+                            onClick={() => onJump(index)}
+                            className={cn(
+                                'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all',
+                                isActive
+                                    ? 'bg-surface dark:bg-white/5'
+                                    : 'hover:bg-surface dark:hover:bg-surface-dark',
+                            )}
+                        >
+                            <span
+                                className={cn(
+                                    'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all',
+                                    isActive
+                                        ? 'bg-text dark:bg-white text-white dark:text-black'
+                                        : isPast
+                                          ? 'bg-border dark:bg-border-dark text-text-muted dark:text-text-muted-dark'
+                                          : 'border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark',
+                                )}
+                            >
+                                {index + 1}
+                            </span>
+                            <span
+                                className={cn(
+                                    'text-sm truncate transition-colors',
+                                    isActive
+                                        ? 'font-medium text-text dark:text-text-dark'
+                                        : 'text-text-secondary dark:text-text-secondary-dark',
+                                )}
+                            >
+                                {labelForStep(step)}
+                            </span>
+                        </button>
+                    );
+                })}
+            </nav>
+            <div className="px-3 py-2 mt-auto border-t border-border dark:border-border-dark">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClose}
+                    className="w-4/5 mx-auto text-xs py-2.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                >
+                    Close wizard
+                </Button>
+            </div>
+        </aside>
+    );
+}
+
+function StepBody({
+    step,
+    flow,
+    catalog,
+    pluginsById,
+    connections,
+    deviceAuthStatuses,
+    isStatusLoading,
+}: {
+    step: WizardStep;
+    flow: ReturnType<typeof useOnboardingFlow>;
+    catalog: OnboardingCatalogResponse;
+    pluginsById: Record<string, UserPlugin | undefined>;
+    connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
+    deviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    isStatusLoading: boolean;
+}) {
+    switch (step.kind) {
+        case 'welcome':
+            return <WelcomeStep />;
+        case 'ai-choice':
+            return (
+                <ChoiceStep
+                    title="Your AI choice"
+                    description="Pick the AI provider that powers content generation."
+                    cards={catalog.ai}
+                    selected={flow.state.ai.choice}
+                    columns={3}
+                    onSelect={(choice) => flow.setAiChoice(choice as OnboardingAiChoice)}
+                    onPlannedClick={(c) => flow.notePlannedClick('ai', c)}
+                />
+            );
+        case 'ai-config': {
+            const pluginId = flow.state.ai.choice;
+            const plugin = pluginsById[pluginId] ?? null;
+            return (
+                <ConfigStep
+                    title={`Configure ${plugin?.name ?? pluginId}`}
+                    description="Paste your credentials below. Skip to come back later."
+                    plugin={plugin}
+                    connection={connections[pluginId] ?? null}
+                    deviceAuthStatus={deviceAuthStatuses[pluginId] ?? null}
+                    isStatusLoading={isStatusLoading}
+                />
+            );
+        }
+        case 'storage-choice':
+            return (
+                <ChoiceStep
+                    title="Your storage"
+                    description="Where do you want your work repos to live?"
+                    cards={catalog.storage}
+                    selected={flow.state.storage.choice}
+                    onSelect={(choice) =>
+                        flow.setStorageChoice(choice as OnboardingStorageChoice)
+                    }
+                    onPlannedClick={(c) => flow.notePlannedClick('storage', c)}
+                />
+            );
+        case 'storage-config': {
+            // Only `user-github` reaches here (others are auto-skipped).
+            const plugin = pluginsById['github'] ?? null;
+            return (
+                <ConfigStep
+                    title="Connect your GitHub"
+                    description="Sign in with GitHub so we can create your work repos."
+                    plugin={plugin}
+                    connection={connections['github'] ?? null}
+                    isStatusLoading={isStatusLoading}
+                />
+            );
+        }
+        case 'deploy-choice':
+            return (
+                <ChoiceStep
+                    title="Your deployment"
+                    description="Where do you want your works to be deployed?"
+                    cards={catalog.deploy}
+                    selected={flow.state.deploy.choice}
+                    columns={3}
+                    onSelect={(choice) =>
+                        flow.setDeployChoice(choice as OnboardingDeployChoice)
+                    }
+                    onPlannedClick={(c) => flow.notePlannedClick('deploy', c)}
+                />
+            );
+        case 'deploy-config': {
+            const pluginId = flow.state.deploy.choice; // 'vercel' | 'k8s'
+            const plugin = pluginsById[pluginId] ?? null;
+            return (
+                <ConfigStep
+                    title={`Configure ${plugin?.name ?? pluginId}`}
+                    description="Add deployment credentials. You can change this later."
+                    plugin={plugin}
+                    connection={connections[pluginId] ?? null}
+                    isStatusLoading={isStatusLoading}
+                />
+            );
+        }
+        case 'plugins-catalog':
+            return (
+                <PluginsCatalogStep
+                    cards={catalog.plugins}
+                    pluginsById={pluginsById}
+                    onExpand={() => flow.setPluginsReviewed(true)}
+                />
+            );
+        case 'create-work':
+            return <CreateWorkStep onLeave={() => flow.finish()} />;
+        default:
+            return null;
+    }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function isConfigKind(kind: WizardStep['kind']): boolean {
+    return kind === 'ai-config' || kind === 'storage-config' || kind === 'deploy-config';
+}
+
+function pluginIdForStep(
+    step: WizardStep,
+    state: ReturnType<typeof useOnboardingFlow>['state'],
+): string | undefined {
+    if (step.kind === 'ai-config') return state.ai.choice;
+    if (step.kind === 'storage-config') return 'github';
+    if (step.kind === 'deploy-config') return state.deploy.choice;
+    return undefined;
+}
+
+function labelForStep(step: WizardStep): string {
+    switch (step.kind) {
+        case 'welcome':
+            return 'Welcome';
+        case 'ai-choice':
+            return 'Your AI choice';
+        case 'ai-config':
+            return 'Configure AI';
+        case 'storage-choice':
+            return 'Your storage';
+        case 'storage-config':
+            return 'Configure storage';
+        case 'deploy-choice':
+            return 'Your deployment';
+        case 'deploy-config':
+            return 'Configure deployment';
+        case 'plugins-catalog':
+            return 'Plugins & Integrations';
+        case 'create-work':
+            return 'Create your first work';
+        default:
+            return step.kind;
+    }
 }

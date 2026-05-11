@@ -23,6 +23,7 @@ import { OnboardingStateController } from './onboarding-state.controller';
 import { OnboardingStateService } from './onboarding-state.service';
 import { OnboardingCatalogController } from './onboarding-catalog.controller';
 import { OnboardingCatalogService } from './onboarding-catalog.service';
+import { OnboardingTelemetryController } from './onboarding-telemetry.controller';
 
 @Module({
     imports: [FacadesModule, DatabaseModule, WorkModule],
@@ -31,6 +32,7 @@ import { OnboardingCatalogService } from './onboarding-catalog.service';
         WellKnownController,
         OnboardingStateController,
         OnboardingCatalogController,
+        OnboardingTelemetryController,
     ],
     providers: [
         OnboardingService,

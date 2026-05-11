@@ -4,10 +4,29 @@ import { DashboardLayoutClient } from './layout-client';
 import { authAPI } from '@/lib/api';
 import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
+import { onboardingAPI } from '@/lib/api/onboarding';
+import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
+import type {
+    OnboardingCatalogResponse,
+    OnboardingStateResponse,
+} from '@ever-works/contracts/api';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import type { UserPlugin } from '@/lib/api/plugins';
+
+const FALLBACK_CATALOG: OnboardingCatalogResponse = {
+    ai: [],
+    storage: [],
+    deploy: [],
+    plugins: [],
+};
+
+const FALLBACK_STATE: OnboardingStateResponse = {
+    completedAt: null,
+    dismissedAt: null,
+    state: ONBOARDING_DEFAULT_STATE,
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
     const user = await getAuthFromCookie();
@@ -16,14 +35,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
         return null;
     }
 
-    const [profile, statsResponse, pluginsResponse] = await Promise.all([
-        authAPI.getFreshProfile().catch(() => null),
-        getWorkStats().catch(() => ({
-            success: false,
-            totalWorks: 0,
-        })),
-        pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
-    ]);
+    const [profile, statsResponse, pluginsResponse, onboardingState, onboardingCatalog] =
+        await Promise.all([
+            authAPI.getFreshProfile().catch(() => null),
+            getWorkStats().catch(() => ({
+                success: false,
+                totalWorks: 0,
+            })),
+            pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
+            onboardingAPI.getState().catch(() => FALLBACK_STATE),
+            onboardingAPI.getCatalog().catch(() => FALLBACK_CATALOG),
+        ]);
 
     const hasGithubConnected =
         profile?.oauthTokens?.some((token) => token.provider === 'github') ?? false;
@@ -64,6 +86,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             onboardingPlugins={onboardingPlugins}
             initialOnboardingConnections={onboardingConnections}
             initialOnboardingDeviceAuthStatuses={onboardingDeviceAuthStatuses}
+            initialOnboardingState={onboardingState}
+            initialOnboardingCatalog={onboardingCatalog}
         >
             {children}
         </DashboardLayoutClient>
