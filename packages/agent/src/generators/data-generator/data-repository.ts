@@ -55,6 +55,23 @@ export interface SettingsConfig {
     collections_enabled?: boolean;
     surveys_enabled?: boolean;
     comparisons_enabled?: boolean;
+    /**
+     * Enables CSV/Excel bulk import of items via the platform Items page.
+     * Off by default — directory admins opt in per directory in `.works/works.yml`.
+     */
+    import_enabled?: boolean;
+    /**
+     * Enables CSV/Excel bulk export of items. When false, the export button
+     * is hidden in the UI and the export endpoints respond 404.
+     */
+    export_enabled?: boolean;
+    /**
+     * Hard cap on rows accepted by a single import upload. Files exceeding
+     * this value are rejected before any write occurs. Default is enforced
+     * by the import service (currently 500); a per-directory override can
+     * raise it up to the service-level ceiling.
+     */
+    import_max_rows?: number;
     header?: SettingsHeaderConfig;
     homepage?: SettingsHomepageConfig;
     footer?: SettingsFooterConfig;
@@ -108,6 +125,9 @@ const DEFAULT_SETTINGS: SettingsConfig = {
     tags_enabled: true,
     collections_enabled: true,
     surveys_enabled: true,
+    import_enabled: false,
+    export_enabled: false,
+    import_max_rows: 500,
     header: {
         submit_enabled: true,
         pricing_enabled: true,
