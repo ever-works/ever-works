@@ -151,7 +151,7 @@ export class OAuthController {
         }
     }
 
-    @Get(':providerId/read-packages/callback/plugins')
+    @Get(':providerId/callback/plugins/read-packages')
     @ApiOperation({
         summary: 'OAuth callback handler for the read-packages flow',
         description:
