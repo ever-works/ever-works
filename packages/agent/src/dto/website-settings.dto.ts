@@ -6,6 +6,9 @@ import {
     IsArray,
     ValidateNested,
     IsIn,
+    IsInt,
+    Min,
+    Max,
     MaxLength,
     ArrayMaxSize,
 } from 'class-validator';
@@ -169,6 +172,33 @@ export class UpdateWebsiteSettingsDto {
     @IsBoolean()
     comparisons_enabled?: boolean;
 
+    /**
+     * Enables CSV/Excel bulk export of items (EW-533). Off by default —
+     * the directory's Export button is hidden until this flag is set.
+     */
+    @IsOptional()
+    @IsBoolean()
+    export_enabled?: boolean;
+
+    /**
+     * Enables CSV/Excel bulk import of items (EW-533). Off by default —
+     * the import wizard is hidden until this flag is set. Wired up in
+     * Phase 3.
+     */
+    @IsOptional()
+    @IsBoolean()
+    import_enabled?: boolean;
+
+    /**
+     * Per-directory cap on rows accepted by a single import upload.
+     * Defaults to 500; the service-level hard ceiling is 2000.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(2000)
+    import_max_rows?: number;
+
     @IsOptional()
     @ValidateNested()
     @Type(() => SettingsHeaderDto)
@@ -204,6 +234,9 @@ export interface WebsiteSettingsResponseDto {
         tags_enabled?: boolean;
         surveys_enabled?: boolean;
         comparisons_enabled?: boolean;
+        export_enabled?: boolean;
+        import_enabled?: boolean;
+        import_max_rows?: number;
         header?: {
             submit_enabled?: boolean;
             pricing_enabled?: boolean;
