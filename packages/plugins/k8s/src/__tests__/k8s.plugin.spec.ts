@@ -124,6 +124,16 @@ describe('KubernetesPlugin metadata', () => {
 		expect(reg.oneOf).toHaveLength(3);
 		expect(reg.default?.kind).toBe('github');
 	});
+
+	it('ingressClass field uses the cluster-ingress-class widget so the form can render a dynamic Select', () => {
+		const ic = plugin.settingsSchema.properties?.ingressClass as Record<string, unknown>;
+		expect(ic?.['x-widget']).toBe('cluster-ingress-class');
+	});
+
+	it('manifest hints verifiesOnSave so the UI labels the save button "Save & verify" and shows cluster info on success', () => {
+		const m = plugin.getManifest();
+		expect(m.uiHints?.verifiesOnSave).toBe(true);
+	});
 });
 
 describe('KubernetesPlugin.validateConnection', () => {

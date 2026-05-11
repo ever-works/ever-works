@@ -148,6 +148,11 @@ export interface PluginUiHints {
 		/** Settings field that selects the auth mode when device auth is available. */
 		authModeField?: string;
 	};
+	/** Plugin's settings save automatically runs `validateConnection` and the
+	 * UI should label the save button "Save & verify" and surface the
+	 * returned `details` (cluster info, detected IngressClass list, ...).
+	 * Set on plugins whose API path auto-validates after save (e.g. k8s). */
+	verifiesOnSave?: boolean;
 }
 
 /**
