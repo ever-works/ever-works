@@ -594,6 +594,22 @@
                 "previous": "Previous",
                 "next": "Next",
                 "pageOf": "Page {page} of {total}"
+            },
+            "viewMode": {
+                "table": "Table",
+                "board": "Board"
+            },
+            "kanban": {
+                "empty": "No activities here",
+                "noWork": "No work",
+                "loadMore": "Load {count} more",
+                "columns": {
+                    "pending": "Pending",
+                    "in_progress": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
             }
         },
         "works": {
@@ -622,6 +638,33 @@
                     "title": "No works found",
                     "withSearch": "Try adjusting your search terms",
                     "withoutSearch": "Create your first AI-powered Work to get started"
+                }
+            },
+            "viewMode": {
+                "card": "Cards",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} items",
+                "noDescription": "No description",
+                "empty": "No works here",
+                "loadMore": "Load {count} more",
+                "columns": {
+                    "not_started": "Not Started",
+                    "scheduled": "Scheduled",
+                    "generating": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                },
+                "status": {
+                    "notStarted": "Not started",
+                    "scheduled": "Scheduled",
+                    "generating": "Generating",
+                    "completed": "Completed",
+                    "completedWithWarnings": "Completed with warnings",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
                 }
             }
         },
@@ -2839,6 +2882,11 @@
             "disable": "Disable",
             "settings": "Settings",
             "saveSettings": "Save Settings",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "Plugin Settings",
             "settingsSaved": "Settings saved successfully",
             "noSettings": "This plugin has no configurable settings",
@@ -2898,7 +2946,13 @@
                 "addItem": "Add",
                 "modify": "Modify",
                 "cancel": "Cancel",
-                "enterNewValue": "Enter new value..."
+                "enterNewValue": "Enter new value...",
+                "clusterIngressClassPlaceholder": "e.g. nginx",
+                "clusterIngressClassUseDefault": "Cluster default",
+                "clusterIngressClassDefault": "default",
+                "clusterIngressClassUnknown": "unknown controller",
+                "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list."
             },
             "oauth": {
                 "title": "Account Connection",

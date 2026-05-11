@@ -594,6 +594,22 @@
                 "previous": "ก่อนหน้า",
                 "next": "ถัดไป",
                 "pageOf": "หน้า {page} จาก {total}"
+            },
+            "viewMode": {
+                "table": "ตาราง",
+                "board": "กระดาน"
+            },
+            "kanban": {
+                "empty": "ไม่มีกิจกรรมที่นี่",
+                "noWork": "ไม่มีงาน",
+                "columns": {
+                    "pending": "รอดำเนินการ",
+                    "in_progress": "กำลังดำเนินการ",
+                    "completed": "เสร็จสิ้น",
+                    "failed": "ล้มเหลว",
+                    "cancelled": "ยกเลิก"
+                },
+                "loadMore": "โหลดเพิ่ม {count} รายการ"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "ลองปรับคำค้นหา",
                     "withoutSearch": "สร้างงานที่ใช้ AI ตัวแรกเพื่อเริ่มต้น"
                 }
+            },
+            "viewMode": {
+                "card": "การ์ด",
+                "kanban": "คัมบัง"
+            },
+            "kanban": {
+                "items": "{count} รายการ",
+                "noDescription": "ไม่มีคำอธิบาย",
+                "empty": "ไม่มีงานที่นี่",
+                "columns": {
+                    "not_started": "ยังไม่เริ่ม",
+                    "scheduled": "กำหนดการ",
+                    "generating": "กำลังดำเนินการ",
+                    "completed": "เสร็จสิ้น",
+                    "failed": "ล้มเหลว",
+                    "cancelled": "ยกเลิก"
+                },
+                "status": {
+                    "notStarted": "ยังไม่เริ่ม",
+                    "scheduled": "กำหนดการ",
+                    "generating": "กำลังสร้าง",
+                    "completed": "เสร็จสิ้น",
+                    "completedWithWarnings": "เสร็จสิ้นพร้อมคำเตือน",
+                    "failed": "ล้มเหลว",
+                    "cancelled": "ยกเลิก"
+                },
+                "loadMore": "โหลดเพิ่ม {count} รายการ"
             }
         },
         "settings": {

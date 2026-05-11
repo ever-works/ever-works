@@ -136,14 +136,20 @@ spec backfill but are good candidates for a future hourly-tracker run.
 
 ## Outstanding follow-ups
 
-- [ ] **T-DEPLOY-CTRL**. Author `apps/api/src/plugins-capabilities/deploy/deploy.controller.spec.ts`
-      covering all 13 endpoints. Today only the service has unit
-      coverage (6 suites). Pin: `ensureCanEdit` runs BEFORE `isConfigured`
-      runs BEFORE `validateToken` runs BEFORE `deploy` runs BEFORE
-      `startVerification` runs BEFORE the activity-log emission;
-      `validateToken` rejection short-circuits with NO log; the
-      activity-log emission is fire-and-forget (`.catch(() => {})`) and
-      does not block the response.
+- [x] **T-DEPLOY-CTRL**. `apps/api/src/plugins-capabilities/deploy/deploy.controller.spec.ts`
+      covering all 14 endpoints — 54 tests across 13 describe-blocks.
+      Pinned: `ensureCanEdit` → `isConfigured` → `validateToken` →
+      `deploy` → `startVerification` → activity-log emission order via
+      shared `order: string[]` array; `validateToken` rejection
+      short-circuits with NO log emission AND NO `startVerification`
+      call; activity-log emission is fire-and-forget
+      (`.catch(() => {})`) and a rejected log promise still returns the
+      `pending` envelope. Creator-vs-shared `userId` fallback wired
+      through `isConfigured`/`validateToken`/`deployService.deploy`/
+      `startVerification` (uses `work.user.id` when caller is not
+      creator) — log payload's `userId` is ALWAYS `auth.userId` even on
+      shared-work deploys. PR
+      [#600](https://github.com/ever-works/ever-works/pull/600).
 
 - [ ] **T-OQ-1**. Decide the fate of `POST /api/deploy/teams` (the
       workless variant). It currently returns `{teams: [], message: 'To

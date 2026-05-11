@@ -89,6 +89,7 @@ export class DeployService {
         });
 
         await this.setRequiredSecrets(ctx, token, work, plugin, settings);
+        await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
@@ -280,6 +281,51 @@ export class DeployService {
                     }`,
                 );
             }
+        }
+    }
+
+    /**
+     * For k8s deploys, push the GitHub `read:packages` PAT (if the user
+     * has saved one on their GitHub plugin settings) as a separate GitHub
+     * Actions secret. The `deploy_k8s.yaml` workflow prefers this over
+     * the workflow's built-in `GITHUB_TOKEN` for the imagePullSecret
+     * because `GITHUB_TOKEN` does not have `packages:read` for GHCR
+     * images owned by a different repo than the workflow itself.
+     *
+     * For non-k8s providers, or when the user hasn't saved a PAT, this
+     * is a no-op. The Vercel path doesn't read this secret.
+     */
+    private async setKubernetesGhcrPullSecret(ctx: RepoContext, work: Work, userId: string) {
+        if (work.deployProvider !== 'k8s') {
+            return;
+        }
+        try {
+            const githubSettings = await this.deployFacade.getOtherPluginSettings('github', {
+                userId,
+                workId: work.id,
+            });
+            const pat =
+                typeof githubSettings?.readPackagesPat === 'string'
+                    ? githubSettings.readPackagesPat.trim()
+                    : '';
+            if (!pat) {
+                // Workflow falls back to GITHUB_TOKEN; that works when the
+                // image and the workflow are in the same repo (the default
+                // case for the generated website's own GHCR image).
+                return;
+            }
+            await this.setSecret(ctx, 'GITHUB_READ_PACKAGES_TOKEN', pat);
+            this.logger.log(
+                `Pushed GITHUB_READ_PACKAGES_TOKEN to ${ctx.owner}/${ctx.repo} for k8s GHCR pull`,
+            );
+        } catch (error) {
+            // Don't block the deploy on this — the workflow has a safe
+            // fallback. Just log so operators can debug if pulls fail.
+            this.logger.warn(
+                `Failed to push GITHUB_READ_PACKAGES_TOKEN for ${ctx.owner}/${ctx.repo}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
         }
     }
 

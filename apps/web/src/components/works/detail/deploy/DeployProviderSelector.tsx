@@ -176,7 +176,7 @@ export function DeployProviderSelector({
                         className={cn(
                             'absolute z-10 w-full mt-1 rounded-lg overflow-hidden',
                             'border border-border dark:border-border-dark',
-                            'bg-card dark:bg-card-primary-dark/30',
+                            'bg-card dark:bg-surface-dark',
                             'shadow-lg',
                         )}
                     >

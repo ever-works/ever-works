@@ -161,7 +161,9 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			ingressClass: {
 				type: 'string',
 				title: 'Ingress class',
-				description: 'Detected at validation time. Leave blank to use the cluster default.'
+				description:
+					'Leave blank to use the cluster default. Save the form once to populate the dropdown from your cluster.',
+				'x-widget': 'cluster-ingress-class'
 			},
 			ingressHost: {
 				type: 'string',
@@ -257,7 +259,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			homepage: 'https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/',
 			uiHints: {
 				includeInOnboarding: false,
-				completionFields: ['kubeconfig']
+				completionFields: ['kubeconfig'],
+				verifiesOnSave: true
 			},
 			icon: {
 				type: 'lucide',

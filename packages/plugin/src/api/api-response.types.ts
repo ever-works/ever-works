@@ -80,6 +80,11 @@ export interface PluginSettingsSchemaProperty {
 	properties?: Record<string, PluginSettingsSchemaProperty>;
 	/** Required property names */
 	required?: readonly string[];
+	/** Discriminated-union branches for object fields. Each branch declares a
+	 * `kind` (or equivalent) property with a `const` value; the UI picks the
+	 * branch matching the field's current value and renders that branch's
+	 * properties. Used by e.g. the k8s plugin's container-registry field. */
+	oneOf?: readonly PluginSettingsSchemaProperty[];
 	/** Groups of fields where at least one must be set. Each group is independent. */
 	requiredGroups?: readonly {
 		readonly fields: readonly string[];
@@ -145,6 +150,9 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 				)
 			: undefined,
 		required: schema.required,
+		oneOf: schema.oneOf
+			? schema.oneOf.map((branch) => toPluginSettingsSchemaProperty(branch as JsonSchema))
+			: undefined,
 		requiredGroups: schema['x-requiredGroups']
 	};
 }

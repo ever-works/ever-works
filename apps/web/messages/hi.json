@@ -594,6 +594,22 @@
                 "previous": "पिछला",
                 "next": "अगला",
                 "pageOf": "पृष्ठ {page} का {total} में"
+            },
+            "viewMode": {
+                "table": "तालिका",
+                "board": "बोर्ड"
+            },
+            "kanban": {
+                "empty": "यहाँ कोई गतिविधि नहीं",
+                "noWork": "कोई कार्य नहीं",
+                "columns": {
+                    "pending": "लंबित",
+                    "in_progress": "प्रगति में",
+                    "completed": "पूर्ण",
+                    "failed": "विफल",
+                    "cancelled": "रद्द"
+                },
+                "loadMore": "{count} और लोड करें"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "अपने खोज शब्दों को समायोजित करने का प्रयास करें",
                     "withoutSearch": "शुरू करने के लिए अपनी पहली AI-संचालित कार्य बनाएं"
                 }
+            },
+            "viewMode": {
+                "card": "कार्ड",
+                "kanban": "कानबान"
+            },
+            "kanban": {
+                "items": "{count} आइटम",
+                "noDescription": "कोई विवरण नहीं",
+                "empty": "यहाँ कोई कार्य नहीं",
+                "columns": {
+                    "not_started": "शुरू नहीं",
+                    "scheduled": "निर्धारित",
+                    "generating": "प्रगति में",
+                    "completed": "पूर्ण",
+                    "failed": "विफल",
+                    "cancelled": "रद्द"
+                },
+                "status": {
+                    "notStarted": "शुरू नहीं",
+                    "scheduled": "निर्धारित",
+                    "generating": "उत्पन्न हो रहा है",
+                    "completed": "पूर्ण",
+                    "completedWithWarnings": "चेतावनियों के साथ पूर्ण",
+                    "failed": "विफल",
+                    "cancelled": "रद्द"
+                },
+                "loadMore": "{count} और लोड करें"
             }
         },
         "settings": {

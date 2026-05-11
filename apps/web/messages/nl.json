@@ -594,6 +594,22 @@
                 "previous": "Vorige",
                 "next": "Volgende",
                 "pageOf": "Pagina {page} van {total}"
+            },
+            "viewMode": {
+                "table": "Tabel",
+                "board": "Bord"
+            },
+            "kanban": {
+                "empty": "Geen activiteiten hier",
+                "noWork": "Geen werk",
+                "columns": {
+                    "pending": "In afwachting",
+                    "in_progress": "Bezig",
+                    "completed": "Voltooid",
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
+                },
+                "loadMore": "{count} meer laden"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Pas je zoektermen aan",
                     "withoutSearch": "Maak je eerste AI-aangedreven werk om te beginnen"
                 }
+            },
+            "viewMode": {
+                "card": "Kaarten",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} items",
+                "noDescription": "Geen beschrijving",
+                "empty": "Geen werken hier",
+                "columns": {
+                    "not_started": "Niet gestart",
+                    "scheduled": "Gepland",
+                    "generating": "Bezig",
+                    "completed": "Voltooid",
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
+                },
+                "status": {
+                    "notStarted": "Niet gestart",
+                    "scheduled": "Gepland",
+                    "generating": "Genereren",
+                    "completed": "Voltooid",
+                    "completedWithWarnings": "Voltooid met waarschuwingen",
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
+                },
+                "loadMore": "{count} meer laden"
             }
         },
         "settings": {

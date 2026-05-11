@@ -594,6 +594,22 @@
                 "previous": "Önceki",
                 "next": "Sonraki",
                 "pageOf": "{total} sayfasının {page} sayfası"
+            },
+            "viewMode": {
+                "table": "Tablo",
+                "board": "Pano"
+            },
+            "kanban": {
+                "empty": "Burada aktivite yok",
+                "noWork": "Çalışma yok",
+                "columns": {
+                    "pending": "Bekliyor",
+                    "in_progress": "Devam Ediyor",
+                    "completed": "Tamamlandı",
+                    "failed": "Başarısız",
+                    "cancelled": "İptal edildi"
+                },
+                "loadMore": "{count} daha yükle"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "Arama terimlerinizi ayarlamayı deneyin",
                     "withoutSearch": "Başlamak için ilk AI destekli işinizi oluşturun"
                 }
+            },
+            "viewMode": {
+                "card": "Kartlar",
+                "kanban": "Kanban"
+            },
+            "kanban": {
+                "items": "{count} öğe",
+                "noDescription": "Açıklama yok",
+                "empty": "Burada çalışma yok",
+                "columns": {
+                    "not_started": "Başlamadı",
+                    "scheduled": "Planlandı",
+                    "generating": "Devam Ediyor",
+                    "completed": "Tamamlandı",
+                    "failed": "Başarısız",
+                    "cancelled": "İptal edildi"
+                },
+                "status": {
+                    "notStarted": "Başlamadı",
+                    "scheduled": "Planlandı",
+                    "generating": "Oluşturuluyor",
+                    "completed": "Tamamlandı",
+                    "completedWithWarnings": "Uyarılarla tamamlandı",
+                    "failed": "Başarısız",
+                    "cancelled": "İptal edildi"
+                },
+                "loadMore": "{count} daha yükle"
             }
         },
         "settings": {

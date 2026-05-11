@@ -594,6 +594,22 @@
                 "previous": "קודם",
                 "next": "הבא",
                 "pageOf": "עמוד {page} מתוך {total}"
+            },
+            "viewMode": {
+                "table": "טבלה",
+                "board": "לוח"
+            },
+            "kanban": {
+                "empty": "אין פעילויות כאן",
+                "noWork": "אין עבודה",
+                "columns": {
+                    "pending": "ממתין",
+                    "in_progress": "בתהליך",
+                    "completed": "הושלם",
+                    "failed": "נכשל",
+                    "cancelled": "בוטל"
+                },
+                "loadMore": "טען עוד {count}"
             }
         },
         "works": {
@@ -623,6 +639,33 @@
                     "withSearch": "נסה להתאים את מונחי החיפוש",
                     "withoutSearch": "צור את ספריית ה-AI הראשונה שלך כדי להתחיל"
                 }
+            },
+            "viewMode": {
+                "card": "כרטיסים",
+                "kanban": "קנבן"
+            },
+            "kanban": {
+                "items": "{count} פריטים",
+                "noDescription": "אין תיאור",
+                "empty": "אין עבודות כאן",
+                "columns": {
+                    "not_started": "לא התחיל",
+                    "scheduled": "מתוזמן",
+                    "generating": "בתהליך",
+                    "completed": "הושלם",
+                    "failed": "נכשל",
+                    "cancelled": "בוטל"
+                },
+                "status": {
+                    "notStarted": "לא התחיל",
+                    "scheduled": "מתוזמן",
+                    "generating": "מייצר",
+                    "completed": "הושלם",
+                    "completedWithWarnings": "הושלם עם אזהרות",
+                    "failed": "נכשל",
+                    "cancelled": "בוטל"
+                },
+                "loadMore": "טען עוד {count}"
             }
         },
         "settings": {
