@@ -125,8 +125,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         {
             name: t('members'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/members`,
-            // visible: permissions.canManageMembers,
-            visible: false,
+            visible: permissions.canManageMembers,
             icon: (
                 <svg
                     className="w-4 h-4 shrink-0"

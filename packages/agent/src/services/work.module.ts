@@ -17,6 +17,7 @@ import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { WorkMemberService } from './work-member.service';
+import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
@@ -69,6 +70,7 @@ import { NotificationsModule } from '@src/notifications';
         WorkScheduleService,
         WorkScheduleDispatcherService,
         WorkMemberService,
+        WorkInvitationService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,
@@ -97,6 +99,7 @@ import { NotificationsModule } from '@src/notifications';
         WorkScheduleService,
         WorkScheduleDispatcherService,
         WorkMemberService,
+        WorkInvitationService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,

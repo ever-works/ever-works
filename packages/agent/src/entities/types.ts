@@ -72,6 +72,47 @@ export const ASSIGNABLE_MEMBER_ROLES = [
 
 export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
 
+/**
+ * Pseudo-role used only on `WorkInvitation`. Accepting an `owner-claim`
+ * invitation transfers `work.userId` to the claimant; it never appears
+ * on a `work_members` row.
+ */
+export const INVITATION_ROLE_OWNER_CLAIM = 'owner-claim' as const;
+
+export const ASSIGNABLE_INVITATION_ROLES = ['manager', 'editor', 'viewer'] as const;
+
+export type AssignableInvitationRole = (typeof ASSIGNABLE_INVITATION_ROLES)[number];
+
+export type InvitationRole = AssignableInvitationRole | typeof INVITATION_ROLE_OWNER_CLAIM;
+
+export const ALL_INVITATION_ROLES = [
+    ...ASSIGNABLE_INVITATION_ROLES,
+    INVITATION_ROLE_OWNER_CLAIM,
+] as const;
+
+export enum WorkInvitationStatus {
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    EXPIRED = 'expired',
+    REVOKED = 'revoked',
+}
+
+export type RepoTransferRecord = {
+    repo: string;
+    status: 'completed' | 'pending_recipient_acceptance' | 'failed';
+    providerAcceptanceUrl?: string;
+    error?: string;
+};
+
+export type WorkInvitationTransferState = {
+    status:
+        | 'not_required'
+        | 'pending_recipient_acceptance'
+        | 'completed'
+        | 'failed';
+    repoTransfers?: RepoTransferRecord[];
+};
+
 export enum DomainEnvironment {
     PRODUCTION = 'production',
     STAGING = 'staging',
