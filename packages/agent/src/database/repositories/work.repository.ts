@@ -174,6 +174,23 @@ export class WorkRepository {
         return await this.repository.count(countOptions);
     }
 
+    /**
+     * Active Works for a user using a given `deployProvider` (default
+     * `'ever-works'`). "Active" means the row's `generateStatus.status` is
+     * not `DELETED` and the work has not been soft-archived. Used by the
+     * Ever Works Deploy quota check.
+     */
+    async countActiveByDeployProvider(userId: string, deployProvider = 'ever-works'): Promise<number> {
+        const all = await this.repository.find({
+            where: { userId, deployProvider },
+            select: { id: true, generateStatus: true } as never,
+        });
+        return all.filter((w) => {
+            const status = (w.generateStatus as { status?: string } | null | undefined)?.status;
+            return status !== 'DELETED' && status !== 'ARCHIVED';
+        }).length;
+    }
+
     async update(id: string, updateData: Partial<Work>): Promise<Work | null> {
         await this.repository.update(id, updateData);
         return await this.findById(id);
