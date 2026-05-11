@@ -233,12 +233,120 @@ packages/agent/src/
   module-name/
     service.ts
     __tests__/
-      service.spec.ts        # Co-located tests
-      fixtures/               # Optional fixture data
+      service.spec.ts        # Co-located tests (Jest)
+      fixtures/              # Optional fixture data
 
 packages/plugins/plugin-name/
   src/
     plugin.ts
-    plugin.spec.ts            # Vitest tests alongside source
-  vitest.config.ts            # Per-plugin Vitest config
+    plugin.spec.ts           # Vitest tests alongside source
+  vitest.config.ts           # Per-plugin Vitest config
+
+apps/api/src/
+  module-name/
+    controller.ts
+    controller.spec.ts       # Jest, alongside source
+
+apps/web/src/
+  components/feature/
+    Component.tsx
+    Component.unit.spec.tsx  # Vitest + Testing Library (jsdom)
+  lib/feature/
+    helper.ts
+    helper.unit.spec.ts      # Vitest
+
+apps/web/e2e/
+  feature.spec.ts            # Playwright (real browser, hits dev API + web)
 ```
+
+## Web app tests (apps/web)
+
+The web app has two completely separate test runners:
+
+- **Vitest** for pure-function helpers, custom hooks, and component
+  logic that doesn't need Next.js. Files use the suffix `.unit.spec.ts`
+  / `.unit.spec.tsx`. Lives next to the source.
+- **Playwright** for end-to-end flows through the real Next.js + API
+  stack. Files use the suffix `.spec.ts` and live under `apps/web/e2e/`.
+
+The two suites never collide because their file globs do not overlap
+(`vitest.config.ts > include` matches only `*.unit.spec.{ts,tsx}`;
+`playwright.config.ts > testDir` is `./e2e/`).
+
+### Running web tests
+
+```bash
+# Vitest — fast, no servers needed (jsdom)
+cd apps/web
+pnpm test                # one-shot
+pnpm test:watch          # watch mode
+pnpm test:cov            # with coverage
+
+# Playwright — needs API on :3100 and Web on :3000
+cd apps/web
+pnpm test:e2e            # headless
+pnpm test:e2e:ui         # Playwright UI
+pnpm test:e2e:headed     # headed
+pnpm test:e2e:debug      # step-debug
+```
+
+The Vitest setup file at `apps/web/vitest.setup.ts` stubs
+`matchMedia`, `IntersectionObserver`, and `ResizeObserver` so components
+that touch them on mount can render in jsdom.
+
+### Writing a Vitest unit spec for a React hook
+
+```typescript
+import { describe, expect, it } from 'vitest';
+import { __test__ } from './useOnboardingFlow';
+
+const { reduce, computeStepList } = __test__;
+
+describe('reduce', () => {
+    it('goNext advances and pushes history', () => {
+        const next = reduce(/* … */);
+        expect(next.stepIndex).toBe(1);
+    });
+});
+```
+
+The `__test__` export is the standard escape hatch we use for reducer /
+helper internals — keeps the public hook API clean while letting tests
+target the underlying logic without rendering.
+
+### Writing a Vitest unit spec for a React component
+
+```typescript
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ChoiceCard } from './ChoiceCard';
+
+it('calls onSelect on click', async () => {
+    const onSelect = vi.fn();
+    render(<ChoiceCard /* … */ onSelect={onSelect} />);
+    await userEvent.click(screen.getByRole('button'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+});
+```
+
+### Writing a Playwright spec
+
+See `apps/web/e2e/onboarding-wizard-v2.spec.ts` for a current example.
+Specs share the `storageState` produced by `global-setup.ts` (an
+authenticated test user with onboarding dismissed); to exercise the
+fresh-user path, undismiss via `page.request.patch('/api/onboarding/state')`
+in a `beforeEach`.
+
+## CI Workflows
+
+| Workflow | File | Triggers | What it runs |
+|---|---|---|---|
+| Lint, build, unit + integration tests | `.github/workflows/ci.yml` | every push + every PR to `main` / `develop` / `stage` | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**) |
+| Playwright e2e | `.github/workflows/e2e.yml` | push to `develop` / `stage` / `main` + manual `workflow_dispatch` | Boots a dev API + Web, then runs every spec under `apps/web/e2e/` |
+| k8s plugin e2e | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s` | k8s-specific provider tests |
+
+The Playwright workflow is deliberately gated to long-lived branches and
+manual dispatch because a full run takes ~30 min on `ubicloud-standard-8`.
+For PR-time fast feedback, push to a feature branch and use the
+**Run workflow** button on the E2E Tests workflow if you need to verify
+something before merge.
