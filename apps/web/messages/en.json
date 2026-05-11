@@ -2882,6 +2882,11 @@
             "disable": "Disable",
             "settings": "Settings",
             "saveSettings": "Save Settings",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "Plugin Settings",
             "settingsSaved": "Settings saved successfully",
             "noSettings": "This plugin has no configurable settings",
@@ -2941,7 +2946,13 @@
                 "addItem": "Add",
                 "modify": "Modify",
                 "cancel": "Cancel",
-                "enterNewValue": "Enter new value..."
+                "enterNewValue": "Enter new value...",
+                "clusterIngressClassPlaceholder": "e.g. nginx",
+                "clusterIngressClassUseDefault": "Cluster default",
+                "clusterIngressClassDefault": "default",
+                "clusterIngressClassUnknown": "unknown controller",
+                "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list."
             },
             "oauth": {
                 "title": "Account Connection",
