@@ -66,6 +66,7 @@ interface Stubs {
     subscriptionService: Record<string, never>;
     activityLogService: { log: Mock };
     templateCatalogService: Record<string, never>;
+    itemExportService: Record<string, never>;
 }
 
 function makeStubs(): Stubs {
@@ -104,6 +105,7 @@ function makeStubs(): Stubs {
         subscriptionService: {} as any,
         activityLogService: { log: jest.fn().mockResolvedValue(undefined) },
         templateCatalogService: {} as any,
+        itemExportService: {} as any,
     };
 }
 
@@ -131,6 +133,7 @@ function makeController(s: Stubs): WorksController {
         s.subscriptionService as any,
         s.activityLogService as any,
         s.templateCatalogService as any,
+        s.itemExportService as any,
     );
 }
 

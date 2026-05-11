@@ -12,6 +12,7 @@ import {
     Post,
     Put,
     Query,
+    Res,
     Logger,
     UseGuards,
 } from '@nestjs/common';
@@ -51,6 +52,10 @@ import {
     UpdateItemDto,
     CheckItemHealthDto,
     CheckItemHealthResponseDto,
+    ItemExportService,
+    EXPORT_FORMATS,
+    type ExportFormat,
+    type ExportSettingsResponse,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -107,6 +112,15 @@ import {
     getWorkItemsCacheKey,
 } from './work-cache.constants';
 
+/**
+ * Minimal Express response surface used by file-download endpoints.
+ * Mirrors the local style established in `activity-log.controller.ts`.
+ */
+type DownloadResponse = {
+    setHeader(name: string, value: string): void;
+    send(body: string | Buffer): void;
+};
+
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
@@ -137,6 +151,7 @@ export class WorksController {
         private readonly subscriptionService: SubscriptionService,
         private readonly activityLogService: ActivityLogService,
         private readonly templateCatalogService: TemplateCatalogService,
+        private readonly itemExportService: ItemExportService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -281,6 +296,73 @@ export class WorksController {
             },
             WORK_CACHE_TTL_MS,
         );
+    }
+
+    @Get('works/:id/export-items/settings')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get export-items feature flag',
+        description:
+            'Returns whether CSV/Excel item export is enabled for this directory. The UI uses this to hide the export button when the feature is off.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Export feature flag' })
+    async getExportItemsSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<ExportSettingsResponse> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.workQueryService.workConfig(id, user);
+        return { export_enabled: !!result.config?.settings?.export_enabled };
+    }
+
+    @Get('works/:id/export-items')
+    @ApiOperation({
+        summary: 'Export work items as CSV or Excel',
+        description:
+            'Downloads all items of a directory as a CSV or XLSX file. Gated by `settings.export_enabled` in the directory config — returns 404 when disabled.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiQuery({ name: 'format', enum: EXPORT_FORMATS, description: 'csv or xlsx' })
+    @ApiResponse({ status: 200, description: 'Item export download' })
+    @ApiResponse({ status: 404, description: 'Export is not enabled for this directory' })
+    async exportWorkItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('format') formatParam: string | undefined,
+        @Res() res: DownloadResponse,
+    ): Promise<void> {
+        const format = (formatParam ?? '').toLowerCase();
+        if (format !== 'csv' && format !== 'xlsx') {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Query parameter 'format' must be 'csv' or 'xlsx'",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        if (!configResult.config?.settings?.export_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item export is not enabled for this directory',
+            });
+        }
+        const itemsResult = await this.workQueryService.workItems(id, user);
+        const items = itemsResult.items ?? [];
+        const payload = await this.itemExportService.exportItems(items, format as ExportFormat);
+        res.setHeader('Content-Type', payload.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${payload.filename}"`);
+        res.send(payload.data);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.EXPORT,
+                action: 'items.exported',
+                status: ActivityStatus.COMPLETED,
+                summary: `Exported ${items.length} items as ${format.toUpperCase()}`,
+            })
+            .catch(() => {});
     }
 
     @Get('works/:id/config')
