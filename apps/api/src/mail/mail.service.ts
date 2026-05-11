@@ -10,7 +10,10 @@ import {
     UserCreatedEvent,
     UserConfirmedEvent,
     MemberInvitedEvent,
+    WorkInvitationIssuedEvent,
 } from '../events';
+
+const OWNER_CLAIM_ROLE = 'owner-claim';
 
 @Injectable()
 export class MailService {
@@ -233,6 +236,42 @@ export class MailService {
         } catch (error) {
             this.logger.error(
                 `Failed to send member-invitation email to ${data.invitee.email}`,
+                error?.stack ?? error,
+            );
+        }
+    }
+
+    /**
+     * Send tokenised work-invitation email (EW-600 claim flow). Skipped
+     * when no recipient email — operator copies the claim URL manually.
+     */
+    @OnEvent(WorkInvitationIssuedEvent.EVENT_NAME)
+    async sendWorkInvitation(data: WorkInvitationIssuedEvent): Promise<void> {
+        if (!data.recipientEmail) {
+            return;
+        }
+        try {
+            const isOwnerClaim = data.role === OWNER_CLAIM_ROLE;
+            await this.mailerService.sendMail({
+                to: data.recipientEmail,
+                subject: isOwnerClaim
+                    ? `Claim ownership of ${data.work.name}`
+                    : `You've been invited to ${data.work.name}`,
+                template: 'work-invitation-claim',
+                context: {
+                    ...this.getBrandingContext(),
+                    workName: data.work.name,
+                    inviterName: data.inviter.username,
+                    roleName: this.formatRoleName(data.role),
+                    claimUrl: data.claimUrl,
+                    expiresAtFormatted: this.formatDateTime(data.expiresAt),
+                    isOwnerClaim,
+                    expectedProviderUsername: data.expectedProviderUsername,
+                },
+            });
+        } catch (error) {
+            this.logger.error(
+                `Failed to send work-invitation email to ${data.recipientEmail}`,
                 error?.stack ?? error,
             );
         }

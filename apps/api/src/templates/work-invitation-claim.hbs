@@ -1,0 +1,123 @@
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>{{#if isOwnerClaim}}Claim ownership of {{workName}}{{else}}You've been invited to {{workName}}{{/if}}</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+                    sans-serif;
+                background-color: #f8fafc;
+                line-height: 1.6;
+            }
+            .container { max-width: 600px; margin: 0 auto; }
+            .logo-section { padding: 40px 20px 30px; text-align: center; }
+            .logo-title { font-size: 28px; font-weight: 600; color: #1e293b; margin: 0; }
+            .logo-subtitle { font-size: 14px; color: #94a3b8; margin: 5px 0 0; }
+            .main-card { margin: 0 20px 40px; background-color: #ffffff; border-radius: 8px; padding: 40px 30px; }
+            .icon { text-align: center; font-size: 40px; margin-bottom: 20px; }
+            .title { font-size: 24px; color: #1e293b; font-weight: 600; text-align: center; margin: 0 0 10px; }
+            .subtitle { text-align: center; color: #64748b; margin: 0 0 30px; font-size: 16px; }
+            .role-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                background-color: #e0e7ff;
+                color: #4338ca;
+                border-radius: 9999px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            .owner-badge {
+                background-color: #fef3c7;
+                color: #92400e;
+            }
+            .button {
+                display: inline-block;
+                text-decoration: none;
+                background-color: #1e293b;
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: 500;
+                padding: 12px 48px;
+                border-radius: 6px;
+                text-align: center;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .button-container { text-align: center; margin-bottom: 20px; }
+            .meta { font-size: 13px; color: #94a3b8; text-align: center; margin-top: 20px; }
+            .footer { padding: 0 20px 40px; text-align: center; }
+            .footer-text { font-size: 14px; color: #94a3b8; margin: 0; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='logo-section'>
+                <h1 class='logo-title'>{{appName}}</h1>
+                <p class='logo-subtitle'>by {{companyOwner}}</p>
+            </div>
+
+            <div class='main-card'>
+                <div class='icon'>{{#if isOwnerClaim}}🔑{{else}}👥{{/if}}</div>
+
+                <h2 class='title'>
+                    {{#if isOwnerClaim}}Claim ownership of {{workName}}{{else}}You've been invited!{{/if}}
+                </h2>
+
+                <p class='subtitle'>
+                    {{#if isOwnerClaim}}
+                        {{inviterName}} prepared an Ever Works directory based on your repository
+                        and is offering you full ownership of the generated repos.
+                    {{else}}
+                        {{inviterName}} has invited you to collaborate on a directory.
+                    {{/if}}
+                </p>
+
+                <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse: collapse; background:#f8fafc; border-radius:6px; padding:0; margin-bottom:25px;'>
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8; width: 110px;'>Directory</td>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;'>{{workName}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'>{{#if isOwnerClaim}}Role on accept{{else}}Your Role{{/if}}</td>
+                        <td style='padding: 12px 16px;'>
+                            <span class='role-badge {{#if isOwnerClaim}}owner-badge{{/if}}'>{{roleName}}</span>
+                        </td>
+                    </tr>
+                    {{#if expectedProviderUsername}}
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'>Recipient</td>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;'>@{{expectedProviderUsername}}</td>
+                    </tr>
+                    {{/if}}
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'>Invited by</td>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;'>{{inviterName}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'>Expires</td>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #1e293b;'>{{expiresAtFormatted}}</td>
+                    </tr>
+                </table>
+
+                <div class='button-container'>
+                    <a href='{{claimUrl}}' class='button'>
+                        {{#if isOwnerClaim}}Claim ownership{{else}}Accept invitation{{/if}}
+                    </a>
+                </div>
+
+                <p class='meta'>This link is single-use and expires on {{expiresAtFormatted}}.</p>
+            </div>
+
+            <div class='footer'>
+                <p class='footer-text'>
+                    If you didn't expect this email, you can safely ignore it.<br /><br />
+                    © {{currentYear}} {{companyOwner}}. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>
