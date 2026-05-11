@@ -42,8 +42,7 @@ const SAMPLE_ROWS: ReadonlyArray<Record<ImportFieldName, string>> = [
 ];
 
 const CSV_CONTENT_TYPE = 'text/csv; charset=utf-8';
-const XLSX_CONTENT_TYPE =
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /**
  * Serialises directory items to CSV / XLSX for EW-533 export. Pure logic
@@ -171,7 +170,9 @@ function normalizeCategoryArray(value: ItemData['category']): string[] {
         return value.length > 0 ? [value] : [];
     }
     if (Array.isArray(value)) {
-        return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+        return value.filter(
+            (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+        );
     }
     return [];
 }
@@ -201,7 +202,10 @@ function normalizeBrand(value: ItemData['brand']): string {
     return (value as Brand).name ?? '';
 }
 
-function normalizeBrandLogo(brand: ItemData['brand'], directLogo: ItemData['brand_logo_url']): string {
+function normalizeBrandLogo(
+    brand: ItemData['brand'],
+    directLogo: ItemData['brand_logo_url'],
+): string {
     if (directLogo) {
         return directLogo;
     }
@@ -210,4 +214,3 @@ function normalizeBrandLogo(brand: ItemData['brand'], directLogo: ItemData['bran
     }
     return '';
 }
-

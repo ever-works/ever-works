@@ -179,12 +179,12 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
     describe('exportWorkItems', () => {
         it('rejects requests without a csv|xlsx format', async () => {
             const res = makeResponse();
-            await expect(controller.exportWorkItems(auth, 'w-1', 'json', res)).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
-            await expect(controller.exportWorkItems(auth, 'w-1', undefined, res)).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
+            await expect(
+                controller.exportWorkItems(auth, 'w-1', 'json', res),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                controller.exportWorkItems(auth, 'w-1', undefined, res),
+            ).rejects.toBeInstanceOf(BadRequestException);
             expect(s.itemExportService.exportItems).not.toHaveBeenCalled();
             expect(res.send).not.toHaveBeenCalled();
         });
@@ -195,9 +195,9 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
                 config: { settings: { export_enabled: false } },
             });
             const res = makeResponse();
-            await expect(controller.exportWorkItems(auth, 'w-1', 'csv', res)).rejects.toBeInstanceOf(
-                NotFoundException,
-            );
+            await expect(
+                controller.exportWorkItems(auth, 'w-1', 'csv', res),
+            ).rejects.toBeInstanceOf(NotFoundException);
             expect(s.itemExportService.exportItems).not.toHaveBeenCalled();
             expect(res.send).not.toHaveBeenCalled();
         });

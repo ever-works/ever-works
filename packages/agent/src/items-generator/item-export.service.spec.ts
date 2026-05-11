@@ -118,8 +118,9 @@ describe('ItemExportService', () => {
             await workbook.xlsx.load(payload.data as any);
             const sheet = workbook.worksheets[0];
             const headerRow = sheet.getRow(1);
-            const headerValues = (headerRow.values as (string | undefined)[])
-                .filter((value): value is string => typeof value === 'string');
+            const headerValues = (headerRow.values as (string | undefined)[]).filter(
+                (value): value is string => typeof value === 'string',
+            );
             expect(headerValues).toEqual(Array.from(ALL_IMPORT_FIELDS));
             const dataRow = sheet.getRow(2);
             expect(dataRow.getCell(1).value).toBe('XLSX Row');

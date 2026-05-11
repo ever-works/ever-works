@@ -17,12 +17,7 @@ export const ARRAY_FIELD_SEPARATOR = ';';
 /**
  * Required item fields. A row missing any of these is invalid.
  */
-export const REQUIRED_IMPORT_FIELDS = [
-    'name',
-    'description',
-    'source_url',
-    'category',
-] as const;
+export const REQUIRED_IMPORT_FIELDS = ['name', 'description', 'source_url', 'category'] as const;
 
 /**
  * Optional item fields. Missing values are tolerated.
@@ -42,10 +37,7 @@ export const OPTIONAL_IMPORT_FIELDS = [
  * All importable fields, in the canonical order used for export columns and
  * sample-file generation.
  */
-export const ALL_IMPORT_FIELDS = [
-    ...REQUIRED_IMPORT_FIELDS,
-    ...OPTIONAL_IMPORT_FIELDS,
-] as const;
+export const ALL_IMPORT_FIELDS = [...REQUIRED_IMPORT_FIELDS, ...OPTIONAL_IMPORT_FIELDS] as const;
 
 export type ImportFieldName = (typeof ALL_IMPORT_FIELDS)[number];
 
@@ -61,16 +53,12 @@ export const ARRAY_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set([
 /**
  * Fields whose values are booleans serialised as 'true'/'false'.
  */
-export const BOOLEAN_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set([
-    'featured',
-]);
+export const BOOLEAN_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set(['featured']);
 
 /**
  * Fields whose values are non-negative integers.
  */
-export const INTEGER_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set([
-    'order',
-]);
+export const INTEGER_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set(['order']);
 
 /**
  * Fields whose values must be HTTP(S) URLs.

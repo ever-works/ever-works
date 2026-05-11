@@ -28,9 +28,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         if (!upstream.ok) {
             return NextResponse.json({ export_enabled: false }, { status: 200 });
         }
-        const body = (await upstream.json().catch(() => null)) as
-            | { export_enabled?: boolean }
-            | null;
+        const body = (await upstream.json().catch(() => null)) as {
+            export_enabled?: boolean;
+        } | null;
         return NextResponse.json({ export_enabled: !!body?.export_enabled }, { status: 200 });
     } catch {
         return NextResponse.json({ export_enabled: false }, { status: 200 });

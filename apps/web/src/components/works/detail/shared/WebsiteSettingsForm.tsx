@@ -536,9 +536,9 @@ function FullLayout({
             {/* Item Import & Export Card (EW-533) */}
             <SettingsCard title="Item Import & Export">
                 <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
-                    Bulk CSV/Excel import and export for directory items. Both flows are
-                    off by default; enable per directory to expose the Export button on
-                    the items page and the bulk-import wizard.
+                    Bulk CSV/Excel import and export for directory items. Both flows are off by
+                    default; enable per directory to expose the Export button on the items page and
+                    the bulk-import wizard.
                 </p>
                 <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4">
                     <Switch

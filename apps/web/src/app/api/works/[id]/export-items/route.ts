@@ -19,14 +19,11 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const upstream = await fetch(
-        `${API_URL}/works/${id}/export-items${request.nextUrl.search}`,
-        {
-            method: 'GET',
-            headers,
-            cache: 'no-store',
-        },
-    );
+    const upstream = await fetch(`${API_URL}/works/${id}/export-items${request.nextUrl.search}`, {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+    });
 
     if (!upstream.ok) {
         const detail = await upstream.text().catch(() => '');
@@ -39,10 +36,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     return new Response(upstream.body, {
         status: 200,
         headers: {
-            'Content-Type':
-                upstream.headers.get('content-type') ?? 'application/octet-stream',
-            'Content-Disposition':
-                upstream.headers.get('content-disposition') ?? 'attachment',
+            'Content-Type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+            'Content-Disposition': upstream.headers.get('content-disposition') ?? 'attachment',
             'Cache-Control': 'no-store',
         },
     });
