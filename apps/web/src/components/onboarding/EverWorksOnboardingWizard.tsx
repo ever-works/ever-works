@@ -12,6 +12,7 @@ import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
+import { AI_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
 import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
 import {
     completeOnboarding,
@@ -303,6 +304,7 @@ function StepBody({
                     cards={catalog.ai}
                     selected={flow.state.ai.choice}
                     columns={3}
+                    icons={AI_ICONS}
                     onSelect={(choice) => flow.setAiChoice(choice as OnboardingAiChoice)}
                     onPlannedClick={(c) => flow.notePlannedClick('ai', c)}
                 />
@@ -328,6 +330,7 @@ function StepBody({
                     description="Where do you want your work repos to live?"
                     cards={catalog.storage}
                     selected={flow.state.storage.choice}
+                    icons={STORAGE_ICONS}
                     onSelect={(choice) =>
                         flow.setStorageChoice(choice as OnboardingStorageChoice)
                     }
@@ -355,6 +358,7 @@ function StepBody({
                     cards={catalog.deploy}
                     selected={flow.state.deploy.choice}
                     columns={3}
+                    icons={DEPLOY_ICONS}
                     onSelect={(choice) =>
                         flow.setDeployChoice(choice as OnboardingDeployChoice)
                     }
