@@ -36,6 +36,7 @@ describe('WorkLifecycleService', () => {
     let deployFacade: any;
     let templateCatalogService: any;
     let websiteRepositoryState: any;
+    let eventEmitter: any;
     let service: WorkLifecycleService;
 
     afterAll(() => {
@@ -86,6 +87,10 @@ describe('WorkLifecycleService', () => {
             isInitialized: jest.fn().mockResolvedValue(false),
         };
 
+        eventEmitter = {
+            emit: jest.fn(),
+        };
+
         service = new WorkLifecycleService(
             workRepository,
             dataGenerator,
@@ -96,6 +101,7 @@ describe('WorkLifecycleService', () => {
             deployFacade,
             templateCatalogService,
             websiteRepositoryState,
+            eventEmitter as never,
         );
     });
 
