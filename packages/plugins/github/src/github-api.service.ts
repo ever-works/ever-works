@@ -230,9 +230,7 @@ export class GitHubApiService {
 			owner,
 			repo,
 			new_owner: options.newOwner,
-			...(options.teamIds && options.teamIds.length > 0
-				? { team_ids: [...options.teamIds] }
-				: {})
+			...(options.teamIds && options.teamIds.length > 0 ? { team_ids: [...options.teamIds] } : {})
 		});
 
 		return {

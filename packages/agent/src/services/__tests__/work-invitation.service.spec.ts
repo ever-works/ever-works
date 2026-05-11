@@ -56,7 +56,9 @@ describe('WorkInvitationService', () => {
 
     describe('issue', () => {
         it('persists invitation with hashed token and returns raw token once', async () => {
-            repo.create.mockImplementation(async (data) => makeInvitation(data as Partial<WorkInvitation>));
+            repo.create.mockImplementation(async (data) =>
+                makeInvitation(data as Partial<WorkInvitation>),
+            );
 
             const { invitation, token } = await service.issue({
                 workId: 'w1',
@@ -82,7 +84,9 @@ describe('WorkInvitationService', () => {
         });
 
         it('defaults expiry to 30 days', async () => {
-            repo.create.mockImplementation(async (d) => makeInvitation(d as Partial<WorkInvitation>));
+            repo.create.mockImplementation(async (d) =>
+                makeInvitation(d as Partial<WorkInvitation>),
+            );
             const before = Date.now();
             await service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer' });
             const arg = repo.create.mock.calls[0][0] as Partial<WorkInvitation>;
@@ -94,16 +98,31 @@ describe('WorkInvitationService', () => {
 
         it('rejects non-integer or non-positive expiry', async () => {
             await expect(
-                service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer', expiresInDays: 0 }),
+                service.issue({
+                    workId: 'w1',
+                    invitedById: 'u1',
+                    role: 'viewer',
+                    expiresInDays: 0,
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
             await expect(
-                service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer', expiresInDays: 1.5 }),
+                service.issue({
+                    workId: 'w1',
+                    invitedById: 'u1',
+                    role: 'viewer',
+                    expiresInDays: 1.5,
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
         it('caps expiry at 90 days', async () => {
             await expect(
-                service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer', expiresInDays: 91 }),
+                service.issue({
+                    workId: 'w1',
+                    invitedById: 'u1',
+                    role: 'viewer',
+                    expiresInDays: 91,
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
@@ -133,7 +152,9 @@ describe('WorkInvitationService', () => {
         });
 
         it('seeds transferState=not_required for owner-claim', async () => {
-            repo.create.mockImplementation(async (d) => makeInvitation(d as Partial<WorkInvitation>));
+            repo.create.mockImplementation(async (d) =>
+                makeInvitation(d as Partial<WorkInvitation>),
+            );
             await service.issue({
                 workId: 'w1',
                 invitedById: 'u1',
@@ -145,14 +166,18 @@ describe('WorkInvitationService', () => {
         });
 
         it('leaves transferState null for regular invitations', async () => {
-            repo.create.mockImplementation(async (d) => makeInvitation(d as Partial<WorkInvitation>));
+            repo.create.mockImplementation(async (d) =>
+                makeInvitation(d as Partial<WorkInvitation>),
+            );
             await service.issue({ workId: 'w1', invitedById: 'u1', role: 'editor' });
             const arg = repo.create.mock.calls[0][0] as Partial<WorkInvitation>;
             expect(arg.transferState).toBeNull();
         });
 
         it('issues different tokens across calls', async () => {
-            repo.create.mockImplementation(async (d) => makeInvitation(d as Partial<WorkInvitation>));
+            repo.create.mockImplementation(async (d) =>
+                makeInvitation(d as Partial<WorkInvitation>),
+            );
             const a = await service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer' });
             const b = await service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer' });
             expect(a.token).not.toBe(b.token);
@@ -172,9 +197,9 @@ describe('WorkInvitationService', () => {
 
         it('throws BadRequest for missing token', async () => {
             await expect(service.findConsumable('')).rejects.toBeInstanceOf(BadRequestException);
-            await expect(service.findConsumable(undefined as unknown as string)).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
+            await expect(
+                service.findConsumable(undefined as unknown as string),
+            ).rejects.toBeInstanceOf(BadRequestException);
         });
 
         it('throws NotFound when no row matches', async () => {
@@ -224,20 +249,26 @@ describe('WorkInvitationService', () => {
 
         it('throws NotFound when missing', async () => {
             repo.findById.mockResolvedValue(null);
-            await expect(service.revoke('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+            await expect(service.revoke('missing', 'user-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
         });
 
         it('rejects non-pending invitations', async () => {
             repo.findById.mockResolvedValue(
                 makeInvitation({ status: WorkInvitationStatus.ACCEPTED }),
             );
-            await expect(service.revoke('inv-1', 'user-1')).rejects.toBeInstanceOf(BadRequestException);
+            await expect(service.revoke('inv-1', 'user-1')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
         });
 
         it('surfaces CAS loss', async () => {
             repo.findById.mockResolvedValue(makeInvitation());
             repo.markRevoked.mockResolvedValue(false);
-            await expect(service.revoke('inv-1', 'user-1')).rejects.toBeInstanceOf(BadRequestException);
+            await expect(service.revoke('inv-1', 'user-1')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
         });
     });
 
@@ -246,11 +277,7 @@ describe('WorkInvitationService', () => {
             repo.tryMarkAccepted.mockResolvedValue(true);
             const result = await service.tryAccept('inv-1', 'user-2');
             expect(result).toBe(true);
-            expect(repo.tryMarkAccepted).toHaveBeenCalledWith(
-                'inv-1',
-                'user-2',
-                expect.any(Date),
-            );
+            expect(repo.tryMarkAccepted).toHaveBeenCalledWith('inv-1', 'user-2', expect.any(Date));
         });
     });
 

@@ -56,9 +56,8 @@ export function PendingInvitationsSection({
                 {invitations.map((invitation) => {
                     const isOwnerClaim = invitation.role === 'owner-claim';
                     const username =
-                        (invitation.metadata?.expectedProviderUsername as
-                            | string
-                            | undefined) ?? null;
+                        (invitation.metadata?.expectedProviderUsername as string | undefined) ??
+                        null;
                     return (
                         <li
                             key={invitation.id}
@@ -81,16 +80,11 @@ export function PendingInvitationsSection({
                                     ) : username ? (
                                         <span className="truncate">@{username}</span>
                                     ) : (
-                                        <span className="text-text-secondary">
-                                            (link-only)
-                                        </span>
+                                        <span className="text-text-secondary">(link-only)</span>
                                     )}
                                 </div>
                                 <p className="text-xs text-text-secondary mt-0.5">
-                                    Expires{' '}
-                                    {new Date(
-                                        invitation.tokenExpiresAt,
-                                    ).toLocaleString()}
+                                    Expires {new Date(invitation.tokenExpiresAt).toLocaleString()}
                                 </p>
                             </div>
                             {canManage ? (

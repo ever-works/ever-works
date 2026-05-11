@@ -105,11 +105,7 @@ export type RepoTransferRecord = {
 };
 
 export type WorkInvitationTransferState = {
-    status:
-        | 'not_required'
-        | 'pending_recipient_acceptance'
-        | 'completed'
-        | 'failed';
+    status: 'not_required' | 'pending_recipient_acceptance' | 'completed' | 'failed';
     repoTransfers?: RepoTransferRecord[];
 };
 

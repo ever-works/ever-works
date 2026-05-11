@@ -10,9 +10,7 @@ import {
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-export async function listInvitations(
-    workId: string,
-): Promise<ActionResult<WorkInvitation[]>> {
+export async function listInvitations(workId: string): Promise<ActionResult<WorkInvitation[]>> {
     try {
         const res = await invitationsAPI.list(workId);
         return { ok: true, data: res.invitations };

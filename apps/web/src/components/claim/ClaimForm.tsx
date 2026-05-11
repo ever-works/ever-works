@@ -25,8 +25,8 @@ export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
                 {result.transferStatus === 'pending_recipient_acceptance' ? (
                     <>
                         <p>
-                            The repository transfer is pending. Accept it on your git
-                            provider to finish handover.
+                            The repository transfer is pending. Accept it on your git provider to
+                            finish handover.
                         </p>
                         {result.providerAcceptanceUrl ? (
                             <a
@@ -43,23 +43,19 @@ export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
                     <p>Repository transfer completed.</p>
                 ) : result.transferStatus === 'failed' ? (
                     <p>
-                        The repository transfer attempt failed. The invitation is
-                        recorded — contact the inviter to retry.
+                        The repository transfer attempt failed. The invitation is recorded — contact
+                        the inviter to retry.
                     </p>
                 ) : (
                     <p>
                         You now have access to{' '}
-                        <a
-                            href={`/${locale}/works/${result.workId}`}
-                            className="underline"
-                        >
+                        <a href={`/${locale}/works/${result.workId}`} className="underline">
                             {preview.workName}
                         </a>
                         .
                     </p>
                 )}
-                {result.transferStatus !== 'pending_recipient_acceptance' &&
-                result.workId ? (
+                {result.transferStatus !== 'pending_recipient_acceptance' && result.workId ? (
                     <a
                         href={`/${locale}/works/${result.workId}`}
                         className="inline-block underline"
@@ -99,8 +95,8 @@ export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
             </Button>
             {isOwnerClaim ? (
                 <p className="text-xs text-text-secondary">
-                    Accepting will initiate the repository transfer. You may need
-                    to confirm on your git provider afterward.
+                    Accepting will initiate the repository transfer. You may need to confirm on your
+                    git provider afterward.
                 </p>
             ) : null}
         </div>

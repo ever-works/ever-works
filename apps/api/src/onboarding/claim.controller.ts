@@ -29,11 +29,7 @@ import { GitFacadeService } from '@ever-works/agent/facades';
 import { Public } from '../auth/decorators/public.decorator';
 import { AuthService, AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import {
-    ClaimAcceptDto,
-    ClaimAcceptResponseDto,
-    ClaimPreviewResponseDto,
-} from './dto/claim.dto';
+import { ClaimAcceptDto, ClaimAcceptResponseDto, ClaimPreviewResponseDto } from './dto/claim.dto';
 
 @ApiTags('Claim')
 @Controller('api/claim')
@@ -116,10 +112,7 @@ export class ClaimController {
             throw new BadRequestException('claimant_is_already_owner');
         }
 
-        const existing = await this.memberRepository.findMember(
-            invitation.workId,
-            claimantUserId,
-        );
+        const existing = await this.memberRepository.findMember(invitation.workId, claimantUserId);
         if (existing) {
             throw new BadRequestException('already_a_member');
         }

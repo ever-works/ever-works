@@ -5,6 +5,7 @@ import {
     IsInt,
     IsObject,
     IsOptional,
+    IsString,
     Max,
     MaxLength,
     Min,
@@ -26,7 +27,8 @@ export class CreateInvitationDto {
     email?: string;
 
     @ApiProperty({
-        description: 'Role granted on accept. owner-claim transfers work ownership; everything else creates a WorkMember row.',
+        description:
+            'Role granted on accept. owner-claim transfers work ownership; everything else creates a WorkMember row.',
         enum: ALL_INVITATION_ROLES,
         example: 'manager',
     })
@@ -57,6 +59,7 @@ export class CreateInvitationDto {
         description: 'Provider login the claimant must match. Used for owner-claim invitations.',
     })
     @IsOptional()
+    @IsString()
     @MinLength(1)
     @MaxLength(128)
     expectedProviderUsername?: string;

@@ -12,12 +12,7 @@ import {
     Post,
     UseGuards,
 } from '@nestjs/common';
-import {
-    ApiBearerAuth,
-    ApiOperation,
-    ApiResponse,
-    ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkInvitationService, WorkOwnershipService } from '@ever-works/agent/services';
 import {
@@ -59,9 +54,10 @@ export class InvitationsController {
     ): Promise<InvitationResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        const { work } = dto.role === INVITATION_ROLE_OWNER_CLAIM
-            ? await this.ownership.ensureIsOwner(workId, user.id)
-            : await this.ownership.ensureCanManageMembers(workId, user.id);
+        const { work } =
+            dto.role === INVITATION_ROLE_OWNER_CLAIM
+                ? await this.ownership.ensureIsOwner(workId, user.id)
+                : await this.ownership.ensureCanManageMembers(workId, user.id);
 
         const expectedProviderUsername =
             dto.expectedProviderUsername ??
@@ -74,9 +70,7 @@ export class InvitationsController {
         }
 
         if (dto.role !== INVITATION_ROLE_OWNER_CLAIM && !dto.email) {
-            throw new BadRequestException(
-                'email is required for member-role invitations',
-            );
+            throw new BadRequestException('email is required for member-role invitations');
         }
 
         const metadata = {

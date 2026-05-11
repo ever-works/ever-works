@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { WorkInvitation } from '../../entities/work-invitation.entity';
-import {
-    WorkInvitationStatus,
-    WorkInvitationTransferState,
-} from '../../entities/types';
+import { WorkInvitationStatus, WorkInvitationTransferState } from '../../entities/types';
 
 @Injectable()
 export class WorkInvitationRepository {
@@ -91,18 +88,15 @@ export class WorkInvitationRepository {
             .createQueryBuilder()
             .update(WorkInvitation)
             .set({ status: WorkInvitationStatus.EXPIRED })
-            .where(
-                'status = :pending AND tokenExpiresAt < :now',
-                { pending: WorkInvitationStatus.PENDING, now },
-            )
+            .where('status = :pending AND tokenExpiresAt < :now', {
+                pending: WorkInvitationStatus.PENDING,
+                now,
+            })
             .execute();
         return result.affected ?? 0;
     }
 
-    async findExpiredPending(
-        now: Date,
-        limit = 100,
-    ): Promise<WorkInvitation[]> {
+    async findExpiredPending(now: Date, limit = 100): Promise<WorkInvitation[]> {
         return this.repository.find({
             where: {
                 status: WorkInvitationStatus.PENDING,

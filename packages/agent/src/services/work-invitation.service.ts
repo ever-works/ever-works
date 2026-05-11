@@ -66,9 +66,7 @@ export class WorkInvitationService {
             status: WorkInvitationStatus.PENDING,
             metadata: input.metadata ?? null,
             transferState:
-                input.role === INVITATION_ROLE_OWNER_CLAIM
-                    ? { status: 'not_required' }
-                    : null,
+                input.role === INVITATION_ROLE_OWNER_CLAIM ? { status: 'not_required' } : null,
         });
 
         return { invitation, token };
@@ -111,9 +109,7 @@ export class WorkInvitationService {
             throw new BadRequestException('invitation_already_accepted');
         }
         if (invitation.isExpired()) {
-            await this.invitations
-                .expireBefore(new Date())
-                .catch(() => 0);
+            await this.invitations.expireBefore(new Date()).catch(() => 0);
             throw new BadRequestException('invitation_expired');
         }
         return invitation;
@@ -152,9 +148,7 @@ export class WorkInvitationService {
             throw new BadRequestException('expiresInDays must be a positive integer');
         }
         if (requested > MAX_EXPIRES_IN_DAYS) {
-            throw new BadRequestException(
-                `expiresInDays cannot exceed ${MAX_EXPIRES_IN_DAYS}`,
-            );
+            throw new BadRequestException(`expiresInDays cannot exceed ${MAX_EXPIRES_IN_DAYS}`);
         }
         return requested;
     }

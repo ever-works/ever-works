@@ -14,8 +14,7 @@ export async function acceptClaim(token: string): Promise<ClaimAcceptOutcome> {
         const result = await claimAPI.accept(token);
         return { ok: true, result };
     } catch (err) {
-        const message =
-            err instanceof Error && err.message ? err.message : 'claim_failed';
+        const message = err instanceof Error && err.message ? err.message : 'claim_failed';
         return { ok: false, error: message };
     }
 }

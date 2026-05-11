@@ -3,10 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { createInvitation } from '@/app/actions/invitations';
-import type {
-    CreateInvitationResponse,
-    InvitationRole,
-} from '@/lib/api/invitations';
+import type { CreateInvitationResponse, InvitationRole } from '@/lib/api/invitations';
 
 interface CreateInvitationCardProps {
     workId: string;
@@ -91,10 +88,7 @@ export function CreateInvitationCard({ workId, isOwner }: CreateInvitationCardPr
 
             <form onSubmit={onSubmit} className="space-y-3">
                 <div>
-                    <label
-                        htmlFor="invite-role"
-                        className="block text-xs font-medium mb-1"
-                    >
+                    <label htmlFor="invite-role" className="block text-xs font-medium mb-1">
                         Role
                     </label>
                     <select
@@ -132,17 +126,13 @@ export function CreateInvitationCard({ workId, isOwner }: CreateInvitationCardPr
                             required
                         />
                         <p className="text-xs text-text-secondary mt-1">
-                            The claimant must sign in with the account linked to this
-                            login.
+                            The claimant must sign in with the account linked to this login.
                         </p>
                     </div>
                 ) : null}
 
                 <div>
-                    <label
-                        htmlFor="invite-email"
-                        className="block text-xs font-medium mb-1"
-                    >
+                    <label htmlFor="invite-email" className="block text-xs font-medium mb-1">
                         Recipient email{isOwnerClaim ? ' (optional)' : ''}
                     </label>
                     <input
@@ -177,12 +167,7 @@ export function CreateInvitationCard({ workId, isOwner }: CreateInvitationCardPr
                     <code className="block break-all rounded bg-muted/30 p-2 text-xs">
                         {latest.claimUrl}
                     </code>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={onCopy}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={onCopy}>
                         {copied ? 'Copied!' : 'Copy URL'}
                     </Button>
                 </div>

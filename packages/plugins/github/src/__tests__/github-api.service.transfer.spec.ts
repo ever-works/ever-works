@@ -38,12 +38,7 @@ describe('GitHubApiService.transferRepository', () => {
 	});
 
 	it('invokes octokit.rest.repos.transfer with mapped args', async () => {
-		await svc.transferRepository(
-			'ever-works',
-			'awesome-go-data',
-			{ newOwner: 'avelino' },
-			'ghp_secret'
-		);
+		await svc.transferRepository('ever-works', 'awesome-go-data', { newOwner: 'avelino' }, 'ghp_secret');
 		expect(transferMock).toHaveBeenCalledTimes(1);
 		expect(transferMock).toHaveBeenCalledWith({
 			owner: 'ever-works',
@@ -59,9 +54,7 @@ describe('GitHubApiService.transferRepository', () => {
 			{ newOwner: 'avelino-org', teamIds: [42, 99] },
 			'ghp_secret'
 		);
-		expect(transferMock).toHaveBeenCalledWith(
-			expect.objectContaining({ team_ids: [42, 99] })
-		);
+		expect(transferMock).toHaveBeenCalledWith(expect.objectContaining({ team_ids: [42, 99] }));
 	});
 
 	it('omits team_ids when array is empty (matches GitHub API contract)', async () => {
@@ -89,8 +82,6 @@ describe('GitHubApiService.transferRepository', () => {
 
 	it('propagates errors thrown by octokit (e.g., 404, permission)', async () => {
 		transferMock.mockRejectedValueOnce(new Error('Not Found'));
-		await expect(
-			svc.transferRepository('a', 'b', { newOwner: 'c' }, 'tok')
-		).rejects.toThrow('Not Found');
+		await expect(svc.transferRepository('a', 'b', { newOwner: 'c' }, 'tok')).rejects.toThrow('Not Found');
 	});
 });

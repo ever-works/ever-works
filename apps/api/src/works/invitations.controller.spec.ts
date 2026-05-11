@@ -21,10 +21,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InvitationsController } from './invitations.controller';
 import { WorkInvitationIssuedEvent } from '../events';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import type {
-    WorkInvitationService,
-    WorkOwnershipService,
-} from '@ever-works/agent/services';
+import type { WorkInvitationService, WorkOwnershipService } from '@ever-works/agent/services';
 import type { AuthService } from '../auth';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -225,9 +222,9 @@ describe('InvitationsController', () => {
 
         it('returns 404 if no pending invitation matches the id (cross-tenant guard)', async () => {
             invitations.listPending.mockResolvedValue([{ id: 'other' }]);
-            await expect(
-                controller.revoke(auth, 'w-1', 'inv-1'),
-            ).rejects.toBeInstanceOf(NotFoundException);
+            await expect(controller.revoke(auth, 'w-1', 'inv-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
             expect(invitations.revoke).not.toHaveBeenCalled();
         });
     });

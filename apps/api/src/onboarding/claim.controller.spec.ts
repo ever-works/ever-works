@@ -321,9 +321,7 @@ describe('ClaimController', () => {
             authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
                 { providerId: 'github', username: '  Avelino  ' },
             ]);
-            await expect(
-                controller.accept(auth, { token: TOKEN }),
-            ).resolves.toBeDefined();
+            await expect(controller.accept(auth, { token: TOKEN })).resolves.toBeDefined();
         });
 
         it('rejects when no connected provider account matches the expected login', async () => {
@@ -356,9 +354,7 @@ describe('ClaimController', () => {
             authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
                 { providerId: 'gitlab', username: 'avelino' },
             ]);
-            await expect(
-                controller.accept(auth, { token: TOKEN }),
-            ).resolves.toBeDefined();
+            await expect(controller.accept(auth, { token: TOKEN })).resolves.toBeDefined();
         });
 
         it('rejects when expectedProviderUsername is missing from metadata', async () => {
