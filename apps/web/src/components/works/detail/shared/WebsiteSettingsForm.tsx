@@ -533,45 +533,6 @@ function FullLayout({
                 </div>
             </SettingsCard>
 
-            {/* Item Import & Export Card (EW-533) */}
-            <SettingsCard title="Item Import & Export">
-                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
-                    Bulk CSV/Excel import and export for directory items. Both flows are off by
-                    default; enable per directory to expose the Export button on the items page and
-                    the bulk-import wizard.
-                </p>
-                <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4">
-                    <Switch
-                        checked={formData.settings.export_enabled ?? false}
-                        onChange={(checked) => updateSettings('export_enabled', checked)}
-                        label="Enable item export"
-                    />
-                    <Switch
-                        checked={formData.settings.import_enabled ?? false}
-                        onChange={(checked) => updateSettings('import_enabled', checked)}
-                        label="Enable item import"
-                    />
-                </div>
-                <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4 pt-3 mt-3 border-t border-card-border dark:border-border-secondary-dark">
-                    <Input
-                        type="number"
-                        label="Max rows per import upload"
-                        value={String(formData.settings.import_max_rows ?? 500)}
-                        onChange={(e) => {
-                            const parsed = Number.parseInt(e.target.value, 10);
-                            updateSettings(
-                                'import_max_rows',
-                                Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
-                            );
-                        }}
-                        min={1}
-                        max={2000}
-                        helperText="Hard ceiling is 2000. Default is 500. Files above the limit are rejected before any write."
-                        variant="form"
-                    />
-                </div>
-            </SettingsCard>
-
             {/* Header Settings Card */}
             <SettingsCard title={tSettings('sections.header.title')}>
                 <div className="space-y-4">
