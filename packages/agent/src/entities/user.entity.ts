@@ -15,6 +15,7 @@ import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkMember } from './work-member.entity';
+import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 @Entity({ name: 'users' })
 export class User {
@@ -69,6 +70,16 @@ export class User {
 
     @Column({ type: 'varchar', nullable: true })
     committerEmail?: string | null;
+
+    // Onboarding wizard v2 — server-side state (so progress survives device switches)
+    @Column({ type: 'timestamp', nullable: true })
+    onboardingCompletedAt?: Date | null;
+
+    @Column({ type: 'timestamp', nullable: true })
+    onboardingDismissedAt?: Date | null;
+
+    @Column('simple-json', { nullable: true })
+    onboardingState?: OnboardingWizardStateV2 | null;
 
     // Timestamps
     @CreateDateColumn()

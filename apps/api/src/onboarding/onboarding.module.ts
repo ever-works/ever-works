@@ -19,10 +19,19 @@ import { OnboardingTerminalService } from './onboarding-terminal.service';
 import { OnboardingAccountAdapter } from './onboarding-account.adapter';
 import { OnboardingWorkAdapter } from './onboarding-work.adapter';
 import { WellKnownController } from './well-known.controller';
+import { OnboardingStateController } from './onboarding-state.controller';
+import { OnboardingStateService } from './onboarding-state.service';
+import { OnboardingCatalogController } from './onboarding-catalog.controller';
+import { OnboardingCatalogService } from './onboarding-catalog.service';
 
 @Module({
     imports: [FacadesModule, DatabaseModule, WorkModule],
-    controllers: [OnboardingController, WellKnownController],
+    controllers: [
+        OnboardingController,
+        WellKnownController,
+        OnboardingStateController,
+        OnboardingCatalogController,
+    ],
     providers: [
         OnboardingService,
         OnboardingTerminalService,
@@ -33,6 +42,8 @@ import { WellKnownController } from './well-known.controller';
         WebhookDeliveryService,
         OnboardingRequestRepository,
         WebhookSubscriptionRepository,
+        OnboardingStateService,
+        OnboardingCatalogService,
         {
             provide: WEBHOOK_HTTP_CLIENT,
             useExisting: FetchWebhookHttpClient,
@@ -54,6 +65,6 @@ import { WellKnownController } from './well-known.controller';
         // OnboardingTerminalService declares the dep as @Optional() and skips
         // the marker step when the binding is absent.
     ],
-    exports: [OnboardingService, OnboardingTerminalService],
+    exports: [OnboardingService, OnboardingTerminalService, OnboardingStateService],
 })
 export class OnboardingModule {}
