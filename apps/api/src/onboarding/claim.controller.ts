@@ -20,10 +20,12 @@ import {
 } from '@ever-works/agent/database';
 import {
     INVITATION_ROLE_OWNER_CLAIM,
+    RepoTransferRecord,
     WorkInvitation,
     WorkInvitationTransferState,
     WorkMemberRole,
 } from '@ever-works/agent/entities';
+import { GitFacadeService } from '@ever-works/agent/facades';
 import { Public } from '../auth/decorators/public.decorator';
 import { AuthService, AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -42,6 +44,7 @@ export class ClaimController {
         private readonly memberRepository: WorkMemberRepository,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly authService: AuthService,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     @Public()
@@ -171,17 +174,77 @@ export class ClaimController {
             throw new BadRequestException('invitation_state_changed');
         }
 
-        const transferState: WorkInvitationTransferState = {
-            status: 'pending_recipient_acceptance',
-        };
+        const transferState = await this.attemptRepoTransfers(
+            work as { owner?: string; slug: string; userId: string; gitProvider?: string },
+            expectedUsername,
+        );
         await this.invitations.setTransferState(invitation.id, transferState);
 
-        return {
+        const acceptanceUrl = transferState.repoTransfers?.find(
+            (r) => r.providerAcceptanceUrl,
+        )?.providerAcceptanceUrl;
+
+        const response: ClaimAcceptResponseDto = {
             invitationId: invitation.id,
             workId: invitation.workId,
             role: invitation.role,
             transferStatus: transferState.status,
         };
+        if (acceptanceUrl) {
+            response.providerAcceptanceUrl = acceptanceUrl;
+        }
+        return response;
+    }
+
+    private async attemptRepoTransfers(
+        work: { owner?: string; slug: string; userId: string; gitProvider?: string },
+        newOwner: string,
+    ): Promise<WorkInvitationTransferState> {
+        const owner = work.owner;
+        const repoNames = [`${work.slug}-data`, `${work.slug}-website`];
+        const providerId = work.gitProvider ?? 'github';
+
+        if (!owner) {
+            return { status: 'pending_recipient_acceptance' };
+        }
+
+        const repoTransfers: RepoTransferRecord[] = [];
+
+        for (const repo of repoNames) {
+            try {
+                const result = await this.gitFacade.transferRepository(
+                    owner,
+                    repo,
+                    { newOwner },
+                    { providerId, userId: work.userId },
+                );
+                repoTransfers.push({
+                    repo,
+                    status: result.status,
+                    providerAcceptanceUrl: result.providerAcceptanceUrl,
+                });
+            } catch (err) {
+                repoTransfers.push({
+                    repo,
+                    status: 'failed',
+                    error:
+                        err instanceof Error
+                            ? err.message
+                            : 'unknown_error_transferring_repository',
+                });
+            }
+        }
+
+        if (repoTransfers.length === 0) {
+            return { status: 'pending_recipient_acceptance' };
+        }
+        if (repoTransfers.every((r) => r.status === 'failed')) {
+            return { status: 'failed', repoTransfers };
+        }
+        if (repoTransfers.every((r) => r.status === 'completed')) {
+            return { status: 'completed', repoTransfers };
+        }
+        return { status: 'pending_recipient_acceptance', repoTransfers };
     }
 
     private async userMatchesProviderLogin(

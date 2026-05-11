@@ -124,7 +124,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('members'),
-            href: `${ROUTES.DASHBOARD_WORK(work.id)}/members`,
+            href: `${ROUTES.DASHBOARD_WORK(work.id)}/settings/members`,
             visible: permissions.canManageMembers,
             icon: (
                 <svg
@@ -168,7 +168,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
                     />
                 </svg>
             ),
-            isActive: pathname.includes('/settings'),
+            isActive: pathname.includes('/settings') && !pathname.includes('/members'),
         },
     ].filter((tab) => tab.visible !== false);
 

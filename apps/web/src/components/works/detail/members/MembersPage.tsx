@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Work, WorkMember, WorkOwner } from '@/lib/api';
+import type { WorkInvitation } from '@/lib/api/invitations';
 import { MembersList } from './MembersList';
 import { InviteMemberDialog } from './InviteMemberDialog';
+import { PendingInvitationsSection } from './PendingInvitationsSection';
+import { CreateInvitationCard } from './CreateInvitationCard';
 import { Button } from '@/components/ui/button';
 import { canManageMembers } from '@/lib/permissions';
 
@@ -12,9 +15,17 @@ interface MembersPageProps {
     work: Work;
     members: WorkMember[];
     owner: WorkOwner;
+    invitations?: WorkInvitation[];
+    currentUserIsOwner?: boolean;
 }
 
-export function MembersPage({ work, members: initialMembers, owner }: MembersPageProps) {
+export function MembersPage({
+    work,
+    members: initialMembers,
+    owner,
+    invitations = [],
+    currentUserIsOwner = false,
+}: MembersPageProps) {
     const t = useTranslations('dashboard.workDetail.members');
     const [members, setMembers] = useState(initialMembers);
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -57,6 +68,18 @@ export function MembersPage({ work, members: initialMembers, owner }: MembersPag
                 onMemberRemoved={handleMemberRemoved}
                 onMemberUpdated={handleMemberUpdated}
             />
+
+            {canInvite ? (
+                <PendingInvitationsSection
+                    workId={work.id}
+                    invitations={invitations}
+                    canManage={canInvite}
+                />
+            ) : null}
+
+            {canInvite ? (
+                <CreateInvitationCard workId={work.id} isOwner={currentUserIsOwner} />
+            ) : null}
 
             <InviteMemberDialog
                 workId={work.id}

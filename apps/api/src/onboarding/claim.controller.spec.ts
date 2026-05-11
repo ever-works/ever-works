@@ -1,5 +1,6 @@
 jest.mock('@ever-works/agent/services', () => ({}));
 jest.mock('@ever-works/agent/database', () => ({}));
+jest.mock('@ever-works/agent/facades', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({
     INVITATION_ROLE_OWNER_CLAIM: 'owner-claim',
     WorkMemberRole: {
@@ -27,6 +28,7 @@ import type {
     WorkMemberRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
+import type { GitFacadeService } from '@ever-works/agent/facades';
 import type { AuthService } from '../auth';
 
 const TOKEN = 'a'.repeat(64);
@@ -58,6 +60,7 @@ describe('ClaimController', () => {
     let memberRepo: { findMember: jest.Mock; addMember: jest.Mock };
     let authAccountRepo: { findProviderAccountsByUserId: jest.Mock };
     let authService: { getUser: jest.Mock };
+    let gitFacade: { transferRepository: jest.Mock };
     let controller: ClaimController;
 
     beforeEach(() => {
@@ -67,9 +70,14 @@ describe('ClaimController', () => {
             setTransferState: jest.fn().mockResolvedValue(undefined),
         };
         workRepo = {
-            findById: jest
-                .fn()
-                .mockResolvedValue({ id: 'w-1', name: 'Awesome Go', userId: 'user-1', gitProvider: 'github' }),
+            findById: jest.fn().mockResolvedValue({
+                id: 'w-1',
+                name: 'Awesome Go',
+                userId: 'user-1',
+                gitProvider: 'github',
+                owner: 'ever-works',
+                slug: 'awesome-go',
+            }),
         };
         memberRepo = {
             findMember: jest.fn().mockResolvedValue(null),
@@ -77,6 +85,12 @@ describe('ClaimController', () => {
         };
         authAccountRepo = { findProviderAccountsByUserId: jest.fn().mockResolvedValue([]) };
         authService = { getUser: jest.fn().mockResolvedValue(claimant) };
+        gitFacade = {
+            transferRepository: jest.fn().mockResolvedValue({
+                status: 'pending_recipient_acceptance',
+                providerAcceptanceUrl: 'https://github.com/avelino',
+            }),
+        };
 
         controller = new ClaimController(
             invitations as unknown as WorkInvitationService,
@@ -84,6 +98,7 @@ describe('ClaimController', () => {
             memberRepo as unknown as WorkMemberRepository,
             authAccountRepo as unknown as AuthAccountRepository,
             authService as unknown as AuthService,
+            gitFacade as unknown as GitFacadeService,
         );
     });
 
@@ -184,7 +199,7 @@ describe('ClaimController', () => {
             );
         });
 
-        it('accepts and records pending_recipient_acceptance when identity matches', async () => {
+        it('accepts, calls gitFacade for each repo, returns acceptance URL', async () => {
             authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
                 { providerId: 'github', username: 'avelino' },
             ]);
@@ -192,16 +207,114 @@ describe('ClaimController', () => {
             const result = await controller.accept(auth, { token: TOKEN });
 
             expect(invitations.tryAccept).toHaveBeenCalledWith('inv-1', 'user-2');
-            expect(invitations.setTransferState).toHaveBeenCalledWith('inv-1', {
-                status: 'pending_recipient_acceptance',
-            });
+            expect(gitFacade.transferRepository).toHaveBeenCalledTimes(2);
+            expect(gitFacade.transferRepository).toHaveBeenNthCalledWith(
+                1,
+                'ever-works',
+                'awesome-go-data',
+                { newOwner: 'avelino' },
+                { providerId: 'github', userId: 'user-1' },
+            );
+            expect(gitFacade.transferRepository).toHaveBeenNthCalledWith(
+                2,
+                'ever-works',
+                'awesome-go-website',
+                { newOwner: 'avelino' },
+                { providerId: 'github', userId: 'user-1' },
+            );
+            expect(invitations.setTransferState).toHaveBeenCalledWith(
+                'inv-1',
+                expect.objectContaining({
+                    status: 'pending_recipient_acceptance',
+                    repoTransfers: expect.arrayContaining([
+                        expect.objectContaining({
+                            repo: 'awesome-go-data',
+                            status: 'pending_recipient_acceptance',
+                        }),
+                        expect.objectContaining({
+                            repo: 'awesome-go-website',
+                            status: 'pending_recipient_acceptance',
+                        }),
+                    ]),
+                }),
+            );
             expect(memberRepo.addMember).not.toHaveBeenCalled();
             expect(result).toEqual({
                 invitationId: 'inv-1',
                 workId: 'w-1',
                 role: 'owner-claim',
                 transferStatus: 'pending_recipient_acceptance',
+                providerAcceptanceUrl: 'https://github.com/avelino',
             });
+        });
+
+        it('reports status=completed when every plugin call returns completed', async () => {
+            authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
+                { providerId: 'github', username: 'avelino' },
+            ]);
+            gitFacade.transferRepository.mockResolvedValue({ status: 'completed' });
+
+            const result = await controller.accept(auth, { token: TOKEN });
+            expect(result.transferStatus).toBe('completed');
+        });
+
+        it('reports status=failed when every repo call throws (e.g., 404 / no permission)', async () => {
+            authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
+                { providerId: 'github', username: 'avelino' },
+            ]);
+            gitFacade.transferRepository.mockRejectedValue(new Error('Not Found'));
+
+            const result = await controller.accept(auth, { token: TOKEN });
+            expect(result.transferStatus).toBe('failed');
+            expect(invitations.setTransferState).toHaveBeenCalledWith(
+                'inv-1',
+                expect.objectContaining({
+                    status: 'failed',
+                    repoTransfers: [
+                        expect.objectContaining({ repo: 'awesome-go-data', status: 'failed' }),
+                        expect.objectContaining({ repo: 'awesome-go-website', status: 'failed' }),
+                    ],
+                }),
+            );
+        });
+
+        it('falls back to pending without repoTransfers when work.owner is missing (operator-assisted)', async () => {
+            workRepo.findById.mockResolvedValue({
+                id: 'w-1',
+                name: 'Awesome Go',
+                userId: 'user-1',
+                gitProvider: 'github',
+                slug: 'awesome-go',
+                // no owner
+            });
+            authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
+                { providerId: 'github', username: 'avelino' },
+            ]);
+
+            const result = await controller.accept(auth, { token: TOKEN });
+            expect(gitFacade.transferRepository).not.toHaveBeenCalled();
+            expect(result.transferStatus).toBe('pending_recipient_acceptance');
+        });
+
+        it('treats GitFacadeError (e.g., plugin lacks transferRepository) as failure but still records claim', async () => {
+            workRepo.findById.mockResolvedValue({
+                id: 'w-1',
+                name: 'X',
+                userId: 'user-1',
+                gitProvider: 'gitlab',
+                slug: 'awesome-go',
+                owner: 'ever-works',
+            });
+            authAccountRepo.findProviderAccountsByUserId.mockResolvedValue([
+                { providerId: 'gitlab', username: 'avelino' },
+            ]);
+            gitFacade.transferRepository.mockRejectedValue(
+                new Error('Transfer repository not supported by this provider'),
+            );
+
+            const result = await controller.accept(auth, { token: TOKEN });
+            expect(invitations.tryAccept).toHaveBeenCalled();
+            expect(result.transferStatus).toBe('failed');
         });
 
         it('matches case-insensitively and trims whitespace', async () => {
