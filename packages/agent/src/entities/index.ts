@@ -3,6 +3,7 @@ export * from './work.entity';
 export * from './work-advanced-prompts.entity';
 export * from './work-custom-domain.entity';
 export * from './work-member.entity';
+export * from './work-invitation.entity';
 export * from './user.entity';
 export * from './refresh-token.entity';
 export * from './work-generation-history.entity';
