@@ -84,6 +84,25 @@ export interface ForkRepositoryOptions {
 	readonly defaultBranchOnly?: boolean;
 }
 
+export interface TransferRepoOptions {
+	/** Provider login / namespace path the repo should be transferred to. */
+	readonly newOwner: string;
+	/** GitHub-specific; ignored by providers that don't support team grants. */
+	readonly teamIds?: readonly number[];
+}
+
+export interface TransferRepoResult {
+	/**
+	 * `completed` — transfer landed synchronously.
+	 * `pending_recipient_acceptance` — provider returned 202; recipient must
+	 *   accept on the provider's web UI. Surface `providerAcceptanceUrl` so the
+	 *   claim page can deep-link them.
+	 */
+	readonly status: 'completed' | 'pending_recipient_acceptance';
+	readonly providerAcceptanceUrl?: string;
+	readonly newRepository?: GitRepository;
+}
+
 export interface CreatePROptions {
 	readonly owner: string;
 	readonly repo: string;
@@ -227,6 +246,14 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		options: MergeOptions | undefined,
 		token: string
 	): Promise<MergeResult>;
+
+	// Repository ownership transfer (optional; providers without an equivalent API omit this)
+	transferRepository?(
+		owner: string,
+		repo: string,
+		options: TransferRepoOptions,
+		token: string
+	): Promise<TransferRepoResult>;
 
 	// Fork & template operations
 	forkRepository?(

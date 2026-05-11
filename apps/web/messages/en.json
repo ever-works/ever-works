@@ -1046,6 +1046,14 @@
                     "submit": "Send Invite",
                     "cancel": "Cancel",
                     "success": "Member invited successfully.",
+                    "modes": {
+                        "direct": {
+                            "description": "Add an existing user as a member right away by their email. They get the assigned role immediately."
+                        },
+                        "link": {
+                            "description": "Generate a single-use link to share. The recipient redeems it to join — or claim ownership, if you create an owner-claim link."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Email address is required.",
                         "failed": "Failed to invite member. Please try again."
@@ -1888,6 +1896,11 @@
                 "stopFailed": "Failed to cancel generation"
             },
             "settings": {
+                "tabs": {
+                    "general": "General",
+                    "members": "Members",
+                    "navigationLabel": "Settings tabs"
+                },
                 "sourceSettings": "Source Repository",
                 "originalSource": "Original Source",
                 "syncEnabled": "Sync Enabled",
@@ -2952,7 +2965,9 @@
                 "clusterIngressClassDefault": "default",
                 "clusterIngressClassUnknown": "unknown controller",
                 "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
-                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list."
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
+                "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually."
             },
             "oauth": {
                 "title": "Account Connection",

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
+import { GithubPackagesOAuthButton } from './GithubPackagesOAuthButton';
 import { isType, getPrimaryType } from './utils';
 
 interface PluginSettingsFieldProps {
@@ -363,6 +364,10 @@ export function PluginSettingsField({
                 {label}
                 {required && <span className="text-danger ml-1">*</span>}
             </label>
+
+            {schema.widget === 'github-packages-oauth' && pluginId && (
+                <GithubPackagesOAuthButton pluginId={pluginId} />
+            )}
 
             {renderInput()}
 

@@ -19,10 +19,12 @@ import { OnboardingTerminalService } from './onboarding-terminal.service';
 import { OnboardingAccountAdapter } from './onboarding-account.adapter';
 import { OnboardingWorkAdapter } from './onboarding-work.adapter';
 import { WellKnownController } from './well-known.controller';
+import { ClaimController } from './claim.controller';
+import { AuthModule } from '../auth';
 
 @Module({
-    imports: [FacadesModule, DatabaseModule, WorkModule],
-    controllers: [OnboardingController, WellKnownController],
+    imports: [FacadesModule, DatabaseModule, WorkModule, AuthModule],
+    controllers: [OnboardingController, WellKnownController, ClaimController],
     providers: [
         OnboardingService,
         OnboardingTerminalService,

@@ -13,6 +13,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
 // Controllers
 import { WorksController } from './works.controller';
 import { MembersController } from './members.controller';
+import { InvitationsController } from './invitations.controller';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -45,6 +46,6 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
     ],
-    controllers: [WorksController, MembersController],
+    controllers: [WorksController, MembersController, InvitationsController],
 })
 export class WorksModule {}
