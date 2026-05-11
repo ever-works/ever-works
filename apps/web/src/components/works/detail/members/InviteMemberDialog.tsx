@@ -199,7 +199,7 @@ export function InviteMemberDialog({
                             className={cn(
                                 'rounded-md px-3 py-1 text-xs font-medium transition-colors duration-200',
                                 mode === m
-                                    ? 'bg-button-primary dark:bg-button-primary-dark text-white shadow-sm'
+                                    ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-button-primary-foreground-dark shadow-sm'
                                     : 'text-text-secondary hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark',
                             )}
                             disabled={isSubmitting}
