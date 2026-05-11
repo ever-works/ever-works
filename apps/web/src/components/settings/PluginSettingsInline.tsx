@@ -255,7 +255,7 @@ export function PluginSettingsInline({
                             </div>
                         )}
 
-                        {saveSuccess && validationDetails && (
+                        {validationDetails && !validationError && (
                             <ValidationDetailsPanel details={validationDetails} />
                         )}
 

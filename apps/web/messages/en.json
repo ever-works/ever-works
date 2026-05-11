@@ -2951,6 +2951,7 @@
                 "clusterIngressClassUseDefault": "Cluster default",
                 "clusterIngressClassDefault": "default",
                 "clusterIngressClassUnknown": "unknown controller",
+                "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
                 "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list."
             },
             "oauth": {

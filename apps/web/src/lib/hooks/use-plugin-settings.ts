@@ -23,14 +23,11 @@ interface UsePluginSettingsOptions {
     onSave: (data: {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
-    }) => Promise<
-        | void
-        | {
-              validationError?: string;
-              validationSuccess?: string;
-              validationDetails?: Record<string, unknown>;
-          }
-    >;
+    }) => Promise<void | {
+        validationError?: string;
+        validationSuccess?: string;
+        validationDetails?: Record<string, unknown>;
+    }>;
     /** Display-only fallback values shown when a field has no value in initialSettings.
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;

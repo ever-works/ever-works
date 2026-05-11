@@ -114,9 +114,15 @@ export function PluginSettingsField({
         }
 
         // Cluster IngressClass select — populated from the most recent
-        // validateConnection result. Falls back to a text input when no
-        // validation has run or the cluster has no detected ingress classes
-        // (helper text below the field tells the user what to install).
+        // validateConnection result. Three states:
+        //   1. No validation yet (`validationDetails == null`): plain text
+        //      input. No warning — we haven't checked anything yet, so
+        //      saying "no controller detected" would be alarming/incorrect.
+        //   2. Validation ran, cluster has no detected classes: text input +
+        //      warning hint (rendered below renderInput) telling the user to
+        //      install nginx/Traefik.
+        //   3. Validation ran, classes detected: dropdown populated from the
+        //      detected list (sorted default-first, strategy-known-second).
         if (schema.widget === 'cluster-ingress-class') {
             const rawList = (validationDetails?.ingressClasses ?? []) as unknown;
             const classes: ClusterIngressClassDescriptor[] = Array.isArray(rawList)
@@ -144,9 +150,7 @@ export function PluginSettingsField({
             return (
                 <Select
                     value={currentValue}
-                    onValueChange={(v) =>
-                        onChange(v === '__cluster_default__' ? null : v)
-                    }
+                    onValueChange={(v) => onChange(v === '__cluster_default__' ? null : v)}
                 >
                     <option value="__cluster_default__">
                         {t('clusterIngressClassUseDefault')}
@@ -367,13 +371,26 @@ export function PluginSettingsField({
             )}
 
             {schema.widget === 'cluster-ingress-class' &&
-                (!validationDetails ||
-                    !Array.isArray(validationDetails.ingressClasses) ||
-                    (validationDetails.ingressClasses as unknown[]).length === 0) && (
-                    <p className="text-xs text-warning dark:text-warning">
-                        {t('clusterIngressClassEmpty')}
-                    </p>
-                )}
+                (() => {
+                    if (!validationDetails) {
+                        // Pre-validation: neutral hint, no warning.
+                        return (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('clusterIngressClassPreVerify')}
+                            </p>
+                        );
+                    }
+                    const list = validationDetails.ingressClasses;
+                    if (!Array.isArray(list) || list.length === 0) {
+                        // Post-validation, cluster has no controllers: warn.
+                        return (
+                            <p className="text-xs text-warning dark:text-warning">
+                                {t('clusterIngressClassEmpty')}
+                            </p>
+                        );
+                    }
+                    return null;
+                })()}
 
             {isSecret && (
                 <p className="text-xs text-warning dark:text-warning items-center gap-1 hidden">

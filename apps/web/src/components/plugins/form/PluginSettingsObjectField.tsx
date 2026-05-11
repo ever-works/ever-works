@@ -85,10 +85,7 @@ export function PluginSettingsObjectField({
 
         return (
             <div className="space-y-4 p-3 rounded-lg border border-border dark:border-border-dark">
-                <Select
-                    value={String(currentKind)}
-                    onValueChange={handleBranchChange}
-                >
+                <Select value={String(currentKind)} onValueChange={handleBranchChange}>
                     {oneOf.map((branch) => {
                         const kindValue = String(discriminator.constByBranch.get(branch) ?? '');
                         return (
