@@ -15,7 +15,9 @@ import type {
 	ForkRepositoryOptions,
 	GitRepositoryWithPermissions,
 	ListRepositoriesOptions,
-	ListPullRequestsOptions
+	ListPullRequestsOptions,
+	TransferRepoOptions,
+	TransferRepoResult
 } from '@ever-works/plugin/git';
 
 function sanitizeDescription(description?: string): string {
@@ -209,6 +211,32 @@ export class GitHubApiService {
 	async deleteRepository(owner: string, repo: string, token: string, baseUrl?: string): Promise<void> {
 		const octokit = this.createOctokit(token, baseUrl);
 		await octokit.rest.repos.delete({ owner, repo });
+	}
+
+	async transferRepository(
+		owner: string,
+		repo: string,
+		options: TransferRepoOptions,
+		token: string,
+		baseUrl?: string
+	): Promise<TransferRepoResult> {
+		const octokit = this.createOctokit(token, baseUrl);
+		// GitHub's transfer API returns 202 with the source repo payload;
+		// the new owner must accept the transfer on github.com before it
+		// completes. The returned repo data describes the OLD location and
+		// isn't useful to consumers — omit `newRepository` and let callers
+		// re-resolve once the transfer settles.
+		await octokit.rest.repos.transfer({
+			owner,
+			repo,
+			new_owner: options.newOwner,
+			...(options.teamIds && options.teamIds.length > 0 ? { team_ids: [...options.teamIds] } : {})
+		});
+
+		return {
+			status: 'pending_recipient_acceptance',
+			providerAcceptanceUrl: `https://github.com/${options.newOwner}`
+		};
 	}
 
 	async updateRepository(

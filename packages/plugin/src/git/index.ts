@@ -15,6 +15,8 @@ export type {
 	CreateRepoOptions,
 	UpdateRepoOptions,
 	ForkRepositoryOptions,
+	TransferRepoOptions,
+	TransferRepoResult,
 	CreatePROptions,
 	MergeOptions,
 	MergeResult,

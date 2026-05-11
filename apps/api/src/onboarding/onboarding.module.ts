@@ -24,12 +24,15 @@ import { OnboardingStateService } from './onboarding-state.service';
 import { OnboardingCatalogController } from './onboarding-catalog.controller';
 import { OnboardingCatalogService } from './onboarding-catalog.service';
 import { OnboardingTelemetryController } from './onboarding-telemetry.controller';
+import { ClaimController } from './claim.controller';
+import { AuthModule } from '../auth';
 
 @Module({
-    imports: [FacadesModule, DatabaseModule, WorkModule],
+    imports: [FacadesModule, DatabaseModule, WorkModule, AuthModule],
     controllers: [
         OnboardingController,
         WellKnownController,
+        ClaimController,
         OnboardingStateController,
         OnboardingCatalogController,
         OnboardingTelemetryController,

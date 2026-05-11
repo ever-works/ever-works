@@ -117,4 +117,64 @@ export class OAuthController {
     async disconnectProvider(@Request() req, @Param('providerId') providerId: string) {
         await this.oauthService.disconnectProvider(req.user.userId, providerId);
     }
+
+    @Get(':providerId/read-packages/connect/url')
+    @ApiOperation({
+        summary: 'Get OAuth authorization URL for read:packages + write:packages',
+        description:
+            'Variant of `connect/url` that requests `read:packages` + `write:packages` scopes. The resulting token is stored on the plugin settings under `readPackagesPat` instead of replacing the main OAuth connection.',
+    })
+    @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
+    @ApiQuery({ name: 'callbackUrl', required: false })
+    @ApiQuery({ name: 'state', required: false })
+    @ApiQuery({ name: 'forceConsent', required: false })
+    @ApiResponse({ status: 200, description: 'OAuth authorization URL' })
+    async getReadPackagesConnectUrl(
+        @Request() req,
+        @Param('providerId') providerId: string,
+        @Query('callbackUrl') callbackUrl?: string,
+        @Query('state') state?: string,
+        @Query('forceConsent') forceConsent?: string,
+    ) {
+        try {
+            return await this.oauthService.getReadPackagesOAuthUrl({
+                userId: req.user.userId,
+                redirectUri: callbackUrl || '',
+                forceConsent: forceConsent === 'true',
+                providerId,
+                state,
+            });
+        } catch (error) {
+            throw new BadRequestException(
+                error instanceof Error ? error.message : 'Failed to get OAuth URL',
+            );
+        }
+    }
+
+    @Get(':providerId/callback/plugins/read-packages')
+    @ApiOperation({
+        summary: 'OAuth callback handler for the read-packages flow',
+        description:
+            "Receives the GitHub OAuth callback for the read-packages variant. Exchanges the code for a token and writes it to the user's plugin settings under `readPackagesPat` (used by the Kubernetes deploy provider as an imagePullSecret password for private GHCR images). Does NOT touch the main OAuth connection.",
+    })
+    @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
+    @ApiQuery({ name: 'code', required: true })
+    @ApiQuery({ name: 'state', required: false })
+    @ApiResponse({ status: 200, description: 'Read-packages PAT saved' })
+    async handleReadPackagesOAuthCallback(
+        @Request() req,
+        @Param('providerId') providerId: string,
+        @Query('code') code: string,
+        @Query('state') state?: string,
+    ) {
+        if (!code) {
+            throw new BadRequestException('Authorization code is required');
+        }
+        return this.oauthService.handleReadPackagesOAuthCallback(
+            req.user.userId,
+            providerId,
+            code,
+            state,
+        );
+    }
 }

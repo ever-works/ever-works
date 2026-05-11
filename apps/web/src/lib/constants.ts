@@ -79,8 +79,10 @@ export const ROUTES = {
     DASHBOARD_WORK_COMPARISON: (id: string, slug: string) =>
         `/works/${id}/generator/comparisons/${slug}`,
     DASHBOARD_WORK_DEPLOY: (id: string) => `/works/${id}/deploy`,
-    DASHBOARD_WORK_MEMBERS: (id: string) => `/works/${id}/members`,
+    DASHBOARD_WORK_MEMBERS: (id: string) => `/works/${id}/settings/members`,
     DASHBOARD_WORK_SETTINGS: (id: string) => `/works/${id}/settings`,
+    DASHBOARD_WORK_SETTINGS_GENERAL: (id: string) => `/works/${id}/settings`,
+    DASHBOARD_WORK_SETTINGS_MEMBERS: (id: string) => `/works/${id}/settings/members`,
     DASHBOARD_WORK_PLUGINS: (id: string) => `/works/${id}/plugins`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
@@ -117,6 +119,7 @@ export const ROUTES = {
     API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
+    API_OAUTH_READ_PACKAGES_CALLBACK: '/api/oauth/:providerId/callback/plugins/read-packages',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {

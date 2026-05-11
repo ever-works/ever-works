@@ -86,6 +86,55 @@ export async function connectGitProvider(
     return connectOAuthProvider(providerId, returnPath, forceConsent);
 }
 
+/**
+ * Start the GitHub read-packages OAuth flow. Mirrors `connectOAuthProvider`
+ * but hits the dedicated `/oauth/:providerId/read-packages/connect/url`
+ * endpoint, which forces `scope=read:packages write:packages` and routes
+ * the callback into plugin settings (`readPackagesPat`) instead of the
+ * user's main OAuth connection. Used by the GitHub plugin's
+ * "Connect via GitHub (read:packages + write:packages)" button.
+ */
+export async function connectReadPackagesOAuthProvider(
+    providerId: string,
+    returnPath?: string,
+    forceConsent?: boolean,
+) {
+    try {
+        if (!providerId) {
+            return { success: false, error: 'Provider ID is required' };
+        }
+
+        const state = generateHexToken(16);
+        await setOAuthStateCookie(state);
+
+        const params = new URLSearchParams();
+        if (returnPath) {
+            params.append('returnPath', returnPath);
+        }
+
+        const queryString = params.toString();
+        const callbackPath = routeWithParams(ROUTES.API_OAUTH_READ_PACKAGES_CALLBACK, {
+            providerId,
+        });
+        const callbackUrl = withAppUrl(callbackPath) + (queryString ? `?${queryString}` : '');
+
+        const response = await oauthAPI.getReadPackagesConnectUrl(
+            providerId,
+            callbackUrl,
+            state,
+            forceConsent,
+        );
+
+        return { success: true, url: response.url, state: response.state };
+    } catch (error) {
+        console.error('Failed to get read-packages OAuth connect URL:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to start OAuth flow',
+        };
+    }
+}
+
 export async function disconnectOAuthProvider(providerId: string) {
     try {
         if (!providerId) {

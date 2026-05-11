@@ -174,6 +174,79 @@ export class OAuthService {
         await this.oauthFacade.revokeToken(userId, providerId);
     }
 
+    /**
+     * Variant of {@link getOAuthUrl} that requests the GitHub `read:packages`
+     * and `write:packages` scopes regardless of the plugin's configured
+     * scopes. Used by the "Authorize with GitHub" button on the GitHub
+     * plugin's `readPackagesPat` field — the resulting token is stored in
+     * plugin settings instead of replacing the user's main OAuth connection.
+     *
+     * The exact same `oauthFacade.getAuthorizationUrl()` path is used; only
+     * the `scopes` slice of the config is overridden, so providers that
+     * ignore `scopes` (non-OAuth-with-scopes flows) keep behaving as before.
+     */
+    async getReadPackagesOAuthUrl({
+        userId,
+        providerId,
+        redirectUri,
+        state,
+        forceConsent,
+    }: {
+        userId: string;
+        providerId: string;
+        redirectUri: string;
+        state?: string;
+        forceConsent?: boolean;
+    }): Promise<{ url: string; state: string }> {
+        void userId;
+        const finalState = state || randomBytes(16).toString('hex');
+
+        const config = await this.getOAuthConfig(providerId, redirectUri);
+        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
+            ...config,
+            scopes: ['read:packages', 'write:packages'],
+            forceConsent,
+        });
+
+        return { url, state: finalState };
+    }
+
+    /**
+     * Callback handler for the read-packages OAuth flow. Exchanges the code
+     * for a token (using the SAME GitHub OAuth app credentials as the main
+     * flow) and writes the resulting access token to the user's GitHub
+     * plugin settings under `readPackagesPat` — the same field a user can
+     * fill manually with a fine-grained PAT.
+     *
+     * Critically, this does NOT touch `authAccountRepository`. The main
+     * GitHub OAuth connection (used for git operations, repo OAuth scopes)
+     * is left untouched; the two tokens live independently.
+     */
+    async handleReadPackagesOAuthCallback(
+        userId: string,
+        providerId: string,
+        code: string,
+        state?: string,
+    ): Promise<{ providerId: string; connected: true }> {
+        void state;
+
+        const config = await this.getOAuthConfig(providerId);
+        const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
+
+        await this.pluginSettingsService.updateUserSettings(
+            providerId,
+            userId,
+            { readPackagesPat: token.accessToken },
+            { secretKeys: ['readPackagesPat'] },
+        );
+
+        this.logger.log(
+            `Stored read-packages OAuth token for user ${userId} on plugin ${providerId}`,
+        );
+
+        return { providerId, connected: true };
+    }
+
     private async getOAuthConfig(
         providerId: string,
         redirectUri?: string,
