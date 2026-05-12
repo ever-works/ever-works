@@ -19,6 +19,7 @@ import {
     UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import {
     ApiTags,
     ApiBearerAuth,
@@ -480,6 +481,9 @@ export class WorksController {
     @Post('works/:id/import-items/validate')
     @HttpCode(HttpStatus.OK)
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    // Validate parses the whole file synchronously; cap at 10/min/IP so a
+    // user can't tie up the API by spamming large uploads.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Parse + validate an item import file (dry-run, no writes)',
         description:
@@ -547,6 +551,10 @@ export class WorksController {
 
     @Post('works/:id/import-items')
     @HttpCode(HttpStatus.OK)
+    // Execute clones the data repo, writes N YAMLs, commits + pushes, and
+    // (usually) opens a PR. Cap aggressively at 3/min/IP — anyone needing
+    // more should split their file.
+    @Throttle({ default: { limit: 3, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Execute a validated bulk item import',
         description:
