@@ -36,6 +36,7 @@ describe('WorkLifecycleService', () => {
     let deployFacade: any;
     let templateCatalogService: any;
     let websiteRepositoryState: any;
+    let eventEmitter: any;
     let service: WorkLifecycleService;
 
     afterAll(() => {
@@ -92,6 +93,9 @@ describe('WorkLifecycleService', () => {
         const everWorksDeployQuota = {
             assertWithinQuota: jest.fn().mockResolvedValue(undefined),
         } as never;
+        eventEmitter = {
+            emit: jest.fn(),
+        };
 
         service = new WorkLifecycleService(
             workRepository,
@@ -105,6 +109,7 @@ describe('WorkLifecycleService', () => {
             templateCatalogService,
             websiteRepositoryState,
             everWorksDeployQuota,
+            eventEmitter as never,
         );
     });
 

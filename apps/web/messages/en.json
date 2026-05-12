@@ -2173,6 +2173,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
+                },
                 "noProviderAlert": {
                     "title": "No Deployment Provider",
                     "description": "Select a deployment provider to deploy your Work's website.",

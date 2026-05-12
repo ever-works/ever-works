@@ -5,8 +5,10 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
+import { WorksConfigSyncRequestedEvent } from '@src/events';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
@@ -46,6 +48,7 @@ export class WorkLifecycleService {
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
         private readonly everWorksDeployQuota: EverWorksDeployQuotaService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     /**
@@ -304,6 +307,26 @@ export class WorkLifecycleService {
             }
 
             updatedWork.owner = updatedWork.getRepoOwner();
+
+            // EW-612: when `deployProvider` changes via the dashboard,
+            // commit the new value to `.works/works.yml` in the data repo
+            // so the next deploy doesn't hit the data-repo-wins precedence
+            // and silently flip the provider back. We do this by emitting
+            // the existing `WorksConfigSyncRequestedEvent`; the existing
+            // `WorksConfigSyncListener` + `WorksConfigRepositorySyncService`
+            // handle the YAML read-modify-write and the git commit/push.
+            //
+            // Only emit when the value actually changed — saving the same
+            // provider should be a no-op for the data repo.
+            if (
+                updateDto.deployProvider !== undefined &&
+                updateDto.deployProvider !== work.deployProvider
+            ) {
+                this.eventEmitter.emit(
+                    WorksConfigSyncRequestedEvent.EVENT_NAME,
+                    new WorksConfigSyncRequestedEvent(id, user.id, 'provider_changed'),
+                );
+            }
 
             return {
                 status: 'success',

@@ -74,6 +74,8 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
     };
     const quota = { assertWithinQuota: jest.fn().mockResolvedValue(undefined) };
 
+    const eventEmitter = { emit: jest.fn() };
+
     const service = new WorkLifecycleService(
         workRepo as never,
         userRepo as never,
@@ -86,6 +88,7 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         templateCatalog as never,
         {} as never,
         quota as never,
+        eventEmitter as never,
     );
 
     return { service, deps: { workRepo, userRepo, quota } };
