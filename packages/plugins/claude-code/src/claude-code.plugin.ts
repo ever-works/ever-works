@@ -177,16 +177,18 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		properties: {
 			oauthToken: {
 				type: 'string',
-				title: 'OAuth Token',
-				description: 'Claude Code OAuth token (from `claude setup-token`)',
+				title: 'OAuth Token (Claude Pro/Max subscription — no per-token cost)',
+				description:
+					'Recommended for cost-conscious users. Generate with `claude setup-token` in your terminal once Claude Code CLI is installed; this lets the platform use your Claude Pro or Max subscription instead of billing each API call.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_CLAUDE_CODE_OAUTH_TOKEN'
 			},
 			apiKey: {
 				type: 'string',
-				title: 'API Key',
-				description: 'Anthropic API key (from console.anthropic.com)',
+				title: 'API Key (Anthropic per-token billing)',
+				description:
+					'Use an Anthropic API key from console.anthropic.com if you do not have a Claude subscription. You pay Anthropic per request. Either OAuth Token or API Key is required — OAuth Token takes precedence when both are provided.',
 				'x-secret': true,
 				'x-scope': 'user'
 			},

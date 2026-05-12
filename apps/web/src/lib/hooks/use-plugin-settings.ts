@@ -23,7 +23,11 @@ interface UsePluginSettingsOptions {
     onSave: (data: {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
-    }) => Promise<void | { validationError?: string; validationSuccess?: string }>;
+    }) => Promise<void | {
+        validationError?: string;
+        validationSuccess?: string;
+        validationDetails?: Record<string, unknown>;
+    }>;
     /** Display-only fallback values shown when a field has no value in initialSettings.
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;
@@ -45,6 +49,11 @@ interface UsePluginSettingsReturn {
     visibleProperties: Record<string, PluginSettingsSchemaProperty>;
     hasSettings: boolean;
     saveMessage: string | null;
+    /** Plugin-specific details returned by the most recent validation, e.g.
+     *  k8s returns cluster name + version + detected IngressClass list. The UI
+     *  can use these to populate dynamic widgets (ingress-class select) and
+     *  show a success summary after Save & verify. Null until first validation. */
+    validationDetails: Record<string, unknown> | null;
     handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
     handleSave: () => Promise<void>;
     getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
@@ -86,6 +95,9 @@ export function usePluginSettings({
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
+    const [validationDetails, setValidationDetails] = useState<Record<string, unknown> | null>(
+        null,
+    );
     const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevInitialRef = useRef(stableInitial);
 
@@ -231,6 +243,12 @@ export function usePluginSettings({
             if (result?.validationError) {
                 setValidationError(result.validationError);
             }
+            // Capture validation details (cluster info, detected IngressClass list, ...)
+            // so dynamic widgets and the success banner can use them.
+            // Always update — including clearing on validation error — so stale
+            // details from a previous successful save don't survive a re-save
+            // that points at a different cluster.
+            setValidationDetails(result?.validationDetails ?? null);
             router.refresh();
             successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
@@ -268,12 +286,19 @@ export function usePluginSettings({
             // Fall back to inherited value for display when no local value is set
             // BUT: if the user has explicitly modified this field, respect their input (even if empty)
             const hasBeenModified = modifiedFields.has(key);
-            if (
-                !hasBeenModified &&
-                (value === undefined || value === null || value === '') &&
-                fallbackSettings
-            ) {
-                return fallbackSettings[key];
+            const isEmpty = value === undefined || value === null || value === '';
+            if (!hasBeenModified && isEmpty && fallbackSettings) {
+                const fallback = fallbackSettings[key];
+                if (fallback !== undefined) {
+                    return fallback;
+                }
+            }
+            // Final fallback: schema's declared default. Without this, object
+            // fields with a top-level default (e.g. k8s registry's
+            // `default: { kind: 'github' }`) render empty because their
+            // discriminated-union branch can't be picked from a missing value.
+            if (!hasBeenModified && isEmpty && propSchema.default !== undefined) {
+                return propSchema.default;
             }
             return value;
         },
@@ -290,6 +315,7 @@ export function usePluginSettings({
         visibleProperties,
         hasSettings,
         saveMessage,
+        validationDetails,
         handleFieldChange,
         handleSave,
         getFieldValue,

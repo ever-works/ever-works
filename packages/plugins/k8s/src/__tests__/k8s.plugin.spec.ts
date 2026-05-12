@@ -124,6 +124,23 @@ describe('KubernetesPlugin metadata', () => {
 		expect(reg.oneOf).toHaveLength(3);
 		expect(reg.default?.kind).toBe('github');
 	});
+
+	it('ingressClass field uses the cluster-ingress-class widget so the form can render a dynamic Select', () => {
+		const ic = plugin.settingsSchema.properties?.ingressClass as Record<string, unknown>;
+		expect(ic?.['x-widget']).toBe('cluster-ingress-class');
+	});
+
+	it('manifest hints verifiesOnSave so the UI labels the save button "Save & verify" and shows cluster info on success', () => {
+		const m = plugin.getManifest();
+		expect(m.uiHints?.verifiesOnSave).toBe(true);
+	});
+
+	it('manifest opts the k8s plugin into onboarding so the Deploy step can route users into the configure form', () => {
+		const m = plugin.getManifest();
+		expect(m.uiHints?.includeInOnboarding).toBe(true);
+		expect(m.uiHints?.onboardingPriority).toBe(4);
+		expect(m.uiHints?.onboardingDescription).toBeDefined();
+	});
 });
 
 describe('KubernetesPlugin.validateConnection', () => {

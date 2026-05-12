@@ -7,6 +7,8 @@ export * from './server-api';
 export * from './settings';
 export * from './health';
 export * from './members';
+export * from './invitations';
+export * from './claim';
 export * from './plugins';
 export * from './plugins-capabilities/screenshot';
 export * from './plugins-capabilities/deploy';

@@ -52,7 +52,10 @@ setup('authenticate', async ({ page, baseURL }) => {
     await expect(page).not.toHaveURL(/\/login/);
 
     // 3. Pre-dismiss the onboarding wizard so subsequent authenticated tests
-    //    aren't blocked by the modal portal intercepting clicks.
+    //    aren't blocked by the modal portal intercepting clicks. v2 stores
+    //    the dismissed flag on the server (users.onboarding_dismissed_at) so
+    //    we POST /api/onboarding/dismiss here. The legacy localStorage key
+    //    is kept for the few specs still on v1.
     const ONBOARDING_KEY = 'ever-works-onboarding';
     await page.evaluate((key) => {
         try {
@@ -64,6 +67,10 @@ setup('authenticate', async ({ page, baseURL }) => {
             // localStorage may not be available; tests can dismiss manually.
         }
     }, ONBOARDING_KEY);
+    await page.request.post('/api/onboarding/dismiss').catch(() => {
+        // Wizard-v2 endpoint may not exist on older API builds — the
+        // localStorage shim above keeps the legacy tests green either way.
+    });
 
     // 4. Dismiss the "Connect your GitHub account" modal if it appears, and
     //    record the dismissal in localStorage (key is keyed by userId, so we

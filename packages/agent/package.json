@@ -120,6 +120,10 @@
         "./account-transfer": {
             "types": "./dist/account-transfer/index.d.ts",
             "default": "./dist/account-transfer/index.js"
+        },
+        "./ever-works-providers": {
+            "types": "./dist/ever-works-providers/index.d.ts",
+            "default": "./dist/ever-works-providers/index.js"
         }
     },
     "scripts": {

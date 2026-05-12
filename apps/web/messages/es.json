@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "No hay actividades aquí",
                 "noWork": "Sin trabajo",
+                "loadMore": "Cargar {count} más",
                 "columns": {
                     "pending": "Pendiente",
                     "in_progress": "En progreso",
                     "completed": "Completado",
                     "failed": "Fallido",
                     "cancelled": "Cancelado"
-                },
-                "loadMore": "Cargar {count} más"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} elementos",
                 "noDescription": "Sin descripción",
                 "empty": "No hay trabajos aquí",
+                "loadMore": "Cargar {count} más",
                 "columns": {
                     "not_started": "No iniciado",
                     "scheduled": "Programado",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Completado con advertencias",
                     "failed": "Fallido",
                     "cancelled": "Cancelado"
-                },
-                "loadMore": "Cargar {count} más"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Seguridad",
                 "apiKeys": "Claves API",
                 "data": "Datos",
+                "githubApp": "GitHub App",
                 "gitProviders": "Proveedores de Git",
                 "dangerZone": "Zona de peligro"
+            },
+            "githubApp": {
+                "title": "Instalaciones de GitHub App",
+                "subtitle": "Inspeccione las instalaciones vinculadas a través de la aplicación GitHub de Ever Works y actualice manualmente la instantánea del repositorio antes de que comience el trabajo de incorporación más profundo.",
+                "emptyTitle": "Aún no hay instalaciones de GitHub App",
+                "emptyDescription": "Instale la aplicación GitHub de Ever Works en un repositorio u organización, luego complete la redirección de configuración para vincular la instalación a este espacio de trabajo.",
+                "sync": "Sincronizar",
+                "syncSuccess": "Instalación sincronizada",
+                "syncError": "Error al sincronizar la instalación",
+                "onboard": "Incorporar",
+                "onboardSuccess": "Repositorio incorporado",
+                "onboardError": "Error al incorporar el repositorio",
+                "active": "Activo",
+                "suspended": "Suspendido",
+                "installationMeta": "Instalación #{installationId} · cuenta {accountType} · destino {targetType}",
+                "repoCount": "Repositorios",
+                "updatedAt": "Última sincronización",
+                "appSlug": "Slug de la aplicación",
+                "repositories": "Repositorios",
+                "noRepositories": "Esta instalación no tiene repositorios almacenados aún. Ejecute sincronizar para actualizar la instantánea desde GitHub.",
+                "branch": "Rama predeterminada: {branch}",
+                "branchUnknown": "Rama predeterminada no disponible",
+                "private": "Privado",
+                "public": "Público"
             },
             "data": {
                 "exportTitle": "Exportar datos",
@@ -1021,6 +1046,14 @@
                     "submit": "Enviar invitación",
                     "cancel": "Cancelar",
                     "success": "Miembro invitado exitosamente.",
+                    "modes": {
+                        "direct": {
+                            "description": "Agregue un usuario existente como miembro de inmediato por su correo electrónico. Obtendrá el rol asignado inmediatamente."
+                        },
+                        "link": {
+                            "description": "Genere un enlace de un solo uso para compartir. El destinatario lo canjea para unirse — o reclamar la propiedad, si crea un enlace de reclamación de propietario."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "La dirección de correo electrónico es obligatoria.",
                         "failed": "No se pudo invitar al miembro. Inténtalo de nuevo."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Cambio de etiqueta",
                     "collection_change": "Cambio de colección",
                     "community_pr_merged": "PR de la comunidad"
+                },
+                "generationInfo": {
+                    "label": "Detalles de generación",
+                    "itemsAdded": "Elementos agregados",
+                    "itemsUpdated": "Elementos actualizados",
+                    "totalItems": "Total de elementos",
+                    "pagesProcessed": "Páginas procesadas",
+                    "tokensUsed": "Tokens utilizados",
+                    "existingReferencesUsed": "Referencias existentes utilizadas"
                 },
                 "detail": {
                     "added": "Agregado",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "Anulación de modelo de IA",
                 "modelOverridePlaceholder": "p. ej. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcional. Utiliza el modelo importado o anterior por defecto a menos que lo sobrescribas aquí.",
+                "modelOverrideUnavailable": "Seleccione primero un proveedor de IA configurado para elegir un modelo de la lista disponible.",
+                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez.",
+                "websiteTemplateLockedHelperText": "La selección de plantilla está bloqueada después de la primera generación del sitio web.",
                 "recommended": "Recomendado",
                 "promptPlaceholder": "Describe qué elementos deben generarse para este trabajo...",
                 "promptHelperText": "Sé específico sobre el tipo de contenido que deseas generar",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Falló la cancelación de la generación"
             },
             "settings": {
+                "tabs": {
+                    "general": "General",
+                    "members": "Miembros",
+                    "navigationLabel": "Pestañas de configuración"
+                },
                 "sourceSettings": "Repositorio de origen",
                 "originalSource": "Origen original",
                 "syncEnabled": "Sincronización activada",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Actualizaciones Automáticas de Plantilla",
                         "description": "Mantén tu sitio web sincronizado automáticamente con los últimos cambios de la plantilla.",
+                        "selectorLabel": "Plantilla de sitio web",
+                        "currentTemplateLabel": "Plantilla actual",
+                        "unknownTemplate": "Predeterminado heredado",
+                        "currentHelperText": "La plantilla seleccionada controla cómo se inicializa y actualiza el repositorio del sitio web.",
+                        "switchHelperText": "Aplicar una nueva plantilla restablecerá el repositorio existente del sitio web a partir de la plantilla seleccionada si ya existe.",
+                        "switchAction": "Aplicar plantilla al repositorio del sitio web",
+                        "switchActionIdle": "La plantilla está actualizada",
+                        "switchConfirmTitle": "¿Cambiar la plantilla del sitio web?",
+                        "switchConfirmDescription": "Si el repositorio del sitio web ya existe, su contenido será reemplazado por la plantilla seleccionada. Cualquier código personalizado en ese repositorio se perderá.",
+                        "switchConfirmButton": "Cambiar plantilla",
+                        "switchCancel": "Cancelar",
                         "autoUpdate": "Actualizar automáticamente",
                         "autoUpdateDescription": "Verifica actualizaciones de plantilla cada hora y aplícalas automáticamente.",
                         "useBeta": "Usar versión beta de la plantilla",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Última actualización",
                         "lastChecked": "Última verificación",
                         "lastError": "Último error",
+                        "inheritedState": "Este trabajo está heredando su plantilla predeterminada actual.",
+                        "explicitState": "Este trabajo está fijado a una selección explícita de plantilla.",
+                        "originStandard": "Estándar",
+                        "originForked": "Ramificado",
+                        "originCustomUrl": "URL personalizada",
                         "updateSuccess": "Configuración actualizada exitosamente",
                         "updateFailed": "Error al actualizar configuración",
                         "githubRequired": "Se requiere conexión a GitHub. Por favor, conecta tu cuenta de GitHub en Configuración para habilitar actualizaciones automáticas"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Repositorio de Organización",
                 "organizationHelp": "Crear repositorios bajo una organización en lugar de tu cuenta personal",
                 "organizationNameLabel": "Nombre de la Organización",
-                "organizationNamePlaceholder": "Ingresa el nombre de la organización"
+                "organizationNamePlaceholder": "Ingresa el nombre de la organización",
+                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez."
             },
             "manual": {
                 "title": "Crear Manualmente",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Crear este trabajo bajo una organización de GitHub en lugar de tu cuenta personal",
                 "organizationNameLabel": "Nombre de la Organización",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez.",
                 "headerLabel": "Encabezado Personalizado de README",
                 "headerPlaceholder": "Agregar contenido personalizado al inicio de tu archivo README",
                 "headerOverwrite": "Reemplazar el encabezado predeterminado completamente",
@@ -2703,6 +2771,7 @@
                 "activity": "Actividad",
                 "works": "Trabajos",
                 "plugins": "Plugins",
+                "templates": "Plantillas",
                 "settings": "Configuración"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Eliminar {login}"
             }
         },
+        "templates": {
+            "title": "Plantillas",
+            "subtitle": "Explore las plantillas de sitio web integradas, administre su catálogo personal y controle qué plantilla usan los nuevos trabajos al comenzar.",
+            "actions": {
+                "addTemplate": "Agregar plantilla personalizada",
+                "refreshTemplates": "Actualizar plantillas"
+            },
+            "hero": {
+                "eyebrow": "Catálogo de plantillas",
+                "catalogHint": "Cualquier plantilla en este catálogo puede convertirse en su predeterminada. Ramifique una plantilla integrada para convertirla en su propio punto de partida."
+            },
+            "stats": {
+                "defaultLabel": "Predeterminado activo",
+                "defaultHint": "Los nuevos trabajos comienzan con esta plantilla a menos que la sobrescriba por trabajo.",
+                "builtInLabel": "Integrado",
+                "builtInHint": "Plantillas de Ever Works mantenidas.",
+                "customLabel": "Personalizada",
+                "customHint": "Guardado desde sus propios repositorios o fork de GitHub.",
+                "none": "Ningún predeterminado"
+            },
+            "filters": {
+                "all": "Todo",
+                "builtIn": "Integrado",
+                "custom": "Personalizada",
+                "searchPlaceholder": "Buscar plantillas, frameworks o repositorios..."
+            },
+            "card": {
+                "builtIn": "Integrado",
+                "custom": "Personalizada",
+                "standard": "Estándar",
+                "forked": "Ramificado",
+                "customUrl": "URL personalizada",
+                "standardSource": "Estándar de Ever Works",
+                "forkedSource": "Ramificado en su GitHub",
+                "customUrlSource": "Agregado desde URL de GitHub",
+                "default": "Predeterminado",
+                "defaultSelected": "Predeterminado seleccionado",
+                "makeDefault": "Establecer como predeterminado",
+                "fork": "Ramificar",
+                "edit": "Editar",
+                "archive": "Archivar",
+                "catalogOnly": "Elemento del catálogo",
+                "openRepository": "Abrir repositorio",
+                "previewAlt": "{name} vista previa",
+                "frameworkAgnostic": "Agnóstico de framework",
+                "branch": "Rama: {branch}",
+                "syncBranches": "{count} ramas de sincronización",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Aún no hay descripción."
+            },
+            "dialog": {
+                "title": "Agregar plantilla personalizada",
+                "description": "Guarde un repositorio de GitHub en su catálogo personal de plantillas. Este primer segmento almacena los metadatos de la plantilla para que pueda seleccionarse en el siguiente flujo de asignación.",
+                "editTitle": "Editar plantilla personalizada",
+                "editDescription": "Actualice los detalles de visualización y la imagen de vista previa utilizados para esta plantilla personalizada en su catálogo.",
+                "repositoryUrlLabel": "URL del repositorio de GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "La URL del repositorio de origen no se puede cambiar después de agregar la plantilla.",
+                "nameLabel": "Nombre de la plantilla",
+                "namePlaceholder": "Nombre de pantalla opcional",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Seleccionar un framework",
+                "frameworkUnspecified": "No especificado",
+                "previewImageLabel": "URL de la imagen de vista previa",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Opcional. Use una captura de pantalla seleccionada si desea sobrescribir la vista previa del repositorio de GitHub.",
+                "descriptionLabel": "Descripción breve",
+                "descriptionPlaceholder": "Para qué es ideal esta plantilla",
+                "branchLabel": "Rama predeterminada",
+                "branchPlaceholder": "main",
+                "branchHelp": "Deje vacío para usar main como predeterminado.",
+                "betaBranchLabel": "Rama beta",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Opcional. Rama utilizada para despliegues beta.",
+                "cancel": "Cancelar",
+                "submit": "Guardar plantilla",
+                "saveChanges": "Guardar cambios"
+            },
+            "forkDialog": {
+                "title": "Ramificar plantilla estándar",
+                "description": "Cree su propia copia de GitHub de esta plantilla estándar, agréguela a su catálogo y establézcala como predeterminada para nuevos trabajos.",
+                "sourceLabel": "Origen de la plantilla",
+                "targetLabel": "Destino del ramificado",
+                "targetPlaceholder": "Seleccionar una cuenta u organización de GitHub",
+                "targetHelp": "El ramificado se creará bajo {target}.",
+                "personalTarget": "Cuenta personal ({login})",
+                "organizationTarget": "Organización ({login})",
+                "noTargets": "Conecte GitHub y cargue sus organizaciones antes de ramificar una plantilla.",
+                "resultLabel": "Nuevo repositorio",
+                "none": "su cuenta seleccionada",
+                "cancel": "Cancelar",
+                "submit": "Ramificar y establecer como predeterminado"
+            },
+            "archiveDialog": {
+                "title": "Archivar plantilla personalizada",
+                "description": "Archive esta plantilla de su catálogo. Solo puede archivar plantillas que no estén actualmente asignadas a ningún trabajo.",
+                "templateLabel": "Plantilla",
+                "cancel": "Cancelar",
+                "submit": "Archivar plantilla"
+            },
+            "empty": {
+                "title": "No se encontraron plantillas",
+                "default": "Aún no hay plantillas que coincidan con esta vista.",
+                "search": "Intente un término de búsqueda diferente o borre el filtro actual.",
+                "resetFilters": "Restablecer filtros"
+            },
+            "messages": {
+                "repositoryUrlRequired": "Se requiere la URL del repositorio de GitHub.",
+                "repositoryUrlInvalid": "Ingrese una URL válida de repositorio de GitHub, como https://github.com/propietario/repositorio.",
+                "forkTargetRequired": "Seleccione una cuenta u organización de GitHub para el ramificado.",
+                "addSuccess": "Plantilla guardada desde la URL de GitHub.",
+                "addFailed": "Error al guardar la plantilla.",
+                "updateSuccess": "Detalles de la plantilla actualizados.",
+                "updateFailed": "Error al actualizar los detalles de la plantilla.",
+                "archiveSuccess": "Plantilla archivada desde su catálogo.",
+                "archiveFailed": "Error al archivar la plantilla.",
+                "forkSuccess": "Ramificado {repository}, agregado a su catálogo y establecido como su predeterminado.",
+                "forkExisting": "{repository} ya estaba en su catálogo y ahora es su plantilla ramificada predeterminada.",
+                "forkFailed": "Error al ramificar la plantilla.",
+                "refreshSuccess": "Catálogo de plantillas actualizado.",
+                "refreshFailed": "Error al actualizar las plantillas.",
+                "defaultUpdated": "Plantilla predeterminada actualizada.",
+                "defaultFailed": "Error al actualizar la plantilla predeterminada."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Usar predeterminado",
+            "defaultOptionWithName": "Usar predeterminado ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Predeterminado)",
+            "changeAnywayLink": "Cambiar de todas formas",
+            "origin": {
+                "standard": "Estándar",
+                "forked": "Ramificado",
+                "customUrl": "URL personalizada"
+            },
+            "state": {
+                "defaultBadge": "Predeterminado heredado",
+                "inheritedTitle": "Usando plantilla predeterminada",
+                "inheritedDescription": "Este trabajo seguirá su plantilla predeterminada actual hasta que fije una específica.",
+                "pinnedTitle": "Plantilla fijada",
+                "pinnedDescription": "Este trabajo seguirá usando esta plantilla incluso si su predeterminado cambia más tarde."
+            }
+        },
         "workPlugins": {
             "title": "Complementos de trabajo",
             "subtitle": "Configurar complementos para este trabajo",
@@ -3067,6 +3280,7 @@
             "history": "Historial",
             "comparisons": "Comparaciones",
             "plugins": "Complementos",
+            "templates": "Plantillas",
             "profile": "Perfil",
             "security": "Seguridad",
             "apiKeys": "Claves de API",

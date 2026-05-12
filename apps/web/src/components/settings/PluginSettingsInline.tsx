@@ -7,7 +7,7 @@ import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
-import { Save, Check, AlertCircle } from 'lucide-react';
+import { Save, Check, AlertCircle, Server } from 'lucide-react';
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
@@ -61,15 +61,25 @@ export function PluginSettingsInline({
             }
 
             const validation = (result.data as Record<string, unknown>)?.validation as
-                | { success: boolean; message: string }
+                | {
+                      success: boolean;
+                      message: string;
+                      details?: Record<string, unknown> | null;
+                  }
                 | null
                 | undefined;
 
             if (validation && !validation.success) {
-                return { validationError: validation.message };
+                return {
+                    validationError: validation.message,
+                    validationDetails: validation.details ?? undefined,
+                };
             }
             if (validation?.success) {
-                return { validationSuccess: validation.message };
+                return {
+                    validationSuccess: validation.message,
+                    validationDetails: validation.details ?? undefined,
+                };
             }
         },
         [plugin.pluginId],
@@ -81,6 +91,7 @@ export function PluginSettingsInline({
         saveSuccess,
         saveMessage,
         validationError,
+        validationDetails,
         visibleProperties,
         hasSettings,
         handleFieldChange,
@@ -183,6 +194,12 @@ export function PluginSettingsInline({
                     />
                 )}
 
+                {plugin.uiHints?.verifiesOnSave && !saveSuccess && !hasChanges && (
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('verifiesOnSaveHint')}
+                    </p>
+                )}
+
                 {/* Settings Form */}
                 {hasSettings ? (
                     <div className="space-y-4">
@@ -226,6 +243,7 @@ export function PluginSettingsInline({
                                         handleFieldChange(key, value, propSchema.secret || false)
                                     }
                                     pluginId={plugin.pluginId}
+                                    validationDetails={validationDetails}
                                 />
                             ))}
                         </div>
@@ -237,6 +255,10 @@ export function PluginSettingsInline({
                             </div>
                         )}
 
+                        {validationDetails && !validationError && (
+                            <ValidationDetailsPanel details={validationDetails} />
+                        )}
+
                         <div className="flex items-center gap-3 pt-3 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"
@@ -246,7 +268,9 @@ export function PluginSettingsInline({
                                 loading={isSaving}
                             >
                                 <Save className="w-3.5 h-3.5 mr-1.5" />
-                                {t('saveSettings')}
+                                {plugin.uiHints?.verifiesOnSave
+                                    ? t('saveAndVerify')
+                                    : t('saveSettings')}
                             </Button>
 
                             {saveBlockedByEnableState && (
@@ -272,5 +296,60 @@ export function PluginSettingsInline({
                 ) : null}
             </div>
         </CollapsibleCard>
+    );
+}
+
+interface ClusterIngressClassSummary {
+    name: string;
+    controller?: string;
+    isDefault?: boolean;
+    hasStrategy?: boolean;
+}
+
+/** Summary of validation `details` rendered after a successful Save & verify.
+ *  Currently understands the fields the k8s plugin emits — cluster name,
+ *  server version, and detected IngressClasses. Other plugins that emit
+ *  these fields get the same UI for free; plugins that emit nothing render
+ *  nothing. */
+function ValidationDetailsPanel({ details }: { details: Record<string, unknown> }) {
+    const t = useTranslations('dashboard.plugins');
+    const clusterName = typeof details.clusterName === 'string' ? details.clusterName : null;
+    const serverVersion = typeof details.serverVersion === 'string' ? details.serverVersion : null;
+    const ingressClasses = Array.isArray(details.ingressClasses)
+        ? (details.ingressClasses as ClusterIngressClassSummary[]).filter(
+              (c) => c && typeof c.name === 'string',
+          )
+        : [];
+
+    if (!clusterName && !serverVersion && ingressClasses.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="p-3 rounded-lg bg-success/5 border border-success/20 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-text dark:text-text-dark">
+                <Server className="w-4 h-4 text-success" />
+                {clusterName && serverVersion
+                    ? t('verifyClusterHeader', { name: clusterName, version: serverVersion })
+                    : clusterName || serverVersion || t('verifySuccessHeader')}
+            </div>
+            {ingressClasses.length > 0 ? (
+                <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-0.5 pl-6 list-disc">
+                    {ingressClasses.map((c) => (
+                        <li key={c.name}>
+                            <span className="font-mono">{c.name}</span>
+                            {c.controller && ` — ${c.controller}`}
+                            {c.isDefault && ` — ${t('settingsField.clusterIngressClassDefault')}`}
+                            {c.hasStrategy === false &&
+                                ` — ${t('settingsField.clusterIngressClassUnknown')}`}
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-xs text-warning dark:text-warning pl-6">
+                    {t('verifyNoIngressClasses')}
+                </p>
+            )}
+        </div>
     );
 }

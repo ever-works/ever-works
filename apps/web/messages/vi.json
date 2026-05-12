@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Không có hoạt động ở đây",
                 "noWork": "Không có công việc",
+                "loadMore": "Tải thêm {count}",
                 "columns": {
                     "pending": "Đang chờ",
                     "in_progress": "Đang tiến hành",
                     "completed": "Hoàn thành",
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
-                },
-                "loadMore": "Tải thêm {count}"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} mục",
                 "noDescription": "Không có mô tả",
                 "empty": "Không có công việc ở đây",
+                "loadMore": "Tải thêm {count}",
                 "columns": {
                     "not_started": "Chưa bắt đầu",
                     "scheduled": "Đã lên lịch",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Hoàn thành với cảnh báo",
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
-                },
-                "loadMore": "Tải thêm {count}"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Bảo mật",
                 "apiKeys": "Khóa API",
                 "data": "Dữ liệu",
+                "githubApp": "Ứng dụng GitHub",
                 "gitProviders": "Nhà cung cấp Git",
                 "dangerZone": "Vùng nguy hiểm"
+            },
+            "githubApp": {
+                "title": "Cài đặt Ứng dụng GitHub",
+                "subtitle": "Kiểm tra các cài đặt được liên kết qua Ứng dụng GitHub của Ever Works và làm mới thủ công ảnh chụp repository trước khi thực hiện công việc onboard sâu hơn.",
+                "emptyTitle": "Chưa có cài đặt Ứng dụng GitHub nào",
+                "emptyDescription": "Cài đặt Ứng dụng GitHub của Ever Works trên một repository hoặc tổ chức, sau đó hoàn thành quá trình chuyển hướng thiết lập để liên kết cài đặt với không gian làm việc này.",
+                "sync": "Đồng bộ",
+                "syncSuccess": "Đã đồng bộ cài đặt",
+                "syncError": "Không thể đồng bộ cài đặt",
+                "onboard": "Tích hợp",
+                "onboardSuccess": "Repository đã được tích hợp",
+                "onboardError": "Không thể tích hợp repository",
+                "active": "Hoạt động",
+                "suspended": "Ngừng hoạt động",
+                "installationMeta": "Cài đặt #{installationId} · tài khoản {accountType} · mục tiêu {targetType}",
+                "repoCount": "Repository",
+                "updatedAt": "Lần đồng bộ cuối cùng",
+                "appSlug": "Slug ứng dụng",
+                "repositories": "Repository",
+                "noRepositories": "Cài đặt này chưa có repository nào được lưu. Chạy đồng bộ để làm mới ảnh chụp từ GitHub.",
+                "branch": "Nhánh mặc định: {branch}",
+                "branchUnknown": "Nhánh mặc định không khả dụng",
+                "private": "Riêng tư",
+                "public": "Công khai"
             },
             "data": {
                 "exportTitle": "Xuất dữ liệu",
@@ -1021,6 +1046,14 @@
                     "submit": "Gửi lời mời",
                     "cancel": "Hủy",
                     "success": "Đã mời thành viên thành công.",
+                    "modes": {
+                        "direct": {
+                            "description": "Thêm người dùng hiện có thành thành viên ngay lập tức qua email của họ. Họ sẽ ngay lập tức nhận vai trò được gán."
+                        },
+                        "link": {
+                            "description": "Tạo liên kết dùng một lần để chia sẻ. Người nhận sẽ đổi lấy để tham gia — hoặc yêu cầu quyền sở hữu nếu bạn tạo liên kết yêu cầu quyền sở hữu."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Địa chỉ email là bắt buộc.",
                         "failed": "Không thể mời thành viên. Vui lòng thử lại."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Thay đổi thẻ",
                     "collection_change": "Thay đổi bộ sưu tập",
                     "community_pr_merged": "PR cộng đồng"
+                },
+                "generationInfo": {
+                    "label": "Chi tiết tạo",
+                    "itemsAdded": "Các mục đã thêm",
+                    "itemsUpdated": "Các mục đã cập nhật",
+                    "totalItems": "Tổng số mục",
+                    "pagesProcessed": "Các trang đã xử lý",
+                    "tokensUsed": "Các token đã dùng",
+                    "existingReferencesUsed": "Các tham chiếu hiện có đã dùng"
                 },
                 "detail": {
                     "added": "Đã thêm",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "Ghi đè mô hình AI",
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
+                "modelOverrideUnavailable": "Hãy chọn một nhà cung cấp AI đã được cấu hình trước để chọn một model từ danh sách có sẵn.",
+                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu.",
+                "websiteTemplateLockedHelperText": "Lựa chọn mẫu bị khóa sau khi tạo website lần đầu.",
                 "recommended": "Được khuyến nghị",
                 "promptPlaceholder": "Mô tả các mục nên được tạo cho công việc này...",
                 "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Không thể hủy việc tạo"
             },
             "settings": {
+                "tabs": {
+                    "general": "Chung",
+                    "members": "Thành viên",
+                    "navigationLabel": "Tab cài đặt"
+                },
                 "sourceSettings": "Kho lưu trữ nguồn",
                 "originalSource": "Nguồn gốc",
                 "syncEnabled": "Đồng bộ đã bật",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Cập nhật Tự động Mẫu",
                         "description": "Giữ trang web của bạn tự động đồng bộ với các thay đổi mẫu mới nhất.",
+                        "selectorLabel": "Mẫu website",
+                        "currentTemplateLabel": "Mẫu hiện tại",
+                        "unknownTemplate": "Mặc định được thừa kế",
+                        "currentHelperText": "Mẫu đã chọn kiểm soát cách khởi tạo và cập nhật repository website.",
+                        "switchHelperText": "Áp dụng một mẫu mới sẽ đặt lại repository website hiện tại từ mẫu đã chọn nếu nó đã tồn tại.",
+                        "switchAction": "Áp dụng mẫu cho repository website",
+                        "switchActionIdle": "Mẫu đã được cập nhật",
+                        "switchConfirmTitle": "Chuyển đổi mẫu website?",
+                        "switchConfirmDescription": "Nếu repository website đã tồn tại, nội dung của nó sẽ được thay thế bằng mẫu đã chọn. Mã tùy chỉnh trong repository đó sẽ bị mất.",
+                        "switchConfirmButton": "Chuyển đổi mẫu",
+                        "switchCancel": "Hủy",
                         "autoUpdate": "Cập nhật tự động",
                         "autoUpdateDescription": "Kiểm tra cập nhật mẫu mỗi giờ và áp dụng tự động.",
                         "useBeta": "Sử dụng phiên bản beta của mẫu",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Cập nhật lần cuối",
                         "lastChecked": "Kiểm tra lần cuối",
                         "lastError": "Lỗi lần cuối",
+                        "inheritedState": "Công việc này đang thừa kế mẫu mặc định hiện tại của bạn.",
+                        "explicitState": "Công việc này được ghim vào một lựa chọn mẫu rõ ràng.",
+                        "originStandard": "Chuẩn",
+                        "originForked": "Đã fork",
+                        "originCustomUrl": "URL tùy chỉnh",
                         "updateSuccess": "Cài đặt được cập nhật thành công",
                         "updateFailed": "Thất bại trong cập nhật cài đặt",
                         "githubRequired": "Yêu cầu kết nối GitHub. Vui lòng kết nối tài khoản GitHub của bạn trong Cài đặt để kích hoạt cập nhật tự động."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Kho Lưu Trữ Tổ Chức",
                 "organizationHelp": "Tạo kho lưu trữ dưới tổ chức thay vì tài khoản cá nhân của bạn",
                 "organizationNameLabel": "Tên Tổ Chức",
-                "organizationNamePlaceholder": "Nhập tên tổ chức"
+                "organizationNamePlaceholder": "Nhập tên tổ chức",
+                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu."
             },
             "manual": {
                 "title": "Tạo Thủ Công",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Tạo công việc này dưới tổ chức GitHub thay vì tài khoản cá nhân của bạn",
                 "organizationNameLabel": "Tên Tổ Chức",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu.",
                 "headerLabel": "Tiêu Đề README Tùy Chỉnh",
                 "headerPlaceholder": "Thêm nội dung tùy chỉnh vào đầu file README của bạn",
                 "headerOverwrite": "Thay thế hoàn toàn tiêu đề mặc định",
@@ -2703,6 +2771,7 @@
                 "activity": "Hoạt động",
                 "works": "Công việc",
                 "plugins": "Plugin",
+                "templates": "Mẫu",
                 "settings": "Cài đặt"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Xóa {login}"
             }
         },
+        "templates": {
+            "title": "Mẫu",
+            "subtitle": "Duyệt các mẫu website có sẵn, quản lý danh mục tùy chỉnh của bạn, và kiểm soát mẫu nào được dùng để bắt đầu công việc mới.",
+            "actions": {
+                "addTemplate": "Thêm mẫu tùy chỉnh",
+                "refreshTemplates": "Làm mới các mẫu"
+            },
+            "hero": {
+                "eyebrow": "Danh mục mẫu",
+                "catalogHint": "Bất kỳ mẫu nào trong danh mục này đều có thể trở thành mặc định của bạn. Fork một mẫu có sẵn để biến nó thành điểm khởi đầu riêng của bạn."
+            },
+            "stats": {
+                "defaultLabel": "Mặc định đang hoạt động",
+                "defaultHint": "Các công việc mới sẽ bắt đầu từ mẫu này trừ khi bạn ghi đè cho từng công việc.",
+                "builtInLabel": "Có sẵn",
+                "builtInHint": "Các mẫu được duy trì bởi Ever Works.",
+                "customLabel": "Tùy chỉnh",
+                "customHint": "Được lưu từ các repository GitHub hoặc fork của riêng bạn.",
+                "none": "Không có mặc định"
+            },
+            "filters": {
+                "all": "Tất cả",
+                "builtIn": "Có sẵn",
+                "custom": "Tùy chỉnh",
+                "searchPlaceholder": "Tìm kiếm mẫu, framework hoặc repository..."
+            },
+            "card": {
+                "builtIn": "Có sẵn",
+                "custom": "Tùy chỉnh",
+                "standard": "Chuẩn",
+                "forked": "Đã fork",
+                "customUrl": "URL tùy chỉnh",
+                "standardSource": "Chuẩn Ever Works",
+                "forkedSource": "Đã fork vào GitHub của bạn",
+                "customUrlSource": "Thêm từ URL GitHub",
+                "default": "Mặc định",
+                "defaultSelected": "Mặc định được chọn",
+                "makeDefault": "Đặt làm mặc định",
+                "fork": "Fork",
+                "edit": "Chỉnh sửa",
+                "archive": "Lưu trữ",
+                "catalogOnly": "Mục danh mục",
+                "openRepository": "Mở repository",
+                "previewAlt": "{name} xem trước",
+                "frameworkAgnostic": "Không phụ thuộc framework",
+                "branch": "Nhánh: {branch}",
+                "syncBranches": "{count} nhánh đồng bộ",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Chưa có mô tả."
+            },
+            "dialog": {
+                "title": "Thêm mẫu tùy chỉnh",
+                "description": "Lưu một repository GitHub vào danh mục mẫu cá nhân của bạn. Phần đầu này lưu siêu dữ liệu mẫu để có thể được chọn trong quy trình gán nhiệm vụ tiếp theo.",
+                "editTitle": "Chỉnh sửa mẫu tùy chỉnh",
+                "editDescription": "Cập nhật chi tiết hiển thị và hình ảnh xem trước được sử dụng cho mẫu tùy chỉnh này trong danh mục của bạn.",
+                "repositoryUrlLabel": "URL repository GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "URL nguồn repository không thể thay đổi sau khi mẫu được thêm.",
+                "nameLabel": "Tên mẫu",
+                "namePlaceholder": "Tên hiển thị tùy chọn",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Chọn một framework",
+                "frameworkUnspecified": "Chưa chỉ định",
+                "previewImageLabel": "URL hình ảnh xem trước",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Tùy chọn. Sử dụng ảnh chụp màn hình đã được curated nếu bạn muốn ghi đè lên xem trước repository GitHub.",
+                "descriptionLabel": "Mô tả ngắn",
+                "descriptionPlaceholder": "Mẫu này tốt nhất dùng để làm gì",
+                "branchLabel": "Nhánh mặc định",
+                "branchPlaceholder": "main",
+                "branchHelp": "Để trống để mặc định là main.",
+                "betaBranchLabel": "Nhánh beta",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Tùy chọn. Nhánh được sử dụng cho việc triển khai beta.",
+                "cancel": "Hủy",
+                "submit": "Lưu mẫu",
+                "saveChanges": "Lưu thay đổi"
+            },
+            "forkDialog": {
+                "title": "Fork mẫu chuẩn",
+                "description": "Tạo bản sao GitHub của bạn từ mẫu chuẩn này, thêm nó vào danh mục của bạn, và đặt làm mặc định cho các công việc mới.",
+                "sourceLabel": "Nguồn mẫu",
+                "targetLabel": "Đích fork",
+                "targetPlaceholder": "Select a GitHub account or organization",
+                "targetHelp": "Fork sẽ được tạo dưới {target}.",
+                "personalTarget": "Tài khoản cá nhân ({login})",
+                "organizationTarget": "Tổ chức ({login})",
+                "noTargets": "Kết nối GitHub và tải các tổ chức của bạn trước khi fork một mẫu.",
+                "resultLabel": "Repository mới",
+                "none": "tài khoản bạn đã chọn",
+                "cancel": "Hủy",
+                "submit": "Fork và đặt làm mặc định"
+            },
+            "archiveDialog": {
+                "title": "Lưu trữ mẫu tùy chỉnh",
+                "description": "Lưu trữ mẫu này từ danh mục của bạn. Bạn chỉ có thể lưu trữ các mẫu mà hiện chưa được gán cho bất kỳ công việc nào.",
+                "templateLabel": "Mẫu",
+                "cancel": "Hủy",
+                "submit": "Lưu trữ mẫu"
+            },
+            "empty": {
+                "title": "Không tìm thấy mẫu",
+                "default": "Chưa có mẫu nào khớp với view này.",
+                "search": "Thử từ khóa tìm kiếm khác hoặc xóa bộ lọc hiện tại.",
+                "resetFilters": "Đặt lại bộ lọc"
+            },
+            "messages": {
+                "repositoryUrlRequired": "Cần URL repository GitHub.",
+                "repositoryUrlInvalid": "Nhập một URL repository GitHub hợp lệ như https://github.com/owner/repository.",
+                "forkTargetRequired": "Chọn một tài khoản GitHub hoặc tổ chức để fork.",
+                "addSuccess": "Mẫu đã được lưu từ URL GitHub.",
+                "addFailed": "Không thể lưu mẫu.",
+                "updateSuccess": "Chi tiết mẫu đã được cập nhật.",
+                "updateFailed": "Không thể cập nhật chi tiết mẫu.",
+                "archiveSuccess": "Mẫu đã được lưu trữ từ danh mục của bạn.",
+                "archiveFailed": "Không thể lưu trữ mẫu.",
+                "forkSuccess": "Đã fork {repository}, thêm vào danh mục của bạn, và đặt làm mặc định.",
+                "forkExisting": "{repository} đã có trong danh mục của bạn và giờ là mẫu forked mặc định của bạn.",
+                "forkFailed": "Không thể fork mẫu.",
+                "refreshSuccess": "Danh mục mẫu đã được làm mới.",
+                "refreshFailed": "Không thể làm mới các mẫu.",
+                "defaultUpdated": "Mẫu mặc định đã được cập nhật.",
+                "defaultFailed": "Không thể cập nhật mẫu mặc định."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Sử dụng mặc định",
+            "defaultOptionWithName": "Sử dụng mặc định ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Mặc định)",
+            "changeAnywayLink": "Thay đổi ngay comunque",
+            "origin": {
+                "standard": "Chuẩn",
+                "forked": "Đã fork",
+                "customUrl": "URL tùy chỉnh"
+            },
+            "state": {
+                "defaultBadge": "Mặc định được thừa kế",
+                "inheritedTitle": "Đang sử dụng mẫu mặc định",
+                "inheritedDescription": "Công việc này sẽ tuân theo mẫu mặc định hiện tại của bạn cho đến khi bạn ghim một mẫu cụ thể.",
+                "pinnedTitle": "Mẫu đã ghim",
+                "pinnedDescription": "Công việc này sẽ tiếp tục sử dụng mẫu này ngay cả khi mặc định của bạn thay đổi sau này."
+            }
+        },
         "workPlugins": {
             "title": "Plugin công việc",
             "subtitle": "Cấu hình plugin cho công việc này",
@@ -3067,6 +3280,7 @@
             "history": "Lịch sử",
             "comparisons": "So sánh",
             "plugins": "Plugin",
+            "templates": "Mẫu",
             "profile": "Hồ sơ",
             "security": "Bảo mật",
             "apiKeys": "Khóa API",

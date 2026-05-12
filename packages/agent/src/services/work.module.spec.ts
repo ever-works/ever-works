@@ -52,6 +52,7 @@ jest.mock('./work-schedule-dispatcher.service', () => ({
     WorkScheduleDispatcherService: class {},
 }));
 jest.mock('./work-member.service', () => ({ WorkMemberService: class {} }));
+jest.mock('./work-invitation.service', () => ({ WorkInvitationService: class {} }));
 jest.mock('./work-import.service', () => ({ WorkImportService: class {} }));
 jest.mock('./work-advanced-prompts.service', () => ({
     WorkAdvancedPromptsService: class {},
@@ -100,8 +101,19 @@ jest.mock('../plugins/services/plugin-operations.service', () => ({
 jest.mock('../plugins/services/settings-schema-validator.service', () => ({
     SettingsSchemaValidatorService: class {},
 }));
+jest.mock('@src/ever-works-providers', () => ({
+    EVER_WORKS_DEPLOY_QUOTA_COUNTER: Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER'),
+    EverWorksDeployQuotaService: class EverWorksDeployQuotaService {},
+}));
+jest.mock('@src/database/repositories/work.repository', () => ({
+    WorkRepository: class WorkRepository {},
+}));
 
 import { WorkModule } from './work.module';
+import {
+    EVER_WORKS_DEPLOY_QUOTA_COUNTER,
+    EverWorksDeployQuotaService,
+} from '@src/ever-works-providers';
 import { WorkDetailService } from './work-detail.service';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
@@ -110,6 +122,7 @@ import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { WorkMemberService } from './work-member.service';
+import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
@@ -180,6 +193,7 @@ describe('WorkModule', () => {
             WorkScheduleService,
             WorkScheduleDispatcherService,
             WorkMemberService,
+            WorkInvitationService,
             WorkImportService,
             WorkAdvancedPromptsService,
             WorkTaxonomyService,
@@ -197,14 +211,29 @@ describe('WorkModule', () => {
             WorksConfigSyncListener,
             PluginOperationsService,
             SettingsSchemaValidatorService,
+            EverWorksDeployQuotaService,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
             expect(meta('providers')).toContain(provider);
         });
 
-        it('keeps the providers list at the documented 26-provider shape', () => {
-            expect(meta('providers')).toHaveLength(expectedProviders.length);
+        it('keeps the providers list at the documented shape (class providers + the EverWorks quota counter factory)', () => {
+            // 28 class providers + 1 factory provider object for the
+            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 29 entries total.
+            expect(meta('providers')).toHaveLength(expectedProviders.length + 1);
+        });
+
+        it('declares the EVER_WORKS_DEPLOY_QUOTA_COUNTER factory provider so the quota service has a live counter', () => {
+            const providers = meta('providers') as Array<{ provide?: symbol }>;
+            const factory = providers.find(
+                (p) =>
+                    typeof p === 'object' &&
+                    p !== null &&
+                    'provide' in p &&
+                    (p as { provide: unknown }).provide === EVER_WORKS_DEPLOY_QUOTA_COUNTER,
+            );
+            expect(factory).toBeDefined();
         });
 
         it('declares WorksConfigSyncListener as a provider (the @OnEvent listener pattern requires registration here so Nest scans its decorators)', () => {
@@ -228,10 +257,16 @@ describe('WorkModule', () => {
             // current behaviour pinned (downstream services that need it would
             // import the plugins module directly).
             for (const provider of providers) {
+                // Skip non-class providers (the EVER_WORKS_DEPLOY_QUOTA_COUNTER
+                // factory is an object, not a class).
+                if (typeof provider !== 'function') {
+                    continue;
+                }
                 if (
                     provider === WorksConfigSyncListener ||
                     provider === SettingsSchemaValidatorService ||
-                    provider === PluginOperationsService
+                    provider === PluginOperationsService ||
+                    provider === EverWorksDeployQuotaService
                 ) {
                     expect(exports).not.toContain(provider);
                 } else {
@@ -247,8 +282,8 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 26-entry shape (23 services + 3 re-exported modules)', () => {
-            expect(meta('exports')).toHaveLength(26);
+        it('keeps the exports list at the documented 27-entry shape (24 services + 3 re-exported modules)', () => {
+            expect(meta('exports')).toHaveLength(27);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

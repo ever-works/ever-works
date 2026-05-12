@@ -30,7 +30,9 @@ import type {
 	GitFileChange,
 	OAuthConfig,
 	OAuthToken,
-	OAuthUser
+	OAuthUser,
+	TransferRepoOptions,
+	TransferRepoResult
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 import { GitOperations } from '@ever-works/plugin/git';
@@ -74,6 +76,15 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				format: 'uri',
 				'x-hidden': true,
 				'x-scope': 'global'
+			},
+			readPackagesPat: {
+				type: 'string',
+				title: 'Read packages PAT',
+				description:
+					'Used by the Kubernetes deploy provider to pull private GHCR images. Click "Connect" to authorize via GitHub (recommended — least-privilege token with `read:packages` + `write:packages` only) or paste a fine-grained PAT manually. Leave blank if your generated website repo is public.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-widget': 'github-packages-oauth'
 			}
 		}
 	};
@@ -136,6 +147,16 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	async deleteRepository(owner: string, repo: string, token: string): Promise<void> {
 		const settings = await this.getSettings();
 		return this.apiService.deleteRepository(owner, repo, token, settings.apiBaseUrl);
+	}
+
+	async transferRepository(
+		owner: string,
+		repo: string,
+		options: TransferRepoOptions,
+		token: string
+	): Promise<TransferRepoResult> {
+		const settings = await this.getSettings();
+		return this.apiService.transferRepository(owner, repo, options, token, settings.apiBaseUrl);
 	}
 
 	async updateRepository(

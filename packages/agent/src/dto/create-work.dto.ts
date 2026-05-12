@@ -107,13 +107,26 @@ export class CreateWorkDto {
     gitProvider: string = 'github';
 
     @ApiPropertyOptional({
-        description: 'Deploy provider (e.g., vercel)',
-        example: 'vercel',
+        description:
+            "Deploy provider for this work. One of 'ever-works' (default for users who picked Ever Works in onboarding), 'vercel', 'k8s'. " +
+            'When omitted the server seeds from the user’s onboarding choice; failing that, falls back to the historical default of vercel.',
+        example: 'ever-works',
     })
     @IsString()
     @IsOptional()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     deployProvider?: string;
+
+    @ApiPropertyOptional({
+        description:
+            "Storage provider. One of 'ever-works-git' (push to the managed Ever Works GitHub org), 'user-github', 'user-gitlab' (planned), 'user-git' (planned). " +
+            'Server seeds from the user’s onboarding choice when omitted; defaults to user-github.',
+        example: 'ever-works-git',
+    })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    storageProvider?: string;
 
     @ApiPropertyOptional({
         description: 'Website template identifier to use for website repository initialization',

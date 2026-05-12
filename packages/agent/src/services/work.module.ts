@@ -17,6 +17,7 @@ import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { WorkMemberService } from './work-member.service';
+import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
@@ -37,6 +38,12 @@ import { SettingsSchemaValidatorService } from '../plugins/services/settings-sch
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
 import { NotificationsModule } from '@src/notifications';
+import {
+    EVER_WORKS_DEPLOY_QUOTA_COUNTER,
+    EverWorksDeployQuotaService,
+    type EverWorksDeployQuotaCounter,
+} from '@src/ever-works-providers';
+import { WorkRepository } from '@src/database/repositories/work.repository';
 
 /**
  * Work module providing work-related services.
@@ -69,6 +76,7 @@ import { NotificationsModule } from '@src/notifications';
         WorkScheduleService,
         WorkScheduleDispatcherService,
         WorkMemberService,
+        WorkInvitationService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,
@@ -86,6 +94,19 @@ import { NotificationsModule } from '@src/notifications';
         WorksConfigSyncListener,
         PluginOperationsService,
         SettingsSchemaValidatorService,
+        EverWorksDeployQuotaService,
+        {
+            // The Ever Works Deploy quota service is repo-agnostic — it
+            // takes a small `EverWorksDeployQuotaCounter` it can consult.
+            // This factory binds that counter to the live `WorkRepository`
+            // so the quota check runs against the real DB.
+            provide: EVER_WORKS_DEPLOY_QUOTA_COUNTER,
+            useFactory: (workRepository: WorkRepository): EverWorksDeployQuotaCounter => ({
+                countActiveDeploys: (userId) =>
+                    workRepository.countActiveByDeployProvider(userId, 'ever-works'),
+            }),
+            inject: [WorkRepository],
+        },
     ],
     exports: [
         WorkOwnershipService,
@@ -97,6 +118,7 @@ import { NotificationsModule } from '@src/notifications';
         WorkScheduleService,
         WorkScheduleDispatcherService,
         WorkMemberService,
+        WorkInvitationService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,

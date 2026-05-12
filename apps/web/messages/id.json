@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Tidak ada aktivitas di sini",
                 "noWork": "Tidak ada pekerjaan",
+                "loadMore": "Muat {count} lagi",
                 "columns": {
                     "pending": "Tertunda",
                     "in_progress": "Sedang Berjalan",
                     "completed": "Selesai",
                     "failed": "Gagal",
                     "cancelled": "Dibatalkan"
-                },
-                "loadMore": "Muat {count} lagi"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} item",
                 "noDescription": "Tidak ada deskripsi",
                 "empty": "Tidak ada pekerjaan di sini",
+                "loadMore": "Muat {count} lagi",
                 "columns": {
                     "not_started": "Belum Dimulai",
                     "scheduled": "Terjadwal",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Selesai dengan peringatan",
                     "failed": "Gagal",
                     "cancelled": "Dibatalkan"
-                },
-                "loadMore": "Muat {count} lagi"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Keamanan",
                 "apiKeys": "Kunci API",
                 "data": "Data",
+                "githubApp": "GitHub App",
                 "gitProviders": "Penyedia Git",
                 "dangerZone": "Zona Berbahaya"
+            },
+            "githubApp": {
+                "title": "Instalasi GitHub App",
+                "subtitle": "Periksa instalasi yang terhubung melalui GitHub App Ever Works dan perbarui secara manual snapshot repositori sebelum pekerjaan onboarding yang lebih mendalam dimulai.",
+                "emptyTitle": "Belum ada instalasi GitHub App",
+                "emptyDescription": "Instal GitHub App Ever Works di repositori atau organisasi, lalu selesaikan pengalihan pengaturan sehingga instalasi terhubung ke ruang kerja ini.",
+                "sync": "Sinkronkan",
+                "syncSuccess": "Instalasi berhasil disinkronkan",
+                "syncError": "Gagal menyinkronkan instalasi",
+                "onboard": "Mulai",
+                "onboardSuccess": "Repositori berhasil di-onboard",
+                "onboardError": "Gagal melakukan onboarding repositori",
+                "active": "Aktif",
+                "suspended": "Tidak aktif",
+                "installationMeta": "Instalasi #{installationId} · akun {accountType} · target {targetType}",
+                "repoCount": "Repositori",
+                "updatedAt": "Terakhir disinkronkan",
+                "appSlug": "Slug aplikasi",
+                "repositories": "Repositori",
+                "noRepositories": "Instalasi ini belum memiliki repositori yang disimpan. Jalankan sinkronisasi untuk menyegarkan snapshot dari GitHub.",
+                "branch": "Cabang default: {branch}",
+                "branchUnknown": "Cabang default tidak tersedia",
+                "private": "Privat",
+                "public": "Publik"
             },
             "data": {
                 "exportTitle": "Ekspor Data",
@@ -1021,6 +1046,14 @@
                     "submit": "Kirim Undangan",
                     "cancel": "Batal",
                     "success": "Anggota berhasil diundang.",
+                    "modes": {
+                        "direct": {
+                            "description": "Tambahkan pengguna yang sudah ada sebagai anggota segera melalui emailnya. Mereka mendapatkan peran yang ditetapkan segera."
+                        },
+                        "link": {
+                            "description": "Hasilkan tautan sekali pakai untuk dibagikan. Penerima dapat menukarnya untuk bergabung — atau mengklaim kepemilikan, jika Anda membuat tautan klaim kepemilikan."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Alamat email wajib diisi.",
                         "failed": "Gagal mengundang anggota. Silakan coba lagi."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Perubahan Tag",
                     "collection_change": "Perubahan Koleksi",
                     "community_pr_merged": "Community PR"
+                },
+                "generationInfo": {
+                    "label": "Detail pembuatan",
+                    "itemsAdded": "Item ditambahkan",
+                    "itemsUpdated": "Item diperbarui",
+                    "totalItems": "Total item",
+                    "pagesProcessed": "Halaman diproses",
+                    "tokensUsed": "Token digunakan",
+                    "existingReferencesUsed": "Referensi yang ada digunakan"
                 },
                 "detail": {
                     "added": "Ditambahkan",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "Penggantian Model AI",
                 "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
+                "modelOverrideUnavailable": "Pilih penyedia AI yang sudah dikonfigurasi terlebih dahulu untuk memilih model dari daftar yang tersedia.",
+                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat.",
+                "websiteTemplateLockedHelperText": "Pemilihan template dikunci setelah pembuatan situs web pertama.",
                 "recommended": "Direkomendasikan",
                 "promptPlaceholder": "Jelaskan item apa yang harus dihasilkan untuk karya ini...",
                 "promptHelperText": "Jadilah spesifik tentang jenis konten yang ingin Anda hasilkan",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Gagal membatalkan pembuatan"
             },
             "settings": {
+                "tabs": {
+                    "general": "Umum",
+                    "members": "Anggota",
+                    "navigationLabel": "Tab pengaturan"
+                },
                 "sourceSettings": "Repositori Sumber",
                 "originalSource": "Sumber Asli",
                 "syncEnabled": "Sinkronisasi Diaktifkan",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Pembaruan Template Otomatis",
                         "description": "Jaga situs web Anda tetap sinkron secara otomatis dengan perubahan template terbaru.",
+                        "selectorLabel": "Template situs web",
+                        "currentTemplateLabel": "Template saat ini",
+                        "unknownTemplate": "Default yang diwarisi",
+                        "currentHelperText": "Template yang dipilih mengontrol cara inisialisasi dan pembaruan repositori situs web.",
+                        "switchHelperText": "Menerapkan template baru akan mengatur ulang repositori situs web yang ada dari template yang dipilih jika sudah ada.",
+                        "switchAction": "Terapkan template ke repositori situs web",
+                        "switchActionIdle": "Template sudah aktual",
+                        "switchConfirmTitle": "Beralih ke template situs web?",
+                        "switchConfirmDescription": "Jika repositori situs web sudah ada, isi akan digantikan dengan template yang dipilih. Kode khusus di repositori tersebut akan hilang.",
+                        "switchConfirmButton": "Beralih template",
+                        "switchCancel": "Batal",
                         "autoUpdate": "Perbarui secara otomatis",
                         "autoUpdateDescription": "Periksa pembaruan template setiap jam dan terapkan secara otomatis.",
                         "useBeta": "Gunakan versi beta template",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Terakhir diperbarui",
                         "lastChecked": "Terakhir diperiksa",
                         "lastError": "Kesalahan terakhir",
+                        "inheritedState": "Kerja ini mewarisi template default Anda saat ini.",
+                        "explicitState": "Kerja ini ditambatkan ke pemilihan template eksplisit.",
+                        "originStandard": "Standar",
+                        "originForked": "Forked",
+                        "originCustomUrl": "URL Kustom",
                         "updateSuccess": "Pengaturan berhasil diperbarui",
                         "updateFailed": "Gagal memperbarui pengaturan",
                         "githubRequired": "Koneksi GitHub diperlukan. Harap hubungkan akun GitHub Anda di Pengaturan untuk mengaktifkan pembaruan otomatis"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Repositori Organisasi",
                 "organizationHelp": "Buat repositori di bawah organisasi bukan akun pribadi Anda",
                 "organizationNameLabel": "Nama Organisasi",
-                "organizationNamePlaceholder": "Masukkan nama organisasi"
+                "organizationNamePlaceholder": "Masukkan nama organisasi",
+                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat."
             },
             "manual": {
                 "title": "Buat Secara Manual",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Buat karya ini di bawah organisasi GitHub bukan akun pribadi Anda",
                 "organizationNameLabel": "Nama Organisasi",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat.",
                 "headerLabel": "Header README Khusus",
                 "headerPlaceholder": "Tambahkan konten khusus di atas file README Anda",
                 "headerOverwrite": "Ganti header default sepenuhnya",
@@ -2703,6 +2771,7 @@
                 "activity": "Aktivitas",
                 "works": "Karya",
                 "plugins": "Plugin",
+                "templates": "Template",
                 "settings": "Pengaturan"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Hapus {login}"
             }
         },
+        "templates": {
+            "title": "Template",
+            "subtitle": "Jelajahi template situs web bawaan, kelola katalog khusus Anda, dan kontrol template mana yang digunakan untuk memulai pekerjaan baru.",
+            "actions": {
+                "addTemplate": "Tambahkan template khusus",
+                "refreshTemplates": "Segarkan template"
+            },
+            "hero": {
+                "eyebrow": "Katalog template",
+                "catalogHint": "Setiap template dalam katalog ini dapat menjadi default Anda. Fork sebuah template bawaan untuk mengubahnya menjadi titik mulai Anda sendiri."
+            },
+            "stats": {
+                "defaultLabel": "Default aktif",
+                "defaultHint": "Pekerjaan baru dimulai dari template ini kecuali Anda menggantinya per pekerjaan.",
+                "builtInLabel": "Bawaan",
+                "builtInHint": "Template Ever Works yang dirawat.",
+                "customLabel": "Kustom",
+                "customHint": "Disimpan dari repositori GitHub Anda sendiri atau fork.",
+                "none": "Tidak ada default"
+            },
+            "filters": {
+                "all": "Semua",
+                "builtIn": "Bawaan",
+                "custom": "Kustom",
+                "searchPlaceholder": "Cari template, framework, atau repositori..."
+            },
+            "card": {
+                "builtIn": "Bawaan",
+                "custom": "Kustom",
+                "standard": "Standar",
+                "forked": "Forked",
+                "customUrl": "URL Kustom",
+                "standardSource": "Standar Ever Works",
+                "forkedSource": "Fork ke GitHub Anda",
+                "customUrlSource": "Ditambahkan dari URL GitHub",
+                "default": "Default",
+                "defaultSelected": "Default dipilih",
+                "makeDefault": "Jadikan default",
+                "fork": "Fork",
+                "edit": "Edit",
+                "archive": "Arsipkan",
+                "catalogOnly": "Item katalog",
+                "openRepository": "Buka repositori",
+                "previewAlt": "{name} pratinjau",
+                "frameworkAgnostic": "Agnostik framework",
+                "branch": "Cabang: {branch}",
+                "syncBranches": "{count} cabang sinkron",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Belum ada deskripsi."
+            },
+            "dialog": {
+                "title": "Tambahkan template khusus",
+                "description": "Simpan repositori GitHub ke dalam katalog template pribadi Anda. Potongan pertama ini menyimpan metadata template sehingga dapat dipilih dalam aliran penugasan berikutnya.",
+                "editTitle": "Edit template khusus",
+                "editDescription": "Perbarui detail tampilan dan gambar pratinjau yang digunakan untuk template khusus ini dalam katalog Anda.",
+                "repositoryUrlLabel": "URL repositori GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "URL sumber repositori tidak dapat diubah setelah template ditambahkan.",
+                "nameLabel": "Nama template",
+                "namePlaceholder": "Nama tampilan opsional",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Pilih sebuah framework",
+                "frameworkUnspecified": "Tidak ditentukan",
+                "previewImageLabel": "URL gambar pratinjau",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Opsional. Gunakan gambar layar yang sudah diedit jika Anda ingin menggantikan pratinjau repositori GitHub.",
+                "descriptionLabel": "Deskripsi singkat",
+                "descriptionPlaceholder": "Apa yang paling sesuai dengan template ini",
+                "branchLabel": "Cabang default",
+                "branchPlaceholder": "main",
+                "branchHelp": "Biarkan kosong untuk menggunakan main sebagai default.",
+                "betaBranchLabel": "Cabang beta",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Opsional. Cabang yang digunakan untuk deployment beta.",
+                "cancel": "Batal",
+                "submit": "Simpan template",
+                "saveChanges": "Simpan perubahan"
+            },
+            "forkDialog": {
+                "title": "Fork template standar",
+                "description": "Buat salinan GitHub Anda sendiri dari template standar ini, tambahkan ke katalog Anda, dan jadikan default untuk pekerjaan baru.",
+                "sourceLabel": "Sumber template",
+                "targetLabel": "Tujuan fork",
+                "targetPlaceholder": "Pilih akun GitHub atau organisasi",
+                "targetHelp": "Fork akan dibuat di bawah {target}.",
+                "personalTarget": "Akun pribadi ({login})",
+                "organizationTarget": "Organisasi ({login})",
+                "noTargets": "Hubungkan GitHub dan muat organisasi Anda sebelum membuat fork template.",
+                "resultLabel": "Repositori baru",
+                "none": "akun yang Anda pilih",
+                "cancel": "Batal",
+                "submit": "Fork dan jadikan default"
+            },
+            "archiveDialog": {
+                "title": "Arsipkan template khusus",
+                "description": "Arsipkan template ini dari katalog Anda. Anda hanya dapat mengarsipkan template yang tidak sedang ditugaskan ke pekerjaan apa pun.",
+                "templateLabel": "Template",
+                "cancel": "Batal",
+                "submit": "Arsipkan template"
+            },
+            "empty": {
+                "title": "Tidak ada template ditemukan",
+                "default": "Belum ada template yang cocok dengan tampilan ini.",
+                "search": "Coba istilah pencarian lain atau bersihkan filter saat ini.",
+                "resetFilters": "Atur ulang filter"
+            },
+            "messages": {
+                "repositoryUrlRequired": "URL repositori GitHub diperlukan.",
+                "repositoryUrlInvalid": "Masukkan URL repositori GitHub yang valid seperti https://github.com/owner/repository.",
+                "forkTargetRequired": "Pilih akun GitHub atau organisasi untuk fork.",
+                "addSuccess": "Template disimpan dari URL GitHub.",
+                "addFailed": "Gagal menyimpan template.",
+                "updateSuccess": "Detail template diperbarui.",
+                "updateFailed": "Gagal memperbarui detail template.",
+                "archiveSuccess": "Template terarsip dari katalog Anda.",
+                "archiveFailed": "Gagal mengarsipkan template.",
+                "forkSuccess": "Fork {repository}, ditambahkan ke katalog Anda, dan ditetapkan sebagai default Anda.",
+                "forkExisting": "{repository} sudah ada dalam katalog Anda dan kini menjadi template fork default Anda.",
+                "forkFailed": "Gagal membuat fork template.",
+                "refreshSuccess": "Katalog template diperbarui.",
+                "refreshFailed": "Gagal memperbarui template.",
+                "defaultUpdated": "Template default diperbarui.",
+                "defaultFailed": "Gagal memperbarui template default."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Gunakan default",
+            "defaultOptionWithName": "Gunakan default ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (default)",
+            "changeAnywayLink": "Ubah tetap saja",
+            "origin": {
+                "standard": "Standar",
+                "forked": "Forked",
+                "customUrl": "URL Kustom"
+            },
+            "state": {
+                "defaultBadge": "Default yang diwarisi",
+                "inheritedTitle": "Menggunakan template default",
+                "inheritedDescription": "Kerja ini akan mengikuti template default Anda saat ini hingga Anda menempelkan satu yang spesifik.",
+                "pinnedTitle": "Template yang ditempelkan",
+                "pinnedDescription": "Kerja ini akan terus menggunakan template ini meski default Anda berubah nanti."
+            }
+        },
         "workPlugins": {
             "title": "Plugin Karya",
             "subtitle": "Konfigurasikan plugin untuk karya ini",
@@ -3067,6 +3280,7 @@
             "history": "Riwayat",
             "comparisons": "Perbandingan",
             "plugins": "Plugin",
+            "templates": "Template",
             "profile": "Profil",
             "security": "Keamanan",
             "apiKeys": "Kunci API",

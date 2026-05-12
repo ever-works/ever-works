@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "ไม่มีกิจกรรมที่นี่",
                 "noWork": "ไม่มีงาน",
+                "loadMore": "โหลดเพิ่ม {count} รายการ",
                 "columns": {
                     "pending": "รอดำเนินการ",
                     "in_progress": "กำลังดำเนินการ",
                     "completed": "เสร็จสิ้น",
                     "failed": "ล้มเหลว",
                     "cancelled": "ยกเลิก"
-                },
-                "loadMore": "โหลดเพิ่ม {count} รายการ"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} รายการ",
                 "noDescription": "ไม่มีคำอธิบาย",
                 "empty": "ไม่มีงานที่นี่",
+                "loadMore": "โหลดเพิ่ม {count} รายการ",
                 "columns": {
                     "not_started": "ยังไม่เริ่ม",
                     "scheduled": "กำหนดการ",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "เสร็จสิ้นพร้อมคำเตือน",
                     "failed": "ล้มเหลว",
                     "cancelled": "ยกเลิก"
-                },
-                "loadMore": "โหลดเพิ่ม {count} รายการ"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "ความปลอดภัย",
                 "apiKeys": "คีย์ API",
                 "data": "ข้อมูล",
+                "githubApp": "GitHub App",
                 "gitProviders": "ผู้ให้บริการ Git",
                 "dangerZone": "โซนอันตราย"
+            },
+            "githubApp": {
+                "title": "การติดตั้ง GitHub App",
+                "subtitle": "ตรวจสอบการติดตั้งที่เชื่อมโยงผ่าน GitHub App ของ Ever Works และรีเฟรชสแนปชอตของคลังข้อมูลด้วยตนเองก่อนที่งานบนบอร์ดที่ลึกกว่าจะเริ่มต้น",
+                "emptyTitle": "ยังไม่มีการติดตั้ง GitHub App",
+                "emptyDescription": "ติดตั้ง GitHub App ของ Ever Works บนคลังข้อมูลหรือองค์กร จากนั้นดำเนินการตั้งค่าให้เสร็จสิ้นเพื่อเชื่อมโยงการติดตั้งกับพื้นที่ทำงานนี้",
+                "sync": "ซิงค์",
+                "syncSuccess": "การติดตั้งซิงค์สำเร็จ",
+                "syncError": "ไม่สามารถซิงค์การติดตั้งได้",
+                "onboard": "บอร์ด",
+                "onboardSuccess": "คลังข้อมูลถูกบอร์ดแล้ว",
+                "onboardError": "ไม่สามารถบอร์ดคลังข้อมูลได้",
+                "active": "ใช้งานอยู่",
+                "suspended": "ถูกระงับ",
+                "installationMeta": "การติดตั้ง #{installationId} · บัญชี {accountType} · เป้าหมาย {targetType}",
+                "repoCount": "คลังข้อมูล",
+                "updatedAt": "ซิงค์ล่าสุด",
+                "appSlug": "Slug ของแอป",
+                "repositories": "คลังข้อมูล",
+                "noRepositories": "การติดตั้งนี้ยังไม่มีคลังข้อมูลที่จัดเก็บไว้ เรียกใช้การซิงค์เพื่อรีเฟรชสแนปชอตจาก GitHub",
+                "branch": "สาขาเริ่มต้น: {branch}",
+                "branchUnknown": "ไม่สามารถใช้สาขาเริ่มต้นได้",
+                "private": "ส่วนตัว",
+                "public": "สาธารณะ"
             },
             "data": {
                 "exportTitle": "ส่งออกข้อมูล",
@@ -1021,6 +1046,14 @@
                     "submit": "ส่งคำเชิญ",
                     "cancel": "ยกเลิก",
                     "success": "เชิญสมาชิกเรียบร้อยแล้ว",
+                    "modes": {
+                        "direct": {
+                            "description": "เพิ่มผู้ใช้ที่มีอยู่เป็นสมาชิกทันทีโดยใช้อีเมลของพวกเขา พวกเขาจะได้รับบทบาทที่ได้รับมอบหมายทันที"
+                        },
+                        "link": {
+                            "description": "สร้างลิงก์ใช้ครั้งเดียวเพื่อแชร์ ผู้รับสามารถแลกใช้เพื่อเข้าร่วม — หรืออ้างสิทธิ์เป็นเจ้าของ หากคุณสร้างลิงก์อ้างสิทธิ์เป็นเจ้าของ"
+                        }
+                    },
                     "errors": {
                         "emailRequired": "ต้องระบุที่อยู่อีเมล",
                         "failed": "ไม่สามารถเชิญสมาชิกได้ โปรดลองอีกครั้ง"
@@ -1321,6 +1354,15 @@
                     "tag_change": "เปลี่ยนแท็ก",
                     "collection_change": "เปลี่ยนคอลเลกชัน",
                     "community_pr_merged": "Community PR"
+                },
+                "generationInfo": {
+                    "label": "รายละเอียดการสร้าง",
+                    "itemsAdded": "รายการที่เพิ่ม",
+                    "itemsUpdated": "รายการที่อัปเดต",
+                    "totalItems": "จำนวนรายการทั้งหมด",
+                    "pagesProcessed": "จำนวนหน้าที่ประมวลผล",
+                    "tokensUsed": "โทเคนที่ใช้",
+                    "existingReferencesUsed": "การอ้างอิงที่มีอยู่ที่ใช้"
                 },
                 "detail": {
                     "added": "เพิ่ม",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "แทนที่โมเดล AI",
                 "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
+                "modelOverrideUnavailable": "เลือกผู้ให้บริการ AI ที่ตั้งค่าไว้ก่อนเพื่อเลือกโมเดลจากรายการที่มี",
+                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก",
+                "websiteTemplateLockedHelperText": "การเลือกเทมเพลตจะถูกล็อกหลังจากการสร้างเว็บไซต์ครั้งแรก",
                 "recommended": "แนะนำ",
                 "promptPlaceholder": "อธิบายว่ารายการใดที่ควรสร้างสำหรับงานนี้...",
                 "promptHelperText": "ระบุรายละเอียดเกี่ยวกับประเภทเนื้อหาที่ต้องการสร้าง",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "ไม่สามารถยกเลิกการสร้างได้"
             },
             "settings": {
+                "tabs": {
+                    "general": "ทั่วไป",
+                    "members": "สมาชิก",
+                    "navigationLabel": "แท็บการตั้งค่า"
+                },
                 "sourceSettings": "คลังต้นทาง",
                 "originalSource": "แหล่งที่มาดั้งเดิม",
                 "syncEnabled": "เปิดการซิงค์",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "อัปเดตเทมเพลตอัตโนมัติ",
                         "description": "ทำให้เว็บไซต์ของคุณซิงค์อัตโนมัติกับการเปลี่ยนแปลงเทมเพลตล่าสุด",
+                        "selectorLabel": "เทมเพลตเว็บไซต์",
+                        "currentTemplateLabel": "เทมเพลตปัจจุบัน",
+                        "unknownTemplate": "ค่าเริ่มต้นที่สืบทอด",
+                        "currentHelperText": "เทมเพลตที่เลือกควบคุมวิธีการเริ่มต้นและอัปเดตคลังข้อมูลเว็บไซต์",
+                        "switchHelperText": "การใช้เทมเพลตใหม่จะรีเซ็ตคลังข้อมูลเว็บไซต์ที่มีอยู่จากเทมเพลตที่เลือก หากมีอยู่แล้ว",
+                        "switchAction": "ใช้เทมเพลตกับคลังข้อมูลเว็บไซต์",
+                        "switchActionIdle": "เทมเพลตเป็นปัจจุบันแล้ว",
+                        "switchConfirmTitle": "เปลี่ยนเทมเพลตเว็บไซต์หรือไม่?",
+                        "switchConfirmDescription": "หากคลังข้อมูลเว็บไซต์มีอยู่แล้ว เนื้อหาจะถูกแทนที่ด้วยเทมเพลตที่เลือก โค้ดที่กำหนดเองในคลังข้อมูลนั้นจะสูญหาย",
+                        "switchConfirmButton": "เปลี่ยนเทมเพลต",
+                        "switchCancel": "ยกเลิก",
                         "autoUpdate": "อัปเดตอัตโนมัติ",
                         "autoUpdateDescription": "ตรวจสอบการอัปเดตเทมเพลตทุกชั่วโมงและใช้โดยอัตโนมัติ",
                         "useBeta": "ใช้เวอร์ชันเบต้าของเทมเพลต",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "อัปเดตล่าสุด",
                         "lastChecked": "ตรวจสอบล่าสุด",
                         "lastError": "ข้อผิดพลาดล่าสุด",
+                        "inheritedState": "งานนี้กำลังสืบทอดเทมเพลตเริ่มต้นปัจจุบันของคุณ",
+                        "explicitState": "งานนี้ถูกยึดติดกับการเลือกเทมเพลตที่ชัดเจน",
+                        "originStandard": "มาตรฐาน",
+                        "originForked": "ฟอร์ก",
+                        "originCustomUrl": "URL กำหนดเอง",
                         "updateSuccess": "อัปเดตการตั้งค่าเรียบร้อยแล้ว",
                         "updateFailed": "อัปเดตการตั้งค่าล้มเหลว",
                         "githubRequired": "ต้องเชื่อมต่อ GitHub โปรดเชื่อมต่อบัญชี GitHub ของคุณใน การตั้งค่า เพื่อเปิดใช้งานการอัปเดตอัตโนมัติ"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Repository ขององค์กร",
                 "organizationHelp": "สร้าง repository ภายใต้องค์กรแทนบัญชีส่วนตัวของคุณ",
                 "organizationNameLabel": "ชื่อองค์กร",
-                "organizationNamePlaceholder": "ป้อนชื่อองค์กร"
+                "organizationNamePlaceholder": "ป้อนชื่อองค์กร",
+                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก"
             },
             "manual": {
                 "title": "สร้างด้วยตนเอง",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "สร้างงานนี้ภายใต้องค์กร GitHub แทนบัญชีส่วนตัวของคุณ",
                 "organizationNameLabel": "ชื่อองค์กร",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก",
                 "headerLabel": "หัวข้อ README กำหนดเอง",
                 "headerPlaceholder": "เพิ่มเนื้อหากำหนดเองที่ด้านบนของไฟล์ README",
                 "headerOverwrite": "แทนที่หัวข้อเริ่มต้นทั้งหมด",
@@ -2703,6 +2771,7 @@
                 "activity": "กิจกรรม",
                 "works": "งาน",
                 "plugins": "ปลั๊กอิน",
+                "templates": "เทมเพลต",
                 "settings": "การตั้งค่า"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "ลบ {login}"
             }
         },
+        "templates": {
+            "title": "เทมเพลต",
+            "subtitle": "เรียกดูเทมเพลตเว็บไซต์ในตัว จัดการแคตตาล็อกแบบกำหนดเองของคุณ และควบคุมว่าเทมเพลตใดที่งานใหม่จะเริ่มต้นจาก",
+            "actions": {
+                "addTemplate": "เพิ่มเทมเพลตแบบกำหนดเอง",
+                "refreshTemplates": "รีเฟรชเทมเพลต"
+            },
+            "hero": {
+                "eyebrow": "แคตตาล็อกเทมเพลต",
+                "catalogHint": "เทมเพลตใดๆ ในแคตตาล็อกนี้สามารถเป็นค่าเริ่มต้นของคุณได้ ฟอร์กเทมเพลตในตัวเพื่อเปลี่ยนเป็นจุดเริ่มต้นของคุณเอง"
+            },
+            "stats": {
+                "defaultLabel": "ค่าเริ่มต้นที่ใช้งานอยู่",
+                "defaultHint": "งานใหม่จะเริ่มจากเทมเพลตนี้ เว้นแต่คุณจะแทนที่ต่อแต่งงาน",
+                "builtInLabel": "ในตัว",
+                "builtInHint": "เทมเพลต Ever Works ที่ได้รับการบำรุงรักษา",
+                "customLabel": "กำหนดเอง",
+                "customHint": "บันทึกจากคลังข้อมูล GitHub ของคุณเองหรือฟอร์ก",
+                "none": "ไม่มีค่าเริ่มต้น"
+            },
+            "filters": {
+                "all": "ทั้งหมด",
+                "builtIn": "ในตัว",
+                "custom": "กำหนดเอง",
+                "searchPlaceholder": "ค้นหาเทมเพลต, เฟรมเวิร์ก หรือคลังข้อมูล..."
+            },
+            "card": {
+                "builtIn": "ในตัว",
+                "custom": "กำหนดเอง",
+                "standard": "มาตรฐาน",
+                "forked": "ฟอร์ก",
+                "customUrl": "URL กำหนดเอง",
+                "standardSource": "มาตรฐานของ Ever Works",
+                "forkedSource": "ฟอร์กเข้าไปใน GitHub ของคุณ",
+                "customUrlSource": "เพิ่มจาก URL ของ GitHub",
+                "default": "ค่าเริ่มต้น",
+                "defaultSelected": "เลือกค่าเริ่มต้นแล้ว",
+                "makeDefault": "ตั้งเป็นค่าเริ่มต้น",
+                "fork": "ฟอร์ก",
+                "edit": "แก้ไข",
+                "archive": "จัดเก็บถาวร",
+                "catalogOnly": "รายการในแคตตาล็อก",
+                "openRepository": "เปิดคลังข้อมูล",
+                "previewAlt": "{name} ตัวอย่าง",
+                "frameworkAgnostic": "ไม่ขึ้นกับเฟรมเวิร์ก",
+                "branch": "สาขา: {branch}",
+                "syncBranches": "{count} สาขาซิงค์",
+                "betaBranch": "เบต้า: {branch}",
+                "noDescription": "ยังไม่มีคำอธิบาย"
+            },
+            "dialog": {
+                "title": "เพิ่มเทมเพลตแบบกำหนดเอง",
+                "description": "บันทึกคลังข้อมูล GitHub ลงในแคตตาล็อกเทมเพลตส่วนตัวของคุณ สไลซ์แรกนี้จะจัดเก็บเมตาดาต้าของเทมเพลตเพื่อให้สามารถเลือกได้ในขั้นตอนการมอบหมายถัดไป",
+                "editTitle": "แก้ไขเทมเพลตแบบกำหนดเอง",
+                "editDescription": "อัปเดตรายละเอียดการแสดงและภาพตัวอย่างที่ใช้สำหรับเทมเพลตแบบกำหนดเองนี้ในแคตตาล็อกของคุณ",
+                "repositoryUrlLabel": "URL ของคลังข้อมูล GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "ไม่สามารถเปลี่ยน URL ของคลังข้อมูลต้นทางได้หลังจากเพิ่มเทมเพลตแล้ว",
+                "nameLabel": "ชื่อเทมเพลต",
+                "namePlaceholder": "ชื่อแสดงตัวเลือก (ไม่บังคับ)",
+                "frameworkLabel": "เฟรมเวิร์ก",
+                "frameworkSelectPlaceholder": "เลือกเฟรมเวิร์ก",
+                "frameworkUnspecified": "ไม่ได้ระบุ",
+                "previewImageLabel": "URL ของภาพตัวอย่าง",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "ไม่บังคับ ใช้ภาพหน้าจอที่คัดสรรแล้วหากคุณต้องการแทนที่การแสดงตัวอย่างของคลังข้อมูล GitHub",
+                "descriptionLabel": "คำอธิบายสั้น",
+                "descriptionPlaceholder": "เทมเพลตนี้เหมาะกับอะไร",
+                "branchLabel": "สาขาเริ่มต้น",
+                "branchPlaceholder": "main",
+                "branchHelp": "เว้นว่างเพื่อใช้ค่าเริ่มต้นเป็น main",
+                "betaBranchLabel": "สาขาเบต้า",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "ไม่บังคับ. สาขาที่ใช้สำหรับการปรับใช้เบต้า",
+                "cancel": "ยกเลิก",
+                "submit": "บันทึกเทมเพลต",
+                "saveChanges": "บันทึกการเปลี่ยนแปลง"
+            },
+            "forkDialog": {
+                "title": "ฟอร์กเทมเพลตมาตรฐาน",
+                "description": "สร้างสำเนา GitHub ของคุณเองจากเทมเพลตมาตรฐานนี้ เพิ่มลงในแคตตาล็อกของคุณ และตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่",
+                "sourceLabel": "แหล่งที่มาของเทมเพลต",
+                "targetLabel": "ปลายทางฟอร์ก",
+                "targetPlaceholder": "เลือกบัญชี GitHub หรือองค์กร",
+                "targetHelp": "ฟอร์กจะถูกสร้างขึ้นภายใต้ {target}",
+                "personalTarget": "บัญชีส่วนตัว ({login})",
+                "organizationTarget": "องค์กร ({login})",
+                "noTargets": "เชื่อมต่อ GitHub และโหลดองค์กรของคุณก่อนทำการฟอร์กเทมเพลต",
+                "resultLabel": "คลังข้อมูลใหม่",
+                "none": "บัญชีที่คุณเลือก",
+                "cancel": "ยกเลิก",
+                "submit": "ฟอร์กและตั้งเป็นค่าเริ่มต้น"
+            },
+            "archiveDialog": {
+                "title": "จัดเก็บเทมเพลตแบบกำหนดเองเป็นถาวร",
+                "description": "จัดเก็บเทมเพลตนี้จากแคตตาล็อกของคุณ คุณสามารถจัดเก็บถาวรเฉพาะเทมเพลตที่ยังไม่ได้ถูกกำหนดให้กับงานใดๆ",
+                "templateLabel": "เทมเพลต",
+                "cancel": "ยกเลิก",
+                "submit": "จัดเก็บเทมเพลตเป็นถาวร"
+            },
+            "empty": {
+                "title": "ไม่พบเทมเพลต",
+                "default": "ยังไม่มีเทมเพลตใดที่ตรงกับมุมมองนี้",
+                "search": "ลองใช้คำค้นหาที่แตกต่างหรือล้างตัวกรองปัจจุบัน",
+                "resetFilters": "รีเซ็ตตัวกรอง"
+            },
+            "messages": {
+                "repositoryUrlRequired": "จำเป็นต้องระบุ URL ของคลังข้อมูล GitHub",
+                "repositoryUrlInvalid": "กรอก URL ของคลังข้อมูล GitHub ที่ถูกต้อง เช่น https://github.com/owner/repository",
+                "forkTargetRequired": "เลือกบัญชี GitHub หรือองค์กรสำหรับการฟอร์ก",
+                "addSuccess": "บันทึกเทมเพลตจาก URL ของ GitHub สำเร็จ",
+                "addFailed": "ไม่สามารถบันทึกเทมเพลตได้",
+                "updateSuccess": "อัปเดตรายละเอียดเทมเพลตสำเร็จ",
+                "updateFailed": "ไม่สามารถอัปเดตรายละเอียดเทมเพลตได้",
+                "archiveSuccess": "จัดเก็บเทมเพลตจากแคตตาล็อกของคุณสำเร็จ",
+                "archiveFailed": "ไม่สามารถจัดเก็บถาวรเทมเพลตได้",
+                "forkSuccess": "ฟอร์ก {repository} จากนั้นเพิ่มลงในแคตตาล็อกของคุณและตั้งเป็นค่าเริ่มต้นของคุณ",
+                "forkExisting": "{repository} มีอยู่แล้วในแคตตาล็อกของคุณและตอนนี้เป็นเทมเพลตฟอร์กค่าเริ่มต้นของคุณ",
+                "forkFailed": "ไม่สามารถฟอร์กเทมเพลตได้",
+                "refreshSuccess": "รีเฟรชแคตตาล็อกเทมเพลตสำเร็จ",
+                "refreshFailed": "ไม่สามารถรีเฟรชเทมเพลตได้",
+                "defaultUpdated": "อัปเดตเทมเพลตเริ่มต้นสำเร็จ",
+                "defaultFailed": "ไม่สามารถอัปเดตเทมเพลตเริ่มต้นได้"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "ใช้ค่าเริ่มต้น",
+            "defaultOptionWithName": "ใช้ค่าเริ่มต้น ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (ค่าเริ่มต้น)",
+            "changeAnywayLink": "เปลี่ยนแปลงอยู่ดี",
+            "origin": {
+                "standard": "มาตรฐาน",
+                "forked": "ฟอร์ก",
+                "customUrl": "URL กำหนดเอง"
+            },
+            "state": {
+                "defaultBadge": "ค่าเริ่มต้นที่สืบทอด",
+                "inheritedTitle": "กำลังใช้เทมเพลตเริ่มต้น",
+                "inheritedDescription": "งานนี้จะปฏิบัติตามเทมเพลตเริ่มต้นปัจจุบันของคุณจนกว่าคุณจะยึดติดกับเทมเพลตที่เฉพาะเจาะจง",
+                "pinnedTitle": "เทมเพลตที่ยึดติด",
+                "pinnedDescription": "งานนี้จะยังคงใช้เทมเพลตนี้ต่อไปแม้ว่าเทมเพลตเริ่มต้นของคุณจะเปลี่ยนแปลงในภายหลัง"
+            }
+        },
         "workPlugins": {
             "title": "ส่วนเสริมงาน",
             "subtitle": "กำหนดค่าส่วนเสริมสำหรับงานนี้",
@@ -3067,6 +3280,7 @@
             "history": "ประวัติ",
             "comparisons": "การเปรียบเทียบ",
             "plugins": "ปลั๊กอิน",
+            "templates": "เทมเพลต",
             "profile": "โปรไฟล์",
             "security": "ความปลอดภัย",
             "apiKeys": "คีย์ API",

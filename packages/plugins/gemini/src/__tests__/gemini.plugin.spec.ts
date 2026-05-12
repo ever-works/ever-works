@@ -145,6 +145,14 @@ describe('GeminiPlugin', () => {
 		expect(props.googleCloudLocation).toBeUndefined();
 	});
 
+	it('should advertise itself as an onboarding-eligible plugin', () => {
+		const manifest = plugin.getManifest();
+		expect(manifest.uiHints?.includeInOnboarding).toBe(true);
+		expect(manifest.uiHints?.onboardingPriority).toBe(2);
+		expect(manifest.uiHints?.completionFields).toContain('apiKey');
+		expect(manifest.uiHints?.onboardingDescription).toBeDefined();
+	});
+
 	it('should validate API key settings', () => {
 		expect(plugin.validateSettings({})).toEqual({
 			valid: false,

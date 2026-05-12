@@ -70,6 +70,14 @@ describe('GitHubPlugin', () => {
 			expect(props.apiBaseUrl.default).toBe('https://api.github.com');
 			expect(props.apiBaseUrl['x-hidden']).toBe(true);
 		});
+
+		it('exposes readPackagesPat as a user-scoped secret for GHCR private pulls from k8s', () => {
+			const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+			expect(props.readPackagesPat).toBeDefined();
+			expect(props.readPackagesPat['x-secret']).toBe(true);
+			expect(props.readPackagesPat['x-scope']).toBe('user');
+			expect(props.readPackagesPat['x-widget']).toBe('github-packages-oauth');
+		});
 	});
 
 	describe('IGitProviderPlugin pure helpers', () => {

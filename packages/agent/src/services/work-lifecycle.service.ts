@@ -5,7 +5,10 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkRepository } from '@src/database/repositories/work.repository';
+import { UserRepository } from '@src/database/repositories/user.repository';
+import { WorksConfigSyncRequestedEvent } from '@src/events';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
@@ -26,6 +29,8 @@ import {
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
+import { EverWorksDeployQuotaService } from '@src/ever-works-providers';
+import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 @Injectable()
 export class WorkLifecycleService {
@@ -33,6 +38,7 @@ export class WorkLifecycleService {
 
     constructor(
         private readonly workRepository: WorkRepository,
+        private readonly userRepository: UserRepository,
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
@@ -41,7 +47,40 @@ export class WorkLifecycleService {
         private readonly deployFacade: DeployFacadeService,
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
+        private readonly everWorksDeployQuota: EverWorksDeployQuotaService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
+
+    /**
+     * Resolve storage / deploy provider for a new Work. Precedence:
+     *
+     *   1. value the client passed in the DTO (explicit overrides win),
+     *   2. the user's persisted onboarding choice (if any),
+     *   3. the historical fallback (`user-github` / `vercel`).
+     *
+     * Returning a separate object keeps the assignment logic small and
+     * unit-testable.
+     */
+    private async resolveProviderDefaults(
+        dto: Pick<CreateWorkDto, 'storageProvider' | 'deployProvider'>,
+        userId: string,
+    ): Promise<{ storageProvider: string; deployProvider: string }> {
+        let onboardingState: OnboardingWizardStateV2 | null | undefined;
+        try {
+            const user = await this.userRepository.findById(userId);
+            onboardingState = user?.onboardingState;
+        } catch (cause) {
+            this.logger.warn(
+                `Failed to read onboarding state for user ${userId}; falling back to defaults: ${(cause as Error).message}`,
+            );
+        }
+
+        return {
+            storageProvider:
+                dto.storageProvider ?? onboardingState?.storage?.choice ?? 'user-github',
+            deployProvider: dto.deployProvider ?? onboardingState?.deploy?.choice ?? 'vercel',
+        };
+    }
 
     private normalizeWebsiteTemplateSelection(value?: string | null): string | null {
         const normalized = value?.trim();
@@ -117,7 +156,6 @@ export class WorkLifecycleService {
             readmeConfig,
             organization,
             gitProvider,
-            deployProvider,
             websiteTemplateId,
         } = createWorkDto;
 
@@ -126,6 +164,18 @@ export class WorkLifecycleService {
             user.id,
         );
 
+        const { storageProvider, deployProvider } = await this.resolveProviderDefaults(
+            createWorkDto,
+            user.id,
+        );
+
+        // Ever Works Deploy is capped per user. The check is a no-op when
+        // the user isn't picking it; we still want a hard fail BEFORE the
+        // create-work side-effects (repo creation etc.) kick in.
+        if (deployProvider === 'ever-works') {
+            await this.everWorksDeployQuota.assertWithinQuota(user.id);
+        }
+
         const workData: Partial<CreateWorkDto & { userId: string }> = {
             slug,
             name,
@@ -133,6 +183,7 @@ export class WorkLifecycleService {
             userId: user.id,
             owner,
             gitProvider,
+            storageProvider,
             deployProvider,
             websiteTemplateId: selectedWebsiteTemplateId,
             readmeConfig,
@@ -256,6 +307,26 @@ export class WorkLifecycleService {
             }
 
             updatedWork.owner = updatedWork.getRepoOwner();
+
+            // EW-612: when `deployProvider` changes via the dashboard,
+            // commit the new value to `.works/works.yml` in the data repo
+            // so the next deploy doesn't hit the data-repo-wins precedence
+            // and silently flip the provider back. We do this by emitting
+            // the existing `WorksConfigSyncRequestedEvent`; the existing
+            // `WorksConfigSyncListener` + `WorksConfigRepositorySyncService`
+            // handle the YAML read-modify-write and the git commit/push.
+            //
+            // Only emit when the value actually changed — saving the same
+            // provider should be a no-op for the data repo.
+            if (
+                updateDto.deployProvider !== undefined &&
+                updateDto.deployProvider !== work.deployProvider
+            ) {
+                this.eventEmitter.emit(
+                    WorksConfigSyncRequestedEvent.EVENT_NAME,
+                    new WorksConfigSyncRequestedEvent(id, user.id, 'provider_changed'),
+                );
+            }
 
             return {
                 status: 'success',

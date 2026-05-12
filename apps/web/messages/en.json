@@ -1046,6 +1046,14 @@
                     "submit": "Send Invite",
                     "cancel": "Cancel",
                     "success": "Member invited successfully.",
+                    "modes": {
+                        "direct": {
+                            "description": "Add an existing user as a member right away by their email. They get the assigned role immediately."
+                        },
+                        "link": {
+                            "description": "Generate a single-use link to share. The recipient redeems it to join — or claim ownership, if you create an owner-claim link."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Email address is required.",
                         "failed": "Failed to invite member. Please try again."
@@ -1888,6 +1896,11 @@
                 "stopFailed": "Failed to cancel generation"
             },
             "settings": {
+                "tabs": {
+                    "general": "General",
+                    "members": "Members",
+                    "navigationLabel": "Settings tabs"
+                },
                 "sourceSettings": "Source Repository",
                 "originalSource": "Original Source",
                 "syncEnabled": "Sync Enabled",
@@ -2160,6 +2173,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
+                },
                 "noProviderAlert": {
                     "title": "No Deployment Provider",
                     "description": "Select a deployment provider to deploy your Work's website.",
@@ -2882,6 +2899,11 @@
             "disable": "Disable",
             "settings": "Settings",
             "saveSettings": "Save Settings",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "Plugin Settings",
             "settingsSaved": "Settings saved successfully",
             "noSettings": "This plugin has no configurable settings",
@@ -2941,7 +2963,15 @@
                 "addItem": "Add",
                 "modify": "Modify",
                 "cancel": "Cancel",
-                "enterNewValue": "Enter new value..."
+                "enterNewValue": "Enter new value...",
+                "clusterIngressClassPlaceholder": "e.g. nginx",
+                "clusterIngressClassUseDefault": "Cluster default",
+                "clusterIngressClassDefault": "default",
+                "clusterIngressClassUnknown": "unknown controller",
+                "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
+                "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually."
             },
             "oauth": {
                 "title": "Account Connection",

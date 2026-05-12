@@ -107,6 +107,10 @@ describe('GitFacadeService', () => {
                 url: 'https://github.com/testuser/fork-repo',
                 cloneUrl: 'https://github.com/testuser/fork-repo.git',
             } as GitRepository),
+            transferRepository: jest.fn().mockResolvedValue({
+                status: 'pending_recipient_acceptance',
+                providerAcceptanceUrl: 'https://github.com/avelino',
+            }),
             createRepositoryFromTemplate: jest.fn().mockResolvedValue({
                 owner: 'testuser',
                 name: 'from-template',
@@ -939,6 +943,74 @@ describe('GitFacadeService', () => {
             });
 
             expect(gitPlugin.deleteRepository).toHaveBeenCalledWith('owner', 'repo', 'test-token');
+        });
+    });
+
+    describe('transferRepository', () => {
+        it('should call plugin.transferRepository when supported', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const result = await service.transferRepository(
+                'ever-works',
+                'awesome-go-data',
+                { newOwner: 'avelino' },
+                { providerId: 'github', token: 'test-token' },
+            );
+
+            expect(gitPlugin.transferRepository).toHaveBeenCalledWith(
+                'ever-works',
+                'awesome-go-data',
+                { newOwner: 'avelino' },
+                'test-token',
+            );
+            expect(result.status).toBe('pending_recipient_acceptance');
+        });
+
+        it('forwards teamIds when provided', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.transferRepository(
+                'ever-works',
+                'awesome-go-data',
+                { newOwner: 'avelino-org', teamIds: [7, 11] },
+                { providerId: 'github', token: 'test-token' },
+            );
+
+            expect(gitPlugin.transferRepository).toHaveBeenCalledWith(
+                'ever-works',
+                'awesome-go-data',
+                { newOwner: 'avelino-org', teamIds: [7, 11] },
+                'test-token',
+            );
+        });
+
+        it('should throw GitFacadeError when the plugin omits transferRepository', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab');
+            gitPlugin.transferRepository = undefined as any;
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await expect(
+                service.transferRepository(
+                    'ever-works',
+                    'awesome-go-data',
+                    { newOwner: 'avelino' },
+                    { providerId: 'gitlab', token: 'tok' },
+                ),
+            ).rejects.toBeInstanceOf(GitFacadeError);
         });
     });
 

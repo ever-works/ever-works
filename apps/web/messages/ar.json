@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "لا توجد أنشطة هنا",
                 "noWork": "لا يوجد عمل",
+                "loadMore": "تحميل {count} المزيد",
                 "columns": {
                     "pending": "قيد الانتظار",
                     "in_progress": "قيد التنفيذ",
                     "completed": "مكتمل",
                     "failed": "فشل",
                     "cancelled": "ملغي"
-                },
-                "loadMore": "تحميل {count} المزيد"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} عناصر",
                 "noDescription": "لا يوجد وصف",
                 "empty": "لا توجد أعمال هنا",
+                "loadMore": "تحميل {count} المزيد",
                 "columns": {
                     "not_started": "لم يبدأ",
                     "scheduled": "مجدول",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "مكتمل مع تحذيرات",
                     "failed": "فشل",
                     "cancelled": "ملغي"
-                },
-                "loadMore": "تحميل {count} المزيد"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "الأمان",
                 "apiKeys": "مفاتيح API",
                 "data": "البيانات",
+                "githubApp": "تطبيق GitHub",
                 "gitProviders": "مزودو Git",
                 "dangerZone": "منطقة الخطر"
+            },
+            "githubApp": {
+                "title": "تثبيتات تطبيق GitHub",
+                "subtitle": "افحص التثبيتات المرتبطة عبر تطبيق GitHub الخاص بـ Ever Works وحدّث يدويًا لقطة المستودع قبل أن يبدأ عمليات الترحيل العميقة.",
+                "emptyTitle": "لا توجد تثبيتات لتطبيق GitHub حتى الآن",
+                "emptyDescription": "ثبت تطبيق Ever Works GitHub على مستودع أو مؤسسة، ثم أكمل عملية إعادة التوجيه للإعداد لربط التثبيت بهذه المساحة.",
+                "sync": "مزامنة",
+                "syncSuccess": "تم مزامنة التثبيت",
+                "syncError": "فشلت مزامنة التثبيت",
+                "onboard": "بدء الترحيل",
+                "onboardSuccess": "تم ترحيل المستودع",
+                "onboardError": "فشل ترحيل المستودع",
+                "active": "نشط",
+                "suspended": "معلق",
+                "installationMeta": "التثبيت #{installationId} · حساب {accountType} · هدف {targetType}",
+                "repoCount": "المستودعات",
+                "updatedAt": "آخر مزامنة",
+                "appSlug": "Slug التطبيق",
+                "repositories": "المستودعات",
+                "noRepositories": "لا توجد مستودعات مخزنة لهذا التثبيت بعد. نفّذ المزامنة لتحديث اللقطة من GitHub.",
+                "branch": "الفرع الافتراضي: {branch}",
+                "branchUnknown": "الفرع الافتراضي غير متاح",
+                "private": "خاص",
+                "public": "عام"
             },
             "data": {
                 "exportTitle": "تصدير البيانات",
@@ -1021,6 +1046,14 @@
                     "submit": "إرسال الدعوة",
                     "cancel": "إلغاء",
                     "success": "تم دعوة العضو بنجاح.",
+                    "modes": {
+                        "direct": {
+                            "description": "أضف مستخدمًا موجودًا كعضو فورًا عبر بريده الإلكتروني. يحصل على الدور المعين فورًا."
+                        },
+                        "link": {
+                            "description": "أنشئ رابطًا للاستخدام مرة واحدة للمشاركة. يستخدم المستلم الرابط للانضمام — أو يدعي الملكية، إذا أنشأت رابطًا لاسترداد الملكية."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "عنوان البريد الإلكتروني مطلوب.",
                         "failed": "فشل في دعوة العضو. يرجى المحاولة مرة أخرى."
@@ -1321,6 +1354,15 @@
                     "tag_change": "تغيير وسم",
                     "collection_change": "تغيير مجموعة",
                     "community_pr_merged": "طلب سحب مجتمعي"
+                },
+                "generationInfo": {
+                    "label": "تفاصيل التوليد",
+                    "itemsAdded": "العناصر المضافة",
+                    "itemsUpdated": "العناصر المحدثة",
+                    "totalItems": "إجمالي العناصر",
+                    "pagesProcessed": "الصفحات المعالجة",
+                    "tokensUsed": "الرموز المستخدمة",
+                    "existingReferencesUsed": "المراجع الموجودة المستخدمة"
                 },
                 "detail": {
                     "added": "تم الإضافة",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
                 "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
+                "modelOverrideUnavailable": "اختر موفر AI مُكوّن أولاً لاختيار نموذج من القائمة المتاحة.",
+                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة.",
+                "websiteTemplateLockedHelperText": "يصبح اختيار القالب مقفلًا بعد أول توليد لموقع الويب.",
                 "recommended": "مُوصى به",
                 "promptPlaceholder": "صف ما يجب توليده من عناصر لهذا المجلد...",
                 "promptHelperText": "كن محددًا بشأن نوع المحتوى الذي تريد توليده",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "فشل إلغاء التوليد"
             },
             "settings": {
+                "tabs": {
+                    "general": "عام",
+                    "members": "الأعضاء",
+                    "navigationLabel": "علامات تبويب الإعداد"
+                },
                 "sourceSettings": "مستودع المصدر",
                 "originalSource": "المصدر الأصلي",
                 "syncEnabled": "المزامنة مفعلة",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "تحديثات القالب التلقائية",
                         "description": "حافظ على موقعك مزامنًا تلقائيًا مع أحدث تغييرات القالب.",
+                        "selectorLabel": "قالب الموقع",
+                        "currentTemplateLabel": "القالب الحالي",
+                        "unknownTemplate": "الافتراضي الموروث",
+                        "currentHelperText": "القالب المختار يتحكم في كيفية تهيئة مستودع الموقع وتحديثه.",
+                        "switchHelperText": "تطبيق قالب جديد سيُعيد ضبط مستودع الموقع الحالي من القالب المختار إذا كان موجودًا مسبقًا.",
+                        "switchAction": "تطبيق القالب على مستودع الموقع",
+                        "switchActionIdle": "القالب محدث",
+                        "switchConfirmTitle": "تبديل قالب الموقع؟",
+                        "switchConfirmDescription": "إذا كان مستودع الموقع موجودًا بالفعل، سيتم استبدال محتوياته من القالب المختار. سيُفقد أي كود مخصص في ذلك المستودع.",
+                        "switchConfirmButton": "تبديل القالب",
+                        "switchCancel": "إلغاء",
                         "autoUpdate": "تحديث تلقائيًا",
                         "autoUpdateDescription": "التحقق من تحديثات القالب كل ساعة وتطبيقها تلقائيًا.",
                         "useBeta": "استخدم إصدار بيتا للقالب",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "آخر تحديث",
                         "lastChecked": "آخر فحص",
                         "lastError": "آخر خطأ",
+                        "inheritedState": "هذا العمل يرث القالب الافتراضي الحالي الخاص بك.",
+                        "explicitState": "هذا العمل مثبت على اختيار قالب صريح.",
+                        "originStandard": "قياسي",
+                        "originForked": "مُشَتّت",
+                        "originCustomUrl": "عنوان URL مخصص",
                         "updateSuccess": "تم تحديث الإعدادات بنجاح",
                         "updateFailed": "فشل في تحديث الإعدادات",
                         "githubRequired": "الاتصال بـ GitHub مطلوب. يرجى ربط حساب GitHub الخاص بك في الإعدادات لتمكين التحديثات التلقائية."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "مستودع المنظمة",
                 "organizationHelp": "إنشاء مستودعات تحت منظمة بدلاً من حسابك الشخصي",
                 "organizationNameLabel": "اسم المنظمة",
-                "organizationNamePlaceholder": "أدخل اسم المنظمة"
+                "organizationNamePlaceholder": "أدخل اسم المنظمة",
+                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة."
             },
             "manual": {
                 "title": "إنشاء يدويًا",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "إنشاء هذا العمل تحت منظمة GitHub بدلاً من حسابك الشخصي",
                 "organizationNameLabel": "اسم المنظمة",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة.",
                 "headerLabel": "رأس README مخصص",
                 "headerPlaceholder": "إضافة محتوى مخصص إلى أعلى ملف README الخاص بك",
                 "headerOverwrite": "استبدال الرأس الافتراضي بالكامل",
@@ -2703,6 +2771,7 @@
                 "activity": "النشاط",
                 "works": "الأعمال",
                 "plugins": "الإضافات",
+                "templates": "القوالب",
                 "settings": "الإعدادات"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "إزالة {login}"
             }
         },
+        "templates": {
+            "title": "القوالب",
+            "subtitle": "استعرض القوالب الجاهزة للموقع، gérer كتالوجك المخصص، وتحكم في أي قالب سيبدأ به الأعمال الجديدة.",
+            "actions": {
+                "addTemplate": "إضافة قالب مخصص",
+                "refreshTemplates": "تحديث القوالب"
+            },
+            "hero": {
+                "eyebrow": "كتالوج القوالب",
+                "catalogHint": "يمكن لأي قالب في هذا الكتالوج أن يصبح افتراضيًا. شتّت قالبًا جاهزًا لتحويله إلى نقطة انطلاقك الخاصة."
+            },
+            "stats": {
+                "defaultLabel": "الافتراضي النشط",
+                "defaultHint": "تبدأ الأعمال الجديدة من هذا القالب ما لم تقم بتجاوزه لكل عمل.",
+                "builtInLabel": "جاهز",
+                "builtInHint": "قوالب Ever Works المُحافظة عليها.",
+                "customLabel": "مخصص",
+                "customHint": "محفوظة من مستودعات GitHub الخاصة بك أو من الشُتّـت.",
+                "none": "لا يوجد افتراضي"
+            },
+            "filters": {
+                "all": "الكل",
+                "builtIn": "جاهز",
+                "custom": "مخصص",
+                "searchPlaceholder": "ابحث عن القوالب، الأطر، أو المستودعات..."
+            },
+            "card": {
+                "builtIn": "جاهز",
+                "custom": "مخصص",
+                "standard": "قياسي",
+                "forked": "مُشَتّت",
+                "customUrl": "عنوان URL مخصص",
+                "standardSource": "المعيار القياسي لـ Ever Works",
+                "forkedSource": "مشَتّت إلى GitHub الخاص بك",
+                "customUrlSource": "أُضيف من عنوان URL لـ GitHub",
+                "default": "افتراضي",
+                "defaultSelected": "تم تحديد الافتراضي",
+                "makeDefault": "اجعله افتراضيًا",
+                "fork": "شُتّت",
+                "edit": "تعديل",
+                "archive": "أرشفة",
+                "catalogOnly": "عنصر الكتالوج فقط",
+                "openRepository": "فتح المستودع",
+                "previewAlt": "{name} معاينة",
+                "frameworkAgnostic": "غير متعلق بإطار",
+                "branch": "الفرع: {branch}",
+                "syncBranches": "{count} فروع مزامنة",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "لا يوجد وصف بعد."
+            },
+            "dialog": {
+                "title": "إضافة قالب مخصص",
+                "description": "احفظ مستودع GitHub في كتالوج القوالب الشخصي الخاص بك. يخزن هذا الجزء الأول بيانات تعريف القالب بحيث يمكن اختياره في تدفق المهمة التالي.",
+                "editTitle": "تعديل قالب مخصص",
+                "editDescription": "حدّث تفاصيل العرض وصورة المعاينة المستخدمة لهذا القالب المخصص في كتالوجك.",
+                "repositoryUrlLabel": "رابط مستودع GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "لا يمكن تغيير عنوان URL لمستودع المصدر بعد إضافة القالب.",
+                "nameLabel": "اسم القالب",
+                "namePlaceholder": "اسم عرض اختياري",
+                "frameworkLabel": "الإطار",
+                "frameworkSelectPlaceholder": "حدد إطارًا",
+                "frameworkUnspecified": "غير محدد",
+                "previewImageLabel": "رابط صورة المعاينة",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "اختياري. استخدم لقطة شاشة مُعَدّة إذا تريدOverride معاينة مستودع GitHub.",
+                "descriptionLabel": "وصف قصير",
+                "descriptionPlaceholder": "ما هو أفضل استخدام لهذا القالب",
+                "branchLabel": "الفرع الافتراضي",
+                "branchPlaceholder": "main",
+                "branchHelp": "اتركه فارغًا لتتعيين الافتراضي إلى main.",
+                "betaBranchLabel": "فرع بيتا",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "اختياري. فرع يستخدم للنشرات التجريبية.",
+                "cancel": "إلغاء",
+                "submit": "حفظ القالب",
+                "saveChanges": "حفظ التغييرات"
+            },
+            "forkDialog": {
+                "title": "شُتّت القالب القياسي",
+                "description": "أنسخ قالبًا قياسيًا على GitHub الخاص بك، أضفه إلى كتالوجك، واجعله الافتراضي للأعمال الجديدة。",
+                "sourceLabel": "مصدر القالب",
+                "targetLabel": "وجهة الشُتّت",
+                "targetPlaceholder": "حدد حسابًا أو مؤسسة على GitHub",
+                "targetHelp": "سيتم إنشاء الشُتّت تحت {target}.",
+                "personalTarget": "حساب شخصي ({login})",
+                "organizationTarget": "منظمة ({login})",
+                "noTargets": "وصّل GitHub وحمّل مؤسساتك قبل شُتّت قالب。",
+                "resultLabel": "مستودع جديد",
+                "none": "الحساب المحدد لديك",
+                "cancel": "إلغاء",
+                "submit": "شُتّت واجعله افتراضيًا"
+            },
+            "archiveDialog": {
+                "title": "أرشفة قالب مخصص",
+                "description": "أَرْشِفْ هذا القالب من كتالوجك. يمكنك أرشفة القوالب فقط التي لا تُعيّن حاليًا لأي أعمال。",
+                "templateLabel": "القالب",
+                "cancel": "إلغاء",
+                "submit": "أرشفة القالب"
+            },
+            "empty": {
+                "title": "لم يتم العثور على قوالب",
+                "default": "لا توجد قوالب تتوافق مع هذا العرض بعد。",
+                "search": "جرّب مصطلح بحث مختلف أو امسح الفلتر الحالي。",
+                "resetFilters": "إعادة تعيين الفلاتر"
+            },
+            "messages": {
+                "repositoryUrlRequired": "مطلوب رابط مستودع GitHub。",
+                "repositoryUrlInvalid": "أدخل رابط مستودع GitHub صالح مثل https://github.com/owner/repository.",
+                "forkTargetRequired": "اختر حسابًا أو مؤسسة على GitHub للشُتّت。",
+                "addSuccess": "تم حفظ القالب من عنوان URL لـ GitHub。",
+                "addFailed": "فشل حفظ القالب。",
+                "updateSuccess": "تم تحديث تفاصيل القالب。",
+                "updateFailed": "فشل تحديث تفاصيل القالب。",
+                "archiveSuccess": "تم أرشفة القالب من كتالوجك。",
+                "archiveFailed": "فشل أرشفة القالب。",
+                "forkSuccess": "تم شُتّت {repository}, أضيف إلى كتالوجك، وتم تعيينه كافتراضي لك。",
+                "forkExisting": "{repository} كان موجودًا بالفعل في كتالوجك وهو الآن القالب المشَتّت الافتراضي لك。",
+                "forkFailed": "فشل شُتّت القالب。",
+                "refreshSuccess": "تم تحديث كتالوج القوالب。",
+                "refreshFailed": "فشل تحديث القوالب。",
+                "defaultUpdated": "تم تحديث القالب الافتراضي。",
+                "defaultFailed": "فشل تحديث القالب الافتراضي。"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "استخدم الافتراضي",
+            "defaultOptionWithName": "استخدم الافتراضي ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (افتراضي)",
+            "changeAnywayLink": "غير مع ذلك",
+            "origin": {
+                "standard": "قياسي",
+                "forked": "مُشَتّت",
+                "customUrl": "عنوان URL مخصص"
+            },
+            "state": {
+                "defaultBadge": "الافتراضي الموروث",
+                "inheritedTitle": "استخدام القالب الافتراضي",
+                "inheritedDescription": "سيتبع هذا العمل القالب الافتراضي الحالي الخاص بك حتى تقوم بتثبيت قالب معين。",
+                "pinnedTitle": "قالب مثبت",
+                "pinnedDescription": "سيستمر هذا العمل في استخدام هذا القالب حتى إذا تغير الافتراضي لاحقًا。"
+            }
+        },
         "workPlugins": {
             "title": "ملحقات العمل",
             "subtitle": "تكوين الملحقات لهذا العمل",
@@ -3067,6 +3280,7 @@
             "history": "التاريخ",
             "comparisons": "المقارنات",
             "plugins": "الإضافات",
+            "templates": "القوالب",
             "profile": "الملف الشخصي",
             "security": "الأمان",
             "apiKeys": "مفاتيح API",

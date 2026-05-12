@@ -298,6 +298,13 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			autoEnable: false,
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
+			uiHints: {
+				completionFields: ['apiKey'],
+				includeInOnboarding: true,
+				onboardingPriority: 2,
+				onboardingDescription:
+					'Bring your own Google AI Studio Gemini API key to use Gemini as the pipeline engine for your works'
+			},
 			readme: [
 				'# Gemini Generator Plugin',
 				'',
