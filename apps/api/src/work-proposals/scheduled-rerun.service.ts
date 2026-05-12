@@ -1,19 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull } from 'typeorm';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import { User } from '@ever-works/agent/entities';
-import { WorkProposalSource } from '@ever-works/agent/user-research';
+import { config } from '@ever-works/agent/config';
 import { WorkProposalsApiService } from './work-proposals.service';
+
+const SCHEDULE_LOCK_KEY = 'user-research:scheduled-rerun';
 
 @Injectable()
 export class ScheduledReRunService {
     private readonly logger = new Logger(ScheduledReRunService.name);
 
     constructor(
-        @InjectRepository(User) private readonly users: Repository<User>,
         private readonly proposals: WorkProposalsApiService,
         private readonly config: ConfigService,
         private readonly taskLockService: DistributedTaskLockService,
@@ -21,16 +19,13 @@ export class ScheduledReRunService {
 
     @Cron(CronExpression.EVERY_DAY_AT_3AM)
     async runDaily(): Promise<void> {
-        const enabled = this.config.get<string | boolean>(
-            'USER_RESEARCH_SCHEDULED_RERUN_ENABLED',
-            false,
-        );
-        const isEnabled = typeof enabled === 'string' ? enabled === 'true' : !!enabled;
-        if (!isEnabled) return;
+        if (!this.shouldUseNestScheduler()) {
+            return;
+        }
 
         await this.taskLockService.runExclusive(
-            'user-research:scheduled-rerun',
-            async () => this.dispatchBatch(),
+            SCHEDULE_LOCK_KEY,
+            async () => this.proposals.runScheduledBatch(),
             {
                 ttlMs: 60 * 60 * 1000,
                 onLocked: () =>
@@ -41,44 +36,14 @@ export class ScheduledReRunService {
         );
     }
 
-    private async dispatchBatch(): Promise<void> {
-        const batchSize = Number(
-            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_BATCH', 20),
+    private shouldUseNestScheduler(): boolean {
+        const enabled = this.config.get<string | boolean>(
+            'USER_RESEARCH_SCHEDULED_RERUN_ENABLED',
+            false,
         );
-        const staleAfterDays = Number(
-            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_STALE_DAYS', 30),
-        );
-        const cutoff = new Date(Date.now() - staleAfterDays * 24 * 60 * 60 * 1000);
+        const isEnabled = typeof enabled === 'string' ? enabled === 'true' : !!enabled;
+        if (!isEnabled) return false;
 
-        try {
-            const candidates = await this.users.find({
-                where: [
-                    { isActive: true, userResearchOptOut: false, inferredInterests: IsNull() },
-                    { isActive: true, userResearchOptOut: false, updatedAt: LessThan(cutoff) },
-                ],
-                take: batchSize,
-                order: { updatedAt: 'ASC' },
-            });
-
-            this.logger.log(
-                `Scheduled rerun: picked ${candidates.length} candidate user(s) (batchSize=${batchSize}, staleDays=${staleAfterDays})`,
-            );
-
-            for (const user of candidates) {
-                const profileResearchedAt = user.inferredInterests?.researchedAt
-                    ? new Date(user.inferredInterests.researchedAt)
-                    : null;
-                if (profileResearchedAt && profileResearchedAt > cutoff) continue;
-                try {
-                    await this.proposals.refresh(user.id, WorkProposalSource.SCHEDULED);
-                } catch (err) {
-                    this.logger.warn(
-                        `Scheduled rerun dispatch failed for ${user.id}: ${(err as Error).message}`,
-                    );
-                }
-            }
-        } catch (err) {
-            this.logger.error(`Scheduled rerun failed: ${(err as Error).message}`);
-        }
+        return !config.trigger.shouldUseTrigger();
     }
 }

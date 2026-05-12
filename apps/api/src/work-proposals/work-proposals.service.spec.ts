@@ -10,6 +10,14 @@ jest.mock(
     { virtual: true },
 );
 
+jest.mock(
+    '@ever-works/agent/entities',
+    () => ({
+        User: class {},
+    }),
+    { virtual: true },
+);
+
 class StubRateLimitedError extends Error {
     constructor(_b: string, _c: number, _m: number) {
         super('rate-limited');
@@ -57,13 +65,17 @@ describe('WorkProposalsApiService', () => {
             findById: jest.fn(),
             update: jest.fn().mockResolvedValue(undefined),
         };
+        const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
+        const config = { get: jest.fn((_k: string, d: unknown) => d) };
         const svc = new WorkProposalsApiService(
             research as never,
             proposals as never,
             limits as never,
             users as never,
+            userOrmRepo as never,
+            config as never,
         );
-        return { svc, research, proposals, limits, users };
+        return { svc, research, proposals, limits, users, userOrmRepo, config };
     };
 
     it('queues a refresh when caps are within budget', async () => {

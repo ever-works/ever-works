@@ -1,4 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
+import { User } from '@ever-works/agent/entities';
 import { UserRepository } from '@ever-works/agent/database';
 import {
     UserResearchService,
@@ -8,6 +12,15 @@ import {
     WorkProposalSource,
     WorkProposalStatus,
 } from '@ever-works/agent/user-research';
+
+export interface ScheduledBatchSummary {
+    candidates: number;
+    queued: number;
+    skipped: number;
+    failed: number;
+    batchSize: number;
+    staleDays: number;
+}
 
 @Injectable()
 export class WorkProposalsApiService {
@@ -19,6 +32,8 @@ export class WorkProposalsApiService {
         private readonly proposals: WorkProposalService,
         private readonly limits: UserResearchLimitsService,
         private readonly users: UserRepository,
+        @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
+        private readonly config: ConfigService,
     ) {}
 
     async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
@@ -91,6 +106,65 @@ export class WorkProposalsApiService {
         this.inFlight.add(userId);
         void this.runPipeline(userId, source).finally(() => this.inFlight.delete(userId));
         return { status: 'queued' };
+    }
+
+    /** Pick stale candidate users and queue a refresh for each. */
+    async runScheduledBatch(): Promise<ScheduledBatchSummary> {
+        const batchSize = Number(
+            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_BATCH', 20),
+        );
+        const staleDays = Number(
+            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_STALE_DAYS', 30),
+        );
+        const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
+
+        const candidates = await this.userOrmRepo.find({
+            where: [
+                { isActive: true, userResearchOptOut: false, inferredInterests: IsNull() },
+                { isActive: true, userResearchOptOut: false, updatedAt: LessThan(cutoff) },
+            ],
+            take: batchSize,
+            order: { updatedAt: 'ASC' },
+        });
+
+        let queued = 0;
+        let skipped = 0;
+        let failed = 0;
+
+        for (const user of candidates) {
+            const researchedAt = user.inferredInterests?.researchedAt
+                ? new Date(user.inferredInterests.researchedAt)
+                : null;
+            if (researchedAt && researchedAt > cutoff) {
+                skipped++;
+                continue;
+            }
+            try {
+                const result = await this.refresh(user.id, WorkProposalSource.SCHEDULED);
+                if (result.status === 'queued') queued++;
+                else skipped++;
+            } catch (err) {
+                failed++;
+                this.logger.warn(
+                    `Scheduled rerun dispatch failed for ${user.id}: ${(err as Error).message}`,
+                );
+            }
+        }
+
+        const summary: ScheduledBatchSummary = {
+            candidates: candidates.length,
+            queued,
+            skipped,
+            failed,
+            batchSize,
+            staleDays,
+        };
+        if (candidates.length > 0 || failed > 0) {
+            this.logger.log(
+                `Scheduled rerun batch: ${queued} queued, ${skipped} skipped, ${failed} failed (${candidates.length}/${batchSize} candidates, staleDays=${staleDays})`,
+            );
+        }
+        return summary;
     }
 
     private async runPipeline(userId: string, source: WorkProposalSource): Promise<void> {
