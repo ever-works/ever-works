@@ -95,6 +95,19 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
 }
 
 describe('WorkLifecycleService.createWork — provider defaults + quota', () => {
+    // `resolveProviderDefaults` reads `config.everWorks.deploy.isEnabled()`,
+    // which derives from `DEPLOY_EVER_WORKS_ENABLED`. Tests that exercise
+    // the `ever-works` deploy path need the flag on; tests that exercise
+    // the fallback path need it off.
+    const previousFlag = process.env.DEPLOY_EVER_WORKS_ENABLED;
+    afterEach(() => {
+        if (previousFlag === undefined) {
+            delete process.env.DEPLOY_EVER_WORKS_ENABLED;
+        } else {
+            process.env.DEPLOY_EVER_WORKS_ENABLED = previousFlag;
+        }
+    });
+
     it('falls back to user-github + vercel when the user has no onboarding state and the DTO is silent', async () => {
         const { service, deps } = makeService(null);
 
@@ -104,6 +117,7 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         const persisted = deps.workRepo.create.mock.calls[0][0];
         expect(persisted.storageProvider).toBe('user-github');
         expect(persisted.deployProvider).toBe('vercel');
+        expect(persisted.gitProvider).toBe('github');
         expect(deps.quota.assertWithinQuota).not.toHaveBeenCalled();
     });
 
@@ -151,15 +165,19 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
     });
 
     it('invokes the Ever Works Deploy quota check when deploy === ever-works', async () => {
+        process.env.DEPLOY_EVER_WORKS_ENABLED = 'true';
         const { service, deps } = makeService(null);
 
         await service.createWork({ ...baseDto, deployProvider: 'ever-works' }, baseUser);
 
         expect(deps.quota.assertWithinQuota).toHaveBeenCalledWith(baseUser.id);
         expect(deps.workRepo.create).toHaveBeenCalledTimes(1);
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.deployProvider).toBe('ever-works');
     });
 
     it('bubbles up EverWorksDeployQuotaExceededError before any DB write', async () => {
+        process.env.DEPLOY_EVER_WORKS_ENABLED = 'true';
         const { service, deps } = makeService(null);
         deps.quota.assertWithinQuota.mockRejectedValueOnce(
             new EverWorksDeployQuotaExceededError(3, 3),
@@ -184,5 +202,92 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         const persisted = deps.workRepo.create.mock.calls[0][0];
         expect(persisted.storageProvider).toBe('user-github');
         expect(persisted.deployProvider).toBe('vercel');
+        expect(persisted.gitProvider).toBe('github');
+    });
+
+    it('rewrites deploy=ever-works → vercel when DEPLOY_EVER_WORKS_ENABLED is off', async () => {
+        // Critical safeguard: there is no plugin registered with id
+        // `ever-works`. Persisting it on the Work would break the deploy
+        // facade later. The wizard's default state still says `ever-works`,
+        // so the rewrite has to live in the seed code.
+        delete process.env.DEPLOY_EVER_WORKS_ENABLED;
+        const state: OnboardingWizardStateV2 = {
+            version: 2,
+            lastStep: 0,
+            ai: { choice: 'ever-works' },
+            storage: { choice: 'user-github' },
+            deploy: { choice: 'ever-works' },
+            skippedSteps: [],
+            pluginsReviewed: false,
+        };
+        const { service, deps } = makeService(state);
+
+        await service.createWork(baseDto, baseUser);
+
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.deployProvider).toBe('vercel');
+        expect(deps.quota.assertWithinQuota).not.toHaveBeenCalled();
+    });
+
+    it("derives gitProvider from the onboarding storage choice (ever-works-git → 'github')", async () => {
+        const state: OnboardingWizardStateV2 = {
+            version: 2,
+            lastStep: 0,
+            ai: { choice: 'ever-works' },
+            storage: { choice: 'ever-works-git' },
+            deploy: { choice: 'vercel' },
+            skippedSteps: [],
+            pluginsReviewed: false,
+        };
+        const { service, deps } = makeService(state);
+
+        // Don't pass gitProvider in the DTO so the seed code has to derive it.
+        const dtoNoGit = { ...baseDto } as CreateWorkDto;
+        delete (dtoNoGit as { gitProvider?: string }).gitProvider;
+
+        await service.createWork(dtoNoGit, baseUser);
+
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.storageProvider).toBe('ever-works-git');
+        expect(persisted.gitProvider).toBe('github');
+    });
+
+    it("derives gitProvider from the onboarding storage choice (user-gitlab → 'gitlab')", async () => {
+        const state: OnboardingWizardStateV2 = {
+            version: 2,
+            lastStep: 0,
+            ai: { choice: 'ever-works' },
+            storage: { choice: 'user-gitlab' },
+            deploy: { choice: 'vercel' },
+            skippedSteps: [],
+            pluginsReviewed: false,
+        };
+        const { service, deps } = makeService(state);
+
+        const dtoNoGit = { ...baseDto } as CreateWorkDto;
+        delete (dtoNoGit as { gitProvider?: string }).gitProvider;
+
+        await service.createWork(dtoNoGit, baseUser);
+
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.gitProvider).toBe('gitlab');
+    });
+
+    it('honours an explicit DTO gitProvider override even when storage choice would derive a different one', async () => {
+        const state: OnboardingWizardStateV2 = {
+            version: 2,
+            lastStep: 0,
+            ai: { choice: 'ever-works' },
+            storage: { choice: 'user-gitlab' },
+            deploy: { choice: 'vercel' },
+            skippedSteps: [],
+            pluginsReviewed: false,
+        };
+        const { service, deps } = makeService(state);
+
+        await service.createWork({ ...baseDto, gitProvider: 'github' }, baseUser);
+
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.gitProvider).toBe('github');
     });
 });

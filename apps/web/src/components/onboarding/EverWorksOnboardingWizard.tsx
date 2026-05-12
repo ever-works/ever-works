@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -73,7 +74,14 @@ export function EverWorksOnboardingWizard({
         initial: initialState,
         catalog,
         patchState: async (patch) => {
-            await patchOnboardingState(patch);
+            const result = await patchOnboardingState(patch);
+            // If the server-action wrapper reports `success: false` (e.g. API
+            // 4xx/5xx, validation error), surface it so the user knows their
+            // progress wasn't saved. Silent failures previously let the user
+            // click through the whole wizard with nothing persisted.
+            if (!result.success) {
+                toast.error(result.error ?? 'Failed to save your onboarding progress');
+            }
         },
         trackEvent: (event, props) => {
             void trackOnboardingEvent(event, props);
