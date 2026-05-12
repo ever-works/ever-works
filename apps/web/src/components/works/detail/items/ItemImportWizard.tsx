@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, FileText, Loader2, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogContent,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { downloadFromUrl } from './downloadFromUrl';
 
 interface ItemImportWizardProps {
     workId: string;
@@ -161,9 +163,7 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
                 const data = (await response.json()) as ImportValidationResponse;
                 setValidation(data);
                 setMapping((prev) =>
-                    Object.keys(prev).length > 0
-                        ? prev
-                        : { ...data.suggestedMapping, ...prev },
+                    Object.keys(prev).length > 0 ? prev : { ...data.suggestedMapping, ...prev },
                 );
                 return data;
             } catch (e) {
@@ -196,8 +196,21 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
         }
     };
 
-    const handleDownloadSample = (format: 'csv' | 'xlsx') => {
-        window.location.href = `/api/works/${workId}/import-items/sample?format=${format}`;
+    const [downloadingSample, setDownloadingSample] = useState<'csv' | 'xlsx' | null>(null);
+    const handleDownloadSample = async (format: 'csv' | 'xlsx') => {
+        if (downloadingSample) return;
+        setDownloadingSample(format);
+        try {
+            await downloadFromUrl(`/api/works/${workId}/import-items/sample?format=${format}`);
+        } catch (e) {
+            toast.error(
+                e instanceof Error
+                    ? `Sample download failed: ${e.message}`
+                    : 'Sample download failed',
+            );
+        } finally {
+            setDownloadingSample(null);
+        }
     };
 
     const handleExecute = async () => {
@@ -242,8 +255,8 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
                                 </span>
                             </DialogTitle>
                             <DialogDescription>
-                                Upload a CSV or Excel file. Validation only — no writes happen
-                                until you confirm in the next phase.
+                                Upload a CSV or Excel file. Validation only — no writes happen until
+                                you confirm in the next phase.
                             </DialogDescription>
                         </div>
                         <button
@@ -267,6 +280,7 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
                         isWorking={isWorking}
                         onFileSelected={handleFileSelected}
                         onDownloadSample={handleDownloadSample}
+                        downloadingSample={downloadingSample}
                         maxRows={maxRows}
                     />
                 ) : null}
@@ -402,6 +416,7 @@ interface UploadStepProps {
     isWorking: boolean;
     onFileSelected: (file: File) => void;
     onDownloadSample: (format: 'csv' | 'xlsx') => void;
+    downloadingSample: 'csv' | 'xlsx' | null;
     maxRows: number;
 }
 
@@ -411,6 +426,7 @@ function UploadStep({
     isWorking,
     onFileSelected,
     onDownloadSample,
+    downloadingSample,
     maxRows,
 }: UploadStepProps) {
     return (
@@ -453,9 +469,7 @@ function UploadStep({
                         <p className="text-sm text-text dark:text-text-dark mb-1">
                             Drag a CSV or Excel file here
                         </p>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
-                            or
-                        </p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">or</p>
                         <label className="inline-block">
                             <input
                                 type="file"
@@ -484,17 +498,27 @@ function UploadStep({
                 <div className="flex items-center gap-3">
                     <button
                         type="button"
-                        className="underline hover:no-underline"
+                        className="underline hover:no-underline inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline"
+                        disabled={downloadingSample !== null}
                         onClick={() => onDownloadSample('csv')}
                     >
-                        Download sample CSV
+                        {downloadingSample === 'csv' ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : null}
+                        {downloadingSample === 'csv' ? 'Downloading CSV…' : 'Download sample CSV'}
                     </button>
                     <button
                         type="button"
-                        className="underline hover:no-underline"
+                        className="underline hover:no-underline inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline"
+                        disabled={downloadingSample !== null}
                         onClick={() => onDownloadSample('xlsx')}
                     >
-                        Download sample Excel
+                        {downloadingSample === 'xlsx' ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : null}
+                        {downloadingSample === 'xlsx'
+                            ? 'Downloading Excel…'
+                            : 'Download sample Excel'}
                     </button>
                 </div>
             </div>
@@ -524,9 +548,9 @@ function MappingStep({ headers, mapping, onMappingChange }: MappingStepProps) {
     return (
         <div className="space-y-3 max-h-[50vh] overflow-y-auto">
             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                Map each column in your file to a directory item field. Required:{' '}
-                <code>name</code>, <code>description</code>, <code>source_url</code>, and{' '}
-                <code>category</code> (or <code>categories</code>).
+                Map each column in your file to a directory item field. Required: <code>name</code>,{' '}
+                <code>description</code>, <code>source_url</code>, and <code>category</code> (or{' '}
+                <code>categories</code>).
             </p>
             <table className="w-full text-sm">
                 <thead>
@@ -711,13 +735,12 @@ function ConfirmStep({
     onDefaultStatusChange,
 }: ConfirmStepProps) {
     const { summary } = validation;
-    const toImport =
-        summary.valid - (duplicateStrategy === 'skip' ? summary.duplicates : 0);
+    const toImport = summary.valid - (duplicateStrategy === 'skip' ? summary.duplicates : 0);
     return (
         <div className="space-y-4">
             <p className="text-sm text-text dark:text-text-dark">
-                Ready to import. Choose how duplicates and missing fields should be handled,
-                then click <strong>Confirm Import</strong>.
+                Ready to import. Choose how duplicates and missing fields should be handled, then
+                click <strong>Confirm Import</strong>.
             </p>
             <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4">
                 <div>
@@ -778,8 +801,8 @@ function ConfirmStep({
                     ) : null}
                     {duplicateStrategy === 'skip' && summary.duplicates > 0 ? (
                         <li>
-                            <strong className="text-warning">{summary.duplicates}</strong>{' '}
-                            duplicate rows will be skipped
+                            <strong className="text-warning">{summary.duplicates}</strong> duplicate
+                            rows will be skipped
                         </li>
                     ) : null}
                 </ul>

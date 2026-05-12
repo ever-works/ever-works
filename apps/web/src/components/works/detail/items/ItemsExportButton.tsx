@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -10,23 +11,26 @@ import {
     DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils/cn';
+import { downloadFromUrl } from './downloadFromUrl';
 
 interface ItemsExportButtonProps {
     workId: string;
 }
+
+type DownloadFormat = 'csv' | 'xlsx';
 
 /**
  * Export dropdown for the items page (EW-533 Phase 1). Renders when the
  * directory has `settings.export_enabled === true` in its `.works/works.yml`;
  * otherwise renders nothing so the gate is invisible.
  *
- * Clicking a format triggers a same-origin GET to the Next.js proxy route at
- * `/api/works/[id]/export-items?format=...`, which forwards to the NestJS
- * API with the session token from cookies. The proxy passes the upstream
- * `Content-Disposition` through, so the browser handles the file save.
+ * The actual download is run as `fetch` + Blob (not `window.location.href`)
+ * so we can show a spinner while the server clones/serialises, disable the
+ * menu items while a download is in flight, and surface a toast on error.
  */
 export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
     const [enabled, setEnabled] = useState<boolean | null>(null);
+    const [downloading, setDownloading] = useState<DownloadFormat | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -51,9 +55,23 @@ export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
         return null;
     }
 
-    const download = (format: 'csv' | 'xlsx') => {
-        window.location.href = `/api/works/${workId}/export-items?format=${format}`;
+    const handleDownload = async (format: DownloadFormat) => {
+        if (downloading) {
+            return;
+        }
+        setDownloading(format);
+        try {
+            await downloadFromUrl(`/api/works/${workId}/export-items?format=${format}`);
+        } catch (error) {
+            toast.error(
+                error instanceof Error ? `Export failed: ${error.message}` : 'Export failed',
+            );
+        } finally {
+            setDownloading(null);
+        }
     };
+
+    const isBusy = downloading !== null;
 
     // The shared `DropdownMenu` wrapper has `w-full` on its root element,
     // which makes it expand to fill flex parents and squeeze sibling buttons
@@ -61,30 +79,43 @@ export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
     // the dropdown's width stays intrinsic.
     return (
         <span className="inline-flex">
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="secondary"
-                    className={cn(
-                        'inline-flex items-center gap-2 whitespace-nowrap',
-                        'text-sm',
-                    )}
-                >
-                    <Download className="w-4 h-4" />
-                    Export
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => download('csv')}>
-                    <FileText className="w-4 h-4 mr-2" />
-                    CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => download('xlsx')}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Excel (.xlsx)
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        className={cn(
+                            'inline-flex items-center gap-2 whitespace-nowrap',
+                            'text-sm',
+                        )}
+                    >
+                        {isBusy ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
+                        {isBusy ? 'Exporting…' : 'Export'}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleDownload('csv')} disabled={isBusy}>
+                        {downloading === 'csv' ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <FileText className="w-4 h-4 mr-2" />
+                        )}
+                        {downloading === 'csv' ? 'Downloading CSV…' : 'CSV'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownload('xlsx')} disabled={isBusy}>
+                        {downloading === 'xlsx' ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        )}
+                        {downloading === 'xlsx' ? 'Downloading Excel…' : 'Excel (.xlsx)'}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </span>
     );
 }
