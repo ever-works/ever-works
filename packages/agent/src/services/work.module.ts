@@ -18,6 +18,7 @@ import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
+import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
@@ -77,6 +78,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkScheduleDispatcherService,
         WorkMemberService,
         WorkInvitationService,
+        PlatformSyncSecretService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,
@@ -119,6 +121,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkScheduleDispatcherService,
         WorkMemberService,
         WorkInvitationService,
+        PlatformSyncSecretService,
         WorkImportService,
         WorkAdvancedPromptsService,
         WorkTaxonomyService,

@@ -53,6 +53,7 @@ jest.mock('./work-schedule-dispatcher.service', () => ({
 }));
 jest.mock('./work-member.service', () => ({ WorkMemberService: class {} }));
 jest.mock('./work-invitation.service', () => ({ WorkInvitationService: class {} }));
+jest.mock('./platform-sync-secret.service', () => ({ PlatformSyncSecretService: class {} }));
 jest.mock('./work-import.service', () => ({ WorkImportService: class {} }));
 jest.mock('./work-advanced-prompts.service', () => ({
     WorkAdvancedPromptsService: class {},
@@ -123,6 +124,7 @@ import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
+import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
@@ -194,6 +196,7 @@ describe('WorkModule', () => {
             WorkScheduleDispatcherService,
             WorkMemberService,
             WorkInvitationService,
+            PlatformSyncSecretService,
             WorkImportService,
             WorkAdvancedPromptsService,
             WorkTaxonomyService,
@@ -219,8 +222,8 @@ describe('WorkModule', () => {
         });
 
         it('keeps the providers list at the documented shape (class providers + the EverWorks quota counter factory)', () => {
-            // 28 class providers + 1 factory provider object for the
-            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 29 entries total.
+            // 29 class providers + 1 factory provider object for the
+            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 30 entries total.
             expect(meta('providers')).toHaveLength(expectedProviders.length + 1);
         });
 
@@ -282,8 +285,8 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 27-entry shape (24 services + 3 re-exported modules)', () => {
-            expect(meta('exports')).toHaveLength(27);
+        it('keeps the exports list at the documented 28-entry shape (25 services + 3 re-exported modules)', () => {
+            expect(meta('exports')).toHaveLength(28);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

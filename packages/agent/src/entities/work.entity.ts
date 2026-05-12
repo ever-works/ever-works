@@ -206,6 +206,23 @@ export class Work {
     @TimestampColumn({ nullable: true })
     sourceValidationLastRunAt?: Date | null;
 
+    // Platform Sync (EW-120 Activity Feed) — per-Work shared secret used by the
+    // platform to authenticate calls to the deployed directory site's
+    // /api/platform/activity-feed endpoint. Value is AES-256-GCM-encrypted with
+    // PLATFORM_ENCRYPTION_KEY before persistence; NULL means "not yet
+    // provisioned" (the next deploy will lazily generate and push it).
+    @Column({ type: 'text', nullable: true })
+    platformSyncSecretEncrypted?: string | null;
+
+    @Column({ type: 'boolean', default: true })
+    platformSyncEnabled: boolean;
+
+    @TimestampColumn({ nullable: true })
+    platformSyncLastSuccessAt?: Date | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    platformSyncLastError?: string | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;
