@@ -8,6 +8,7 @@ import { DeployTokenAlert } from '@/components/works/detail/deploy/DeployTokenAl
 import { DeployProviderSelector } from '@/components/works/detail/deploy/DeployProviderSelector';
 import { SharedWorkNoTokenAlert } from '@/components/works/detail/deploy/SharedWorkNoTokenAlert';
 import { DomainManagement } from '@/components/works/detail/deploy/DomainManagement';
+import { DeployProgressPanel } from '@/components/works/detail/deploy/DeployProgressPanel';
 import { canDeploy } from '@/lib/permissions';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -119,6 +120,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
                 providerName={providerName}
                 websiteTemplates={websiteTemplates}
             />
+            <DeployProgressPanel workId={work.id} isDeploying={isDeploying(work)} />
             {work.website && <DomainManagement work={work} />}
         </div>
     );

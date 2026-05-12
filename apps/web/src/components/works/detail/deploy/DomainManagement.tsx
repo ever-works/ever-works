@@ -127,7 +127,17 @@ function DomainManagementContent({ work }: DomainManagementProps) {
         toast.success(t('copied'));
     };
 
-    const isVercelAutoAssigned = (name: string) => name.endsWith('.vercel.app');
+    // A `*.vercel.app` hostname is auto-managed by Vercel when the Work
+    // deploys there — it can't be removed from the dashboard while the user
+    // is still deploying to Vercel (Vercel re-creates it).
+    //
+    // BUT once the user has switched `deployProvider` away from Vercel, that
+    // hostname is just a stale DB row pointing at a project the new provider
+    // doesn't know about. The user needs to be able to clean it up.
+    // (See EW-611.) The "no remove" gate therefore only applies while the
+    // Work's current provider is still `vercel`.
+    const isVercelAutoAssigned = (name: string) =>
+        name.endsWith('.vercel.app') && work.deployProvider === 'vercel';
 
     return (
         <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
