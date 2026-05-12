@@ -284,6 +284,77 @@ describe('ItemImportExecutorService', () => {
         expect(result.created).toBe(1);
     });
 
+    it("detects intra-batch slug collisions from name-derived slugs (skip strategy doesn't double-write)", async () => {
+        // Both rows have the same name and no explicit slug — the executor
+        // derives slug='same-name' for both. Without the planning pass, the
+        // second writeItem would silently overwrite the first under
+        // concurrency=5. With the planning pass, the second is classified as
+        // a duplicate and skipped.
+        const work = makeWork();
+        const git = makeGitFacade();
+        const repo = makeDataRepo();
+        dataRepoCreateMock.mockResolvedValue(repo);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
+
+        const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
+            rows: [
+                row(0, {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://a.test',
+                    category: 'Tools',
+                }),
+                row(1, {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://b.test',
+                    category: 'Tools',
+                }),
+            ],
+            duplicate_strategy: 'skip',
+        });
+
+        expect(repo.createItemDir).toHaveBeenCalledTimes(1);
+        expect(repo.writeItem).toHaveBeenCalledTimes(1);
+        expect(result.created).toBe(1);
+        expect(result.skipped).toBe(1);
+        expect(result.errors).toHaveLength(0);
+    });
+
+    it('on `update` strategy, name-derived collisions write twice (create + update) without two creates', async () => {
+        const work = makeWork();
+        const git = makeGitFacade();
+        const repo = makeDataRepo();
+        dataRepoCreateMock.mockResolvedValue(repo);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
+
+        const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
+            rows: [
+                row(0, {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://a.test',
+                    category: 'Tools',
+                }),
+                row(1, {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://b.test',
+                    category: 'Tools',
+                }),
+            ],
+            duplicate_strategy: 'update',
+        });
+
+        // First row creates a fresh item directory; the second is treated as
+        // an update (writeItem only). No second createItemDir = no silent
+        // overwrite of a freshly-created sibling.
+        expect(repo.createItemDir).toHaveBeenCalledTimes(1);
+        expect(repo.writeItem).toHaveBeenCalledTimes(2);
+        expect(result.created).toBe(1);
+        expect(result.updated).toBe(1);
+    });
+
     it('rejects rows that pass `valid: true` but fail server-side revalidation (tamper guard)', async () => {
         const work = makeWork();
         const git = makeGitFacade();

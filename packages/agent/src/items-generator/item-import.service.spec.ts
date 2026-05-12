@@ -236,6 +236,80 @@ describe('ItemImportService.validateRows', () => {
         });
     });
 
+    it('flags two rows with the same name and no explicit slug as intra-batch duplicates', () => {
+        // Both rows would have the executor compute slug='same-name', so the
+        // second one would silently overwrite the first if validate didn't
+        // catch the collision here.
+        const parsed = {
+            headers: baseHeaders,
+            rows: [
+                {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://a.test',
+                    category: 'Tools',
+                },
+                {
+                    name: 'Same Name',
+                    description: 'd',
+                    source_url: 'https://b.test',
+                    category: 'Tools',
+                },
+            ],
+        };
+        const result = service.validateRows(parsed, baseMapping, []);
+        expect(result.validationResults[0].duplicate).toBeUndefined();
+        expect(result.validationResults[1].duplicate?.slug).toBe('same-name');
+        expect(result.summary.duplicates).toBe(1);
+    });
+
+    it('flags an explicit slug + a name that slugifies to the same string as a duplicate', () => {
+        // Row 0 explicitly sets slug "my-tool"; row 1 has no slug but the
+        // executor would derive slug="my-tool" from its name. Validate must
+        // catch this canonical collision.
+        const parsed = {
+            headers: [...baseHeaders, 'slug'],
+            rows: [
+                {
+                    name: 'Whatever',
+                    description: 'd',
+                    source_url: 'https://a.test',
+                    category: 'Tools',
+                    slug: 'my-tool',
+                },
+                {
+                    name: 'My Tool',
+                    description: 'd',
+                    source_url: 'https://b.test',
+                    category: 'Tools',
+                    slug: '',
+                },
+            ],
+        };
+        const mapping = { ...baseMapping, slug: 'slug' };
+        const result = service.validateRows(parsed, mapping, []);
+        expect(result.validationResults[1].duplicate?.slug).toBe('my-tool');
+        expect(result.summary.duplicates).toBe(1);
+    });
+
+    it('flags a row whose slugified name matches an existing item slug', () => {
+        const parsed = {
+            headers: baseHeaders,
+            rows: [
+                {
+                    name: 'Foo Bar',
+                    description: 'd',
+                    source_url: 'https://new.test',
+                    category: 'Tools',
+                },
+            ],
+        };
+        const result = service.validateRows(parsed, baseMapping, [
+            { slug: 'foo-bar', source_url: 'https://something-else.test' },
+        ]);
+        expect(result.validationResults[0].duplicate?.slug).toBe('foo-bar');
+    });
+
     it('emits an error for a malformed slug', () => {
         const parsed = {
             headers: [...baseHeaders, 'slug'],

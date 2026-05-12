@@ -15,6 +15,7 @@ import {
     parseBooleanCell,
     parseIntegerCell,
 } from './column-mapping';
+import { slugifyText } from '../utils/text.utils';
 import type {
     ColumnMapping,
     ImportDuplicateMatch,
@@ -154,8 +155,14 @@ export class ItemImportService {
         for (let i = 0; i < parsed.rows.length; i += 1) {
             const rowResult = this.validateSingleRow(parsed.rows[i], i, reverseMapping);
             if (rowResult.data) {
+                // Compute the EFFECTIVE slug — what the executor will actually
+                // write — so two rows with the same name and no explicit slug
+                // are detected as duplicates here, before any git work
+                // happens. Mirrors `ItemImportExecutorService.buildItemData`.
+                const effectiveSlug = effectiveSlugFor(rowResult.data);
                 const dup = detectDuplicate(
                     rowResult.data,
+                    effectiveSlug,
                     existingSlugs,
                     existingUrls,
                     seenSlugs,
@@ -165,7 +172,7 @@ export class ItemImportService {
                     rowResult.duplicate = dup;
                     duplicateCount += 1;
                 }
-                if (rowResult.data.slug) seenSlugs.add(rowResult.data.slug);
+                if (effectiveSlug) seenSlugs.add(effectiveSlug);
                 if (rowResult.data.source_url) seenUrls.add(rowResult.data.source_url);
             }
             if (rowResult.valid) {
@@ -341,16 +348,29 @@ function isImportFieldName(value: string): value is ImportFieldName {
     return (ALL_IMPORT_FIELDS as readonly string[]).includes(value);
 }
 
+/**
+ * Returns the slug the executor will actually write for `row`, mirroring
+ * `ItemImportExecutorService.buildItemData`'s `slugifyText(row.slug || row.name)`
+ * call. Validating against this — not the raw `row.slug` — catches collisions
+ * driven by name-derived slugs, accent normalization, and casing differences
+ * that would otherwise only surface (silently) at execute time.
+ */
+function effectiveSlugFor(row: ImportRowData): string {
+    const source = row.slug && row.slug.length > 0 ? row.slug : row.name;
+    return source ? slugifyText(source) : '';
+}
+
 function detectDuplicate(
     row: ImportRowData,
+    effectiveSlug: string,
     existingSlugs: ReadonlySet<string>,
     existingUrls: ReadonlySet<string>,
     seenSlugs: ReadonlySet<string>,
     seenUrls: ReadonlySet<string>,
 ): ImportDuplicateMatch | undefined {
     const match: ImportDuplicateMatch = {};
-    if (row.slug && (existingSlugs.has(row.slug) || seenSlugs.has(row.slug))) {
-        match.slug = row.slug;
+    if (effectiveSlug && (existingSlugs.has(effectiveSlug) || seenSlugs.has(effectiveSlug))) {
+        match.slug = effectiveSlug;
     }
     if (row.source_url && (existingUrls.has(row.source_url) || seenUrls.has(row.source_url))) {
         match.source_url = row.source_url;

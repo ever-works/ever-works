@@ -112,54 +112,85 @@ export class ItemImportExecutorService {
         let skippedCount = 0;
         const errors: { rowIndex: number; message: string }[] = [];
 
-        await pMap(
-            validRows,
-            async (row) => {
-                try {
-                    // Server-side re-validation — never trust `row.valid` or the
-                    // shape of `row.data` from the client. Strips unknown
-                    // fields, re-runs URL / slug / required-field checks, and
-                    // coerces booleans + integers through the same parsers as
-                    // the validate endpoint.
-                    const revalidated = this.itemImportService.revalidateImportRowData(
-                        row.data,
-                        row.rowIndex,
-                    );
-                    if (!revalidated.valid || !revalidated.data) {
-                        errors.push({
-                            rowIndex: row.rowIndex,
-                            message: `Server-side validation failed: ${revalidated.errors.join('; ')}`,
-                        });
-                        return;
-                    }
-                    const itemData = this.buildItemData(revalidated.data);
-                    const isDuplicate =
-                        existingSlugs.has(itemData.slug ?? '') ||
-                        (itemData.source_url && existingUrls.has(itemData.source_url));
+        // Two-pass design — the previous single-pass loop ran in `pMap` with
+        // concurrency=5 AND mutated the shared `existingSlugs` / `existingUrls`
+        // sets after each write. Two rows whose name-derived slugs collide
+        // could both pass `existingSlugs.has(slug)` before either had finished
+        // writing, so the second `writeItem` would silently overwrite the
+        // first while the result counter said "2 created".
+        //
+        // Pass 1 (this loop): serial. Revalidate, build the canonical
+        // `itemData`, classify as create/update/skip/error, and **claim** the
+        // slug + source_url against the shared sets immediately. This is
+        // CPU-only — no I/O — so going serial here is cheap and gives us
+        // deterministic intra-batch collision detection.
+        //
+        // Pass 2 (the `pMap` below): parallel. Only the disk + git writes,
+        // each operating on the already-classified plan entry. No shared
+        // mutation, no race.
+        type PlanEntry =
+            | { kind: 'create'; rowIndex: number; itemData: MutableItemData }
+            | { kind: 'update'; rowIndex: number; itemData: MutableItemData };
+        const plan: PlanEntry[] = [];
 
-                    if (isDuplicate) {
-                        if (input.duplicate_strategy === 'skip') {
-                            skippedCount += 1;
-                            return;
-                        }
-                        // Update strategy — overwrite the existing YAML.
-                        await data.writeItem(itemData);
+        for (const row of validRows) {
+            const revalidated = this.itemImportService.revalidateImportRowData(
+                row.data,
+                row.rowIndex,
+            );
+            if (!revalidated.valid || !revalidated.data) {
+                errors.push({
+                    rowIndex: row.rowIndex,
+                    message: `Server-side validation failed: ${revalidated.errors.join('; ')}`,
+                });
+                continue;
+            }
+            const itemData = this.buildItemData(revalidated.data);
+            const slug = itemData.slug ?? '';
+            const isDuplicate =
+                (slug.length > 0 && existingSlugs.has(slug)) ||
+                (typeof itemData.source_url === 'string' &&
+                    existingUrls.has(itemData.source_url));
+
+            if (isDuplicate) {
+                if (input.duplicate_strategy === 'skip') {
+                    skippedCount += 1;
+                    continue;
+                }
+                plan.push({ kind: 'update', rowIndex: row.rowIndex, itemData });
+                // Even on update, mark the URL as taken so a subsequent row
+                // with the same source_url is also routed to update / skip
+                // instead of trying to create a fresh item directory.
+                if (typeof itemData.source_url === 'string') {
+                    existingUrls.add(itemData.source_url);
+                }
+                continue;
+            }
+
+            plan.push({ kind: 'create', rowIndex: row.rowIndex, itemData });
+            if (slug.length > 0) existingSlugs.add(slug);
+            if (typeof itemData.source_url === 'string') existingUrls.add(itemData.source_url);
+        }
+
+        await pMap(
+            plan,
+            async (entry) => {
+                try {
+                    if (entry.kind === 'update') {
+                        await data.writeItem(entry.itemData);
                         updatedCount += 1;
                         return;
                     }
-
-                    await data.createItemDir(itemData);
-                    await data.writeItem(itemData);
+                    await data.createItemDir(entry.itemData);
+                    await data.writeItem(entry.itemData);
                     createdCount += 1;
-                    if (itemData.slug) existingSlugs.add(itemData.slug);
-                    if (itemData.source_url) existingUrls.add(itemData.source_url);
                 } catch (error) {
                     this.logger.error(
-                        `Failed to write item at row ${row.rowIndex}`,
+                        `Failed to write item at row ${entry.rowIndex}`,
                         error instanceof Error ? error.stack : String(error),
                     );
                     errors.push({
-                        rowIndex: row.rowIndex,
+                        rowIndex: entry.rowIndex,
                         message: error instanceof Error ? error.message : String(error),
                     });
                 }
