@@ -27,3 +27,16 @@ export type {
 	WorksManifestSpec,
 	WorksManifestOutput
 } from './manifest.types.js';
+export type {
+	OnboardingAiChoice,
+	OnboardingStorageChoice,
+	OnboardingDeployChoice,
+	OnboardingWizardStateV2,
+	OnboardingStateResponse,
+	OnboardingStatePatchRequest,
+	OnboardingCatalogResponse,
+	OnboardingCard,
+	OnboardingCardBadge,
+	OnboardingPluginCard
+} from './wizard-state.js';
+export { ONBOARDING_DEFAULT_STATE } from './wizard-state.js';

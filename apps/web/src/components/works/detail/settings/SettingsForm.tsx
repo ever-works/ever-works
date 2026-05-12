@@ -12,6 +12,7 @@ import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
 import { CommunityPrSettings } from './CommunityPrSettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
+import { ItemImportExportSettings } from './ItemImportExportSettings';
 import { CommitterSettings } from './CommitterSettings';
 interface SettingsFormProps {
     work: Work;
@@ -45,6 +46,9 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
 
                 {/* Website Configuration Settings */}
                 <WebsiteConfigSettings workId={work.id} />
+
+                {/* Item Import & Export Settings (EW-533) */}
+                <ItemImportExportSettings workId={work.id} />
 
                 {/* Git Committer Settings */}
                 <CommitterSettings />

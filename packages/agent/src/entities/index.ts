@@ -28,4 +28,5 @@ export * from './onboarding-request.entity';
 export * from './template.entity';
 export * from './user-template-preference.entity';
 export * from './webhook-subscription.entity';
+export * from './work-proposal.entity';
 export * from './types';

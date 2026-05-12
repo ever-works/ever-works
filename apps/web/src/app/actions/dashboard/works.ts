@@ -983,6 +983,9 @@ export async function updateWebsiteSettings(
         companies_enabled?: boolean;
         tags_enabled?: boolean;
         surveys_enabled?: boolean;
+        export_enabled?: boolean;
+        import_enabled?: boolean;
+        import_max_rows?: number;
         header?: {
             submit_enabled?: boolean;
             pricing_enabled?: boolean;

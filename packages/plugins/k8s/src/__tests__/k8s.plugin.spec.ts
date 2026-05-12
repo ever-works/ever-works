@@ -134,6 +134,13 @@ describe('KubernetesPlugin metadata', () => {
 		const m = plugin.getManifest();
 		expect(m.uiHints?.verifiesOnSave).toBe(true);
 	});
+
+	it('manifest opts the k8s plugin into onboarding so the Deploy step can route users into the configure form', () => {
+		const m = plugin.getManifest();
+		expect(m.uiHints?.includeInOnboarding).toBe(true);
+		expect(m.uiHints?.onboardingPriority).toBe(4);
+		expect(m.uiHints?.onboardingDescription).toBeDefined();
+	});
 });
 
 describe('KubernetesPlugin.validateConnection', () => {

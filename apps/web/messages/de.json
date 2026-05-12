@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Keine Aktivitäten hier",
                 "noWork": "Keine Arbeit",
+                "loadMore": "{count} weitere laden",
                 "columns": {
                     "pending": "Ausstehend",
                     "in_progress": "In Bearbeitung",
                     "completed": "Abgeschlossen",
                     "failed": "Fehlgeschlagen",
                     "cancelled": "Abgebrochen"
-                },
-                "loadMore": "{count} weitere laden"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} Elemente",
                 "noDescription": "Keine Beschreibung",
                 "empty": "Keine Arbeiten hier",
+                "loadMore": "{count} weitere laden",
                 "columns": {
                     "not_started": "Nicht begonnen",
                     "scheduled": "Geplant",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Abgeschlossen mit Warnungen",
                     "failed": "Fehlgeschlagen",
                     "cancelled": "Abgebrochen"
-                },
-                "loadMore": "{count} weitere laden"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Sicherheit",
                 "apiKeys": "API-Schlüssel",
                 "data": "Daten",
+                "githubApp": "GitHub-App",
                 "gitProviders": "Git-Anbieter",
                 "dangerZone": "Gefahrenzone"
+            },
+            "githubApp": {
+                "title": "GitHub-App-Installationen",
+                "subtitle": "Prüfen Sie die über die Ever Works GitHub App verknüpften Installationen und aktualisieren Sie den Repository-Snapshot manuell, bevor tieferes Onboarding-Arbeiten erfolgt.",
+                "emptyTitle": "Noch keine GitHub-App-Installationen vorhanden",
+                "emptyDescription": "Installieren Sie die Ever Works GitHub App auf einem Repository oder einer Organisation und schließen Sie anschließend die Einrichtungsumleitung ab, damit die Installation mit diesem Arbeitsbereich verknüpft wird.",
+                "sync": "Synchronisieren",
+                "syncSuccess": "Installation synchronisiert",
+                "syncError": "Synchronisierung der Installation fehlgeschlagen",
+                "onboard": "Onboarden",
+                "onboardSuccess": "Repository onboardet",
+                "onboardError": "Repository-Onboarding fehlgeschlagen",
+                "active": "Aktiv",
+                "suspended": "Ausgesetzt",
+                "installationMeta": "Installation #{installationId} · {accountType}-Konto · {targetType}-Ziel",
+                "repoCount": "Repositorys",
+                "updatedAt": "Zuletzt synchronisiert",
+                "appSlug": "App-Slug",
+                "repositories": "Repositorys",
+                "noRepositories": "Diese Installation hat derzeit keine gespeicherten Repositorys. Führen Sie einen Sync aus, um den Snapshot von GitHub zu aktualisieren.",
+                "branch": "Standardzweig: {branch}",
+                "branchUnknown": "Standardzweig nicht verfügbar",
+                "private": "Privat",
+                "public": "Öffentlich"
             },
             "data": {
                 "exportTitle": "Daten exportieren",
@@ -1021,6 +1046,14 @@
                     "submit": "Einladung senden",
                     "cancel": "Abbrechen",
                     "success": "Mitglied erfolgreich eingeladen.",
+                    "modes": {
+                        "direct": {
+                            "description": "Fügen Sie einen bestehenden Benutzer per E-Mail sofort als Mitglied hinzu. Sie erhalten sofort die zugewiesene Rolle."
+                        },
+                        "link": {
+                            "description": "Erzeugen Sie einen Einmal-Link zum Teilen. Der Empfänger löst ihn ein, um beizutreten — oder beansprucht die Eigentümerschaft, wenn Sie einen Eigentümer-Claim-Link erzeugen."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "E-Mail-Adresse ist erforderlich.",
                         "failed": "Fehler beim Einladen des Mitglieds. Bitte versuchen Sie es erneut."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Tagänderung",
                     "collection_change": "Sammlungsänderung",
                     "community_pr_merged": "Community PR"
+                },
+                "generationInfo": {
+                    "label": "Generierungsdetails",
+                    "itemsAdded": "Hinzugefügte Elemente",
+                    "itemsUpdated": "Aktualisierte Elemente",
+                    "totalItems": "Gesamtanzahl Elemente",
+                    "pagesProcessed": "Verarbeitete Seiten",
+                    "tokensUsed": "Verwendete Tokens",
+                    "existingReferencesUsed": "Verwendete vorhandene Referenzen"
                 },
                 "detail": {
                     "added": "Hinzugefügt",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "KI-Modell überschreiben",
                 "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optional. Verwendet standardmäßig das importierte oder vorherige Modell, es sei denn, Sie überschreiben es hier.",
+                "modelOverrideUnavailable": "Wählen Sie zunächst einen konfigurierten KI-Anbieter aus, um ein Modell aus der verfügbaren Liste auszuwählen.",
+                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll.",
+                "websiteTemplateLockedHelperText": "Die Vorlagenauswahl ist nach der ersten Website-Generierung gesperrt.",
                 "recommended": "Empfohlen",
                 "promptPlaceholder": "Beschreiben Sie, welche Elemente für diesen Ordner generiert werden sollen…",
                 "promptHelperText": "Seien Sie spezifisch bezüglich des Typs von Inhalt, den Sie generieren möchten",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Stornierung der Generierung fehlgeschlagen"
             },
             "settings": {
+                "tabs": {
+                    "general": "Allgemein",
+                    "members": "Mitglieder",
+                    "navigationLabel": "Einstellungs-Tabs"
+                },
                 "sourceSettings": "Quell-Repository",
                 "originalSource": "Originalquelle",
                 "syncEnabled": "Synchronisation aktiviert",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Automatische Template-Updates",
                         "description": "Halten Sie Ihre Website automatisch mit den neuesten Template-Änderungen synchron.",
+                        "selectorLabel": "Website-Vorlage",
+                        "currentTemplateLabel": "Aktuelle Vorlage",
+                        "unknownTemplate": "Geerbter Standard",
+                        "currentHelperText": "Die ausgewählte Vorlage steuert, wie das Website-Repository initialisiert und aktualisiert wird.",
+                        "switchHelperText": "Das Anwenden einer neuen Vorlage setzt das bestehende Website-Repository auf die ausgewählte Vorlage zurück, falls es bereits existiert.",
+                        "switchAction": "Vorlage auf Website-Repository anwenden",
+                        "switchActionIdle": "Vorlage ist auf dem neuesten Stand",
+                        "switchConfirmTitle": "Website-Vorlage wechseln?",
+                        "switchConfirmDescription": "Falls das Website-Repository bereits existiert, wird sein Inhalt durch die ausgewählte Vorlage ersetzt. Jeglicher benutzerdefinierter Code in diesem Repository geht verloren.",
+                        "switchConfirmButton": "Vorlage wechseln",
+                        "switchCancel": "Abbrechen",
                         "autoUpdate": "Automatisch aktualisieren",
                         "autoUpdateDescription": "Stündlich nach Template-Updates prüfen und automatisch anwenden.",
                         "useBeta": "Beta-Version des Templates verwenden",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Zuletzt aktualisiert",
                         "lastChecked": "Zuletzt geprüft",
                         "lastError": "Letzter Fehler",
+                        "inheritedState": "Diese Arbeit erbt Ihre aktuelle Standardvorlage.",
+                        "explicitState": "Diese Arbeit ist an eine explizite Vorlagenauswahl gebunden.",
+                        "originStandard": "Standard",
+                        "originForked": "Geforkt",
+                        "originCustomUrl": "Benutzerdefinierte URL",
                         "updateSuccess": "Einstellungen erfolgreich aktualisiert",
                         "updateFailed": "Einstellungen konnten nicht aktualisiert werden",
                         "githubRequired": "GitHub-Verbindung erforderlich. Bitte verbinden Sie Ihr GitHub-Konto in den Einstellungen, um automatische Updates zu aktivieren."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Organisations-Repository",
                 "organizationHelp": "Repositories unter einer Organisation statt Ihrem persönlichen Konto erstellen",
                 "organizationNameLabel": "Organisationsname",
-                "organizationNamePlaceholder": "Organisationsname eingeben"
+                "organizationNamePlaceholder": "Organisationsname eingeben",
+                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll."
             },
             "manual": {
                 "title": "Manuell erstellen",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Dieses Werk unter einer GitHub-Organisation statt Ihrem persönlichen Konto erstellen",
                 "organizationNameLabel": "Organisationsname",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll.",
                 "headerLabel": "Benutzerdefinierter README-Header",
                 "headerPlaceholder": "Benutzerdefinierten Inhalt oben in Ihre README-Datei hinzufügen",
                 "headerOverwrite": "Standard-Header vollständig ersetzen",
@@ -2703,6 +2771,7 @@
                 "activity": "Aktivität",
                 "works": "Werke",
                 "plugins": "Plugins",
+                "templates": "Vorlagen",
                 "settings": "Einstellungen"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "{login} entfernen"
             }
         },
+        "templates": {
+            "title": "Vorlagen",
+            "subtitle": "Durchsuchen Sie die integrierten Website-Vorlagen, verwalten Sie Ihren benutzerdefinierten Katalog und steuern Sie, welche Vorlage neue Arbeiten verwendet.",
+            "actions": {
+                "addTemplate": "Benutzerdefinierte Vorlage hinzufügen",
+                "refreshTemplates": "Vorlagen aktualisieren"
+            },
+            "hero": {
+                "eyebrow": "Vorlagenkatalog",
+                "catalogHint": "Jede Vorlage in diesem Katalog kann Ihre Standardvorlage werden. Forken Sie eine integrierte Vorlage, um sie zu Ihrer eigenen Ausgangsbasis zu machen."
+            },
+            "stats": {
+                "defaultLabel": "Aktiver Standard",
+                "defaultHint": "Neue Arbeiten starten von dieser Vorlage, außer Sie überschreiben sie pro Arbeit.",
+                "builtInLabel": "Integriert",
+                "builtInHint": "Von Ever Works gepflegte Vorlagen.",
+                "customLabel": "Benutzerdefiniert",
+                "customHint": "Aus Ihren eigenen GitHub-Repositorys oder Forks gespeichert.",
+                "none": "Kein Standard"
+            },
+            "filters": {
+                "all": "Alle",
+                "builtIn": "Integriert",
+                "custom": "Benutzerdefiniert",
+                "searchPlaceholder": "Nach Vorlagen, Frameworks oder Repositorys suchen..."
+            },
+            "card": {
+                "builtIn": "Integriert",
+                "custom": "Benutzerdefiniert",
+                "standard": "Standard",
+                "forked": "Geforkt",
+                "customUrl": "Benutzerdefinierte URL",
+                "standardSource": "Ever Works Standard",
+                "forkedSource": "In Ihr GitHub geforkt",
+                "customUrlSource": "Aus GitHub-URL hinzugefügt",
+                "default": "Standard",
+                "defaultSelected": "Standard ausgewählt",
+                "makeDefault": "Als Standard festlegen",
+                "fork": "Forken",
+                "edit": "Bearbeiten",
+                "archive": "Archivieren",
+                "catalogOnly": "Katalogelement",
+                "openRepository": "Repository öffnen",
+                "previewAlt": "{name} Vorschau",
+                "frameworkAgnostic": "Framework-unabhängig",
+                "branch": "Zweig: {branch}",
+                "syncBranches": "{count} Synchronisationszweige",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Noch keine Beschreibung vorhanden."
+            },
+            "dialog": {
+                "title": "Benutzerdefinierte Vorlage hinzufügen",
+                "description": "Speichern Sie ein GitHub-Repository in Ihrem persönlichen Vorlagenkatalog. Dieser erste Schritt speichert die Vorlagenmetadaten, damit sie im nächsten Zuweisungsfluss ausgewählt werden kann.",
+                "editTitle": "Benutzerdefinierte Vorlage bearbeiten",
+                "editDescription": "Aktualisieren Sie die Anzeigedetails und das Vorschaubild, die für diese benutzerdefinierte Vorlage in Ihrem Katalog verwendet werden.",
+                "repositoryUrlLabel": "GitHub-Repository-URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "Die Quell-Repository-URL kann nach Hinzufügen der Vorlage nicht mehr geändert werden.",
+                "nameLabel": "Vorlagenname",
+                "namePlaceholder": "Optional angezeigter Name",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Framework auswählen",
+                "frameworkUnspecified": "Nicht angegeben",
+                "previewImageLabel": "Vorschaubild-URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Optional. Verwenden Sie einen kuratierten Screenshot, wenn Sie die GitHub-Repository-Vorschau überschreiben möchten.",
+                "descriptionLabel": "Kurzbeschreibung",
+                "descriptionPlaceholder": "Wofür diese Vorlage am besten geeignet ist",
+                "branchLabel": "Standardzweig",
+                "branchPlaceholder": "main",
+                "branchHelp": "Lassen Sie leer, um auf main zurückzugreifen.",
+                "betaBranchLabel": "Beta-Zweig",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Optional. Zweig, der für Beta-Bereitstellungen verwendet wird.",
+                "cancel": "Abbrechen",
+                "submit": "Vorlage speichern",
+                "saveChanges": "Änderungen speichern"
+            },
+            "forkDialog": {
+                "title": "Standardvorlage forken",
+                "description": "Erstellen Sie Ihre eigene GitHub-Kopie dieser Standardvorlage, fügen Sie sie Ihrem Katalog hinzu und machen Sie sie zur Standardvorlage für neue Arbeiten.",
+                "sourceLabel": "Vorlagenquelle",
+                "targetLabel": "Fork-Ziel",
+                "targetPlaceholder": "Wählen Sie ein GitHub-Konto oder eine Organisation",
+                "targetHelp": "Der Fork wird unter {target} erstellt.",
+                "personalTarget": "Persönliches Konto ({login})",
+                "organizationTarget": "Organisation ({login})",
+                "noTargets": "Verbinden Sie GitHub und laden Sie Ihre Organisationen, bevor Sie eine Vorlage forken.",
+                "resultLabel": "Neues Repository",
+                "none": "Ihr ausgewähltes Konto",
+                "cancel": "Abbrechen",
+                "submit": "Forken und als Standard festlegen"
+            },
+            "archiveDialog": {
+                "title": "Benutzerdefinierte Vorlage archivieren",
+                "description": "Archivieren Sie diese Vorlage aus Ihrem Katalog. Sie können nur Vorlagen archivieren, die aktuell keiner Arbeit zugewiesen sind.",
+                "templateLabel": "Vorlage",
+                "cancel": "Abbrechen",
+                "submit": "Vorlage archivieren"
+            },
+            "empty": {
+                "title": "Keine Vorlagen gefunden",
+                "default": "Keine Vorlagen entsprechen dieser Ansicht noch.",
+                "search": "Versuchen Sie einen anderen Suchbegriff oder löschen Sie den aktuellen Filter.",
+                "resetFilters": "Filter zurücksetzen"
+            },
+            "messages": {
+                "repositoryUrlRequired": "Eine GitHub-Repository-URL ist erforderlich.",
+                "repositoryUrlInvalid": "Geben Sie eine gültige GitHub-Repository-URL ein, z. B. https://github.com/owner/repository.",
+                "forkTargetRequired": "Wählen Sie ein GitHub-Konto oder eine Organisation für den Fork.",
+                "addSuccess": "Vorlage aus GitHub-URL gespeichert.",
+                "addFailed": "Vorlage konnte nicht gespeichert werden.",
+                "updateSuccess": "Vorlagendetails aktualisiert.",
+                "updateFailed": "Vorlagendetails konnten nicht aktualisiert werden.",
+                "archiveSuccess": "Vorlage aus Ihrem Katalog archiviert.",
+                "archiveFailed": "Vorlage konnte nicht archiviert werden.",
+                "forkSuccess": "{repository} geforkt, zu Ihrem Katalog hinzugefügt und als Standard festgelegt.",
+                "forkExisting": "{repository} war bereits in Ihrem Katalog und ist jetzt Ihre Standard-Geforkte-Vorlage.",
+                "forkFailed": "Das Forken der Vorlage ist fehlgeschlagen.",
+                "refreshSuccess": "Vorlagenkatalog aktualisiert.",
+                "refreshFailed": "Vorlagen konnten nicht aktualisiert werden.",
+                "defaultUpdated": "Standardvorlage aktualisiert.",
+                "defaultFailed": "Standardvorlage konnte nicht aktualisiert werden."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Standard verwenden",
+            "defaultOptionWithName": "Standard verwenden ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Standard)",
+            "changeAnywayLink": "Trotzdem ändern",
+            "origin": {
+                "standard": "Standard",
+                "forked": "Geforkt",
+                "customUrl": "Benutzerdefinierte URL"
+            },
+            "state": {
+                "defaultBadge": "Geerbter Standard",
+                "inheritedTitle": "Standardvorlage wird verwendet",
+                "inheritedDescription": "Diese Arbeit wird Ihrer aktuellen Standardvorlage folgen, bis Sie eine bestimmte festlegen.",
+                "pinnedTitle": "Fixierte Vorlage",
+                "pinnedDescription": "Diese Arbeit wird diese Vorlage weiterhin verwenden, auch wenn Ihre Standardvorlage später geändert wird."
+            }
+        },
         "workPlugins": {
             "title": "Werk-Plugins",
             "subtitle": "Plugins für dieses Werk konfigurieren",
@@ -3067,6 +3280,7 @@
             "history": "Verlauf",
             "comparisons": "Vergleiche",
             "plugins": "Plugins",
+            "templates": "Vorlagen",
             "profile": "Profil",
             "security": "Sicherheit",
             "apiKeys": "API-Schlüssel",

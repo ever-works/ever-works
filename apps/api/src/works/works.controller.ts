@@ -12,9 +12,14 @@ import {
     Post,
     Put,
     Query,
+    Res,
     Logger,
     UseGuards,
+    UseInterceptors,
+    UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import {
     ApiTags,
     ApiBearerAuth,
@@ -51,6 +56,19 @@ import {
     UpdateItemDto,
     CheckItemHealthDto,
     CheckItemHealthResponseDto,
+    ItemExportService,
+    ItemImportService,
+    ItemImportExecutorService,
+    EXPORT_FORMATS,
+    MAX_IMPORT_ROWS_CEILING,
+    type ExportFormat,
+    type ExportSettingsResponse,
+    type ColumnMapping,
+    type ImportValidationResponse,
+    type ImportRowValidation,
+    type ImportDuplicateStrategy,
+    type ImportResult,
+    type ExecuteImportResult,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -107,6 +125,65 @@ import {
     getWorkItemsCacheKey,
 } from './work-cache.constants';
 
+/**
+ * Body shape for `POST /api/works/:id/import-items` (Phase 3 execute).
+ * Validated structurally in the handler so we can keep the route DTO-free
+ * and accept whatever Phase 2's validate endpoint returned.
+ */
+interface ExecuteImportRequestBody {
+    rows: ImportRowValidation[];
+    duplicate_strategy?: ImportDuplicateStrategy;
+    default_status?: string;
+}
+
+function buildImportActivitySummary(result: ImportResult): string {
+    const parts: string[] = [`Imported ${result.created} items`];
+    if (result.updated > 0) parts.push(`${result.updated} updated`);
+    if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+    if (result.errors.length > 0) parts.push(`${result.errors.length} errors`);
+    return parts.join(', ');
+}
+
+/**
+ * Resolves the per-directory import row cap, clamping to the global
+ * `MAX_IMPORT_ROWS_CEILING`. Used by both the validate and execute
+ * endpoints so the limit is consistent regardless of where the request
+ * enters the system.
+ */
+function effectiveImportMaxRows(setting: unknown): number {
+    const configured = typeof setting === 'number' && setting > 0 ? setting : 500;
+    return Math.min(configured, MAX_IMPORT_ROWS_CEILING);
+}
+
+/**
+ * Parses the `mapping` form-data field on the import-validate endpoint.
+ * Accepts either a JSON-encoded object or undefined; returns an empty
+ * mapping on any parse error so the service falls back to auto-inference.
+ */
+function parseMappingField(value: string | undefined): ColumnMapping {
+    if (!value) {
+        return {};
+    }
+    try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed as ColumnMapping;
+        }
+    } catch {
+        // Fall through to empty mapping.
+    }
+    return {};
+}
+
+/**
+ * Minimal Express response surface used by file-download endpoints.
+ * Mirrors the local style established in `activity-log.controller.ts`.
+ */
+type DownloadResponse = {
+    setHeader(name: string, value: string): void;
+    send(body: string | Buffer): void;
+};
+
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
@@ -137,6 +214,9 @@ export class WorksController {
         private readonly subscriptionService: SubscriptionService,
         private readonly activityLogService: ActivityLogService,
         private readonly templateCatalogService: TemplateCatalogService,
+        private readonly itemExportService: ItemExportService,
+        private readonly itemImportService: ItemImportService,
+        private readonly itemImportExecutor: ItemImportExecutorService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -281,6 +361,287 @@ export class WorksController {
             },
             WORK_CACHE_TTL_MS,
         );
+    }
+
+    @Get('works/:id/export-items/settings')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get export-items feature flag',
+        description:
+            'Returns whether CSV/Excel item export is enabled for this directory. The UI uses this to hide the export button when the feature is off.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Export feature flag' })
+    async getExportItemsSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<ExportSettingsResponse> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.workQueryService.workConfig(id, user);
+        return { export_enabled: !!result.config?.settings?.export_enabled };
+    }
+
+    @Get('works/:id/export-items')
+    @ApiOperation({
+        summary: 'Export work items as CSV or Excel',
+        description:
+            'Downloads all items of a directory as a CSV or XLSX file. Gated by `settings.export_enabled` in the directory config — returns 404 when disabled.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiQuery({ name: 'format', enum: EXPORT_FORMATS, description: 'csv or xlsx' })
+    @ApiResponse({ status: 200, description: 'Item export download' })
+    @ApiResponse({ status: 404, description: 'Export is not enabled for this directory' })
+    async exportWorkItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('format') formatParam: string | undefined,
+        @Res() res: DownloadResponse,
+    ): Promise<void> {
+        const format = (formatParam ?? '').toLowerCase();
+        if (format !== 'csv' && format !== 'xlsx') {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Query parameter 'format' must be 'csv' or 'xlsx'",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        if (!configResult.config?.settings?.export_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item export is not enabled for this directory',
+            });
+        }
+        const itemsResult = await this.workQueryService.workItems(id, user);
+        const items = itemsResult.items ?? [];
+        const payload = await this.itemExportService.exportItems(items, format as ExportFormat);
+        res.setHeader('Content-Type', payload.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${payload.filename}"`);
+        res.send(payload.data);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.EXPORT,
+                action: 'items.exported',
+                status: ActivityStatus.COMPLETED,
+                summary: `Exported ${items.length} items as ${format.toUpperCase()}`,
+            })
+            .catch(() => {});
+    }
+
+    @Get('works/:id/import-items/settings')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get import-items feature flag',
+        description:
+            'Returns whether CSV/Excel item import is enabled for this directory, plus the per-directory max-rows cap. The UI uses this to hide the import button and to validate file size client-side.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Import feature flag + max rows' })
+    async getImportItemsSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<{ import_enabled: boolean; import_max_rows: number }> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.workQueryService.workConfig(id, user);
+        const settings = result.config?.settings;
+        return {
+            import_enabled: !!settings?.import_enabled,
+            import_max_rows: effectiveImportMaxRows(settings?.import_max_rows),
+        };
+    }
+
+    @Get('works/:id/import-items/sample')
+    @ApiOperation({
+        summary: 'Download an item import template',
+        description:
+            'Returns a sample CSV / XLSX template the user can fill in and upload via the import wizard. Same column contract as export.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiQuery({ name: 'format', enum: EXPORT_FORMATS, description: 'csv or xlsx' })
+    @ApiResponse({ status: 200, description: 'Sample template download' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    async getImportItemsSample(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('format') formatParam: string | undefined,
+        @Res() res: DownloadResponse,
+    ): Promise<void> {
+        const format = (formatParam ?? '').toLowerCase();
+        if (format !== 'csv' && format !== 'xlsx') {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Query parameter 'format' must be 'csv' or 'xlsx'",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        if (!configResult.config?.settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const payload = await this.itemExportService.generateSample(format as ExportFormat);
+        res.setHeader('Content-Type', payload.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${payload.filename}"`);
+        res.send(payload.data);
+    }
+
+    @Post('works/:id/import-items/validate')
+    @HttpCode(HttpStatus.OK)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    // Validate parses the whole file synchronously; cap at 10/min/IP so a
+    // user can't tie up the API by spamming large uploads.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Parse + validate an item import file (dry-run, no writes)',
+        description:
+            'Accepts a multipart CSV/XLSX upload, parses it, applies the user-supplied column mapping (or auto-infers one), validates each row against the column contract, and detects duplicates against existing items. Performs no writes — Phase 3 will add the execute endpoint.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Per-row validation result + summary' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    @ApiResponse({ status: 413, description: 'File exceeds per-directory row cap' })
+    async validateImportItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body('mapping') mappingJson: string | undefined,
+    ): Promise<ImportValidationResponse> {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        const settings = configResult.config?.settings;
+        if (!settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const maxRows = effectiveImportMaxRows(settings.import_max_rows);
+
+        const filename = (file.originalname ?? '').toLowerCase();
+        const isXlsx = filename.endsWith('.xlsx') || filename.endsWith('.xls');
+        const isCsv = filename.endsWith('.csv') || file.mimetype === 'text/csv';
+        if (!isXlsx && !isCsv) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'File must be .csv, .xls, or .xlsx',
+            });
+        }
+
+        let parsed;
+        try {
+            parsed = isXlsx
+                ? await this.itemImportService.parseXLSX(file.buffer)
+                : this.itemImportService.parseCSV(file.buffer);
+        } catch (error) {
+            // ExcelJS throws on legacy .xls (BIFF8 binary format), corrupted
+            // OOXML containers, and password-protected workbooks; PapaParse
+            // throws on non-UTF-8 byte sequences. Surface as a friendly 400
+            // rather than the raw 500 the framework would otherwise emit.
+            throw new BadRequestException({
+                status: 'error',
+                code: 'ParseError',
+                message: isXlsx
+                    ? 'Failed to parse XLSX file. Save it as .xlsx (the legacy .xls binary format and password-protected files are not supported).'
+                    : 'Failed to parse CSV file. Make sure it is a well-formed UTF-8 CSV.',
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
+
+        if (parsed.rows.length > maxRows) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'RowCountExceeded',
+                message: `File has ${parsed.rows.length} rows; the per-directory cap is ${maxRows}`,
+            });
+        }
+
+        const mapping = parseMappingField(mappingJson);
+        const itemsResult = await this.workQueryService.workItems(id, user);
+        const existingItems = (itemsResult.items ?? []).map((item) => ({
+            slug: item.slug,
+            source_url: item.source_url,
+        }));
+
+        return this.itemImportService.validateRows(parsed, mapping, existingItems);
+    }
+
+    @Post('works/:id/import-items')
+    @HttpCode(HttpStatus.OK)
+    // Execute clones the data repo, writes N YAMLs, commits + pushes, and
+    // (usually) opens a PR. Cap aggressively at 3/min/IP — anyone needing
+    // more should split their file.
+    @Throttle({ default: { limit: 3, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Execute a validated bulk item import',
+        description:
+            'Writes the validated rows to the directory data repository under a single commit, then either pushes directly (when `autoapproval` is true) or opens a PR. Honors the per-row `duplicate_strategy` (skip or update). Phase 3 of EW-533.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Import result + optional PR details' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    async executeImportItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: ExecuteImportRequestBody,
+    ): Promise<ExecuteImportResult> {
+        if (!Array.isArray(body?.rows)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Body must include a `rows` array',
+            });
+        }
+        const duplicateStrategy: ImportDuplicateStrategy =
+            body.duplicate_strategy === 'update' ? 'update' : 'skip';
+        const defaultStatus =
+            typeof body.default_status === 'string' ? body.default_status : 'pending';
+
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        const settings = configResult.config?.settings;
+        if (!settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const maxRows = effectiveImportMaxRows(settings.import_max_rows);
+        if (body.rows.length > maxRows) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'RowCountExceeded',
+                message: `Submitted ${body.rows.length} rows; the per-directory cap is ${maxRows}`,
+            });
+        }
+        const { work } = await this.workOwnershipService.ensureCanEdit(id, user.id);
+
+        const result = await this.itemImportExecutor.executeImport(work, user, {
+            rows: body.rows,
+            duplicate_strategy: duplicateStrategy,
+            default_status: defaultStatus,
+        });
+
+        await this.invalidateWorkCaches(id);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.IMPORT,
+                action: 'items.imported',
+                status: ActivityStatus.COMPLETED,
+                summary: buildImportActivitySummary(result),
+            })
+            .catch(() => {});
+        return result;
     }
 
     @Get('works/:id/config')

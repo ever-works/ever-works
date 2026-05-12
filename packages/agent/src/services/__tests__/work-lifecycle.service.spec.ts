@@ -87,12 +87,19 @@ describe('WorkLifecycleService', () => {
             isInitialized: jest.fn().mockResolvedValue(false),
         };
 
+        const userRepository = {
+            findById: jest.fn().mockResolvedValue({ id: 'u1', onboardingState: null }),
+        } as never;
+        const everWorksDeployQuota = {
+            assertWithinQuota: jest.fn().mockResolvedValue(undefined),
+        } as never;
         eventEmitter = {
             emit: jest.fn(),
         };
 
         service = new WorkLifecycleService(
             workRepository,
+            userRepository,
             dataGenerator,
             markdownGenerator,
             websiteGenerator,
@@ -101,6 +108,7 @@ describe('WorkLifecycleService', () => {
             deployFacade,
             templateCatalogService,
             websiteRepositoryState,
+            everWorksDeployQuota,
             eventEmitter as never,
         );
     });

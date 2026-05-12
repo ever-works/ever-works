@@ -4,6 +4,7 @@ import { getAuthFromCookie } from '@/lib/auth';
 import DashboardClient from './dashboard-client';
 import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
 import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
+import { workProposalsAPI } from '@/lib/api/work-proposals';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -11,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Dashboard() {
-    const [user, worksResponse, statsResponse] = await Promise.all([
+    const [user, worksResponse, statsResponse, proposals, proposalsStatus] = await Promise.all([
         getAuthFromCookie(),
         getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
             success: false,
@@ -24,6 +25,8 @@ export default async function Dashboard() {
             totalItems: 0,
             activeWebsites: 0,
         })),
+        workProposalsAPI.list(['pending']).catch(() => []),
+        workProposalsAPI.status().catch(() => ({ researching: false })),
     ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
@@ -35,6 +38,8 @@ export default async function Dashboard() {
             totalWorks={totalWorks}
             totalItems={statsResponse.totalItems}
             activeWebsites={statsResponse.activeWebsites}
+            initialProposals={proposals}
+            initiallyResearching={proposalsStatus.researching}
         />
     );
 }

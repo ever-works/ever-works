@@ -463,6 +463,38 @@
                 "description": "We could not connect your {provider} account. Please try again."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideas for you",
+                "titleWithName": "Ideas for you, {username}"
+            },
+            "actions": {
+                "accept": "Use this idea",
+                "dismiss": "Dismiss",
+                "dismissAria": "Dismiss this idea",
+                "refresh": "Suggest more ideas"
+            },
+            "researching": {
+                "title": "Drafting ideas from your profile…",
+                "subtitle": "This usually takes under a minute."
+            },
+            "empty": {
+                "title": "No ideas right now.",
+                "subtitle": "Click 'Suggest more ideas' anytime to refresh."
+            },
+            "errors": {
+                "rateLimited": "Daily limit reached. Try again tomorrow.",
+                "generic": "Couldn't refresh ideas. Please try again."
+            },
+            "plugins": {
+                "label": "Suggested plugins"
+            },
+            "disclosure": "Drafted from your public profile. Manage in Settings."
+        },
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
+        },
         "header": {
             "welcome": "Welcome back, {username}!",
             "subtitle": "Manage your AI-powered works and track their performance",
@@ -2418,6 +2450,10 @@
                 "configureNow": "Configure now",
                 "formTitle": "New Work — Manual Setup",
                 "formSubtitle": "Configure your Work with full control over every setting",
+                "proposalBanner": {
+                    "title": "Pre-filled from an AI suggestion.",
+                    "subtitle": "Tweak anything before creating."
+                },
                 "basicInfo": "Basic Information",
                 "nameLabel": "Work Name *",
                 "namePlaceholder": "e.g., Awesome AI Tools",
@@ -3286,6 +3322,7 @@
             "dashboard": "Dashboard",
             "activity": "Activity Log",
             "works": "Works",
+            "discover": "Discover",
             "newWork": "New Work",
             "work": "Work",
             "overview": "Overview",

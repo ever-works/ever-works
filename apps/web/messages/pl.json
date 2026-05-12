@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Brak aktywności tutaj",
                 "noWork": "Brak pracy",
+                "loadMore": "Załaduj {count} więcej",
                 "columns": {
                     "pending": "Oczekujące",
                     "in_progress": "W toku",
                     "completed": "Ukończone",
                     "failed": "Nieudane",
                     "cancelled": "Anulowane"
-                },
-                "loadMore": "Załaduj {count} więcej"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} elementy",
                 "noDescription": "Brak opisu",
                 "empty": "Brak prac tutaj",
+                "loadMore": "Załaduj {count} więcej",
                 "columns": {
                     "not_started": "Nie rozpoczęto",
                     "scheduled": "Zaplanowane",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Ukończone z ostrzeżeniami",
                     "failed": "Nieudane",
                     "cancelled": "Anulowane"
-                },
-                "loadMore": "Załaduj {count} więcej"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Bezpieczeństwo",
                 "apiKeys": "Klucze API",
                 "data": "Dane",
+                "githubApp": "Aplikacja GitHub",
                 "gitProviders": "Dostawcy Git",
                 "dangerZone": "Strefa niebezpieczeństwa"
+            },
+            "githubApp": {
+                "title": "Instalacje aplikacji GitHub",
+                "subtitle": "Sprawdzaj instalacje powiązane przez aplikację GitHub Ever Works i ręcznie odśwież migawkę repozytorium przed rozpoczęciem głębszego onboardingu.",
+                "emptyTitle": "Brak jeszcze instalacji aplikacji GitHub",
+                "emptyDescription": "Zainstaluj aplikację GitHub Ever Works w repozytorium lub organizacji, a następnie dokończ proces przekierowania, aby instalacja została połączona z tym obszarem roboczym.",
+                "sync": "Synchronizuj",
+                "syncSuccess": "Instalacja zsynchronizowana",
+                "syncError": "Nie udało się zsynchronizować instalacji",
+                "onboard": "Dołącz",
+                "onboardSuccess": "Repozytorium dołączone",
+                "onboardError": "Nie udało się dołączyć repozytorium",
+                "active": "Aktywne",
+                "suspended": "Zawieszone",
+                "installationMeta": "Instalacja #{installationId} · konto {accountType} · cel {targetType}",
+                "repoCount": "Repozytoria",
+                "updatedAt": "Ostatnia synchronizacja",
+                "appSlug": "Slug aplikacji",
+                "repositories": "Repozytoria",
+                "noRepositories": "Ta instalacja nie ma jeszcze przechowywanych repozytoriów. Uruchom synchronizację, aby odświeżyć migawkę z GitHub.",
+                "branch": "Gałąź domyślna: {branch}",
+                "branchUnknown": "Gałąź domyślna niedostępna",
+                "private": "Prywatne",
+                "public": "Publiczne"
             },
             "data": {
                 "exportTitle": "Eksportuj dane",
@@ -1021,6 +1046,14 @@
                     "submit": "Wyślij zaproszenie",
                     "cancel": "Anuluj",
                     "success": "Członek został pomyślnie zaproszony.",
+                    "modes": {
+                        "direct": {
+                            "description": "Dodaj istniejącego użytkownika jako członka od razu za pomocą ich adresu e-mail. Otrzymają przypisaną rolę od razu."
+                        },
+                        "link": {
+                            "description": "Wygeneruj jednorazowy link do udostępnienia. Odbiorca może go wykorzystać, aby dołączyć — lub przejąć własność, jeśli utworzysz link do żądania własności."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "Adres e-mail jest wymagany.",
                         "failed": "Nie udało się zaprosić członka. Spróbuj ponownie."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Zmiana tagu",
                     "collection_change": "Zmiana kolekcji",
                     "community_pr_merged": "PR społeczności"
+                },
+                "generationInfo": {
+                    "label": "Szczegóły generowania",
+                    "itemsAdded": "Dodane elementy",
+                    "itemsUpdated": "Zaktualizowane elementy",
+                    "totalItems": "Łączna liczba elementów",
+                    "pagesProcessed": "Przetworzone strony",
+                    "tokensUsed": "Użyte tokeny",
+                    "existingReferencesUsed": "Wykorzystane istniejące odniesienia"
                 },
                 "detail": {
                     "added": "Dodane",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "Nadpisanie modelu AI",
                 "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
+                "modelOverrideUnavailable": "Najpierw wybierz skonfigurowanego dostawcę AI, aby wybrać model z dostępnej listy.",
+                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony.",
+                "websiteTemplateLockedHelperText": "Wybór szablonu jest zablokowany po pierwszym wygenerowaniu strony.",
                 "recommended": "Zalecane",
                 "promptPlaceholder": "Opisz, jakie elementy powinny być wygenerowane dla tego pracy...",
                 "promptHelperText": "Bądź precyzyjny co do typu treści, którą chcesz wygenerować",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Nie udało się anulować generowania"
             },
             "settings": {
+                "tabs": {
+                    "general": "Ogólne",
+                    "members": "Członkowie",
+                    "navigationLabel": "Karty ustawień"
+                },
                 "sourceSettings": "Repozytorium źródłowe",
                 "originalSource": "Oryginalne źródło",
                 "syncEnabled": "Synchronizacja włączona",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Automatyczne aktualizacje szablonu",
                         "description": "Utrzymuj stronę automatycznie zsynchronizowaną z najnowszymi zmianami szablonu.",
+                        "selectorLabel": "Szablon strony internetowej",
+                        "currentTemplateLabel": "Bieżący szablon",
+                        "unknownTemplate": "Dziedziczony domyślny",
+                        "currentHelperText": "Wybrany szablon określa, jak inicjalizowane i aktualizowane jest repozytorium strony.",
+                        "switchHelperText": "Zastosowanie nowego szablonu zresetuje istniejące repozytorium strony do wybranego szablonu, jeśli już istnieje.",
+                        "switchAction": "Zastosuj szablon do repozytorium strony",
+                        "switchActionIdle": "Szablon jest aktualny",
+                        "switchConfirmTitle": "Przełączyć szablon strony internetowej?",
+                        "switchConfirmDescription": "Jeśli repozytorium strony już istnieje, jego zawartość zostanie zastąpiona zawartością wybranego szablonu. Cały niestandardowy kod w tym repozytorium zostanie utracony.",
+                        "switchConfirmButton": "Przełącz szablon",
+                        "switchCancel": "Anuluj",
                         "autoUpdate": "Aktualizuj automatycznie",
                         "autoUpdateDescription": "Sprawdzaj aktualizacje szablonu co godzinę i stosuj automatycznie.",
                         "useBeta": "Używaj wersji beta szablonu",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Ostatnia aktualizacja",
                         "lastChecked": "Ostatnio sprawdzono",
                         "lastError": "Ostatni błąd",
+                        "inheritedState": "Ta praca dziedziczy bieżący domyślny szablon.",
+                        "explicitState": "Ta praca jest przypięta do jawnie wybranego szablonu.",
+                        "originStandard": "Standard",
+                        "originForked": "Rozgałęziony",
+                        "originCustomUrl": "Niestandardowy URL",
                         "updateSuccess": "Ustawienia zaktualizowane pomyślnie",
                         "updateFailed": "Nie udało się zaktualizować ustawień",
                         "githubRequired": "Wymagane połączenie z GitHub. Połącz konto GitHub w Ustawieniach, aby włączyć automatyczne aktualizacje"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Repozytorium organizacji",
                 "organizationHelp": "Twórz repozytoria w organizacji zamiast na koncie osobistym",
                 "organizationNameLabel": "Nazwa organizacji",
-                "organizationNamePlaceholder": "Wprowadź nazwę organizacji"
+                "organizationNamePlaceholder": "Wprowadź nazwę organizacji",
+                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony."
             },
             "manual": {
                 "title": "Utwórz ręcznie",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Utwórz ten praca w organizacji GitHub zamiast na koncie osobistym",
                 "organizationNameLabel": "Nazwa organizacji",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony.",
                 "headerLabel": "Niestandardowy nagłówek README",
                 "headerPlaceholder": "Dodaj niestandardową zawartość na górę pliku README",
                 "headerOverwrite": "Całkowicie zastąp domyślny nagłówek",
@@ -2703,6 +2771,7 @@
                 "activity": "Aktywność",
                 "works": "Prace",
                 "plugins": "Wtyczki",
+                "templates": "Szablony",
                 "settings": "Ustawienia"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Usuń {login}"
             }
         },
+        "templates": {
+            "title": "Szablony",
+            "subtitle": "Przeglądaj wbudowane szablony stron internetowych, zarządzaj własnym katalogiem oraz kontroluj, którego szablonu używają nowe prace przy starcie.",
+            "actions": {
+                "addTemplate": "Dodaj niestandardowy szablon",
+                "refreshTemplates": "Odśwież szablony"
+            },
+            "hero": {
+                "eyebrow": "Katalog szablonów",
+                "catalogHint": "Każdy szablon w tym katalogu może stać się twoim domyślnym. Rozgałęź wbudowany szablon, aby przekształcić go w własny punkt wyjścia."
+            },
+            "stats": {
+                "defaultLabel": "Aktywny domyślny",
+                "defaultHint": "Nowe prace rozpoczynają się od tego szablonu, chyba że nadpiszesz.",
+                "builtInLabel": "Wbudowane",
+                "builtInHint": "Utrzymywane szablony Ever Works.",
+                "customLabel": "Niestandardowe",
+                "customHint": "Zapisane z własnych repozytoriów GitHub lub ich forków.",
+                "none": "Brak domyślnego"
+            },
+            "filters": {
+                "all": "Wszystkie",
+                "builtIn": "Wbudowane",
+                "custom": "Niestandardowe",
+                "searchPlaceholder": "Szukaj szablonów, frameworków lub repozytoriów..."
+            },
+            "card": {
+                "builtIn": "Wbudowane",
+                "custom": "Niestandardowe",
+                "standard": "Standard",
+                "forked": "Rozgałęziony",
+                "customUrl": "Niestandardowy URL",
+                "standardSource": "Ever Works standard",
+                "forkedSource": "Rozgałęziony w Twoim GitHub",
+                "customUrlSource": "Dodany z adresu URL GitHub",
+                "default": "Domyślny",
+                "defaultSelected": "Domyślny wybrany",
+                "makeDefault": "Ustaw jako domyślny",
+                "fork": "Rozgałęź",
+                "edit": "Edytuj",
+                "archive": "Archiwizuj",
+                "catalogOnly": "Pozycja katalogu",
+                "openRepository": "Otwórz repozytorium",
+                "previewAlt": "{name} podgląd",
+                "frameworkAgnostic": "Niezależny od frameworku",
+                "branch": "Gałąź: {branch}",
+                "syncBranches": "{count} synchronizowanych gałęzi",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Brak jeszcze opisu."
+            },
+            "dialog": {
+                "title": "Dodaj niestandardowy szablon",
+                "description": "Zapisz repozytorium GitHub do swojego osobistego katalogu szablonów. Ta pierwsza część przechowuje metadane szablonu, aby można było go wybrać w następnym przepływie przypisywania.",
+                "editTitle": "Edytuj niestandardowy szablon",
+                "editDescription": "Zaktualizuj szczegóły wyświetlania i obraz podglądu używany dla tego niestandardowego szablonu w Twoim katalogu.",
+                "repositoryUrlLabel": "Adres URL repozytorium GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "Adres URL źródłowego repozytorium nie może być zmieniony po dodaniu szablonu.",
+                "nameLabel": "Nazwa szablonu",
+                "namePlaceholder": "Opcjonalna nazwa wyświetlana",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Wybierz framework",
+                "frameworkUnspecified": "Nie określono",
+                "previewImageLabel": "Adres URL obrazu podglądu",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Opcjonalnie. Użyj wyselekcjonowanego zrzutu ekranu, jeśli chcesz zastąpić podgląd repozytorium GitHub.",
+                "descriptionLabel": "Krótki opis",
+                "descriptionPlaceholder": "Do czego najlepiej szablon się nadaje",
+                "branchLabel": "Domyślna gałąź",
+                "branchPlaceholder": "main",
+                "branchHelp": "Pozostaw puste, aby użyć domyślnej gałęzi main.",
+                "betaBranchLabel": "Gałąź beta",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Opcjonalnie. Gałąź używana do wdrożeń beta.",
+                "cancel": "Anuluj",
+                "submit": "Zapisz szablon",
+                "saveChanges": "Zapisz zmiany"
+            },
+            "forkDialog": {
+                "title": "Rozgałęź szablon standardowy",
+                "description": "Utwórz własną kopię GitHub tego standardowego szablonu, dodaj ją do swojego katalogu i ustaw jako domyślny dla nowych prac.",
+                "sourceLabel": "Źródło szablonu",
+                "targetLabel": "Cel rozgałęzienia",
+                "targetPlaceholder": "Wybierz konto GitHub lub organizację",
+                "targetHelp": "Rozgałęzienie zostanie utworzone poniżej {target}.",
+                "personalTarget": "Konto osobiste ({login})",
+                "organizationTarget": "Organizacja ({login})",
+                "noTargets": "Połącz GitHub i wczytaj swoje organizacje przed rozgałęzieniem szablonu.",
+                "resultLabel": "Nowe repozytorium",
+                "none": "twoje wybrane konto",
+                "cancel": "Anuluj",
+                "submit": "Rozgałęź i ustaw jako domyślny"
+            },
+            "archiveDialog": {
+                "title": "Archiwizuj niestandardowy szablon",
+                "description": "Archiwizuj ten szablon ze swojego katalogu. Możesz archiwizować tylko szablony, które nie są obecnie przypisane do żadnych prac.",
+                "templateLabel": "Szablon",
+                "cancel": "Anuluj",
+                "submit": "Archiwizuj szablon"
+            },
+            "empty": {
+                "title": "Nie znaleziono szablonów",
+                "default": "Brak szablonów pasujących do tego widoku.",
+                "search": "Spróbuj innego terminu wyszukiwania lub wyczyść bieżący filtr.",
+                "resetFilters": "Zresetuj filtry"
+            },
+            "messages": {
+                "repositoryUrlRequired": "Wymagany jest adres URL repozytorium GitHub.",
+                "repositoryUrlInvalid": "Wprowadź prawidłowy adres URL repozytorium GitHub, np. https://github.com/właściciel/repozytorium.",
+                "forkTargetRequired": "Wybierz konto GitHub lub organizację dla rozgałęzienia.",
+                "addSuccess": "Szablon zapisany z adresu URL GitHub.",
+                "addFailed": "Nie udało się zapisać szablonu.",
+                "updateSuccess": "Szczegóły szablonu zostały zaktualizowane.",
+                "updateFailed": "Nie udało się zaktualizować szczegółów szablonu.",
+                "archiveSuccess": "Szablon zarchiwizowany z Twojego katalogu.",
+                "archiveFailed": "Nie udało się zarchiwizować szablonu.",
+                "forkSuccess": "Rozgałęziono {repository}, dodano go do katalogu i ustawiono jako domyślny.",
+                "forkExisting": "{repository} był już w Twoim katalogu i jest teraz Twoim domyślnym szablonem rozgałęzionym.",
+                "forkFailed": "Nie udało się rozgałęzić szablonu.",
+                "refreshSuccess": "Katalog szablonów został odświeżony.",
+                "refreshFailed": "Nie udało się odświeżyć szablonów.",
+                "defaultUpdated": "Zaktualizowano domyślny szablon.",
+                "defaultFailed": "Nie udało się zaktualizować domyślnego szablon"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Użyj domyślnego",
+            "defaultOptionWithName": "Użyj domyślnego ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Domyślny)",
+            "changeAnywayLink": "Mimo to zmień",
+            "origin": {
+                "standard": "Standard",
+                "forked": "Rozgałęziony",
+                "customUrl": "Niestandardowy URL"
+            },
+            "state": {
+                "defaultBadge": "Dziedziczony domyślny",
+                "inheritedTitle": "Używanie domyślnego szablonu",
+                "inheritedDescription": "Ta praca będzie podążać za bieżącym domyślnym szablonem, aż nie przypniesz konkretnego.",
+                "pinnedTitle": "Przypięty szablon",
+                "pinnedDescription": "Ta praca będzie nadal używać tego szablonu nawet jeśli Twój domyślny zmieni się później."
+            }
+        },
         "workPlugins": {
             "title": "Wtyczki pracy",
             "subtitle": "Skonfiguruj wtyczki dla tego pracy",
@@ -3067,6 +3280,7 @@
             "history": "Historia",
             "comparisons": "Porównania",
             "plugins": "Wtyczki",
+            "templates": "Szablony",
             "profile": "Profil",
             "security": "Bezpieczeństwo",
             "apiKeys": "Klucz API",
