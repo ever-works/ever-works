@@ -118,18 +118,32 @@ doesn't need their own Vercel or Kubernetes credentials. Capped at
 
 ### 2.1 Cluster choice
 
-We already operate two managed DO clusters in `sfo2`
-(see [`EVER_WORKS_K8S.md`](../../../../../Workspace/knowledge/infrastructure/EVER_WORKS_K8S.md)
-in the operator workspace):
+**Decision (owner, 2026-05-12):** a dedicated **`k8s-works`** cluster is
+the target. It is **not yet provisioned** as of this commit — the owner
+will stand up the cluster and configure SSL termination / ingress
+separately. Until that lands, `DEPLOY_EVER_WORKS_ENABLED` stays `false`
+and the wizard renders the **Ever Works** deploy card as Planned.
 
-| Cluster             | Purpose today                                                                     | Suitability for Ever Works Deploy                                                                                                                            |
-| ------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `do-sfo2-k8s-gauzy` | The Ever Works platform itself (web / api / mcp) + Gauzy + Teams + Rec + CLOC + … | OK but already busy. Mixing user-workloads with platform workloads is risky.                                                                                 |
-| `do-sfo2-k8s-ever`  | CMS / marketing sites (`website-cms.*.ever.works`, etc.)                          | **Recommended.** Already serves `*.ever.works` subdomains, same naming pattern user Works will produce. Light load, fits the directory-web-template profile. |
+For context on the existing clusters we run today (which are explicitly
+**not** the target — the application cluster is busy and the CMS cluster
+hosts unrelated marketing sites), see
+[`EVER_WORKS_K8S.md`](../../../../../Workspace/knowledge/infrastructure/EVER_WORKS_K8S.md)
+in the operator workspace. Both `do-sfo2-k8s-gauzy` and
+`do-sfo2-k8s-ever` were considered but ruled out so user Works workloads
+get their own isolation boundary.
 
-**Decision**: use `do-sfo2-k8s-ever` as the tenant cluster for Ever
-Works Deploy. Works will land alongside the marketing-site CMSs they
-sit closest to functionally.
+When `k8s-works` is up:
+
+1. Generate a kubeconfig with `kubectl-readonly`-equivalent permissions
+   scoped to the tenant namespace prefix (so a leaked PAT can't escape
+   into other clusters).
+2. Install `cert-manager` + the chosen ingress controller. Use a
+   wildcard cert for `*.ever.works` issued via `letsencrypt-prod` (the
+   DNS-01 challenge keeps things simple; the existing Cloudflare zone
+   for `ever.works` makes this a few clicks).
+3. Add a `ClusterIssuer` named `letsencrypt-prod` so the env value below
+   resolves at deploy time.
+4. Follow §2.3 to push the kubeconfig into the API's `ever-works-secrets`.
 
 ### 2.2 Per-user namespace
 
@@ -140,14 +154,15 @@ handles it.
 
 ### 2.3 Kubeconfig
 
-The current kubeconfig for `do-sfo2-k8s-ever` lives at
-`C:\Coding\Workspace\.config\k8s-ever-kubeconfig.yaml` (gitignored,
-per-host). For production we need the same kubeconfig stored as a k8s
-Secret in `do-sfo2-k8s-gauzy` (the cluster where the API runs).
+Once `k8s-works` is up, drop its kubeconfig at
+`C:\Coding\Workspace\.config\k8s-works-kubeconfig.yaml` (gitignored,
+per-host, mirroring the convention used for the other two clusters).
+Production reads it from the `ever-works-secrets` Secret in
+`do-sfo2-k8s-gauzy` (the cluster the API runs on).
 
 ```powershell
 # 1. Read the YAML into a variable
-$kc = Get-Content "C:\Coding\Workspace\.config\k8s-ever-kubeconfig.yaml" -Raw
+$kc = Get-Content "C:\Coding\Workspace\.config\k8s-works-kubeconfig.yaml" -Raw
 
 # 2. Push into the API's deployment secret
 $env:KUBECONFIG = "C:\Coding\Workspace\.config\k8s-gauzy-kubeconfig.yaml"
@@ -180,17 +195,19 @@ EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER=3
 
 `{slug}` in the ingress host template is substituted to the Work's slug
 at provision time, so a user with `slug = my-tools` gets
-`my-tools.ever.works`. The cluster's ingress already terminates
-`*.ever.works`; no per-deploy DNS work required if the Work uses an
-ever.works subdomain (custom domains follow the existing
-`WorkCustomDomain` flow).
+`my-tools.ever.works`. Custom domains follow the existing
+`WorkCustomDomain` flow.
 
 ### 2.5 Wildcard DNS + TLS
 
-`*.ever.works` already resolves to `157.230.74.104` (the
-`do-sfo2-k8s-ever` ingress LB) per Cloudflare DNS. `letsencrypt-prod`
-issues per-host certs automatically through `cert-manager` already
-installed on the cluster.
+When `k8s-works` is provisioned, point `*.ever.works` (or a sub-zone
+like `*.works.ever.works`) at its ingress LB in Cloudflare. The owner
+will install **cert-manager** and configure SSL termination on the
+cluster as a separate step — until then, the `Ever Works` deploy card
+stays Planned in the wizard and the `letsencrypt-prod` `ClusterIssuer`
+referenced by `EVER_WORKS_DEPLOY_TLS_ISSUER` will not yet exist. Once
+SSL is in place, flipping `DEPLOY_EVER_WORKS_ENABLED=true` is all that's
+needed to surface the card.
 
 ### 2.6 Quota guarantees
 
