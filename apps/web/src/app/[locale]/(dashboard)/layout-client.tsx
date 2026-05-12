@@ -88,8 +88,26 @@ export function DashboardLayoutClient({
     const shouldAutoOpenOnboarding =
         onboardingTotalWorks === 0 && !isOnboardingDismissed && !isOnboardingCompleted;
     const isOnboardingOpen = onboardingOpenManually || shouldAutoOpenOnboarding;
+    // Track header-badge dismissal separately from wizard dismissal — both share
+    // `dismissedAt` on the server, but dismissing the badge X must not require
+    // marking onboarding as completed, and dismissing the wizard must leave the
+    // badge visible. v1 kept the same split as `headerDismissed` in localStorage;
+    // keep the client-only convention to avoid an API/DB migration.
+    const headerDismissedKey = `ever-works-onboarding-header-dismissed:${user.id}`;
+    const [headerDismissed, setHeaderDismissed] = useState(false);
+    useEffect(() => {
+        try {
+            if (typeof window === 'undefined') return;
+            setHeaderDismissed(window.localStorage.getItem(headerDismissedKey) === '1');
+        } catch {
+            // localStorage unavailable (private mode, quota) — leave default.
+        }
+    }, [headerDismissedKey]);
     const showOnboardingBadge =
-        onboardingTotalWorks === 0 && isOnboardingDismissed && !isOnboardingCompleted;
+        onboardingTotalWorks === 0 &&
+        isOnboardingDismissed &&
+        !isOnboardingCompleted &&
+        !headerDismissed;
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -225,12 +243,21 @@ export function DashboardLayoutClient({
         void dismissOnboarding();
     }, []);
     const dismissOnboardingBadge = useCallback(() => {
+        setHeaderDismissed(true);
+        try {
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(headerDismissedKey, '1');
+            }
+        } catch {
+            // localStorage unavailable; state update alone hides the badge for
+            // this session, which is still better than the prior no-op.
+        }
         setOnboardingState((prev) => ({
             ...prev,
             dismissedAt: prev.dismissedAt ?? new Date().toISOString(),
         }));
         void dismissOnboarding();
-    }, []);
+    }, [headerDismissedKey]);
 
     // Ensure chat is in resizable (non-expanded) mode. Used when user interacts
     // with the sidebar so we collapse the expanded view back to the resizable width.
