@@ -10,6 +10,7 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { SubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { ItemsGeneratorModule } from '@ever-works/agent/items-generator';
+import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -36,6 +37,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         SubscriptionsModule,
         ActivityLogModule,
         ItemsGeneratorModule,
+        ActivityFeedModule,
     ],
     providers: [
         CacheEntryRepository,
