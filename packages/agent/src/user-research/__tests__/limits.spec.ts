@@ -3,6 +3,7 @@ import {
     UserResearchLimitsService,
     UserResearchRateLimitedError,
 } from '../limits';
+import { Test } from '@nestjs/testing';
 
 describe('UserResearchLimitsService', () => {
     let svc: UserResearchLimitsService;
@@ -15,6 +16,14 @@ describe('UserResearchLimitsService', () => {
         await expect(svc.assertCanRun('u1')).resolves.toBeUndefined();
         await expect(svc.assertSearchAllowed('u1')).resolves.toBeUndefined();
         await expect(svc.assertFetchAllowed('u1')).resolves.toBeUndefined();
+    });
+
+    it('can be instantiated by Nest without an explicit limits config provider', async () => {
+        const moduleRef = await Test.createTestingModule({
+            providers: [UserResearchLimitsService],
+        }).compile();
+
+        expect(moduleRef.get(UserResearchLimitsService)).toBeInstanceOf(UserResearchLimitsService);
     });
 
     it('counts run increments and trips the per-day cap', async () => {

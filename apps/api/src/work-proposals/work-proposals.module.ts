@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { UserResearchModule } from '@ever-works/agent/user-research';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { User } from '@ever-works/agent/entities';
@@ -11,7 +13,13 @@ import { WorkCreatedLearningListener } from './work-created.listener';
 import { ScheduledReRunService } from './scheduled-rerun.service';
 
 @Module({
-    imports: [UserResearchModule, AuthModule, TypeOrmModule.forFeature([User])],
+    imports: [
+        UserResearchModule,
+        DatabaseModule,
+        AuthModule,
+        ConfigModule,
+        TypeOrmModule.forFeature([User]),
+    ],
     controllers: [WorkProposalsController],
     providers: [
         WorkProposalsApiService,

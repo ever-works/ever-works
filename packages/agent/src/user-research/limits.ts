@@ -8,6 +8,8 @@ export interface UserResearchLimitsConfig {
     maxTokensPerDay: number;
 }
 
+export const USER_RESEARCH_LIMITS_CONFIG = 'USER_RESEARCH_LIMITS_CONFIG';
+
 export const DEFAULT_USER_RESEARCH_LIMITS: UserResearchLimitsConfig = {
     maxRunsPerDay: 3,
     maxSearchesPerDay: 30,
@@ -35,14 +37,19 @@ export class UserResearchLimitsService {
     private readonly logger = new Logger(UserResearchLimitsService.name);
     private readonly fallback = new Map<string, number>();
     private readonly ttlMs = 36 * 60 * 60 * 1000;
+    private readonly config: UserResearchLimitsConfig;
     // Per-key tail of increment promises — serializes the non-atomic
     // read-modify-write so two concurrent calls don't both land on baseline+1.
     private readonly incrementChain = new Map<string, Promise<unknown>>();
 
     constructor(
         @Optional() @Inject(CACHE_MANAGER) private readonly cache?: Cache,
-        private readonly config: UserResearchLimitsConfig = DEFAULT_USER_RESEARCH_LIMITS,
-    ) {}
+        @Optional()
+        @Inject(USER_RESEARCH_LIMITS_CONFIG)
+        config: UserResearchLimitsConfig = DEFAULT_USER_RESEARCH_LIMITS,
+    ) {
+        this.config = config;
+    }
 
     async assertCanRun(userId: string): Promise<void> {
         const runs = await this.read('runs', userId);
