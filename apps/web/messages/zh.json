@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "此处无活动",
                 "noWork": "无工作",
+                "loadMore": "加载更多 {count} 项",
                 "columns": {
                     "pending": "待处理",
                     "in_progress": "进行中",
                     "completed": "已完成",
                     "failed": "失败",
                     "cancelled": "已取消"
-                },
-                "loadMore": "加载更多 {count} 项"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} 个项目",
                 "noDescription": "暂无描述",
                 "empty": "此处无工作",
+                "loadMore": "加载更多 {count} 项",
                 "columns": {
                     "not_started": "未开始",
                     "scheduled": "已计划",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "完成但有警告",
                     "failed": "失败",
                     "cancelled": "已取消"
-                },
-                "loadMore": "加载更多 {count} 项"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "安全",
                 "apiKeys": "API 密钥",
                 "data": "数据",
+                "githubApp": "GitHub App",
                 "gitProviders": "Git 提供商",
                 "dangerZone": "危险区域"
+            },
+            "githubApp": {
+                "title": "GitHub App 安装",
+                "subtitle": "检查通过 Ever Works GitHub App 链接的安装，并在进行更深入的入职工作之前手动刷新仓库快照。",
+                "emptyTitle": "尚无 GitHub App 安装",
+                "emptyDescription": "在仓库或组织上安装 Ever Works GitHub App，然后完成设置重定向，以将安装链接到此工作区。",
+                "sync": "同步",
+                "syncSuccess": "安装已同步",
+                "syncError": "同步安装失败",
+                "onboard": "入职",
+                "onboardSuccess": "仓库已入职",
+                "onboardError": "入职仓库失败",
+                "active": "活跃",
+                "suspended": "已暂停",
+                "installationMeta": "安装 #{installationId} · {accountType} 账户 · {targetType} 目标",
+                "repoCount": "仓库",
+                "updatedAt": "上次同步",
+                "appSlug": "App 别名",
+                "repositories": "仓库",
+                "noRepositories": "此安装目前尚未存储任何仓库。运行同步以从 GitHub 刷新快照。",
+                "branch": "默认分支：{branch}",
+                "branchUnknown": "默认分支不可用",
+                "private": "私有",
+                "public": "公开"
             },
             "data": {
                 "exportTitle": "导出数据",
@@ -1021,6 +1046,14 @@
                     "submit": "发送邀请",
                     "cancel": "取消",
                     "success": "成员邀请成功。",
+                    "modes": {
+                        "direct": {
+                            "description": "通过电子邮件立即将现有用户添加为成员。他们将立即获得分配的角色。"
+                        },
+                        "link": {
+                            "description": "生成一个一次性链接以供共享。接收者兑换它以加入——或如果您创建了所有者认领链接，则可以认领所有权。"
+                        }
+                    },
                     "errors": {
                         "emailRequired": "电子邮件地址为必填项。",
                         "failed": "邀请成员失败。请重试。"
@@ -1321,6 +1354,15 @@
                     "tag_change": "标签变更",
                     "collection_change": "集合变更",
                     "community_pr_merged": "社区 PR"
+                },
+                "generationInfo": {
+                    "label": "生成详情",
+                    "itemsAdded": "已添加项目",
+                    "itemsUpdated": "已更新项目",
+                    "totalItems": "总项目数",
+                    "pagesProcessed": "已处理页面",
+                    "tokensUsed": "已使用令牌",
+                    "existingReferencesUsed": "已使用现有引用"
                 },
                 "detail": {
                     "added": "已添加",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "AI 模型覆盖",
                 "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
+                "modelOverrideUnavailable": "请先选择一个已配置的 AI 提供方，以便从可用列表中选择模型。",
+                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。",
+                "websiteTemplateLockedHelperText": "模板选择在首次网站生成后被锁定。",
                 "recommended": "推荐",
                 "promptPlaceholder": "描述为此作品应生成哪些项目...",
                 "promptHelperText": "具体说明您想要生成的内容类型",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "取消生成失败"
             },
             "settings": {
+                "tabs": {
+                    "general": "常规",
+                    "members": "成员",
+                    "navigationLabel": "设置标签"
+                },
                 "sourceSettings": "源仓库",
                 "originalSource": "原始源",
                 "syncEnabled": "同步已启用",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "自动模板更新",
                         "description": "保持您的网站自动与最新模板更改同步。",
+                        "selectorLabel": "网站模板",
+                        "currentTemplateLabel": "当前模板",
+                        "unknownTemplate": "继承的默认值",
+                        "currentHelperText": "所选模板控制网站仓库的初始化和更新方式。",
+                        "switchHelperText": "应用新模板将在网站仓库已存在时，从所选模板重置现有网站仓库。",
+                        "switchAction": "将模板应用到网站仓库",
+                        "switchActionIdle": "模板已是最新",
+                        "switchConfirmTitle": "切换网站模板？",
+                        "switchConfirmDescription": "如果网站仓库已存在，其内容将被所选模板替换。该仓库中的任何自定义代码将丢失。",
+                        "switchConfirmButton": "切换模板",
+                        "switchCancel": "取消",
                         "autoUpdate": "自动更新",
                         "autoUpdateDescription": "每小时检查模板更新并自动应用。",
                         "useBeta": "使用模板的 beta 版本",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "最后更新",
                         "lastChecked": "最后检查",
                         "lastError": "最后错误",
+                        "inheritedState": "此工作正在继承您当前的默认模板。",
+                        "explicitState": "此工作已固定到显式模板选择。",
+                        "originStandard": "标准",
+                        "originForked": "派生",
+                        "originCustomUrl": "自定义 URL",
                         "updateSuccess": "设置已成功更新",
                         "updateFailed": "更新设置失败",
                         "githubRequired": "需要 GitHub 连接。请在设置中连接您的 GitHub 账户以启用自动更新。"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "组织仓库",
                 "organizationHelp": "在组织下创建仓库，而不是个人账户",
                 "organizationNameLabel": "组织名称",
-                "organizationNamePlaceholder": "输入组织名称"
+                "organizationNamePlaceholder": "输入组织名称",
+                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。"
             },
             "manual": {
                 "title": "手动创建",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "在 GitHub 组织下创建此作品，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。",
                 "headerLabel": "自定义 README 标头",
                 "headerPlaceholder": "在 README 文件顶部添加自定义内容",
                 "headerOverwrite": "完全替换默认标头",
@@ -2703,6 +2771,7 @@
                 "activity": "活动",
                 "works": "作品",
                 "plugins": "插件",
+                "templates": "模板",
                 "settings": "设置"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "移除 {login}"
             }
         },
+        "templates": {
+            "title": "模板",
+            "subtitle": "浏览内置网站模板，管理您的自定义目录，并控制新工作从哪个模板开始。",
+            "actions": {
+                "addTemplate": "添加自定义模板",
+                "refreshTemplates": "刷新模板"
+            },
+            "hero": {
+                "eyebrow": "模板目录",
+                "catalogHint": "此目录中的任何模板都可以成为您的默认模板。fork 一个内置模板以将其转换为您自己的起点。"
+            },
+            "stats": {
+                "defaultLabel": "活跃默认",
+                "defaultHint": "除非您为特定工作覆盖它，否则新工作将从此模板开始。",
+                "builtInLabel": "内置",
+                "builtInHint": "Ever Works 维护的模板。",
+                "customLabel": "自定义",
+                "customHint": "保存自您自己的 GitHub 仓库或分支。",
+                "none": "无默认"
+            },
+            "filters": {
+                "all": "全部",
+                "builtIn": "内置",
+                "custom": "自定义",
+                "searchPlaceholder": "搜索模板、框架或仓库..."
+            },
+            "card": {
+                "builtIn": "内置",
+                "custom": "自定义",
+                "standard": "标准",
+                "forked": "派生",
+                "customUrl": "自定义 URL",
+                "standardSource": "Ever Works 标准",
+                "forkedSource": "分派到您的 GitHub",
+                "customUrlSource": "从 GitHub URL 添加",
+                "default": "默认",
+                "defaultSelected": "已选默认",
+                "makeDefault": "设为默认",
+                "fork": "分派",
+                "edit": "编辑",
+                "archive": "归档",
+                "catalogOnly": "仅目录项",
+                "openRepository": "打开仓库",
+                "previewAlt": "{name} 预览",
+                "frameworkAgnostic": "与框架无关",
+                "branch": "分支：{branch}",
+                "syncBranches": "{count} 个同步分支",
+                "betaBranch": "测试版：{branch}",
+                "noDescription": "暂无描述。"
+            },
+            "dialog": {
+                "title": "添加自定义模板",
+                "description": "将 GitHub 仓库保存到您的个人模板目录。此第一部分存储模板元数据，以便在下次分配流程中选择。",
+                "editTitle": "编辑自定义模板",
+                "editDescription": "更新目录中此自定义模板的显示详情和预览图像。",
+                "repositoryUrlLabel": "GitHub 仓库 URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "添加模板后，源仓库 URL 不能更改。",
+                "nameLabel": "模板名称",
+                "namePlaceholder": "可选的显示名称",
+                "frameworkLabel": "框架",
+                "frameworkSelectPlaceholder": "选择框架",
+                "frameworkUnspecified": "未指定",
+                "previewImageLabel": "预览图像 URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "可选。如果您想要覆盖 GitHub 仓库预览，请使用 curated screenshot。",
+                "descriptionLabel": "简短描述",
+                "descriptionPlaceholder": "此模板最适合用于何处",
+                "branchLabel": "默认分支",
+                "branchPlaceholder": "main",
+                "branchHelp": "留空则默认为 main。",
+                "betaBranchLabel": "测试版分支",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "可选。用于 beta 部署的分支。",
+                "cancel": "取消",
+                "submit": "保存模板",
+                "saveChanges": "保存更改"
+            },
+            "forkDialog": {
+                "title": "分派标准模板",
+                "description": "创建此标准模板的您自己的 GitHub 副本，将其添加到您的目录中，并将其设为新工作的默认模板。",
+                "sourceLabel": "模板来源",
+                "targetLabel": "分派目标",
+                "targetPlaceholder": "选择 GitHub 账户或组织",
+                "targetHelp": "分派将在 {target} 下创建。",
+                "personalTarget": "个人账户 ({login})",
+                "organizationTarget": "组织 ({login})",
+                "noTargets": "在分派模板之前，请先连接 GitHub 并加载您的组织。",
+                "resultLabel": "新仓库",
+                "none": "您选定的账户",
+                "cancel": "取消",
+                "submit": "分派并设为默认"
+            },
+            "archiveDialog": {
+                "title": "归档自定义模板",
+                "description": "从您的目录中归档此模板。仅可归档当前未分配给任何工作的模板。",
+                "templateLabel": "模板",
+                "cancel": "取消",
+                "submit": "归档模板"
+            },
+            "empty": {
+                "title": "未找到模板",
+                "default": "目前此视图下没有匹配的模板。",
+                "search": "尝试不同的搜索词或清除当前过滤器。",
+                "resetFilters": "重置过滤器"
+            },
+            "messages": {
+                "repositoryUrlRequired": "需要 GitHub 仓库 URL。",
+                "repositoryUrlInvalid": "请输入有效的 GitHub 仓库 URL，例如 https://github.com/owner/repository。",
+                "forkTargetRequired": "为分派选择一个 GitHub 账户或组织。",
+                "addSuccess": "已从 GitHub URL 保存模板。",
+                "addFailed": "保存模板失败。",
+                "updateSuccess": "模板详情已更新。",
+                "updateFailed": "更新模板详情失败。",
+                "archiveSuccess": "模板已从您的目录中归档。",
+                "archiveFailed": "归档模板失败。",
+                "forkSuccess": "已分派 {repository}，添加到您的目录，并将其设为您的默认模板。",
+                "forkExisting": "{repository} 已经存在于您的目录中，现在是您的默认派生模板。",
+                "forkFailed": "分派模板失败。",
+                "refreshSuccess": "模板目录已刷新。",
+                "refreshFailed": "刷新模板失败。",
+                "defaultUpdated": "默认模板已更新。",
+                "defaultFailed": "更新默认模板失败。"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "使用默认",
+            "defaultOptionWithName": "使用默认 ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (默认)",
+            "changeAnywayLink": "仍要更改",
+            "origin": {
+                "standard": "标准",
+                "forked": "派生",
+                "customUrl": "自定义 URL"
+            },
+            "state": {
+                "defaultBadge": "继承的默认",
+                "inheritedTitle": "使用默认模板",
+                "inheritedDescription": "此工作将遵循您当前的默认模板，直到您固定一个特定模板。",
+                "pinnedTitle": "固定模板",
+                "pinnedDescription": "即使您以后更改默认模板，此工作仍将继续使用此模板。"
+            }
+        },
         "workPlugins": {
             "title": "作品插件",
             "subtitle": "为该作品配置插件",
@@ -3067,6 +3280,7 @@
             "history": "历史记录",
             "comparisons": "比较",
             "plugins": "插件",
+            "templates": "模板",
             "profile": "个人资料",
             "security": "安全",
             "apiKeys": "API 密钥",

@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "여기에 활동이 없습니다",
                 "noWork": "작업 없음",
+                "loadMore": "{count}개 더 불러오기",
                 "columns": {
                     "pending": "대기 중",
                     "in_progress": "진행 중",
                     "completed": "완료",
                     "failed": "실패",
                     "cancelled": "취소됨"
-                },
-                "loadMore": "{count}개 더 불러오기"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} 항목",
                 "noDescription": "설명 없음",
                 "empty": "여기에 작업이 없습니다",
+                "loadMore": "{count}개 더 불러오기",
                 "columns": {
                     "not_started": "시작 안 됨",
                     "scheduled": "예약됨",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "경고와 함께 완료",
                     "failed": "실패",
                     "cancelled": "취소됨"
-                },
-                "loadMore": "{count}개 더 불러오기"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "보안",
                 "apiKeys": "API 키",
                 "data": "데이터",
+                "githubApp": "GitHub 앱",
                 "gitProviders": "Git 공급자",
                 "dangerZone": "위험 영역"
+            },
+            "githubApp": {
+                "title": "GitHub 앱 설치",
+                "subtitle": "Ever Works GitHub 앱을 통해 연결된 설치를 검사하고, 더 깊은 온보딩 작업이 적용되기 전에 저장소 스냅샷을 수동으로 새로 고침합니다.",
+                "emptyTitle": "아직 GitHub 앱 설치가 없습니다.",
+                "emptyDescription": "저장소 또는 조직에 Ever Works GitHub 앱을 설치한 다음, 설정 리디렉션을 완료하여 이 워크스페이스에 설치를 연결합니다.",
+                "sync": "동기화",
+                "syncSuccess": "설치가 동기화되었습니다",
+                "syncError": "설치 동기화에 실패했습니다",
+                "onboard": "온보딩",
+                "onboardSuccess": "저장소가 온보딩되었습니다",
+                "onboardError": "저장소 온보딩에 실패했습니다",
+                "active": "활성",
+                "suspended": "중지됨",
+                "installationMeta": "설치 #{installationId} · {accountType} 계정 · {targetType} 대상",
+                "repoCount": "저장소",
+                "updatedAt": "마지막 동기화",
+                "appSlug": "앱 슬러그",
+                "repositories": "저장소",
+                "noRepositories": "이 설정에 아직 저장소가 저장되지 않았습니다. GitHub에서 스냅샷을 새로 고치려면 동기화를 실행하세요.",
+                "branch": "기본 브랜치: {branch}",
+                "branchUnknown": "기본 브랜치를 사용할 수 없습니다",
+                "private": "비공개",
+                "public": "공개"
             },
             "data": {
                 "exportTitle": "데이터 내보내기",
@@ -1021,6 +1046,14 @@
                     "submit": "초대 보내기",
                     "cancel": "취소",
                     "success": "멤버 초대 성공.",
+                    "modes": {
+                        "direct": {
+                            "description": "이메일을 사용하여 기존 사용자를 바로 멤버로 추가합니다. 할당된 역할을 즉시 받게 됩니다."
+                        },
+                        "link": {
+                            "description": "공유용 일회용 링크를 생성합니다. 수신자는 해당 링크를 사용하여 참여하거나, 소유자 청구 링크를 만든 경우 소유권을 주장할 수 있습니다."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "이메일 주소가 필요합니다.",
                         "failed": "멤버 초대 실패. 다시 시도해 주세요."
@@ -1321,6 +1354,15 @@
                     "tag_change": "태그 변경",
                     "collection_change": "컬렉션 변경",
                     "community_pr_merged": "커뮤니티 PR"
+                },
+                "generationInfo": {
+                    "label": "세대 세부 정보",
+                    "itemsAdded": "추가된 항목",
+                    "itemsUpdated": "업데이트된 항목",
+                    "totalItems": "총 항목",
+                    "pagesProcessed": "처리된 페이지",
+                    "tokensUsed": "사용된 토큰",
+                    "existingReferencesUsed": "기존 참조 사용됨"
                 },
                 "detail": {
                     "added": "추가됨",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "AI 모델 재정의",
                 "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "선택 사항입니다. 여기에 재정의하지 않으면 기본적으로 가져온 모델 또는 이전 모델을 사용합니다.",
+                "modelOverrideUnavailable": "사용 가능한 목록에서 모델을 선택하려면 먼저 구성된 AI 제공자를 선택하세요.",
+                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요.",
+                "websiteTemplateLockedHelperText": "첫 번째 웹사이트 생성 후 템플릿 선택이 잠깁니다.",
                 "recommended": "권장",
                 "promptPlaceholder": "이 워크에 생성할 항목을 설명하세요...",
                 "promptHelperText": "생성하려는 콘텐츠 유형에 대해 구체적으로 설명하세요",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "생성 취소에 실패했습니다"
             },
             "settings": {
+                "tabs": {
+                    "general": "일반",
+                    "members": "멤버",
+                    "navigationLabel": "설정 탭"
+                },
                 "sourceSettings": "소스 저장소",
                 "originalSource": "원본 소스",
                 "syncEnabled": "동기화 활성화됨",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "자동 템플릿 업데이트",
                         "description": "웹사이트를 최신 템플릿 변경 사항과 자동으로 동기화하세요.",
+                        "selectorLabel": "웹사이트 템플릿",
+                        "currentTemplateLabel": "현재 템플릿",
+                        "unknownTemplate": "상속된 기본값",
+                        "currentHelperText": "선택된 템플릿은 웹사이트 저장소가 어떻게 초기화되고 업데이트되는지를 제어합니다.",
+                        "switchHelperText": "새 템플릿을 적용하면 기존 웹사이트 저장소가 이미 존재하는 경우 선택된 템플릿으로 재설정됩니다.",
+                        "switchAction": "웹사이트 저장소에 템플릿 적용",
+                        "switchActionIdle": "템플릿이 최신 상태입니다",
+                        "switchConfirmTitle": "웹사이트 템플릿을 전환하시겠습니까?",
+                        "switchConfirmDescription": "웹사이트 저장소가 이미 존재하는 경우, 선택된 템플릿의 내용으로 대체됩니다. 해당 저장소의 사용자 정의 코드는 손실됩니다.",
+                        "switchConfirmButton": "템플릿 전환",
+                        "switchCancel": "취소",
                         "autoUpdate": "자동 업데이트",
                         "autoUpdateDescription": "매시간 템플릿 업데이트를 확인하고 자동 적용",
                         "useBeta": "템플릿 베타 버전 사용",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "마지막 업데이트",
                         "lastChecked": "마지막 확인",
                         "lastError": "마지막 오류",
+                        "inheritedState": "이 작업은 현재 기본 템플릿을 상속하고 있습니다.",
+                        "explicitState": "이 작업은 명시적인 템플릿 선택에 고정되어 있습니다.",
+                        "originStandard": "표준",
+                        "originForked": "포크됨",
+                        "originCustomUrl": "사용자 정의 URL",
                         "updateSuccess": "설정이 성공적으로 업데이트되었습니다",
                         "updateFailed": "설정 업데이트 실패",
                         "githubRequired": "GitHub 연결 필요. 자동 업데이트를 활성화하려면 설정에서 GitHub 계정을 연결하세요."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "조직 저장소",
                 "organizationHelp": "개인 계정 대신 조직 아래에 저장소 생성",
                 "organizationNameLabel": "조직 이름",
-                "organizationNamePlaceholder": "조직 이름 입력"
+                "organizationNamePlaceholder": "조직 이름 입력",
+                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요."
             },
             "manual": {
                 "title": "수동 생성",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "이 워크를 개인 계정 대신 GitHub 조직 아래에 생성",
                 "organizationNameLabel": "조직 이름",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요.",
                 "headerLabel": "사용자 지정 README 헤더",
                 "headerPlaceholder": "README 파일 상단에 사용자 지정 콘텐츠 추가",
                 "headerOverwrite": "기본 헤더 완전히 교체",
@@ -2703,6 +2771,7 @@
                 "activity": "활동",
                 "works": "워크",
                 "plugins": "플러그인",
+                "templates": "템플릿",
                 "settings": "설정"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "{login} 제거"
             }
         },
+        "templates": {
+            "title": "템플릿",
+            "subtitle": "내장 웹사이트 템플릿을 찾아보고, 사용자 지정 카탈로그를 관리하며, 새로운 작업이 시작될 때 어떤 템플릿을 사용할지 제어하세요.",
+            "actions": {
+                "addTemplate": "사용자 지정 템플릿 추가",
+                "refreshTemplates": "템플릿 새로 고침"
+            },
+            "hero": {
+                "eyebrow": "템플릿 카탈로그",
+                "catalogHint": "이 카탈로그의 어떤 템플릿도 기본 템플릿이 될 수 있습니다. 내장 템플릿을 포크하여 자신만의 시작점으로 만드세요."
+            },
+            "stats": {
+                "defaultLabel": "활성 기본값",
+                "defaultHint": "작업을 별도로 재정의하지 않는 한, 새로운 작업은 이 템플릿에서 시작됩니다.",
+                "builtInLabel": "내장",
+                "builtInHint": "Ever Works에서 유지 관리되는 템플릿입니다.",
+                "customLabel": "사용자 지정",
+                "customHint": "사용자 자신의 GitHub 저장소 또는 포크에서 저장됨.",
+                "none": "기본값 없음"
+            },
+            "filters": {
+                "all": "전체",
+                "builtIn": "내장",
+                "custom": "사용자 지정",
+                "searchPlaceholder": "템플릿, 프레임워크, 또는 저장소 검색..."
+            },
+            "card": {
+                "builtIn": "내장",
+                "custom": "사용자 지정",
+                "standard": "표준",
+                "forked": "포크됨",
+                "customUrl": "사용자 정의 URL",
+                "standardSource": "Ever Works 표준",
+                "forkedSource": "귀하의 GitHub에 포크됨",
+                "customUrlSource": "GitHub URL에서 추가됨",
+                "default": "기본값",
+                "defaultSelected": "기본값 선택됨",
+                "makeDefault": "기본값으로 설정",
+                "fork": "포크",
+                "edit": "편집",
+                "archive": "보관",
+                "catalogOnly": "카탈로그 항목",
+                "openRepository": "저장소 열기",
+                "previewAlt": "{name} 미리보기",
+                "frameworkAgnostic": "프레임워크에 구애되지 않음",
+                "branch": "브랜치: {branch}",
+                "syncBranches": "{count} 동기화 브랜치",
+                "betaBranch": "베타: {branch}",
+                "noDescription": "아직 설명이 없습니다."
+            },
+            "dialog": {
+                "title": "사용자 지정 템플릿 추가",
+                "description": "GitHub 저장소를 개인 템플릿 카탈로그에 저장합니다. 이 첫 번째 단계에서 템플릿 메타데이터를 저장하여 다음 할당 흐름에서 선택할 수 있도록 합니다.",
+                "editTitle": "사용자 지정 템플릿 편집",
+                "editDescription": "카탈로그에서 이 사용자 지정 템플릿에 사용되는 표시 세부 정보 및 미리보기 이미지를 업데이트합니다.",
+                "repositoryUrlLabel": "GitHub 저장소 URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "템플릿이 추가된 후에는 소스 저장소 URL을 변경할 수 없습니다.",
+                "nameLabel": "템플릿 이름",
+                "namePlaceholder": "선택 사항 표시 이름",
+                "frameworkLabel": "프레임워크",
+                "frameworkSelectPlaceholder": "프레임워크 선택",
+                "frameworkUnspecified": "미지정",
+                "previewImageLabel": "미리보기 이미지 URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "선택 사항. GitHub 저장소 미리보기를 재정의하려면 curated 스크린샷을 사용하세요.",
+                "descriptionLabel": "간단 설명",
+                "descriptionPlaceholder": "이 템플릿이 가장 적합한 용도",
+                "branchLabel": "기본 브랜치",
+                "branchPlaceholder": "main",
+                "branchHelp": "비워 두면 기본적으로 main이 됩니다.",
+                "betaBranchLabel": "베타 브랜치",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "선택 사항. 베타 배포에 사용되는 브랜치.",
+                "cancel": "취소",
+                "submit": "템플릿 저장",
+                "saveChanges": "변경 사항 저장"
+            },
+            "forkDialog": {
+                "title": "표준 템플릿 포크",
+                "description": "이 표준 템플릿의 włas GitHub 사본을 생성하고, 카탈로그에 추가하며, 새로운 작업의 기본값으로 설정합니다.",
+                "sourceLabel": "템플릿 소스",
+                "targetLabel": "포크 대상",
+                "targetPlaceholder": "GitHub 계정 또는 조직 선택",
+                "targetHelp": "포크는 {target} 아래에 생성됩니다.",
+                "personalTarget": "개인 계정 ({login})",
+                "organizationTarget": "조직 ({login})",
+                "noTargets": "템플릿을 포크하기 전에 GitHub를 연결하고 조직을 로드하세요.",
+                "resultLabel": "새 저장소",
+                "none": "선택한 계정",
+                "cancel": "취소",
+                "submit": "포크하고 기본값으로 설정"
+            },
+            "archiveDialog": {
+                "title": "사용자 지정 템플릿 보관",
+                "description": "카탈로그에서 이 템플릿을 보관합니다. 현재 어떤 작업에도 할당되지 않은 템플릿만 보관할 수 있습니다.",
+                "templateLabel": "템플릿",
+                "cancel": "취소",
+                "submit": "템플릿 보관"
+            },
+            "empty": {
+                "title": "템플릿을 찾을 수 없음",
+                "default": "아직 이 보기에 일치하는 템플릿이 없습니다.",
+                "search": "다른 검색어를 시도하거나 현재 필터를 지우세요.",
+                "resetFilters": "필터 재설정"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub 저장소 URL이 필요합니다.",
+                "repositoryUrlInvalid": "예: https://github.com/owner/repository 와 같은 유효한 GitHub 저장소 URL을 입력하세요.",
+                "forkTargetRequired": "포크에 사용할 GitHub 계정 또는 조직을 선택하세요.",
+                "addSuccess": "GitHub URL에서 템플릿이 저장되었습니다.",
+                "addFailed": "템플릿 저장에 실패했습니다.",
+                "updateSuccess": "템플릿 세부 정보가 업데이트되었습니다.",
+                "updateFailed": "템플릿 세부 정보 업데이트에 실패했습니다.",
+                "archiveSuccess": "카탈로그에서 템플릿이 보관되었습니다.",
+                "archiveFailed": "템플릿 보관에 실패했습니다.",
+                "forkSuccess": "{repository}을(를) 포크하여 카탈로그에 추가하고 기본값으로 설정했습니다.",
+                "forkExisting": "{repository}은(는) 이미 카탈로그에 있었으며, 이제는 기본 포크된 템플릿이 되었습니다.",
+                "forkFailed": "템플릿 포크에 실패했습니다.",
+                "refreshSuccess": "템플릿 카탈로그가 새로 고쳐졌습니다.",
+                "refreshFailed": "템플릿 새로 고침에 실패했습니다.",
+                "defaultUpdated": "기본 템플릿이 업데이트되었습니다.",
+                "defaultFailed": "기본 템플릿 업데이트에 실패했습니다."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "기본값 사용",
+            "defaultOptionWithName": "기본값 사용 ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (기본값)",
+            "changeAnywayLink": "그래도 변경",
+            "origin": {
+                "standard": "표준",
+                "forked": "포크됨",
+                "customUrl": "사용자 정의 URL"
+            },
+            "state": {
+                "defaultBadge": "상속된 기본값",
+                "inheritedTitle": "기본 템플릿 사용 중",
+                "inheritedDescription": "특정 템플릿을 고정할 때까지 이 작업은 현재 기본 템플릿을 따릅니다.",
+                "pinnedTitle": "고정된 템플릿",
+                "pinnedDescription": "기본값이 나중에 바뀌어도 이 작업은 이 템플릿을 계속 사용합니다."
+            }
+        },
         "workPlugins": {
             "title": "워크 플러그인",
             "subtitle": "이 워크에 대한 플러그인 구성",
@@ -3067,6 +3280,7 @@
             "history": "역사",
             "comparisons": "비교",
             "plugins": "플러그인",
+            "templates": "템플릿",
             "profile": "프로필",
             "security": "보안",
             "apiKeys": "API 키",

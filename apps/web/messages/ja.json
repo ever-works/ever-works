@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "ここにアクティビティはありません",
                 "noWork": "作業なし",
+                "loadMore": "さらに{count}件読み込む",
                 "columns": {
                     "pending": "保留中",
                     "in_progress": "進行中",
                     "completed": "完了",
                     "failed": "失敗",
                     "cancelled": "キャンセル"
-                },
-                "loadMore": "さらに{count}件読み込む"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} アイテム",
                 "noDescription": "説明なし",
                 "empty": "ここに作業はありません",
+                "loadMore": "さらに{count}件読み込む",
                 "columns": {
                     "not_started": "未開始",
                     "scheduled": "スケジュール済み",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "警告付きで完了",
                     "failed": "失敗",
                     "cancelled": "キャンセル"
-                },
-                "loadMore": "さらに{count}件読み込む"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "セキュリティ",
                 "apiKeys": "API キー",
                 "data": "データ",
+                "githubApp": "GitHub App",
                 "gitProviders": "Git プロバイダー",
                 "dangerZone": "危険ゾーン"
+            },
+            "githubApp": {
+                "title": "GitHub App インストール",
+                "subtitle": "Ever Works GitHub App にリンクされたインストールを調査し、より深いオンボード作業が開始される前にリポジトリスナップショットを手動で更新します。",
+                "emptyTitle": "まだ GitHub App のインストールはありません",
+                "emptyDescription": "リポジトリまたは組織に Ever Works GitHub App をインストールし、セットアップリダイレクトを完了して、このワークスペースにインストールをリンクしてください。",
+                "sync": "同期",
+                "syncSuccess": "インストールを同期しました",
+                "syncError": "インストールの同期に失敗しました",
+                "onboard": "オンボード",
+                "onboardSuccess": "リポジトリをオンボードしました",
+                "onboardError": "リポジトリのオンボードに失敗しました",
+                "active": "アクティブ",
+                "suspended": "一時停止",
+                "installationMeta": "インストール #{installationId} · {accountType} アカウント · {targetType} ターゲット",
+                "repoCount": "リポジトリ",
+                "updatedAt": "最終同期",
+                "appSlug": "App スラッグ",
+                "repositories": "リポジトリ",
+                "noRepositories": "このインストールにはまだリポジトリが保存されていません。同期を実行して、GitHub からスナップショットを更新してください。",
+                "branch": "デフォルトブランチ: {branch}",
+                "branchUnknown": "デフォルトブランチを取得できません",
+                "private": "プライベート",
+                "public": "公開"
             },
             "data": {
                 "exportTitle": "データをエクスポート",
@@ -1021,6 +1046,14 @@
                     "submit": "招待を送信",
                     "cancel": "キャンセル",
                     "success": "メンバーの招待が成功しました。",
+                    "modes": {
+                        "direct": {
+                            "description": "メールアドレスで既存のユーザーをすぐにメンバーとして追加します。割り当てられたロールがすぐに付与されます。"
+                        },
+                        "link": {
+                            "description": "共有用の使い捨てリンクを生成します。受信者はそのリンクを利用して参加できます（オーナー請求リンクを作成した場合は、所有権を主張することもできます）。"
+                        }
+                    },
                     "errors": {
                         "emailRequired": "メールアドレスが必要です。",
                         "failed": "メンバーの招待に失敗しました。もう一度お試しください。"
@@ -1321,6 +1354,15 @@
                     "tag_change": "タグ変更",
                     "collection_change": "コレクション変更",
                     "community_pr_merged": "コミュニティPR"
+                },
+                "generationInfo": {
+                    "label": "生成詳細",
+                    "itemsAdded": "追加されたアイテム",
+                    "itemsUpdated": "更新されたアイテム",
+                    "totalItems": "アイテム合計",
+                    "pagesProcessed": "処理されたページ数",
+                    "tokensUsed": "使用されたトークン",
+                    "existingReferencesUsed": "既存の参照を使用"
                 },
                 "detail": {
                     "added": "追加",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "AI モデル上書き",
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
+                "modelOverrideUnavailable": "利用可能なリストからモデルを選択する前に、まず設定済みの AI プロバイダーを選択してください。",
+                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。",
+                "websiteTemplateLockedHelperText": "最初のウェブサイト生成後、テンプレートの選択はロックされます。",
                 "recommended": "おすすめ",
                 "promptPlaceholder": "このワークに生成するアイテムを記述してください...",
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "生成のキャンセルに失敗しました"
             },
             "settings": {
+                "tabs": {
+                    "general": "一般",
+                    "members": "メンバー",
+                    "navigationLabel": "設定タブ"
+                },
                 "sourceSettings": "ソース リポジトリ",
                 "originalSource": "元のソース",
                 "syncEnabled": "同期が有効",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "自動テンプレート更新",
                         "description": "ウェブサイトを最新のテンプレート変更と自動的に同期します。",
+                        "selectorLabel": "ウェブサイトテンプレート",
+                        "currentTemplateLabel": "現在のテンプレート",
+                        "unknownTemplate": "継承されたデフォルト",
+                        "currentHelperText": "選択されたテンプレートは、ウェブサイトリポジトリの初期化と更新方法を制御します。",
+                        "switchHelperText": "新しいテンプレートを適用すると、既存のウェブサイトリポジトリが選択されたテンプレートからリセットされます（すでに存在する場合）。",
+                        "switchAction": "ウェブサイトリポジトリにテンプレートを適用",
+                        "switchActionIdle": "テンプレートは最新です",
+                        "switchConfirmTitle": "ウェブサイトテンプレートを切り替えますか？",
+                        "switchConfirmDescription": "ウェブサイトリポジトリが既に存在する場合、その内容は選択されたテンプレートから置き換えられます。そのリポジトリ内のカスタムコードはすべて失われます。",
+                        "switchConfirmButton": "テンプレートを切り替える",
+                        "switchCancel": "キャンセル",
                         "autoUpdate": "自動更新",
                         "autoUpdateDescription": "1時間ごとにテンプレート更新をチェックし、自動的に適用します。",
                         "useBeta": "テンプレートのベータ版を使用",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "最終更新",
                         "lastChecked": "最終チェック",
                         "lastError": "最終エラー",
+                        "inheritedState": "このワークは現在のデフォルトテンプレートを継承しています。",
+                        "explicitState": "このワークは明示的に選択されたテンプレートに固定されています。",
+                        "originStandard": "標準",
+                        "originForked": "フォーク済み",
+                        "originCustomUrl": "カスタム URL",
                         "updateSuccess": "設定が正常に更新されました",
                         "updateFailed": "設定の更新に失敗しました",
                         "githubRequired": "GitHub接続が必要です。設定でGitHubアカウントを接続して自動更新を有効にしてください。"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "組織リポジトリ",
                 "organizationHelp": "個人アカウントではなく組織の下にリポジトリを作成",
                 "organizationNameLabel": "組織名",
-                "organizationNamePlaceholder": "組織名を入力"
+                "organizationNamePlaceholder": "組織名を入力",
+                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。"
             },
             "manual": {
                 "title": "手動で作成",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "このワークを個人アカウントではなく GitHub 組織の下に作成",
                 "organizationNameLabel": "組織名",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。",
                 "headerLabel": "カスタム README ヘッダー",
                 "headerPlaceholder": "README ファイルの上部にカスタムコンテンツを追加",
                 "headerOverwrite": "デフォルトヘッダーを完全に置き換え",
@@ -2703,6 +2771,7 @@
                 "activity": "アクティビティ",
                 "works": "ワーク",
                 "plugins": "プラグイン",
+                "templates": "テンプレート",
                 "settings": "設定"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "{login} を削除"
             }
         },
+        "templates": {
+            "title": "テンプレート",
+            "subtitle": "組み込みのウェブサイトテンプレートを閲覧し、カスタムカタログを管理し、新しいワークがどのテンプレートから開始されるかを制御してください。",
+            "actions": {
+                "addTemplate": "カスタムテンプレートを追加",
+                "refreshTemplates": "テンプレートを更新"
+            },
+            "hero": {
+                "eyebrow": "テンプレートカタログ",
+                "catalogHint": "このカタログ内のどのテンプレートもデフォルトに設定できます。組み込みテンプレートをフォークして、自分만의出発点に変えることができます。"
+            },
+            "stats": {
+                "defaultLabel": "アクティブなデフォルト",
+                "defaultHint": "ワークごとにオーバーライドしない限り、新しいワークはこのテンプレートから開始されます。",
+                "builtInLabel": "組み込み",
+                "builtInHint": "Ever Works がメンテナンスするテンプレート。",
+                "customLabel": "カスタム",
+                "customHint": "自分の GitHub リポジトリまたはフォークから保存されました。",
+                "none": "デフォルトなし"
+            },
+            "filters": {
+                "all": "すべて",
+                "builtIn": "組み込み",
+                "custom": "カスタム",
+                "searchPlaceholder": "テンプレート、フレームワーク、またはリポジトリを検索..."
+            },
+            "card": {
+                "builtIn": "組み込み",
+                "custom": "カスタム",
+                "standard": "標準",
+                "forked": "フォーク済み",
+                "customUrl": "カスタム URL",
+                "standardSource": "Ever Works 標準",
+                "forkedSource": "GitHub にフォーク",
+                "customUrlSource": "GitHub URL から追加",
+                "default": "デフォルト",
+                "defaultSelected": "デフォルトが選択されました",
+                "makeDefault": "デフォルトに設定",
+                "fork": "フォーク",
+                "edit": "編集",
+                "archive": "アーカイブ",
+                "catalogOnly": "カタログアイテムのみ",
+                "openRepository": "リポジトリを開く",
+                "previewAlt": "{name} プレビュー",
+                "frameworkAgnostic": "フレームワークに依存しない",
+                "branch": "ブランチ: {branch}",
+                "syncBranches": "{count} 同期ブランチ",
+                "betaBranch": "ベータ: {branch}",
+                "noDescription": "まだ説明がありません。"
+            },
+            "dialog": {
+                "title": "カスタムテンプレートを追加",
+                "description": "GitHub リポジトリを個人のテンプレートカタログに保存します。この最初のスライスでは、次の割り当てフローで選択できるようにテンプレートのメタデータを保存します。",
+                "editTitle": "カスタムテンプレートを編集",
+                "editDescription": "カタログ内のこのカスタムテンプレートに使用される表示詳細とプレビュー画像を更新します。",
+                "repositoryUrlLabel": "GitHub リポジトリ URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "テンプレート追加後にソースリポジトリURLは変更できません。",
+                "nameLabel": "テンプレート名",
+                "namePlaceholder": "省略可能な表示名",
+                "frameworkLabel": "フレームワーク",
+                "frameworkSelectPlaceholder": "フレームワークを選択",
+                "frameworkUnspecified": "未指定",
+                "previewImageLabel": "プレビュー画像 URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "省略可能。GitHub リポジトリのプレビューを上書きする場合は、キュレーションされたスクリーンショットを使用してください。",
+                "descriptionLabel": "簡単な説明",
+                "descriptionPlaceholder": "このテンプレートが最も適している用途",
+                "branchLabel": "デフォルトブランチ",
+                "branchPlaceholder": "main",
+                "branchHelp": "空白にすると main がデフォルトになります。",
+                "betaBranchLabel": "ベータブランチ",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "省略可能。ベータデプロイに使用されるブランチ。",
+                "cancel": "キャンセル",
+                "submit": "テンプレートを保存",
+                "saveChanges": "変更を保存"
+            },
+            "forkDialog": {
+                "title": "標準テンプレートをフォーク",
+                "description": "この標準テンプレートの自分の GitHub コピーを作成し、カタログに追加して、新しいワークのデフォルトに設定します。",
+                "sourceLabel": "テンプレートソース",
+                "targetLabel": "フォーク先",
+                "targetPlaceholder": "GitHub アカウントまたは組織を選択",
+                "targetHelp": "{target} の下にフォークが作成されます。",
+                "personalTarget": "個人アカウント ({login})",
+                "organizationTarget": "組織 ({login})",
+                "noTargets": "テンプレートをフォークする前に、GitHub を接続し、組織を読み込んでください。",
+                "resultLabel": "新しいリポジトリ",
+                "none": "選択したアカウント",
+                "cancel": "キャンセル",
+                "submit": "フォークしてデフォルトに設定"
+            },
+            "archiveDialog": {
+                "title": "カスタムテンプレートをアーカイブ",
+                "description": "カタログからこのテンプレートをアーカイブします。現在どのワークにも割り当てられていないテンプレートのみアーカイブできます。",
+                "templateLabel": "テンプレート",
+                "cancel": "キャンセル",
+                "submit": "テンプレートをアーカイブ"
+            },
+            "empty": {
+                "title": "テンプレートが見つかりません",
+                "default": "このビューに一致するテンプレートはまだありません。",
+                "search": "別の検索語を試すか、現在のフィルターをクリアしてください。",
+                "resetFilters": "フィルターをリセット"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub リポジトリ URL が必要です。",
+                "repositoryUrlInvalid": "https://github.com/owner/repository のような有効な GitHub リポジトリ URL を入力してください。",
+                "forkTargetRequired": "フォークの GitHub アカウントまたは組織を選択してください。",
+                "addSuccess": "GitHub URL からテンプレートを保存しました。",
+                "addFailed": "テンプレートの保存に失敗しました。",
+                "updateSuccess": "テンプレートの詳細を更新しました。",
+                "updateFailed": "テンプレート詳細の更新に失敗しました。",
+                "archiveSuccess": "カタログからテンプレートをアーカイブしました。",
+                "archiveFailed": "テンプレートのアーカイブに失敗しました。",
+                "forkSuccess": "{repository} をフォークし、カタログに追加してデフォルトに設定しました。",
+                "forkExisting": "{repository} は既にカタログに存在し、現在デフォルトのフォーク済みテンプレートとなっています。",
+                "forkFailed": "テンプレートのフォークに失敗しました。",
+                "refreshSuccess": "テンプレートカタログを更新しました。",
+                "refreshFailed": "テンプレートの更新に失敗しました。",
+                "defaultUpdated": "デフォルトテンプレートを更新しました。",
+                "defaultFailed": "デフォルトテンプレートの更新に失敗しました。"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "デフォルトを使用",
+            "defaultOptionWithName": "デフォルトを使用 ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (デフォルト)",
+            "changeAnywayLink": "それでも変更する",
+            "origin": {
+                "standard": "標準",
+                "forked": "フォーク済み",
+                "customUrl": "カスタム URL"
+            },
+            "state": {
+                "defaultBadge": "継承されたデフォルト",
+                "inheritedTitle": "デフォルトテンプレートを使用中",
+                "inheritedDescription": "特定のテンプレートをピン止めするまで、このワークは現在のデフォルトテンプレートに従います。",
+                "pinnedTitle": "ピン止めされたテンプレート",
+                "pinnedDescription": "デフォルトが後で変更されても、このワークはこのテンプレートを使い続けます。"
+            }
+        },
         "workPlugins": {
             "title": "ワークプラグイン",
             "subtitle": "このワークのプラグインを設定",
@@ -3067,6 +3280,7 @@
             "history": "履歴",
             "comparisons": "比較",
             "plugins": "プラグイン",
+            "templates": "テンプレート",
             "profile": "プロフィール",
             "security": "セキュリティ",
             "apiKeys": "APIキー",
