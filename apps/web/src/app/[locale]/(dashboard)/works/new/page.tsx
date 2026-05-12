@@ -11,6 +11,8 @@ import {
 } from '@/lib/api';
 import NewWorkClient from './new-work-client';
 import type { DeployProvider } from './deploy-provider-selector';
+import { workProposalsAPI } from '@/lib/api/work-proposals';
+import type { WorkProposal } from '@/lib/api/work-proposals';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -22,7 +24,12 @@ export interface ProviderWithConnection {
     connectionInfo: GitProviderConnectionInfo | null;
 }
 
-export default async function NewWorkPage() {
+interface NewWorkPageProps {
+    searchParams: Promise<{ proposal?: string }>;
+}
+
+export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
+    const { proposal: proposalId } = await searchParams;
     const user = await getAuthFromCookie();
 
     // Get all available git providers and their connection status
@@ -76,6 +83,16 @@ export default async function NewWorkPage() {
         websiteTemplates = [];
     }
 
+    let proposal: WorkProposal | null = null;
+    if (proposalId) {
+        try {
+            const list = await workProposalsAPI.list(['pending']);
+            proposal = list.find((p) => p.id === proposalId) ?? null;
+        } catch (error) {
+            console.error('Failed to fetch proposal for prefill:', error);
+        }
+    }
+
     return (
         <NewWorkClient
             user={user!}
@@ -84,6 +101,7 @@ export default async function NewWorkPage() {
             deployProviders={deployProviders}
             defaultDeployProviderId={defaultDeployProviderId}
             websiteTemplates={websiteTemplates}
+            proposal={proposal}
         />
     );
 }

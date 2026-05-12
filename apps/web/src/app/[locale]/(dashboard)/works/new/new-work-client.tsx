@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
 import { Bot, PenLine, FolderInput, ArrowRight } from 'lucide-react';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
+import type { WorkProposal } from '@/lib/api/work-proposals';
 
 interface NewWorkClientProps {
     user: AuthUser;
@@ -20,6 +21,7 @@ interface NewWorkClientProps {
     deployProviders: DeployProvider[];
     defaultDeployProviderId: string | null;
     websiteTemplates: WebsiteTemplateOption[];
+    proposal?: WorkProposal | null;
 }
 
 export default function NewWorkClient({
@@ -29,8 +31,13 @@ export default function NewWorkClient({
     deployProviders,
     defaultDeployProviderId,
     websiteTemplates,
+    proposal,
 }: NewWorkClientProps) {
-    const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
+    // When prefilling from a Work Proposal (EW-584), jump straight to the
+    // manual form with proposal values pre-populated.
+    const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(
+        proposal ? 'manual' : null,
+    );
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
         defaultProviderId || providers[0]?.provider.id || null,
     );
@@ -268,6 +275,7 @@ export default function NewWorkClient({
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
+                        proposal={proposal ?? undefined}
                     />
                 )}
                 {creationMode === 'import' && (
