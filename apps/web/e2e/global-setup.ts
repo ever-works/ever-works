@@ -70,7 +70,7 @@ setup('authenticate', async ({ page, baseURL }) => {
         }
     }, ONBOARDING_KEY);
 
-    const apiBase = process.env.API_URL || 'http://localhost:3100';
+    let apiBase = process.env.API_URL || 'http://localhost:3100';
     try {
         const loginRes = await fetch(`${apiBase}/api/auth/login`, {
             method: 'POST',
@@ -83,10 +83,20 @@ setup('authenticate', async ({ page, baseURL }) => {
         if (loginRes.ok) {
             const { access_token } = (await loginRes.json()) as { access_token?: string };
             if (access_token) {
-                await fetch(`${apiBase}/api/onboarding/dismiss`, {
+                const dismissRes = await fetch(`${apiBase}/api/onboarding/dismiss`, {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${access_token}` },
                 });
+                // If the endpoint exists but rejects the call, surface it.
+                // 404 is tolerated (older API builds without v2 wizard route),
+                // but anything else means onboarding_dismissed_at stays NULL
+                // and the modal will block subsequent Playwright clicks — the
+                // exact regression this setup is meant to prevent.
+                if (!dismissRes.ok && dismissRes.status !== 404) {
+                    console.warn(
+                        `[e2e global-setup] onboarding dismiss returned ${dismissRes.status} ${dismissRes.statusText} — wizard may still block clicks`,
+                    );
+                }
             }
         }
     } catch {
