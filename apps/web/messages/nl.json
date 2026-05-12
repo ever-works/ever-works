@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Geen activiteiten hier",
                 "noWork": "Geen werk",
+                "loadMore": "{count} meer laden",
                 "columns": {
                     "pending": "In afwachting",
                     "in_progress": "Bezig",
                     "completed": "Voltooid",
                     "failed": "Mislukt",
                     "cancelled": "Geannuleerd"
-                },
-                "loadMore": "{count} meer laden"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} items",
                 "noDescription": "Geen beschrijving",
                 "empty": "Geen werken hier",
+                "loadMore": "{count} meer laden",
                 "columns": {
                     "not_started": "Niet gestart",
                     "scheduled": "Gepland",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Voltooid met waarschuwingen",
                     "failed": "Mislukt",
                     "cancelled": "Geannuleerd"
-                },
-                "loadMore": "{count} meer laden"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Beveiliging",
                 "apiKeys": "API-sleutels",
                 "data": "Gegevens",
+                "githubApp": "GitHub App",
                 "gitProviders": "Git-providers",
                 "dangerZone": "Gevaarzone"
+            },
+            "githubApp": {
+                "title": "GitHub App-installaties",
+                "subtitle": "Controleer installaties die via de Ever Works GitHub App zijn gekoppeld en ververs handmatig de repository-snapshot voordat verdere onboardingwerk wordt uitgevoerd.",
+                "emptyTitle": "Nog geen GitHub App-installaties",
+                "emptyDescription": "Installeer de Ever Works GitHub App op een repository of organisatie, voltooi daarna de installatiestap om de installatie aan deze werkruimte te koppelen.",
+                "sync": "Synchroniseer",
+                "syncSuccess": "Installatie gesynchroniseerd",
+                "syncError": "Fout bij synchroniseren van installatie",
+                "onboard": "Onboarden",
+                "onboardSuccess": "Repository geboarded",
+                "onboardError": "Fout bij onboarden van repository",
+                "active": "Actief",
+                "suspended": "Geschorst",
+                "installationMeta": "Installatie #{installationId} · {accountType} account · {targetType} doel",
+                "repoCount": "Repositories",
+                "updatedAt": "Laatst gesynchroniseerd",
+                "appSlug": "App-slug",
+                "repositories": "Repositories",
+                "noRepositories": "Deze installatie heeft nog geen opgeslagen repositories. Voer synchronisatie uit om de snapshot vanuit GitHub te vernieuwen.",
+                "branch": "Tak: {branch}",
+                "branchUnknown": "Standaardbranch niet beschikbaar",
+                "private": "Privaat",
+                "public": "Openbaar"
             },
             "data": {
                 "exportTitle": "Gegevens exporteren",
@@ -1021,6 +1046,14 @@
                     "submit": "Uitnodiging verzenden",
                     "cancel": "Annuleren",
                     "success": "Lid succesvol uitgenodigd.",
+                    "modes": {
+                        "direct": {
+                            "description": "Voeg een bestaande gebruiker direct als lid toe via hun e‑mail. Ze krijgen meteen de toegewezen rol."
+                        },
+                        "link": {
+                            "description": "Genereer een eenmalige link om te delen. De ontvanger kan deze inwisselen om lid te worden — of eigendom te claimen, als je een eigenaarsclaim-link maakt."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "E-mailadres is verplicht.",
                         "failed": "Kon lid niet uitnodigen. Probeer het opnieuw."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Tag gewijzigd",
                     "collection_change": "Verzameling gewijzigd",
                     "community_pr_merged": "Community PR"
+                },
+                "generationInfo": {
+                    "label": "Generatiedetails",
+                    "itemsAdded": "Toegevoegde items",
+                    "itemsUpdated": "Bijgewerkte items",
+                    "totalItems": "Totaal items",
+                    "pagesProcessed": "Verwerkte pagina's",
+                    "tokensUsed": "Gebruikte tokens",
+                    "existingReferencesUsed": "Gebruikte bestaande referenties"
                 },
                 "detail": {
                     "added": "Toegevoegd",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "AI-model overschrijven",
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optioneel. Gebruikt standaard het geïmporteerde of vorige model, tenzij je het hier overschrijft.",
+                "modelOverrideUnavailable": "Selecteer eerst een geconfigureerde AI‑provider om een model te kiezen uit de beschikbare lijst.",
+                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt.",
+                "websiteTemplateLockedHelperText": "De template‑selectie is vergrendeld na de eerste website‑generatie.",
                 "recommended": "Aanbevolen",
                 "promptPlaceholder": "Beschrijf welke items voor deze map moeten worden gegenereerd...",
                 "promptHelperText": "Wees specifiek over het type content dat je wilt genereren",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Annulering van generatie mislukt"
             },
             "settings": {
+                "tabs": {
+                    "general": "Algemeen",
+                    "members": "Leden",
+                    "navigationLabel": "Instellingen-tabbladen"
+                },
                 "sourceSettings": "Bronrepository",
                 "originalSource": "Originele bron",
                 "syncEnabled": "Synchronisatie ingeschakeld",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Automatische sjabloonupdates",
                         "description": "Houd uw website automatisch gesynchroniseerd met de nieuwste sjabloonwijzigingen.",
+                        "selectorLabel": "Website‑template",
+                        "currentTemplateLabel": "Huidige template",
+                        "unknownTemplate": "Geërfde standaard",
+                        "currentHelperText": "De geselecteerde template bepaalt hoe de website‑repository wordt geïnitialiseerd en bijgewerkt.",
+                        "switchHelperText": "Het toepassen van een nieuwe template zet de bestaande website‑repository terug naar de geselecteerde template, als deze al bestaat.",
+                        "switchAction": "Pas template toe op website‑repository",
+                        "switchActionIdle": "Template is up‑to‑date",
+                        "switchConfirmTitle": "Website‑template overschakelen?",
+                        "switchConfirmDescription": "Als de website‑repository al bestaat, wordt de inhoud vervangen door de geselecteerde template. Eventuele aangepaste code in die repository gaat verloren.",
+                        "switchConfirmButton": "Sjabloon overschakelen",
+                        "switchCancel": "Annuleren",
                         "autoUpdate": "Automatisch bijwerken",
                         "autoUpdateDescription": "Controleer elk uur op sjabloonupdates en pas automatisch toe.",
                         "useBeta": "Beta-versie van sjabloon gebruiken",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Laatst bijgewerkt",
                         "lastChecked": "Laatst gecontroleerd",
                         "lastError": "Laatste fout",
+                        "inheritedState": "Dit werk erft je huidige standaardtemplate.",
+                        "explicitState": "Dit werk is vastgezet op een expliciete template‑selectie.",
+                        "originStandard": "Standaard",
+                        "originForked": "Forked",
+                        "originCustomUrl": "Aangepaste URL",
                         "updateSuccess": "Instellingen succesvol bijgewerkt",
                         "updateFailed": "Instellingen bijwerken mislukt",
                         "githubRequired": "GitHub-verbinding vereist. Verbind uw GitHub-account in Instellingen om automatische updates in te schakelen."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Organisatie-repository",
                 "organizationHelp": "Maak repositories aan onder een organisatie in plaats van je persoonlijke account",
                 "organizationNameLabel": "Organisatienaam",
-                "organizationNamePlaceholder": "Voer organisatienaam in"
+                "organizationNamePlaceholder": "Voer organisatienaam in",
+                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt."
             },
             "manual": {
                 "title": "Handmatig aanmaken",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Maak deze werk aan onder een GitHub-organisatie in plaats van je persoonlijke account",
                 "organizationNameLabel": "Organisatienaam",
                 "organizationNamePlaceholder": "mijn-organisatie",
+                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt.",
                 "headerLabel": "Aangepaste README-header",
                 "headerPlaceholder": "Voeg aangepaste content toe bovenaan je README-bestand",
                 "headerOverwrite": "Standaard header volledig vervangen",
@@ -2703,6 +2771,7 @@
                 "activity": "Activiteit",
                 "works": "Werken",
                 "plugins": "Plugins",
+                "templates": "Sjablonen",
                 "settings": "Instellingen"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Verwijder {login}"
             }
         },
+        "templates": {
+            "title": "Sjablonen",
+            "subtitle": "Blader door de ingebouwde website‑sjablonen, beheer je aangepaste catalogus, en bepaal welke sjabloon nieuwe werken gebruiken.",
+            "actions": {
+                "addTemplate": "Aangepaste sjabloon toevoegen",
+                "refreshTemplates": "Sjablonen verversen"
+            },
+            "hero": {
+                "eyebrow": "Sjablonencatalogus",
+                "catalogHint": "Elke sjabloon in deze catalogus kan je standaard worden. Fork een ingebouwde sjabloon om er je eigen startpunt van te maken."
+            },
+            "stats": {
+                "defaultLabel": "Actieve standaard",
+                "defaultHint": "Nieuwe werken beginnen met deze sjabloon tenzij je deze per werk overschrijft.",
+                "builtInLabel": "Ingebouwd",
+                "builtInHint": "Onderhouden Ever Works‑sjablonen.",
+                "customLabel": "Aangepast",
+                "customHint": "Opgeslagen uit je eigen GitHub‑repositories of forks.",
+                "none": "Geen standaard"
+            },
+            "filters": {
+                "all": "Alles",
+                "builtIn": "Ingebouwd",
+                "custom": "Aangepast",
+                "searchPlaceholder": "Zoek sjablonen, frameworks of repositories..."
+            },
+            "card": {
+                "builtIn": "Ingebouwd",
+                "custom": "Aangepast",
+                "standard": "Standaard",
+                "forked": "Forked",
+                "customUrl": "Aangepaste URL",
+                "standardSource": "Ever Works standaard",
+                "forkedSource": "Geforkt naar je GitHub",
+                "customUrlSource": "Toegevoegd vanuit GitHub‑URL",
+                "default": "Standaard",
+                "defaultSelected": "Standaard geselecteerd",
+                "makeDefault": "Maak standaard",
+                "fork": "Fork",
+                "edit": "Bewerken",
+                "archive": "Archiveren",
+                "catalogOnly": "Catalogus-item",
+                "openRepository": "Repository openen",
+                "previewAlt": "{name} preview",
+                "frameworkAgnostic": "Framework‑onafhankelijk",
+                "branch": "Tak: {branch}",
+                "syncBranches": "{count} sync‑takken",
+                "betaBranch": "Bèta: {branch}",
+                "noDescription": "Nog geen beschrijving."
+            },
+            "dialog": {
+                "title": "Aangepaste sjabloon toevoegen",
+                "description": "Sla een GitHub‑repository op in je persoonlijke sjablooncatalogus. Dit eerste deel slaat de sjabloonmetadata op zodat deze in de volgende toewijzingsstroom kan worden geselecteerd.",
+                "editTitle": "Aangepaste sjabloon bewerken",
+                "editDescription": "Werk de weergegevens en preview‑afbeelding bij die worden gebruikt voor deze aangepaste sjabloon in je catalogus.",
+                "repositoryUrlLabel": "GitHub‑repository‑URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "De bronsrepository‑URL kan niet worden gewijzigd nadat de sjabloon is toegevoegd.",
+                "nameLabel": "Sjabloonnaam",
+                "namePlaceholder": "Optionele weergavenaam",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Selecteer een framework",
+                "frameworkUnspecified": "Niet gespecificeerd",
+                "previewImageLabel": "Preview‑afbeelding‑URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Optioneel. Gebruik een gecureerde screenshot als je de GitHub‑repository‑preview wilt overschrijven.",
+                "descriptionLabel": "Korte beschrijving",
+                "descriptionPlaceholder": "Waarvoor deze sjabloon het meest geschikt is",
+                "branchLabel": "Standaardtak",
+                "branchPlaceholder": "main",
+                "branchHelp": "Laat leeg om standaard op main te worden.",
+                "betaBranchLabel": "Bèta‑tak",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Optioneel. Tak die wordt gebruikt voor bèta‑implementaties.",
+                "cancel": "Annuleren",
+                "submit": "Sjabloon opslaan",
+                "saveChanges": "Wijzigingen opslaan"
+            },
+            "forkDialog": {
+                "title": "Standaardsjabloon forken",
+                "description": "Maak je eigen GitHub‑kopie van deze standaardsjabloon, voeg het toe aan je catalogus en stel het in als standaard voor nieuwe werken.",
+                "sourceLabel": "Sjabloonbron",
+                "targetLabel": "Fork‑bestemming",
+                "targetPlaceholder": "Selecteer een GitHub‑account of organisatie",
+                "targetHelp": "De fork wordt gemaakt onder {target}.",
+                "personalTarget": "Persoonlijk account ({login})",
+                "organizationTarget": "Organisatie ({login})",
+                "noTargets": "Verbind GitHub en laad je organisaties voordat je een sjabloon fork.",
+                "resultLabel": "Nieuwe repository",
+                "none": "jouw geselecteerde account",
+                "cancel": "Annuleren",
+                "submit": "Forken en als standaard instellen"
+            },
+            "archiveDialog": {
+                "title": "Aangepaste sjabloon archiveren",
+                "description": "Archiveer deze sjabloon uit je catalogus. Je kunt alleen sjablonen archiveren die momenteel niet aan enige werken zijn toegewezen.",
+                "templateLabel": "Sjabloon",
+                "cancel": "Annuleren",
+                "submit": "Sjabloon archiveren"
+            },
+            "empty": {
+                "title": "Geen sjablonen gevonden",
+                "default": "Nog geen sjablonen passen bij deze weergave.",
+                "search": "Probeer een andere zoekterm of wis de huidige filter.",
+                "resetFilters": "Filters resetten"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub‑repository‑URL is vereist.",
+                "repositoryUrlInvalid": "Voer een geldige GitHub‑repository‑URL in, bijvoorbeeld https://github.com/eigenaar/repository.",
+                "forkTargetRequired": "Kies een GitHub‑account of organisatie voor de fork.",
+                "addSuccess": "Sjabloon opgeslagen vanuit GitHub‑URL.",
+                "addFailed": "Mislukt om sjabloon op te slaan.",
+                "updateSuccess": "Sjabloongegevens bijgewerkt.",
+                "updateFailed": "Mislukt om sjabloongegevens bij te werken.",
+                "archiveSuccess": "Sjabloon gearchiveerd uit je catalogus.",
+                "archiveFailed": "Mislukt om sjabloon te archiveren.",
+                "forkSuccess": "Geforkt {repository}, toegevoegd aan je catalogus, en ingesteld als jouw standaard.",
+                "forkExisting": "{repository} zat al in je catalogus en is nu je standaard geforkte sjabloon.",
+                "forkFailed": "Mislukt om sjabloon te forken.",
+                "refreshSuccess": "Sjablonencatalogus vernieuwd.",
+                "refreshFailed": "Mislukt om sjablonen te vernieuwen.",
+                "defaultUpdated": "Standaardsjabloon bijgewerkt.",
+                "defaultFailed": "Mislukt om standaardsjabloon bij te werken."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Gebruik standaard",
+            "defaultOptionWithName": "Gebruik standaard ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Standaard)",
+            "changeAnywayLink": "Desondanks wijzigen",
+            "origin": {
+                "standard": "Standaard",
+                "forked": "Forked",
+                "customUrl": "Aangepaste URL"
+            },
+            "state": {
+                "defaultBadge": "Geërfde standaard",
+                "inheritedTitle": "Standaardsjabloon gebruiken",
+                "inheritedDescription": "Dit werk volgt je huidige standaardsjabloon totdat je een specifieke sjabloon vastzet.",
+                "pinnedTitle": "Vastgezette sjabloon",
+                "pinnedDescription": "Dit werk blijft deze sjabloon gebruiken, zelfs als je standaard later verandert."
+            }
+        },
         "workPlugins": {
             "title": "Mapplug-ins",
             "subtitle": "Configureer plug-ins voor deze map",
@@ -3067,6 +3280,7 @@
             "history": "Geschiedenis",
             "comparisons": "Vergelijkingen",
             "plugins": "Plug-ins",
+            "templates": "Sjablonen",
             "profile": "Profiel",
             "security": "Beveiliging",
             "apiKeys": "API-sleutels",

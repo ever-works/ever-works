@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "אין פעילויות כאן",
                 "noWork": "אין עבודה",
+                "loadMore": "טען עוד {count}",
                 "columns": {
                     "pending": "ממתין",
                     "in_progress": "בתהליך",
                     "completed": "הושלם",
                     "failed": "נכשל",
                     "cancelled": "בוטל"
-                },
-                "loadMore": "טען עוד {count}"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} פריטים",
                 "noDescription": "אין תיאור",
                 "empty": "אין עבודות כאן",
+                "loadMore": "טען עוד {count}",
                 "columns": {
                     "not_started": "לא התחיל",
                     "scheduled": "מתוזמן",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "הושלם עם אזהרות",
                     "failed": "נכשל",
                     "cancelled": "בוטל"
-                },
-                "loadMore": "טען עוד {count}"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "אבטחה",
                 "apiKeys": "מפתחות API",
                 "data": "נתונים",
+                "githubApp": "GitHub App",
                 "gitProviders": "ספקי Git",
                 "dangerZone": "אזור סכנה"
+            },
+            "githubApp": {
+                "title": "התקנות GitHub App",
+                "subtitle": "בדוק את ההתקנות המקושרות דרך GitHub App של Ever Works ורענן באופן ידני את צילום המאגר לפני שהעבודה המורכבת יותר של הקליטה תתחיל。",
+                "emptyTitle": "עדיין אין התקנות של GitHub App",
+                "emptyDescription": "התקן את GitHub App של Ever Works במאגר או בארגון, לאחר מכן השלם את הפניה להגדרה כדי שההתקנה תהיה מקושרת למרחב העבודה הזה。",
+                "sync": "סנכרן",
+                "syncSuccess": "התקנה סונכרנה",
+                "syncError": "הסנכרון נכשל",
+                "onboard": "קלוט",
+                "onboardSuccess": "המאגר נקלט",
+                "onboardError": "הכשלון בקליטת המאגר",
+                "active": "פעיל",
+                "suspended": "מושהה",
+                "installationMeta": "התקנה #{installationId} · חשבון {accountType} · מטרה {targetType}",
+                "repoCount": "מאגרים",
+                "updatedAt": "סונכרן לאחרונה",
+                "appSlug": "Slug של האפליקציה",
+                "repositories": "מאגרים",
+                "noRepositories": "ההתקנה הזו עדיין לא כוללת מאגרים מאוחסנים. הפעל סנכרון כדי לרענן את הצילום מ-GitHub.",
+                "branch": "ענף ברירת מחדל: {branch}",
+                "branchUnknown": "ענף ברירת מחדל לא זמין",
+                "private": "פרטי",
+                "public": "ציבורי"
             },
             "data": {
                 "exportTitle": "ייצוא נתונים",
@@ -1021,6 +1046,14 @@
                     "submit": "שלח הזמנה",
                     "cancel": "בטל",
                     "success": "החבר הוזמן בהצלחה.",
+                    "modes": {
+                        "direct": {
+                            "description": "הוסף משתמש קיים כחבר באופן מיידי באמצעות כתובת האימייל שלו. הוא יקבל את התפקיד שהוקצה מיד。"
+                        },
+                        "link": {
+                            "description": "צור קישור חד-פעמי לשיתוף. הנמען יוכל לממש אותו כדי להצטרף — או לבקש בעלות, אם יצרת קישור בעלות。"
+                        }
+                    },
                     "errors": {
                         "emailRequired": "כתובת דוא\"ל נדרשת.",
                         "failed": "נכשל בהזמנת החבר. נסה שוב."
@@ -1321,6 +1354,15 @@
                     "tag_change": "שינוי תג",
                     "collection_change": "שינוי אוסף",
                     "community_pr_merged": "PR קהילתי"
+                },
+                "generationInfo": {
+                    "label": "פרטי יצירה",
+                    "itemsAdded": "פריטים שנוספו",
+                    "itemsUpdated": "פריטים שעודכנו",
+                    "totalItems": "סך הפריטים",
+                    "pagesProcessed": "דפים שעובדו",
+                    "tokensUsed": "טוקנים שנוצלו",
+                    "existingReferencesUsed": "הפניות קיימות שנוצלו"
                 },
                 "detail": {
                     "added": "נוסף",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "עקיפת מודל AI",
                 "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "אופציונלי. משתמש במודל המיובא או הקודם כברירת מחדל אלא אם תעקוף אותו כאן.",
+                "modelOverrideUnavailable": "ראשית בחר ספק AI מוגדר כדי לבחור מודל מהרשימה הזמינה。",
+                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。",
+                "websiteTemplateLockedHelperText": "בחירת התבנית נעולה לאחר יצירת האתר הראשונה。",
                 "recommended": "מומלץ",
                 "promptPlaceholder": "תאר אילו פריטים יש לייצר עבור תיקייה זו...",
                 "promptHelperText": "היה ספציפי לגבי סוג התוכן שברצונך לייצר",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "נכשל בביטול יצירה"
             },
             "settings": {
+                "tabs": {
+                    "general": "כללי",
+                    "members": "חברים",
+                    "navigationLabel": "כרטיסיות הגדרות"
+                },
                 "sourceSettings": "מאגר מקור",
                 "originalSource": "מקור מקורי",
                 "syncEnabled": "סנכרון מופעל",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "עדכוני תבנית אוטומטיים",
                         "description": "שמור על אתרך מסונכרן אוטומטית עם השינויים האחרונים בתבנית.",
+                        "selectorLabel": "תבנית אתר",
+                        "currentTemplateLabel": "תבנית נוכחית",
+                        "unknownTemplate": "ברירת מחדל מורשת",
+                        "currentHelperText": "התבנית שנבחרה שולטת באופן אתחול ועדכון מאגר האתר。",
+                        "switchHelperText": "החלת תבנית חדשה תאפס את מאגר האתר הקיים מהתבנית שנבחרה אם הוא כבר קיים。",
+                        "switchAction": "החל תבנית על מאגר האתר",
+                        "switchActionIdle": "התבנית מעודכנת",
+                        "switchConfirmTitle": "להחליף תבנית אתר؟",
+                        "switchConfirmDescription": "אם מאגר האתר כבר קיים, תכניו יחלפו מהתבנית שנבחרה. כל קוד מותאם במאגר זה ייאבד。",
+                        "switchConfirmButton": "החלף תבנית",
+                        "switchCancel": "ביטול",
                         "autoUpdate": "עדכן אוטומטית",
                         "autoUpdateDescription": "בדוק עדכוני תבנית כל שעה והחל אוטומטית.",
                         "useBeta": "השתמש בגרסת בטא של התבנית",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "עודכן לאחרונה",
                         "lastChecked": "נבדק לאחרונה",
                         "lastError": "שגיאה אחרונה",
+                        "inheritedState": "העבודה הזו יורשת את ברירת המחדל הנוכחית שלך。",
+                        "explicitState": "העבודה הזו מוצמדת לבחירת תבנית מפורשת。",
+                        "originStandard": "תקן",
+                        "originForked": "מועתק",
+                        "originCustomUrl": "כתובת URL מותאמת",
                         "updateSuccess": "הגדרות עודכנו בהצלחה",
                         "updateFailed": "נכשל בעדכון ההגדרות",
                         "githubRequired": "נדרשת חיבור GitHub. נא חבר את חשבון GitHub שלך בהגדרות כדי לאפשר עדכונים אוטומטיים."
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "מאגר ארגון",
                 "organizationHelp": "צור מאגרים תחת ארגון במקום חשבון אישי",
                 "organizationNameLabel": "שם ארגון",
-                "organizationNamePlaceholder": "הזן שם ארגון"
+                "organizationNamePlaceholder": "הזן שם ארגון",
+                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。"
             },
             "manual": {
                 "title": "צור ידנית",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "צור עבודה זו תחת ארגון GitHub במקום חשבון אישי",
                 "organizationNameLabel": "שם ארגון",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。",
                 "headerLabel": "כותרת README מותאמת",
                 "headerPlaceholder": "הוסף תוכן מותאם לחלק העליון של קובץ README שלך",
                 "headerOverwrite": "החלף את הכותרת המוגדרת מראש לחלוטין",
@@ -2703,6 +2771,7 @@
                 "activity": "פעילות",
                 "works": "עבודות",
                 "plugins": "תוספים",
+                "templates": "תבניות",
                 "settings": "הגדרות"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "הסר {login}"
             }
         },
+        "templates": {
+            "title": "תבניות",
+            "subtitle": "עיין בתבניות אתרים מובנות, נהל את הקטלוג המותאם שלך, וקבע איזו תבנית יתחילו ממנה עבודות חדשות.",
+            "actions": {
+                "addTemplate": "הוסף תבנית מותאמת",
+                "refreshTemplates": "רענן תבניות"
+            },
+            "hero": {
+                "eyebrow": "קטלוג תבניות",
+                "catalogHint": "כל תבנית בקטלוג זה יכולה להפוך לברירת המחדל שלך. פיצול תבנית מובנית כדי להפוך אותה לנקודת ההתחלה שלך."
+            },
+            "stats": {
+                "defaultLabel": "ברירת מחדל פעילה",
+                "defaultHint": "עבודות חדשות יתחילו מתבנית זו אלא אם תעקוף אותה לכל עבודה.",
+                "builtInLabel": "מובנה",
+                "builtInHint": "תבניות Ever Works מתוחזקות.",
+                "customLabel": "מותאם",
+                "customHint": "נשמר ממאגרי GitHub משלך או מפיצולים.",
+                "none": "אין ברירת מחדל"
+            },
+            "filters": {
+                "all": "הכל",
+                "builtIn": "מובנה",
+                "custom": "מותאם",
+                "searchPlaceholder": "חפש תבניות, מסגרות, או מאגרים..."
+            },
+            "card": {
+                "builtIn": "מובנה",
+                "custom": "מותאם",
+                "standard": "תקן",
+                "forked": "מפוצל",
+                "customUrl": "כתובת URL מותאמת",
+                "standardSource": "תקן Ever Works",
+                "forkedSource": "מפוצל ל-GitHub שלך",
+                "customUrlSource": "הוסף מכתובת URL של GitHub",
+                "default": "ברירת מחדל",
+                "defaultSelected": "ברירת מחדל נבחרה",
+                "makeDefault": "הפוך לברירת מחדל",
+                "fork": "פיצול",
+                "edit": "עריכה",
+                "archive": "ארכיון",
+                "catalogOnly": "פריט בקטלוג בלבד",
+                "openRepository": "פתח מאגר",
+                "previewAlt": "{name} תצוגה מקדימה",
+                "frameworkAgnostic": "בלתי תלוי במסגרת",
+                "branch": "ענף: {branch}",
+                "syncBranches": "{count} ענפים מסונכרנים",
+                "betaBranch": "בטא: {branch}",
+                "noDescription": "עדיין אין תיאור."
+            },
+            "dialog": {
+                "title": "הוסף תבנית מותאמת",
+                "description": "שמור מאגר GitHub בקטלוג התבניות האישי שלך. השלב הראשון מאחסן את מטא-הנתונים של התבנית כך שניתן יהיה לבחור אותה בזרימת ההקצאה הבאה.",
+                "editTitle": "ערוך תבנית מותאמת",
+                "editDescription": "עדכן את פרטי התצוגה ותמונת התצוגה המקדימה המשמשים לתבנית המותאמת בקטלוג שלך.",
+                "repositoryUrlLabel": "כתובת URL של מאגר GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "כתובת URL של מאגר המקור לא ניתן לשינוי לאחר שהוספת התבנית.",
+                "nameLabel": "שם תבנית",
+                "namePlaceholder": "שם תצוגה אופציונלי",
+                "frameworkLabel": "מסגרת",
+                "frameworkSelectPlaceholder": "בחר מסגרת",
+                "frameworkUnspecified": "לא צוין",
+                "previewImageLabel": "כתובת URL של תמונת תצוגה מקדימה",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "אופציונלי. השתמש בצילום מסך מאוצר אם ברצונך להחליף את תצוגת המקדימה של מאגר GitHub.",
+                "descriptionLabel": "תיאור קצר",
+                "descriptionPlaceholder": "למה תבנית זו מתאימה ביותר",
+                "branchLabel": "ענף ברירת מחדל",
+                "branchPlaceholder": "main",
+                "branchHelp": "השאר ריק כדי להשתמש בענף main כברירת מחדל.",
+                "betaBranchLabel": "ענף בטא",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "אופציונלי. ענף המשמש לפריסות בטא.",
+                "cancel": "ביטול",
+                "submit": "שמור תבנית",
+                "saveChanges": "שמור שינויים"
+            },
+            "forkDialog": {
+                "title": "פיצול תבנית תקן",
+                "description": "צור עותק GitHub משלך של תבנית תקן זו, הוסף אותה לקטלוג שלך, וקבע אותה כברירת מחדל לעבודות חדשות.",
+                "sourceLabel": "מקור תבנית",
+                "targetLabel": "יעד פיצול",
+                "targetPlaceholder": "בחר חשבון GitHub או ארגון",
+                "targetHelp": "הפיצול ייווצר תחת {target}.",
+                "personalTarget": "חשבון אישי ({login})",
+                "organizationTarget": "ארגון ({login})",
+                "noTargets": "חבר את GitHub וטען את הארגונים שלך לפני ביצוע פיצול של תבנית.",
+                "resultLabel": "מאגר חדש",
+                "none": "החשבון שנבחר",
+                "cancel": "ביטול",
+                "submit": "פיצול והפוך לברירת מחדל"
+            },
+            "archiveDialog": {
+                "title": "ארכן תבנית מותאמת",
+                "description": "ארכן תבנית זו מהקטלוג שלך. ניתן לארכן רק תבניות שאינן מוקצות כרגע לשום עבודה.",
+                "templateLabel": "תבנית",
+                "cancel": "ביטול",
+                "submit": "ארכן תבנית"
+            },
+            "empty": {
+                "title": "לא נמצאו תבניות",
+                "default": "עדיין אין תבניות התואמות תצוגה זו.",
+                "search": "נסה מונח חיפוש אחר או נקה את המסנן הנוכחי.",
+                "resetFilters": "אפס מסננים"
+            },
+            "messages": {
+                "repositoryUrlRequired": "נדרשת כתובת URL של מאגר GitHub.",
+                "repositoryUrlInvalid": "הזן כתובת URL תקינה של מאגר GitHub כמו https://github.com/owner/repository.",
+                "forkTargetRequired": "בחר חשבון GitHub או ארגון עבור הפיצול.",
+                "addSuccess": "תבנית נשמרה מכתובת URL של GitHub.",
+                "addFailed": "השמירה של התבנית נכשלה.",
+                "updateSuccess": "פרטי התבנית עודכנו.",
+                "updateFailed": "העדכון של פרטי התבנית נכשל.",
+                "archiveSuccess": "תבנית אוחסנה מהקטלוג שלך.",
+                "archiveFailed": "הארכנה של התבנית נכשלה.",
+                "forkSuccess": "פוצל {repository}, נוסף לקטלוג שלך, ונקבע כברירת המחדל שלך.",
+                "forkExisting": "{repository} כבר היה בקטלוג שלך וכעת הוא תבנית המפוצלת ברירת המחדל שלך.",
+                "forkFailed": "הפיצול של התבנית נכשל.",
+                "refreshSuccess": "קטלוג התבניות רענן.",
+                "refreshFailed": "הרענון של התבניות נכשל.",
+                "defaultUpdated": "ברירת המחדל של התבנית עודכנה.",
+                "defaultFailed": "העדכון של ברירת המחדל של התבנית נכשל."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "השתמש בברירת המחדל",
+            "defaultOptionWithName": "השתמש בברירת המחדל ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (ברירת מחדל)",
+            "changeAnywayLink": "שנה בכל מקרה",
+            "origin": {
+                "standard": "תקן",
+                "forked": "מפוצל",
+                "customUrl": "כתובת URL מותאמת"
+            },
+            "state": {
+                "defaultBadge": "ברירת מחדל מורשת",
+                "inheritedTitle": "משתמש בתבנית ברירת המחדל",
+                "inheritedDescription": "העבודה הזו תעקוב אחר תבנית ברירת המחדל הנוכחית שלך עד שתצמיד תבנית ספציפית.",
+                "pinnedTitle": "תבנית מוצמדת",
+                "pinnedDescription": "העבודה הזו תמשיך להשתמש בתבנית זו גם אם ברירת המחדל שלך תשתנה בהמשך."
+            }
+        },
         "workPlugins": {
             "title": "תוספי עבודה",
             "subtitle": "הגדר תוספים עבור עבודה זו",
@@ -3067,6 +3280,7 @@
             "history": "היסטוריה",
             "comparisons": "השוואות",
             "plugins": "תוספים",
+            "templates": "תבניות",
             "profile": "פרופיל",
             "security": "אבטחה",
             "apiKeys": "מפתחות API",

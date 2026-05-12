@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Burada aktivite yok",
                 "noWork": "Çalışma yok",
+                "loadMore": "{count} daha yükle",
                 "columns": {
                     "pending": "Bekliyor",
                     "in_progress": "Devam Ediyor",
                     "completed": "Tamamlandı",
                     "failed": "Başarısız",
                     "cancelled": "İptal edildi"
-                },
-                "loadMore": "{count} daha yükle"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} öğe",
                 "noDescription": "Açıklama yok",
                 "empty": "Burada çalışma yok",
+                "loadMore": "{count} daha yükle",
                 "columns": {
                     "not_started": "Başlamadı",
                     "scheduled": "Planlandı",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Uyarılarla tamamlandı",
                     "failed": "Başarısız",
                     "cancelled": "İptal edildi"
-                },
-                "loadMore": "{count} daha yükle"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Güvenlik",
                 "apiKeys": "API Anahtarları",
                 "data": "Veri",
+                "githubApp": "GitHub Uygulaması",
                 "gitProviders": "Git Sağlayıcıları",
                 "dangerZone": "Tehlike Alanı"
+            },
+            "githubApp": {
+                "title": "GitHub App Kurulumları",
+                "subtitle": "Ever Works GitHub App üzerinden linklenmiş kurulumları inceleyin ve daha derin onboarding işlemi başlamadan önce depoların anlık görüntüsünü manuel olarak yenileyin.",
+                "emptyTitle": "Henüz GitHub App kurulumu yok",
+                "emptyDescription": "Ever Works GitHub App'yi bir depoya veya organizasyona kurun, ardından kurulum yönlendirmesini tamamlayarak bu çalışma alanına kurulumu bağlayın.",
+                "sync": "Senkronize",
+                "syncSuccess": "Kurulum senkronize edildi",
+                "syncError": "Kurulum senkronize edilemedi",
+                "onboard": "Onboard Et",
+                "onboardSuccess": "Depo onboard edildi",
+                "onboardError": "Depo onboard edilemedi",
+                "active": "Aktif",
+                "suspended": "Askıya Alınmış",
+                "installationMeta": "Kurulum #{installationId} · {accountType} hesabı · {targetType} hedefi",
+                "repoCount": "Depolar",
+                "updatedAt": "Son senkronizasyon",
+                "appSlug": "Uygulama slug",
+                "repositories": "Depolar",
+                "noRepositories": "Bu kurulumun henüz kaydedilmiş deposu yok. Senkronizasyonu çalıştırarak GitHub'dan anlık görüntüyü yenileyin.",
+                "branch": "Varsayılan dal: {branch}",
+                "branchUnknown": "Varsayılan dal kullanılamıyor",
+                "private": "Özel",
+                "public": "Genel"
             },
             "data": {
                 "exportTitle": "Veriyi Dışa Aktar",
@@ -1021,6 +1046,14 @@
                     "submit": "Davet Gönder",
                     "cancel": "İptal",
                     "success": "Üye başarıyla davet edildi.",
+                    "modes": {
+                        "direct": {
+                            "description": "Mevcut bir kullanıcıyı e-posta adresiyle hemen üye olarak ekleyin. Atanan rolü hemen alır."
+                        },
+                        "link": {
+                            "description": "Paylaşmak için tek kullanımlık bir bağlantı oluşturun. Alıcı bu bağlantıyı kullanarak katılabilir — veya sahip olma talebinde bulunabilir, eğer bir sahip-claim bağlantısı oluşturduysanız."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "E-posta adresi gereklidir.",
                         "failed": "Üye davet etme başarısız. Lütfen tekrar deneyin."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Etiket Değişikliği",
                     "collection_change": "Koleksiyon Değişikliği",
                     "community_pr_merged": "Topluluk PR"
+                },
+                "generationInfo": {
+                    "label": "Üretim ayrıntıları",
+                    "itemsAdded": "Eklenen öğeler",
+                    "itemsUpdated": "Güncellenen öğeler",
+                    "totalItems": "Toplam öğe",
+                    "pagesProcessed": "İşlenen sayfalar",
+                    "tokensUsed": "Kullanılan jetonlar",
+                    "existingReferencesUsed": "Kullanılan mevcut referanslar"
                 },
                 "detail": {
                     "added": "Eklendi",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "AI Modeli Geçersiz Kılma",
                 "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
+                "modelOverrideUnavailable": "Kullanılabilir listeden bir model seçmek için önce yapılandırılmış bir AI sağlayıcısı seçin.",
+                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin.",
+                "websiteTemplateLockedHelperText": "Şablon seçimi, ilk web sitesi üretildikten sonra kilitlenir.",
                 "recommended": "Önerilen",
                 "promptPlaceholder": "Bu iş için oluşturulacak öğeleri açıklayın...",
                 "promptHelperText": "Oluşturmak istediğiniz içerik türünü detaylı belirtin",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Üretim iptal edilemedi"
             },
             "settings": {
+                "tabs": {
+                    "general": "Genel",
+                    "members": "Üyeler",
+                    "navigationLabel": "Ayarlar sekmeleri"
+                },
                 "sourceSettings": "Kaynak Deposu",
                 "originalSource": "Orijinal Kaynak",
                 "syncEnabled": "Senkronizasyon Etkin",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Otomatik Şablon Güncellemeleri",
                         "description": "Web sitenizi en son şablon değişiklikleriyle otomatik olarak senkronize tutun.",
+                        "selectorLabel": "Web sitesi şablonu",
+                        "currentTemplateLabel": "Geçerli şablon",
+                        "unknownTemplate": "Devralınan varsayılan",
+                        "currentHelperText": "Seçilen şablon, web sitesi deposunun nasıl başlatılacağını ve güncelleneceğini kontrol eder.",
+                        "switchHelperText": "Yeni bir şablon uygulanırsa, mevcut web sitesi deposu seçilen şablondan sıfırlanır (zaten varsa).",
+                        "switchAction": "Şablonu web sitesi deposuna uygula",
+                        "switchActionIdle": "Şablon güncel",
+                        "switchConfirmTitle": "Web sitesi şablonunu değiştirmek istediğinizden emin misiniz?",
+                        "switchConfirmDescription": "Web sitesi deposu zaten varsa, içeriği seçilen şablondan değiştirilecektir. Depodaki herhangi bir özel kod kaybolacaktır.",
+                        "switchConfirmButton": "Şablonu Değiştir",
+                        "switchCancel": "İptal",
                         "autoUpdate": "Otomatik güncelle",
                         "autoUpdateDescription": "Her saat şablon güncellemelerini kontrol edin ve otomatik uygulayın.",
                         "useBeta": "Şablonun beta sürümünü kullan",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Son güncelleme",
                         "lastChecked": "Son kontrol",
                         "lastError": "Son hata",
+                        "inheritedState": "Bu iş, geçerli varsayılan şablonu devralıyor.",
+                        "explicitState": "Bu iş, açık bir şablon seçimine sabitlenmiştir.",
+                        "originStandard": "Standart",
+                        "originForked": "Forklu",
+                        "originCustomUrl": "Özel URL",
                         "updateSuccess": "Ayarlar başarıyla güncellendi",
                         "updateFailed": "Ayarlar güncellenemedi",
                         "githubRequired": "GitHub bağlantısı gerekli. Otomatik güncellemeleri etkinleştirmek için Ayarlar'da GitHub hesabınızı bağlayın"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Kuruluş Deposu",
                 "organizationHelp": "Kişisel hesabınız yerine bir kuruluş altında depolar oluşturun",
                 "organizationNameLabel": "Kuruluş Adı",
-                "organizationNamePlaceholder": "Kuruluş adını girin"
+                "organizationNamePlaceholder": "Kuruluş adını girin",
+                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin."
             },
             "manual": {
                 "title": "Manuel Oluştur",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Bu işi kişisel hesabınız yerine bir GitHub kuruluşu altında oluşturun",
                 "organizationNameLabel": "Kuruluş Adı",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin.",
                 "headerLabel": "Özel README Başlığı",
                 "headerPlaceholder": "README dosyanızın üstüne özel içerik ekleyin",
                 "headerOverwrite": "Varsayılan başlığı tamamen değiştir",
@@ -2703,6 +2771,7 @@
                 "activity": "Etkinlik",
                 "works": "İşler",
                 "plugins": "Eklentiler",
+                "templates": "Şablonlar",
                 "settings": "Ayarlar"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "{login} öğesini kaldır"
             }
         },
+        "templates": {
+            "title": "Şablonlar",
+            "subtitle": "Yerleşik web sitesi şablonlarını gözatın, özel kataloğunuzu yönetin ve yeni işlerin hangi şablondan başlayacağını kontrol edin.",
+            "actions": {
+                "addTemplate": "Özel şablon ekle",
+                "refreshTemplates": "Şablonları yenile"
+            },
+            "hero": {
+                "eyebrow": "Şablon kataloğu",
+                "catalogHint": "Bu kataloğudaki her şablon varsayılanınız olabilir. Yerleşik bir şablonu çatallayarak kendi başlangıç noktanızı oluşturabilirsiniz."
+            },
+            "stats": {
+                "defaultLabel": "Etkin varsayılan",
+                "defaultHint": "Yeni işler bu şablondan başlar, açıkça geçersiz kılmadıkça.",
+                "builtInLabel": "Yerleşik",
+                "builtInHint": "Sürekli güncellenen Ever Works şablonları.",
+                "customLabel": "Özel",
+                "customHint": "Kendi GitHub depolarınızdan veya çatallarınızdan kaydedildi.",
+                "none": "Varsayılan yok"
+            },
+            "filters": {
+                "all": "Hepsi",
+                "builtIn": "Yerleşik",
+                "custom": "Özel",
+                "searchPlaceholder": "Şablonlar, framework'ler veya depolar ara..."
+            },
+            "card": {
+                "builtIn": "Yerleyen",
+                "custom": "Özel",
+                "standard": "Standart",
+                "forked": "Forklu",
+                "customUrl": "Özel URL",
+                "standardSource": "Ever Works standart",
+                "forkedSource": "GitHub'nize çatallandı",
+                "customUrlSource": "GitHub URL'sinden eklendi",
+                "default": "Varsayılan",
+                "defaultSelected": "Varsayılan seçildi",
+                "makeDefault": "Varsayılan yap",
+                "fork": "Çatalla",
+                "edit": "Düzenle",
+                "archive": "Arşivle",
+                "catalogOnly": "Sadece kataloğ",
+                "openRepository": "Depoyu aç",
+                "previewAlt": "{name} önizlemesi",
+                "frameworkAgnostic": "Framework bağımsız",
+                "branch": "Dal: {branch}",
+                "syncBranches": "{count} senkron dalı",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Henüz açıklama yok."
+            },
+            "dialog": {
+                "title": "Özel şablon ekle",
+                "description": "Bir GitHub deposunu kişisel şablon kataloğunuzuna kaydedin. Bu ilk dilim, şablon meta verisini saklar ve sonraki atama akışında seçilebilir.",
+                "editTitle": "Özel şablonu düzenle",
+                "editDescription": "Katalogunuzda bu özel şablon için kullanılan görüntüleme ayrıntılarını ve önizleme resmini güncelleyin.",
+                "repositoryUrlLabel": "GitHub deposu URL'si",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "Kaynak deposu URL'si şablon eklendikten sonra değiştirilemez.",
+                "nameLabel": "Şablon adı",
+                "namePlaceholder": "İsteğe bağlı görünen ad",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Bir framework seçin",
+                "frameworkUnspecified": "Belirtilmedi",
+                "previewImageLabel": "Önizleme görüntüsü URL'si",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "İsteğe bağlı. GitHub deposu önizlemesini geçersiz kılmak istiyorsanız düzenlenmiş bir ekran görüntüsü kullanın.",
+                "descriptionLabel": "Kısa açıklama",
+                "descriptionPlaceholder": "Bu şablon ne için en iyidir?",
+                "branchLabel": "Varsayılan dal",
+                "branchPlaceholder": "main",
+                "branchHelp": "Boş bırakarak varsayılan olarak main'i kullanın.",
+                "betaBranchLabel": "Beta dalı",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "İsteğe bağlı. Beta dağıtımları için kullanılan dal.",
+                "cancel": "İptal",
+                "submit": "Şablonu kaydet",
+                "saveChanges": "Değişiklikleri kaydet"
+            },
+            "forkDialog": {
+                "title": "Standart şablonu çatalla",
+                "description": "Bu standart şablonun kendi GitHub kopyasını oluşturun, kataloğunuza ekleyin ve yeni işler için varsayılan yapın.",
+                "sourceLabel": "Şablon kaynağı",
+                "targetLabel": "Çatallama hedefi",
+                "targetPlaceholder": "Bir GitHub hesabı veya organizasyonu seçin",
+                "targetHelp": "Çatallama {target} altında oluşturulacak.",
+                "personalTarget": "Kişisel hesap ({login})",
+                "organizationTarget": "Organizasyon ({login})",
+                "noTargets": "Bir şablonu çatallamadan önce GitHub'ı bağlayıp organizasyonlarınızı yükleyin.",
+                "resultLabel": "Yeni depo",
+                "none": "seçtiğiniz hesabınız",
+                "cancel": "İptal",
+                "submit": "Çatalla ve varsayılan yap"
+            },
+            "archiveDialog": {
+                "title": "Özel şablonu arşivlendi",
+                "description": "Bu şablonu kataloğunuzundan arşivlendi. Şu anda hiçbir işe atanmamış şablonlar sadece arşivlenebilir.",
+                "templateLabel": "Şablon",
+                "cancel": "İptal",
+                "submit": "Şablonu arşivle"
+            },
+            "empty": {
+                "title": "Şablon bulunamadı",
+                "default": "Henüz bu görünümle eşleşen şablon yok.",
+                "search": "Farklı bir arama terimi deneyin veya mevcut filtreyi temizleyin.",
+                "resetFilters": "Filtreleri sıfırla"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub deposu URL'si gereklidir.",
+                "repositoryUrlInvalid": "Geçerli bir GitHub deposu URL'si girin, örneğin https://github.com/owner/repository.",
+                "forkTargetRequired": "Çatallama için bir GitHub hesabı veya organizasyonu seçin.",
+                "addSuccess": "Şablon GitHub URL'sinden kaydedildi.",
+                "addFailed": "Şablon kaydedilemedi.",
+                "updateSuccess": "Şablon detayları güncellendi.",
+                "updateFailed": "Şablon detayları güncellenemedi.",
+                "archiveSuccess": "Şablon kataloğunuzundan arşivlendi.",
+                "archiveFailed": "Şablon arşivlendi edilemedi.",
+                "forkSuccess": "{repository} çatallandı, kataloğunuza eklendi ve varsayılanınız olarak ayarlandı.",
+                "forkExisting": "{repository} zaten kataloğunuzdaydı ve şimdi varsayılan çatallanmış şablonunuz.",
+                "forkFailed": "Şablon çatallama başarısız oldu.",
+                "refreshSuccess": "Şablon kataloğu yenilendi.",
+                "refreshFailed": "Şablonlar yenilenemedi.",
+                "defaultUpdated": "Varsayılan şablon güncellendi.",
+                "defaultFailed": "Varsayılan şablon güncellenemedi."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Varsayılanı kullan",
+            "defaultOptionWithName": "Varsayılanı kullan ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Varsayılan)",
+            "changeAnywayLink": "İndi değiştir",
+            "origin": {
+                "standard": "Standart",
+                "forked": "Forklu",
+                "customUrl": "Özel URL"
+            },
+            "state": {
+                "defaultBadge": "Devralınan varsayılan",
+                "inheritedTitle": "Varsayılan şablon kullanılıyor",
+                "inheritedDescription": "Bu iş, belirli bir şablonu sabitleyeene kadar geçerli varsayılan şablonu takip edecek.",
+                "pinnedTitle": "Sabitlenen şablon",
+                "pinnedDescription": "Bu iş, varsayılanınız değiştirilse bile bu şablonu kullanmaya devam edecek."
+            }
+        },
         "workPlugins": {
             "title": "İş Eklentileri",
             "subtitle": "Bu iş için eklentileri yapılandırın",
@@ -3067,6 +3280,7 @@
             "history": "Geçmiş",
             "comparisons": "Karşılaştırmalar",
             "plugins": "Eklentiler",
+            "templates": "Şablonlar",
             "profile": "Profil",
             "security": "Güvenlik",
             "apiKeys": "API Anahtarları",
