@@ -65,21 +65,21 @@ flowchart TB
 
 ## 2. Tech choices
 
-| Concern                          | Choice                                                                                                                       | Rationale                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Polling                          | SWR `refreshInterval: 5000` with `document.hidden` pause via existing pattern (`activity-client.tsx`)                        | Matches the global `/activity` page; no new realtime infra (NFR-5, FR-8, FR-12)        |
-| Auth (platform → template)       | HMAC-SHA256 over `timestamp + ':' + queryString + ':' + tenantId` with `PLATFORM_SYNC_SECRET`; 5-min drift window            | Symmetric, simple, no PKI; same shape as Stripe / GitHub webhook signing               |
-| Secret encryption                | AES-GCM via platform's existing `ConfigEncryptionService` (same key used for plugin-settings secrets)                        | Reuses key management; no new key rotation surface                                     |
-| Secret distribution              | `getDeploymentSecrets()` returns it as a GHA secret; `deploy_vercel.yaml` step copies it to Vercel project env via CLI       | Reuses the existing GHA-secret push path — no new Vercel env-API code on platform side |
-| Aggregator cache                 | Redis, 30s TTL, key `activity-feed:{workId}:{category}:{sinceBucketMin}`                                                     | Existing Redis; staleness up to 30s is acceptable per FR-22                            |
-| Deployed-site fetch              | `fetch` with `AbortController` 5s timeout, one retry on network error, no retry on 4xx                                       | Avoids amplification; degraded mode keeps the feed responsive                          |
-| Concurrency on aggregator        | `requestIdRef`-style dedup client-side (matches `activity-client.tsx`)                                                       | Prevents flicker from out-of-order responses                                           |
-| API auth (platform → aggregator) | Existing `WorkAccessGuard` — read permission on the Work                                                                     | Same guard used by other `/works/:id/*` endpoints                                      |
-| Cache invalidation               | `@OnEvent('activity-log.created')` and `@OnEvent('work-generation.completed')` purge the per-Work cache key set              | Best-effort; staleness bounded by TTL even if a listener fails                         |
-| Telemetry                        | Server action calling `@ever-works/monitoring` `AnalyticsService.track`                                                      | Same pattern as onboarding-wizard-v2; no client-side bundle additions                  |
-| Tests (api)                      | Jest with mocked `HttpService` / `fetch`; integration tests against in-memory data fixtures                                  | Matches existing `apps/api` and `packages/agent` test conventions                      |
-| Tests (web)                      | Vitest for hook + client component unit tests; Playwright for tab smoke test                                                 | Matches existing `apps/web/vitest.config.ts` and `apps/web/e2e/` layout                |
-| Template-side route              | Next.js App Router `route.ts` handler (Node runtime), drizzle queries                                                        | Matches existing `app/api/admin/*` admin endpoints in `directory-web-template`         |
+| Concern                          | Choice                                                                                                                 | Rationale                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Polling                          | SWR `refreshInterval: 5000` with `document.hidden` pause via existing pattern (`activity-client.tsx`)                  | Matches the global `/activity` page; no new realtime infra (NFR-5, FR-8, FR-12)        |
+| Auth (platform → template)       | HMAC-SHA256 over `timestamp + ':' + queryString + ':' + tenantId` with `PLATFORM_SYNC_SECRET`; 5-min drift window      | Symmetric, simple, no PKI; same shape as Stripe / GitHub webhook signing               |
+| Secret encryption                | AES-GCM via platform's existing `ConfigEncryptionService` (same key used for plugin-settings secrets)                  | Reuses key management; no new key rotation surface                                     |
+| Secret distribution              | `getDeploymentSecrets()` returns it as a GHA secret; `deploy_vercel.yaml` step copies it to Vercel project env via CLI | Reuses the existing GHA-secret push path — no new Vercel env-API code on platform side |
+| Aggregator cache                 | Redis, 30s TTL, key `activity-feed:{workId}:{category}:{sinceBucketMin}`                                               | Existing Redis; staleness up to 30s is acceptable per FR-22                            |
+| Deployed-site fetch              | `fetch` with `AbortController` 5s timeout, one retry on network error, no retry on 4xx                                 | Avoids amplification; degraded mode keeps the feed responsive                          |
+| Concurrency on aggregator        | `requestIdRef`-style dedup client-side (matches `activity-client.tsx`)                                                 | Prevents flicker from out-of-order responses                                           |
+| API auth (platform → aggregator) | Existing `WorkAccessGuard` — read permission on the Work                                                               | Same guard used by other `/works/:id/*` endpoints                                      |
+| Cache invalidation               | `@OnEvent('activity-log.created')` and `@OnEvent('work-generation.completed')` purge the per-Work cache key set        | Best-effort; staleness bounded by TTL even if a listener fails                         |
+| Telemetry                        | Server action calling `@ever-works/monitoring` `AnalyticsService.track`                                                | Same pattern as onboarding-wizard-v2; no client-side bundle additions                  |
+| Tests (api)                      | Jest with mocked `HttpService` / `fetch`; integration tests against in-memory data fixtures                            | Matches existing `apps/api` and `packages/agent` test conventions                      |
+| Tests (web)                      | Vitest for hook + client component unit tests; Playwright for tab smoke test                                           | Matches existing `apps/web/vitest.config.ts` and `apps/web/e2e/` layout                |
+| Template-side route              | Next.js App Router `route.ts` handler (Node runtime), drizzle queries                                                  | Matches existing `app/api/admin/*` admin endpoints in `directory-web-template`         |
 
 ## 3. Data model
 
@@ -126,17 +126,17 @@ Document in template's `.env.example`. The template's new endpoint MUST return `
 - `activity-feed.module.ts` — registers controller + service + `DirectoryWebsiteClient` + `PlatformSyncSecretService`.
 - `activity-feed.controller.ts` — `@Get('/works/:id/activity-feed')`. Uses `WorkAccessGuard` + `@CurrentUser()`. Query DTO with `since`, `limit` (≤ 200), `category`.
 - `activity-feed.service.ts` — `compose(workId, { since, limit, category })`:
-  1. Read from Redis cache; return on hit.
-  2. In parallel: `activityLogService.findAll({ workId, ... })`, `workGenerationHistoryService.list({ workId, ... })`, `directoryWebsiteClient.fetchActivityFeed(work, ...)` (only if `work.platformSyncEnabled`).
-  3. Normalize each source to a common `FeedEntry` shape (see DTO).
-  4. Merge timestamp DESC, truncate to `limit`, build `nextCursor` from last entry's timestamp.
-  5. Attach `degraded` block if any source failed; persist `work.platformSyncLastError` / `platformSyncLastSuccessAt`.
-  6. Write back to cache (30s TTL).
+    1. Read from Redis cache; return on hit.
+    2. In parallel: `activityLogService.findAll({ workId, ... })`, `workGenerationHistoryService.list({ workId, ... })`, `directoryWebsiteClient.fetchActivityFeed(work, ...)` (only if `work.platformSyncEnabled`).
+    3. Normalize each source to a common `FeedEntry` shape (see DTO).
+    4. Merge timestamp DESC, truncate to `limit`, build `nextCursor` from last entry's timestamp.
+    5. Attach `degraded` block if any source failed; persist `work.platformSyncLastError` / `platformSyncLastSuccessAt`.
+    6. Write back to cache (30s TTL).
 - `directory-website-client.service.ts` — `fetchActivityFeed(work, params)`:
-  - Decrypt `work.platformSyncSecretEncrypted` via `PlatformSyncSecretService`.
-  - Build query string deterministically, compute HMAC-SHA256 over `timestamp + ':' + qs + ':' + work.tenantId` (if the template is multi-tenant — fall back to `''` otherwise).
-  - Fetch `${work.website}/api/platform/activity-feed?...` with `Authorization: Bearer ${hmac}`, `x-platform-ts: <iso>`, `AbortController` 5s timeout.
-  - On 401 / 403 / network error / DNS / timeout / 5xx — return `{ entries: [], degraded: { reason } }`. On 200 — return parsed body.
+    - Decrypt `work.platformSyncSecretEncrypted` via `PlatformSyncSecretService`.
+    - Build query string deterministically, compute HMAC-SHA256 over `timestamp + ':' + qs + ':' + work.tenantId` (if the template is multi-tenant — fall back to `''` otherwise).
+    - Fetch `${work.website}/api/platform/activity-feed?...` with `Authorization: Bearer ${hmac}`, `x-platform-ts: <iso>`, `AbortController` 5s timeout.
+    - On 401 / 403 / network error / DNS / timeout / 5xx — return `{ entries: [], degraded: { reason } }`. On 200 — return parsed body.
 - `dto/feed-entry.dto.ts` — `FeedEntry` shape (see §6.1 of spec.md, plus platform-side fields like `actorKind`).
 - `dto/feed-response.dto.ts` — `{ entries, nextCursor?, serverTime, degraded? }`.
 - `dto/feed-query.dto.ts` — class-validator schema for the query.
@@ -193,16 +193,16 @@ K8s plugin already has `getDeploymentSecrets()`. We do not modify it for v1 sinc
 ### 7.1 New components (`apps/web/src/components/works/detail/activity/`)
 
 - `ActivityFeedClient.tsx` — top-level client component:
-  - `useSWR('/api/works/:id/activity-feed?...', { refreshInterval: 5000, refreshWhenHidden: false, dedupingInterval: 2000 })`.
-  - `document.hidden` pause via `visibilitychange` listener; resume with one immediate revalidate on focus.
-  - `requestIdRef` to discard out-of-order responses (mirror `activity-client.tsx:55-237`).
-  - Renders `FeedFilterChips` + `FeedList` + optional `DegradedBanner`.
+    - `useSWR('/api/works/:id/activity-feed?...', { refreshInterval: 5000, refreshWhenHidden: false, dedupingInterval: 2000 })`.
+    - `document.hidden` pause via `visibilitychange` listener; resume with one immediate revalidate on focus.
+    - `requestIdRef` to discard out-of-order responses (mirror `activity-client.tsx:55-237`).
+    - Renders `FeedFilterChips` + `FeedList` + optional `DegradedBanner`.
 - `FeedFilterChips.tsx` — chip group with active state. Active filter syncs to `?category=...` URL.
 - `FeedList.tsx` — list virtualization NOT required (limit 25 default). Each row is a `FeedRow`.
 - `FeedRow.tsx` — switches by `entry.source` (`'platform-activity-log'` | `'generation-history'` | `'directory-site'`) and renders:
-  - **platform-activity-log** → click opens existing `ActivityDetailModal`.
-  - **generation-history** → click navigates to `/works/:id/generator/history?run=<id>`.
-  - **directory-site** → click opens `entry.target.adminUrl` in new tab.
+    - **platform-activity-log** → click opens existing `ActivityDetailModal`.
+    - **generation-history** → click navigates to `/works/:id/generator/history?run=<id>`.
+    - **directory-site** → click opens `entry.target.adminUrl` in new tab.
 - `DegradedBanner.tsx` — yellow info banner: "Deployed-site events unavailable — last success at <relativeTime>".
 - `EmptyState.tsx` — shown when zero entries across all sources.
 - `SkeletonList.tsx` — 8 placeholder rows.
@@ -210,14 +210,14 @@ K8s plugin already has `getDeploymentSecrets()`. We do not modify it for v1 sinc
 ### 7.2 Tab + route + constants
 
 - `WorkTabs.tsx` — insert new tab between Overview (index 0) and Items (now index 2):
-  ```tsx
-  {
-    name: t('activity'),
-    href: ROUTES.DASHBOARD_WORK_ACTIVITY(work.id),
-    icon: /* pulse / activity icon SVG */,
-    isActive: pathname.includes('/activity')
-  }
-  ```
+    ```tsx
+    {
+      name: t('activity'),
+      href: ROUTES.DASHBOARD_WORK_ACTIVITY(work.id),
+      icon: /* pulse / activity icon SVG */,
+      isActive: pathname.includes('/activity')
+    }
+    ```
 - `constants.ts` — add `DASHBOARD_WORK_ACTIVITY: (id) => /works/${id}/activity`.
 - `apps/web/src/app/[locale]/(dashboard)/works/[id]/activity/page.tsx` — server component, calls `workAPI.get(id)` server-side to confirm access, renders `<ActivityFeedClient workId={id} initialCategory={searchParams.category} />`.
 
@@ -237,36 +237,36 @@ New namespace under `dashboard.workDetail.activity` in every locale (en + 20):
 
 ```json
 {
-  "tabs": { "activity": "Activity Feed" },
-  "activity": {
-    "title": "Activity Feed",
-    "subtitle": "Everything that's happening on this directory",
-    "empty": { "title": "No activity yet", "body": "Run a generation to see events here." },
-    "filters": {
-      "all": "All",
-      "generation": "Generation",
-      "items": "Items",
-      "deployment": "Deployment",
-      "settings": "Settings",
-      "comparisons": "Comparisons",
-      "communityPr": "Community PR",
-      "users": "Users",
-      "submissions": "Submissions",
-      "reports": "Reports"
-    },
-    "actions": { "refresh": "Refresh", "viewAll": "View all" },
-    "degraded": { "title": "Deployed-site events unavailable", "lastSuccess": "Last success: {time}" },
-    "entry": {
-      "userRegistered": "{name} registered",
-      "itemCreated": "{name} submitted {item}",
-      "itemStatusChanged": "{item} → {status}",
-      "reportCreated": "{name} reported {target}",
-      "generationCompleted": "Generation completed ({items} items)",
-      "generationFailed": "Generation failed",
-      "deployed": "Deployed to {target}",
-      "pluginEnabled": "{plugin} enabled"
-    }
-  }
+	"tabs": { "activity": "Activity Feed" },
+	"activity": {
+		"title": "Activity Feed",
+		"subtitle": "Everything that's happening on this directory",
+		"empty": { "title": "No activity yet", "body": "Run a generation to see events here." },
+		"filters": {
+			"all": "All",
+			"generation": "Generation",
+			"items": "Items",
+			"deployment": "Deployment",
+			"settings": "Settings",
+			"comparisons": "Comparisons",
+			"communityPr": "Community PR",
+			"users": "Users",
+			"submissions": "Submissions",
+			"reports": "Reports"
+		},
+		"actions": { "refresh": "Refresh", "viewAll": "View all" },
+		"degraded": { "title": "Deployed-site events unavailable", "lastSuccess": "Last success: {time}" },
+		"entry": {
+			"userRegistered": "{name} registered",
+			"itemCreated": "{name} submitted {item}",
+			"itemStatusChanged": "{item} → {status}",
+			"reportCreated": "{name} reported {target}",
+			"generationCompleted": "Generation completed ({items} items)",
+			"generationFailed": "Generation failed",
+			"deployed": "Deployed to {target}",
+			"pluginEnabled": "{plugin} enabled"
+		}
+	}
 }
 ```
 
@@ -285,9 +285,9 @@ Coordinated minimal PR.
 - Verify HMAC: read `Authorization: Bearer <hmac>` and `x-platform-ts`; compute expected HMAC; constant-time compare; reject on drift > 5min.
 - Resolve tenant from request (existing tenant resolver — or default tenant if single-tenant).
 - Union three queries (drizzle):
-  - `clientProfiles` ordered by `createdAt DESC` (sign-ups).
-  - `itemAuditLogs` where `action IN ('CREATED','STATUS_CHANGED')` ordered by `createdAt DESC`.
-  - `reports` ordered by `createdAt DESC`.
+    - `clientProfiles` ordered by `createdAt DESC` (sign-ups).
+    - `itemAuditLogs` where `action IN ('CREATED','STATUS_CHANGED')` ordered by `createdAt DESC`.
+    - `reports` ordered by `createdAt DESC`.
 - Each capped at `ceil(limit / activeTypeCount)`; union sorted DESC; truncated to `limit`.
 - Map each to the normalized `FeedEntry` shape from §5.1 with `adminUrl` set to the deployed site's local admin URL (e.g., `/admin/users/<id>`).
 - Return `{ entries, nextCursor, serverTime }`.
@@ -302,11 +302,11 @@ Add a step before the `vercel deploy` step:
 - name: Sync PLATFORM_SYNC_SECRET to Vercel env (production)
   if: ${{ secrets.PLATFORM_SYNC_SECRET != '' }}
   run: |
-    echo "${{ secrets.PLATFORM_SYNC_SECRET }}" \
-      | vercel env add PLATFORM_SYNC_SECRET production \
-        --token=${{ secrets.VERCEL_TOKEN }} \
-        --yes \
-      || echo "env already set"
+      echo "${{ secrets.PLATFORM_SYNC_SECRET }}" \
+        | vercel env add PLATFORM_SYNC_SECRET production \
+          --token=${{ secrets.VERCEL_TOKEN }} \
+          --yes \
+        || echo "env already set"
 ```
 
 The `|| echo "env already set"` swallows the "duplicate env" error on second run (Vercel CLI errors on duplicate adds; an idempotent path is a follow-up if the noise is annoying).
@@ -321,29 +321,29 @@ The `|| echo "env already set"` swallows the "duplicate env" error on second run
 
 All emitted through the existing server action pattern (no new client bundle). Events carry `userId`, `workId`, `feedVersion: 'v1'`.
 
-| Event                          | Required props                                       | When                                          |
-| ------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
-| `activity_feed_tab_viewed`     | none                                                 | First render of the new tab                   |
-| `activity_feed_filter_changed` | `category`                                           | User clicks a filter chip                     |
-| `activity_feed_refresh_clicked` | none                                                | Manual refresh button                         |
-| `activity_feed_entry_clicked`  | `entry.source`, `entry.type`                         | User clicks a row                             |
-| `activity_feed_degraded_shown` | `reason: 'timeout'\|'401'\|'5xx'\|'network'\|'disabled'` | Degraded banner becomes visible           |
-| `activity_feed_overview_widget_view_all_clicked` | none                               | "View all →" link in Overview widget         |
+| Event                                            | Required props                                           | When                                 |
+| ------------------------------------------------ | -------------------------------------------------------- | ------------------------------------ |
+| `activity_feed_tab_viewed`                       | none                                                     | First render of the new tab          |
+| `activity_feed_filter_changed`                   | `category`                                               | User clicks a filter chip            |
+| `activity_feed_refresh_clicked`                  | none                                                     | Manual refresh button                |
+| `activity_feed_entry_clicked`                    | `entry.source`, `entry.type`                             | User clicks a row                    |
+| `activity_feed_degraded_shown`                   | `reason: 'timeout'\|'401'\|'5xx'\|'network'\|'disabled'` | Degraded banner becomes visible      |
+| `activity_feed_overview_widget_view_all_clicked` | none                                                     | "View all →" link in Overview widget |
 
 ## 10. Failure modes
 
-| Scenario                                                  | Behaviour                                                                                                                              |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployed-site endpoint times out                          | Aggregator returns platform sources + `degraded: { directorySite: { reason: 'timeout' } }`. Banner shown. `work.platformSyncLastError` set. |
-| Deployed-site returns 401                                 | Same as above, `reason: 'unauthorized'`. Most likely cause: secret drift between platform DB and the deployed Vercel env. Logged with `workId`. |
-| Deployed-site returns 5xx                                 | Same as above, `reason: 'upstream_5xx'`. No retry beyond the single network-error retry.                                               |
-| `work.platform_sync_secret_encrypted` is NULL             | `DirectoryWebsiteClient` returns degraded `reason: 'not_provisioned'`. Banner notes "Will sync from next deploy." No exception thrown. |
-| `work.platform_sync_enabled` is false                     | Aggregator skips the deployed-site source entirely. No banner.                                                                          |
-| Redis is down                                             | Cache layer logs and falls through to live composition. Performance degrades; functionality intact.                                     |
-| Aggregator throws                                         | Existing NestJS exception filter returns 500. Client renders empty state with a transient retry button (not a degraded banner — this is a platform bug).  |
-| Template's tenant resolver fails                          | Template returns 500; aggregator handles as "5xx degraded".                                                                            |
-| Encryption key rotation                                   | New secrets encrypt with new key; existing secrets still decrypt with the rotation-aware key path provided by `ConfigEncryptionService`. |
-| Concurrent first-deploy generates two secrets             | `getOrGenerate(workId)` uses `UPDATE ... WHERE platform_sync_secret_encrypted IS NULL RETURNING ...` to ensure idempotency. One wins, the other reads. |
+| Scenario                                      | Behaviour                                                                                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployed-site endpoint times out              | Aggregator returns platform sources + `degraded: { directorySite: { reason: 'timeout' } }`. Banner shown. `work.platformSyncLastError` set.              |
+| Deployed-site returns 401                     | Same as above, `reason: 'unauthorized'`. Most likely cause: secret drift between platform DB and the deployed Vercel env. Logged with `workId`.          |
+| Deployed-site returns 5xx                     | Same as above, `reason: 'upstream_5xx'`. No retry beyond the single network-error retry.                                                                 |
+| `work.platform_sync_secret_encrypted` is NULL | `DirectoryWebsiteClient` returns degraded `reason: 'not_provisioned'`. Banner notes "Will sync from next deploy." No exception thrown.                   |
+| `work.platform_sync_enabled` is false         | Aggregator skips the deployed-site source entirely. No banner.                                                                                           |
+| Redis is down                                 | Cache layer logs and falls through to live composition. Performance degrades; functionality intact.                                                      |
+| Aggregator throws                             | Existing NestJS exception filter returns 500. Client renders empty state with a transient retry button (not a degraded banner — this is a platform bug). |
+| Template's tenant resolver fails              | Template returns 500; aggregator handles as "5xx degraded".                                                                                              |
+| Encryption key rotation                       | New secrets encrypt with new key; existing secrets still decrypt with the rotation-aware key path provided by `ConfigEncryptionService`.                 |
+| Concurrent first-deploy generates two secrets | `getOrGenerate(workId)` uses `UPDATE ... WHERE platform_sync_secret_encrypted IS NULL RETURNING ...` to ensure idempotency. One wins, the other reads.   |
 
 ## 11. Rollout
 

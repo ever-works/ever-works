@@ -25,7 +25,7 @@
     - `platformSyncEnabled` (`boolean`, default `true`, not null).
     - `platformSyncLastSuccessAt` (`timestamptz`, nullable).
     - `platformSyncLastError` (`text`, nullable).
-    Update relevant entity tests under `packages/agent/src/entities/__tests__/`.
+      Update relevant entity tests under `packages/agent/src/entities/__tests__/`.
 - [ ] **T2**. Hand-written TypeORM migration at `apps/api/src/migrations/{nextTs}-AddWorkPlatformSync.ts`. Up adds four columns. Down drops them. No data backfill.
 - [ ] **T3**. New service `packages/agent/src/services/platform-sync-secret.service.ts` with:
     - `generateForWork(workId)` — 32 random bytes → hex → AES-GCM encrypt via existing `ConfigEncryptionService` → persist via `WorkRepository.update`.
@@ -49,9 +49,9 @@
 - [ ] **T10**. `activity-feed.service.ts` `compose(workId, query)`:
     - Read Redis cache first (`CacheManager.get(cacheKey)`).
     - On miss, in parallel:
-      - `activityLogService.findAll({ workId, since, limit })` → map to platform-activity-log entries.
-      - `workGenerationHistoryService.list({ workId, since, limit })` → map to generation-history entries.
-      - If `work.platformSyncEnabled && work.website`: `directoryWebsiteClient.fetchActivityFeed(work, { since, limit, types: deriveTypesFrom(category) })`.
+        - `activityLogService.findAll({ workId, since, limit })` → map to platform-activity-log entries.
+        - `workGenerationHistoryService.list({ workId, since, limit })` → map to generation-history entries.
+        - If `work.platformSyncEnabled && work.website`: `directoryWebsiteClient.fetchActivityFeed(work, { since, limit, types: deriveTypesFrom(category) })`.
     - Filter by `category` if provided.
     - Merge by timestamp DESC, truncate to `limit`, derive `nextCursor` from the oldest entry's timestamp.
     - Persist `platformSyncLastSuccessAt` on success or `platformSyncLastError` on failure (best-effort; do NOT await on the hot path).
@@ -113,9 +113,9 @@
     - Sync to URL via `router.replace` (shallow) on change.
 - [ ] **T27**. `apps/web/src/components/works/detail/activity/FeedRow.tsx`:
     - Switches by `entry.source`:
-      - `platform-activity-log` → click opens `ActivityDetailModal` (existing).
-      - `generation-history` → `<Link href={DASHBOARD_WORK_HISTORY(workId)}?run=<id>>`.
-      - `directory-site` → `<a href={entry.target.adminUrl} target="_blank" rel="noopener">`.
+        - `platform-activity-log` → click opens `ActivityDetailModal` (existing).
+        - `generation-history` → `<Link href={DASHBOARD_WORK_HISTORY(workId)}?run=<id>>`.
+        - `directory-site` → `<a href={entry.target.adminUrl} target="_blank" rel="noopener">`.
 - [ ] **T28**. `apps/web/src/components/works/detail/activity/DegradedBanner.tsx` — yellow banner reading title + "Last success: <relativeTime>" / "Not yet provisioned". Dismissible-per-session (sessionStorage).
 - [ ] **T29**. `apps/web/src/components/works/detail/activity/EmptyState.tsx` and `SkeletonList.tsx` — stateless presentational.
 

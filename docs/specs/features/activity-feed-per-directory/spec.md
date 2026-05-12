@@ -85,9 +85,9 @@ The "user" is a logged-in Work owner or member with read access to the Work.
 ### 3.2 Feed content
 
 - **FR-4**. The feed MUST display events from three sources, merged into a single timeline ordered by event timestamp DESC:
-  - **Platform activity-log** events filtered by `workId` (existing `GET /api/activity-log?workId=<id>`).
-  - **Generation history** entries for this Work (existing `workAPI.getHistory(id)`).
-  - **Deployed-site events** from the new internal endpoint (§3.5), gated by `work.platformSyncEnabled`.
+    - **Platform activity-log** events filtered by `workId` (existing `GET /api/activity-log?workId=<id>`).
+    - **Generation history** entries for this Work (existing `workAPI.getHistory(id)`).
+    - **Deployed-site events** from the new internal endpoint (§3.5), gated by `work.platformSyncEnabled`.
 - **FR-5**. Each entry MUST render: category icon, relative timestamp (with absolute on hover), one-line summary, primary action (deep-link or inline expand).
 - **FR-6**. The feed MUST support pagination (cursor-based) with an initial page size of 25 entries.
 - **FR-7**. The feed MUST offer filter chips for: **All** (default), **Generation**, **Items**, **Deployment**, **Settings**, **Comparisons**, **Community PR**, **Users** (deployed site), **Submissions** (deployed site), **Reports** (deployed site). The active filter MUST be reflected in the URL as `?category=<id>`.
@@ -112,20 +112,20 @@ The "user" is a logged-in Work owner or member with read access to the Work.
 - **FR-17**. The endpoint MUST authenticate via two headers: `x-platform-ts: <ISO-8601>` and `x-platform-key: HMAC-SHA256(timestamp + ':' + query-string + ':' + tenantId, PLATFORM_SYNC_SECRET)`. Drift > 5 minutes MUST return `401`. Invalid HMAC MUST return `401`.
 - **FR-18**. The endpoint MUST scope results to the caller's tenant (resolved from the `PLATFORM_SYNC_SECRET` lookup — one secret per directory site).
 - **FR-19**. The endpoint MUST return normalized entries:
-  ```
-  {
-    entries: Array<{
-      id: string,
-      type: 'user_registered' | 'item_created' | 'item_status_changed' | 'report_created',
-      timestamp: string (ISO-8601),
-      summary: string,
-      actor: { id: string, name: string, email?: string } | null,
-      target: { id: string, type: 'user'|'item'|'report', name: string, adminUrl: string }
-    }>,
-    nextCursor?: string,
-    serverTime: string (ISO-8601)
-  }
-  ```
+    ```
+    {
+      entries: Array<{
+        id: string,
+        type: 'user_registered' | 'item_created' | 'item_status_changed' | 'report_created',
+        timestamp: string (ISO-8601),
+        summary: string,
+        actor: { id: string, name: string, email?: string } | null,
+        target: { id: string, type: 'user'|'item'|'report', name: string, adminUrl: string }
+      }>,
+      nextCursor?: string,
+      serverTime: string (ISO-8601)
+    }
+    ```
 - **FR-20**. The endpoint MUST union three queries: `clientProfiles` newer than `since` (sign-ups), `itemAuditLogs` with action `CREATED` or `STATUS_CHANGED` (submissions and moderation transitions), `reports` (all statuses). Each source contributes at most `ceil(limit / count(activeTypes))` entries; the union is sorted timestamp DESC then truncated to `limit`.
 
 ### 3.6 Platform aggregator
