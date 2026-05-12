@@ -55,12 +55,20 @@ export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
         window.location.href = `/api/works/${workId}/export-items?format=${format}`;
     };
 
+    // The shared `DropdownMenu` wrapper has `w-full` on its root element,
+    // which makes it expand to fill flex parents and squeeze sibling buttons
+    // (Add Item was wrapping to two lines). Wrap in an inline-flex shim so
+    // the dropdown's width stays intrinsic.
     return (
+        <span className="inline-flex">
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="secondary"
-                    className={cn('inline-flex items-center gap-2', 'text-sm')}
+                    className={cn(
+                        'inline-flex items-center gap-2 whitespace-nowrap',
+                        'text-sm',
+                    )}
                 >
                     <Download className="w-4 h-4" />
                     Export
@@ -77,5 +85,6 @@ export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+        </span>
     );
 }

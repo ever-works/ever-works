@@ -57,11 +57,16 @@ import {
     CheckItemHealthResponseDto,
     ItemExportService,
     ItemImportService,
+    ItemImportExecutorService,
     EXPORT_FORMATS,
     type ExportFormat,
     type ExportSettingsResponse,
     type ColumnMapping,
     type ImportValidationResponse,
+    type ImportRowValidation,
+    type ImportDuplicateStrategy,
+    type ImportResult,
+    type ExecuteImportResult,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -117,6 +122,25 @@ import {
     getWorkCountCacheKey,
     getWorkItemsCacheKey,
 } from './work-cache.constants';
+
+/**
+ * Body shape for `POST /api/works/:id/import-items` (Phase 3 execute).
+ * Validated structurally in the handler so we can keep the route DTO-free
+ * and accept whatever Phase 2's validate endpoint returned.
+ */
+interface ExecuteImportRequestBody {
+    rows: ImportRowValidation[];
+    duplicate_strategy?: ImportDuplicateStrategy;
+    default_status?: string;
+}
+
+function buildImportActivitySummary(result: ImportResult): string {
+    const parts: string[] = [`Imported ${result.created} items`];
+    if (result.updated > 0) parts.push(`${result.updated} updated`);
+    if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+    if (result.errors.length > 0) parts.push(`${result.errors.length} errors`);
+    return parts.join(', ');
+}
 
 /**
  * Parses the `mapping` form-data field on the import-validate endpoint.
@@ -179,6 +203,7 @@ export class WorksController {
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly itemExportService: ItemExportService,
         private readonly itemImportService: ItemImportService,
+        private readonly itemImportExecutor: ItemImportExecutorService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -518,6 +543,61 @@ export class WorksController {
         }));
 
         return this.itemImportService.validateRows(parsed, mapping, existingItems);
+    }
+
+    @Post('works/:id/import-items')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Execute a validated bulk item import',
+        description:
+            'Writes the validated rows to the directory data repository under a single commit, then either pushes directly (when `autoapproval` is true) or opens a PR. Honors the per-row `duplicate_strategy` (skip or update). Phase 3 of EW-533.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Import result + optional PR details' })
+    @ApiResponse({ status: 404, description: 'Import is not enabled for this directory' })
+    async executeImportItems(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: ExecuteImportRequestBody,
+    ): Promise<ExecuteImportResult> {
+        if (!Array.isArray(body?.rows)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Body must include a `rows` array',
+            });
+        }
+        const duplicateStrategy: ImportDuplicateStrategy =
+            body.duplicate_strategy === 'update' ? 'update' : 'skip';
+        const defaultStatus = typeof body.default_status === 'string' ? body.default_status : 'pending';
+
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+        if (!configResult.config?.settings?.import_enabled) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Item import is not enabled for this directory',
+            });
+        }
+        const { work } = await this.workOwnershipService.ensureCanEdit(id, user.id);
+
+        const result = await this.itemImportExecutor.executeImport(work, user, {
+            rows: body.rows,
+            duplicate_strategy: duplicateStrategy,
+            default_status: defaultStatus,
+        });
+
+        await this.invalidateWorkCaches(id);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.IMPORT,
+                action: 'items.imported',
+                status: ActivityStatus.COMPLETED,
+                summary: buildImportActivitySummary(result),
+            })
+            .catch(() => {});
+        return result;
     }
 
     @Get('works/:id/config')

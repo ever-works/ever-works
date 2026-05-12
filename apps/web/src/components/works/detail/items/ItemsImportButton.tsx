@@ -48,7 +48,10 @@ export function ItemsImportButton({ workId }: ItemsImportButtonProps) {
             <Button
                 variant="secondary"
                 onClick={() => setIsOpen(true)}
-                className={cn('inline-flex items-center gap-2', 'text-sm')}
+                className={cn(
+                    'inline-flex items-center gap-2 whitespace-nowrap',
+                    'text-sm',
+                )}
             >
                 <Upload className="w-4 h-4" />
                 Import

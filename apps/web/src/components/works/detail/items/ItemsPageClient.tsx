@@ -146,7 +146,10 @@ export function ItemsPageClient({
                                 <Button
                                     variant="primary"
                                     onClick={() => setIsAddModalOpen(true)}
-                                    className={cn('inline-flex items-center gap-2', 'text-sm')}
+                                    className={cn(
+                                        'inline-flex items-center gap-2 whitespace-nowrap',
+                                        'text-sm',
+                                    )}
                                 >
                                     <Plus className="w-4 h-4" />
                                     {t('addItem')}

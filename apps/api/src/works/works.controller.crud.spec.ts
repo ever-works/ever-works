@@ -78,6 +78,7 @@ interface Stubs {
     templateCatalogService: { listTemplatesForUser: Mock };
     itemExportService: Record<string, never>;
     itemImportService: Record<string, never>;
+    itemImportExecutor: Record<string, never>;
 }
 
 function makeStubs(): Stubs {
@@ -122,6 +123,7 @@ function makeStubs(): Stubs {
         templateCatalogService: { listTemplatesForUser: jest.fn() },
         itemExportService: {} as any,
         itemImportService: {} as any,
+        itemImportExecutor: {} as any,
     };
 }
 
@@ -162,6 +164,7 @@ function makeController(s: Stubs): WorksController {
         s.templateCatalogService as any,
         s.itemExportService as any,
         s.itemImportService as any,
+        s.itemImportExecutor as any,
     );
 }
 

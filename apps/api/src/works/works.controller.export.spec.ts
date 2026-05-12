@@ -3,6 +3,7 @@
 jest.mock('@ever-works/agent/dto', () => ({}));
 jest.mock('@ever-works/agent/items-generator', () => ({
     EXPORT_FORMATS: ['csv', 'xlsx'],
+    ItemImportExecutorService: class {},
 }));
 jest.mock('@ever-works/agent/services', () => ({}));
 jest.mock('@ever-works/agent/comparison-generator', () => ({}));
@@ -18,6 +19,7 @@ jest.mock('@ever-works/agent/cache', () => ({
 jest.mock('@ever-works/agent/entities', () => ({
     ActivityActionType: {
         EXPORT: 'EXPORT',
+        IMPORT: 'IMPORT',
         ITEM_ADDED: 'ITEM_ADDED',
         ITEM_REMOVED: 'ITEM_REMOVED',
         ITEM_UPDATED: 'ITEM_UPDATED',
@@ -50,7 +52,7 @@ interface Stubs {
     workScheduleService: Record<string, never>;
     workImportService: Record<string, never>;
     repositoryManagementService: Record<string, never>;
-    workOwnershipService: Record<string, never>;
+    workOwnershipService: { ensureCanEdit: Mock };
     workAdvancedPromptsService: Record<string, never>;
     workTaxonomyService: Record<string, never>;
     generatorFormSchemaService: Record<string, never>;
@@ -68,6 +70,7 @@ interface Stubs {
         parseXLSX: Mock;
         validateRows: Mock;
     };
+    itemImportExecutor: { executeImport: Mock };
 }
 
 function makeStubs(): Stubs {
@@ -87,7 +90,9 @@ function makeStubs(): Stubs {
         workScheduleService: {} as any,
         workImportService: {} as any,
         repositoryManagementService: {} as any,
-        workOwnershipService: {} as any,
+        workOwnershipService: {
+            ensureCanEdit: jest.fn().mockResolvedValue({ work: { id: 'w-1', slug: 'demo' } }),
+        },
         workAdvancedPromptsService: {} as any,
         workTaxonomyService: {} as any,
         generatorFormSchemaService: {} as any,
@@ -106,6 +111,15 @@ function makeStubs(): Stubs {
             parseCSV: jest.fn(),
             parseXLSX: jest.fn(),
             validateRows: jest.fn(),
+        },
+        itemImportExecutor: {
+            executeImport: jest.fn().mockResolvedValue({
+                total: 0,
+                created: 0,
+                updated: 0,
+                skipped: 0,
+                errors: [],
+            }),
         },
     };
 }
@@ -136,6 +150,7 @@ function makeController(s: Stubs): WorksController {
         s.templateCatalogService as any,
         s.itemExportService as any,
         s.itemImportService as any,
+        s.itemImportExecutor as any,
     );
 }
 
@@ -464,6 +479,116 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
                 expect.any(Object),
                 {},
                 [],
+            );
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Execute (EW-533 Phase 3): POST /:id/import-items
+    // -----------------------------------------------------------------------
+
+    describe('executeImportItems', () => {
+        const validRow = (rowIndex: number) => ({
+            rowIndex,
+            valid: true,
+            errors: [],
+            warnings: [],
+            data: {
+                name: `Item ${rowIndex}`,
+                description: 'd',
+                source_url: `https://r${rowIndex}.test`,
+                category: 'T',
+            },
+        });
+
+        it('rejects requests with no rows array', async () => {
+            await expect(
+                controller.executeImportItems(auth, 'w-1', {} as any),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('returns 404 when import is not enabled', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: false } },
+            });
+            await expect(
+                controller.executeImportItems(auth, 'w-1', {
+                    rows: [validRow(0)],
+                } as any),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(s.itemImportExecutor.executeImport).not.toHaveBeenCalled();
+        });
+
+        it("defaults duplicate_strategy to 'skip' and default_status to 'pending'", async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            await controller.executeImportItems(auth, 'w-1', {
+                rows: [validRow(0)],
+            } as any);
+            expect(s.itemImportExecutor.executeImport).toHaveBeenCalledWith(
+                { id: 'w-1', slug: 'demo' },
+                { id: 'user-1' },
+                expect.objectContaining({
+                    duplicate_strategy: 'skip',
+                    default_status: 'pending',
+                }),
+            );
+        });
+
+        it("threads duplicate_strategy='update' through to the executor", async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            await controller.executeImportItems(auth, 'w-1', {
+                rows: [validRow(0)],
+                duplicate_strategy: 'update',
+                default_status: 'published',
+            } as any);
+            expect(s.itemImportExecutor.executeImport).toHaveBeenCalledWith(
+                expect.any(Object),
+                expect.any(Object),
+                expect.objectContaining({
+                    duplicate_strategy: 'update',
+                    default_status: 'published',
+                }),
+            );
+        });
+
+        it('invalidates caches and logs IMPORT activity on success', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true } },
+            });
+            s.itemImportExecutor.executeImport.mockResolvedValue({
+                total: 3,
+                created: 2,
+                updated: 1,
+                skipped: 0,
+                errors: [],
+                pr_number: 7,
+                pr_url: 'https://github.com/o/r/pull/7',
+            });
+
+            const result = await controller.executeImportItems(auth, 'w-1', {
+                rows: [validRow(0), validRow(1), validRow(2)],
+            } as any);
+
+            expect(result.created).toBe(2);
+            expect(result.pr_number).toBe(7);
+            expect(
+                s.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,
+            ).toHaveBeenCalledWith('w-1');
+            expect(s.activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'IMPORT',
+                    action: 'items.imported',
+                    status: 'COMPLETED',
+                    summary: 'Imported 2 items, 1 updated',
+                }),
             );
         });
     });

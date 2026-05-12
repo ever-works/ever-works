@@ -19,13 +19,30 @@ interface ItemImportWizardProps {
     onClose: () => void;
 }
 
-type WizardStep = 'upload' | 'mapping' | 'preview';
+type WizardStep = 'upload' | 'mapping' | 'preview' | 'confirm' | 'results';
+type DuplicateStrategy = 'skip' | 'update';
+
+interface ImportRowData {
+    name?: string;
+    description?: string;
+    source_url?: string;
+    category?: string;
+    categories?: string[];
+    tags?: string[];
+    slug?: string;
+    featured?: boolean;
+    order?: number;
+    brand?: string;
+    brand_logo_url?: string;
+    images?: string[];
+}
 
 interface ImportRowValidation {
     rowIndex: number;
     valid: boolean;
     errors: string[];
     warnings: string[];
+    data?: ImportRowData;
     duplicate?: { slug?: string; source_url?: string };
 }
 
@@ -34,6 +51,17 @@ interface ImportValidationResponse {
     suggestedMapping: Record<string, string>;
     validationResults: ImportRowValidation[];
     summary: { total: number; valid: number; invalid: number; duplicates: number };
+}
+
+interface ImportResult {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: { rowIndex: number; message: string }[];
+    pr_url?: string;
+    pr_number?: number;
+    direct_commit?: boolean;
 }
 
 /**
@@ -74,6 +102,9 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
     const [error, setError] = useState<string | null>(null);
     const [maxRows, setMaxRows] = useState<number>(500);
     const [dragActive, setDragActive] = useState(false);
+    const [duplicateStrategy, setDuplicateStrategy] = useState<DuplicateStrategy>('skip');
+    const [defaultStatus, setDefaultStatus] = useState<string>('pending');
+    const [executionResult, setExecutionResult] = useState<ImportResult | null>(null);
 
     const reset = useCallback(() => {
         setStep('upload');
@@ -83,6 +114,9 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
         setError(null);
         setIsWorking(false);
         setDragActive(false);
+        setDuplicateStrategy('skip');
+        setDefaultStatus('pending');
+        setExecutionResult(null);
     }, []);
 
     useEffect(() => {
@@ -166,6 +200,36 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
         window.location.href = `/api/works/${workId}/import-items/sample?format=${format}`;
     };
 
+    const handleExecute = async () => {
+        if (!validation) return;
+        setIsWorking(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/works/${workId}/import-items`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rows: validation.validationResults,
+                    duplicate_strategy: duplicateStrategy,
+                    default_status: defaultStatus,
+                }),
+            });
+            if (!response.ok) {
+                const detail = await readErrorDetail(response);
+                setError(detail);
+                return;
+            }
+            const result = (await response.json()) as ImportResult;
+            setExecutionResult(result);
+            setStep('results');
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to execute import');
+        } finally {
+            setIsWorking(false);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-4xl">
@@ -217,6 +281,20 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
 
                 {step === 'preview' && validation ? <PreviewStep validation={validation} /> : null}
 
+                {step === 'confirm' && validation ? (
+                    <ConfirmStep
+                        validation={validation}
+                        duplicateStrategy={duplicateStrategy}
+                        onDuplicateStrategyChange={setDuplicateStrategy}
+                        defaultStatus={defaultStatus}
+                        onDefaultStatusChange={setDefaultStatus}
+                    />
+                ) : null}
+
+                {step === 'results' && executionResult ? (
+                    <ResultsStep result={executionResult} />
+                ) : null}
+
                 <DialogFooter>
                     {step === 'upload' ? (
                         <Button variant="ghost" onClick={onClose}>
@@ -237,14 +315,34 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
                             </Button>
                         </>
                     ) : null}
-                    {step === 'preview' ? (
+                    {step === 'preview' && validation ? (
                         <>
                             <Button variant="ghost" onClick={() => setStep('mapping')}>
                                 Back
                             </Button>
-                            <Button onClick={onClose}>Done</Button>
+                            <Button
+                                onClick={() => setStep('confirm')}
+                                disabled={validation.summary.valid === 0}
+                            >
+                                Continue
+                            </Button>
                         </>
                     ) : null}
+                    {step === 'confirm' ? (
+                        <>
+                            <Button variant="ghost" onClick={() => setStep('preview')}>
+                                Back
+                            </Button>
+                            <Button
+                                onClick={handleExecute}
+                                disabled={isWorking}
+                                loading={isWorking}
+                            >
+                                Confirm Import
+                            </Button>
+                        </>
+                    ) : null}
+                    {step === 'results' ? <Button onClick={onClose}>Done</Button> : null}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -258,6 +356,8 @@ function WizardSteps({ current }: { current: WizardStep }) {
         { id: 'upload', label: '1. Upload' },
         { id: 'mapping', label: '2. Mapping' },
         { id: 'preview', label: '3. Preview' },
+        { id: 'confirm', label: '4. Confirm' },
+        { id: 'results', label: '5. Results' },
     ];
     const currentIdx = steps.findIndex((s) => s.id === current);
     return (
@@ -594,6 +694,165 @@ function RowStatusBadge({ row }: { row: ImportRowValidation }) {
 }
 
 // ---------------------------------------------------------------------------
+
+interface ConfirmStepProps {
+    validation: ImportValidationResponse;
+    duplicateStrategy: DuplicateStrategy;
+    onDuplicateStrategyChange: (strategy: DuplicateStrategy) => void;
+    defaultStatus: string;
+    onDefaultStatusChange: (status: string) => void;
+}
+
+function ConfirmStep({
+    validation,
+    duplicateStrategy,
+    onDuplicateStrategyChange,
+    defaultStatus,
+    onDefaultStatusChange,
+}: ConfirmStepProps) {
+    const { summary } = validation;
+    const toImport =
+        summary.valid - (duplicateStrategy === 'skip' ? summary.duplicates : 0);
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-text dark:text-text-dark">
+                Ready to import. Choose how duplicates and missing fields should be handled,
+                then click <strong>Confirm Import</strong>.
+            </p>
+            <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark mb-1.5">
+                        Duplicate handling
+                    </label>
+                    <select
+                        value={duplicateStrategy}
+                        onChange={(e) =>
+                            onDuplicateStrategyChange(e.target.value as DuplicateStrategy)
+                        }
+                        className="w-full rounded-sm border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-1.5 text-sm"
+                    >
+                        <option value="skip">Skip duplicates (recommended)</option>
+                        <option value="update">Update existing items</option>
+                    </select>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                        {duplicateStrategy === 'skip'
+                            ? `${summary.duplicates} duplicate row${summary.duplicates === 1 ? '' : 's'} will be skipped.`
+                            : `${summary.duplicates} existing item${summary.duplicates === 1 ? '' : 's'} will be overwritten.`}
+                    </p>
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark mb-1.5">
+                        Default status for new items
+                    </label>
+                    <select
+                        value={defaultStatus}
+                        onChange={(e) => onDefaultStatusChange(e.target.value)}
+                        className="w-full rounded-sm border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-1.5 text-sm"
+                    >
+                        <option value="pending">pending</option>
+                        <option value="published">published</option>
+                    </select>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                        Applied to rows without an explicit status.
+                    </p>
+                </div>
+            </div>
+            <div
+                className={cn(
+                    'rounded-md border px-4 py-3 text-sm',
+                    'bg-card dark:bg-card-primary-dark/30',
+                    'border-card-border dark:border-border-secondary-dark',
+                )}
+            >
+                <p className="font-medium text-text dark:text-text-dark mb-2">Summary</p>
+                <ul className="space-y-1 text-text-muted dark:text-text-muted-dark text-xs">
+                    <li>
+                        <strong className="text-text dark:text-text-dark">{toImport}</strong> rows
+                        will be {duplicateStrategy === 'update' ? 'created or updated' : 'created'}
+                    </li>
+                    {summary.invalid > 0 ? (
+                        <li>
+                            <strong className="text-danger">{summary.invalid}</strong> invalid rows
+                            will be skipped
+                        </li>
+                    ) : null}
+                    {duplicateStrategy === 'skip' && summary.duplicates > 0 ? (
+                        <li>
+                            <strong className="text-warning">{summary.duplicates}</strong>{' '}
+                            duplicate rows will be skipped
+                        </li>
+                    ) : null}
+                </ul>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
+                    A single commit will be added to the data repo. If autoapproval is off, a PR
+                    will be opened instead.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+interface ResultsStepProps {
+    result: ImportResult;
+}
+
+function ResultsStep({ result }: ResultsStepProps) {
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span>Import completed.</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                <SummaryCard label="Created" value={result.created} tone="success" />
+                <SummaryCard label="Updated" value={result.updated} tone="success" />
+                <SummaryCard label="Skipped" value={result.skipped} tone="warning" />
+                <SummaryCard label="Errors" value={result.errors.length} tone="danger" />
+            </div>
+            {result.pr_url ? (
+                <div className="rounded-md border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/30 px-4 py-3 text-sm">
+                    <p className="font-medium text-text dark:text-text-dark mb-1">
+                        Pull request #{result.pr_number} opened
+                    </p>
+                    <a
+                        href={result.pr_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-button-primary underline break-all"
+                    >
+                        {result.pr_url}
+                    </a>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                        Items will appear in the directory after the PR is merged.
+                    </p>
+                </div>
+            ) : null}
+            {result.direct_commit ? (
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    Items were committed directly to the main branch (autoapproval is enabled).
+                </p>
+            ) : null}
+            {result.errors.length > 0 ? (
+                <div className="space-y-2">
+                    <p className="text-sm font-medium text-danger">Per-row errors</p>
+                    <ul className="space-y-1 max-h-60 overflow-y-auto">
+                        {result.errors.map((err, idx) => (
+                            <li
+                                key={idx}
+                                className="text-xs text-danger flex items-start gap-2 rounded-sm border border-danger/20 bg-danger/5 px-2 py-1.5"
+                            >
+                                <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                                <span>
+                                    <strong>Row {err.rowIndex + 1}:</strong> {err.message}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+        </div>
+    );
+}
 
 function SummaryCard({
     label,
