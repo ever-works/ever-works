@@ -1009,6 +1009,7 @@
             },
             "tabs": {
                 "overview": "نظرة عامة",
+                "activity": "Activity Feed",
                 "items": "العناصر",
                 "generator": "مولد",
                 "schedule": "جدولة",
@@ -1440,11 +1441,49 @@
                 "dataRepository": "مستودع البيانات"
             },
             "activity": {
-                "title": "النشاط الحديث",
+                "title": "Activity Feed",
+                "subtitle": "Everything that's happening on this directory",
                 "noActivity": "لا يوجد نشاط بعد",
                 "created": "تم إنشاء العمل",
                 "workCreated": "تم إنشاء العمل بنجاح",
-                "justNow": "الآن"
+                "justNow": "الآن",
+                "empty": {
+                    "title": "No activity yet",
+                    "body": "Run a generation, add an item, or wait for visitors to see events here."
+                },
+                "actions": {
+                    "refresh": "Refresh",
+                    "viewAll": "View all"
+                },
+                "filters": {
+                    "label": "Filter by category",
+                    "all": "All",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "deployment": "Deployment",
+                    "settings": "Settings",
+                    "comparisons": "Comparisons",
+                    "communityPr": "Community PR",
+                    "users": "Users",
+                    "submissions": "Submissions",
+                    "reports": "Reports"
+                },
+                "degraded": {
+                    "title": {
+                        "not_provisioned": "Deployed-site events not yet available",
+                        "disabled": "Deployed-site sync is turned off in Settings",
+                        "timeout": "Deployed-site events temporarily unavailable",
+                        "unauthorized": "Deployed-site rejected the request",
+                        "upstream_5xx": "Deployed-site is currently unreachable",
+                        "network": "Network error reaching the deployed site",
+                        "parse_error": "Unexpected response from the deployed site"
+                    },
+                    "lastSuccess": "Last successful sync: {time}",
+                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                },
+                "entry": {
+                    "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
+                }
             },
             "items": {
                 "title": "عناصر العمل",

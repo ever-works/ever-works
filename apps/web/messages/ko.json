@@ -1009,6 +1009,7 @@
             },
             "tabs": {
                 "overview": "개요",
+                "activity": "Activity Feed",
                 "items": "항목",
                 "generator": "생성기",
                 "schedule": "스케줄",
@@ -1440,11 +1441,49 @@
                 "dataRepository": "데이터 리포지토리"
             },
             "activity": {
-                "title": "최근 활동",
+                "title": "Activity Feed",
+                "subtitle": "Everything that's happening on this directory",
                 "noActivity": "아직 활동 없음",
                 "created": "워크 생성",
                 "workCreated": "워크가 성공적으로 생성되었습니다",
-                "justNow": "방금"
+                "justNow": "방금",
+                "empty": {
+                    "title": "No activity yet",
+                    "body": "Run a generation, add an item, or wait for visitors to see events here."
+                },
+                "actions": {
+                    "refresh": "Refresh",
+                    "viewAll": "View all"
+                },
+                "filters": {
+                    "label": "Filter by category",
+                    "all": "All",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "deployment": "Deployment",
+                    "settings": "Settings",
+                    "comparisons": "Comparisons",
+                    "communityPr": "Community PR",
+                    "users": "Users",
+                    "submissions": "Submissions",
+                    "reports": "Reports"
+                },
+                "degraded": {
+                    "title": {
+                        "not_provisioned": "Deployed-site events not yet available",
+                        "disabled": "Deployed-site sync is turned off in Settings",
+                        "timeout": "Deployed-site events temporarily unavailable",
+                        "unauthorized": "Deployed-site rejected the request",
+                        "upstream_5xx": "Deployed-site is currently unreachable",
+                        "network": "Network error reaching the deployed site",
+                        "parse_error": "Unexpected response from the deployed site"
+                    },
+                    "lastSuccess": "Last successful sync: {time}",
+                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                },
+                "entry": {
+                    "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
+                }
             },
             "items": {
                 "title": "워크 항목",

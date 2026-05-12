@@ -1009,6 +1009,7 @@
             },
             "tabs": {
                 "overview": "概览",
+                "activity": "Activity Feed",
                 "items": "项目",
                 "generator": "生成器",
                 "schedule": "计划",
@@ -1440,11 +1441,49 @@
                 "dataRepository": "数据仓库"
             },
             "activity": {
-                "title": "最近活动",
+                "title": "Activity Feed",
+                "subtitle": "Everything that's happening on this directory",
                 "noActivity": "尚未有活动",
                 "created": "作品已创建",
                 "workCreated": "作品创建成功",
-                "justNow": "刚刚"
+                "justNow": "刚刚",
+                "empty": {
+                    "title": "No activity yet",
+                    "body": "Run a generation, add an item, or wait for visitors to see events here."
+                },
+                "actions": {
+                    "refresh": "Refresh",
+                    "viewAll": "View all"
+                },
+                "filters": {
+                    "label": "Filter by category",
+                    "all": "All",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "deployment": "Deployment",
+                    "settings": "Settings",
+                    "comparisons": "Comparisons",
+                    "communityPr": "Community PR",
+                    "users": "Users",
+                    "submissions": "Submissions",
+                    "reports": "Reports"
+                },
+                "degraded": {
+                    "title": {
+                        "not_provisioned": "Deployed-site events not yet available",
+                        "disabled": "Deployed-site sync is turned off in Settings",
+                        "timeout": "Deployed-site events temporarily unavailable",
+                        "unauthorized": "Deployed-site rejected the request",
+                        "upstream_5xx": "Deployed-site is currently unreachable",
+                        "network": "Network error reaching the deployed site",
+                        "parse_error": "Unexpected response from the deployed site"
+                    },
+                    "lastSuccess": "Last successful sync: {time}",
+                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                },
+                "entry": {
+                    "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
+                }
             },
             "items": {
                 "title": "作品项目",
