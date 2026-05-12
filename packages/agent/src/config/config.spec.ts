@@ -625,6 +625,7 @@ describe('agent/config', () => {
                 'billing',
                 'branding',
                 'database',
+                'everWorks',
                 'getAppType',
                 'getEnvironment',
                 'git',

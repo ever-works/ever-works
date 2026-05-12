@@ -258,7 +258,9 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			].join('\n'),
 			homepage: 'https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/',
 			uiHints: {
-				includeInOnboarding: false,
+				includeInOnboarding: true,
+				onboardingPriority: 4,
+				onboardingDescription: 'Deploy your works to your own Kubernetes cluster by pasting your kubeconfig',
 				completionFields: ['kubeconfig'],
 				verifiesOnSave: true
 			},

@@ -1,0 +1,63 @@
+{
+	"name": "@ever-works/grok-plugin",
+	"version": "1.0.0",
+	"description": "Grok (xAI) AI provider plugin for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "grok",
+			"name": "Grok (xAI)",
+			"version": "1.0.0",
+			"category": "ai-provider",
+			"capabilities": [
+				"ai-provider"
+			],
+			"description": "Grok (xAI) AI provider plugin for Ever Works platform",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": false
+		}
+	}
+}

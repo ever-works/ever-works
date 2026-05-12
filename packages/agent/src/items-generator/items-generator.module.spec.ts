@@ -1,6 +1,29 @@
+// `ItemImportExecutorService` imports `p-map` v7, which is ESM-only and
+// can't be parsed by jest's CJS transform. The mock matches the one in
+// `item-import-executor.service.spec.ts` — this spec only exercises module
+// metadata (Reflect API), so a no-op default export is sufficient.
+jest.mock('p-map', () => ({
+    __esModule: true,
+    default: async <T, R>(
+        iterable: Iterable<T>,
+        mapper: (item: T, index: number) => Promise<R>,
+    ): Promise<R[]> => {
+        const results: R[] = [];
+        let index = 0;
+        for (const item of iterable) {
+            results.push(await mapper(item, index));
+            index += 1;
+        }
+        return results;
+    },
+}));
+
 import * as itemsGeneratorBarrel from './index';
 import { ItemsGeneratorModule } from './items-generator.module';
 import { ItemSubmissionService } from './item-submission.service';
+import { ItemExportService } from './item-export.service';
+import { ItemImportService } from './item-import.service';
+import { ItemImportExecutorService } from './item-import-executor.service';
 import { DomainType } from '@ever-works/contracts';
 
 /**
@@ -9,12 +32,13 @@ import { DomainType } from '@ever-works/contracts';
  *
  * Two non-obvious contracts are pinned here:
  *
- *   1. `ItemSubmissionService` is the ONLY service exported. Generation
+ *   1. The module exposes four services: `ItemSubmissionService` (single-
+ *      item submit) and the three EW-533 services (`ItemExportService`,
+ *      `ItemImportService`, `ItemImportExecutorService`). Generation
  *      itself runs through `PipelineOrchestratorService` (imported from
  *      `PipelineModule` indirectly). A future refactor that moves
  *      generation back into this module would have to consciously update
- *      this contract — currently this module is intentionally a thin
- *      single-item-submission wrapper.
+ *      this contract.
  *
  *   2. `DomainType` is re-exported from `@ever-works/contracts` for CJS
  *      consumers that import via the items-generator barrel. The
@@ -28,8 +52,11 @@ describe('ItemsGeneratorModule + barrel re-exports', () => {
             expect(itemsGeneratorBarrel.ItemsGeneratorModule).toBe(ItemsGeneratorModule);
         });
 
-        it('re-exports ItemSubmissionService (the only service in this submodule)', () => {
+        it('re-exports the four services exposed by this submodule', () => {
             expect(itemsGeneratorBarrel.ItemSubmissionService).toBe(ItemSubmissionService);
+            expect(itemsGeneratorBarrel.ItemExportService).toBe(ItemExportService);
+            expect(itemsGeneratorBarrel.ItemImportService).toBe(ItemImportService);
+            expect(itemsGeneratorBarrel.ItemImportExecutorService).toBe(ItemImportExecutorService);
         });
 
         it('re-exports DomainType from @ever-works/contracts (CJS bridge)', () => {
@@ -89,15 +116,22 @@ describe('ItemsGeneratorModule + barrel re-exports', () => {
             return Reflect.getMetadata(key, ItemsGeneratorModule) ?? [];
         }
 
-        it('declares ItemSubmissionService as the only provider', () => {
+        it('declares the four EW-533 services as providers', () => {
             const providers = getMeta('providers');
             expect(providers).toContain(ItemSubmissionService);
-            expect(providers).toHaveLength(1);
+            expect(providers).toContain(ItemExportService);
+            expect(providers).toContain(ItemImportService);
+            expect(providers).toContain(ItemImportExecutorService);
+            expect(providers).toHaveLength(4);
         });
 
-        it('exports ItemSubmissionService (consumed by apps/api works module)', () => {
+        it('exports the four services (consumed by apps/api works module)', () => {
             const exports = getMeta('exports');
             expect(exports).toContain(ItemSubmissionService);
+            expect(exports).toContain(ItemExportService);
+            expect(exports).toContain(ItemImportService);
+            expect(exports).toContain(ItemImportExecutorService);
+            expect(exports).toHaveLength(4);
         });
 
         it('imports DatabaseModule, FacadesModule, and PipelineModule (by name)', () => {

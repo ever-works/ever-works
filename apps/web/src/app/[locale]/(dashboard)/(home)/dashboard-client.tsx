@@ -3,11 +3,13 @@
 import { AuthUser } from '@/lib/auth';
 import { WorkList } from '@/components/works/WorkList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
+import { WorkProposalsSection } from '@/components/dashboard/WorkProposalsSection';
 import { EmptyState } from '@/components/common/EmptyState';
 import { GET_WORK_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api';
+import type { WorkProposal } from '@/lib/api/work-proposals';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -15,6 +17,8 @@ interface DashboardClientProps {
     totalWorks: number;
     totalItems: number;
     activeWebsites: number;
+    initialProposals: WorkProposal[];
+    initiallyResearching: boolean;
 }
 
 export default function DashboardClient({
@@ -23,6 +27,8 @@ export default function DashboardClient({
     totalWorks,
     totalItems,
     activeWebsites,
+    initialProposals,
+    initiallyResearching,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -43,6 +49,12 @@ export default function DashboardClient({
                 totalWorks={totalWorks}
                 totalItems={totalItems}
                 activeWebsites={activeWebsites}
+            />
+
+            <WorkProposalsSection
+                initialProposals={initialProposals}
+                initiallyResearching={initiallyResearching}
+                username={user.username}
             />
 
             <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">

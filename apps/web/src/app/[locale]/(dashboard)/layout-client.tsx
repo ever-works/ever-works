@@ -12,12 +12,12 @@ import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
-import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
-import { useOnboardingState } from '@/components/onboarding/use-onboarding-state';
+import { dismissOnboarding } from '@/app/actions/onboarding/state';
+import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
@@ -36,6 +36,8 @@ interface DashboardLayoutClientProps {
         OAuthConnectionInfo | GitProviderConnectionInfo | null
     >;
     initialOnboardingDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    initialOnboardingState: OnboardingStateResponse;
+    initialOnboardingCatalog: OnboardingCatalogResponse;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -50,79 +52,44 @@ export function DashboardLayoutClient({
     onboardingPlugins,
     initialOnboardingConnections,
     initialOnboardingDeviceAuthStatuses,
+    initialOnboardingState,
+    initialOnboardingCatalog,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
-    const [onboardingOpen, setOnboardingOpen] = useState(false);
+    const [onboardingOpenManually, setOnboardingOpenManually] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
     const [chatWidth, setChatWidth] = useState<number>(DEFAULT_CHAT_WIDTH);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
-    const [onboardingState, setOnboardingState] = useOnboardingState();
-    const [onboardingConnections, setOnboardingConnections] = useState(
-        initialOnboardingConnections,
-    );
-    const [onboardingDeviceAuthStatuses, setOnboardingDeviceAuthStatuses] = useState(
-        initialOnboardingDeviceAuthStatuses,
-    );
-    const [isLoadingOnboardingStatuses, setIsLoadingOnboardingStatuses] = useState(false);
-    const [hasRequestedOnboardingStatuses, setHasRequestedOnboardingStatuses] = useState(false);
+
+    // Server-authoritative onboarding state; mutated optimistically by the
+    // wizard's own server-action calls and by close/dismiss handlers below.
+    const [onboardingState, setOnboardingState] = useState(initialOnboardingState);
 
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(false);
-    const onboardingTotalSteps = onboardingPlugins.length + 2;
-    const onboardingCurrentStep = Math.min(onboardingState.step, onboardingTotalSteps - 1) + 1;
-    const shouldAutoOpenOnboarding = onboardingTotalWorks === 0 && !onboardingState.modalDismissed;
-    const isOnboardingOpen = onboardingOpen || shouldAutoOpenOnboarding;
+
+    // The v2 wizard derives its own step list — we only need step + total
+    // counts for the header "x of N" badge. Approximating with the persisted
+    // `lastStep` is sufficient because the badge is informational only.
+    const onboardingTotalSteps = 9;
+    const onboardingCurrentStep = Math.min(
+        (onboardingState.state?.lastStep ?? 0) + 1,
+        onboardingTotalSteps,
+    );
+
+    const isOnboardingDismissed = Boolean(onboardingState.dismissedAt);
+    const isOnboardingCompleted = Boolean(onboardingState.completedAt);
+    const shouldAutoOpenOnboarding =
+        onboardingTotalWorks === 0 && !isOnboardingDismissed && !isOnboardingCompleted;
+    const isOnboardingOpen = onboardingOpenManually || shouldAutoOpenOnboarding;
     const showOnboardingBadge =
-        onboardingTotalWorks === 0 &&
-        onboardingState.modalDismissed &&
-        !onboardingState.headerDismissed;
-
-    const loadOnboardingStatuses = useCallback(async () => {
-        if (onboardingPlugins.length === 0) {
-            setHasRequestedOnboardingStatuses(true);
-            return;
-        }
-
-        setHasRequestedOnboardingStatuses(true);
-        setIsLoadingOnboardingStatuses(true);
-
-        try {
-            const result = await getOnboardingPluginStatuses(
-                onboardingPlugins.map((plugin) => ({
-                    pluginId: plugin.pluginId,
-                    capabilities: plugin.capabilities,
-                })),
-            );
-
-            if (!result.success || !result.data) {
-                return;
-            }
-
-            setOnboardingConnections(result.data.connections);
-            setOnboardingDeviceAuthStatuses(result.data.deviceAuthStatuses);
-        } finally {
-            setIsLoadingOnboardingStatuses(false);
-        }
-    }, [onboardingPlugins]);
-
-    useEffect(() => {
-        if (!isOnboardingOpen || hasRequestedOnboardingStatuses || isLoadingOnboardingStatuses) {
-            return;
-        }
-
-        void loadOnboardingStatuses();
-    }, [
-        hasRequestedOnboardingStatuses,
-        isLoadingOnboardingStatuses,
-        isOnboardingOpen,
-        loadOnboardingStatuses,
-    ]);
+        onboardingTotalWorks === 0 && isOnboardingDismissed && !isOnboardingCompleted;
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -246,21 +213,24 @@ export function DashboardLayoutClient({
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
     const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
-    const openOnboarding = useCallback(() => setOnboardingOpen(true), []);
+    const openOnboarding = useCallback(() => setOnboardingOpenManually(true), []);
     const closeOnboarding = useCallback(() => {
-        setOnboardingOpen(false);
-        setOnboardingState({
-            ...onboardingState,
-            modalDismissed: true,
-        });
-    }, [onboardingState, setOnboardingState]);
+        setOnboardingOpenManually(false);
+        // Optimistically flip dismissedAt so the badge appears and we don't
+        // auto-reopen on the next mount. The server action persists.
+        setOnboardingState((prev) => ({
+            ...prev,
+            dismissedAt: prev.dismissedAt ?? new Date().toISOString(),
+        }));
+        void dismissOnboarding();
+    }, []);
     const dismissOnboardingBadge = useCallback(() => {
-        setOnboardingState({
-            ...onboardingState,
-            modalDismissed: true,
-            headerDismissed: true,
-        });
-    }, [onboardingState, setOnboardingState]);
+        setOnboardingState((prev) => ({
+            ...prev,
+            dismissedAt: prev.dismissedAt ?? new Date().toISOString(),
+        }));
+        void dismissOnboarding();
+    }, []);
 
     // Ensure chat is in resizable (non-expanded) mode. Used when user interacts
     // with the sidebar so we collapse the expanded view back to the resizable width.
@@ -330,12 +300,11 @@ export function DashboardLayoutClient({
             <ChatProvider>
                 <EverWorksOnboardingWizard
                     open={isOnboardingOpen}
-                    state={onboardingState}
+                    initialState={onboardingState}
+                    catalog={initialOnboardingCatalog}
                     plugins={onboardingPlugins}
-                    connections={onboardingConnections}
-                    deviceAuthStatuses={onboardingDeviceAuthStatuses}
-                    isStatusLoading={isLoadingOnboardingStatuses}
-                    onStateChange={setOnboardingState}
+                    initialConnections={initialOnboardingConnections}
+                    initialDeviceAuthStatuses={initialOnboardingDeviceAuthStatuses}
                     onClose={closeOnboarding}
                 />
 

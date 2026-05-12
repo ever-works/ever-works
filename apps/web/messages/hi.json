@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "यहाँ कोई गतिविधि नहीं",
                 "noWork": "कोई कार्य नहीं",
+                "loadMore": "{count} और लोड करें",
                 "columns": {
                     "pending": "लंबित",
                     "in_progress": "प्रगति में",
                     "completed": "पूर्ण",
                     "failed": "विफल",
                     "cancelled": "रद्द"
-                },
-                "loadMore": "{count} और लोड करें"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} आइटम",
                 "noDescription": "कोई विवरण नहीं",
                 "empty": "यहाँ कोई कार्य नहीं",
+                "loadMore": "{count} और लोड करें",
                 "columns": {
                     "not_started": "शुरू नहीं",
                     "scheduled": "निर्धारित",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "चेतावनियों के साथ पूर्ण",
                     "failed": "विफल",
                     "cancelled": "रद्द"
-                },
-                "loadMore": "{count} और लोड करें"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "सुरक्षा",
                 "apiKeys": "API कुंजियाँ",
                 "data": "डेटा",
+                "githubApp": "GitHub ऐप",
                 "gitProviders": "Git प्रदाता",
                 "dangerZone": "खतरे का क्षेत्र"
+            },
+            "githubApp": {
+                "title": "GitHub ऐप इंस्टॉलेशन",
+                "subtitle": "Ever Works GitHub ऐप के माध्यम से लिंक की गई इंस्टॉलेशन की जाँच करें और गहरे ओनबोर्डिंग कार्य से पहले रिपॉज़िटरी स्नैपशॉट को मैन्युअली रिफ़्रेश करें।",
+                "emptyTitle": "अभी तक कोई GitHub ऐप इंस्टॉलेशन नहीं",
+                "emptyDescription": "एक रिपॉज़िटरी या संगठन पर Ever Works GitHub ऐप इंस्टॉल करें, फिर सेटअप रीडायरेक्ट को पूरा करें ताकि इस वर्कस्पेस में इंस्टॉलेशन लिंक हो।",
+                "sync": "सिंक",
+                "syncSuccess": "इंस्टॉलेशन सिंक हो गया",
+                "syncError": "इंस्टॉलेशन सिंक करने में विफल",
+                "onboard": "ओनबोर्ड",
+                "onboardSuccess": "रिपॉज़िटरी ओनबोर्ड की गई",
+                "onboardError": "रिपॉज़िटरी ओनबोर्ड करने में विफल",
+                "active": "सक्रिय",
+                "suspended": "निलंबित",
+                "installationMeta": "इंस्टॉलेशन #{installationId} · {accountType} खाता · {targetType} लक्ष्य",
+                "repoCount": "रिपॉज़िटरी",
+                "updatedAt": "अंतिम सिंक",
+                "appSlug": "ऐप स्लग",
+                "repositories": "रिपॉज़िटरी",
+                "noRepositories": "इस इंस्टॉलेशन में अभी तक कोई रिपॉज़िटरी संग्रहीत नहीं है। स्नैपशॉट को GitHub से रिफ़्रेश करने के लिए सिंक चलाएँ।",
+                "branch": "डिफ़ॉल्ट ब्रांच: {branch}",
+                "branchUnknown": "डिफ़ॉल्ट ब्रांच उपलब्ध नहीं",
+                "private": "निजी",
+                "public": "सार्वजनिक"
             },
             "data": {
                 "exportTitle": "डेटा निर्यात करें",
@@ -1021,6 +1046,14 @@
                     "submit": "आमंत्रण भेजें",
                     "cancel": "रद्द करें",
                     "success": "सदस्य को सफलतापूर्वक आमंत्रित किया गया।",
+                    "modes": {
+                        "direct": {
+                            "description": "अपने ईमेल द्वारा तुरंत किसी मौजूदा उपयोगकर्ता को सदस्य के रूप में जोड़ें। उन्हें तुरंत आवंटित भूमिका मिल जाएगी।"
+                        },
+                        "link": {
+                            "description": "साझा करने के लिए एकल-उपयोग लिंक बनाएँ। प्राप्तकर्ता इसे भुना कर जुड़ सकता है — या यदि आप एक मालिक-दावा लिंक बनाते हैं तो स्वामित्व का दावा कर सकता है।"
+                        }
+                    },
                     "errors": {
                         "emailRequired": "ईमेल पता आवश्यक है।",
                         "failed": "सदस्य को आमंत्रित करने में विफल। कृपया पुनः प्रयास करें।"
@@ -1321,6 +1354,15 @@
                     "tag_change": "टैग परिवर्तन",
                     "collection_change": "कलेक्शन परिवर्तन",
                     "community_pr_merged": "समुदाय पीआर"
+                },
+                "generationInfo": {
+                    "label": "जेनरेशन विवरण",
+                    "itemsAdded": "जोड़ी गई आइटम",
+                    "itemsUpdated": "अपडेट की गई आइटम",
+                    "totalItems": "कुल आइटम",
+                    "pagesProcessed": "प्रोसेस किए गए पृष्ठ",
+                    "tokensUsed": "उपयोग किए गए टोकन",
+                    "existingReferencesUsed": "मौजूदा संदर्भों का उपयोग"
                 },
                 "detail": {
                     "added": "जोड़ा गया",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "एआई मॉडल ओवरराइड",
                 "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "वैकल्पिक। डिफ़ॉल्ट रूप से आयातित या पिछला मॉडल उपयोग किया जाता है जब तक कि आप इसे यहाँ ओवरराइड न करें।",
+                "modelOverrideUnavailable": "सूची से मॉडल चुनने के लिए पहले एक कॉन्फ़िगर किए गए AI प्रदाता का चयन करें।",
+                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
+                "websiteTemplateLockedHelperText": "पहली वेबसाइट जेनरेशन के बाद टेम्प्लेट चयन लॉक हो जाता है।",
                 "recommended": "अनुशंसित",
                 "promptPlaceholder": "वर्णन करें कि इस कार्य के लिए कौन से आइटम उत्पन्न करने चाहिए...",
                 "promptHelperText": "उत्पन्न करने वाले कंटेंट के प्रकार के बारे में विशिष्ट रहें",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "जनरेशन रद्द करने में विफल"
             },
             "settings": {
+                "tabs": {
+                    "general": "सामान्य",
+                    "members": "सदस्य",
+                    "navigationLabel": "सेटिंग टैब"
+                },
                 "sourceSettings": "स्रोत रिपॉजिटरी",
                 "originalSource": "मूल स्रोत",
                 "syncEnabled": "सिंक सक्षम",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "स्वचालित टेम्पलेट अपडेट",
                         "description": "अपनी वेबसाइट को नवीनतम टेम्पलेट परिवर्तनों के साथ स्वचालित रूप से सिंक रखें।",
+                        "selectorLabel": "वेबसाइट टेम्प्लेट",
+                        "currentTemplateLabel": "वर्तमान टेम्प्लेट",
+                        "unknownTemplate": "वरासत में मिला डिफ़ॉल्ट",
+                        "currentHelperText": "चयनित टेम्प्लेट वेबसाइट रिपॉज़िटरी को कैसे प्रारंभ और अपडेट किया जाता है, इसका नियंत्रण करता है।",
+                        "switchHelperText": "यदि वेबसाइट रिपॉज़िटरी पहले से मौजूद है, तो नया टेम्प्लेट लागू करने से चयनित टेम्प्लेट से मौजूदा वेबसाइट रिपॉज़िटरी रीसेट हो जाएगी।",
+                        "switchAction": "वेबसाइट रिपॉज़िटरी पर टेम्प्लेट लागू करें",
+                        "switchActionIdle": "टेम्प्लेट अप-टू-डेट है",
+                        "switchConfirmTitle": "वेबसाइट टेम्प्लेट बदलें?",
+                        "switchConfirmDescription": "यदि वेबसाइट रिपॉज़िटरी पहले से मौजूद है, तो इसकी सामग्री चयनित टेम्प्लेट से बदल दी जाएगी। उस रिपॉज़िटरी में कोई भी कस्टम कोड नष्ट हो जाएगा।",
+                        "switchConfirmButton": "टेम्प्लेट बदलें",
+                        "switchCancel": "रद्द करें",
                         "autoUpdate": "स्वचालित रूप से अपडेट करें",
                         "autoUpdateDescription": "हर घंटे टेम्पलेट अपडेट की जाँच करें और स्वचालित रूप से लागू करें।",
                         "useBeta": "टेम्पलेट का बीटा संस्करण उपयोग करें",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "अंतिम अपडेट",
                         "lastChecked": "अंतिम जाँच",
                         "lastError": "अंतिम त्रुटि",
+                        "inheritedState": "यह कार्य आपके वर्तमान डिफ़ॉल्ट टेम्प्लेट को विरासत में प्राप्त कर रहा है।",
+                        "explicitState": "यह कार्य स्पष्ट टेम्प्लेट चयन पर पinned है।",
+                        "originStandard": "मानक",
+                        "originForked": "फ़ॉर्क किया गया",
+                        "originCustomUrl": "कस्टम URL",
                         "updateSuccess": "सेटिंग्स सफलतापूर्वक अपडेट हो गईं",
                         "updateFailed": "सेटिंग्स अपडेट करने में विफल",
                         "githubRequired": "GitHub कनेक्शन आवश्यक। स्वचालित अपडेट सक्षम करने के लिए सेटिंग्स में अपना GitHub खाता कनेक्ट करें।"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "संगठन रिपॉजिटरी",
                 "organizationHelp": "अपने व्यक्तिगत खाते के बजाय संगठन के अंतर्गत रिपॉजिटरी बनाएँ",
                 "organizationNameLabel": "संगठन का नाम",
-                "organizationNamePlaceholder": "संगठन का नाम दर्ज करें"
+                "organizationNamePlaceholder": "संगठन का नाम दर्ज करें",
+                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।"
             },
             "manual": {
                 "title": "मैन्युअल रूप से बनाएँ",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "इस कार्य को GitHub संगठन के अंतर्गत बनाएँ न कि अपने व्यक्तिगत खाते के अंतर्गत",
                 "organizationNameLabel": "संगठन का नाम",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
                 "headerLabel": "कस्टम README हेडर",
                 "headerPlaceholder": "अपने README फ़ाइल के शीर्ष पर कस्टम सामग्री जोड़ें",
                 "headerOverwrite": "पूर्वनिर्धारित हेडर को पूरी तरह बदलें",
@@ -2703,6 +2771,7 @@
                 "activity": "गतिविधि",
                 "works": "कार्यज़",
                 "plugins": "प्लगइन्स",
+                "templates": "टेम्प्लेट",
                 "settings": "सेटिंग्स"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "{login} हटाएँ"
             }
         },
+        "templates": {
+            "title": "टेम्प्लेट",
+            "subtitle": "बिल्ट-इन वेबसाइट टेम्प्लेट्स ब्राउज़ करें, अपने कस्टम कैटलॉग को मैनेज करें, और नियंत्रित करें कि नए कार्य किस टेम्प्लेट से शुरू हों।",
+            "actions": {
+                "addTemplate": "कस्टम टेम्प्लेट जोड़ें",
+                "refreshTemplates": "टेम्प्लेट रिफ़्रेश करें"
+            },
+            "hero": {
+                "eyebrow": "टेम्प्लेट कैटलॉग",
+                "catalogHint": "इस कैटलॉग में कोई भी टेम्प्लेट आपका डिफ़ॉल्ट बन सकता है। एक बिल्ट-इन टेम्प्लेट को फ़ॉर्क करके इसे अपना प्रारंभिक बिंदु बनाएं।"
+            },
+            "stats": {
+                "defaultLabel": "सक्रिय डिफ़ॉल्ट",
+                "defaultHint": "नए कार्य इस टेम्प्लेट से शुरू होते हैं, जब तक आप प्रति कार्य इसे ओवरराइड नहीं करते।",
+                "builtInLabel": "बिल्ट-इन",
+                "builtInHint": "Ever Works द्वारा रखरखाव किए गए टेम्प्लेट",
+                "customLabel": "कस्टम",
+                "customHint": "अपने propios GitHub रिपॉज़िटरी या फ़ॉर्क से संग्रहीत",
+                "none": "डिफ़ॉल्ट नहीं"
+            },
+            "filters": {
+                "all": "सभी",
+                "builtIn": "बिल्ट-इन",
+                "custom": "कस्टम",
+                "searchPlaceholder": "टेम्प्लेट, फ्रेमवर्क या रिपॉज़िटरी खोजें..."
+            },
+            "card": {
+                "builtIn": "बिल्ट-इन",
+                "custom": "कस्टम",
+                "standard": "मानक",
+                "forked": "फ़ॉर्क किया गया",
+                "customUrl": "कस्टम URL",
+                "standardSource": "Ever Works मानक",
+                "forkedSource": "आपके GitHub में फ़ॉर्क किया गया",
+                "customUrlSource": "GitHub URL से जोड़ा गया",
+                "default": "डिफ़ॉल्ट",
+                "defaultSelected": "डिफ़ॉल्ट चयनित",
+                "makeDefault": "डिफ़ॉल्ट बनाएं",
+                "fork": "फ़ॉर्क",
+                "edit": "संपादित करें",
+                "archive": "आर्काइव",
+                "catalogOnly": "केवल कैटलॉग आइटम",
+                "openRepository": "रिपॉज़िटर खोलें",
+                "previewAlt": "{name} प्रीवью",
+                "frameworkAgnostic": "फ्रेमवर्क से स्वतंत्र",
+                "branch": "शाखा: {branch}",
+                "syncBranches": "{count} सिंक शाखाएँ",
+                "betaBranch": "बीटा: {branch}",
+                "noDescription": "अभी तक कोई विवरण नहीं"
+            },
+            "dialog": {
+                "title": "कस्टम टेम्प्लेट जोड़ें",
+                "description": "अपने व्यक्तिगत टेम्प्लेट कैटलॉग में एक GitHub रिपॉज़िटर संग्रहीत करें। यह पहला भाग टेम्प्लेट मेटाडेटा संग्रहीत करता है ताकि इसे अगले असाइनमेंट फ़्लो में चयन किया जा सके।",
+                "editTitle": "कस्टम टेम्प्लेट संपादित करें",
+                "editDescription": "अपने कैटलॉग में इस कस्टम टेम्प्लेट के लिए उपयोग किए जाने वाले प्रदर्शन विवरण और पूर्वावलोकन छवि को अपडेट करें।",
+                "repositoryUrlLabel": "GitHub रिपॉज़िटर URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "स्रोत रिपॉज़िटर URL टेम्प्लेट जोड़े जाने के बाद नहीं बदला जा सकता।",
+                "nameLabel": "टेम्प्लेट का नाम",
+                "namePlaceholder": "वैकल्पिक प्रदर्शन नाम",
+                "frameworkLabel": "फ्रेमवर्क",
+                "frameworkSelectPlaceholder": "एक फ्रेमवर्क चुनें",
+                "frameworkUnspecified": "निर्दिष्ट नहीं",
+                "previewImageLabel": "प्रीव्यू इमेज URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "वैकल्पिक. यदि आप GitHub रिपॉज़िटर पूर्वावलोकन को ओवरराइड करना चाहते हैं तो एकキュरेटेड स्क्रीनशॉट उपयोग करें।",
+                "descriptionLabel": "लघु विवरण",
+                "descriptionPlaceholder": "यह टेम्प्लेट किसके लिए सबसे अच्छा है",
+                "branchLabel": "डिफ़ॉल्ट शाखा",
+                "branchPlaceholder": "main",
+                "branchHelp": "खाली छोड़ने पर डिफ़ॉल्ट रूप से main माना जाएगा।",
+                "betaBranchLabel": "बीटा शाखा",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "वैकल्पिक. बीटा डिप्लॉयमेंट के लिए उपयोग की जाने वाली शाखा।",
+                "cancel": "रद्द करें",
+                "submit": "टेम्प्लेट सहेजें",
+                "saveChanges": "परिवर्तन सहेजें"
+            },
+            "forkDialog": {
+                "title": "मानक टेम्प्लेट का फ़ॉर्क",
+                "description": "इस मानक टेम्प्लेट की अपनी GitHub कॉपी बनाएँ, इसे अपने कैटलॉग में जोड़ें, और नए कार्यों के लिए इसे डिफ़ॉल्ट बनाएँ।",
+                "sourceLabel": "टेम्प्लेट स्रोत",
+                "targetLabel": "फ़ॉर्क गंतव्य",
+                "targetPlaceholder": "एक GitHub खाता या संगठन चुनें",
+                "targetHelp": "फ़ॉर्क {target} के अंतर्गत बनाया जाएगा।",
+                "personalTarget": "व्यक्तिगत खाता ({login})",
+                "organizationTarget": "संगठन ({login})",
+                "noTargets": "एक टेम्प्लेट का फ़ॉर्क करने से पहले GitHub से जुड़ें और अपने संगठन लोड करें।",
+                "resultLabel": "नया रिपॉज़िटर",
+                "none": "आपका चयनित खाता",
+                "cancel": "रद्द करें",
+                "submit": "फ़ॉर्क करें और डिफ़ॉल्ट बनाएँ"
+            },
+            "archiveDialog": {
+                "title": "कस्टम टेम्प्लेट आर्काइव करें",
+                "description": "अपने कैटलॉग से इस टेम्प्लेट को आर्काइव करें। आप केवल उन्हीं टेम्प्लेट्स को आर्काइव कर सकते हैं जो वर्तमान में किसी कार्य से असाइन नहीं हैं।",
+                "templateLabel": "टेम्प्लेट",
+                "cancel": "रद्द करें",
+                "submit": "टेम्प्लेट आर्काइव करें"
+            },
+            "empty": {
+                "title": "कोई टेम्प्लेट नहीं मिला",
+                "default": "अभी तक इस दृश्य से कोई टेम्प्लेट मेल नहीं खाता",
+                "search": "एक अलग खोज शब्द आजमाएँ या मौजूदा फ़िल्टर साफ़ करें",
+                "resetFilters": "फ़िल्टर रीसेट करें"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub रिपॉज़िटर URL आवश्यक है",
+                "repositoryUrlInvalid": "एक वैध GitHub रिपॉज़िटर URL दर्ज करें जैसे https://github.com/owner/repository",
+                "forkTargetRequired": "फ़ॉर्क के लिए एक GitHub खाता या संगठन चुनें",
+                "addSuccess": "GitHub URL से टेम्प्लेट संग्रहीत किया गया",
+                "addFailed": "टेम्प्लेट संग्रहीत करने में विफल",
+                "updateSuccess": "टेम्प्लेट विवरण अपडेट किए गए",
+                "updateFailed": "टेम्प्लेट विवरण अपडेट करने में विफल",
+                "archiveSuccess": "आपके कैटलॉग से टेम्प्लेट आर्काइव किया गया",
+                "archiveFailed": "टेम्प्लेट आर्काइव करने में विफल",
+                "forkSuccess": "{repository} को फ़ॉर्क किया गया, इसे आपके कैटलॉग में जोड़ा गया, और इसे आपके डिफ़ॉल्ट के रूप में सेट किया गया।",
+                "forkExisting": "{repository} पहले से आपके कैटलॉग में था और अब यह आपके डिफ़ॉल्ट फ़ॉर्क्ड टेम्प्लेट है।",
+                "forkFailed": "टेम्प्लेट फ़ॉर्क करने में विफल",
+                "refreshSuccess": "टेम्प्लेट कैटलॉग रिफ़्रेश किया गया",
+                "refreshFailed": "टेम्प्लेट रिफ़्रेश करने में विफल",
+                "defaultUpdated": "डिफ़ॉल्ट टेम्प्लेट अपडेट किया गया",
+                "defaultFailed": "डिफ़ॉल्ट टेम्प्लेट अपडेट करने में विफल"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "डिफ़ॉल्ट उपयोग करें",
+            "defaultOptionWithName": "डिफ़ॉल्ट उपयोग करें ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (डिफ़ॉल्ट)",
+            "changeAnywayLink": "फिर भी बदलें",
+            "origin": {
+                "standard": "मानक",
+                "forked": "फ़ॉर्क किया गया",
+                "customUrl": "कस्टम URL"
+            },
+            "state": {
+                "defaultBadge": "वरासत में मिला डिफ़ॉल्ट",
+                "inheritedTitle": "डिफ़ॉल्ट टेम्प्लेट का उपयोग हो रहा है",
+                "inheritedDescription": "यह कार्य आपके वर्तमान डिफ़ॉल्ट टेम्प्लेट का पालन करेगा जब तक आप किसी विशिष्ट टेम्प्लेट को पिन नहीं करते।",
+                "pinnedTitle": "पinned टेम्प्लेट",
+                "pinnedDescription": "यह कार्य इस टेम्प्लेट का उपयोग जारी रखेगा भले ही बाद में आपका डिफ़ॉल्ट बदल जाए।"
+            }
+        },
         "workPlugins": {
             "title": "कार्य प्लगइन्स",
             "subtitle": "इस कार्य के लिए प्लगइन्स कॉन्फ़िगर करें",
@@ -3067,6 +3280,7 @@
             "history": "इतिहास",
             "comparisons": "तुलनाएँ",
             "plugins": "प्लगइन्स",
+            "templates": "टेम्प्लेट",
             "profile": "प्रोफ़ाइल",
             "security": "सुरक्षा",
             "apiKeys": "API कुंजियाँ",

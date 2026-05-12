@@ -9,8 +9,11 @@ import {
     GitProviderInfo,
     type WebsiteTemplateOption,
 } from '@/lib/api';
+import { redirect } from 'next/navigation';
 import NewWorkClient from './new-work-client';
 import type { DeployProvider } from './deploy-provider-selector';
+import { workProposalsAPI } from '@/lib/api/work-proposals';
+import type { WorkProposal } from '@/lib/api/work-proposals';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -22,7 +25,12 @@ export interface ProviderWithConnection {
     connectionInfo: GitProviderConnectionInfo | null;
 }
 
-export default async function NewWorkPage() {
+interface NewWorkPageProps {
+    searchParams: Promise<{ proposal?: string }>;
+}
+
+export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
+    const { proposal: proposalId } = await searchParams;
     const user = await getAuthFromCookie();
 
     // Get all available git providers and their connection status
@@ -76,6 +84,20 @@ export default async function NewWorkPage() {
         websiteTemplates = [];
     }
 
+    let proposal: WorkProposal | null = null;
+    if (proposalId) {
+        proposal = await workProposalsAPI.get(proposalId);
+        // If the proposal is already accepted, send the user to the existing Work
+        // instead of starting a duplicate create flow.
+        if (proposal?.status === 'accepted' && proposal.acceptedWorkId) {
+            redirect(`/works/${proposal.acceptedWorkId}`);
+        }
+        // Already-dismissed proposals fall through: form opens blank, no prefill.
+        if (proposal?.status !== 'pending') {
+            proposal = null;
+        }
+    }
+
     return (
         <NewWorkClient
             user={user!}
@@ -84,6 +106,7 @@ export default async function NewWorkPage() {
             deployProviders={deployProviders}
             defaultDeployProviderId={defaultDeployProviderId}
             websiteTemplates={websiteTemplates}
+            proposal={proposal}
         />
     );
 }

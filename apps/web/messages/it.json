@@ -602,14 +602,14 @@
             "kanban": {
                 "empty": "Nessuna attività qui",
                 "noWork": "Nessun lavoro",
+                "loadMore": "Carica altri {count}",
                 "columns": {
                     "pending": "In attesa",
                     "in_progress": "In corso",
                     "completed": "Completato",
                     "failed": "Fallito",
                     "cancelled": "Annullato"
-                },
-                "loadMore": "Carica altri {count}"
+                }
             }
         },
         "works": {
@@ -648,6 +648,7 @@
                 "items": "{count} elementi",
                 "noDescription": "Nessuna descrizione",
                 "empty": "Nessun lavoro qui",
+                "loadMore": "Carica altri {count}",
                 "columns": {
                     "not_started": "Non avviato",
                     "scheduled": "Pianificato",
@@ -664,8 +665,7 @@
                     "completedWithWarnings": "Completato con avvisi",
                     "failed": "Fallito",
                     "cancelled": "Annullato"
-                },
-                "loadMore": "Carica altri {count}"
+                }
             }
         },
         "settings": {
@@ -676,8 +676,33 @@
                 "security": "Sicurezza",
                 "apiKeys": "Chiavi API",
                 "data": "Dati",
+                "githubApp": "GitHub App",
                 "gitProviders": "Fornitori Git",
                 "dangerZone": "Zona di pericolo"
+            },
+            "githubApp": {
+                "title": "Installazioni GitHub App",
+                "subtitle": "Ispeziona le installazioni collegate tramite l'App GitHub di Ever Works e aggiorna manualmente lo snapshot del repository prima di procedere con l'onboarding più approfondito.",
+                "emptyTitle": "Nessuna installazione GitHub App ancora",
+                "emptyDescription": "Installa l'App GitHub di Ever Works su un repository o un'organizzazione, poi completa il reindirizzamento di setup per collegare l'installazione a questo spazio di lavoro.",
+                "sync": "Sincronizza",
+                "syncSuccess": "Installazione sincronizzata",
+                "syncError": "Errore durante la sincronizzazione dell'installazione",
+                "onboard": "Integra",
+                "onboardSuccess": "Repository integrato",
+                "onboardError": "Errore nell'integrazione del repository",
+                "active": "Attiva",
+                "suspended": "Sospesa",
+                "installationMeta": "Installazione #{installationId} · account {accountType} · target {targetType}",
+                "repoCount": "Repository",
+                "updatedAt": "Ultima sincronizzazione",
+                "appSlug": "Slug app",
+                "repositories": "Repository",
+                "noRepositories": "Questa installazione non ha ancora repository memorizzati. Esegui la sincronizzazione per aggiornare lo snapshot da GitHub.",
+                "branch": "Ramo predefinito: {branch}",
+                "branchUnknown": "Ramo predefinito non disponibile",
+                "private": "Privato",
+                "public": "Pubblico"
             },
             "data": {
                 "exportTitle": "Esporta dati",
@@ -1021,6 +1046,14 @@
                     "submit": "Invia invito",
                     "cancel": "Annulla",
                     "success": "Membro invitato con successo.",
+                    "modes": {
+                        "direct": {
+                            "description": "Aggiungi immediatamente un utente esistente come membro tramite la loro email. Otterranno subito il ruolo assegnato."
+                        },
+                        "link": {
+                            "description": "Genera un link monouso da condividere. Il destinatario lo riscatta per unirsi — o per rivendicare la proprietà, se crei un link di richiesta di proprietà."
+                        }
+                    },
                     "errors": {
                         "emailRequired": "L'indirizzo email è obbligatorio.",
                         "failed": "Impossibile invitare il membro. Riprova."
@@ -1321,6 +1354,15 @@
                     "tag_change": "Modifica tag",
                     "collection_change": "Modifica collezione",
                     "community_pr_merged": "Community PR"
+                },
+                "generationInfo": {
+                    "label": "Dettagli di generazione",
+                    "itemsAdded": "Elementi aggiunti",
+                    "itemsUpdated": "Elementi aggiornati",
+                    "totalItems": "Totale elementi",
+                    "pagesProcessed": "Pagine elaborate",
+                    "tokensUsed": "Token utilizzati",
+                    "existingReferencesUsed": "Riferimenti esistenti utilizzati"
                 },
                 "detail": {
                     "added": "Aggiunto",
@@ -1711,6 +1753,9 @@
                 "modelOverride": "Sovrascrittura modello AI",
                 "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
+                "modelOverrideUnavailable": "Seleziona prima un provider AI configurato per scegliere un modello dall'elenco disponibile.",
+                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta.",
+                "websiteTemplateLockedHelperText": "La selezione del modello è bloccata dopo la prima generazione del sito web.",
                 "recommended": "Consigliato",
                 "promptPlaceholder": "Descrivi quali elementi devono essere generati per questa lavori...",
                 "promptHelperText": "Sii specifico sul tipo di contenuto che vuoi generare",
@@ -1851,6 +1896,11 @@
                 "stopFailed": "Impossibile annullare la generazione"
             },
             "settings": {
+                "tabs": {
+                    "general": "Generale",
+                    "members": "Membri",
+                    "navigationLabel": "Schede impostazioni"
+                },
                 "sourceSettings": "Repository di origine",
                 "originalSource": "Origine originale",
                 "syncEnabled": "Sincronizzazione abilitata",
@@ -2189,6 +2239,17 @@
                     "websiteTemplate": {
                         "title": "Aggiornamenti Automatici del Template",
                         "description": "Mantieni il tuo sito web automaticamente sincronizzato con le ultime modifiche del template.",
+                        "selectorLabel": "Modello sito web",
+                        "currentTemplateLabel": "Modello corrente",
+                        "unknownTemplate": "Predefinito ereditato",
+                        "currentHelperText": "Il modello selezionato controlla come il repository del sito web viene inizializzato e aggiornato.",
+                        "switchHelperText": "L'applicazione di un nuovo modello reimposterà il repository esistente del sito web dal modello selezionato, se esiste già.",
+                        "switchAction": "Applica modello al repository del sito web",
+                        "switchActionIdle": "Il modello è aggiornato",
+                        "switchConfirmTitle": "Cambiare modello di sito web?",
+                        "switchConfirmDescription": "Se il repository del sito web esiste già, il suo contenuto verrà sostituito dal modello selezionato. Eventuale codice personalizzato in quel repository verrà perso.",
+                        "switchConfirmButton": "Cambia modello",
+                        "switchCancel": "Annulla",
                         "autoUpdate": "Aggiorna automaticamente",
                         "autoUpdateDescription": "Controlla gli aggiornamenti del template ogni ora e applicali automaticamente.",
                         "useBeta": "Usa versione beta del template",
@@ -2196,6 +2257,11 @@
                         "lastUpdated": "Ultimo aggiornamento",
                         "lastChecked": "Ultimo controllo",
                         "lastError": "Ultimo errore",
+                        "inheritedState": "Questo lavoro sta ereditando il tuo modello predefinito corrente.",
+                        "explicitState": "Questo lavoro è fissato su una selezione esplicita di modello.",
+                        "originStandard": "Standard",
+                        "originForked": "Forkato",
+                        "originCustomUrl": "URL personalizzato",
                         "updateSuccess": "Impostazioni aggiornate con successo",
                         "updateFailed": "Impossibile aggiornare le impostazioni",
                         "githubRequired": "Connessione GitHub richiesta. Collega il tuo account GitHub in Impostazioni per abilitare gli aggiornamenti automatici"
@@ -2339,7 +2405,8 @@
                 "organizationLabel": "Repository Organizzazione",
                 "organizationHelp": "Crea repository sotto un'organizzazione invece del tuo account personale",
                 "organizationNameLabel": "Nome Organizzazione",
-                "organizationNamePlaceholder": "Inserisci il nome dell'organizzazione"
+                "organizationNamePlaceholder": "Inserisci il nome dell'organizzazione",
+                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta."
             },
             "manual": {
                 "title": "Crea Manualmente",
@@ -2362,6 +2429,7 @@
                 "organizationHelp": "Crea questa lavori sotto un'organizzazione GitHub invece del tuo account personale",
                 "organizationNameLabel": "Nome Organizzazione",
                 "organizationNamePlaceholder": "my-organization",
+                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta.",
                 "headerLabel": "Intestazione README Personalizzata",
                 "headerPlaceholder": "Aggiungi contenuto personalizzato in cima al file README",
                 "headerOverwrite": "Sostituisci completamente l'intestazione predefinita",
@@ -2703,6 +2771,7 @@
                 "activity": "Attività",
                 "works": "Lavori",
                 "plugins": "Plugin",
+                "templates": "Modelli",
                 "settings": "Impostazioni"
             },
             "tooltips": {
@@ -2933,6 +3002,150 @@
                 "removeLabel": "Rimuovi {login}"
             }
         },
+        "templates": {
+            "title": "Modelli",
+            "subtitle": "Sfoglia i modelli di sito web predefiniti, gestisci il tuo catalogo personalizzato e controlla quale modello i nuovi lavori utilizzeranno inizialmente.",
+            "actions": {
+                "addTemplate": "Aggiungi modello personalizzato",
+                "refreshTemplates": "Aggiorna modelli"
+            },
+            "hero": {
+                "eyebrow": "Catalogo modelli",
+                "catalogHint": "Qualsiasi modello in questo catalogo può diventare il tuo predefinito. Esegui il fork di un modello predefinito per trasformarlo nel tuo punto di partenza personale."
+            },
+            "stats": {
+                "defaultLabel": "Predefinito attivo",
+                "defaultHint": "I nuovi lavori partono da questo modello a meno che non lo sovrascrivi per lavoro.",
+                "builtInLabel": "Predefinito",
+                "builtInHint": "Modelli Ever Works mantenuti.",
+                "customLabel": "Personalizzato",
+                "customHint": "Salvato dai tuoi repository GitHub o dai fork.",
+                "none": "Nessun predefinito"
+            },
+            "filters": {
+                "all": "Tutti",
+                "builtIn": "Predefinito",
+                "custom": "Personalizzato",
+                "searchPlaceholder": "Cerca modelli, framework o repository..."
+            },
+            "card": {
+                "builtIn": "Predefinito",
+                "custom": "Personalizzato",
+                "standard": "Standard",
+                "forked": "Forkato",
+                "customUrl": "URL personalizzato",
+                "standardSource": "Standard Ever Works",
+                "forkedSource": "Forkato nel tuo GitHub",
+                "customUrlSource": "Aggiunto da URL GitHub",
+                "default": "Predefinito",
+                "defaultSelected": "Predefinito selezionato",
+                "makeDefault": "Imposta come predefinito",
+                "fork": "Fork",
+                "edit": "Modifica",
+                "archive": "Archivia",
+                "catalogOnly": "Solo catalogo",
+                "openRepository": "Apri repository",
+                "previewAlt": "{name} anteprima",
+                "frameworkAgnostic": "Indipendente dal framework",
+                "branch": "Ramo: {branch}",
+                "syncBranches": "{count} rami di sincronizzazione",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "Nessuna descrizione ancora."
+            },
+            "dialog": {
+                "title": "Aggiungi modello personalizzato",
+                "description": "Salva un repository GitHub nel tuo catalogo personale di modelli. Questa prima sezione memorizza i metadati del modello così può essere selezionato nel successivo flusso di assegnazione.",
+                "editTitle": "Modifica modello personalizzato",
+                "editDescription": "Aggiorna i dettagli di visualizzazione e l'immagine di anteprima utilizzati per questo modello personalizzato nel tuo catalogo.",
+                "repositoryUrlLabel": "URL repository GitHub",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "L'URL del repository sorgente non può essere modificato dopo l'aggiunta del modello.",
+                "nameLabel": "Nome modello",
+                "namePlaceholder": "Nome visualizzato opzionale",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Seleziona un framework",
+                "frameworkUnspecified": "Non specificato",
+                "previewImageLabel": "URL immagine anteprima",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Facoltativo. Utilizza uno screenshot curato se desideri sovrascrivere l'anteprima del repository GitHub.",
+                "descriptionLabel": "Descrizione breve",
+                "descriptionPlaceholder": "A cosa serve questo modello",
+                "branchLabel": "Branch predefinito",
+                "branchPlaceholder": "main",
+                "branchHelp": "Lascia vuoto per impostare il valore predefinito su main.",
+                "betaBranchLabel": "Branch beta",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Facoltativo. Branch utilizzato per i deployment beta.",
+                "cancel": "Annulla",
+                "submit": "Salva modello",
+                "saveChanges": "Salva modifiche"
+            },
+            "forkDialog": {
+                "title": "Esegui fork del modello standard",
+                "description": "Crea una tua copia GitHub di questo modello standard, aggiungila al tuo catalogo e impostala come predefinita per i nuovi lavori.",
+                "sourceLabel": "Origine modello",
+                "targetLabel": "Destinazione fork",
+                "targetPlaceholder": "Seleziona un account o organizzazione GitHub",
+                "targetHelp": "Il fork verrà creato sotto {target}.",
+                "personalTarget": "Account personale ({login})",
+                "organizationTarget": "Organizzazione ({login})",
+                "noTargets": "Connetti GitHub e carica le tue organizzazioni prima di eseguire il fork di un modello.",
+                "resultLabel": "Nuovo repository",
+                "none": "il tuo account selezionato",
+                "cancel": "Annulla",
+                "submit": "Esegui fork e imposta come predefinito"
+            },
+            "archiveDialog": {
+                "title": "Archivia modello personalizzato",
+                "description": "Archivia questo modello dal tuo catalogo. Puoi archiviare solo i modelli che non sono attualmente assegnati a nessun lavoro.",
+                "templateLabel": "Modello",
+                "cancel": "Annulla",
+                "submit": "Archivia modello"
+            },
+            "empty": {
+                "title": "Nessun modello trovato",
+                "default": "Nessun modello corrisponde ancora a questa visualizzazione.",
+                "search": "Prova un diverso termine di ricerca o cancella il filtro corrente.",
+                "resetFilters": "Reimposta filtri"
+            },
+            "messages": {
+                "repositoryUrlRequired": "L'URL del repository GitHub è obbligatorio.",
+                "repositoryUrlInvalid": "Inserisci un URL valido del repository GitHub, ad esempio https://github.com/proprietario/repository.",
+                "forkTargetRequired": "Scegli un account o organizzazione GitHub per il fork.",
+                "addSuccess": "Modello salvato dall'URL GitHub.",
+                "addFailed": "Impossibile salvare il modello.",
+                "updateSuccess": "Dettagli del modello aggiornati.",
+                "updateFailed": "Impossibile aggiornare i dettagli del modello.",
+                "archiveSuccess": "Modello archiviato dal tuo catalogo.",
+                "archiveFailed": "Impossibile archiviare il modello.",
+                "forkSuccess": "Eseguito il fork di {repository}, aggiunto al tuo catalogo e impostato come predefinito.",
+                "forkExisting": "{repository} era già nel tuo catalogo ed è ora il tuo modello forkato predefinito.",
+                "forkFailed": "Impossibile eseguire il fork del modello.",
+                "refreshSuccess": "Catalogo modelli aggiornato.",
+                "refreshFailed": "Impossibile aggiornare i modelli.",
+                "defaultUpdated": "Modello predefinito aggiornato.",
+                "defaultFailed": "Impossibile aggiornare il modello predefinito"
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Usa predefinito",
+            "defaultOptionWithName": "Usa predefinito ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Predefinito)",
+            "changeAnywayLink": "Cambia comunque",
+            "origin": {
+                "standard": "Standard",
+                "forked": "Forkato",
+                "customUrl": "URL personalizzato"
+            },
+            "state": {
+                "defaultBadge": "Predefinito ereditato",
+                "inheritedTitle": "Utilizzo del modello predefinito",
+                "inheritedDescription": "Questo lavoro seguirà il tuo modello predefinito corrente finché non fissi uno specifico.",
+                "pinnedTitle": "Modello fissato",
+                "pinnedDescription": "Questo lavoro continuerà a utilizzare questo modello anche se il tuo predefinito cambia in seguito."
+            }
+        },
         "workPlugins": {
             "title": "Plugin lavori",
             "subtitle": "Configura plugin per questa lavori",
@@ -3067,6 +3280,7 @@
             "history": "Cronologia",
             "comparisons": "Confronti",
             "plugins": "Plugin",
+            "templates": "Modelli",
             "profile": "Profilo",
             "security": "Sicurezza",
             "apiKeys": "Chiavi API",

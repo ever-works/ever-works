@@ -4,9 +4,16 @@ import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
+import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 
 @Module({
-    imports: [WorkOperationsModule, WorkModule, NotificationsModule, FacadesModule],
+    imports: [
+        WorkOperationsModule,
+        WorkModule,
+        NotificationsModule,
+        FacadesModule,
+        WorkProposalsModule,
+    ],
     controllers: [TriggerInternalController],
 })
 export class TriggerInternalModule {}

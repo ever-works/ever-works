@@ -3,14 +3,17 @@ import {
     Body,
     Controller,
     ForbiddenException,
+    forwardRef,
     Get,
     Headers,
     OnModuleInit,
+    Optional,
     Param,
     Post,
     Query,
     Inject,
 } from '@nestjs/common';
+import { WorkProposalsApiService } from '../work-proposals/work-proposals.service';
 import superjson from 'superjson';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
@@ -59,6 +62,9 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly templateRepository: TemplateRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
+        @Optional()
+        @Inject(forwardRef(() => WorkProposalsApiService))
+        private readonly workProposalsApiService?: WorkProposalsApiService,
     ) {}
 
     onModuleInit() {
@@ -75,6 +81,9 @@ export class TriggerInternalController implements OnModuleInit {
             CacheManager: this.cacheManager,
             WorkScheduleDispatcherService: this.scheduleDispatcher,
             WorkScheduleService: this.workScheduleService,
+            ...(this.workProposalsApiService
+                ? { WorkProposalsApiService: this.workProposalsApiService }
+                : {}),
         };
     }
 

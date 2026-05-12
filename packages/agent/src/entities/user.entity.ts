@@ -9,12 +9,27 @@ import {
     JoinColumn,
 } from 'typeorm';
 import type { ClassToObject } from './types';
+import { TimestampColumn } from './_types';
 import { Work } from './work.entity';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkMember } from './work-member.entity';
+import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
+
+export interface InferredUserProfile {
+    industry?: string;
+    role?: string;
+    expertise: string[];
+    topics: string[];
+    businessType?: string;
+    confidence: 'low' | 'medium' | 'high';
+    sources: { url: string; title: string }[];
+    researchedAt: string;
+    tokensUsed?: number;
+    toolCallsCount?: number;
+}
 
 @Entity({ name: 'users' })
 export class User {
@@ -69,6 +84,27 @@ export class User {
 
     @Column({ type: 'varchar', nullable: true })
     committerEmail?: string | null;
+
+    // Onboarding wizard v2 — server-side state (so progress survives device
+    // switches). `TimestampColumn` stores as `bigint` so the schema is
+    // identical on Postgres + SQLite (the `internal-cli` test driver).
+    @TimestampColumn({ nullable: true })
+    onboardingCompletedAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    onboardingDismissedAt?: Date | null;
+
+    @Column('simple-json', { nullable: true })
+    onboardingState?: OnboardingWizardStateV2 | null;
+
+    @Column('simple-json', { nullable: true })
+    inferredInterests?: InferredUserProfile | null;
+
+    @Column('simple-json', { nullable: true })
+    suggestedVerticals?: string[] | null;
+
+    @Column({ default: false })
+    userResearchOptOut: boolean;
 
     // Timestamps
     @CreateDateColumn()
