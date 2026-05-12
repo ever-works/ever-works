@@ -9,6 +9,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import type { ClassToObject } from './types';
+import { TimestampColumn } from './_types';
 import { Work } from './work.entity';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
@@ -71,11 +72,13 @@ export class User {
     @Column({ type: 'varchar', nullable: true })
     committerEmail?: string | null;
 
-    // Onboarding wizard v2 — server-side state (so progress survives device switches)
-    @Column({ type: 'timestamp', nullable: true })
+    // Onboarding wizard v2 — server-side state (so progress survives device
+    // switches). `TimestampColumn` stores as `bigint` so the schema is
+    // identical on Postgres + SQLite (the `internal-cli` test driver).
+    @TimestampColumn({ nullable: true })
     onboardingCompletedAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @TimestampColumn({ nullable: true })
     onboardingDismissedAt?: Date | null;
 
     @Column('simple-json', { nullable: true })
