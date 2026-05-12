@@ -13,10 +13,7 @@ import {
 } from '@/components/ui/accordion';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-    getWebsiteSettings,
-    updateWebsiteSettings,
-} from '@/app/actions/dashboard/works';
+import { getWebsiteSettings, updateWebsiteSettings } from '@/app/actions/dashboard/works';
 
 interface ItemImportExportSettingsProps {
     workId: string;
@@ -135,9 +132,8 @@ export function ItemImportExportSettings({ workId }: ItemImportExportSettingsPro
                     ) : (
                         <div className="space-y-4">
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Both flows are off by default. Enable per directory to
-                                expose the Export dropdown on the items page and the
-                                bulk-import wizard.
+                                Both flows are off by default. Enable per directory to expose the
+                                Export dropdown on the items page and the bulk-import wizard.
                             </p>
                             <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4">
                                 <Switch

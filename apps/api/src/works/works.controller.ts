@@ -576,7 +576,8 @@ export class WorksController {
         }
         const duplicateStrategy: ImportDuplicateStrategy =
             body.duplicate_strategy === 'update' ? 'update' : 'skip';
-        const defaultStatus = typeof body.default_status === 'string' ? body.default_status : 'pending';
+        const defaultStatus =
+            typeof body.default_status === 'string' ? body.default_status : 'pending';
 
         const user = await this.authService.getUser(auth.userId);
         const configResult = await this.workQueryService.workConfig(id, user);

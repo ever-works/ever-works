@@ -144,9 +144,7 @@ describe('ItemImportService.validateRows', () => {
     it('rejects an invalid source_url with an error and no data', () => {
         const parsed = {
             headers: baseHeaders,
-            rows: [
-                { name: 'A', description: 'd', source_url: 'not-a-url', category: 'Tools' },
-            ],
+            rows: [{ name: 'A', description: 'd', source_url: 'not-a-url', category: 'Tools' }],
         };
         const result = service.validateRows(parsed, baseMapping, []);
         expect(result.summary.valid).toBe(0);

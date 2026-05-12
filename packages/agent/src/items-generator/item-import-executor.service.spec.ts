@@ -144,7 +144,9 @@ describe('ItemImportExecutorService', () => {
     it('direct-commits to main when autoapproval is true (no PR)', async () => {
         const work = makeWork();
         const git = makeGitFacade();
-        const repo = makeDataRepo({ getConfig: jest.fn().mockResolvedValue({ autoapproval: true }) });
+        const repo = makeDataRepo({
+            getConfig: jest.fn().mockResolvedValue({ autoapproval: true }),
+        });
         dataRepoCreateMock.mockResolvedValue(repo);
         const service = new ItemImportExecutorService(git as any);
 

@@ -38,10 +38,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     return new Response(upstream.body, {
         status: 200,
         headers: {
-            'Content-Type':
-                upstream.headers.get('content-type') ?? 'application/octet-stream',
-            'Content-Disposition':
-                upstream.headers.get('content-disposition') ?? 'attachment',
+            'Content-Type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+            'Content-Disposition': upstream.headers.get('content-disposition') ?? 'attachment',
             'Cache-Control': 'no-store',
         },
     });

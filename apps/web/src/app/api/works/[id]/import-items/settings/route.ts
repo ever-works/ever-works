@@ -44,9 +44,6 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
             { status: 200 },
         );
     } catch {
-        return NextResponse.json(
-            { import_enabled: false, import_max_rows: 500 },
-            { status: 200 },
-        );
+        return NextResponse.json({ import_enabled: false, import_max_rows: 500 }, { status: 200 });
     }
 }

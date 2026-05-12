@@ -30,11 +30,11 @@ Import & Export" section under the directory's Settings tab.
 Persisted in `.works/works.yml` under `settings:`. All three keys are
 optional; missing keys take the defaults below.
 
-| Key | Type | Default | Effect |
-|---|---|---|---|
-| `export_enabled` | boolean | `false` | When false, the Export button is hidden and `GET /export-items` responds 404. |
-| `import_enabled` | boolean | `false` | When false, the Import button is hidden and the import endpoints respond 404. |
-| `import_max_rows` | int (1–2000) | `500` | Hard ceiling on rows accepted by a single import upload. Files exceeding the cap are rejected with `code: RowCountExceeded` before any write. |
+| Key               | Type         | Default | Effect                                                                                                                                        |
+| ----------------- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `export_enabled`  | boolean      | `false` | When false, the Export button is hidden and `GET /export-items` responds 404.                                                                 |
+| `import_enabled`  | boolean      | `false` | When false, the Import button is hidden and the import endpoints respond 404.                                                                 |
+| `import_max_rows` | int (1–2000) | `500`   | Hard ceiling on rows accepted by a single import upload. Files exceeding the cap are rejected with `code: RowCountExceeded` before any write. |
 
 Surfaced through:
 
@@ -53,23 +53,23 @@ is off.
 
 ### Export (Phase 1)
 
-| Method | Path | Notes |
-|---|---|---|
-| `GET` | `/api/works/:id/export-items?format=csv\|xlsx` | Streams the serialised items. Logs `ActivityActionType.EXPORT`. |
-| `GET` | `/api/works/:id/export-items/settings` | `{ export_enabled }` probe used by the UI to hide the button. |
+| Method | Path                                           | Notes                                                           |
+| ------ | ---------------------------------------------- | --------------------------------------------------------------- |
+| `GET`  | `/api/works/:id/export-items?format=csv\|xlsx` | Streams the serialised items. Logs `ActivityActionType.EXPORT`. |
+| `GET`  | `/api/works/:id/export-items/settings`         | `{ export_enabled }` probe used by the UI to hide the button.   |
 
 ### Import — parse + validate (Phase 2, dry-run)
 
-| Method | Path | Notes |
-|---|---|---|
-| `POST` | `/api/works/:id/import-items/validate` | `multipart/form-data` with `file` (CSV/XLSX) + optional JSON `mapping`. Returns `ImportValidationResponse`. Throttle: 10/min. File-size cap: 10 MB. |
-| `GET` | `/api/works/:id/import-items/sample?format=csv\|xlsx` | Downloads the import template (reuses `ItemExportService.generateSample`). |
-| `GET` | `/api/works/:id/import-items/settings` | `{ import_enabled, import_max_rows }`. |
+| Method | Path                                                  | Notes                                                                                                                                               |
+| ------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/works/:id/import-items/validate`                | `multipart/form-data` with `file` (CSV/XLSX) + optional JSON `mapping`. Returns `ImportValidationResponse`. Throttle: 10/min. File-size cap: 10 MB. |
+| `GET`  | `/api/works/:id/import-items/sample?format=csv\|xlsx` | Downloads the import template (reuses `ItemExportService.generateSample`).                                                                          |
+| `GET`  | `/api/works/:id/import-items/settings`                | `{ import_enabled, import_max_rows }`.                                                                                                              |
 
 ### Import — execute (Phase 3, writes)
 
-| Method | Path | Notes |
-|---|---|---|
+| Method | Path                          | Notes                                                                                                                                                                                                                                   |
+| ------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST` | `/api/works/:id/import-items` | Body: `{ rows, duplicate_strategy?, default_status? }`. Defaults: `skip` / `pending`. Returns `{ total, created, updated, skipped, errors[], pr_url?, pr_number?, direct_commit? }`. Throttle: 3/min. Logs `ActivityActionType.IMPORT`. |
 
 ## 4. Column contract
@@ -165,14 +165,14 @@ cloneOrPull (work owner credentials, current user as committer)
 
 ## 7. Limits
 
-| Limit | Value | Where |
-|---|---|---|
-| File-size cap | 10 MB | `FileInterceptor` on the validate route |
-| Rows per upload (per-directory) | 500 default, configurable up to 2000 | `settings.import_max_rows` |
-| Rows per upload (service-level ceiling) | 10,000 | `PARSER_HARD_ROW_CAP` in `item-import.service.ts` |
-| Throttle — `/import-items/validate` | 10 / min / IP | `@Throttle` on the route |
-| Throttle — `/import-items` (execute) | 3 / min / IP | `@Throttle` on the route |
-| Pipeline concurrency | 5 | `p-map` `concurrency` in the executor |
+| Limit                                   | Value                                | Where                                             |
+| --------------------------------------- | ------------------------------------ | ------------------------------------------------- |
+| File-size cap                           | 10 MB                                | `FileInterceptor` on the validate route           |
+| Rows per upload (per-directory)         | 500 default, configurable up to 2000 | `settings.import_max_rows`                        |
+| Rows per upload (service-level ceiling) | 10,000                               | `PARSER_HARD_ROW_CAP` in `item-import.service.ts` |
+| Throttle — `/import-items/validate`     | 10 / min / IP                        | `@Throttle` on the route                          |
+| Throttle — `/import-items` (execute)    | 3 / min / IP                         | `@Throttle` on the route                          |
+| Pipeline concurrency                    | 5                                    | `p-map` `concurrency` in the executor             |
 
 ## 8. Files of interest
 

@@ -48,19 +48,12 @@ export function ItemsImportButton({ workId }: ItemsImportButtonProps) {
             <Button
                 variant="secondary"
                 onClick={() => setIsOpen(true)}
-                className={cn(
-                    'inline-flex items-center gap-2 whitespace-nowrap',
-                    'text-sm',
-                )}
+                className={cn('inline-flex items-center gap-2 whitespace-nowrap', 'text-sm')}
             >
                 <Upload className="w-4 h-4" />
                 Import
             </Button>
-            <ItemImportWizard
-                workId={workId}
-                isOpen={isOpen}
-                onClose={() => setIsOpen(false)}
-            />
+            <ItemImportWizard workId={workId} isOpen={isOpen} onClose={() => setIsOpen(false)} />
         </>
     );
 }

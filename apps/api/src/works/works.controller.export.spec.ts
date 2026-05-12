@@ -336,8 +336,9 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
             });
             // generateSample lives on itemExportService — the import route
             // re-uses it because the column contract is shared.
-            (s.itemExportService as unknown as { generateSample: jest.Mock }).generateSample =
-                jest.fn().mockResolvedValue({
+            (s.itemExportService as unknown as { generateSample: jest.Mock }).generateSample = jest
+                .fn()
+                .mockResolvedValue({
                     data: 'name,description\r\n',
                     contentType: 'text/csv; charset=utf-8',
                     filename: 'items-import-template.csv',
@@ -431,11 +432,9 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
 
             const result = await controller.validateImportItems(auth, 'w-1', csvFile(), undefined);
             expect(s.itemImportService.parseCSV).toHaveBeenCalled();
-            expect(s.itemImportService.validateRows).toHaveBeenCalledWith(
-                expect.any(Object),
-                {},
-                [{ slug: 'existing', source_url: 'https://existing.test' }],
-            );
+            expect(s.itemImportService.validateRows).toHaveBeenCalledWith(expect.any(Object), {}, [
+                { slug: 'existing', source_url: 'https://existing.test' },
+            ]);
             expect(result).toBe(validationResponse);
         });
 

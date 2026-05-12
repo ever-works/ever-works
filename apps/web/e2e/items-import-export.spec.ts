@@ -83,10 +83,9 @@ test.describe('EW-533 — import routes (auth + format gating)', () => {
     });
 
     test('POST /api/works/:id/import-items without auth → 401', async ({ request }) => {
-        const res = await request.post(
-            `${API_BASE}/api/works/${FAKE_WORK_ID}/import-items`,
-            { data: { rows: [] } },
-        );
+        const res = await request.post(`${API_BASE}/api/works/${FAKE_WORK_ID}/import-items`, {
+            data: { rows: [] },
+        });
         expect(res.status()).toBe(401);
     });
 
@@ -102,10 +101,10 @@ test.describe('EW-533 — import routes (auth + format gating)', () => {
 
     test('POST /api/works/:id/import-items without rows → 4xx', async ({ request }) => {
         const u = await registerUserViaAPI(request);
-        const res = await request.post(
-            `${API_BASE}/api/works/${FAKE_WORK_ID}/import-items`,
-            { headers: authedHeaders(u.access_token), data: {} },
-        );
+        const res = await request.post(`${API_BASE}/api/works/${FAKE_WORK_ID}/import-items`, {
+            headers: authedHeaders(u.access_token),
+            data: {},
+        });
         // 400 from our body-shape guard, or upstream ownership 4xx.
         expect(res.status(), `unexpected status ${res.status()}`).toBeGreaterThanOrEqual(400);
         expect(res.status()).toBeLessThan(500);
