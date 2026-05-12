@@ -165,6 +165,19 @@ spec:
             - name: RESEND_EMAIL_FROM
               value: "$RESEND_EMAIL_FROM"
 
+            # Ever Works Git (EW-608) — onboarding-wizard-v2 storage provider.
+            # Gates EverWorksGitProvider which pushes per-Work repos to the
+            # platform-owned GitHub org. PAT is org-scoped to ever-works-cloud
+            # only. See docs/specs/features/onboarding-wizard-v2/deployment.md §1.
+            - name: STORAGE_EVER_WORKS_GIT_ENABLED
+              value: "$STORAGE_EVER_WORKS_GIT_ENABLED"
+            - name: EVER_WORKS_CUSTOMERS_GITHUB_ORG
+              value: "$EVER_WORKS_CUSTOMERS_GITHUB_ORG"
+            - name: EVER_WORKS_CUSTOMERS_GITHUB_PAT
+              value: "$EVER_WORKS_CUSTOMERS_GITHUB_PAT"
+            - name: EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY
+              value: "$EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY"
+
           resources:
             requests:
               memory: "512Mi"
