@@ -35,6 +35,9 @@ export class UserResearchLimitsService {
     private readonly logger = new Logger(UserResearchLimitsService.name);
     private readonly fallback = new Map<string, number>();
     private readonly ttlMs = 36 * 60 * 60 * 1000;
+    // Per-key tail of increment promises — serializes the non-atomic
+    // read-modify-write so two concurrent calls don't both land on baseline+1.
+    private readonly incrementChain = new Map<string, Promise<unknown>>();
 
     constructor(
         @Optional() @Inject(CACHE_MANAGER) private readonly cache?: Cache,
@@ -120,16 +123,25 @@ export class UserResearchLimitsService {
 
     private async increment(bucket: string, userId: string, delta = 1): Promise<number> {
         const k = this.key(bucket, userId);
-        const next = (await this.read(bucket, userId)) + delta;
-        if (this.cache) {
-            try {
-                await this.cache.set(k, next, this.ttlMs);
-                return next;
-            } catch (err) {
-                this.logger.warn(`limits cache write failed: ${(err as Error).message}`);
+        const previous = this.incrementChain.get(k) ?? Promise.resolve();
+        const run = previous.then(async () => {
+            const next = (await this.read(bucket, userId)) + delta;
+            if (this.cache) {
+                try {
+                    await this.cache.set(k, next, this.ttlMs);
+                    return next;
+                } catch (err) {
+                    this.logger.warn(`limits cache write failed: ${(err as Error).message}`);
+                }
             }
-        }
-        this.fallback.set(k, next);
-        return next;
+            this.fallback.set(k, next);
+            return next;
+        });
+        // Keep the chain alive but don't let one failing increment block the next.
+        this.incrementChain.set(
+            k,
+            run.catch(() => undefined),
+        );
+        return run as Promise<number>;
     }
 }

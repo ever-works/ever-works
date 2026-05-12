@@ -76,7 +76,6 @@ export class WorkProposalService {
         try {
             const providerConfig = await this.aiFacade.getProviderConfig({
                 userId,
-                workId: userId,
             });
             if (!providerConfig.baseUrl || !providerConfig.apiKey) {
                 return {

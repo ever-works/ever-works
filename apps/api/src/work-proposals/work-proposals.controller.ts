@@ -104,6 +104,31 @@ export class WorkProposalsController {
         return this.service.updatePreferences(auth.userId, body.optOut);
     }
 
+    @Get(':id')
+    @ApiOperation({ summary: 'Get a specific proposal by id (any status)' })
+    @HttpCode(HttpStatus.OK)
+    async getOne(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<WorkProposalResponseDto> {
+        const proposal = await this.service.getForUser(auth.userId, id);
+        if (!proposal) throw new NotFoundException('Proposal not found');
+        return {
+            id: proposal.id,
+            title: proposal.title,
+            description: proposal.description,
+            slugSuggestion: proposal.slugSuggestion,
+            suggestedCategories: proposal.suggestedCategories,
+            suggestedFields: proposal.suggestedFields,
+            recommendedPlugins: proposal.recommendedPlugins,
+            reasoning: proposal.reasoning,
+            source: proposal.source,
+            status: proposal.status,
+            acceptedWorkId: proposal.acceptedWorkId ?? null,
+            generatedAt: proposal.generatedAt,
+        };
+    }
+
     @Patch(':id/dismiss')
     @ApiOperation({ summary: 'Dismiss a pending proposal' })
     @ApiResponse({ status: 204, description: 'Dismissed' })

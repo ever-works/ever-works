@@ -9,6 +9,7 @@ import {
     GitProviderInfo,
     type WebsiteTemplateOption,
 } from '@/lib/api';
+import { redirect } from 'next/navigation';
 import NewWorkClient from './new-work-client';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
@@ -85,11 +86,15 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
 
     let proposal: WorkProposal | null = null;
     if (proposalId) {
-        try {
-            const list = await workProposalsAPI.list(['pending']);
-            proposal = list.find((p) => p.id === proposalId) ?? null;
-        } catch (error) {
-            console.error('Failed to fetch proposal for prefill:', error);
+        proposal = await workProposalsAPI.get(proposalId);
+        // If the proposal is already accepted, send the user to the existing Work
+        // instead of starting a duplicate create flow.
+        if (proposal?.status === 'accepted' && proposal.acceptedWorkId) {
+            redirect(`/works/${proposal.acceptedWorkId}`);
+        }
+        // Already-dismissed proposals fall through: form opens blank, no prefill.
+        if (proposal?.status !== 'pending') {
+            proposal = null;
         }
     }
 

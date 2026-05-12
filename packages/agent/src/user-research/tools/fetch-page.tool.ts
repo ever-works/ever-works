@@ -36,7 +36,7 @@ export function createFetchPageTool(opts: CreateFetchPageToolOptions) {
                 const result = await opts.contentExtractor.extractContentWithDiagnostics(
                     input.url,
                     { includeImages: false, includeLinks: false },
-                    { userId: opts.userId, workId: opts.userId },
+                    { userId: opts.userId },
                 );
 
                 await opts.limits.incrementFetches(opts.userId);

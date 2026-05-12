@@ -36,7 +36,7 @@ export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
                 const results = await opts.searchFacade.search(
                     input.query,
                     { maxResults: input.limit ?? 5 },
-                    { userId: opts.userId, workId: opts.userId },
+                    { userId: opts.userId },
                 );
 
                 await opts.limits.incrementSearches(opts.userId);

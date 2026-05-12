@@ -50,6 +50,10 @@ export class WorkProposalsApiService {
         return this.proposals.markAccepted(userId, proposalId, workId);
     }
 
+    async getForUser(userId: string, proposalId: string) {
+        return this.proposals.getForUser(userId, proposalId);
+    }
+
     async isResearching(userId: string): Promise<boolean> {
         return this.inFlight.has(userId);
     }

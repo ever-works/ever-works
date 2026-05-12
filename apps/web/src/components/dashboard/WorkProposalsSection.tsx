@@ -53,6 +53,11 @@ export function WorkProposalsSection({
                     // Network blip — keep polling until deadline.
                 }
             }
+            // Deadline reached while the server still reports researching —
+            // clear the spinner so the user isn't stuck. They can refresh manually.
+            if (!cancelled) {
+                setResearching(false);
+            }
         };
         loop();
         return () => {

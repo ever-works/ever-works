@@ -20,6 +20,14 @@ export interface WorkProposal {
 }
 
 export const workProposalsAPI = {
+    async get(id: string): Promise<WorkProposal | null> {
+        try {
+            return await serverFetch<WorkProposal>(`/me/work-proposals/${id}`, { method: 'GET' });
+        } catch {
+            return null;
+        }
+    },
+
     async list(statuses: WorkProposalStatus[] = ['pending']): Promise<WorkProposal[]> {
         const params = statuses.map((s) => `statuses=${encodeURIComponent(s)}`).join('&');
         return serverFetch<WorkProposal[]>(`/me/work-proposals?${params}`, {
