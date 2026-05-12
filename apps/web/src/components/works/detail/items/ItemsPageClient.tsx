@@ -10,6 +10,8 @@ import {
 } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
+import { ItemsExportButton } from './ItemsExportButton';
+import { ItemsImportButton } from './ItemsImportButton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -136,15 +138,24 @@ export function ItemsPageClient({
                             {t('subtitle')}
                         </p>
                     </div>
-                    {permissions.canEdit && activeTab === 'items' && (
-                        <Button
-                            variant="primary"
-                            onClick={() => setIsAddModalOpen(true)}
-                            className={cn('inline-flex items-center gap-2', 'text-sm')}
-                        >
-                            <Plus className="w-4 h-4" />
-                            {t('addItem')}
-                        </Button>
+                    {activeTab === 'items' && (
+                        <div className="flex items-center gap-2">
+                            <ItemsExportButton workId={workId} />
+                            {permissions.canEdit && <ItemsImportButton workId={workId} />}
+                            {permissions.canEdit && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setIsAddModalOpen(true)}
+                                    className={cn(
+                                        'inline-flex items-center gap-2 whitespace-nowrap',
+                                        'text-sm',
+                                    )}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    {t('addItem')}
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

@@ -67,6 +67,9 @@ interface Stubs {
     subscriptionService: { getCadenceAllowances: Mock };
     activityLogService: { log: Mock };
     templateCatalogService: Record<string, never>;
+    itemExportService: Record<string, never>;
+    itemImportService: Record<string, never>;
+    itemImportExecutor: Record<string, never>;
 }
 
 function makeStubs(): Stubs {
@@ -109,6 +112,9 @@ function makeStubs(): Stubs {
         subscriptionService: { getCadenceAllowances: jest.fn() },
         activityLogService: { log: jest.fn().mockResolvedValue(undefined) },
         templateCatalogService: {} as any,
+        itemExportService: {} as any,
+        itemImportService: {} as any,
+        itemImportExecutor: {} as any,
     };
 }
 
@@ -136,6 +142,9 @@ function makeController(s: Stubs): WorksController {
         s.subscriptionService as any,
         s.activityLogService as any,
         s.templateCatalogService as any,
+        s.itemExportService as any,
+        s.itemImportService as any,
+        s.itemImportExecutor as any,
     );
 }
 
