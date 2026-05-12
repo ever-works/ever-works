@@ -19,16 +19,16 @@ import { WorkMember } from './work-member.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 export interface InferredUserProfile {
-	industry?: string;
-	role?: string;
-	expertise: string[];
-	topics: string[];
-	businessType?: string;
-	confidence: 'low' | 'medium' | 'high';
-	sources: { url: string; title: string }[];
-	researchedAt: string;
-	tokensUsed?: number;
-	toolCallsCount?: number;
+    industry?: string;
+    role?: string;
+    expertise: string[];
+    topics: string[];
+    businessType?: string;
+    confidence: 'low' | 'medium' | 'high';
+    sources: { url: string; title: string }[];
+    researchedAt: string;
+    tokensUsed?: number;
+    toolCallsCount?: number;
 }
 
 @Entity({ name: 'users' })
@@ -97,10 +97,6 @@ export class User {
     @Column('simple-json', { nullable: true })
     onboardingState?: OnboardingWizardStateV2 | null;
 
-    // EW-584 — AI background-research agent results. `inferredInterests` is the
-    // structured profile distilled from web search at signup; `suggestedVerticals`
-    // is a small derived list used to seed proposal generation. `userResearchOptOut`
-    // lets the user disable the background agent (opt-out, default off).
     @Column('simple-json', { nullable: true })
     inferredInterests?: InferredUserProfile | null;
 

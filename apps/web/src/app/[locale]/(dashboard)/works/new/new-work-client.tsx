@@ -33,8 +33,6 @@ export default function NewWorkClient({
     websiteTemplates,
     proposal,
 }: NewWorkClientProps) {
-    // When prefilling from a Work Proposal (EW-584), jump straight to the
-    // manual form with proposal values pre-populated.
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(
         proposal ? 'manual' : null,
     );

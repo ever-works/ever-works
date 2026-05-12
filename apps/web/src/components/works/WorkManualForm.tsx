@@ -25,8 +25,6 @@ interface WorkManualFormProps {
     gitConnected?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
-    /** When set, the form is pre-filled from a WorkProposal (EW-584) and the
-     *  proposal is marked accepted after successful creation. */
     proposal?: WorkProposal;
 }
 
@@ -75,7 +73,6 @@ export function WorkManualForm({
             if (result.success) {
                 toast.success(result.message || t('success.created'));
 
-                // Mark proposal accepted (EW-584). Best-effort; never blocks navigation.
                 if (proposal && result.work) {
                     acceptProposalAction(proposal.id, result.work.id).catch(() => undefined);
                 }

@@ -65,86 +65,88 @@ For each proposal:
 - Quality > quantity. Three sharp proposals beat five generic ones.`;
 
 export function buildSeedPrompt(user: User, socials: string[]): string {
-	const lines: string[] = [];
-	lines.push(`User to research:`);
-	lines.push(`- Name: ${user.username}`);
-	lines.push(`- Email: ${user.email}`);
-	if (user.registrationProvider && user.registrationProvider !== 'local') {
-		lines.push(`- OAuth provider: ${user.registrationProvider}`);
-	}
-	if (user.avatar) {
-		lines.push(`- Avatar URL (often a profile photo from their OAuth provider): ${user.avatar}`);
-	}
-	if (socials.length > 0) {
-		lines.push(`- Linked social profiles: ${socials.join(', ')}`);
-	}
-	const domain = user.email.split('@')[1];
-	if (domain) {
-		lines.push(`- Email domain: ${domain}`);
-	}
-	lines.push('');
-	lines.push(
-		'Research this person and call finalize with your inferred profile. Aim for 2-6 searches and 0-3 page fetches.'
-	);
-	return lines.join('\n');
+    const lines: string[] = [];
+    lines.push(`User to research:`);
+    lines.push(`- Name: ${user.username}`);
+    lines.push(`- Email: ${user.email}`);
+    if (user.registrationProvider && user.registrationProvider !== 'local') {
+        lines.push(`- OAuth provider: ${user.registrationProvider}`);
+    }
+    if (user.avatar) {
+        lines.push(
+            `- Avatar URL (often a profile photo from their OAuth provider): ${user.avatar}`,
+        );
+    }
+    if (socials.length > 0) {
+        lines.push(`- Linked social profiles: ${socials.join(', ')}`);
+    }
+    const domain = user.email.split('@')[1];
+    if (domain) {
+        lines.push(`- Email domain: ${domain}`);
+    }
+    lines.push('');
+    lines.push(
+        'Research this person and call finalize with your inferred profile. Aim for 2-6 searches and 0-3 page fetches.',
+    );
+    return lines.join('\n');
 }
 
 export function buildProposalsPrompt(
-	profile: InferredProfile,
-	existingWorkNames: string[],
-	availablePluginIds: string[]
+    profile: InferredProfile,
+    existingWorkNames: string[],
+    availablePluginIds: string[],
 ): string {
-	const lines: string[] = [];
-	lines.push('## Inferred user profile');
-	lines.push(JSON.stringify(profile, null, 2));
-	lines.push('');
-	if (existingWorkNames.length > 0) {
-		lines.push('## Works the user already has (avoid duplicating these)');
-		existingWorkNames.forEach((n) => lines.push(`- ${n}`));
-		lines.push('');
-	}
-	lines.push('## Available plugin IDs (use only these)');
-	lines.push(availablePluginIds.join(', '));
-	lines.push('');
-	lines.push('Generate 3-5 personalized Work proposals matching the schema.');
-	return lines.join('\n');
+    const lines: string[] = [];
+    lines.push('## Inferred user profile');
+    lines.push(JSON.stringify(profile, null, 2));
+    lines.push('');
+    if (existingWorkNames.length > 0) {
+        lines.push('## Works the user already has (avoid duplicating these)');
+        existingWorkNames.forEach((n) => lines.push(`- ${n}`));
+        lines.push('');
+    }
+    lines.push('## Available plugin IDs (use only these)');
+    lines.push(availablePluginIds.join(', '));
+    lines.push('');
+    lines.push('Generate 3-5 personalized Work proposals matching the schema.');
+    return lines.join('\n');
 }
 
 export function deriveVerticals(profile: InferredProfile): string[] {
-	const verticals = new Set<string>();
-	const industry = profile.industry?.toLowerCase() ?? '';
-	const businessType = profile.businessType?.toLowerCase() ?? '';
-	const role = profile.role?.toLowerCase() ?? '';
-	const topics = profile.topics.map((t) => t.toLowerCase());
+    const verticals = new Set<string>();
+    const industry = profile.industry?.toLowerCase() ?? '';
+    const businessType = profile.businessType?.toLowerCase() ?? '';
+    const role = profile.role?.toLowerCase() ?? '';
+    const topics = profile.topics.map((t) => t.toLowerCase());
 
-	const has = (needle: string) =>
-		industry.includes(needle) ||
-		businessType.includes(needle) ||
-		role.includes(needle) ||
-		topics.some((t) => t.includes(needle));
+    const has = (needle: string) =>
+        industry.includes(needle) ||
+        businessType.includes(needle) ||
+        role.includes(needle) ||
+        topics.some((t) => t.includes(needle));
 
-	if (has('developer') || has('engineer') || has('software') || has('ai') || has('coding')) {
-		verticals.add('dev-tools');
-	}
-	if (has('marketing') || has('seo') || has('growth') || has('agency')) {
-		verticals.add('marketing-saas');
-	}
-	if (has('design') || has('product') || has('ux')) {
-		verticals.add('design-tools');
-	}
-	if (has('recruit') || has('hire') || has('hr') || has('talent')) {
-		verticals.add('recruiting');
-	}
-	if (has('founder') || has('startup') || has('saas') || has('indie')) {
-		verticals.add('startup-tools');
-	}
-	if (has('research') || has('academic') || has('scientific')) {
-		verticals.add('research-tools');
-	}
+    if (has('developer') || has('engineer') || has('software') || has('ai') || has('coding')) {
+        verticals.add('dev-tools');
+    }
+    if (has('marketing') || has('seo') || has('growth') || has('agency')) {
+        verticals.add('marketing-saas');
+    }
+    if (has('design') || has('product') || has('ux')) {
+        verticals.add('design-tools');
+    }
+    if (has('recruit') || has('hire') || has('hr') || has('talent')) {
+        verticals.add('recruiting');
+    }
+    if (has('founder') || has('startup') || has('saas') || has('indie')) {
+        verticals.add('startup-tools');
+    }
+    if (has('research') || has('academic') || has('scientific')) {
+        verticals.add('research-tools');
+    }
 
-	if (verticals.size === 0) {
-		verticals.add('general');
-	}
+    if (verticals.size === 0) {
+        verticals.add('general');
+    }
 
-	return Array.from(verticals);
+    return Array.from(verticals);
 }
