@@ -24,10 +24,16 @@ jest.mock('p-map', () => ({
 }));
 
 import { ItemImportExecutorService } from './item-import-executor.service';
+import { ItemImportService } from './item-import.service';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type { ImportRowValidation } from './item-import-export.types';
 
 const dataRepoCreateMock = DataRepository.create as jest.Mock;
+
+// Real ItemImportService — its revalidateImportRowData is pure logic over
+// canonical-shape row data and exercises the same field validators as the
+// /validate endpoint. Sharing the instance across tests is fine.
+const itemImportService = new ItemImportService();
 
 interface WorkLike {
     id: string;
@@ -114,7 +120,7 @@ describe('ItemImportExecutorService', () => {
         const git = makeGitFacade();
         const repo = makeDataRepo();
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, user as any, {
             rows: [row(0, { name: 'A' }), row(1, { name: 'B' })],
@@ -148,7 +154,7 @@ describe('ItemImportExecutorService', () => {
             getConfig: jest.fn().mockResolvedValue({ autoapproval: true }),
         });
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [row(0, { name: 'A' })],
@@ -170,7 +176,7 @@ describe('ItemImportExecutorService', () => {
                 .mockResolvedValue([{ slug: 'row-0', source_url: 'https://row-0.test' }]),
         });
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [
@@ -194,7 +200,7 @@ describe('ItemImportExecutorService', () => {
                 .mockResolvedValue([{ slug: 'row-0', source_url: 'https://row-0.test' }]),
         });
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [row(0, { name: 'Row 0', slug: 'row-0' })],
@@ -217,7 +223,7 @@ describe('ItemImportExecutorService', () => {
                 .mockResolvedValueOnce(undefined),
         });
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [row(0, { name: 'Boom' }), row(1, { name: 'OK' })],
@@ -238,7 +244,7 @@ describe('ItemImportExecutorService', () => {
             writeItem: jest.fn().mockRejectedValue(new Error('always fails')),
         });
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [row(0, { name: 'A' })],
@@ -258,7 +264,7 @@ describe('ItemImportExecutorService', () => {
         const git = makeGitFacade();
         const repo = makeDataRepo();
         dataRepoCreateMock.mockResolvedValue(repo);
-        const service = new ItemImportExecutorService(git as any);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
 
         const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
             rows: [
@@ -276,5 +282,89 @@ describe('ItemImportExecutorService', () => {
 
         expect(repo.writeItem).toHaveBeenCalledTimes(1);
         expect(result.created).toBe(1);
+    });
+
+    it('rejects rows that pass `valid: true` but fail server-side revalidation (tamper guard)', async () => {
+        const work = makeWork();
+        const git = makeGitFacade();
+        const repo = makeDataRepo();
+        dataRepoCreateMock.mockResolvedValue(repo);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
+
+        // Row 0: client claims valid but source_url is not http(s) — rejected.
+        // Row 1: client claims valid but missing required `description` — rejected.
+        // Row 2: legitimately valid — written.
+        const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
+            rows: [
+                {
+                    rowIndex: 0,
+                    valid: true,
+                    errors: [],
+                    warnings: [],
+                    data: {
+                        name: 'Tampered',
+                        description: 'd',
+                        source_url: 'javascript:alert(1)',
+                        category: 'Tools',
+                    } as any,
+                },
+                {
+                    rowIndex: 1,
+                    valid: true,
+                    errors: [],
+                    warnings: [],
+                    data: {
+                        name: 'Missing description',
+                        source_url: 'https://r1.test',
+                        category: 'Tools',
+                    } as any,
+                },
+                row(2, { name: 'Legit' }),
+            ],
+            duplicate_strategy: 'skip',
+        });
+
+        expect(repo.writeItem).toHaveBeenCalledTimes(1);
+        expect(result.created).toBe(1);
+        expect(result.errors).toHaveLength(2);
+        expect(result.errors[0].message).toMatch(/Server-side validation failed/);
+        expect(result.errors[0].message).toMatch(/source_url/);
+        expect(result.errors[1].message).toMatch(/Server-side validation failed/);
+        expect(result.errors[1].message).toMatch(/description/);
+    });
+
+    it('strips unknown fields from row.data during revalidation (no path-traversal in extra keys)', async () => {
+        const work = makeWork();
+        const git = makeGitFacade();
+        const repo = makeDataRepo();
+        dataRepoCreateMock.mockResolvedValue(repo);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
+
+        const result = await service.executeImport(work as any, { id: 'u-1' } as any, {
+            rows: [
+                {
+                    rowIndex: 0,
+                    valid: true,
+                    errors: [],
+                    warnings: [],
+                    data: {
+                        name: 'OK',
+                        description: 'd',
+                        source_url: 'https://ok.test',
+                        category: 'Tools',
+                        // Unknown attribute the wizard would never emit —
+                        // must not reach writeItem.
+                        __proto__: { admin: true },
+                        rogue_field: '../../etc/passwd',
+                    } as any,
+                },
+            ],
+            duplicate_strategy: 'skip',
+        });
+
+        expect(result.created).toBe(1);
+        const writtenItem = (repo.writeItem as jest.Mock).mock.calls[0][0];
+        expect(writtenItem).not.toHaveProperty('rogue_field');
+        expect(writtenItem.name).toBe('OK');
     });
 });

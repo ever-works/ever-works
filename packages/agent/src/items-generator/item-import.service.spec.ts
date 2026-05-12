@@ -260,3 +260,100 @@ describe('ItemImportService.validateRows', () => {
         expect(result.headers).toEqual(ALL_IMPORT_FIELDS);
     });
 });
+
+describe('ItemImportService.revalidateImportRowData', () => {
+    it('accepts a well-formed canonical row', () => {
+        const result = service.revalidateImportRowData(
+            {
+                name: 'A',
+                description: 'd',
+                source_url: 'https://a.test',
+                category: 'Tools',
+            },
+            0,
+        );
+        expect(result.valid).toBe(true);
+        expect(result.errors).toEqual([]);
+        expect(result.data?.name).toBe('A');
+    });
+
+    it('rejects rows missing required fields even when caller claims `valid`', () => {
+        const result = service.revalidateImportRowData(
+            { name: 'A', source_url: 'https://a.test', category: 'Tools' },
+            0,
+        );
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toMatch(/description/);
+        expect(result.data).toBeUndefined();
+    });
+
+    it('rejects a non-http(s) source_url (tamper guard against javascript: scheme)', () => {
+        const result = service.revalidateImportRowData(
+            {
+                name: 'A',
+                description: 'd',
+                source_url: 'javascript:alert(1)',
+                category: 'Tools',
+            },
+            0,
+        );
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toMatch(/source_url/);
+    });
+
+    it('rejects a slug that does not match the canonical kebab-case pattern', () => {
+        const result = service.revalidateImportRowData(
+            {
+                name: 'A',
+                description: 'd',
+                source_url: 'https://a.test',
+                category: 'Tools',
+                slug: 'NOT A SLUG',
+            },
+            0,
+        );
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toMatch(/slug/);
+    });
+
+    it('strips unknown fields from the input', () => {
+        const result = service.revalidateImportRowData(
+            {
+                name: 'A',
+                description: 'd',
+                source_url: 'https://a.test',
+                category: 'Tools',
+                __admin: true,
+                rogue: '../etc/passwd',
+            },
+            0,
+        );
+        expect(result.valid).toBe(true);
+        expect(result.data).toBeDefined();
+        expect(result.data).not.toHaveProperty('__admin');
+        expect(result.data).not.toHaveProperty('rogue');
+    });
+
+    it('handles non-object input (null / array / primitive) by reporting required-field errors', () => {
+        expect(service.revalidateImportRowData(null, 0).valid).toBe(false);
+        expect(service.revalidateImportRowData([], 0).valid).toBe(false);
+        expect(service.revalidateImportRowData('payload', 0).valid).toBe(false);
+    });
+
+    it('coerces booleans and integers through the same parsers as validateRows', () => {
+        const result = service.revalidateImportRowData(
+            {
+                name: 'A',
+                description: 'd',
+                source_url: 'https://a.test',
+                category: 'Tools',
+                featured: 'true',
+                order: '7',
+            },
+            0,
+        );
+        expect(result.valid).toBe(true);
+        expect(result.data?.featured).toBe(true);
+        expect(result.data?.order).toBe(7);
+    });
+});

@@ -8,6 +8,7 @@ import { User } from '../entities/user.entity';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { slugifyText } from '../utils/text.utils';
 import { config as appConfig } from '../config';
+import { ItemImportService } from './item-import.service';
 import type {
     ImportDuplicateStrategy,
     ImportResult,
@@ -48,7 +49,10 @@ export interface ExecuteImportResult extends ImportResult {
 export class ItemImportExecutorService {
     private readonly logger = new Logger(ItemImportExecutorService.name);
 
-    constructor(private readonly gitFacade: GitFacadeService) {}
+    constructor(
+        private readonly gitFacade: GitFacadeService,
+        private readonly itemImportService: ItemImportService,
+    ) {}
 
     async executeImport(
         work: Work,
@@ -112,7 +116,23 @@ export class ItemImportExecutorService {
             validRows,
             async (row) => {
                 try {
-                    const itemData = this.buildItemData(row.data);
+                    // Server-side re-validation — never trust `row.valid` or the
+                    // shape of `row.data` from the client. Strips unknown
+                    // fields, re-runs URL / slug / required-field checks, and
+                    // coerces booleans + integers through the same parsers as
+                    // the validate endpoint.
+                    const revalidated = this.itemImportService.revalidateImportRowData(
+                        row.data,
+                        row.rowIndex,
+                    );
+                    if (!revalidated.valid || !revalidated.data) {
+                        errors.push({
+                            rowIndex: row.rowIndex,
+                            message: `Server-side validation failed: ${revalidated.errors.join('; ')}`,
+                        });
+                        return;
+                    }
+                    const itemData = this.buildItemData(revalidated.data);
                     const isDuplicate =
                         existingSlugs.has(itemData.slug ?? '') ||
                         (itemData.source_url && existingUrls.has(itemData.source_url));

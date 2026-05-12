@@ -3,6 +3,7 @@
 jest.mock('@ever-works/agent/dto', () => ({}));
 jest.mock('@ever-works/agent/items-generator', () => ({
     EXPORT_FORMATS: ['csv', 'xlsx'],
+    MAX_IMPORT_ROWS_CEILING: 2000,
     ItemImportExecutorService: class {},
 }));
 jest.mock('@ever-works/agent/services', () => ({}));
@@ -407,6 +408,51 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
+        it('clamps an over-large import_max_rows setting to the 2000 ceiling', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 50_000 } },
+            });
+            s.itemImportService.parseCSV.mockReturnValue({
+                headers: ['name'],
+                rows: Array.from({ length: 2_001 }, (_, i) => ({ name: `r${i}` })),
+            });
+            await expect(
+                controller.validateImportItems(auth, 'w-1', csvFile(), undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('wraps parse failures in BadRequest instead of leaking a 500', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 500 } },
+            });
+            s.itemImportService.parseCSV.mockImplementation(() => {
+                throw new Error('papaparse crashed on garbage bytes');
+            });
+            await expect(
+                controller.validateImportItems(auth, 'w-1', csvFile(), undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('wraps XLSX parse failures with a hint about legacy .xls', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 500 } },
+            });
+            const file = {
+                buffer: Buffer.from('legacy .xls binary content'),
+                originalname: 'old.xls',
+                mimetype: 'application/vnd.ms-excel',
+            } as Express.Multer.File;
+            s.itemImportService.parseXLSX.mockRejectedValue(
+                new Error('exceljs: unsupported BIFF8 stream'),
+            );
+            await expect(
+                controller.validateImportItems(auth, 'w-1', file, undefined),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
         it('parses + validates the file and returns the service response', async () => {
             s.workQueryService.workConfig.mockResolvedValue({
                 status: 'success',
@@ -555,6 +601,31 @@ describe('WorksController — item export endpoints (EW-533 Phase 1)', () => {
                     default_status: 'published',
                 }),
             );
+        });
+
+        it('rejects payloads that exceed the per-directory max-rows cap', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 2 } },
+            });
+            await expect(
+                controller.executeImportItems(auth, 'w-1', {
+                    rows: [validRow(0), validRow(1), validRow(2)],
+                } as any),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(s.itemImportExecutor.executeImport).not.toHaveBeenCalled();
+        });
+
+        it('clamps an over-large import_max_rows setting to the 2000 ceiling', async () => {
+            s.workQueryService.workConfig.mockResolvedValue({
+                status: 'success',
+                config: { settings: { import_enabled: true, import_max_rows: 50_000 } },
+            });
+            const rows = Array.from({ length: 2_001 }, (_, i) => validRow(i));
+            await expect(
+                controller.executeImportItems(auth, 'w-1', { rows } as any),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(s.itemImportExecutor.executeImport).not.toHaveBeenCalled();
         });
 
         it('invalidates caches and logs IMPORT activity on success', async () => {

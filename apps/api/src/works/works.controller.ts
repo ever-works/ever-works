@@ -60,6 +60,7 @@ import {
     ItemImportService,
     ItemImportExecutorService,
     EXPORT_FORMATS,
+    MAX_IMPORT_ROWS_CEILING,
     type ExportFormat,
     type ExportSettingsResponse,
     type ColumnMapping,
@@ -141,6 +142,17 @@ function buildImportActivitySummary(result: ImportResult): string {
     if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
     if (result.errors.length > 0) parts.push(`${result.errors.length} errors`);
     return parts.join(', ');
+}
+
+/**
+ * Resolves the per-directory import row cap, clamping to the global
+ * `MAX_IMPORT_ROWS_CEILING`. Used by both the validate and execute
+ * endpoints so the limit is consistent regardless of where the request
+ * enters the system.
+ */
+function effectiveImportMaxRows(setting: unknown): number {
+    const configured = typeof setting === 'number' && setting > 0 ? setting : 500;
+    return Math.min(configured, MAX_IMPORT_ROWS_CEILING);
 }
 
 /**
@@ -436,8 +448,7 @@ export class WorksController {
         const settings = result.config?.settings;
         return {
             import_enabled: !!settings?.import_enabled,
-            import_max_rows:
-                typeof settings?.import_max_rows === 'number' ? settings.import_max_rows : 500,
+            import_max_rows: effectiveImportMaxRows(settings?.import_max_rows),
         };
     }
 
@@ -514,8 +525,7 @@ export class WorksController {
                 message: 'Item import is not enabled for this directory',
             });
         }
-        const maxRows =
-            typeof settings.import_max_rows === 'number' ? settings.import_max_rows : 500;
+        const maxRows = effectiveImportMaxRows(settings.import_max_rows);
 
         const filename = (file.originalname ?? '').toLowerCase();
         const isXlsx = filename.endsWith('.xlsx') || filename.endsWith('.xls');
@@ -527,9 +537,25 @@ export class WorksController {
             });
         }
 
-        const parsed = isXlsx
-            ? await this.itemImportService.parseXLSX(file.buffer)
-            : this.itemImportService.parseCSV(file.buffer);
+        let parsed;
+        try {
+            parsed = isXlsx
+                ? await this.itemImportService.parseXLSX(file.buffer)
+                : this.itemImportService.parseCSV(file.buffer);
+        } catch (error) {
+            // ExcelJS throws on legacy .xls (BIFF8 binary format), corrupted
+            // OOXML containers, and password-protected workbooks; PapaParse
+            // throws on non-UTF-8 byte sequences. Surface as a friendly 400
+            // rather than the raw 500 the framework would otherwise emit.
+            throw new BadRequestException({
+                status: 'error',
+                code: 'ParseError',
+                message: isXlsx
+                    ? 'Failed to parse XLSX file. Save it as .xlsx (the legacy .xls binary format and password-protected files are not supported).'
+                    : 'Failed to parse CSV file. Make sure it is a well-formed UTF-8 CSV.',
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
 
         if (parsed.rows.length > maxRows) {
             throw new BadRequestException({
@@ -581,10 +607,19 @@ export class WorksController {
 
         const user = await this.authService.getUser(auth.userId);
         const configResult = await this.workQueryService.workConfig(id, user);
-        if (!configResult.config?.settings?.import_enabled) {
+        const settings = configResult.config?.settings;
+        if (!settings?.import_enabled) {
             throw new NotFoundException({
                 status: 'error',
                 message: 'Item import is not enabled for this directory',
+            });
+        }
+        const maxRows = effectiveImportMaxRows(settings.import_max_rows);
+        if (body.rows.length > maxRows) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'RowCountExceeded',
+                message: `Submitted ${body.rows.length} rows; the per-directory cap is ${maxRows}`,
             });
         }
         const { work } = await this.workOwnershipService.ensureCanEdit(id, user.id);

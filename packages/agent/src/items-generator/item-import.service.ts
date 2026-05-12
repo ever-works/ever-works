@@ -189,19 +189,49 @@ export class ItemImportService {
         };
     }
 
+    /**
+     * Re-runs the column-contract validators on a row of canonical-shape
+     * `ImportRowData` that arrives from a client request (the execute
+     * endpoint receives these directly in `body.rows[].data`). Unlike
+     * `validateRows`, this method does not consult a column mapping — the
+     * input is already in canonical shape — but it still:
+     *
+     *   - whitelists fields to `ALL_IMPORT_FIELDS` (drops anything extra),
+     *   - re-parses array/boolean/integer cells through the same coercers,
+     *   - re-checks required fields, URL fields, and the slug pattern.
+     *
+     * Used by `ItemImportExecutorService` to gate every row that gets
+     * written to the data repo, even when the client claims `valid: true`.
+     * Defense against tampered `/import-items` payloads bypassing the
+     * Phase 2 validate endpoint.
+     */
+    revalidateImportRowData(input: unknown, rowIndex: number): ImportRowValidation {
+        const raw =
+            input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+        return this.buildValidatedRow(rowIndex, (field) => raw[field]);
+    }
+
     private validateSingleRow(
         raw: Record<string, unknown>,
         rowIndex: number,
         reverseMapping: Record<ImportFieldName, string>,
+    ): ImportRowValidation {
+        return this.buildValidatedRow(rowIndex, (field) => {
+            const sourceHeader = reverseMapping[field];
+            return sourceHeader ? raw[sourceHeader] : undefined;
+        });
+    }
+
+    private buildValidatedRow(
+        rowIndex: number,
+        getField: (field: ImportFieldName) => unknown,
     ): ImportRowValidation {
         const errors: string[] = [];
         const warnings: string[] = [];
         const data: Partial<ImportRowData> = {};
 
         for (const field of ALL_IMPORT_FIELDS) {
-            const sourceHeader = reverseMapping[field];
-            const rawValue = sourceHeader ? raw[sourceHeader] : undefined;
-            this.applyField(field, rawValue, data, errors, warnings);
+            this.applyField(field, getField(field), data, errors, warnings);
         }
 
         for (const required of REQUIRED_IMPORT_FIELDS) {

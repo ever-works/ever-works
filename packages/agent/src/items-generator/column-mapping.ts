@@ -15,6 +15,14 @@ import type { ColumnMapping } from './item-import-export.types';
 export const ARRAY_FIELD_SEPARATOR = ';';
 
 /**
+ * Hard ceiling on the per-import-batch row count, regardless of what the
+ * per-directory `settings.import_max_rows` allows. Defends against an admin
+ * setting a comically high cap (or a client bypassing the validate step) —
+ * the validate + execute endpoints clamp `import_max_rows` to this value.
+ */
+export const MAX_IMPORT_ROWS_CEILING = 2000;
+
+/**
  * Required item fields. A row missing any of these is invalid.
  */
 export const REQUIRED_IMPORT_FIELDS = ['name', 'description', 'source_url', 'category'] as const;
