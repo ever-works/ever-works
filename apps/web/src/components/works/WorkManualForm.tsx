@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { RepositoryOwnerCard } from './RepositoryOwnerCard';
 import { WebsiteTemplateSelector } from './shared/WebsiteTemplateSelector';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
+import type { WorkProposal } from '@/lib/api/work-proposals';
+import { acceptProposalAction } from '@/app/actions/dashboard/work-proposals';
 
 interface WorkManualFormProps {
     user: AuthUser;
@@ -23,6 +25,7 @@ interface WorkManualFormProps {
     gitConnected?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
+    proposal?: WorkProposal;
 }
 
 export function WorkManualForm({
@@ -31,6 +34,7 @@ export function WorkManualForm({
     gitConnected,
     deployProvider,
     websiteTemplates,
+    proposal,
 }: WorkManualFormProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -38,9 +42,9 @@ export function WorkManualForm({
 
     // Form state - gitProvider is determined automatically by backend
     const [formData, setFormData] = useState<CreateWorkDto>({
-        slug: '',
-        name: '',
-        description: '',
+        slug: proposal?.slugSuggestion ?? '',
+        name: proposal?.title ?? '',
+        description: proposal?.description ?? '',
         organization: false,
         owner: '',
         websiteTemplateId: '',
@@ -68,6 +72,10 @@ export function WorkManualForm({
 
             if (result.success) {
                 toast.success(result.message || t('success.created'));
+
+                if (proposal && result.work) {
+                    acceptProposalAction(proposal.id, result.work.id).catch(() => undefined);
+                }
 
                 if (result.work) {
                     router.push(ROUTES.DASHBOARD_WORK(result.work.id));
@@ -100,6 +108,18 @@ export function WorkManualForm({
                     {t('formSubtitle')}
                 </p>
             </div>
+
+            {proposal && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-primary/5 dark:bg-primary/10 border border-primary/20 text-sm">
+                    <Sparkles className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                    <div className="text-text dark:text-text-dark">
+                        <strong>{t('proposalBanner.title')}</strong>{' '}
+                        <span className="text-text-secondary dark:text-text-secondary-dark">
+                            {t('proposalBanner.subtitle')}
+                        </span>
+                    </div>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
                 {/* Basic Fields */}

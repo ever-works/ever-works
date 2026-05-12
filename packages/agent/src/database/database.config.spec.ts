@@ -30,6 +30,7 @@ jest.mock('../entities', () => ({
     Template: class Template {},
     UserTemplatePreference: class UserTemplatePreference {},
     WebhookSubscription: class WebhookSubscription {},
+    WorkProposal: class WorkProposal {},
 }));
 jest.mock('../entities/cache.entity', () => ({
     CacheEntry: class CacheEntry {},

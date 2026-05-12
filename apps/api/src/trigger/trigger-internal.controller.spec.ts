@@ -28,6 +28,9 @@ jest.mock('@ever-works/agent/plugins', () => ({
     UserPluginRepository: class UserPluginRepository {},
     WorkPluginRepository: class WorkPluginRepository {},
 }));
+jest.mock('../work-proposals/work-proposals.service', () => ({
+    WorkProposalsApiService: class WorkProposalsApiService {},
+}));
 
 const getInternalSecretMock = jest.fn<string | undefined, []>();
 jest.mock('@ever-works/agent/config', () => ({
@@ -77,6 +80,7 @@ describe('TriggerInternalController', () => {
             authAccountRepository,
             templateRepository,
             userTemplatePreferenceRepository,
+            undefined,
         );
         c.onModuleInit();
         return c;
