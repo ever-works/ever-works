@@ -141,6 +141,26 @@ describe('ItemImportService.validateRows', () => {
         expect(result.validationResults[0].data?.categories).toEqual(['Tools', 'Analytics']);
     });
 
+    it('rejects an image with a non-http(s) URL (each element of array URL fields is validated)', () => {
+        const parsed = {
+            headers: [...baseHeaders, 'images'],
+            rows: [
+                {
+                    name: 'A',
+                    description: 'd',
+                    source_url: 'https://a.test',
+                    category: 'Tools',
+                    images: 'https://ok.test/1.png;javascript:alert(1)',
+                },
+            ],
+        };
+        const mapping = { ...baseMapping, images: 'images' };
+        const result = service.validateRows(parsed, mapping, []);
+        expect(result.validationResults[0].valid).toBe(false);
+        expect(result.validationResults[0].errors[0]).toMatch(/images/);
+        expect(result.validationResults[0].errors[0]).toMatch(/javascript:/);
+    });
+
     it('rejects an invalid source_url with an error and no data', () => {
         const parsed = {
             headers: baseHeaders,

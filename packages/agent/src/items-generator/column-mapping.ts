@@ -69,11 +69,17 @@ export const BOOLEAN_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set(['fea
 export const INTEGER_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set(['order']);
 
 /**
- * Fields whose values must be HTTP(S) URLs.
+ * Fields whose values must be HTTP(S) URLs. Array fields (e.g. `images`)
+ * have each element validated individually in `applyField`. Anything that
+ * eventually renders as `<img src>` / `<a href>` in the directory web
+ * template MUST be listed here so non-http(s) schemes (javascript:, data:,
+ * file:) and malformed values are rejected at import time, not silently
+ * written to the data repository.
  */
 export const URL_IMPORT_FIELDS: ReadonlySet<ImportFieldName> = new Set([
     'source_url',
     'brand_logo_url',
+    'images',
 ]);
 
 /**
