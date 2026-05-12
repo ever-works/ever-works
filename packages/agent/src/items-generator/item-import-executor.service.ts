@@ -149,8 +149,7 @@ export class ItemImportExecutorService {
             const slug = itemData.slug ?? '';
             const isDuplicate =
                 (slug.length > 0 && existingSlugs.has(slug)) ||
-                (typeof itemData.source_url === 'string' &&
-                    existingUrls.has(itemData.source_url));
+                (typeof itemData.source_url === 'string' && existingUrls.has(itemData.source_url));
 
             if (isDuplicate) {
                 if (input.duplicate_strategy === 'skip') {
