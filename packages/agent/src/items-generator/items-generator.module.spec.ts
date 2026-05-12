@@ -56,9 +56,7 @@ describe('ItemsGeneratorModule + barrel re-exports', () => {
             expect(itemsGeneratorBarrel.ItemSubmissionService).toBe(ItemSubmissionService);
             expect(itemsGeneratorBarrel.ItemExportService).toBe(ItemExportService);
             expect(itemsGeneratorBarrel.ItemImportService).toBe(ItemImportService);
-            expect(itemsGeneratorBarrel.ItemImportExecutorService).toBe(
-                ItemImportExecutorService,
-            );
+            expect(itemsGeneratorBarrel.ItemImportExecutorService).toBe(ItemImportExecutorService);
         });
 
         it('re-exports DomainType from @ever-works/contracts (CJS bridge)', () => {
