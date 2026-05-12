@@ -216,4 +216,62 @@ export const config = {
             );
         },
     },
+
+    // Ever Works platform-default providers used by the onboarding wizard.
+    // Each is env-gated until the underlying external resource is provisioned.
+    everWorks: {
+        // "Ever Works Git" storage option — push customer repos to a
+        // platform-owned GitHub org using a server-held PAT, so users can
+        // ship without bringing their own GitHub account.
+        git: {
+            isEnabled() {
+                return process.env.STORAGE_EVER_WORKS_GIT_ENABLED === 'true';
+            },
+            getOrg() {
+                return process.env.EVER_WORKS_CUSTOMERS_GITHUB_ORG || 'ever-works-cloud';
+            },
+            getPat() {
+                return process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT || '';
+            },
+            getVisibility(): 'private' | 'public' {
+                return process.env.EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY === 'public'
+                    ? 'public'
+                    : 'private';
+            },
+        },
+
+        // "Ever Works" deployment option — deploy to a platform-owned
+        // Kubernetes cluster configured from env, with a per-user active-Works
+        // cap so a single user can't exhaust the shared cluster.
+        deploy: {
+            isEnabled() {
+                return process.env.DEPLOY_EVER_WORKS_ENABLED === 'true';
+            },
+            getKubeconfig() {
+                return process.env.EVER_WORKS_DEPLOY_KUBECONFIG || '';
+            },
+            getKubeconfigPath() {
+                return process.env.EVER_WORKS_DEPLOY_KUBECONFIG_PATH || '';
+            },
+            getNamespace() {
+                return process.env.EVER_WORKS_DEPLOY_NAMESPACE || 'ever-works-tenants';
+            },
+            getIngressHostTemplate() {
+                return process.env.EVER_WORKS_DEPLOY_INGRESS_HOST_TEMPLATE || '{slug}.ever.works';
+            },
+            getIngressClass() {
+                return process.env.EVER_WORKS_DEPLOY_INGRESS_CLASS || 'nginx';
+            },
+            getTlsIssuer() {
+                return process.env.EVER_WORKS_DEPLOY_TLS_ISSUER || 'letsencrypt-prod';
+            },
+            getRegistry() {
+                return process.env.EVER_WORKS_DEPLOY_REGISTRY || '';
+            },
+            getMaxWorksPerUser() {
+                const raw = parseInt(process.env.EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER || '3', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 3;
+            },
+        },
+    },
 };
