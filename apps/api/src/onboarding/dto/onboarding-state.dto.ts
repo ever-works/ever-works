@@ -54,16 +54,12 @@ class DeployChoicePatchDto {
     choice!: OnboardingDeployChoice;
 }
 
-export class OnboardingStatePatchBodyDto {
-    @ApiPropertyOptional({
-        description: 'Partial state update. Server deep-merges with persisted version-2 shape.',
-    })
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => OnboardingStatePatchInnerDto)
-    state?: OnboardingStatePatchInnerDto;
-}
-
+// `OnboardingStatePatchInnerDto` MUST be declared BEFORE
+// `OnboardingStatePatchBodyDto`: the latter references it inside a
+// `@Type(() => OnboardingStatePatchInnerDto)` decorator. Even though the
+// arrow function defers the lookup, SWC's class decorator evaluation
+// order trips a TDZ ReferenceError when the decorated outer class is
+// instantiated by Nest at startup. ts-jest tolerates it; SWC doesn't.
 export class OnboardingStatePatchInnerDto {
     @ApiPropertyOptional({ minimum: 0 })
     @IsOptional()
@@ -99,6 +95,16 @@ export class OnboardingStatePatchInnerDto {
     @IsOptional()
     @IsBoolean()
     pluginsReviewed?: boolean;
+}
+
+export class OnboardingStatePatchBodyDto {
+    @ApiPropertyOptional({
+        description: 'Partial state update. Server deep-merges with persisted version-2 shape.',
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => OnboardingStatePatchInnerDto)
+    state?: OnboardingStatePatchInnerDto;
 }
 
 export class OnboardingStateResponseDto {
