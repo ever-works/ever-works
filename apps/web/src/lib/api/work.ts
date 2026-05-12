@@ -340,6 +340,12 @@ export interface WebsiteSettings {
     companies_enabled?: boolean;
     tags_enabled?: boolean;
     surveys_enabled?: boolean;
+    /** Enables CSV/Excel bulk export of items (EW-533). */
+    export_enabled?: boolean;
+    /** Enables CSV/Excel bulk import of items (EW-533). */
+    import_enabled?: boolean;
+    /** Per-directory cap on rows accepted by a single import upload (default 500). */
+    import_max_rows?: number;
     header?: WebsiteSettingsHeader;
     homepage?: WebsiteSettingsHomepage;
     footer?: WebsiteSettingsFooter;
@@ -362,6 +368,9 @@ export interface UpdateWebsiteSettingsDto {
     companies_enabled?: boolean;
     tags_enabled?: boolean;
     surveys_enabled?: boolean;
+    export_enabled?: boolean;
+    import_enabled?: boolean;
+    import_max_rows?: number;
     header?: WebsiteSettingsHeader;
     homepage?: WebsiteSettingsHomepage;
     footer?: WebsiteSettingsFooter;
