@@ -206,8 +206,7 @@ export class ItemImportService {
      * Phase 2 validate endpoint.
      */
     revalidateImportRowData(input: unknown, rowIndex: number): ImportRowValidation {
-        const raw =
-            input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+        const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
         return this.buildValidatedRow(rowIndex, (field) => raw[field]);
     }
 
