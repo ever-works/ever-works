@@ -3,11 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
     WorkProposal,
+    WorkProposalSource,
+    WorkProposalStatus,
     type WorkProposalCategory,
     type WorkProposalField,
     type WorkProposalRecommendedPlugin,
-    type WorkProposalSource,
-    type WorkProposalStatus,
 } from '../entities/work-proposal.entity';
 
 export interface CreateWorkProposalInput {
@@ -33,14 +33,14 @@ export class WorkProposalRepository {
     async bulkInsert(items: CreateWorkProposalInput[]): Promise<WorkProposal[]> {
         if (items.length === 0) return [];
         const entities = items.map((i) =>
-            this.repository.create({ ...i, status: 'pending' as WorkProposalStatus }),
+            this.repository.create({ ...i, status: WorkProposalStatus.PENDING }),
         );
         return this.repository.save(entities);
     }
 
     async findByUser(
         userId: string,
-        statuses: WorkProposalStatus[] = ['pending'],
+        statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
     ): Promise<WorkProposal[]> {
         return this.repository
             .createQueryBuilder('p')
@@ -60,21 +60,23 @@ export class WorkProposalRepository {
 
     async markDismissed(id: string, userId: string): Promise<boolean> {
         const res = await this.repository.update(
-            { id, userId, status: 'pending' },
-            { status: 'dismissed' },
+            { id, userId, status: WorkProposalStatus.PENDING },
+            { status: WorkProposalStatus.DISMISSED },
         );
         return (res.affected ?? 0) > 0;
     }
 
     async markAccepted(id: string, userId: string, workId: string): Promise<boolean> {
         const res = await this.repository.update(
-            { id, userId, status: 'pending' },
-            { status: 'accepted', acceptedWorkId: workId },
+            { id, userId, status: WorkProposalStatus.PENDING },
+            { status: WorkProposalStatus.ACCEPTED, acceptedWorkId: workId },
         );
         return (res.affected ?? 0) > 0;
     }
 
     async countPendingByUser(userId: string): Promise<number> {
-        return this.repository.count({ where: { userId, status: 'pending' } });
+        return this.repository.count({
+            where: { userId, status: WorkProposalStatus.PENDING },
+        });
     }
 }

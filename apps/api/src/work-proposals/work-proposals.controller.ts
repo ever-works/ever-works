@@ -16,23 +16,24 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
     ListWorkProposalsQueryDto,
+    UpdateWorkProposalPreferencesDto,
     type RefreshResponseDto,
     type WorkProposalResponseDto,
 } from './dto/work-proposal.dto';
-import type { WorkProposalStatus } from '@ever-works/agent/user-research';
 
 @ApiTags('work-proposals')
-@Controller('v1')
+@Controller('api/me/work-proposals')
 export class WorkProposalsController {
     constructor(private readonly service: WorkProposalsApiService) {}
 
-    @Get('me/work-proposals')
+    @Get()
     @ApiOperation({ summary: 'List my work proposals' })
     @HttpCode(HttpStatus.OK)
     async list(
@@ -40,7 +41,9 @@ export class WorkProposalsController {
         @Query() query: ListWorkProposalsQueryDto,
     ): Promise<WorkProposalResponseDto[]> {
         const statuses: WorkProposalStatus[] =
-            query.statuses && query.statuses.length > 0 ? query.statuses : ['pending'];
+            query.statuses && query.statuses.length > 0
+                ? query.statuses
+                : [WorkProposalStatus.PENDING];
         const proposals = await this.service.list(auth.userId, statuses);
         return proposals.map((p) => ({
             id: p.id,
@@ -52,13 +55,13 @@ export class WorkProposalsController {
             recommendedPlugins: p.recommendedPlugins,
             reasoning: p.reasoning,
             source: p.source,
-            status: p.status as WorkProposalStatus,
+            status: p.status,
             acceptedWorkId: p.acceptedWorkId ?? null,
             generatedAt: p.generatedAt,
         }));
     }
 
-    @Get('me/work-proposals/status')
+    @Get('status')
     @ApiOperation({ summary: 'Check whether a refresh is currently running for the caller' })
     @HttpCode(HttpStatus.OK)
     async status(@CurrentUser() auth: AuthenticatedUser) {
@@ -66,7 +69,7 @@ export class WorkProposalsController {
         return { researching };
     }
 
-    @Post('me/work-proposals/refresh')
+    @Post('refresh')
     @ApiOperation({ summary: 'Trigger a fresh research + proposal-generation run' })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ default: { limit: 3, ttl: 60_000 } })
@@ -81,7 +84,27 @@ export class WorkProposalsController {
         return { status: result.status, error: result.error };
     }
 
-    @Patch('me/work-proposals/:id/dismiss')
+    @Get('preferences')
+    @ApiOperation({ summary: 'Get my user-research preferences' })
+    @HttpCode(HttpStatus.OK)
+    async getPreferences(@CurrentUser() auth: AuthenticatedUser) {
+        return this.service.getPreferences(auth.userId);
+    }
+
+    @Put('preferences')
+    @ApiOperation({ summary: 'Update my user-research preferences' })
+    @HttpCode(HttpStatus.OK)
+    async updatePreferences(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: UpdateWorkProposalPreferencesDto,
+    ) {
+        if (typeof body?.optOut !== 'boolean') {
+            throw new BadRequestException('optOut is required and must be boolean');
+        }
+        return this.service.updatePreferences(auth.userId, body.optOut);
+    }
+
+    @Patch(':id/dismiss')
     @ApiOperation({ summary: 'Dismiss a pending proposal' })
     @ApiResponse({ status: 204, description: 'Dismissed' })
     @HttpCode(HttpStatus.NO_CONTENT)
@@ -95,27 +118,7 @@ export class WorkProposalsController {
         }
     }
 
-    @Get('me/work-proposals/preferences')
-    @ApiOperation({ summary: 'Get my user-research preferences' })
-    @HttpCode(HttpStatus.OK)
-    async getPreferences(@CurrentUser() auth: AuthenticatedUser) {
-        return this.service.getPreferences(auth.userId);
-    }
-
-    @Put('me/work-proposals/preferences')
-    @ApiOperation({ summary: 'Update my user-research preferences' })
-    @HttpCode(HttpStatus.OK)
-    async updatePreferences(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body() body: { optOut: boolean },
-    ) {
-        if (typeof body?.optOut !== 'boolean') {
-            throw new BadRequestException('optOut is required and must be boolean');
-        }
-        return this.service.updatePreferences(auth.userId, body.optOut);
-    }
-
-    @Post('me/work-proposals/:id/accept')
+    @Post(':id/accept')
     @ApiOperation({
         summary: 'Mark a proposal as accepted after the user creates a Work from it',
     })

@@ -11,9 +11,18 @@ import {
 import { User } from './user.entity';
 import { Work } from './work.entity';
 
-export type WorkProposalStatus = 'pending' | 'dismissed' | 'accepted';
+export enum WorkProposalStatus {
+    PENDING = 'pending',
+    DISMISSED = 'dismissed',
+    ACCEPTED = 'accepted',
+}
 
-export type WorkProposalSource = 'auto-signup' | 'user-refresh' | 'discover' | 'scheduled';
+export enum WorkProposalSource {
+    AUTO_SIGNUP = 'auto-signup',
+    USER_REFRESH = 'user-refresh',
+    DISCOVER = 'discover',
+    SCHEDULED = 'scheduled',
+}
 
 export interface WorkProposalCategory {
     name: string;
@@ -66,10 +75,10 @@ export class WorkProposal {
     @Column({ type: 'text' })
     reasoning: string;
 
-    @Column({ default: 'auto-signup' })
+    @Column({ type: 'varchar', default: WorkProposalSource.AUTO_SIGNUP })
     source: WorkProposalSource;
 
-    @Column({ default: 'pending' })
+    @Column({ type: 'varchar', default: WorkProposalStatus.PENDING })
     status: WorkProposalStatus;
 
     @Column('uuid', { nullable: true })
@@ -79,8 +88,8 @@ export class WorkProposal {
     @JoinColumn({ name: 'acceptedWorkId' })
     acceptedWork?: Work | null;
 
-    @Column({ nullable: true })
-    generationRunId?: string;
+    @Column({ type: 'varchar', nullable: true })
+    generationRunId?: string | null;
 
     @CreateDateColumn()
     generatedAt: Date;

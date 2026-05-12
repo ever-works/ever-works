@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull } from 'typeorm';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { User } from '@ever-works/agent/entities';
+import { WorkProposalSource } from '@ever-works/agent/user-research';
 import { WorkProposalsApiService } from './work-proposals.service';
 
 @Injectable()
@@ -69,7 +70,7 @@ export class ScheduledReRunService {
                     : null;
                 if (profileResearchedAt && profileResearchedAt > cutoff) continue;
                 try {
-                    await this.proposals.refresh(user.id, 'scheduled');
+                    await this.proposals.refresh(user.id, WorkProposalSource.SCHEDULED);
                 } catch (err) {
                     this.logger.warn(
                         `Scheduled rerun dispatch failed for ${user.id}: ${(err as Error).message}`,

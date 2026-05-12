@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
+import { WorkProposalSource } from '@ever-works/agent/user-research';
 import { UserConfirmedEvent } from '../events';
 import { WorkProposalsApiService } from './work-proposals.service';
 
@@ -23,7 +24,10 @@ export class UserResearchListener {
         }
 
         try {
-            const result = await this.proposals.refresh(event.user.id, 'auto-signup');
+            const result = await this.proposals.refresh(
+                event.user.id,
+                WorkProposalSource.AUTO_SIGNUP,
+            );
             this.logger.log(
                 `User research dispatched for ${event.user.id} (status=${result.status})`,
             );

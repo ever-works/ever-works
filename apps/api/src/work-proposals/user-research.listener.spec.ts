@@ -13,6 +13,12 @@ jest.mock(
     '@ever-works/agent/user-research',
     () => ({
         UserResearchRateLimitedError: class extends Error {},
+        WorkProposalSource: {
+            AUTO_SIGNUP: 'auto-signup',
+            USER_REFRESH: 'user-refresh',
+            DISCOVER: 'discover',
+            SCHEDULED: 'scheduled',
+        },
     }),
     { virtual: true },
 );

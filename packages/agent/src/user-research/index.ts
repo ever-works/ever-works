@@ -8,8 +8,8 @@ export * from './work-proposal.repository';
 export * from './user-research.module';
 export {
     WorkProposal,
-    type WorkProposalStatus,
-    type WorkProposalSource,
+    WorkProposalStatus,
+    WorkProposalSource,
     type WorkProposalCategory,
     type WorkProposalField,
     type WorkProposalFieldType,

@@ -8,7 +8,11 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { WorkProposalRepository } from './work-proposal.repository';
 import { workProposalsBatchSchema, type WorkProposalsBatch } from './schemas';
 import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
-import type { WorkProposal, WorkProposalSource } from '../entities/work-proposal.entity';
+import {
+    WorkProposalStatus,
+    type WorkProposal,
+    type WorkProposalSource,
+} from '../entities/work-proposal.entity';
 
 export interface GenerateProposalsResult {
     status: 'generated' | 'skipped-no-profile' | 'skipped-low-confidence' | 'error';
@@ -148,10 +152,7 @@ export class WorkProposalService {
         return { status: 'generated', proposals: saved, tokensUsed };
     }
 
-    async list(
-        userId: string,
-        statuses: Array<'pending' | 'dismissed' | 'accepted'> = ['pending'],
-    ) {
+    async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
         return this.repo.findByUser(userId, statuses);
     }
 

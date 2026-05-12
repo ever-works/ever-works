@@ -1,19 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
-import type { WorkProposalStatus } from '@ever-works/agent/user-research';
-
-const STATUSES: WorkProposalStatus[] = ['pending', 'dismissed', 'accepted'];
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
 
 export class ListWorkProposalsQueryDto {
     @ApiProperty({
         required: false,
         isArray: true,
-        enum: STATUSES,
+        enum: WorkProposalStatus,
         description: 'Filter by status (default: pending only)',
     })
     @IsOptional()
     @IsArray()
-    @IsIn(STATUSES, { each: true })
+    @IsEnum(WorkProposalStatus, { each: true })
     statuses?: WorkProposalStatus[];
 }
 
@@ -21,6 +19,11 @@ export class AcceptWorkProposalDto {
     @ApiProperty({ description: 'The work that was created from this proposal.' })
     @IsUUID()
     workId: string;
+}
+
+export class UpdateWorkProposalPreferencesDto {
+    @ApiProperty({ description: 'When true, the user opts out of background research.' })
+    optOut: boolean;
 }
 
 export class WorkProposalResponseDto {
@@ -70,10 +73,10 @@ export class WorkProposalResponseDto {
     @ApiProperty()
     reasoning: string;
 
-    @ApiProperty({ enum: ['auto-signup', 'user-refresh', 'discover', 'scheduled'] })
-    source: string;
+    @ApiProperty({ enum: WorkProposalSource })
+    source: WorkProposalSource;
 
-    @ApiProperty({ enum: STATUSES })
+    @ApiProperty({ enum: WorkProposalStatus })
     status: WorkProposalStatus;
 
     @ApiProperty({ required: false, nullable: true })

@@ -23,6 +23,17 @@ jest.mock(
         UserResearchService: class {},
         WorkProposalService: class {},
         UserResearchLimitsService: class {},
+        WorkProposalSource: {
+            AUTO_SIGNUP: 'auto-signup',
+            USER_REFRESH: 'user-refresh',
+            DISCOVER: 'discover',
+            SCHEDULED: 'scheduled',
+        },
+        WorkProposalStatus: {
+            PENDING: 'pending',
+            DISMISSED: 'dismissed',
+            ACCEPTED: 'accepted',
+        },
     }),
     { virtual: true },
 );

@@ -5,7 +5,8 @@ import {
     UserResearchLimitsService,
     UserResearchRateLimitedError,
     WorkProposalService,
-    type WorkProposalSource,
+    WorkProposalSource,
+    WorkProposalStatus,
 } from '@ever-works/agent/user-research';
 
 @Injectable()
@@ -20,10 +21,7 @@ export class WorkProposalsApiService {
         private readonly users: UserRepository,
     ) {}
 
-    async list(
-        userId: string,
-        statuses: Array<'pending' | 'dismissed' | 'accepted'> = ['pending'],
-    ) {
+    async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
         return this.proposals.list(userId, statuses);
     }
 
@@ -75,7 +73,7 @@ export class WorkProposalsApiService {
 
     async refresh(
         userId: string,
-        source: WorkProposalSource = 'user-refresh',
+        source: WorkProposalSource = WorkProposalSource.USER_REFRESH,
     ): Promise<{ status: 'queued' | 'rate-limited'; error?: string }> {
         if (this.inFlight.has(userId)) {
             return { status: 'queued', error: 'already in flight' };
