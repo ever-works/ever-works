@@ -30,7 +30,37 @@ import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 import { EverWorksDeployQuotaService } from '@src/ever-works-providers';
+import { config } from '@src/config';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
+
+/**
+ * Map a wizard "storage" choice onto the existing `gitProvider` field.
+ *
+ * The Work entity still drives every repository operation off
+ * `work.gitProvider` (see git facade + repository-management). The onboarding
+ * wizard's storage step is a higher-level choice that needs to translate
+ * back into a concrete git-provider plugin id, otherwise picking
+ * `ever-works-git` would silently fall back to whatever `gitProvider` the
+ * DTO carried (default `github`).
+ */
+function gitProviderFromStorageChoice(storage: string): string | undefined {
+    switch (storage) {
+        case 'ever-works-git':
+            // Ever Works Git is a managed GitHub org, so the runtime git
+            // provider is still GitHub.
+            return 'github';
+        case 'user-github':
+            return 'github';
+        case 'user-gitlab':
+            return 'gitlab';
+        case 'user-git':
+            // Self-hosted Git is "planned" in the catalog. Until a concrete
+            // plugin lands, fall through to the caller's default.
+            return undefined;
+        default:
+            return undefined;
+    }
+}
 
 @Injectable()
 export class WorkLifecycleService {
@@ -52,19 +82,28 @@ export class WorkLifecycleService {
     ) {}
 
     /**
-     * Resolve storage / deploy provider for a new Work. Precedence:
+     * Resolve storage / deploy / git provider for a new Work. Precedence:
      *
      *   1. value the client passed in the DTO (explicit overrides win),
      *   2. the user's persisted onboarding choice (if any),
      *   3. the historical fallback (`user-github` / `vercel`).
      *
-     * Returning a separate object keeps the assignment logic small and
-     * unit-testable.
+     * Two additional safeguards:
+     *
+     *   - `deployProvider === 'ever-works'` is only persisted when the env
+     *     flag is on. There's no plugin registered with id `ever-works`, so
+     *     the deploy facade would throw at deploy time on environments where
+     *     the feature is off (which is the prod default until the tenant
+     *     cluster is wired up). Fall back to `vercel` in that case.
+     *   - The storage choice is translated back into a concrete `gitProvider`
+     *     value, since repository operations still read `work.gitProvider`.
+     *     Without this, picking `ever-works-git` in the wizard had no
+     *     runtime effect.
      */
     private async resolveProviderDefaults(
-        dto: Pick<CreateWorkDto, 'storageProvider' | 'deployProvider'>,
+        dto: Pick<CreateWorkDto, 'storageProvider' | 'deployProvider' | 'gitProvider'>,
         userId: string,
-    ): Promise<{ storageProvider: string; deployProvider: string }> {
+    ): Promise<{ storageProvider: string; deployProvider: string; gitProvider: string }> {
         let onboardingState: OnboardingWizardStateV2 | null | undefined;
         try {
             const user = await this.userRepository.findById(userId);
@@ -75,11 +114,21 @@ export class WorkLifecycleService {
             );
         }
 
-        return {
-            storageProvider:
-                dto.storageProvider ?? onboardingState?.storage?.choice ?? 'user-github',
-            deployProvider: dto.deployProvider ?? onboardingState?.deploy?.choice ?? 'vercel',
-        };
+        const storageProvider =
+            dto.storageProvider ?? onboardingState?.storage?.choice ?? 'user-github';
+
+        let deployProvider = dto.deployProvider ?? onboardingState?.deploy?.choice ?? 'vercel';
+        if (deployProvider === 'ever-works' && !config.everWorks.deploy.isEnabled()) {
+            this.logger.warn(
+                `deployProvider 'ever-works' selected by user ${userId} but DEPLOY_EVER_WORKS_ENABLED is off — falling back to 'vercel' to avoid persisting an unresolvable provider id`,
+            );
+            deployProvider = 'vercel';
+        }
+
+        const gitProvider =
+            dto.gitProvider ?? gitProviderFromStorageChoice(storageProvider) ?? 'github';
+
+        return { storageProvider, deployProvider, gitProvider };
     }
 
     private normalizeWebsiteTemplateSelection(value?: string | null): string | null {
@@ -148,23 +197,15 @@ export class WorkLifecycleService {
     }
 
     async createWork(createWorkDto: CreateWorkDto, user: User) {
-        const {
-            slug,
-            name,
-            description,
-            owner,
-            readmeConfig,
-            organization,
-            gitProvider,
-            websiteTemplateId,
-        } = createWorkDto;
+        const { slug, name, description, owner, readmeConfig, organization, websiteTemplateId } =
+            createWorkDto;
 
         const selectedWebsiteTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
             websiteTemplateId,
             user.id,
         );
 
-        const { storageProvider, deployProvider } = await this.resolveProviderDefaults(
+        const { storageProvider, deployProvider, gitProvider } = await this.resolveProviderDefaults(
             createWorkDto,
             user.id,
         );
