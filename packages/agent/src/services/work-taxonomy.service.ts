@@ -96,6 +96,7 @@ export class WorkTaxonomyService {
             name: dto.name.trim(),
             description: dto.description?.trim(),
             icon_url: dto.icon_url?.trim(),
+            icon_svg: dto.icon_svg?.trim(),
             priority: dto.priority,
         };
 
@@ -159,6 +160,7 @@ export class WorkTaxonomyService {
             ...(dto.name && { name: dto.name.trim() }),
             ...(dto.description !== undefined && { description: dto.description?.trim() }),
             ...(dto.icon_url !== undefined && { icon_url: dto.icon_url?.trim() }),
+            ...(dto.icon_svg !== undefined && { icon_svg: dto.icon_svg?.trim() }),
             ...(dto.priority !== undefined && { priority: dto.priority }),
         };
 
@@ -180,7 +182,9 @@ export class WorkTaxonomyService {
                     fieldsChanged: Object.keys(dto).filter(
                         (key) =>
                             (dto as Record<string, unknown>)[key] !== undefined &&
-                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                            ['name', 'description', 'icon_url', 'icon_svg', 'priority'].includes(
+                                key,
+                            ),
                     ),
                 },
             ],
@@ -442,6 +446,7 @@ export class WorkTaxonomyService {
             name: dto.name.trim(),
             description: dto.description?.trim(),
             icon_url: dto.icon_url?.trim(),
+            icon_svg: dto.icon_svg?.trim(),
             priority: dto.priority,
         };
 
@@ -505,6 +510,7 @@ export class WorkTaxonomyService {
             ...(dto.name && { name: dto.name.trim() }),
             ...(dto.description !== undefined && { description: dto.description?.trim() }),
             ...(dto.icon_url !== undefined && { icon_url: dto.icon_url?.trim() }),
+            ...(dto.icon_svg !== undefined && { icon_svg: dto.icon_svg?.trim() }),
             ...(dto.priority !== undefined && { priority: dto.priority }),
         };
 
@@ -526,7 +532,9 @@ export class WorkTaxonomyService {
                     fieldsChanged: Object.keys(dto).filter(
                         (key) =>
                             (dto as Record<string, unknown>)[key] !== undefined &&
-                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                            ['name', 'description', 'icon_url', 'icon_svg', 'priority'].includes(
+                                key,
+                            ),
                     ),
                 },
             ],

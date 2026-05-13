@@ -4,6 +4,13 @@ import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 
 // Category DTOs
 
+/**
+ * Hard cap on inline SVG payload size. Sanitized icons should be well
+ * under 3KB; the limit gives headroom for legitimate paths while
+ * rejecting obvious abuse (megabyte rasterized blobs encoded as data URIs).
+ */
+const MAX_ICON_SVG_LENGTH = 8000;
+
 export class CreateCategoryDto {
     @IsString()
     @MaxLength(100)
@@ -20,6 +27,11 @@ export class CreateCategoryDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()
@@ -44,6 +56,11 @@ export class UpdateCategoryDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()
@@ -70,6 +87,11 @@ export class CreateCollectionDto {
     @MaxLength(500)
     icon_url?: string;
 
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
+
     @IsNumber()
     @IsOptional()
     @Min(0)
@@ -93,6 +115,11 @@ export class UpdateCollectionDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()
