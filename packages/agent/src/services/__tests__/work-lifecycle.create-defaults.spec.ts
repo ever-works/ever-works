@@ -12,7 +12,11 @@ jest.mock('@src/generators/website-generator/website-update.service', () => ({
 }));
 
 import { WorkLifecycleService } from '../work-lifecycle.service';
-import { EverWorksDeployQuotaExceededError } from '../../ever-works-providers';
+import {
+    EverWorksDeployQuotaExceededError,
+    EverWorksGitDisabledError,
+    EverWorksGitRequestError,
+} from '../../ever-works-providers';
 import { CreateWorkDto } from '@src/dto/create-work.dto';
 import type { User } from '@src/entities/user.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
