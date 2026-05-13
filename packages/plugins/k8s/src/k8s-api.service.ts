@@ -97,6 +97,24 @@ interface CoreV1ApiLike {
 }
 
 /**
+ * Subset of @kubernetes/client-node KubernetesObjectApi we depend on. Used
+ * for Server-Side Apply so we can specify Content-Type
+ * `application/apply-patch+yaml` and pass `force=true` — the typed
+ * patchNamespaced* methods on AppsV1Api/CoreV1Api/NetworkingV1Api default to
+ * Strategic Merge Patch, which rejects `force` with a 422.
+ */
+interface KubernetesObjectApiLike {
+	patch(
+		spec: Record<string, unknown>,
+		pretty?: string,
+		dryRun?: string,
+		fieldManager?: string,
+		force?: boolean,
+		patchStrategy?: string
+	): Promise<unknown>;
+}
+
+/**
  * Hook so tests can inject mock clients without dynamic-importing the real
  * `@kubernetes/client-node` package.
  */
@@ -106,7 +124,11 @@ export interface KubernetesClientFactory {
 	networkingV1Api(client: KubernetesApiClientLike): NetworkingV1ApiLike;
 	appsV1Api(client: KubernetesApiClientLike): AppsV1ApiLike;
 	coreV1Api(client: KubernetesApiClientLike): CoreV1ApiLike;
+	objectApi(client: KubernetesApiClientLike): KubernetesObjectApiLike;
 }
+
+/** Content-Type for Kubernetes Server-Side Apply patches. */
+const SERVER_SIDE_APPLY: string = 'application/apply-patch+yaml';
 
 /**
  * Default factory using the real `@kubernetes/client-node`.
@@ -156,6 +178,13 @@ export const defaultClientFactory: KubernetesClientFactory = {
 	coreV1Api(client) {
 		const k8s = k8sClientLoader();
 		return client.makeApiClient(k8s.CoreV1Api as never);
+	},
+	objectApi(client) {
+		const k8s = k8sClientLoader();
+		// KubernetesObjectApi.makeApiClient consumes the KubeConfig directly
+		// rather than going through makeApiClient(...), so it can pick up the
+		// default namespace from the current context.
+		return k8s.KubernetesObjectApi.makeApiClient(client as never) as unknown as KubernetesObjectApiLike;
 	}
 };
 
@@ -283,15 +312,8 @@ export class KubernetesApiService {
 		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
-		const apps = this.factory.appsV1Api(client);
-		const meta = (manifest.metadata as { name?: string; namespace?: string }) ?? {};
-		await apps.patchNamespacedDeployment({
-			name: meta.name ?? '',
-			namespace: meta.namespace ?? '',
-			body: manifest,
-			fieldManager: FIELD_MANAGER,
-			force: true
-		});
+		const objects = this.factory.objectApi(client);
+		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
 	}
 
 	async applyService(
@@ -300,15 +322,8 @@ export class KubernetesApiService {
 		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
-		const core = this.factory.coreV1Api(client);
-		const meta = (manifest.metadata as { name?: string; namespace?: string }) ?? {};
-		await core.patchNamespacedService({
-			name: meta.name ?? '',
-			namespace: meta.namespace ?? '',
-			body: manifest,
-			fieldManager: FIELD_MANAGER,
-			force: true
-		});
+		const objects = this.factory.objectApi(client);
+		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
 	}
 
 	/**
@@ -358,15 +373,8 @@ export class KubernetesApiService {
 		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
-		const net = this.factory.networkingV1Api(client);
-		const meta = (manifest.metadata as { name?: string; namespace?: string }) ?? {};
-		await net.patchNamespacedIngress({
-			name: meta.name ?? '',
-			namespace: meta.namespace ?? '',
-			body: manifest,
-			fieldManager: FIELD_MANAGER,
-			force: true
-		});
+		const objects = this.factory.objectApi(client);
+		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
 	}
 
 	async applyImagePullSecret(
@@ -375,15 +383,8 @@ export class KubernetesApiService {
 		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
-		const core = this.factory.coreV1Api(client);
-		const meta = (manifest.metadata as { name?: string; namespace?: string }) ?? {};
-		await core.patchNamespacedSecret({
-			name: meta.name ?? '',
-			namespace: meta.namespace ?? '',
-			body: manifest,
-			fieldManager: FIELD_MANAGER,
-			force: true
-		});
+		const objects = this.factory.objectApi(client);
+		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
 	}
 
 	async readIngress(

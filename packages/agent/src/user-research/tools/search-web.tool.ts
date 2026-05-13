@@ -3,11 +3,18 @@ import { z } from 'zod';
 import { Logger } from '@nestjs/common';
 import type { SearchFacadeService } from '../../facades/search.facade';
 import type { UserResearchLimitsService } from '../limits';
+import { isTransientProviderError } from '../provider-resolver';
 
 interface CreateSearchWebToolOptions {
     searchFacade: SearchFacadeService;
     limits: UserResearchLimitsService;
     userId: string;
+    /**
+     * Ordered list of search plugin IDs to try. Empty / undefined means
+     * "let the facade pick its default". The tool walks the chain on
+     * transient errors so a flapping provider doesn't drop the whole run.
+     */
+    providerChain?: string[];
     logger?: Logger;
     onResult?: (results: { title: string; url: string }[]) => void;
 }
@@ -19,6 +26,8 @@ const inputSchema = z.object({
 
 export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
     const log = opts.logger ?? new Logger('UserResearch:searchWeb');
+    const chain =
+        opts.providerChain && opts.providerChain.length > 0 ? opts.providerChain : [undefined];
 
     return tool({
         description:
@@ -32,27 +41,40 @@ export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
                 return { results: [], error: 'rate_limited' as const };
             }
 
-            try {
-                const results = await opts.searchFacade.search(
-                    input.query,
-                    { maxResults: input.limit ?? 5 },
-                    { userId: opts.userId },
-                );
+            let lastErr: unknown;
+            for (const providerOverride of chain) {
+                try {
+                    const results = await opts.searchFacade.search(
+                        input.query,
+                        { maxResults: input.limit ?? 5 },
+                        { userId: opts.userId, providerOverride },
+                    );
 
-                await opts.limits.incrementSearches(opts.userId);
+                    await opts.limits.incrementSearches(opts.userId);
 
-                const compact = results.slice(0, input.limit ?? 5).map((r) => ({
-                    title: r.title,
-                    url: r.url,
-                    publishedDate: r.publishedDate,
-                }));
+                    const compact = results.slice(0, input.limit ?? 5).map((r) => ({
+                        title: r.title,
+                        url: r.url,
+                        publishedDate: r.publishedDate,
+                    }));
 
-                opts.onResult?.(compact);
-                return { results: compact };
-            } catch (err) {
-                log.warn(`searchWeb failed: ${(err as Error).message}`);
-                return { results: [], error: (err as Error).message };
+                    opts.onResult?.(compact);
+                    return { results: compact };
+                } catch (err) {
+                    lastErr = err;
+                    if (!isTransientProviderError(err)) {
+                        log.warn(`searchWeb failed (non-retryable): ${(err as Error).message}`);
+                        return { results: [], error: (err as Error).message };
+                    }
+                    log.warn(
+                        `searchWeb provider ${providerOverride ?? '<default>'} failed (retryable): ${(err as Error).message}`,
+                    );
+                }
             }
+            return {
+                results: [],
+                error: (lastErr as Error)?.message ?? 'all search providers failed',
+            };
         },
     });
 }

@@ -4,6 +4,7 @@ import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
+import { config } from '../../config';
 
 /**
  * Cross-database case-insensitive LIKE using LOWER() function.
@@ -184,11 +185,18 @@ export class WorkRepository {
         userId: string,
         deployProvider = 'ever-works',
     ): Promise<number> {
-        const all = await this.repository.find({
+        // The Ever Works Deploy quota check (`EverWorksDeployQuotaService`)
+        // only cares whether the user is **at or over** the cap. Cap the
+        // fetched rows at `maxWorksPerUser + 1` so the in-process filter
+        // doesn't have to scan an unbounded set if the user has many
+        // archived/deleted Works under this provider. Greptile P1 from PR #705.
+        const maxRows = config.everWorks.deploy.getMaxWorksPerUser() + 1;
+        const candidates = await this.repository.find({
             where: { userId, deployProvider },
             select: { id: true, generateStatus: true } as never,
+            take: maxRows,
         });
-        return all.filter((w) => {
+        return candidates.filter((w) => {
             const status = (w.generateStatus as { status?: string } | null | undefined)?.status;
             return status !== 'DELETED' && status !== 'ARCHIVED';
         }).length;

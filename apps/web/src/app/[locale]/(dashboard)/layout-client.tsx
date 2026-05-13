@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import React, { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -16,7 +16,9 @@ import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
+import { computeStepList } from '@/components/onboarding/useOnboardingFlow';
 import { dismissOnboarding } from '@/app/actions/onboarding/state';
+import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
 import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -74,10 +76,18 @@ export function DashboardLayoutClient({
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(false);
 
-    // The v2 wizard derives its own step list — we only need step + total
-    // counts for the header "x of N" badge. Approximating with the persisted
-    // `lastStep` is sufficient because the badge is informational only.
-    const onboardingTotalSteps = 9;
+    // The v2 wizard derives its own step list from the user's choices —
+    // config sub-steps are skipped when the user picks an Ever Works default
+    // for that bucket. Re-derive the same way here so the header "x of N"
+    // badge matches the actual flow length (7 with all defaults, up to 10
+    // with all BYOK + 'k8s' deploy). Hardcoding `9` drifted the badge any
+    // time the user picked Ever Works for at least one bucket. Greptile P2
+    // from PR #705.
+    const onboardingStepList = useMemo(
+        () => computeStepList(onboardingState.state ?? ONBOARDING_DEFAULT_STATE),
+        [onboardingState.state],
+    );
+    const onboardingTotalSteps = onboardingStepList.length;
     const onboardingCurrentStep = Math.min(
         (onboardingState.state?.lastStep ?? 0) + 1,
         onboardingTotalSteps,

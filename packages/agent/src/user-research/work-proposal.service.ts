@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateObject } from 'ai';
 import { AiFacadeService } from '../facades/ai.facade';
 import { UserRepository } from '../database/repositories/user.repository';
@@ -8,6 +7,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { WorkProposalRepository } from './work-proposal.repository';
 import { workProposalsBatchSchema, type WorkProposalsBatch } from './schemas';
 import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
+import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
     type WorkProposal,
@@ -68,16 +68,17 @@ export class WorkProposalService {
             .map((p) => p.plugin.id)
             .filter(Boolean);
 
+        let resolvedModel;
         let providerName: string;
         let modelName: string;
-        let tokensUsed = 0;
-        let parsed: WorkProposalsBatch;
-
         try {
-            const providerConfig = await this.aiFacade.getProviderConfig({
+            const resolved = await resolveAiProviderForResearch(
+                this.aiFacade,
+                this.registry,
                 userId,
-            });
-            if (!providerConfig.baseUrl || !providerConfig.apiKey) {
+                this.logger,
+            );
+            if (!resolved) {
                 return {
                     status: 'error',
                     proposals: [],
@@ -85,28 +86,21 @@ export class WorkProposalService {
                     error: 'ai-provider-not-configured',
                 };
             }
-            const provider = createOpenAICompatible({
-                name: providerConfig.providerId,
-                baseURL: providerConfig.baseUrl,
-                apiKey: providerConfig.apiKey,
-            });
-            modelName =
-                providerConfig.routing.complexModel ??
-                providerConfig.routing.mediumModel ??
-                providerConfig.defaultModel ??
-                '';
-            if (!modelName) {
-                return {
-                    status: 'error',
-                    proposals: [],
-                    tokensUsed: 0,
-                    error: 'no-model-configured',
-                };
-            }
-            providerName = providerConfig.providerName ?? providerConfig.providerId;
+            resolvedModel = resolved.model;
+            providerName = resolved.providerName;
+            modelName = resolved.modelName;
+        } catch (err) {
+            const message = (err as Error).message;
+            this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
+            return { status: 'error', proposals: [], tokensUsed: 0, error: message };
+        }
 
+        let tokensUsed = 0;
+        let parsed: WorkProposalsBatch;
+
+        try {
             const result = await generateObject({
-                model: provider(modelName),
+                model: resolvedModel,
                 schema: workProposalsBatchSchema,
                 system: PROPOSALS_SYSTEM_PROMPT,
                 prompt: buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),

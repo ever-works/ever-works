@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
 
@@ -10,6 +11,11 @@ export class ListWorkProposalsQueryDto {
         description: 'Filter by status (default: pending only)',
     })
     @IsOptional()
+    // Express parses `?statuses=pending` as a string and `?statuses=a&statuses=b`
+    // as an array. Normalize to array so @IsArray accepts both shapes.
+    @Transform(({ value }) =>
+        value === undefined || value === null ? value : Array.isArray(value) ? value : [value],
+    )
     @IsArray()
     @IsEnum(WorkProposalStatus, { each: true })
     statuses?: WorkProposalStatus[];
