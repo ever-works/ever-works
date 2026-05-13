@@ -6,10 +6,7 @@ import type { Category, Collection, FacadeOptions } from '@ever-works/plugin';
 
 import { AiFacadeService } from '../../facades/ai.facade';
 import { generateCategoryIconSvg } from './ai-generator';
-import {
-    getFallbackIcon,
-    lookupCuratedIcon,
-} from './curated-mapping';
+import { getFallbackIcon, lookupCuratedIcon } from './curated-mapping';
 import { sanitizeSvg } from './svg-sanitizer';
 
 /**
@@ -152,11 +149,9 @@ export class CategoryIconService {
             return [];
         }
 
-        return pMap(
-            categories,
-            async (category) => this.enrichOne(category, options),
-            { concurrency: ENRICHMENT_CONCURRENCY },
-        );
+        return pMap(categories, async (category) => this.enrichOne(category, options), {
+            concurrency: ENRICHMENT_CONCURRENCY,
+        });
     }
 
     /**
@@ -171,11 +166,9 @@ export class CategoryIconService {
             return [];
         }
 
-        return pMap(
-            collections,
-            async (collection) => this.enrichOne(collection, options),
-            { concurrency: ENRICHMENT_CONCURRENCY },
-        );
+        return pMap(collections, async (collection) => this.enrichOne(collection, options), {
+            concurrency: ENRICHMENT_CONCURRENCY,
+        });
     }
 
     private async enrichOne<T extends IconBearing & { name: string; description?: string }>(

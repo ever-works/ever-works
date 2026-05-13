@@ -36,9 +36,7 @@ export const CATEGORY_ICON_LIBRARY: Readonly<Record<string, CuratedIcon>> = Obje
     },
     'code-2': {
         name: 'code-2',
-        svg: wrap(
-            '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>',
-        ),
+        svg: wrap('<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>'),
     },
     briefcase: {
         name: 'briefcase',
@@ -206,7 +204,9 @@ export const CATEGORY_ICON_LIBRARY: Readonly<Record<string, CuratedIcon>> = Obje
     },
     activity: {
         name: 'activity',
-        svg: wrap('<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.68 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4.44 13H2"/>'),
+        svg: wrap(
+            '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.68 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4.44 13H2"/>',
+        ),
     },
     flask: {
         name: 'flask',
@@ -264,9 +264,7 @@ export const CATEGORY_ICON_LIBRARY: Readonly<Record<string, CuratedIcon>> = Obje
     },
     kanban: {
         name: 'kanban',
-        svg: wrap(
-            '<path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/>',
-        ),
+        svg: wrap('<path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/>'),
     },
     tag: {
         name: 'tag',
@@ -290,14 +288,23 @@ interface KeywordRule {
 const KEYWORD_RULES: readonly KeywordRule[] = [
     { patterns: [/\btime[-\s]?tracking\b/i, /\btimesheet/i], iconKey: 'clock' },
     { patterns: [/\bopen[-\s]?source\b/i, /\bfoss\b/i, /\boss\b/i], iconKey: 'code' },
-    { patterns: [/\bcommercial\b/i, /\benterprise\b/i, /\bbusiness\b/i, /\bb2b\b/i], iconKey: 'briefcase' },
+    {
+        patterns: [/\bcommercial\b/i, /\benterprise\b/i, /\bbusiness\b/i, /\bb2b\b/i],
+        iconKey: 'briefcase',
+    },
     { patterns: [/\bproductivity\b/i], iconKey: 'briefcase' },
     { patterns: [/\bfree(ware)?\b/i, /\bgift\b/i, /\bfreemium\b/i], iconKey: 'gift' },
     { patterns: [/\b(?:ai|gpt|llm|machine[-\s]?learning|neural)\b/i], iconKey: 'brain' },
     { patterns: [/\b(?:cloud|saas|paas|iaas)\b/i], iconKey: 'cloud' },
-    { patterns: [/\bdatabase\b/i, /\bdb\b/i, /\bdata[-\s]?store\b/i, /\bsql\b/i, /\bnosql\b/i], iconKey: 'database' },
+    {
+        patterns: [/\bdatabase\b/i, /\bdb\b/i, /\bdata[-\s]?store\b/i, /\bsql\b/i, /\bnosql\b/i],
+        iconKey: 'database',
+    },
     { patterns: [/\bsearch\b/i, /\bdiscover/i], iconKey: 'search' },
-    { patterns: [/\b(?:security|auth|encryption|privacy|firewall|antivirus)\b/i], iconKey: 'shield' },
+    {
+        patterns: [/\b(?:security|auth|encryption|privacy|firewall|antivirus)\b/i],
+        iconKey: 'shield',
+    },
     { patterns: [/\b(?:analytic|metric|dashboard|insight|report)/i], iconKey: 'chart-bar' },
     { patterns: [/\b(?:chat|messaging|messenger|im)\b/i], iconKey: 'message-circle' },
     { patterns: [/\b(?:email|mail|inbox|smtp)\b/i], iconKey: 'mail' },
@@ -306,30 +313,54 @@ const KEYWORD_RULES: readonly KeywordRule[] = [
     { patterns: [/\b(?:video|stream|broadcast)/i], iconKey: 'video' },
     { patterns: [/\b(?:photo|camera|image)\b/i], iconKey: 'camera' },
     { patterns: [/\b(?:design|graphics|illustrat|sketch|figma)/i], iconKey: 'palette' },
-    { patterns: [/\b(?:cli|terminal|shell|console)\b/i, /\b(?:ide|editor)\b/i], iconKey: 'terminal' },
-    { patterns: [/\b(?:dev|developer)[-\s]?tools?\b/i, /\bcoding\b/i, /\bprogramming\b/i], iconKey: 'code-2' },
+    {
+        patterns: [/\b(?:cli|terminal|shell|console)\b/i, /\b(?:ide|editor)\b/i],
+        iconKey: 'terminal',
+    },
+    {
+        patterns: [/\b(?:dev|developer)[-\s]?tools?\b/i, /\bcoding\b/i, /\bprogramming\b/i],
+        iconKey: 'code-2',
+    },
     { patterns: [/\b(?:notes?|journal|document|wiki|knowledge)\b/i], iconKey: 'file-text' },
     { patterns: [/\b(?:todo|tasks?|gtd|reminder)\b/i], iconKey: 'check-square' },
-    { patterns: [/\b(?:education|learn|course|training|tutorial|book|read)/i], iconKey: 'book-open' },
+    {
+        patterns: [/\b(?:education|learn|course|training|tutorial|book|read)/i],
+        iconKey: 'book-open',
+    },
     { patterns: [/\b(?:news|newsletter|rss)\b/i], iconKey: 'newspaper' },
     { patterns: [/\b(?:social|community|forum|network)/i], iconKey: 'users' },
     { patterns: [/\bgam(?:ing|es?)\b/i], iconKey: 'gamepad' },
-    { patterns: [/\b(?:finance|banking|crypto|payment|invest|fintech|accounting)/i], iconKey: 'dollar-sign' },
-    { patterns: [/\b(?:shopping|ecommerce|retail|marketplace|store)\b/i], iconKey: 'shopping-cart' },
+    {
+        patterns: [/\b(?:finance|banking|crypto|payment|invest|fintech|accounting)/i],
+        iconKey: 'dollar-sign',
+    },
+    {
+        patterns: [/\b(?:shopping|ecommerce|retail|marketplace|store)\b/i],
+        iconKey: 'shopping-cart',
+    },
     { patterns: [/\b(?:travel|flight|hotel|tourism|booking)\b/i], iconKey: 'plane' },
     { patterns: [/\b(?:health|fitness|medical|wellness|workout)\b/i], iconKey: 'heart' },
     { patterns: [/\b(?:weather|climate|forecast)\b/i], iconKey: 'cloud-sun' },
     { patterns: [/\b(?:maps?|navigation|geo|location)/i], iconKey: 'map-pin' },
     { patterns: [/\b(?:monitor|observ|logging|tracing|alerting)/i], iconKey: 'activity' },
-    { patterns: [/\b(?:test|qa|quality[-\s]?assurance|automated[-\s]?testing)\b/i], iconKey: 'flask' },
+    {
+        patterns: [/\b(?:test|qa|quality[-\s]?assurance|automated[-\s]?testing)\b/i],
+        iconKey: 'flask',
+    },
     { patterns: [/\b(?:deployment|devops|ci[-\s]?cd|hosting)\b/i], iconKey: 'rocket' },
     { patterns: [/\b(?:container|docker|kubernetes|k8s|orchestrat)/i], iconKey: 'package' },
     { patterns: [/\b(?:api|microservice|webhook|integration|service)\b/i], iconKey: 'plug' },
     { patterns: [/\b(?:collaboration|teamwork)\b/i, /\bteams?\b/i], iconKey: 'users' },
     { patterns: [/\b(?:project[-\s]?management|pm|agile|scrum|kanban)\b/i], iconKey: 'kanban' },
     { patterns: [/\b(?:crm|customer[-\s]?support|helpdesk|ticketing)\b/i], iconKey: 'headphones' },
-    { patterns: [/\b(?:hr|hrm|human[-\s]?resources|recruit|hiring|payroll)\b/i], iconKey: 'user-check' },
-    { patterns: [/\b(?:automation|workflow|rpa|no[-\s]?code|low[-\s]?code|zapier)\b/i], iconKey: 'workflow' },
+    {
+        patterns: [/\b(?:hr|hrm|human[-\s]?resources|recruit|hiring|payroll)\b/i],
+        iconKey: 'user-check',
+    },
+    {
+        patterns: [/\b(?:automation|workflow|rpa|no[-\s]?code|low[-\s]?code|zapier)\b/i],
+        iconKey: 'workflow',
+    },
     { patterns: [/\b(?:vpn|networking|proxy|browser|web)\b/i], iconKey: 'globe' },
     { patterns: [/\b(?:backup|archive|storage)\b/i], iconKey: 'archive' },
 ];

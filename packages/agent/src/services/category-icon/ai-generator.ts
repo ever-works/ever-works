@@ -62,16 +62,11 @@ export interface CategoryIconGenerateSuccess {
 
 export interface CategoryIconGenerateFailure {
     readonly ok: false;
-    readonly reason:
-        | 'no-content'
-        | 'sanitize-failed'
-        | 'facade-error';
+    readonly reason: 'no-content' | 'sanitize-failed' | 'facade-error';
     readonly detail?: string;
 }
 
-export type CategoryIconGenerateResult =
-    | CategoryIconGenerateSuccess
-    | CategoryIconGenerateFailure;
+export type CategoryIconGenerateResult = CategoryIconGenerateSuccess | CategoryIconGenerateFailure;
 
 /**
  * Ask the configured AI provider for an SVG icon describing a category.
@@ -121,9 +116,7 @@ export async function generateCategoryIconSvg(
     const sanitized = sanitizeSvg(stripped);
     if (sanitized.ok === false) {
         const reason = sanitized.reason;
-        logger?.warn(
-            `Category icon for "${name}" failed sanitization (${reason}); model=${model}`,
-        );
+        logger?.warn(`Category icon for "${name}" failed sanitization (${reason}); model=${model}`);
         return {
             ok: false,
             reason: 'sanitize-failed',

@@ -47,7 +47,8 @@ describe('sanitizeSvg', () => {
 
     describe('scrubbing', () => {
         it('strips <script> blocks', () => {
-            const input = '<svg viewBox="0 0 24 24"><script>alert(1)</script><circle cx="12" cy="12" r="6"/></svg>';
+            const input =
+                '<svg viewBox="0 0 24 24"><script>alert(1)</script><circle cx="12" cy="12" r="6"/></svg>';
             const result = sanitizeSvg(input);
             expect(result.ok).toBe(true);
             if (result.ok === true) {
@@ -70,7 +71,8 @@ describe('sanitizeSvg', () => {
         });
 
         it('strips event handler attributes (on*)', () => {
-            const input = '<svg viewBox="0 0 24 24"><circle onload="evil()" onclick="evil()" cx="12" cy="12" r="6"/></svg>';
+            const input =
+                '<svg viewBox="0 0 24 24"><circle onload="evil()" onclick="evil()" cx="12" cy="12" r="6"/></svg>';
             const result = sanitizeSvg(input);
             expect(result.ok).toBe(true);
             if (result.ok === true) {
@@ -158,7 +160,8 @@ describe('sanitizeSvg', () => {
         });
 
         it('discards content outside the <svg>...</svg> root', () => {
-            const input = 'Sure, here is your icon:\n<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>\nLet me know if you need adjustments.';
+            const input =
+                'Sure, here is your icon:\n<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>\nLet me know if you need adjustments.';
             const result = sanitizeSvg(input);
             expect(result.ok).toBe(true);
             if (result.ok === true) {

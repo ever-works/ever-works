@@ -366,14 +366,12 @@ export class DataGeneratorService {
                 await data.resetFiles();
             }
 
-            const mergedCategories = this.merge(
-                existingCategories,
-                [...newCategories],
-            ) as Category[];
-            const mergedCollections = this.merge(
-                existingCollections,
-                [...newCollections],
-            ) as Collection[];
+            const mergedCategories = this.merge(existingCategories, [
+                ...newCategories,
+            ]) as Category[];
+            const mergedCollections = this.merge(existingCollections, [
+                ...newCollections,
+            ]) as Collection[];
 
             // Auto-generate SVG icons for any category/collection that
             // doesn't already have one. Opt-out via pluginConfig flag.

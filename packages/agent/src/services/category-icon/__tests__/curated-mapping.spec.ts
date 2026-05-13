@@ -1,8 +1,4 @@
-import {
-    CATEGORY_ICON_LIBRARY,
-    getFallbackIcon,
-    lookupCuratedIcon,
-} from '../curated-mapping';
+import { CATEGORY_ICON_LIBRARY, getFallbackIcon, lookupCuratedIcon } from '../curated-mapping';
 
 describe('lookupCuratedIcon', () => {
     describe('null inputs', () => {

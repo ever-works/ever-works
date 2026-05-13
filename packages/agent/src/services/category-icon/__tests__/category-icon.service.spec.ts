@@ -34,7 +34,9 @@ function buildAiResponse(content: string): ChatCompletionResponse {
     } as unknown as ChatCompletionResponse;
 }
 
-function makeAiFacadeMock(content: string | (() => Promise<ChatCompletionResponse>)): AiFacadeService {
+function makeAiFacadeMock(
+    content: string | (() => Promise<ChatCompletionResponse>),
+): AiFacadeService {
     const createChatCompletion = jest.fn().mockImplementation(async () => {
         if (typeof content === 'function') {
             return content();
@@ -44,7 +46,9 @@ function makeAiFacadeMock(content: string | (() => Promise<ChatCompletionRespons
     return { createChatCompletion } as unknown as AiFacadeService;
 }
 
-function makeCacheMock(initial: Record<string, string> = {}): Cache & { _store: Map<string, string> } {
+function makeCacheMock(
+    initial: Record<string, string> = {},
+): Cache & { _store: Map<string, string> } {
     const store = new Map<string, string>(Object.entries(initial));
     return {
         _store: store,
@@ -61,7 +65,8 @@ function makeCacheMock(initial: Record<string, string> = {}): Cache & { _store: 
 describe('CategoryIconService', () => {
     describe('ensureIcon', () => {
         it('returns from cache without calling AI when a cached entry exists', async () => {
-            const cached = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>';
+            const cached =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>';
             const cache = makeCacheMock({ 'category-icon:v1:productivity': cached });
             const aiFacade = makeAiFacadeMock(CLEAN_AI_SVG);
             const service = new CategoryIconService(aiFacade, cache);

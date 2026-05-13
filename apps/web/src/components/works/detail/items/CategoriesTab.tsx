@@ -34,13 +34,7 @@ function CategoryIcon({ category }: { category: Category }) {
         );
     }
     if (category.icon_url) {
-        return (
-            <img
-                src={category.icon_url}
-                alt=""
-                className="w-6 h-6 rounded"
-            />
-        );
+        return <img src={category.icon_url} alt="" className="w-6 h-6 rounded" />;
     }
     return (
         <FolderTree
