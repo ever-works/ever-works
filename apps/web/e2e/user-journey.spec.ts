@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './helpers/api';
 
 /**
  * Full user journey E2E test.
@@ -40,6 +41,10 @@ test.describe('Complete user journey', () => {
 
         // ---- Step 2: Navigate to create work ----
         // Pre-dismiss the onboarding wizard so the modal doesn't intercept clicks.
+        // v1 wizard stores dismissal in localStorage; v2 wizard reads `dismissedAt`
+        // from the API (users.onboarding_dismissed_at). Address both — the v2 modal
+        // portal was blocking the manual-card click below for 100+ retries until the
+        // 240s test budget exhausted.
         await page.evaluate(() => {
             try {
                 window.localStorage.setItem(
@@ -54,6 +59,24 @@ test.describe('Complete user journey', () => {
                 /* ignore */
             }
         });
+        try {
+            const loginRes = await page.request.post(apiUrl('/api/auth/login'), {
+                data: { email: user.email, password: user.password },
+            });
+            if (loginRes.ok()) {
+                const { access_token } = (await loginRes.json()) as { access_token?: string };
+                if (access_token) {
+                    await page.request.post(apiUrl('/api/onboarding/dismiss'), {
+                        headers: { Authorization: `Bearer ${access_token}` },
+                        data: {},
+                    });
+                }
+            }
+        } catch {
+            // Older API builds without the v2 endpoint — the localStorage seed
+            // above still covers v1 specs that don't depend on v2 dismissal.
+        }
+        await page.reload({ waitUntil: 'domcontentloaded' });
 
         // Dismiss the "Connect your GitHub account" modal if it appears.
         const dismissGithubModal = page.getByRole('button', {
