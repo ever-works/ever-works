@@ -92,10 +92,7 @@ export class ActivityLogService {
         });
     }
 
-    async log(
-        entry: CreateActivityLogDto,
-        overrides?: { createdAt?: Date },
-    ): Promise<ActivityLog> {
+    async log(entry: CreateActivityLogDto, overrides?: { createdAt?: Date }): Promise<ActivityLog> {
         const activity = await this.repository.create(entry, overrides);
         this.dispatchAnalytics(activity);
         this.logger.debug(

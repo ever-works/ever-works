@@ -52,10 +52,7 @@ const ACTIVITY_LOG_TYPES_BY_CATEGORY: Record<FeedCategory, ActivityActionType[] 
     // (EW-120 push flow).
     users: [ActivityActionType.WEBSITE_USER_REGISTERED],
     submissions: [ActivityActionType.WEBSITE_ITEM_SUBMITTED],
-    reports: [
-        ActivityActionType.WEBSITE_REPORT_FILED,
-        ActivityActionType.WEBSITE_REPORT_RESOLVED,
-    ],
+    reports: [ActivityActionType.WEBSITE_REPORT_FILED, ActivityActionType.WEBSITE_REPORT_RESOLVED],
 };
 
 const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] | null> = {

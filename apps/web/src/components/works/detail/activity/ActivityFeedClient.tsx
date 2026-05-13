@@ -6,11 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useRouter, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getActivityFeed } from '@/app/actions/dashboard/activity-feed';
-import type {
-    FeedCategory,
-    FeedEntry,
-    FeedResponse,
-} from '@/lib/api/works/activity-feed.types';
+import type { FeedCategory, FeedEntry, FeedResponse } from '@/lib/api/works/activity-feed.types';
 import { FeedFilterChips } from './FeedFilterChips';
 import { FeedRow } from './FeedRow';
 import { EmptyState } from './EmptyState';

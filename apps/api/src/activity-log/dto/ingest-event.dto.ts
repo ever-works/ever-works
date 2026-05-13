@@ -66,11 +66,16 @@ export class IngestEventDto {
     })
     actionType: WebsiteActionType;
 
-    @ApiProperty({ description: 'ISO 8601 timestamp from the deployed site when the event occurred' })
+    @ApiProperty({
+        description: 'ISO 8601 timestamp from the deployed site when the event occurred',
+    })
     @IsISO8601()
     occurredAt: string;
 
-    @ApiProperty({ description: 'Human-readable one-line summary shown in the feed', maxLength: 500 })
+    @ApiProperty({
+        description: 'Human-readable one-line summary shown in the feed',
+        maxLength: 500,
+    })
     @IsString()
     @IsNotEmpty()
     @MaxLength(500)

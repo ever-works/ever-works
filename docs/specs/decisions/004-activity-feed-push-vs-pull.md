@@ -114,7 +114,7 @@ for each user-facing action it wants surfaced.
 ### Negative / trade-offs
 
 - **The platform now exposes a public POST endpoint.** Mitigated by
-  the bearer guard, class-validator allow-listing of WEBSITE_*
+  the bearer guard, class-validator allow-listing of WEBSITE\_\*
   action types only, payload size limits, the global throttler, and
   attribution to the Work owner (the event author isn't trusted to
   set `userId`).
@@ -141,7 +141,7 @@ for each user-facing action it wants surfaced.
 - Schema migration: `1778677529777-AddActivityLogIngestEventId`.
   Adds `activity_log.ingestEventId` (varchar 64, nullable) +
   partial unique index `(workId, ingestEventId) WHERE ingestEventId
-  IS NOT NULL`.
+IS NOT NULL`.
 - Push endpoint: `apps/api/src/activity-log/activity-log.controller.ts`
   → `POST /api/activity-log/ingest`, decorated `@Public()` +
   `@UseGuards(PlatformSecretGuard)`.
@@ -188,25 +188,25 @@ EOF
 
 Field rules (enforced by `IngestEventDto` + `class-validator`):
 
-| Field        | Type                | Notes                                                                                          |
-| ------------ | ------------------- | ---------------------------------------------------------------------------------------------- |
-| `workId`     | UUID                | The Work ID — also pushed to the deployed site as the `WORK_ID` env var.                       |
-| `eventId`    | UUID                | Client-generated; **must be stable across retries** for idempotency.                           |
+| Field        | Type                | Notes                                                                                                          |
+| ------------ | ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `workId`     | UUID                | The Work ID — also pushed to the deployed site as the `WORK_ID` env var.                                       |
+| `eventId`    | UUID                | Client-generated; **must be stable across retries** for idempotency.                                           |
 | `actionType` | enum                | One of `website_user_registered`, `website_item_submitted`, `website_report_filed`, `website_report_resolved`. |
-| `occurredAt` | ISO 8601 string     | When the event actually happened. Used as the row's `createdAt` so the feed orders by real time. |
-| `summary`    | string, ≤ 500 chars | Human-readable one-liner shown in the feed.                                                    |
-| `metadata`   | object, ≤ 8 KiB     | Optional. Free-form. Capped after JSON serialisation.                                          |
+| `occurredAt` | ISO 8601 string     | When the event actually happened. Used as the row's `createdAt` so the feed orders by real time.               |
+| `summary`    | string, ≤ 500 chars | Human-readable one-liner shown in the feed.                                                                    |
+| `metadata`   | object, ≤ 8 KiB     | Optional. Free-form. Capped after JSON serialisation.                                                          |
 
 Responses:
 
-| Status | Meaning                                                                  |
-| ------ | ------------------------------------------------------------------------ |
-| 202    | Accepted. Response body: `{ id: <activity-log row id> }`.                |
-| 400    | Validation failed (missing field, bad UUID, unknown action type, etc.).  |
-| 401    | Missing / invalid bearer token.                                          |
-| 404    | `workId` does not exist.                                                 |
-| 429    | Rate limit (60 req / min / IP).                                          |
-| 503    | `PLATFORM_API_SECRET_TOKEN` is not configured on the platform.           |
+| Status | Meaning                                                                 |
+| ------ | ----------------------------------------------------------------------- |
+| 202    | Accepted. Response body: `{ id: <activity-log row id> }`.               |
+| 400    | Validation failed (missing field, bad UUID, unknown action type, etc.). |
+| 401    | Missing / invalid bearer token.                                         |
+| 404    | `workId` does not exist.                                                |
+| 429    | Rate limit (60 req / min / IP).                                         |
+| 503    | `PLATFORM_API_SECRET_TOKEN` is not configured on the platform.          |
 
 Retries: the website should retry on 5xx and on network errors,
 reusing the same `eventId`. The partial unique index on
