@@ -17,6 +17,12 @@ export default defineConfig({
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : undefined,
     reporter: process.env.CI ? 'github' : 'html',
+    // First-hit dashboard routes hit Next.js dev-mode compilation (~10–15s
+    // each), and several spec files chain multiple such hits. 30s (Playwright
+    // default) leaves no headroom and produces "T" (timeout) bursts across
+    // the profile/settings sweep in CI. 90s removes the cold-compile cliff
+    // while keeping genuine hangs surfaced reasonably fast.
+    timeout: 90_000,
 
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
