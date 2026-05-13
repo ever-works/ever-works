@@ -22,7 +22,12 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubicloud-standard-8
-    timeout-minutes: 45
+    # 150 min covers the current 1-worker × 333-spec suite even with retries
+    # and slow specs. The prior 45-min ceiling was too tight: a single full
+    # run on develop hit the wall partway through. Keep the headroom while
+    # we work through suite-level test debt; revisit downward only once the
+    # suite consistently finishes well under it.
+    timeout-minutes: 150
 
     strategy:
       fail-fast: false
