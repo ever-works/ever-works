@@ -126,6 +126,10 @@ describe('WorkProposalsApiService', () => {
     });
 
     it('getRefreshStatus reports researching=true while a run is in flight', async () => {
+        // Relies on getRefreshStatus reading inFlight.has(userId) synchronously
+        // before its first await — if that order ever changes, the pipeline
+        // microtask queued by refresh() could drain first and inFlight would
+        // be empty by the time we look. Reorder = flip; update the test then.
         const { svc } = makeDeps();
         await svc.refresh('u1');
         const status = await svc.getRefreshStatus('u1');
