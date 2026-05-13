@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverFetch, serverMutation } from './server-api';
+import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type WorkProposalStatus = 'pending' | 'dismissed' | 'accepted';
 export type WorkProposalSource = 'auto-signup' | 'user-refresh' | 'discover' | 'scheduled';
@@ -48,12 +48,27 @@ export const workProposalsAPI = {
     },
 
     async refresh(): Promise<{ status: 'queued' | 'rate-limited'; error?: string }> {
-        return serverMutation<{ status: 'queued' | 'rate-limited'; error?: string }>({
-            endpoint: '/me/work-proposals/refresh',
-            data: {},
-            method: 'POST',
-            wrapInData: false,
-        });
+        try {
+            return await serverMutation<{ status: 'queued' | 'rate-limited'; error?: string }>({
+                endpoint: '/me/work-proposals/refresh',
+                data: {},
+                method: 'POST',
+                wrapInData: false,
+            });
+        } catch (err) {
+            // The controller maps the service's `rate-limited` result to a 429
+            // HTTP status, which serverMutation rejects with ApiResponseError.
+            // Translate back to the structured shape so the UI's rate-limited
+            // branch (hide the button, swap the empty subtitle) still fires.
+            if (err instanceof ApiResponseError && err.statusCode === 429) {
+                const details = err.details as { status?: string; error?: string } | undefined;
+                return {
+                    status: 'rate-limited',
+                    error: details?.error ?? err.message,
+                };
+            }
+            throw err;
+        }
     },
 
     async dismiss(id: string): Promise<void> {
