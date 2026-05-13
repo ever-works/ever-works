@@ -105,6 +105,30 @@ describe('sanitizeSvg', () => {
             }
         });
 
+        it('detects a dangerous URL on every call (regression: stateful /g regex bypass)', () => {
+            // Greptile P1: when DANGEROUS_URL_VALUE_RE was declared with the `g`
+            // flag, RegExp.prototype.test() retained `lastIndex` across calls.
+            // After a successful match at offset N, the next call starts
+            // searching from N — and any payload whose `javascript:` appears
+            // before that offset returned `false`, silently bypassing the check.
+            // This test calls sanitizeSvg with two different payloads in
+            // succession and asserts both are rejected.
+            const padded = `<svg viewBox="0 0 24 24"><circle fill="url(javascript:alert(1))" cx="12" cy="12" r="6" data-pad="${'x'.repeat(60)}"/></svg>`;
+            const compact =
+                '<svg viewBox="0 0 24 24"><circle fill="url(javascript:alert(2))" cx="12" cy="12" r="6"/></svg>';
+
+            const first = sanitizeSvg(padded);
+            const second = sanitizeSvg(compact);
+            const third = sanitizeSvg(compact);
+
+            for (const result of [first, second, third]) {
+                expect(result.ok).toBe(false);
+                if (result.ok === false) {
+                    expect(result.reason).toBe('dangerous-content');
+                }
+            }
+        });
+
         it.each<[string, string]>([
             [
                 'http://… in fill',

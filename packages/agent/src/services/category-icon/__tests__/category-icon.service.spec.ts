@@ -1,12 +1,8 @@
-// p-map is ESM-only and Jest can't load it under ts-jest. Replace with a
-// trivial Promise.all-equivalent — concurrency limits don't matter for tests.
-jest.mock('p-map', () => ({
-    __esModule: true,
-    default: async <T, R>(
-        input: Iterable<T>,
-        mapper: (value: T, index: number) => Promise<R> | R,
-    ): Promise<R[]> => Promise.all([...input].map((value, index) => mapper(value, index))),
-}));
+// Note: `p-map` is ESM-only and unloadable under ts-jest. The
+// substitution lives globally in jest.config.js's moduleNameMapper
+// (-> packages/agent/test/jest-mocks/p-map.ts) so every spec that
+// transitively touches it gets the stub automatically — no per-spec
+// jest.mock needed.
 
 import type { Cache } from 'cache-manager';
 import type { Category, ChatCompletionResponse, FacadeOptions } from '@ever-works/plugin';

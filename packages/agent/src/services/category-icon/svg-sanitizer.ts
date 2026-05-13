@@ -59,7 +59,13 @@ const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 const WIDTH_HEIGHT_ATTR_RE = /\s+(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-const DANGEROUS_URL_VALUE_RE = /\b(?:javascript|data|vbscript|file)\s*:/gi;
+// IMPORTANT: no `g` flag. JavaScript regexes are stateful when `g` is set —
+// `RegExp.prototype.test()` advances `lastIndex` between calls, so a match
+// at byte offset 50 in call 1 leaves lastIndex at ~62, and a payload whose
+// `javascript:` lives before offset 62 in call 2 silently slips through
+// (test() returns false, lastIndex resets to 0, alternating bypass).
+// `.test()` is an existence check; iteration semantics buy nothing here.
+const DANGEROUS_URL_VALUE_RE = /\b(?:javascript|data|vbscript|file)\s*:/i;
 
 // External paint-server references: `url(http://…)`, `url(https://…)`,
 // `url(//host/…)`. Local fragment refs like `url(#id)` are fine and stay.
