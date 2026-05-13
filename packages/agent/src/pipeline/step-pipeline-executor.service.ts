@@ -529,14 +529,29 @@ export class StepPipelineExecutorService {
         limit: number,
     ): Promise<void> {
         const executing = new Set<Promise<void>>();
+        let firstError: unknown;
         for (const task of tasks) {
-            const p = task().finally(() => executing.delete(p));
+            if (firstError) break;
+
+            const p = task()
+                .catch((error) => {
+                    firstError ??= error;
+                    throw error;
+                })
+                .finally(() => executing.delete(p));
             executing.add(p);
             if (executing.size >= limit) {
-                await Promise.race(executing);
+                await Promise.race(executing).catch((error) => {
+                    firstError ??= error;
+                });
             }
         }
-        await Promise.all(executing);
+
+        const remaining = await Promise.allSettled(executing);
+        firstError ??= remaining.find((result) => result.status === 'rejected')?.reason;
+        if (firstError) {
+            throw firstError;
+        }
     }
 
     private resolveGroupConcurrency(
