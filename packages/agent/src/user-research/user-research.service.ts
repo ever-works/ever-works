@@ -3,17 +3,83 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText, stepCountIs } from 'ai';
 import type { LanguageModel } from 'ai';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { UserRepository } from '../database/repositories/user.repository';
 import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
+import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import type { InferredUserProfile } from '../entities';
 import { UserResearchCompletedEvent, UserResearchFailedEvent } from './events';
 import { USER_RESEARCH_AGENT_PROMPT, buildSeedPrompt, deriveVerticals } from './prompts';
 import { inferredProfileSchema, type InferredProfile } from './schemas';
 import { UserResearchLimitsService, UserResearchRateLimitedError } from './limits';
+import { capChain, resolveProviderChain } from './provider-resolver';
 import { createSearchWebTool, createFetchPageTool, createFinalizeTool } from './tools';
+
+const DEFAULT_PROVIDER_FALLBACK_MAX = 2;
+
+function getProviderFallbackMax(): number {
+    const raw = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
+    if (!raw) return DEFAULT_PROVIDER_FALLBACK_MAX;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_PROVIDER_FALLBACK_MAX;
+}
+
+export interface ResolvedAiProvider {
+    model: LanguageModel;
+    providerId: string;
+    providerName: string;
+    modelName: string;
+}
+
+/**
+ * Walks the user's enabled ai-provider plugins in priority order and returns
+ * the first one with a usable config (baseUrl + apiKey + model). Capped by
+ * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
+ * through every configured key.
+ */
+export async function resolveAiProviderForResearch(
+    aiFacade: AiFacadeService,
+    registry: PluginRegistryService,
+    userId: string,
+    logger?: Logger,
+): Promise<ResolvedAiProvider | null> {
+    const chain = capChain(
+        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
+        getProviderFallbackMax(),
+    );
+    if (chain.length === 0) return null;
+
+    for (const candidate of chain) {
+        try {
+            const cfg = await aiFacade.getProviderConfig({
+                userId,
+                providerOverride: candidate.plugin.id,
+            });
+            if (!cfg.baseUrl || !cfg.apiKey) continue;
+            const modelName =
+                cfg.routing.complexModel ?? cfg.routing.mediumModel ?? cfg.defaultModel;
+            if (!modelName) continue;
+
+            const provider = createOpenAICompatible({
+                name: cfg.providerId,
+                baseURL: cfg.baseUrl,
+                apiKey: cfg.apiKey,
+            });
+            return {
+                model: provider(modelName),
+                providerId: cfg.providerId,
+                providerName: cfg.providerName ?? cfg.providerId,
+                modelName,
+            };
+        } catch (err) {
+            logger?.warn(`ai-provider ${candidate.plugin.id} unusable: ${(err as Error).message}`);
+        }
+    }
+    return null;
+}
 
 export interface UserResearchResult {
     status: 'completed' | 'rate-limited' | 'no-data' | 'error';
@@ -51,6 +117,7 @@ export class UserResearchService {
         private readonly aiFacade: AiFacadeService,
         private readonly searchFacade: SearchFacadeService,
         private readonly contentExtractor: ContentExtractorFacadeService,
+        private readonly registry: PluginRegistryService,
         private readonly limits: UserResearchLimitsService,
         @Optional() private readonly events?: EventEmitter2,
     ) {}
@@ -106,53 +173,22 @@ export class UserResearchService {
             );
         }
 
-        let model: LanguageModel;
-        let providerName: string;
-        try {
-            const providerConfig = await this.aiFacade.getProviderConfig({
-                userId,
-            });
-            if (!providerConfig.baseUrl || !providerConfig.apiKey) {
-                return {
-                    status: 'error',
-                    tokensUsed: 0,
-                    toolCallsCount: 0,
-                    durationMs: Date.now() - startedAt,
-                    error: 'ai-provider-not-configured',
-                };
-            }
-            const provider = createOpenAICompatible({
-                name: providerConfig.providerId,
-                baseURL: providerConfig.baseUrl,
-                apiKey: providerConfig.apiKey,
-            });
-            const modelName =
-                providerConfig.routing.complexModel ??
-                providerConfig.routing.mediumModel ??
-                providerConfig.defaultModel;
-            if (!modelName) {
-                return {
-                    status: 'error',
-                    tokensUsed: 0,
-                    toolCallsCount: 0,
-                    durationMs: Date.now() - startedAt,
-                    error: 'no-model-configured',
-                };
-            }
-            model = provider(modelName);
-            providerName = providerConfig.providerName ?? providerConfig.providerId;
-        } catch (err) {
-            this.logger.warn(
-                `Could not resolve AI provider for user research: ${(err as Error).message}`,
-            );
+        const resolved = await resolveAiProviderForResearch(
+            this.aiFacade,
+            this.registry,
+            userId,
+            this.logger,
+        );
+        if (!resolved) {
             return {
                 status: 'error',
                 tokensUsed: 0,
                 toolCallsCount: 0,
                 durationMs: Date.now() - startedAt,
-                error: 'ai-provider-error',
+                error: 'ai-provider-not-configured',
             };
         }
+        const { model, providerName } = resolved;
 
         let finalProfile: InferredProfile | null = null;
         let tokensUsed = 0;
@@ -164,6 +200,11 @@ export class UserResearchService {
             : timeoutSignal;
 
         const seedPrompt = buildSeedPrompt(user, socials);
+
+        const searchChain = capChain(
+            await resolveProviderChain(this.registry, PLUGIN_CAPABILITIES.SEARCH, userId),
+            getProviderFallbackMax(),
+        ).map((p) => p.plugin.id);
 
         try {
             this.logger.log(
@@ -179,6 +220,7 @@ export class UserResearchService {
                         searchFacade: this.searchFacade,
                         limits: this.limits,
                         userId,
+                        providerChain: searchChain,
                         logger: this.logger,
                     }),
                     fetchPage: createFetchPageTool({
