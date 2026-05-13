@@ -140,9 +140,14 @@ export function WorkProposalsSection({
             )}
 
             {!showResearching && showEmpty && (
-                <div className="rounded-md p-5 bg-card dark:bg-surface-secondary-dark border border-card-border text-sm text-text-secondary dark:text-text-secondary-dark">
-                    <p>{t('empty.title')}</p>
-                    <p className="mt-1 text-xs">
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                    <div className="p-3 bg-surface dark:bg-surface-dark rounded-full mb-3">
+                        <Sparkles className="w-6 h-6 text-text-secondary dark:text-text-secondary-dark" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-text dark:text-text-dark mb-1">
+                        {t('empty.title')}
+                    </h3>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark max-w-xs">
                         {canRefresh ? t('empty.subtitle') : t('empty.limitReached')}
                     </p>
                 </div>
