@@ -412,7 +412,7 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
     });
 
     it('EW-614: provider EverWorksGitDisabledError → BadRequestException, no Work persisted', async () => {
-        const { EverWorksGitDisabledError } = await import('../../ever-works-providers/types');
+        const { EverWorksGitDisabledError } = await import('../../ever-works-providers/types.js');
         const state: OnboardingWizardStateV2 = {
             version: 2,
             lastStep: 0,
@@ -433,7 +433,7 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
     });
 
     it('EW-614: provider EverWorksGitRequestError → ServiceUnavailableException, no Work persisted', async () => {
-        const { EverWorksGitRequestError } = await import('../../ever-works-providers/types');
+        const { EverWorksGitRequestError } = await import('../../ever-works-providers/types.js');
         const state: OnboardingWizardStateV2 = {
             version: 2,
             lastStep: 0,
