@@ -36,6 +36,11 @@ export function WorkActivity({ workId }: WorkActivityProps) {
         if (currentRequestId !== requestIdRef.current) return;
         if (result.success) {
             setEntries(result.data.entries);
+        } else {
+            // Resolve the skeleton on failure so the widget falls through
+            // to the empty state instead of spinning forever. Polling will
+            // retry every POLL_INTERVAL and recover if the API comes back.
+            setEntries((prev) => (prev === null ? [] : prev));
         }
     }, [workId]);
 

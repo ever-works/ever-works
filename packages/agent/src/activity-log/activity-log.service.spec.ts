@@ -99,7 +99,9 @@ describe('ActivityLogService', () => {
 
         it('sets createdAt to occurredAt so feed ordering reflects when the event happened', async () => {
             const { svc, repo } = buildService(null);
-            const occurredAt = new Date('2026-05-13T10:00:00.000Z');
+            // Clearly-past date so the future-timestamp clamp added for
+            // P2 review feedback can't interfere with this assertion.
+            const occurredAt = new Date('2024-01-15T10:00:00.000Z');
 
             await svc.ingestFromWebsite({
                 workId: 'work-1',
@@ -128,6 +130,61 @@ describe('ActivityLogService', () => {
                     summary: 'Report',
                 }),
             ).rejects.toThrow(/work missing not found/i);
+        });
+
+        it('clamps a future occurredAt to "now" so a misbehaving template cannot pin a row to the top', async () => {
+            const { svc, repo } = buildService(null);
+            const future = new Date(Date.now() + 60 * 60 * 1000);
+            const before = Date.now();
+
+            await svc.ingestFromWebsite({
+                workId: 'work-1',
+                eventId: 'evt-1',
+                actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
+                occurredAt: future,
+                summary: 'Future event',
+            });
+
+            const after = Date.now();
+            const overrides = repo.create.mock.calls[0][1] as { createdAt: Date };
+            expect(overrides.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+            expect(overrides.createdAt.getTime()).toBeLessThanOrEqual(after);
+            // Original timestamp is preserved in metadata for forensics.
+            const created = repo.create.mock.calls[0][0] as { metadata: Record<string, unknown> };
+            expect(created.metadata.occurredAt).toBe(future.toISOString());
+        });
+
+        it('returns the winning row when a concurrent insert trips the unique index', async () => {
+            // Simulate the TOCTOU race: existence check sees null, then the
+            // INSERT fails with a Postgres unique_violation because a
+            // concurrent request beat us to it. The service must recover
+            // by re-reading and returning the winning row.
+            const winner = { id: 'al-winner', ingestEventId: 'evt-race' };
+            const findByWorkAndIngestEventId = jest
+                .fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(winner);
+            const create = jest.fn().mockRejectedValue(
+                Object.assign(new Error('duplicate key'), {
+                    driverError: { code: '23505' },
+                }),
+            );
+            const repo = { findByWorkAndIngestEventId, create };
+            const workRepo = {
+                findById: jest.fn().mockResolvedValue({ id: 'work-1', userId: 'owner-1' }),
+            };
+            const svc = new ActivityLogService(repo as never, workRepo as never, {} as never);
+
+            const result = await svc.ingestFromWebsite({
+                workId: 'work-1',
+                eventId: 'evt-race',
+                actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
+                occurredAt: new Date('2026-05-13T10:00:00.000Z'),
+                summary: 'Raced signup',
+            });
+
+            expect(result).toBe(winner);
+            expect(findByWorkAndIngestEventId).toHaveBeenCalledTimes(2);
         });
     });
 

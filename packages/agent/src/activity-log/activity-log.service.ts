@@ -130,26 +130,57 @@ export class ActivityLogService {
             throw new Error(`Work ${payload.workId} not found`);
         }
 
+        // Clamp future timestamps to "now" so a misbehaving template
+        // can't pin a row above every genuine event by sending
+        // `occurredAt: 2099-01-01`. The original value is preserved in
+        // `metadata.occurredAt` for forensics.
+        const now = new Date();
+        const createdAt = payload.occurredAt > now ? now : payload.occurredAt;
+
         // Pin `createdAt` to the website's `occurredAt` so the feed
         // orders by "when it happened" rather than "when the platform
         // got around to recording it". TypeORM's @CreateDateColumn only
         // auto-populates when the value is left undefined.
-        return this.log(
-            {
-                userId: work.userId,
-                workId: payload.workId,
-                actionType: payload.actionType,
-                action: `website.${payload.actionType}`,
-                status: ActivityStatus.COMPLETED,
-                summary: payload.summary,
-                metadata: {
-                    ...(payload.metadata ?? {}),
-                    occurredAt: payload.occurredAt.toISOString(),
+        try {
+            return await this.log(
+                {
+                    userId: work.userId,
+                    workId: payload.workId,
+                    actionType: payload.actionType,
+                    action: `website.${payload.actionType}`,
+                    status: ActivityStatus.COMPLETED,
+                    summary: payload.summary,
+                    metadata: {
+                        ...(payload.metadata ?? {}),
+                        occurredAt: payload.occurredAt.toISOString(),
+                    },
+                    ingestEventId: payload.eventId,
                 },
-                ingestEventId: payload.eventId,
-            },
-            { createdAt: payload.occurredAt },
-        );
+                { createdAt },
+            );
+        } catch (error) {
+            // The check-then-insert above isn't atomic: two concurrent
+            // retries with the same (workId, eventId) can both pass the
+            // existence check and race to INSERT. The second one trips the
+            // partial unique index. Treat that as the idempotent outcome
+            // it should have been and return the row that won the race.
+            if (this.isUniqueViolation(error)) {
+                const winner = await this.repository.findByWorkAndIngestEventId(
+                    payload.workId,
+                    payload.eventId,
+                );
+                if (winner) return winner;
+            }
+            throw error;
+        }
+    }
+
+    private isUniqueViolation(error: unknown): boolean {
+        if (!error || typeof error !== 'object') return false;
+        const driverCode = (error as { driverError?: { code?: string } }).driverError?.code;
+        const topCode = (error as { code?: string }).code;
+        // Postgres unique_violation
+        return driverCode === '23505' || topCode === '23505';
     }
 
     async updateStatus(
