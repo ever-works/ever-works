@@ -187,6 +187,40 @@ describe('StepPipelineExecutorService', () => {
             }
         });
 
+        it('waits for already running limited-concurrency tasks before rejecting', async () => {
+            const events: string[] = [];
+            let releaseSlowTask: (() => void) | undefined;
+            const slowTaskFinished = new Promise<void>((resolve) => {
+                releaseSlowTask = () => {
+                    events.push('slow-finished');
+                    resolve();
+                };
+            });
+
+            const runPromise = (service as any).runWithConcurrencyLimit(
+                [
+                    async () => {
+                        events.push('fail-started');
+                        throw new Error('first failure');
+                    },
+                    async () => {
+                        events.push('slow-started');
+                        await slowTaskFinished;
+                    },
+                    async () => {
+                        events.push('not-started');
+                    },
+                ],
+                2,
+            );
+
+            await Promise.resolve();
+            releaseSlowTask?.();
+
+            await expect(runPromise).rejects.toThrow('first failure');
+            expect(events).toEqual(['fail-started', 'slow-started', 'slow-finished']);
+        });
+
         it('should execute pipeline and emit started event', async () => {
             const result = await service.execute(
                 standardPlugin,
