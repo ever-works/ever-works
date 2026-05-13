@@ -1,13 +1,16 @@
 import {
     capChain,
+    isAuthOrConfigError,
     isTransientProviderError,
+    resolveAiProviderForResearch,
     resolveProviderChain,
-    tryInOrder,
+    resolveSearchProviderIds,
 } from '../provider-resolver';
 import type {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
+import type { AiFacadeService } from '../../facades/ai.facade';
 
 type FakePlugin = {
     id: string;
@@ -70,58 +73,46 @@ describe('capChain', () => {
     });
 });
 
-describe('tryInOrder', () => {
-    const plugins = [
-        makeRegistered({ id: 'a' }),
-        makeRegistered({ id: 'b' }),
-        makeRegistered({ id: 'c' }),
-    ];
+describe('resolveSearchProviderIds', () => {
+    it('returns capped, defaultForCapabilities-first plugin IDs', async () => {
+        const registry = makeRegistry([
+            { id: 'brave' },
+            { id: 'tavily', defaultForCapabilities: ['search'] },
+            { id: 'exa' },
+        ]);
 
-    it('returns the first success without trying later providers', async () => {
-        const attempt = jest.fn().mockResolvedValueOnce('ok');
-        const result = await tryInOrder(plugins, attempt, () => true);
-        expect(result).toBe('ok');
-        expect(attempt).toHaveBeenCalledTimes(1);
+        const prev = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
+        process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = '2';
+        try {
+            await expect(resolveSearchProviderIds(registry, 'u-1')).resolves.toEqual([
+                'tavily',
+                'brave',
+            ]);
+        } finally {
+            if (prev === undefined) delete process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
+            else process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = prev;
+        }
+    });
+});
+
+describe('isAuthOrConfigError', () => {
+    it('matches 401/403/invalid api key shapes', () => {
+        for (const msg of [
+            '401 Unauthorized',
+            '403 Forbidden',
+            'request is forbidden',
+            'unauthorized request',
+            'invalid api key',
+            'invalid_api_key',
+        ]) {
+            expect(isAuthOrConfigError(new Error(msg))).toBe(true);
+        }
     });
 
-    it('falls through transient errors to the next provider', async () => {
-        const attempt = jest
-            .fn<Promise<string>, [RegisteredPlugin]>()
-            .mockRejectedValueOnce(new Error('rate limit'))
-            .mockRejectedValueOnce(new Error('429 quota'))
-            .mockResolvedValueOnce('third-time');
-
-        const result = await tryInOrder(plugins, attempt, () => true);
-        expect(result).toBe('third-time');
-        expect(attempt).toHaveBeenCalledTimes(3);
-    });
-
-    it('rethrows the first non-retryable error immediately', async () => {
-        const attempt = jest
-            .fn<Promise<string>, [RegisteredPlugin]>()
-            .mockRejectedValueOnce(new Error('401 unauthorized'));
-
-        await expect(tryInOrder(plugins, attempt, () => false)).rejects.toThrow('401 unauthorized');
-        expect(attempt).toHaveBeenCalledTimes(1);
-    });
-
-    it('throws if the chain is empty', async () => {
-        await expect(
-            tryInOrder(
-                [],
-                async () => 'x',
-                () => true,
-            ),
-        ).rejects.toThrow('No providers available');
-    });
-
-    it('rethrows the last transient error if every provider fails', async () => {
-        const attempt = jest
-            .fn<Promise<string>, [RegisteredPlugin]>()
-            .mockRejectedValue(new Error('rate limit'));
-
-        await expect(tryInOrder(plugins, attempt, () => true)).rejects.toThrow('rate limit');
-        expect(attempt).toHaveBeenCalledTimes(3);
+    it('returns false for transient and unknown shapes', () => {
+        expect(isAuthOrConfigError(new Error('rate limit'))).toBe(false);
+        expect(isAuthOrConfigError(new Error('500 Internal Server Error'))).toBe(false);
+        expect(isAuthOrConfigError(undefined)).toBe(false);
     });
 });
 
@@ -137,8 +128,10 @@ describe('isTransientProviderError', () => {
             'socket hang up',
             'overloaded',
             'service unavailable',
+            'internal server error',
             'bad gateway',
             'gateway timeout',
+            '500 Internal Server Error',
             '502 Bad Gateway',
             '503 Service Unavailable',
             '504 Gateway Timeout',
@@ -161,5 +154,84 @@ describe('isTransientProviderError', () => {
     it('returns false for non-Error rejections', () => {
         expect(isTransientProviderError('string error')).toBe(false);
         expect(isTransientProviderError(undefined)).toBe(false);
+    });
+});
+
+describe('resolveAiProviderForResearch', () => {
+    const registry = makeRegistry([{ id: 'openai' }, { id: 'anthropic' }]);
+
+    function makeAiFacade(getProviderConfig: jest.Mock): AiFacadeService {
+        return { getProviderConfig } as unknown as AiFacadeService;
+    }
+
+    it('returns the first usable provider config', async () => {
+        const getProviderConfig = jest.fn().mockResolvedValueOnce({
+            providerId: 'openai',
+            providerName: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'gpt-4o',
+            routing: {},
+        });
+
+        const result = await resolveAiProviderForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result).toMatchObject({
+            providerId: 'openai',
+            providerName: 'OpenAI',
+            modelName: 'gpt-4o',
+        });
+        expect(getProviderConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips providers with no apiKey/baseUrl and tries the next one', async () => {
+        const getProviderConfig = jest
+            .fn()
+            .mockResolvedValueOnce({
+                providerId: 'openai',
+                baseUrl: '',
+                apiKey: '',
+                defaultModel: 'gpt-4o',
+                routing: {},
+            })
+            .mockResolvedValueOnce({
+                providerId: 'anthropic',
+                providerName: 'Anthropic',
+                baseUrl: 'https://api.anthropic.com',
+                apiKey: 'sk-ant',
+                defaultModel: 'claude-haiku',
+                routing: {},
+            });
+
+        const result = await resolveAiProviderForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result?.providerId).toBe('anthropic');
+        expect(getProviderConfig).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-throws auth errors instead of silently masking with the next provider', async () => {
+        const getProviderConfig = jest.fn().mockRejectedValue(new Error('401 Unauthorized'));
+
+        await expect(
+            resolveAiProviderForResearch(makeAiFacade(getProviderConfig), registry, 'u'),
+        ).rejects.toThrow('401 Unauthorized');
+        expect(getProviderConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null when no provider has a usable config', async () => {
+        const registry = makeRegistry([]);
+        const getProviderConfig = jest.fn();
+        await expect(
+            resolveAiProviderForResearch(makeAiFacade(getProviderConfig), registry, 'u'),
+        ).resolves.toBeNull();
+        expect(getProviderConfig).not.toHaveBeenCalled();
     });
 });

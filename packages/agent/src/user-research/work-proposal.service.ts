@@ -7,7 +7,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { WorkProposalRepository } from './work-proposal.repository';
 import { workProposalsBatchSchema, type WorkProposalsBatch } from './schemas';
 import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
-import { resolveAiProviderForResearch } from './user-research.service';
+import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
     type WorkProposal,
@@ -68,28 +68,39 @@ export class WorkProposalService {
             .map((p) => p.plugin.id)
             .filter(Boolean);
 
-        const resolved = await resolveAiProviderForResearch(
-            this.aiFacade,
-            this.registry,
-            userId,
-            this.logger,
-        );
-        if (!resolved) {
-            return {
-                status: 'error',
-                proposals: [],
-                tokensUsed: 0,
-                error: 'ai-provider-not-configured',
-            };
+        let resolvedModel;
+        let providerName: string;
+        let modelName: string;
+        try {
+            const resolved = await resolveAiProviderForResearch(
+                this.aiFacade,
+                this.registry,
+                userId,
+                this.logger,
+            );
+            if (!resolved) {
+                return {
+                    status: 'error',
+                    proposals: [],
+                    tokensUsed: 0,
+                    error: 'ai-provider-not-configured',
+                };
+            }
+            resolvedModel = resolved.model;
+            providerName = resolved.providerName;
+            modelName = resolved.modelName;
+        } catch (err) {
+            const message = (err as Error).message;
+            this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
+            return { status: 'error', proposals: [], tokensUsed: 0, error: message };
         }
-        const { model, providerName, modelName } = resolved;
 
         let tokensUsed = 0;
         let parsed: WorkProposalsBatch;
 
         try {
             const result = await generateObject({
-                model,
+                model: resolvedModel,
                 schema: workProposalsBatchSchema,
                 system: PROPOSALS_SYSTEM_PROMPT,
                 prompt: buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
