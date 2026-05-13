@@ -5,25 +5,34 @@
  *   1. Curated library (trusted, hardcoded Lucide markup).
  *   2. AI generator (untrusted-ish — model output, even with a locked
  *      prompt, can include comments, forbidden tags, or unbalanced markup).
- *   3. User paste via the category modal (fully untrusted).
+ *   3. User paste via the category modal / taxonomy API (fully untrusted).
  *
- * Output is rendered by the frontend as
- *   <img src="data:image/svg+xml;utf8,<svg…>">
- * Browsers sandbox SVGs loaded via <img> (no script execution, no external
- * resource loading), so the primary risks reduce to malformed markup that
- * breaks layout or oversized payloads. This sanitizer enforces:
+ * Output is rendered by the frontend INLINE via `dangerouslySetInnerHTML`
+ * (see `apps/web/src/components/works/detail/items/CategoriesTab.tsx`),
+ * so the SVG executes in the host document's origin. There is no `<img>`
+ * sandbox, no CSP isolation — anything that survives this pass runs with
+ * full DOM access. Treat this sanitizer as the only line of defence and
+ * fail closed on anything ambiguous. The passes enforced:
  *
- *   - Comments / DOCTYPE / processing instructions stripped.
+ *   - Comments / DOCTYPE / processing instructions / CDATA stripped so
+ *     payloads cannot hide inside them.
  *   - Forbidden elements removed: <script>, <foreignObject>, <iframe>,
- *     <embed>, <object>, <use> referencing external URLs.
- *   - Forbidden attributes removed: on*, xlink:href to external URLs,
- *     javascript: / data: URLs.
+ *     <embed>, <object>, <animate*>, <set>, <handler>, <listener>.
+ *   - Forbidden attributes removed: on* event handlers, xlink:href/href
+ *     (the most common SVG XSS vector), inline style (can carry
+ *     url(javascript:…)).
+ *   - URL schemes rejected anywhere in the body: javascript:, data:,
+ *     vbscript:, file:.
+ *   - External paint-server references rejected: any `url(<scheme>://…)`
+ *     in fill/stroke/filter/etc. would otherwise leak the viewer's IP to
+ *     an arbitrary host as a tracking pixel.
  *   - viewBox normalized to "0 0 24 24"; width/height attrs stripped.
- *   - Total length capped at MAX_SVG_LENGTH bytes.
+ *   - Total length capped at MAX_SVG_LENGTH bytes (matches the DTO cap).
  *
  * The sanitizer is intentionally regex-based to keep the agent package
  * free of jsdom / DOMPurify (heavy server-side deps). For the trust
- * profile above, conservative regex passes are sufficient.
+ * profile above, conservative regex passes that reject anything they
+ * can't fully parse are sufficient.
  */
 
 export const MAX_SVG_LENGTH = 4000;
@@ -51,6 +60,12 @@ const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const WIDTH_HEIGHT_ATTR_RE = /\s+(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 const DANGEROUS_URL_VALUE_RE = /\b(?:javascript|data|vbscript|file)\s*:/gi;
+
+// External paint-server references: `url(http://…)`, `url(https://…)`,
+// `url(//host/…)`. Local fragment refs like `url(#id)` are fine and stay.
+// Without this guard, an attribute like `fill="url(https://tracker/pixel)"`
+// turns the inline SVG into an IP-logging beacon for any viewer.
+const EXTERNAL_URL_REF_RE = /url\s*\(\s*['"]?\s*(?:[a-z][a-z0-9+.-]*:)?\/\//i;
 
 const SVG_OPEN_TAG_RE = /<svg\b([^>]*)>/i;
 
@@ -114,6 +129,13 @@ export function sanitizeSvg(input: string | null | undefined): SanitizeResult {
     // After scrubbing, double-check no dangerous URL scheme leaked
     // through (e.g. inside fill="url(javascript:…)" — paranoid belt).
     if (DANGEROUS_URL_VALUE_RE.test(working)) {
+        return { ok: false, reason: 'dangerous-content' };
+    }
+
+    // Reject external paint-server references — `url(https://…)` etc.
+    // would fetch from an arbitrary host when the SVG renders inline and
+    // leak the viewer's IP. Local `url(#id)` fragment refs are fine.
+    if (EXTERNAL_URL_REF_RE.test(working)) {
         return { ok: false, reason: 'dangerous-content' };
     }
 

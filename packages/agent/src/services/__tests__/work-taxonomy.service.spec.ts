@@ -344,6 +344,52 @@ describe('WorkTaxonomyService', () => {
             ).rejects.toBeInstanceOf(ForbiddenException);
             expect(dataGenerator.saveCategories).not.toHaveBeenCalled();
         });
+
+        // ============================================================================
+        // icon_svg sanitization (stored-XSS guard — frontend renders inline)
+        // ============================================================================
+        it('sanitizes inline icon_svg before persisting (strips <script>)', async () => {
+            const malicious =
+                '<svg viewBox="0 0 24 24"><script>alert(1)</script><circle cx="12" cy="12" r="6"/></svg>';
+
+            await service.createCategory(
+                'w-1',
+                { name: 'New Cat', icon_svg: malicious } as any,
+                'u-1',
+            );
+
+            const saved: Category[] = dataGenerator.saveCategories.mock.calls[0][2];
+            const persisted = saved[saved.length - 1];
+            expect(persisted.icon_svg).toBeDefined();
+            expect(persisted.icon_svg).not.toContain('<script');
+            expect(persisted.icon_svg).not.toContain('alert');
+            expect(persisted.icon_svg).toContain('<circle');
+        });
+
+        it('rejects icon_svg with no <svg> root with BadRequestException; nothing persisted', async () => {
+            await expect(
+                service.createCategory(
+                    'w-1',
+                    { name: 'Bad', icon_svg: '<div>not-an-svg</div>' } as any,
+                    'u-1',
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(dataGenerator.saveCategories).not.toHaveBeenCalled();
+        });
+
+        it('rejects icon_svg with external paint-server URL (IP-leak vector)', async () => {
+            const beacon =
+                '<svg viewBox="0 0 24 24"><circle fill="url(https://tracker.example/pixel)" cx="12" cy="12" r="6"/></svg>';
+
+            await expect(
+                service.createCategory(
+                    'w-1',
+                    { name: 'Beacon', icon_svg: beacon } as any,
+                    'u-1',
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(dataGenerator.saveCategories).not.toHaveBeenCalled();
+        });
     });
 
     // ============================================================================
@@ -522,6 +568,67 @@ describe('WorkTaxonomyService', () => {
                 service.updateCategory('w-1', 'a', { name: 'X' } as any, 'u-1'),
             ).rejects.toBeInstanceOf(ForbiddenException);
             expect(dataGenerator.getCategoriesTags).not.toHaveBeenCalled();
+        });
+
+        // ============================================================================
+        // icon_svg sanitization on update (stored-XSS guard)
+        // ============================================================================
+        it('sanitizes incoming icon_svg before persisting on update', async () => {
+            dataGenerator.getCategoriesTags.mockResolvedValue({
+                categories: [buildCategory({ id: 'a' })],
+                tags: [],
+                collections: [],
+            });
+            const malicious =
+                '<svg viewBox="0 0 24 24" onload="alert(1)"><script>steal()</script><path d="M0 0"/></svg>';
+
+            await service.updateCategory(
+                'w-1',
+                'a',
+                { icon_svg: malicious } as any,
+                'u-1',
+            );
+
+            const [, , saved] = dataGenerator.saveCategories.mock.calls[0];
+            expect(saved[0].icon_svg).not.toMatch(/\bonload=/i);
+            expect(saved[0].icon_svg).not.toContain('<script');
+            expect(saved[0].icon_svg).not.toContain('steal');
+        });
+
+        it('treats empty-string icon_svg as clear (sets to empty), not BadRequest', async () => {
+            dataGenerator.getCategoriesTags.mockResolvedValue({
+                categories: [buildCategory({ id: 'a', icon_svg: '<svg/>' })],
+                tags: [],
+                collections: [],
+            });
+
+            await service.updateCategory(
+                'w-1',
+                'a',
+                { icon_svg: '' } as any,
+                'u-1',
+            );
+
+            const [, , saved] = dataGenerator.saveCategories.mock.calls[0];
+            expect(saved[0].icon_svg).toBe('');
+        });
+
+        it('rejects update with malformed icon_svg; nothing persisted', async () => {
+            dataGenerator.getCategoriesTags.mockResolvedValue({
+                categories: [buildCategory({ id: 'a' })],
+                tags: [],
+                collections: [],
+            });
+
+            await expect(
+                service.updateCategory(
+                    'w-1',
+                    'a',
+                    { icon_svg: '<svg viewBox="0 0 24 24"><circle/>' } as any,
+                    'u-1',
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(dataGenerator.saveCategories).not.toHaveBeenCalled();
         });
     });
 
@@ -873,6 +980,29 @@ describe('WorkTaxonomyService', () => {
                     priority: undefined,
                 },
             });
+        });
+
+        it('sanitizes icon_svg on create and rejects malformed payloads', async () => {
+            const malicious =
+                '<svg viewBox="0 0 24 24"><foreignObject><div onclick="x()"></div></foreignObject><rect width="24" height="24"/></svg>';
+
+            await service.createCollection(
+                'w-1',
+                { name: 'Safe Picks', icon_svg: malicious } as any,
+                'u-1',
+            );
+
+            const [, , saved] = dataGenerator.saveCollections.mock.calls[0];
+            expect(saved[0].icon_svg).not.toContain('foreignObject');
+            expect(saved[0].icon_svg).not.toContain('onclick');
+
+            await expect(
+                service.createCollection(
+                    'w-1',
+                    { name: 'Bad Picks', icon_svg: '<div/>' } as any,
+                    'u-1',
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
         });
     });
 

@@ -105,6 +105,37 @@ describe('sanitizeSvg', () => {
             }
         });
 
+        it.each<[string, string]>([
+            [
+                'http://… in fill',
+                '<svg viewBox="0 0 24 24"><circle fill="url(http://tracker.example/pixel.svg#g)" cx="12" cy="12" r="6"/></svg>',
+            ],
+            [
+                'https://… in fill',
+                '<svg viewBox="0 0 24 24"><rect fill="url(https://tracker.example/pixel)" width="24" height="24"/></svg>',
+            ],
+            [
+                'protocol-relative // in stroke',
+                '<svg viewBox="0 0 24 24"><circle stroke="url(//tracker.example/pixel)" cx="12" cy="12" r="6"/></svg>',
+            ],
+        ])('rejects external paint-server reference (%s) — IP-leak vector', (_, input) => {
+            const result = sanitizeSvg(input);
+            expect(result.ok).toBe(false);
+            if (result.ok === false) {
+                expect(result.reason).toBe('dangerous-content');
+            }
+        });
+
+        it('allows local fragment paint refs like url(#myGradient)', () => {
+            const input =
+                '<svg viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0"/></linearGradient></defs><circle fill="url(#g)" cx="12" cy="12" r="6"/></svg>';
+            const result = sanitizeSvg(input);
+            expect(result.ok).toBe(true);
+            if (result.ok === true) {
+                expect(result.svg).toContain('url(#g)');
+            }
+        });
+
         it('strips comments, DOCTYPE, processing instructions, and CDATA', () => {
             const input =
                 '<?xml version="1.0"?><!DOCTYPE svg><svg viewBox="0 0 24 24"><!-- payload --><![CDATA[stuff]]><circle cx="12" cy="12" r="6"/></svg>';

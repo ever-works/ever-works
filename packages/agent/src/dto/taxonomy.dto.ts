@@ -5,11 +5,13 @@ import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 // Category DTOs
 
 /**
- * Hard cap on inline SVG payload size. Sanitized icons should be well
- * under 3KB; the limit gives headroom for legitimate paths while
- * rejecting obvious abuse (megabyte rasterized blobs encoded as data URIs).
+ * Hard cap on inline SVG payload size — matches `MAX_SVG_LENGTH` in
+ * `services/category-icon/svg-sanitizer.ts`. Keep these aligned so the
+ * DTO rejects oversized payloads at the API boundary with a clear 400
+ * instead of silently falling through to the sanitizer's `too-large`
+ * branch (which surfaces as a generic fallback icon downstream).
  */
-const MAX_ICON_SVG_LENGTH = 8000;
+const MAX_ICON_SVG_LENGTH = 4000;
 
 export class CreateCategoryDto {
     @IsString()
