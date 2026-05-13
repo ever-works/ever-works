@@ -30,7 +30,9 @@ import type {
     PipelineResult,
     PipelineProgress,
     ReferenceEntry,
+    FacadeOptions,
 } from '@ever-works/plugin';
+import { CategoryIconService } from '../../services/category-icon';
 import { mergeReferences } from '@ever-works/plugin';
 import type { WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
@@ -98,6 +100,7 @@ export class DataGeneratorService {
         private readonly pipelineOrchestrator: PipelineOrchestratorService,
         private readonly workOperations: WorkOperationsService,
         private readonly worksConfigWriter: WorksConfigWriterService,
+        private readonly categoryIconService: CategoryIconService,
     ) {}
 
     private getWorkOwner(work: Work): User {
@@ -363,10 +366,33 @@ export class DataGeneratorService {
                 await data.resetFiles();
             }
 
+            const mergedCategories = this.merge(
+                existingCategories,
+                [...newCategories],
+            ) as Category[];
+            const mergedCollections = this.merge(
+                existingCollections,
+                [...newCollections],
+            ) as Collection[];
+
+            // Auto-generate SVG icons for any category/collection that
+            // doesn't already have one. Opt-out via pluginConfig flag.
+            const facadeOptions: FacadeOptions = { userId: user.id, workId: work.id };
+            const enrichedCategories = await this.maybeEnrichCategoryIcons(
+                mergedCategories,
+                createItemsGeneratorDto,
+                facadeOptions,
+            );
+            const enrichedCollections = await this.maybeEnrichCollectionIcons(
+                mergedCollections,
+                createItemsGeneratorDto,
+                facadeOptions,
+            );
+
             const promises = [
-                data.writeCategories(this.merge(existingCategories, [...newCategories])),
+                data.writeCategories(enrichedCategories),
                 data.writeTags(this.merge(existingTags, [...newTags])),
-                data.writeCollections(this.merge(existingCollections, [...newCollections])),
+                data.writeCollections(enrichedCollections),
             ];
 
             const generatedReferences = this.extractPipelineReferences(pipelineResult);
@@ -1396,6 +1422,59 @@ export class DataGeneratorService {
             map.set(item.id, item);
         }
         return Array.from(map.values());
+    }
+
+    /**
+     * Resolve and attach `icon_svg` for each category lacking one.
+     * Returns the input list unchanged when icon generation is disabled
+     * via pluginConfig.generate_category_icons === false. Failures
+     * inside the icon service never abort the generation pipeline —
+     * worst case, categories ship without icons and the UI fallback
+     * renders.
+     */
+    private async maybeEnrichCategoryIcons(
+        categories: Category[],
+        dto: CreateItemsGeneratorDto,
+        facadeOptions: FacadeOptions,
+    ): Promise<Category[]> {
+        if (!this.shouldGenerateCategoryIcons(dto)) {
+            return categories;
+        }
+
+        try {
+            return await this.categoryIconService.enrichCategories(categories, {
+                facadeOptions,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Category icon enrichment skipped due to error: ${message}`);
+            return categories;
+        }
+    }
+
+    private async maybeEnrichCollectionIcons(
+        collections: Collection[],
+        dto: CreateItemsGeneratorDto,
+        facadeOptions: FacadeOptions,
+    ): Promise<Collection[]> {
+        if (!this.shouldGenerateCategoryIcons(dto)) {
+            return collections;
+        }
+
+        try {
+            return await this.categoryIconService.enrichCollections(collections, {
+                facadeOptions,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Collection icon enrichment skipped due to error: ${message}`);
+            return collections;
+        }
+    }
+
+    private shouldGenerateCategoryIcons(dto: CreateItemsGeneratorDto): boolean {
+        const pluginConfig = dto.pluginConfig as Record<string, unknown> | undefined;
+        return pluginConfig?.generate_category_icons !== false;
     }
 
     private getDefaultReadme(work: Work) {

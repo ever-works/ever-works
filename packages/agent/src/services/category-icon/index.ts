@@ -42,3 +42,5 @@ export {
     type CategoryIconSource,
     type EnsureCategoryIconOptions,
 } from './category-icon.service';
+
+export { CategoryIconModule } from './category-icon.module';

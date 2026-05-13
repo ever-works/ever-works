@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import type { FacadeOptions } from '@ever-works/plugin';
+import pMap from 'p-map';
+import type { Category, Collection, FacadeOptions } from '@ever-works/plugin';
 
 import { AiFacadeService } from '../../facades/ai.facade';
 import {
@@ -13,6 +14,16 @@ import {
     lookupCuratedIcon,
 } from './curated-mapping';
 import { sanitizeSvg } from './svg-sanitizer';
+
+/**
+ * How many categories to resolve in parallel during bulk enrichment.
+ * AI calls are the bottleneck — keep concurrency modest so a single
+ * generation pass doesn't fan out into rate-limit territory.
+ */
+const ENRICHMENT_CONCURRENCY = 4;
+
+/** What the entity already has — used to decide whether to skip. */
+type IconBearing = { readonly icon_svg?: string };
 
 /** Cache key version. Bump to invalidate the entire icon cache (e.g.
  *  if the prompt template or palette changes meaningfully). */
@@ -124,6 +135,72 @@ export class CategoryIconService {
 
         // 4. Hard fallback — guaranteed non-null icon.
         return this.fallback();
+    }
+
+    /**
+     * Bulk enrichment for an array of categories. Items that already
+     * have a non-empty `icon_svg` are returned untouched. Resolution
+     * runs at controlled concurrency so a 50-category pass doesn't
+     * blow through provider rate limits.
+     *
+     * Failures for individual categories never abort the batch — the
+     * affected entry retains whatever icon_svg it came in with (or
+     * none, which the UI handles via the fallback render path).
+     */
+    async enrichCategories<T extends Category>(
+        categories: readonly T[],
+        options: Omit<EnsureCategoryIconOptions, 'name' | 'description'>,
+    ): Promise<T[]> {
+        if (!categories || categories.length === 0) {
+            return [];
+        }
+
+        return pMap(
+            categories,
+            async (category) => this.enrichOne(category, options),
+            { concurrency: ENRICHMENT_CONCURRENCY },
+        );
+    }
+
+    /**
+     * Same as {@link enrichCategories} but for collections (which share
+     * the icon_svg field shape).
+     */
+    async enrichCollections<T extends Collection>(
+        collections: readonly T[],
+        options: Omit<EnsureCategoryIconOptions, 'name' | 'description'>,
+    ): Promise<T[]> {
+        if (!collections || collections.length === 0) {
+            return [];
+        }
+
+        return pMap(
+            collections,
+            async (collection) => this.enrichOne(collection, options),
+            { concurrency: ENRICHMENT_CONCURRENCY },
+        );
+    }
+
+    private async enrichOne<T extends IconBearing & { name: string; description?: string }>(
+        entity: T,
+        options: Omit<EnsureCategoryIconOptions, 'name' | 'description'>,
+    ): Promise<T> {
+        if (entity.icon_svg && entity.icon_svg.trim().length > 0) {
+            return entity;
+        }
+
+        try {
+            const resolved = await this.ensureIcon({
+                ...options,
+                name: entity.name,
+                description: entity.description,
+            });
+            return { ...entity, icon_svg: resolved.svg };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Failed to enrich icon for "${entity.name}": ${message}`);
+            return entity;
+        }
     }
 
     private async tryGenerate(
