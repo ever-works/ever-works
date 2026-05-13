@@ -1,18 +1,18 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText, stepCountIs } from 'ai';
-import type { LanguageModel } from 'ai';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { UserRepository } from '../database/repositories/user.repository';
 import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
+import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import type { InferredUserProfile } from '../entities';
 import { UserResearchCompletedEvent, UserResearchFailedEvent } from './events';
 import { USER_RESEARCH_AGENT_PROMPT, buildSeedPrompt, deriveVerticals } from './prompts';
 import { inferredProfileSchema, type InferredProfile } from './schemas';
 import { UserResearchLimitsService, UserResearchRateLimitedError } from './limits';
+import { resolveAiProviderForResearch, resolveSearchProviderIds } from './provider-resolver';
 import { createSearchWebTool, createFetchPageTool, createFinalizeTool } from './tools';
 
 export interface UserResearchResult {
@@ -51,6 +51,7 @@ export class UserResearchService {
         private readonly aiFacade: AiFacadeService,
         private readonly searchFacade: SearchFacadeService,
         private readonly contentExtractor: ContentExtractorFacadeService,
+        private readonly registry: PluginRegistryService,
         private readonly limits: UserResearchLimitsService,
         @Optional() private readonly events?: EventEmitter2,
     ) {}
@@ -106,13 +107,17 @@ export class UserResearchService {
             );
         }
 
-        let model: LanguageModel;
+        let resolvedModel;
         let providerName: string;
+        let searchChain: string[];
         try {
-            const providerConfig = await this.aiFacade.getProviderConfig({
+            const resolved = await resolveAiProviderForResearch(
+                this.aiFacade,
+                this.registry,
                 userId,
-            });
-            if (!providerConfig.baseUrl || !providerConfig.apiKey) {
+                this.logger,
+            );
+            if (!resolved) {
                 return {
                     status: 'error',
                     tokensUsed: 0,
@@ -121,36 +126,18 @@ export class UserResearchService {
                     error: 'ai-provider-not-configured',
                 };
             }
-            const provider = createOpenAICompatible({
-                name: providerConfig.providerId,
-                baseURL: providerConfig.baseUrl,
-                apiKey: providerConfig.apiKey,
-            });
-            const modelName =
-                providerConfig.routing.complexModel ??
-                providerConfig.routing.mediumModel ??
-                providerConfig.defaultModel;
-            if (!modelName) {
-                return {
-                    status: 'error',
-                    tokensUsed: 0,
-                    toolCallsCount: 0,
-                    durationMs: Date.now() - startedAt,
-                    error: 'no-model-configured',
-                };
-            }
-            model = provider(modelName);
-            providerName = providerConfig.providerName ?? providerConfig.providerId;
+            resolvedModel = resolved.model;
+            providerName = resolved.providerName;
+            searchChain = await resolveSearchProviderIds(this.registry, userId);
         } catch (err) {
-            this.logger.warn(
-                `Could not resolve AI provider for user research: ${(err as Error).message}`,
-            );
+            const message = (err as Error).message;
+            this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
             return {
                 status: 'error',
                 tokensUsed: 0,
                 toolCallsCount: 0,
                 durationMs: Date.now() - startedAt,
-                error: 'ai-provider-error',
+                error: message,
             };
         }
 
@@ -171,7 +158,7 @@ export class UserResearchService {
             );
 
             const result = await generateText({
-                model,
+                model: resolvedModel,
                 system: USER_RESEARCH_AGENT_PROMPT,
                 prompt: seedPrompt,
                 tools: {
@@ -179,6 +166,7 @@ export class UserResearchService {
                         searchFacade: this.searchFacade,
                         limits: this.limits,
                         userId,
+                        providerChain: searchChain,
                         logger: this.logger,
                     }),
                     fetchPage: createFetchPageTool({

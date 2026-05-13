@@ -26,6 +26,7 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		createNamespace: ReturnType<typeof vi.fn>;
 		readNamespace: ReturnType<typeof vi.fn>;
 	};
+	objectApi: { patch: ReturnType<typeof vi.fn> };
 	createKubeConfig: ReturnType<typeof vi.fn>;
 } {
 	const versionApi = { getCode: vi.fn(async () => ({ gitVersion: 'v1.30.4', platform: 'linux/amd64' })) };
@@ -78,6 +79,7 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		createNamespace: vi.fn(async () => undefined),
 		readNamespace: vi.fn(async () => undefined)
 	};
+	const objectApi = { patch: vi.fn(async () => undefined) };
 	const createKubeConfig = vi.fn(() => ({
 		loadFromString: vi.fn(),
 		setCurrentContext: vi.fn(),
@@ -90,10 +92,11 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		networkingV1Api: () => networkingApi as never,
 		appsV1Api: () => appsApi as never,
 		coreV1Api: () => coreApi as never,
+		objectApi: () => objectApi as never,
 		...overrides
 	};
 
-	return { factory, versionApi, networkingApi, appsApi, coreApi, createKubeConfig };
+	return { factory, versionApi, networkingApi, appsApi, coreApi, objectApi, createKubeConfig };
 }
 
 describe('KubernetesApiService.validateConnection', () => {
@@ -232,27 +235,30 @@ describe('KubernetesApiService.listManagedDeployments', () => {
 });
 
 describe('KubernetesApiService SSA apply helpers', () => {
-	it('applyDeployment uses the field manager and force=true', async () => {
-		const { factory, appsApi } = makeFactory();
+	const SERVER_SIDE_APPLY = 'application/apply-patch+yaml';
+
+	it('applyDeployment uses Server-Side Apply with field manager and force=true', async () => {
+		const { factory, objectApi } = makeFactory();
 		const svc = new KubernetesApiService(factory);
-		await svc.applyDeployment(VALID, {
+		const manifest = {
 			apiVersion: 'apps/v1',
 			kind: 'Deployment',
 			metadata: { name: 'site-a', namespace: 'ever-works' },
 			spec: {}
-		});
-		expect(appsApi.patchNamespacedDeployment).toHaveBeenCalledWith(
-			expect.objectContaining({
-				name: 'site-a',
-				namespace: 'ever-works',
-				fieldManager: FIELD_MANAGER,
-				force: true
-			})
+		};
+		await svc.applyDeployment(VALID, manifest);
+		expect(objectApi.patch).toHaveBeenCalledWith(
+			manifest,
+			undefined,
+			undefined,
+			FIELD_MANAGER,
+			true,
+			SERVER_SIDE_APPLY
 		);
 	});
 
-	it('applyService passes manifest body through to CoreV1', async () => {
-		const { factory, coreApi } = makeFactory();
+	it('applyService routes Server-Side Apply through the object API', async () => {
+		const { factory, objectApi } = makeFactory();
 		const svc = new KubernetesApiService(factory);
 		const manifest = {
 			apiVersion: 'v1',
@@ -260,13 +266,18 @@ describe('KubernetesApiService SSA apply helpers', () => {
 			metadata: { name: 'site-a', namespace: 'ns' }
 		};
 		await svc.applyService(VALID, manifest);
-		expect(coreApi.patchNamespacedService).toHaveBeenCalledWith(
-			expect.objectContaining({ body: manifest, fieldManager: FIELD_MANAGER })
+		expect(objectApi.patch).toHaveBeenCalledWith(
+			manifest,
+			undefined,
+			undefined,
+			FIELD_MANAGER,
+			true,
+			SERVER_SIDE_APPLY
 		);
 	});
 
-	it('applyIngress passes manifest body through to NetworkingV1', async () => {
-		const { factory, networkingApi } = makeFactory();
+	it('applyIngress routes Server-Side Apply through the object API', async () => {
+		const { factory, objectApi } = makeFactory();
 		const svc = new KubernetesApiService(factory);
 		const manifest = {
 			apiVersion: 'networking.k8s.io/v1',
@@ -274,13 +285,18 @@ describe('KubernetesApiService SSA apply helpers', () => {
 			metadata: { name: 'site-a', namespace: 'ns' }
 		};
 		await svc.applyIngress(VALID, manifest);
-		expect(networkingApi.patchNamespacedIngress).toHaveBeenCalledWith(
-			expect.objectContaining({ body: manifest, fieldManager: FIELD_MANAGER })
+		expect(objectApi.patch).toHaveBeenCalledWith(
+			manifest,
+			undefined,
+			undefined,
+			FIELD_MANAGER,
+			true,
+			SERVER_SIDE_APPLY
 		);
 	});
 
-	it('applyImagePullSecret patches the namespaced Secret', async () => {
-		const { factory, coreApi } = makeFactory();
+	it('applyImagePullSecret routes Server-Side Apply through the object API', async () => {
+		const { factory, objectApi } = makeFactory();
 		const svc = new KubernetesApiService(factory);
 		const manifest = {
 			apiVersion: 'v1',
@@ -288,7 +304,14 @@ describe('KubernetesApiService SSA apply helpers', () => {
 			metadata: { name: 'pull', namespace: 'ns' }
 		};
 		await svc.applyImagePullSecret(VALID, manifest);
-		expect(coreApi.patchNamespacedSecret).toHaveBeenCalled();
+		expect(objectApi.patch).toHaveBeenCalledWith(
+			manifest,
+			undefined,
+			undefined,
+			FIELD_MANAGER,
+			true,
+			SERVER_SIDE_APPLY
+		);
 	});
 });
 
