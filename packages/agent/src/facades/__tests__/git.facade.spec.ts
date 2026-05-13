@@ -928,6 +928,207 @@ describe('GitFacadeService', () => {
         });
     });
 
+    // ─────────────────────────────────────────────────────────────────────
+    // EW-614 — resolvePluginAndToken: platform-PAT routing for
+    // Works whose `storageProvider === 'ever-works-git'`.
+    //
+    // The hook short-circuits BEFORE any user-credential lookup so:
+    //   - createRepository, push, pull, status, getRepository, etc.
+    //     all transparently target the platform org with the platform PAT
+    //   - the user's personal GitHub OAuth is never touched for these Works
+    //
+    // Tested via `createRepository` because it goes through
+    // `resolvePluginAndToken` and lets us assert the token passed downstream.
+    // ─────────────────────────────────────────────────────────────────────
+    describe('EW-614 — resolvePluginAndToken: ever-works-git platform-PAT routing', () => {
+        const PLATFORM_PAT = 'github_pat_test_platform_value';
+        const previousFlag = process.env.STORAGE_EVER_WORKS_GIT_ENABLED;
+        const previousPat = process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT;
+
+        afterEach(() => {
+            if (previousFlag === undefined) delete process.env.STORAGE_EVER_WORKS_GIT_ENABLED;
+            else process.env.STORAGE_EVER_WORKS_GIT_ENABLED = previousFlag;
+            if (previousPat === undefined) delete process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT;
+            else process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = previousPat;
+        });
+
+        function setupGithubPlugin() {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+            return gitPlugin;
+        }
+
+        it('routes the platform PAT when work.storageProvider==="ever-works-git" AND flag on', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            workRepository.findById.mockResolvedValue({
+                id: 'work-1',
+                storageProvider: 'ever-works-git',
+            } as never);
+
+            await service.createRepository(
+                { name: 'ever-works-cloud-repo', isPrivate: true },
+                { providerId: 'github', userId: 'user-1', workId: 'work-1' },
+            );
+
+            // Platform PAT was passed to the plugin, NOT a user OAuth token.
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'ever-works-cloud-repo', isPrivate: true },
+                PLATFORM_PAT,
+            );
+            // User-OAuth lookup path was NOT touched.
+            expect(authAccountRepository.findConnectedProviderAccount).not.toHaveBeenCalled();
+        });
+
+        it('falls through to user OAuth/PAT when the flag is OFF (even with matching storageProvider)', async () => {
+            delete process.env.STORAGE_EVER_WORKS_GIT_ENABLED;
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            authAccountRepository.findConnectedProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ accessToken: 'user-oauth-token' }),
+            );
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                { providerId: 'github', userId: 'user-1', workId: 'work-1' },
+            );
+
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'user-oauth-token',
+            );
+        });
+
+        it('falls through to user OAuth/PAT when storageProvider is NOT "ever-works-git"', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            workRepository.findById.mockResolvedValue({
+                id: 'work-1',
+                storageProvider: 'user-github',
+            } as never);
+            authAccountRepository.findConnectedProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ accessToken: 'user-oauth-token' }),
+            );
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                { providerId: 'github', userId: 'user-1', workId: 'work-1' },
+            );
+
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'user-oauth-token',
+            );
+        });
+
+        it('falls through when no workId is provided (one-off facade calls)', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            authAccountRepository.findConnectedProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ accessToken: 'user-oauth-token' }),
+            );
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                { providerId: 'github', userId: 'user-1' },
+            );
+
+            expect(workRepository.findById).not.toHaveBeenCalled();
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'user-oauth-token',
+            );
+        });
+
+        it('falls through when PAT env var is empty (misconfig safety)', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = '';
+
+            const gitPlugin = setupGithubPlugin();
+            workRepository.findById.mockResolvedValue({
+                id: 'work-1',
+                storageProvider: 'ever-works-git',
+            } as never);
+            authAccountRepository.findConnectedProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ accessToken: 'user-oauth-token' }),
+            );
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                { providerId: 'github', userId: 'user-1', workId: 'work-1' },
+            );
+
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'user-oauth-token',
+            );
+        });
+
+        it('falls through when workRepository.findById throws (transient DB blip)', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            // The new EW-614 helper swallows the error and returns null. Use
+            // `mockRejectedValueOnce` so the existing `getInstallationTokenForWork`
+            // path (which also calls findById downstream) doesn't get nuked
+            // by the same mock — its own missing-work path returns null.
+            workRepository.findById.mockRejectedValueOnce(new Error('db blip'));
+            workRepository.findById.mockResolvedValue(null);
+            authAccountRepository.findConnectedProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ accessToken: 'user-oauth-token' }),
+            );
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                { providerId: 'github', userId: 'user-1', workId: 'work-1' },
+            );
+
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'user-oauth-token',
+            );
+        });
+
+        it('preserves direct-token-wins precedence (options.token > platform PAT)', async () => {
+            process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
+            process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT = PLATFORM_PAT;
+
+            const gitPlugin = setupGithubPlugin();
+            workRepository.findById.mockResolvedValue({
+                id: 'work-1',
+                storageProvider: 'ever-works-git',
+            } as never);
+
+            await service.createRepository(
+                { name: 'repo', isPrivate: false },
+                {
+                    providerId: 'github',
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    token: 'explicit-token-wins',
+                },
+            );
+
+            expect(gitPlugin.createRepository).toHaveBeenCalledWith(
+                { name: 'repo', isPrivate: false },
+                'explicit-token-wins',
+            );
+            expect(workRepository.findById).not.toHaveBeenCalled();
+        });
+    });
+
     describe('deleteRepository', () => {
         it('should call plugin.deleteRepository', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');

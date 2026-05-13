@@ -148,15 +148,26 @@ them forward (apps/web Vitest runner, Playwright wizard spec, brand SVGs,
 `WorksService.create` wire-up). Items still requiring ops action are
 documented in [`./deployment.md`](./deployment.md):
 
-- [ ] **T60**. Create the `ever-works-cloud` GitHub PAT (manual web-UI
+- [x] **T60**. Create the `ever-works-cloud` GitHub PAT (manual web-UI
       step — GitHub disallows API creation; see deployment.md §1.3); store
       in k8s + GH-Actions secrets; flip `STORAGE_EVER_WORKS_GIT_ENABLED=true`.
-- [ ] **T61**. Push the `do-sfo2-k8s-ever` kubeconfig into the API
+      _Shipped 2026-05-12 via PR #721._
+- [ ] **T61**. Push the `k8s-works` kubeconfig into the API
       deployment secret as `EVER_WORKS_DEPLOY_KUBECONFIG`; flip
-      `DEPLOY_EVER_WORKS_ENABLED=true` (see deployment.md §2).
-- [ ] **T62**. Admin override for the 3-Work cap (lifts the limit for a
+      `DEPLOY_EVER_WORKS_ENABLED=true` (see deployment.md §2). _Blocked
+      on `k8s-works` cluster + SSL termination being owner-provisioned._
+- [x] **T62**. Wire `EverWorksGitProvider` into `WorkLifecycleService.createWork`
+      so picking "Ever Works Git" actually publishes to `ever-works-cloud`
+      via the platform PAT (not the user's OAuth). _Shipped 2026-05-13 via
+      EW-614 — see [`./ew-614-storage-wireup.md`](./ew-614-storage-wireup.md)._
+- [ ] **T63**. Admin override for the 3-Work cap (lifts the limit for a
       specific user — useful for internal Ever Works staff demoing the flow).
-- [ ] **T63**. Cost reporting / per-user usage panel for Ever Works Deploy.
-- [ ] **T64**. Migrate `EverWorksGitProvider` to the GitHub App
+- [ ] **T64**. Cost reporting / per-user usage panel for Ever Works Deploy.
+- [ ] **T65**. Migrate `EverWorksGitProvider` to the GitHub App
       installation-token path so we don't rely on a long-lived PAT (the App
-      is already installed for user GitHub flows).
+      is already installed for user GitHub flows). Tracked as a follow-up
+      on EW-614.
+- [ ] **T66**. Orphan-repo cleanup cron over `ever-works-cloud` repos
+      with no matching Work row (handles the rare slug-collision rollback
+      case where the GitHub repo was created but the DB insert failed —
+      see EW-614 wire-up doc §2).

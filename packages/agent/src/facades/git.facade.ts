@@ -823,6 +823,17 @@ export class GitFacadeService implements IGitFacade {
             return { plugin, token: options.token };
         }
 
+        // EW-614 — when the Work was created via "Ever Works Git" storage,
+        // the underlying repo lives in the platform org (`ever-works-cloud`)
+        // and the user's personal OAuth token cannot reach it. Short-circuit
+        // to the platform PAT BEFORE any user-credential lookup. Works
+        // transparently for every git-facade method that takes `workId`
+        // (createRepository, push, pull, status, getRepository, ...).
+        const platformToken = await this.tryResolveEverWorksGitPlatformToken(options);
+        if (platformToken) {
+            return { plugin, token: platformToken };
+        }
+
         if (!options.userId) {
             throw new GitFacadeError(
                 'No token provided and no userId for credential lookup',
@@ -869,6 +880,39 @@ export class GitFacadeService implements IGitFacade {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * EW-614 — return the platform PAT when the Work's `storageProvider`
+     * is `'ever-works-git'` AND the global env flag is on. Returns `null`
+     * when:
+     *   - no `workId` is provided (one-off facade calls without a Work),
+     *   - the Work doesn't exist or has a different storageProvider,
+     *   - the feature flag is off, or
+     *   - the PAT env var is empty.
+     *
+     * Short-lived `repo lookup` failures (DB transient errors) are swallowed
+     * — falling through to the existing user-OAuth resolution path is the
+     * safer default than crashing every git call when the Work-table read
+     * blips. The resulting behaviour matches what callers see when the flag
+     * is off: regular OAuth/PAT lookup.
+     */
+    private async tryResolveEverWorksGitPlatformToken(
+        options: GitFacadeOptions,
+    ): Promise<string | null> {
+        if (!options.workId) return null;
+        if (!config.everWorks.git.isEnabled()) return null;
+
+        let work;
+        try {
+            work = await this.workRepository.findById(options.workId);
+        } catch {
+            return null;
+        }
+        if (!work || work.storageProvider !== 'ever-works-git') return null;
+
+        const pat = config.everWorks.git.getPat();
+        return pat || null;
     }
 
     private async resolvePlugin(
