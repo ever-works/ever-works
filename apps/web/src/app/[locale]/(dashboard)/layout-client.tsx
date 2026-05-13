@@ -103,9 +103,7 @@ export function DashboardLayoutClient({
     useEffect(() => {
         try {
             if (typeof window !== 'undefined') {
-                setHeaderDismissed(
-                    window.localStorage.getItem(headerDismissedKey) === '1',
-                );
+                setHeaderDismissed(window.localStorage.getItem(headerDismissedKey) === '1');
             }
         } catch {
             // localStorage unavailable (private mode, quota) — leave default.
