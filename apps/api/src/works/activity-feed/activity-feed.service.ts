@@ -76,7 +76,6 @@ const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] 
 
 interface ComposeContext {
     workId: string;
-    userId: string;
     limit: number;
     category: FeedCategory;
 }
@@ -88,12 +87,12 @@ export class ActivityFeedService {
         private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
     ) {}
 
-    async compose(workId: string, userId: string, query: FeedQueryDto): Promise<FeedResponse> {
+    async compose(workId: string, _userId: string, query: FeedQueryDto): Promise<FeedResponse> {
         const limit = query.limit ?? DEFAULT_LIMIT;
         const category = query.category ?? 'all';
         const cursorTimestamp = parseCursor(query.cursor);
 
-        const ctx: ComposeContext = { workId, userId, limit, category };
+        const ctx: ComposeContext = { workId, limit, category };
         const activityLogTypes = ACTIVITY_LOG_TYPES_BY_CATEGORY[category];
         const historyTypes = HISTORY_TYPES_BY_CATEGORY[category];
 
@@ -128,10 +127,13 @@ export class ActivityFeedService {
         }
         const collected: PlatformActivityLogEntry[] = [];
         const typeIterable = types && types.length > 0 ? types : [undefined];
+        // Note: bypasses the userId filter on purpose. Access is enforced
+        // upstream by WorkOwnershipService.ensureAccess (controller); the
+        // feed must surface every row scoped to the Work, including the
+        // owner-attributed website-ingested events for member viewers.
         const results = await Promise.all(
             typeIterable.map((actionType) =>
-                this.activityLogService.findAll({
-                    userId: ctx.userId,
+                this.activityLogService.findByWork({
                     workId: ctx.workId,
                     actionType,
                     limit,

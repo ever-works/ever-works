@@ -40,8 +40,12 @@ describe('ActivityLogService', () => {
             const created: Array<Record<string, unknown>> = [];
             const repo = {
                 findByWorkAndIngestEventId: jest.fn().mockResolvedValue(existingByEvent),
-                create: jest.fn().mockImplementation((entry) => {
-                    const row = { id: 'al-' + (created.length + 1), ...entry };
+                create: jest.fn().mockImplementation((entry, overrides) => {
+                    const row = {
+                        id: 'al-' + (created.length + 1),
+                        ...entry,
+                        ...(overrides ?? {}),
+                    };
                     created.push(row);
                     return Promise.resolve(row);
                 }),
@@ -91,6 +95,25 @@ describe('ActivityLogService', () => {
             const metadata = row.metadata as Record<string, unknown>;
             expect(metadata.itemId).toBe('i-1');
             expect(metadata.occurredAt).toBe('2026-05-13T10:00:00.000Z');
+        });
+
+        it('sets createdAt to occurredAt so feed ordering reflects when the event happened', async () => {
+            const { svc, repo } = buildService(null);
+            const occurredAt = new Date('2026-05-13T10:00:00.000Z');
+
+            await svc.ingestFromWebsite({
+                workId: 'work-1',
+                eventId: 'evt-1',
+                actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
+                occurredAt,
+                summary: 'User signed up',
+            });
+
+            // Repository.create receives the override as the second arg.
+            expect(repo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ ingestEventId: 'evt-1' }),
+                { createdAt: occurredAt },
+            );
         });
 
         it('throws when the referenced work does not exist', async () => {

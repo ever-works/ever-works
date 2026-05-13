@@ -17,8 +17,14 @@ export class ActivityLogRepository {
         private readonly repository: Repository<ActivityLog>,
     ) {}
 
-    async create(data: CreateActivityLogDto): Promise<ActivityLog> {
-        const entry = this.repository.create(data);
+    async create(
+        data: CreateActivityLogDto,
+        overrides?: { createdAt?: Date },
+    ): Promise<ActivityLog> {
+        const entry = this.repository.create({
+            ...data,
+            ...(overrides?.createdAt ? { createdAt: overrides.createdAt } : {}),
+        });
         return this.repository.save(entry);
     }
 
@@ -48,6 +54,43 @@ export class ActivityLogRepository {
         return this.repository.findOne({
             where: { workId, ingestEventId },
         });
+    }
+
+    /**
+     * Per-Work activity-log lookup that intentionally ignores `userId`.
+     *
+     * The Activity Feed tab is scoped by `workId` and access is enforced
+     * upstream by `WorkOwnershipService.ensureAccess` (controller layer).
+     * Filtering by `userId` here would drop rows attributed to other
+     * collaborators on the same Work — including the website-ingested
+     * rows that EW-120 attributes to the Work owner — making them
+     * invisible to members.
+     */
+    async findByWork(options: {
+        workId: string;
+        actionType?: ActivityActionType;
+        dateTo?: Date;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        const qb = this.repository
+            .createQueryBuilder('activity')
+            .leftJoinAndSelect('activity.work', 'work')
+            .where('activity.workId = :workId', { workId: options.workId })
+            .orderBy('activity.createdAt', 'DESC');
+
+        if (options.actionType) {
+            qb.andWhere('activity.actionType = :actionType', { actionType: options.actionType });
+        }
+        if (options.dateTo) {
+            qb.andWhere('activity.createdAt <= :dateTo', { dateTo: options.dateTo });
+        }
+
+        const limit = Math.min(options.limit ?? 25, 100);
+        const offset = options.offset ?? 0;
+
+        const [activities, total] = await qb.take(limit).skip(offset).getManyAndCount();
+        return { activities, total };
     }
 
     async findLatestByUserWorkActionStatus(params: {

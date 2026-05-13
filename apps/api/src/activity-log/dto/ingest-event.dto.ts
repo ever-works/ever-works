@@ -7,9 +7,32 @@ import {
     IsString,
     IsUUID,
     MaxLength,
+    Validate,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActivityActionType } from '@ever-works/agent/entities';
+
+const METADATA_BYTE_CAP = 8 * 1024;
+
+@ValidatorConstraint({ name: 'metadataByteCap', async: false })
+class MetadataByteCapConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (value === undefined || value === null) return true;
+        if (typeof value !== 'object') return false;
+        try {
+            const serialized = JSON.stringify(value);
+            return Buffer.byteLength(serialized, 'utf8') <= METADATA_BYTE_CAP;
+        } catch {
+            return false;
+        }
+    }
+
+    defaultMessage(): string {
+        return `metadata must serialise to <= ${METADATA_BYTE_CAP} bytes`;
+    }
+}
 
 const WEBSITE_ACTION_TYPES = [
     ActivityActionType.WEBSITE_USER_REGISTERED,
@@ -54,9 +77,10 @@ export class IngestEventDto {
     summary: string;
 
     @ApiPropertyOptional({
-        description: 'Free-form metadata (actor name, target id, admin URL, etc.)',
+        description: `Free-form metadata (actor name, target id, admin URL, etc.). Capped at ${METADATA_BYTE_CAP} bytes after JSON serialisation.`,
     })
     @IsOptional()
     @IsObject()
+    @Validate(MetadataByteCapConstraint)
     metadata?: Record<string, unknown>;
 }

@@ -49,7 +49,7 @@ import { ActivityActionType } from '@ever-works/agent/entities';
 import { ActivityFeedService } from '../activity-feed.service';
 import { FeedQueryDto } from '../dto/feed-query.dto';
 
-type ActivityLogMock = { findAll: jest.Mock };
+type ActivityLogMock = { findByWork: jest.Mock };
 type HistoryRepoMock = { findByWorkFiltered: jest.Mock };
 
 function makeActivityLog(overrides: Record<string, unknown> = {}) {
@@ -90,14 +90,30 @@ describe('ActivityFeedService', () => {
     let service: ActivityFeedService;
 
     beforeEach(() => {
-        activityLogService = { findAll: jest.fn() };
+        activityLogService = { findByWork: jest.fn() };
         historyRepo = { findByWorkFiltered: jest.fn() };
         service = new ActivityFeedService(activityLogService as never, historyRepo as never);
     });
 
+    it('does NOT pass userId to ActivityLogService — member viewers see owner-attributed rows', async () => {
+        // P1 review fix: the prior implementation filtered by ctx.userId,
+        // hiding website-ingested events (attributed to the Work owner)
+        // from member viewers. Pin the new contract: only workId is
+        // forwarded; access is verified upstream by the controller.
+        activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+
+        const query = new FeedQueryDto();
+        query.category = 'deployment';
+        await service.compose('work-1', 'member-not-owner', query);
+
+        const call = activityLogService.findByWork.mock.calls[0][0] as Record<string, unknown>;
+        expect(call.workId).toBe('work-1');
+        expect(call).not.toHaveProperty('userId');
+    });
+
     describe('merging', () => {
         it('merges sources sorted timestamp DESC and truncates to limit', async () => {
-            activityLogService.findAll.mockResolvedValue({
+            activityLogService.findByWork.mockResolvedValue({
                 activities: [
                     makeActivityLog({
                         id: 'al-new',
@@ -130,7 +146,7 @@ describe('ActivityFeedService', () => {
         });
 
         it('omits nextCursor when fewer entries than limit are returned', async () => {
-            activityLogService.findAll.mockResolvedValue({
+            activityLogService.findByWork.mockResolvedValue({
                 activities: [makeActivityLog()],
                 total: 1,
             });
@@ -143,14 +159,14 @@ describe('ActivityFeedService', () => {
 
     describe('category filtering', () => {
         it('users category queries activity-log with WEBSITE_USER_REGISTERED and skips history', async () => {
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
 
             const query = new FeedQueryDto();
             query.category = 'users';
             await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findAll).toHaveBeenCalledTimes(1);
-            expect(activityLogService.findAll).toHaveBeenCalledWith(
+            expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
+            expect(activityLogService.findByWork).toHaveBeenCalledWith(
                 expect.objectContaining({
                     workId: 'work-1',
                     actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
@@ -160,14 +176,14 @@ describe('ActivityFeedService', () => {
         });
 
         it('reports category queries both WEBSITE_REPORT_FILED and WEBSITE_REPORT_RESOLVED', async () => {
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
 
             const query = new FeedQueryDto();
             query.category = 'reports';
             await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findAll).toHaveBeenCalledTimes(2);
-            const types = activityLogService.findAll.mock.calls.map(
+            expect(activityLogService.findByWork).toHaveBeenCalledTimes(2);
+            const types = activityLogService.findByWork.mock.calls.map(
                 (c) => (c[0] as { actionType: string }).actionType,
             );
             expect(types.sort()).toEqual(
@@ -179,14 +195,14 @@ describe('ActivityFeedService', () => {
         });
 
         it('deployment category only queries activity-log', async () => {
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
 
             const query = new FeedQueryDto();
             query.category = 'deployment';
             await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findAll).toHaveBeenCalledTimes(1);
-            expect(activityLogService.findAll).toHaveBeenCalledWith(
+            expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
+            expect(activityLogService.findByWork).toHaveBeenCalledWith(
                 expect.objectContaining({
                     workId: 'work-1',
                     actionType: ActivityActionType.DEPLOYMENT,

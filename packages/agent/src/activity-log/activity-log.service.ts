@@ -92,8 +92,11 @@ export class ActivityLogService {
         });
     }
 
-    async log(entry: CreateActivityLogDto): Promise<ActivityLog> {
-        const activity = await this.repository.create(entry);
+    async log(
+        entry: CreateActivityLogDto,
+        overrides?: { createdAt?: Date },
+    ): Promise<ActivityLog> {
+        const activity = await this.repository.create(entry, overrides);
         this.dispatchAnalytics(activity);
         this.logger.debug(
             `Activity logged: [${entry.actionType}] ${entry.summary} (user: ${entry.userId})`,
@@ -130,19 +133,26 @@ export class ActivityLogService {
             throw new Error(`Work ${payload.workId} not found`);
         }
 
-        return this.log({
-            userId: work.userId,
-            workId: payload.workId,
-            actionType: payload.actionType,
-            action: `website.${payload.actionType}`,
-            status: ActivityStatus.COMPLETED,
-            summary: payload.summary,
-            metadata: {
-                ...(payload.metadata ?? {}),
-                occurredAt: payload.occurredAt.toISOString(),
+        // Pin `createdAt` to the website's `occurredAt` so the feed
+        // orders by "when it happened" rather than "when the platform
+        // got around to recording it". TypeORM's @CreateDateColumn only
+        // auto-populates when the value is left undefined.
+        return this.log(
+            {
+                userId: work.userId,
+                workId: payload.workId,
+                actionType: payload.actionType,
+                action: `website.${payload.actionType}`,
+                status: ActivityStatus.COMPLETED,
+                summary: payload.summary,
+                metadata: {
+                    ...(payload.metadata ?? {}),
+                    occurredAt: payload.occurredAt.toISOString(),
+                },
+                ingestEventId: payload.eventId,
             },
-            ingestEventId: payload.eventId,
-        });
+            { createdAt: payload.occurredAt },
+        );
     }
 
     async updateStatus(
@@ -257,6 +267,21 @@ export class ActivityLogService {
         query: ActivityLogQueryOptions,
     ): Promise<{ activities: ActivityLog[]; total: number }> {
         return this.repository.findByUserId(query);
+    }
+
+    /**
+     * Per-Work activity lookup that bypasses the `userId` filter. Use for
+     * the work-scoped Activity Feed; access must have been verified
+     * upstream (controller layer). See repository docstring for context.
+     */
+    async findByWork(options: {
+        workId: string;
+        actionType?: ActivityActionType;
+        dateTo?: Date;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        return this.repository.findByWork(options);
     }
 
     async countRunning(userId: string): Promise<number> {

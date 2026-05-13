@@ -20,6 +20,7 @@ import {
     ApiQuery,
     ApiParam,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -191,11 +192,16 @@ export class ActivityLogController {
     @Post('ingest')
     @Public()
     @UseGuards(PlatformSecretGuard)
+    // The shared `PLATFORM_API_SECRET_TOKEN` is pushed to every deployed
+    // site, so its blast radius if leaked is wide. Cap per-IP throughput to
+    // 60/min on top of the bearer check, mitigating spam even if a token
+    // is compromised before rotation lands.
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
     @HttpCode(202)
     @ApiOperation({
         summary: 'Ingest a website-sourced activity event (EW-120)',
         description:
-            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`.',
+            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`; rate-limited at 60 req/min per IP.',
     })
     @ApiResponse({ status: 202, description: 'Event accepted' })
     @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })

@@ -163,6 +163,56 @@ for each user-facing action it wants surfaced.
   to the corresponding `WEBSITE_*` action types in
   `ActivityFeedService`.
 
+## Wire format
+
+The deployed site authenticates with the platform-wide bearer
+token (`PLATFORM_API_SECRET_TOKEN`, pushed by `DeployService` as a
+GitHub Actions secret on every deploy) and POSTs JSON to
+`${PLATFORM_API_URL}/api/activity-log/ingest`.
+
+```bash
+curl -X POST "${PLATFORM_API_URL}/api/activity-log/ingest" \
+  -H "Authorization: Bearer ${PLATFORM_API_SECRET_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data @- <<'EOF'
+{
+  "workId":     "11111111-1111-1111-1111-111111111111",
+  "eventId":    "22222222-2222-2222-2222-222222222222",
+  "actionType": "website_user_registered",
+  "occurredAt": "2026-05-13T10:00:00.000Z",
+  "summary":    "Alice signed up",
+  "metadata":   { "actor": "alice@example.com" }
+}
+EOF
+```
+
+Field rules (enforced by `IngestEventDto` + `class-validator`):
+
+| Field        | Type                | Notes                                                                                          |
+| ------------ | ------------------- | ---------------------------------------------------------------------------------------------- |
+| `workId`     | UUID                | The Work ID — also pushed to the deployed site as the `WORK_ID` env var.                       |
+| `eventId`    | UUID                | Client-generated; **must be stable across retries** for idempotency.                           |
+| `actionType` | enum                | One of `website_user_registered`, `website_item_submitted`, `website_report_filed`, `website_report_resolved`. |
+| `occurredAt` | ISO 8601 string     | When the event actually happened. Used as the row's `createdAt` so the feed orders by real time. |
+| `summary`    | string, ≤ 500 chars | Human-readable one-liner shown in the feed.                                                    |
+| `metadata`   | object, ≤ 8 KiB     | Optional. Free-form. Capped after JSON serialisation.                                          |
+
+Responses:
+
+| Status | Meaning                                                                  |
+| ------ | ------------------------------------------------------------------------ |
+| 202    | Accepted. Response body: `{ id: <activity-log row id> }`.                |
+| 400    | Validation failed (missing field, bad UUID, unknown action type, etc.).  |
+| 401    | Missing / invalid bearer token.                                          |
+| 404    | `workId` does not exist.                                                 |
+| 429    | Rate limit (60 req / min / IP).                                          |
+| 503    | `PLATFORM_API_SECRET_TOKEN` is not configured on the platform.           |
+
+Retries: the website should retry on 5xx and on network errors,
+reusing the same `eventId`. The partial unique index on
+`(workId, ingestEventId)` makes the second POST a no-op that
+returns the original row's id.
+
 ## Follow-up
 
 - Template-side wiring (`directory-web-template` repo): add 4 fetch
