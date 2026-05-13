@@ -12,7 +12,11 @@ jest.mock('@src/generators/website-generator/website-update.service', () => ({
 }));
 
 import { WorkLifecycleService } from '../work-lifecycle.service';
-import { EverWorksDeployQuotaExceededError } from '../../ever-works-providers';
+import {
+    EverWorksDeployQuotaExceededError,
+    EverWorksGitDisabledError,
+    EverWorksGitRequestError,
+} from '../../ever-works-providers';
 import { CreateWorkDto } from '@src/dto/create-work.dto';
 import type { User } from '@src/entities/user.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
@@ -412,7 +416,6 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
     });
 
     it('EW-614: provider EverWorksGitDisabledError → BadRequestException, no Work persisted', async () => {
-        const { EverWorksGitDisabledError } = await import('../../ever-works-providers/types');
         const state: OnboardingWizardStateV2 = {
             version: 2,
             lastStep: 0,
@@ -433,7 +436,6 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
     });
 
     it('EW-614: provider EverWorksGitRequestError → ServiceUnavailableException, no Work persisted', async () => {
-        const { EverWorksGitRequestError } = await import('../../ever-works-providers/types');
         const state: OnboardingWizardStateV2 = {
             version: 2,
             lastStep: 0,
