@@ -93,6 +93,13 @@ describe('WorkLifecycleService', () => {
         const everWorksDeployQuota = {
             assertWithinQuota: jest.fn().mockResolvedValue(undefined),
         } as never;
+        // EW-614: WorkLifecycleService also depends on EverWorksGitProvider.
+        // These tests don't exercise the EverWorks Git path; default the
+        // mock to disabled so the createWork code-path skips it.
+        const everWorksGit = {
+            isEnabled: jest.fn().mockReturnValue(false),
+            createRepository: jest.fn(),
+        } as never;
         eventEmitter = {
             emit: jest.fn(),
         };
@@ -109,6 +116,7 @@ describe('WorkLifecycleService', () => {
             templateCatalogService,
             websiteRepositoryState,
             everWorksDeployQuota,
+            everWorksGit,
             eventEmitter as never,
         );
     });
