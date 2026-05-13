@@ -26,7 +26,7 @@ export default async function Dashboard() {
             activeWebsites: 0,
         })),
         workProposalsAPI.list(['pending']).catch(() => []),
-        workProposalsAPI.status().catch(() => ({ researching: false })),
+        workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
     ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
@@ -40,6 +40,7 @@ export default async function Dashboard() {
             activeWebsites={statsResponse.activeWebsites}
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
+            initiallyCanRefresh={proposalsStatus.canRefresh}
         />
     );
 }

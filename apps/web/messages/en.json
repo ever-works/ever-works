@@ -480,7 +480,8 @@
             },
             "empty": {
                 "title": "No ideas right now.",
-                "subtitle": "Click 'Suggest more ideas' anytime to refresh."
+                "subtitle": "Click 'Suggest more ideas' anytime to refresh.",
+                "limitReached": "Daily limit reached — try again tomorrow."
             },
             "errors": {
                 "rateLimited": "Daily limit reached. Try again tomorrow.",

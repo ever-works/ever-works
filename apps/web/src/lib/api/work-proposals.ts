@@ -4,6 +4,12 @@ import { serverFetch, serverMutation } from './server-api';
 export type WorkProposalStatus = 'pending' | 'dismissed' | 'accepted';
 export type WorkProposalSource = 'auto-signup' | 'user-refresh' | 'discover' | 'scheduled';
 
+export interface WorkProposalsRefreshStatus {
+    researching: boolean;
+    canRefresh: boolean;
+    refreshDisabledReason?: 'rate-limited';
+}
+
 export interface WorkProposal {
     id: string;
     title: string;
@@ -35,8 +41,8 @@ export const workProposalsAPI = {
         });
     },
 
-    async status(): Promise<{ researching: boolean }> {
-        return serverFetch<{ researching: boolean }>(`/me/work-proposals/status`, {
+    async status(): Promise<WorkProposalsRefreshStatus> {
+        return serverFetch<WorkProposalsRefreshStatus>(`/me/work-proposals/status`, {
             method: 'GET',
         });
     },

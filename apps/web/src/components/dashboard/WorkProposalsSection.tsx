@@ -17,17 +17,20 @@ const POLL_MAX_MS = 120_000;
 interface WorkProposalsSectionProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
+    initiallyCanRefresh: boolean;
     username?: string;
 }
 
 export function WorkProposalsSection({
     initialProposals,
     initiallyResearching,
+    initiallyCanRefresh,
     username,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const [proposals, setProposals] = useState(initialProposals);
     const [researching, setResearching] = useState(initiallyResearching);
+    const [canRefresh, setCanRefresh] = useState(initiallyCanRefresh);
     const [pendingRefresh, startRefreshTransition] = useTransition();
     const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -48,6 +51,7 @@ export function WorkProposalsSection({
                     if (cancelled) return;
                     setProposals(list);
                     setResearching(status.researching);
+                    setCanRefresh(status.canRefresh);
                     if (!status.researching) return;
                 } catch {
                     // Network blip — keep polling until deadline.
@@ -74,6 +78,7 @@ export function WorkProposalsSection({
                     setResearching(true);
                 } else if (result.status === 'rate-limited') {
                     setRefreshError(t('errors.rateLimited'));
+                    setCanRefresh(false);
                 }
             } catch {
                 setRefreshError(t('errors.generic'));
@@ -87,6 +92,9 @@ export function WorkProposalsSection({
 
     const showEmpty = proposals.length === 0 && !researching;
     const showResearching = researching && proposals.length === 0;
+    // The button is meaningful only when the user has quota left or is
+    // already mid-run (in which case it doubles as the spinner indicator).
+    const showRefreshButton = canRefresh || researching;
 
     return (
         <section className="mt-8" aria-labelledby="work-proposals-heading">
@@ -100,19 +108,21 @@ export function WorkProposalsSection({
                         {username ? t('header.titleWithName', { username }) : t('header.title')}
                     </h2>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleRefresh}
-                    disabled={pendingRefresh || researching}
-                    className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50"
-                >
-                    {pendingRefresh || researching ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="w-4 h-4" />
-                    )}
-                    {t('actions.refresh')}
-                </button>
+                {showRefreshButton && (
+                    <button
+                        type="button"
+                        onClick={handleRefresh}
+                        disabled={pendingRefresh || researching}
+                        className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50"
+                    >
+                        {pendingRefresh || researching ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <RefreshCw className="w-4 h-4" />
+                        )}
+                        {t('actions.refresh')}
+                    </button>
+                )}
             </div>
 
             {refreshError && (
@@ -132,7 +142,9 @@ export function WorkProposalsSection({
             {!showResearching && showEmpty && (
                 <div className="rounded-md p-5 bg-card dark:bg-surface-secondary-dark border border-card-border text-sm text-text-secondary dark:text-text-secondary-dark">
                     <p>{t('empty.title')}</p>
-                    <p className="mt-1 text-xs">{t('empty.subtitle')}</p>
+                    <p className="mt-1 text-xs">
+                        {canRefresh ? t('empty.subtitle') : t('empty.limitReached')}
+                    </p>
                 </div>
             )}
 
