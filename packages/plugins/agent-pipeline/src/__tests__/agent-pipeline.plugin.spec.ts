@@ -247,6 +247,39 @@ describe('AgentPipelinePlugin', () => {
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('User ID');
 		});
+
+		it('passes processed per-plugin config to data sources', async () => {
+			const queryAll = vi.fn().mockResolvedValue({ items: [], errors: [] });
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+			const processedPluginConfig = {
+				'apify-data-source': { enabled: true, datasetId: 'dataset-1' }
+			};
+
+			await (plugin as any).queryDataSources(
+				{
+					dataSourceFacade: {
+						isConfigured: () => true,
+						queryAll
+					}
+				},
+				work,
+				'user1',
+				{
+					...request,
+					config: { target_items: 25 },
+					pluginConfig: processedPluginConfig
+				},
+				existing,
+				'/tmp/unused-agent-pipeline-test',
+				logger
+			);
+
+			expect(queryAll).toHaveBeenCalledWith(
+				expect.objectContaining({
+					pluginConfig: processedPluginConfig
+				})
+			);
+		});
 	});
 
 	describe('dedup helpers', () => {
