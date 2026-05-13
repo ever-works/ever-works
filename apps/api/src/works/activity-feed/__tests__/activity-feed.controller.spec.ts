@@ -3,7 +3,6 @@
 // convention in `activity-log.controller.spec.ts`.
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class {},
-    PlatformSyncSecretService: class {},
 }));
 jest.mock('@ever-works/agent/activity-log', () => ({}));
 jest.mock('@ever-works/agent/database', () => ({}));

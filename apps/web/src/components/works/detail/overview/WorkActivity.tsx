@@ -119,8 +119,6 @@ export function WorkActivity({ workId }: WorkActivityProps) {
                                         'bg-info/10 text-info',
                                     entry.source === 'generation-history' &&
                                         'bg-success/10 text-success',
-                                    entry.source === 'directory-site' &&
-                                        'bg-warning/10 text-warning',
                                 )}
                                 aria-hidden="true"
                             >

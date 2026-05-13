@@ -14,11 +14,7 @@ interface FeedRowProps {
 
 function IconForSource({ source }: { source: FeedEntry['source'] }) {
     const colorClass =
-        source === 'platform-activity-log'
-            ? 'text-info bg-info/10'
-            : source === 'generation-history'
-              ? 'text-success bg-success/10'
-              : 'text-warning bg-warning/10';
+        source === 'platform-activity-log' ? 'text-info bg-info/10' : 'text-success bg-success/10';
 
     return (
         <span
@@ -46,9 +42,6 @@ function entryHref(entry: FeedEntry, workId: string): { href: string; external: 
             href: `${ROUTES.DASHBOARD_WORK_HISTORY(workId)}?run=${entry.runId}`,
             external: false,
         };
-    }
-    if (entry.source === 'directory-site') {
-        return { href: entry.target.adminUrl, external: true };
     }
     // Platform activity-log entries deep-link to the global activity view
     // filtered to this entry; ActivityDetailModal embedding can come later.

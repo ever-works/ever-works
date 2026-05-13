@@ -262,37 +262,6 @@ export class WorkRepository {
         });
     }
 
-    /**
-     * Set `platformSyncSecretEncrypted` only if it is currently NULL.
-     * Used by `PlatformSyncSecretService.getOrGenerate` to make first-deploy
-     * secret bootstrap idempotent under concurrent deploys: the first writer
-     * wins; subsequent writers see `affected === 0` and re-read the row.
-     */
-    async setPlatformSyncSecretIfNull(workId: string, encryptedSecret: string): Promise<boolean> {
-        const result = await this.repository.update(
-            { id: workId, platformSyncSecretEncrypted: IsNull() },
-            { platformSyncSecretEncrypted: encryptedSecret },
-        );
-        return (result.affected ?? 0) > 0;
-    }
-
-    async updatePlatformSyncStatus(
-        workId: string,
-        update: { lastSuccessAt?: Date; lastError?: string | null },
-    ): Promise<void> {
-        const data: Partial<Work> = {};
-        if (update.lastSuccessAt !== undefined) {
-            data.platformSyncLastSuccessAt = update.lastSuccessAt;
-        }
-        if (update.lastError !== undefined) {
-            data.platformSyncLastError = update.lastError;
-        }
-        if (Object.keys(data).length === 0) {
-            return;
-        }
-        await this.repository.update(workId, data);
-    }
-
     async updateGenerateStatus(id: string, generateStatus: Work['generateStatus']): Promise<void> {
         if (generateStatus?.warnings?.length) {
             generateStatus = { ...generateStatus, warnings: [...new Set(generateStatus.warnings)] };

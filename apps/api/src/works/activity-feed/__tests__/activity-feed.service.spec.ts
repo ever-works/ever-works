@@ -4,7 +4,6 @@
 jest.mock('@ever-works/agent/activity-log', () => ({}));
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
-jest.mock('@ever-works/agent/cache', () => ({ CACHE_MANAGER: Symbol('CACHE_MANAGER') }));
 jest.mock('@ever-works/agent/entities', () => ({
     ActivityActionType: {
         GENERATION: 'generation',
@@ -42,32 +41,12 @@ jest.mock('@ever-works/agent/entities', () => ({
     },
 }));
 
-import type { Cache } from '@ever-works/agent/cache';
 import { ActivityActionType } from '@ever-works/agent/entities';
 import { ActivityFeedService } from '../activity-feed.service';
 import { FeedQueryDto } from '../dto/feed-query.dto';
 
 type ActivityLogMock = { findAll: jest.Mock };
 type HistoryRepoMock = { findByWorkFiltered: jest.Mock };
-type DirectoryClientMock = { fetchActivityFeed: jest.Mock };
-type WorkRepoMock = { findById: jest.Mock; updatePlatformSyncStatus: jest.Mock };
-type CacheMock = { get: jest.Mock; set: jest.Mock; del: jest.Mock };
-
-interface WorkLike {
-    id: string;
-    userId: string;
-    platformSyncEnabled: boolean;
-    platformSyncLastSuccessAt?: Date | null;
-}
-
-function makeWork(overrides: Partial<WorkLike> = {}): WorkLike {
-    return {
-        id: 'work-1',
-        userId: 'user-1',
-        platformSyncEnabled: true,
-        ...overrides,
-    };
-}
 
 function makeActivityLog(overrides: Record<string, unknown> = {}) {
     return {
@@ -104,70 +83,16 @@ function makeHistoryRow(overrides: Record<string, unknown> = {}) {
 describe('ActivityFeedService', () => {
     let activityLogService: ActivityLogMock;
     let historyRepo: HistoryRepoMock;
-    let directoryClient: DirectoryClientMock;
-    let workRepo: WorkRepoMock;
-    let cache: CacheMock;
     let service: ActivityFeedService;
 
     beforeEach(() => {
         activityLogService = { findAll: jest.fn() };
         historyRepo = { findByWorkFiltered: jest.fn() };
-        directoryClient = { fetchActivityFeed: jest.fn() };
-        workRepo = { findById: jest.fn(), updatePlatformSyncStatus: jest.fn() };
-        cache = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
-        service = new ActivityFeedService(
-            activityLogService as never,
-            historyRepo as never,
-            directoryClient as never,
-            workRepo as never,
-            cache as unknown as Cache,
-        );
-    });
-
-    describe('cache', () => {
-        it('returns cached response without calling sources', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            const cached = {
-                entries: [],
-                nextCursor: null,
-                serverTime: '2026-05-12T11:00:00.000Z',
-            };
-            cache.get.mockResolvedValue(cached);
-
-            const result = await service.compose('work-1', 'user-1', new FeedQueryDto());
-
-            expect(result).toBe(cached);
-            expect(activityLogService.findAll).not.toHaveBeenCalled();
-            expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
-            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
-        });
-
-        it('writes to cache after composing on a miss', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
-            historyRepo.findByWorkFiltered.mockResolvedValue([]);
-            directoryClient.fetchActivityFeed.mockResolvedValue({
-                ok: true,
-                entries: [],
-                nextCursor: null,
-            });
-
-            await service.compose('work-1', 'user-1', new FeedQueryDto());
-
-            expect(cache.set).toHaveBeenCalledTimes(1);
-            const [key, value, ttl] = cache.set.mock.calls[0];
-            expect(key).toMatch(/^activity-feed:work-1:/);
-            expect(ttl).toBe(30_000);
-            expect(value.entries).toEqual([]);
-        });
+        service = new ActivityFeedService(activityLogService as never, historyRepo as never);
     });
 
     describe('merging', () => {
         it('merges sources sorted timestamp DESC and truncates to limit', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
-
             activityLogService.findAll.mockResolvedValue({
                 activities: [
                     makeActivityLog({
@@ -187,7 +112,6 @@ describe('ActivityFeedService', () => {
                     startedAt: new Date('2026-05-12T11:00:00.000Z'),
                 }),
             ]);
-            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
 
             const query = new FeedQueryDto();
             query.limit = 2;
@@ -202,14 +126,11 @@ describe('ActivityFeedService', () => {
         });
 
         it('omits nextCursor when fewer entries than limit are returned', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
             activityLogService.findAll.mockResolvedValue({
                 activities: [makeActivityLog()],
                 total: 1,
             });
             historyRepo.findByWorkFiltered.mockResolvedValue([]);
-            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
 
             const response = await service.compose('work-1', 'user-1', new FeedQueryDto());
             expect(response.nextCursor).toBeNull();
@@ -217,26 +138,17 @@ describe('ActivityFeedService', () => {
     });
 
     describe('category filtering', () => {
-        it('users category skips activity-log and history, only calls directory client', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
-            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
-
+        it('users category skips activity-log and history (website-only events)', async () => {
             const query = new FeedQueryDto();
             query.category = 'users';
-            await service.compose('work-1', 'user-1', query);
+            const response = await service.compose('work-1', 'user-1', query);
 
             expect(activityLogService.findAll).not.toHaveBeenCalled();
             expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
-            expect(directoryClient.fetchActivityFeed).toHaveBeenCalledWith(
-                expect.objectContaining({ id: 'work-1' }),
-                expect.objectContaining({ types: ['users'] }),
-            );
+            expect(response.entries).toEqual([]);
         });
 
         it('deployment category only queries activity-log', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
             activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
 
             const query = new FeedQueryDto();
@@ -251,69 +163,6 @@ describe('ActivityFeedService', () => {
                 }),
             );
             expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
-            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('degraded propagation', () => {
-        it('surfaces directory-site degraded reason in the response and updates lastError', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
-            historyRepo.findByWorkFiltered.mockResolvedValue([]);
-            directoryClient.fetchActivityFeed.mockResolvedValue({
-                ok: false,
-                degraded: { reason: 'timeout', detail: 'after 5s' },
-            });
-            workRepo.updatePlatformSyncStatus.mockResolvedValue(undefined);
-
-            const response = await service.compose('work-1', 'user-1', new FeedQueryDto());
-
-            expect(response.degraded?.directorySite?.reason).toBe('timeout');
-            await new Promise((resolve) => setImmediate(resolve));
-            expect(workRepo.updatePlatformSyncStatus).toHaveBeenCalledWith(
-                'work-1',
-                expect.objectContaining({ lastError: expect.stringContaining('timeout') }),
-            );
-        });
-
-        it('records lastSuccessAt when all sources succeeded', async () => {
-            workRepo.findById.mockResolvedValue(makeWork());
-            cache.get.mockResolvedValue(null);
-            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
-            historyRepo.findByWorkFiltered.mockResolvedValue([]);
-            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
-            workRepo.updatePlatformSyncStatus.mockResolvedValue(undefined);
-
-            await service.compose('work-1', 'user-1', new FeedQueryDto());
-            await new Promise((resolve) => setImmediate(resolve));
-
-            expect(workRepo.updatePlatformSyncStatus).toHaveBeenCalledWith(
-                'work-1',
-                expect.objectContaining({ lastSuccessAt: expect.any(Date), lastError: null }),
-            );
-        });
-    });
-
-    describe('defensive guards', () => {
-        it('returns an empty response when the work cannot be found', async () => {
-            workRepo.findById.mockResolvedValue(null);
-            const response = await service.compose('missing', 'user-1', new FeedQueryDto());
-            expect(response.entries).toEqual([]);
-            expect(cache.set).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('cache invalidation', () => {
-        it('deletes the per-Work cache keys on work-event', async () => {
-            await service.onWorkEvent({ workId: 'work-42' });
-            expect(cache.del).toHaveBeenCalledWith('activity-feed:work-42:all:50:null');
-            expect(cache.del).toHaveBeenCalledWith('activity-feed:work-42:generation:50:null');
-        });
-
-        it('ignores events without a workId payload', async () => {
-            await service.onWorkEvent({} as never);
-            expect(cache.del).not.toHaveBeenCalled();
         });
     });
 });

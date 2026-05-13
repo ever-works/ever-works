@@ -5,7 +5,6 @@ import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
-import { PlatformSyncSecretService } from '@ever-works/agent/services';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -51,7 +50,6 @@ export class DeployService {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
-        private readonly platformSyncSecretService: PlatformSyncSecretService,
     ) {}
 
     /**
@@ -258,23 +256,6 @@ export class DeployService {
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
-
-        // EW-120: push the per-Work `PLATFORM_SYNC_SECRET` so the deployed
-        // directory site can verify HMAC-signed Activity Feed pulls from the
-        // platform aggregator. Generated lazily on first deploy.
-        // Best-effort — a failure here MUST NOT block the deploy, since
-        // existing Works can run without sync (the aggregator degrades to
-        // "not_provisioned" until the next successful deploy).
-        try {
-            const platformSyncSecret = await this.platformSyncSecretService.getOrGenerate(work.id);
-            await this.setSecret(ctx, 'PLATFORM_SYNC_SECRET', platformSyncSecret);
-        } catch (error) {
-            this.logger.error(
-                `Failed to push PLATFORM_SYNC_SECRET for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-        }
 
         // Plugin-specific extra secrets (k8s registry creds, namespace, etc.)
         // The plugin returns a Record<string, string> of secret name → value;

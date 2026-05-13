@@ -58,35 +58,12 @@ export interface GenerationHistoryEntry extends FeedEntryBase {
     durationInSeconds?: number | null;
 }
 
-export interface DirectorySiteEntry extends FeedEntryBase {
-    source: 'directory-site';
-    type: 'user_registered' | 'item_created' | 'item_status_changed' | 'report_created';
-    actor: { id: string; name: string; email?: string | null } | null;
-    target: { id: string; type: 'user' | 'item' | 'report'; name: string; adminUrl: string };
-}
-
-export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry | DirectorySiteEntry;
-
-export interface FeedDegradedReason {
-    reason:
-        | 'not_provisioned'
-        | 'disabled'
-        | 'timeout'
-        | 'unauthorized'
-        | 'upstream_5xx'
-        | 'network'
-        | 'parse_error';
-    detail?: string;
-    lastSuccessAt?: string | null;
-}
+export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry;
 
 export interface FeedResponse {
     entries: FeedEntry[];
     nextCursor?: string | null;
     serverTime: string;
-    degraded?: {
-        directorySite?: FeedDegradedReason;
-    };
 }
 
 export interface GetActivityFeedParams {

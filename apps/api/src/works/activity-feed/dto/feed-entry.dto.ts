@@ -3,8 +3,10 @@ import type { WorkHistoryActivityType } from '@ever-works/contracts/api';
 
 /**
  * Categories surfaced as filter chips in the Activity Feed UI. Maps to a set
- * of `type` values across the three sources (platform activity-log, work
- * generation history, deployed-site events). See `ActivityFeedService.compose`.
+ * of `type` values across the two sources (platform activity-log, work
+ * generation history). Website-sourced events (users/submissions/reports) are
+ * ingested into the platform activity-log via the EW-120 push endpoint.
+ * See `ActivityFeedService.compose`.
  */
 export type FeedCategory =
     | 'all'
@@ -32,11 +34,10 @@ export const FEED_CATEGORIES: readonly FeedCategory[] = [
 ];
 
 /**
- * Discriminated union normalising the three feed sources into a single shape
- * the web client can render uniformly. Each variant carries source-specific
- * extras under `details` while the top-level fields are stable across sources.
+ * Discriminated union normalising the feed sources into a single shape the web
+ * client can render uniformly.
  */
-export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry | DirectorySiteEntry;
+export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry;
 
 interface FeedEntryBase {
     id: string;
@@ -61,11 +62,4 @@ export interface GenerationHistoryEntry extends FeedEntryBase {
     updatedItemsCount: number;
     totalItemsCount: number;
     durationInSeconds?: number | null;
-}
-
-export interface DirectorySiteEntry extends FeedEntryBase {
-    source: 'directory-site';
-    type: 'user_registered' | 'item_created' | 'item_status_changed' | 'report_created';
-    actor: { id: string; name: string; email?: string | null } | null;
-    target: { id: string; type: 'user' | 'item' | 'report'; name: string; adminUrl: string };
 }

@@ -10,11 +10,9 @@ import type {
     FeedCategory,
     FeedEntry,
     FeedResponse,
-    FeedDegradedReason,
 } from '@/lib/api/works/activity-feed.types';
 import { FeedFilterChips } from './FeedFilterChips';
 import { FeedRow } from './FeedRow';
-import { DegradedBanner } from './DegradedBanner';
 import { EmptyState } from './EmptyState';
 import { SkeletonList } from './SkeletonList';
 
@@ -34,7 +32,6 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
 
     const [category, setCategory] = useState<FeedCategory>(initialCategory);
     const [entries, setEntries] = useState<FeedEntry[] | null>(null);
-    const [degraded, setDegraded] = useState<FeedDegradedReason | undefined>();
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const requestIdRef = useRef(0);
@@ -53,7 +50,6 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
                 if (result.success) {
                     const data: FeedResponse = result.data;
                     setEntries(data.entries);
-                    setDegraded(data.degraded?.directorySite);
                     setError(null);
                 } else {
                     setError(result.error);
@@ -121,8 +117,6 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
     }, [category, fetchFeed]);
 
     const isInitialLoading = entries === null && !error;
-    const isDirectorySyncBroken =
-        degraded?.reason === 'disabled' || degraded?.reason === 'not_provisioned';
 
     return (
         <div className="space-y-4">
@@ -167,13 +161,7 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
                 </button>
             </header>
 
-            <FeedFilterChips
-                value={category}
-                onChange={handleCategoryChange}
-                directorySiteDisabled={isDirectorySyncBroken}
-            />
-
-            {degraded && <DegradedBanner degraded={degraded} />}
+            <FeedFilterChips value={category} onChange={handleCategoryChange} />
 
             {error && (
                 <div

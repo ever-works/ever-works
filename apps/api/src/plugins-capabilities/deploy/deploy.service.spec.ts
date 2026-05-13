@@ -1,7 +1,6 @@
 jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
 jest.mock('@ever-works/agent/entities', () => ({ Work: class {}, User: class {} }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
-jest.mock('@ever-works/agent/services', () => ({ PlatformSyncSecretService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({
     DeployFacadeService: class {},
     GitFacadeService: class {},
@@ -106,10 +105,6 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             emit: jest.fn(),
         };
 
-        const platformSyncSecretService = {
-            getOrGenerate: jest.fn().mockResolvedValue('hex'.repeat(21) + 'h'), // 64 hex chars
-        };
-
         const service = new DeployService(
             deployFacade as any,
             gitFacade as any,
@@ -118,7 +113,6 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             websiteUpdateService as any,
             websiteTemplateResolver as any,
             eventEmitter as any,
-            platformSyncSecretService as any,
         );
 
         return {
@@ -129,7 +123,6 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             pluginRegistry,
             githubPlugin,
             eventEmitter,
-            platformSyncSecretService,
         };
     };
 
@@ -219,59 +212,18 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
         const { secrets } = captureCalls(githubPlugin);
         const keys = secrets.map((s: any) => s.key).sort();
-        // Only the 4 standard secrets + CRON_SECRET + PLATFORM_SYNC_SECRET (EW-120).
+        // Only the 4 standard secrets + CRON_SECRET.
         expect(keys).toEqual(
             expect.arrayContaining([
                 'CRON_SECRET',
                 'DATA_REPOSITORY',
                 'DEPLOY_TOKEN',
                 'K8S_TOKEN',
-                'PLATFORM_SYNC_SECRET',
                 'TENANT_ID',
             ]),
         );
         // No K8S_-prefixed extras (they only come from getDeploymentSecrets).
         expect(keys.filter((k: string) => k.startsWith('K8S_INGRESS'))).toEqual([]);
-    });
-
-    describe('PLATFORM_SYNC_SECRET (EW-120)', () => {
-        it('pushes per-Work PLATFORM_SYNC_SECRET on every deploy regardless of plugin', async () => {
-            const { service, githubPlugin, platformSyncSecretService } = buildService({
-                plugin: {
-                    id: 'vercel',
-                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
-                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
-                },
-                deployProvider: 'vercel',
-            });
-
-            await service.deploy('work-1', 'user-1', {});
-
-            expect(platformSyncSecretService.getOrGenerate).toHaveBeenCalledWith('work-1');
-            const { secrets } = captureCalls(githubPlugin);
-            const platformSecret = secrets.find((s: any) => s.key === 'PLATFORM_SYNC_SECRET');
-            expect(platformSecret).toBeDefined();
-            expect(platformSecret?.value).toBe('hex'.repeat(21) + 'h');
-        });
-
-        it('does not abort the deploy if the secret service throws', async () => {
-            const { service, githubPlugin, platformSyncSecretService } = buildService({
-                plugin: { id: 'k8s', getDeploymentSecrets: jest.fn().mockResolvedValue({}) },
-            });
-            platformSyncSecretService.getOrGenerate.mockRejectedValueOnce(
-                new Error('PLATFORM_ENCRYPTION_KEY missing'),
-            );
-
-            const result = await service.deploy('work-1', 'user-1', {});
-
-            // Deploy still completes — the standard TENANT_ID etc. still get pushed.
-            expect(result).toBe(true);
-            const { secrets } = captureCalls(githubPlugin);
-            const keys = secrets.map((s: any) => s.key);
-            expect(keys).toContain('TENANT_ID');
-            // PLATFORM_SYNC_SECRET specifically did NOT land.
-            expect(keys).not.toContain('PLATFORM_SYNC_SECRET');
-        });
     });
 
     it('does not leak the plugin token (kubeconfig) into pushed secret values from getDeploymentSecrets', async () => {

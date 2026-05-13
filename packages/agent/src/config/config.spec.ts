@@ -632,7 +632,6 @@ describe('agent/config', () => {
                 'github',
                 'githubApp',
                 'isCli',
-                'platformSync',
                 'posthog',
                 'sentry',
                 'subscriptions',

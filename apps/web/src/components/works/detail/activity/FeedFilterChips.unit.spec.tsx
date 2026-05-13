@@ -25,16 +25,4 @@ describe('FeedFilterChips', () => {
         await userEvent.click(usersChip);
         expect(onChange).toHaveBeenCalledWith('users');
     });
-
-    it('dims directory-site chips when directorySiteDisabled is true', () => {
-        render(<FeedFilterChips value="all" onChange={() => undefined} directorySiteDisabled />);
-        const dimmed = ['users', 'submissions', 'reports'];
-        for (const cat of dimmed) {
-            const chip = screen.getByRole('tab', { name: cat });
-            expect(chip.className).toContain('opacity-50');
-        }
-        // Non-directory chips are not dimmed.
-        const platform = screen.getByRole('tab', { name: 'deployment' });
-        expect(platform.className).not.toContain('opacity-50');
-    });
 });

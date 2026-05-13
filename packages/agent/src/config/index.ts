@@ -274,14 +274,4 @@ export const config = {
             },
         },
     },
-
-    // EW-120 Activity Feed — per-Work `PLATFORM_SYNC_SECRET` is generated
-    // lazily on first deploy and stored AES-256-GCM-encrypted with this key.
-    // 32 raw bytes encoded as 64 hex chars. Required for any Work whose
-    // deployed-site activity source is enabled.
-    platformSync: {
-        getEncryptionKey() {
-            return process.env.PLATFORM_ENCRYPTION_KEY || '';
-        },
-    },
 };
