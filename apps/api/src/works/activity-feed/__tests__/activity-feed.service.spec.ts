@@ -31,6 +31,10 @@ jest.mock('@ever-works/agent/entities', () => ({
         SCHEDULE_DELETED: 'schedule_deleted',
         SCHEDULE_EXECUTED: 'schedule_executed',
         COMMUNITY_PR_MERGED: 'community_pr_merged',
+        WEBSITE_USER_REGISTERED: 'website_user_registered',
+        WEBSITE_ITEM_SUBMITTED: 'website_item_submitted',
+        WEBSITE_REPORT_FILED: 'website_report_filed',
+        WEBSITE_REPORT_RESOLVED: 'website_report_resolved',
     },
     ActivityStatus: {
         PENDING: 'pending',
@@ -138,14 +142,40 @@ describe('ActivityFeedService', () => {
     });
 
     describe('category filtering', () => {
-        it('users category skips activity-log and history (website-only events)', async () => {
+        it('users category queries activity-log with WEBSITE_USER_REGISTERED and skips history', async () => {
+            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
+
             const query = new FeedQueryDto();
             query.category = 'users';
-            const response = await service.compose('work-1', 'user-1', query);
+            await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findAll).not.toHaveBeenCalled();
+            expect(activityLogService.findAll).toHaveBeenCalledTimes(1);
+            expect(activityLogService.findAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: 'work-1',
+                    actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
+                }),
+            );
             expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
-            expect(response.entries).toEqual([]);
+        });
+
+        it('reports category queries both WEBSITE_REPORT_FILED and WEBSITE_REPORT_RESOLVED', async () => {
+            activityLogService.findAll.mockResolvedValue({ activities: [], total: 0 });
+
+            const query = new FeedQueryDto();
+            query.category = 'reports';
+            await service.compose('work-1', 'user-1', query);
+
+            expect(activityLogService.findAll).toHaveBeenCalledTimes(2);
+            const types = activityLogService.findAll.mock.calls.map(
+                (c) => (c[0] as { actionType: string }).actionType,
+            );
+            expect(types.sort()).toEqual(
+                [
+                    ActivityActionType.WEBSITE_REPORT_FILED,
+                    ActivityActionType.WEBSITE_REPORT_RESOLVED,
+                ].sort(),
+            );
         });
 
         it('deployment category only queries activity-log', async () => {

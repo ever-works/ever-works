@@ -101,6 +101,50 @@ export class ActivityLogService {
         return activity;
     }
 
+    /**
+     * Persist an event POSTed by a deployed directory site (EW-120).
+     *
+     * Idempotent by `(workId, eventId)` — a retry from the website lands on
+     * the same row instead of creating duplicates. The attribution `userId`
+     * is the Work owner so the event surfaces in their per-Work Activity
+     * Feed without authenticating the end-user that triggered it.
+     */
+    async ingestFromWebsite(payload: {
+        workId: string;
+        eventId: string;
+        actionType: ActivityActionType;
+        occurredAt: Date;
+        summary: string;
+        metadata?: Record<string, unknown>;
+    }): Promise<ActivityLog> {
+        const existing = await this.repository.findByWorkAndIngestEventId(
+            payload.workId,
+            payload.eventId,
+        );
+        if (existing) {
+            return existing;
+        }
+
+        const work = await this.workRepository.findById(payload.workId);
+        if (!work) {
+            throw new Error(`Work ${payload.workId} not found`);
+        }
+
+        return this.log({
+            userId: work.userId,
+            workId: payload.workId,
+            actionType: payload.actionType,
+            action: `website.${payload.actionType}`,
+            status: ActivityStatus.COMPLETED,
+            summary: payload.summary,
+            metadata: {
+                ...(payload.metadata ?? {}),
+                occurredAt: payload.occurredAt.toISOString(),
+            },
+            ingestEventId: payload.eventId,
+        });
+    }
+
     async updateStatus(
         id: string,
         status: ActivityStatus,

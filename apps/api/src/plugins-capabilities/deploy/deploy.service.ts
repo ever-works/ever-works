@@ -252,10 +252,38 @@ export class DeployService {
 
         await Promise.all([
             this.setSecret(ctx, 'TENANT_ID', work.id),
+            this.setSecret(ctx, 'WORK_ID', work.id),
             this.setSecret(ctx, 'DATA_REPOSITORY', work.getDataRepo()),
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
+
+        // EW-120: push the platform-wide PLATFORM_API_URL +
+        // PLATFORM_API_SECRET_TOKEN so the deployed directory site can POST
+        // user-facing events (signups, item submissions, reports) to the
+        // platform's ingest endpoint. Operator-configured on the platform
+        // itself; if either is missing the deploy continues without the
+        // ingest plumbing — feed degrades to the platform-only sources.
+        const platformApiUrl = process.env.PLATFORM_API_URL;
+        const platformApiSecret = process.env.PLATFORM_API_SECRET_TOKEN;
+        if (platformApiUrl && platformApiSecret) {
+            try {
+                await Promise.all([
+                    this.setSecret(ctx, 'PLATFORM_API_URL', platformApiUrl),
+                    this.setSecret(ctx, 'PLATFORM_API_SECRET_TOKEN', platformApiSecret),
+                ]);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to push PLATFORM_API_* secrets for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        } else {
+            this.logger.debug(
+                `PLATFORM_API_URL / PLATFORM_API_SECRET_TOKEN not configured on platform; skipping ingest secret push for work ${work.id}`,
+            );
+        }
 
         // Plugin-specific extra secrets (k8s registry creds, namespace, etc.)
         // The plugin returns a Record<string, string> of secret name → value;

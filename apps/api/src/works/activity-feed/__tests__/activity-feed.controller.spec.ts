@@ -37,6 +37,10 @@ jest.mock('@ever-works/agent/entities', () => ({
         SCHEDULE_DELETED: 'schedule_deleted',
         SCHEDULE_EXECUTED: 'schedule_executed',
         COMMUNITY_PR_MERGED: 'community_pr_merged',
+        WEBSITE_USER_REGISTERED: 'website_user_registered',
+        WEBSITE_ITEM_SUBMITTED: 'website_item_submitted',
+        WEBSITE_REPORT_FILED: 'website_report_filed',
+        WEBSITE_REPORT_RESOLVED: 'website_report_resolved',
     },
 }));
 

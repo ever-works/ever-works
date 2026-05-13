@@ -1,12 +1,16 @@
 import {
+    Body,
     Controller,
     Get,
+    HttpCode,
+    NotFoundException,
     Param,
+    Post,
     Query,
     Res,
     DefaultValuePipe,
     ParseIntPipe,
-    NotFoundException,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -17,10 +21,13 @@ import {
     ApiParam,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { WorkRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
+import { IngestEventDto } from './dto/ingest-event.dto';
+import { PlatformSecretGuard } from './guards/platform-secret.guard';
 
 type CsvResponse = {
     setHeader(name: string, value: string): void;
@@ -179,6 +186,37 @@ export class ActivityLogController {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename=activity-log.csv');
         res.send(csv);
+    }
+
+    @Post('ingest')
+    @Public()
+    @UseGuards(PlatformSecretGuard)
+    @HttpCode(202)
+    @ApiOperation({
+        summary: 'Ingest a website-sourced activity event (EW-120)',
+        description:
+            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`.',
+    })
+    @ApiResponse({ status: 202, description: 'Event accepted' })
+    @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+    @ApiResponse({ status: 404, description: 'Work not found' })
+    async ingestWebsiteEvent(@Body() dto: IngestEventDto) {
+        try {
+            const activity = await this.activityLogService.ingestFromWebsite({
+                workId: dto.workId,
+                eventId: dto.eventId,
+                actionType: dto.actionType,
+                occurredAt: new Date(dto.occurredAt),
+                summary: dto.summary,
+                metadata: dto.metadata,
+            });
+            return { id: activity.id };
+        } catch (err) {
+            if (err instanceof Error && /not found/i.test(err.message)) {
+                throw new NotFoundException(err.message);
+            }
+            throw err;
+        }
     }
 
     @Get(':id')

@@ -41,6 +41,15 @@ export class ActivityLogRepository {
         });
     }
 
+    async findByWorkAndIngestEventId(
+        workId: string,
+        ingestEventId: string,
+    ): Promise<ActivityLog | null> {
+        return this.repository.findOne({
+            where: { workId, ingestEventId },
+        });
+    }
+
     async findLatestByUserWorkActionStatus(params: {
         userId: string;
         workId: string;

@@ -74,10 +74,10 @@ describe('activity-log.types', () => {
         });
 
         it('has the expected total number of literal values (catch silent additions)', () => {
-            // 36 documented literals — pinned so any silent addition is a
-            // deliberate change.
+            // 40 documented literals — pinned so any silent addition is a
+            // deliberate change. Last bumped by EW-120 (4 WEBSITE_* values).
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(36);
+            expect(literals).toHaveLength(40);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

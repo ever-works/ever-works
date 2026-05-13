@@ -226,6 +226,64 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         expect(keys.filter((k: string) => k.startsWith('K8S_INGRESS'))).toEqual([]);
     });
 
+    describe('Activity Feed ingest secrets (EW-120)', () => {
+        const originalUrl = process.env.PLATFORM_API_URL;
+        const originalToken = process.env.PLATFORM_API_SECRET_TOKEN;
+
+        afterEach(() => {
+            process.env.PLATFORM_API_URL = originalUrl;
+            process.env.PLATFORM_API_SECRET_TOKEN = originalToken;
+        });
+
+        it('always pushes WORK_ID alongside TENANT_ID', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: { id: 'legacy' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.TENANT_ID).toBe('work-1');
+            expect(byKey.WORK_ID).toBe('work-1');
+        });
+
+        it('pushes PLATFORM_API_URL + PLATFORM_API_SECRET_TOKEN when both env vars are set', async () => {
+            process.env.PLATFORM_API_URL = 'https://api.ever.works';
+            process.env.PLATFORM_API_SECRET_TOKEN = 'platform-shared-secret-value-32x';
+
+            const { service, githubPlugin } = buildService({
+                plugin: { id: 'legacy' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.PLATFORM_API_URL).toBe('https://api.ever.works');
+            expect(byKey.PLATFORM_API_SECRET_TOKEN).toBe('platform-shared-secret-value-32x');
+        });
+
+        it('skips the PLATFORM_API_* push when env vars are not configured', async () => {
+            delete process.env.PLATFORM_API_URL;
+            delete process.env.PLATFORM_API_SECRET_TOKEN;
+
+            const { service, githubPlugin } = buildService({
+                plugin: { id: 'legacy' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const keys = secrets.map((s: any) => s.key);
+            expect(keys).not.toContain('PLATFORM_API_URL');
+            expect(keys).not.toContain('PLATFORM_API_SECRET_TOKEN');
+            // The deploy still succeeded — WORK_ID + TENANT_ID landed.
+            expect(keys).toContain('WORK_ID');
+            expect(keys).toContain('TENANT_ID');
+        });
+    });
+
     it('does not leak the plugin token (kubeconfig) into pushed secret values from getDeploymentSecrets', async () => {
         const kubeconfigYaml = 'apiVersion: v1\nkind: Config\nusers:\n  - token: leaked-12345';
         const { service, githubPlugin } = buildService({

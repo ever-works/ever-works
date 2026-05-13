@@ -48,11 +48,14 @@ const ACTIVITY_LOG_TYPES_BY_CATEGORY: Record<FeedCategory, ActivityActionType[] 
     comparisons: [ActivityActionType.COMPARISON_GENERATION],
     communityPr: [ActivityActionType.COMMUNITY_PR_MERGED],
     // Website-sourced categories — populated by activity-log rows ingested
-    // from the deployed directory site (see EW-120 push flow). The
-    // corresponding action types are added in Step 2.
-    users: [],
-    submissions: [],
-    reports: [],
+    // from the deployed directory site via POST /api/activity-log/ingest
+    // (EW-120 push flow).
+    users: [ActivityActionType.WEBSITE_USER_REGISTERED],
+    submissions: [ActivityActionType.WEBSITE_ITEM_SUBMITTED],
+    reports: [
+        ActivityActionType.WEBSITE_REPORT_FILED,
+        ActivityActionType.WEBSITE_REPORT_RESOLVED,
+    ],
 };
 
 const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] | null> = {
@@ -233,6 +236,14 @@ function categoryForActivityLog(type: ActivityActionType): FeedCategory {
         return 'items';
     }
     if (type === ActivityActionType.COMMUNITY_PR_MERGED) return 'communityPr';
+    if (type === ActivityActionType.WEBSITE_USER_REGISTERED) return 'users';
+    if (type === ActivityActionType.WEBSITE_ITEM_SUBMITTED) return 'submissions';
+    if (
+        type === ActivityActionType.WEBSITE_REPORT_FILED ||
+        type === ActivityActionType.WEBSITE_REPORT_RESOLVED
+    ) {
+        return 'reports';
+    }
     return 'settings';
 }
 
