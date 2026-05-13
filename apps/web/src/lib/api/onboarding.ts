@@ -9,12 +9,12 @@ import type {
 /** Server-side client for the v2 onboarding wizard's REST surface. */
 export const onboardingAPI = {
     getState() {
-        return serverFetch<OnboardingStateResponse>('/api/onboarding/state');
+        return serverFetch<OnboardingStateResponse>('/onboarding/state');
     },
 
     patchState(body: OnboardingStatePatchRequest) {
         return serverMutation<OnboardingStateResponse>({
-            endpoint: '/api/onboarding/state',
+            endpoint: '/onboarding/state',
             data: body,
             method: 'PATCH',
             wrapInData: false,
@@ -23,7 +23,7 @@ export const onboardingAPI = {
 
     markCompleted() {
         return serverMutation<OnboardingStateResponse>({
-            endpoint: '/api/onboarding/complete',
+            endpoint: '/onboarding/complete',
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -32,7 +32,7 @@ export const onboardingAPI = {
 
     markDismissed() {
         return serverMutation<OnboardingStateResponse>({
-            endpoint: '/api/onboarding/dismiss',
+            endpoint: '/onboarding/dismiss',
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -40,12 +40,12 @@ export const onboardingAPI = {
     },
 
     getCatalog() {
-        return serverFetch<OnboardingCatalogResponse>('/api/onboarding/catalog');
+        return serverFetch<OnboardingCatalogResponse>('/onboarding/catalog');
     },
 
     track(event: string, properties?: Record<string, unknown>) {
         return serverMutation<void>({
-            endpoint: '/api/onboarding/telemetry',
+            endpoint: '/onboarding/telemetry',
             data: { event, properties },
             method: 'POST',
             wrapInData: false,
