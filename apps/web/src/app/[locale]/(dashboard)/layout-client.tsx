@@ -95,15 +95,25 @@ export function DashboardLayoutClient({
     // keep the client-only convention to avoid an API/DB migration.
     const headerDismissedKey = `ever-works-onboarding-header-dismissed:${user.id}`;
     const [headerDismissed, setHeaderDismissed] = useState(false);
+    // Gate the badge on hydration so users who previously dismissed don't see
+    // a one-frame flash of the badge before the useEffect reads localStorage.
+    // Trade-off: all users see ~one frame without the badge instead — that's a
+    // strictly better failure mode for an informational element.
+    const [headerHydrated, setHeaderHydrated] = useState(false);
     useEffect(() => {
         try {
-            if (typeof window === 'undefined') return;
-            setHeaderDismissed(window.localStorage.getItem(headerDismissedKey) === '1');
+            if (typeof window !== 'undefined') {
+                setHeaderDismissed(
+                    window.localStorage.getItem(headerDismissedKey) === '1',
+                );
+            }
         } catch {
             // localStorage unavailable (private mode, quota) — leave default.
         }
+        setHeaderHydrated(true);
     }, [headerDismissedKey]);
     const showOnboardingBadge =
+        headerHydrated &&
         onboardingTotalWorks === 0 &&
         isOnboardingDismissed &&
         !isOnboardingCompleted &&
