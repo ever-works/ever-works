@@ -140,7 +140,7 @@ export function WorkProposalsSection({
             )}
 
             {!showResearching && showEmpty && (
-                <div className="rounded-md p-5 bg-card dark:bg-surface-secondary-dark border border-dashed border-card-border/60 text-sm text-text-secondary dark:text-text-secondary-dark">
+                <div className="rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <p>{t('empty.title')}</p>
                     <p className="mt-1 text-xs">{t('empty.subtitle')}</p>
                 </div>
@@ -153,10 +153,6 @@ export function WorkProposalsSection({
                     ))}
                 </div>
             )}
-
-            <p className="mt-3 text-xs text-text-secondary dark:text-text-secondary-dark">
-                {t('disclosure')}
-            </p>
         </section>
     );
 }
