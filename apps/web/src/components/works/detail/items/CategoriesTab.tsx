@@ -1,17 +1,48 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Category, ItemData } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Plus, Pencil, Trash2, Search, FolderTree } from 'lucide-react';
+import { FolderTree, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { getCategoryNames } from '@/lib/utils/items';
 import { CategoryModal } from './CategoryModal';
 import { createCategory, updateCategory, deleteCategory } from '@/app/actions/dashboard/taxonomy';
 import { toast } from 'sonner';
+
+/**
+ * Render the category's icon. Resolution order:
+ *   1. `icon_svg` — server-sanitized inline SVG. Rendered with
+ *      dangerouslySetInnerHTML so `stroke="currentColor"` themes
+ *      through the wrapping span's text color. Backend strips
+ *      scripts/event handlers/foreignObject before persistence
+ *      (see svg-sanitizer.ts in @ever-works/agent).
+ *   2. `icon_url` — legacy external image URL.
+ *   3. Default `<FolderTree>` Lucide glyph.
+ */
+function CategoryIcon({ category }: { category: Category }) {
+    if (category.icon_svg) {
+        return (
+            <span
+                aria-hidden="true"
+                className="inline-flex w-6 h-6 items-center justify-center text-text-secondary dark:text-text-secondary-dark shrink-0 [&>svg]:w-full [&>svg]:h-full"
+                dangerouslySetInnerHTML={{ __html: category.icon_svg }}
+            />
+        );
+    }
+    if (category.icon_url) {
+        return <img src={category.icon_url} alt="" className="w-6 h-6 rounded" />;
+    }
+    return (
+        <FolderTree
+            strokeWidth={1.3}
+            className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0"
+        />
+    );
+}
 
 interface CategoriesTabProps {
     workId: string;
@@ -212,18 +243,7 @@ export function CategoriesTab({ workId, initialCategories, items, canEdit }: Cat
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                {category.icon_url ? (
-                                                    <img
-                                                        src={category.icon_url}
-                                                        alt=""
-                                                        className="w-6 h-6 rounded"
-                                                    />
-                                                ) : (
-                                                    <FolderTree
-                                                        strokeWidth={1.3}
-                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0"
-                                                    />
-                                                )}
+                                                <CategoryIcon category={category} />
                                                 <span className="font-medium text-sm text-text dark:text-text-dark">
                                                     {category.name}
                                                 </span>
