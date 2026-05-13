@@ -83,9 +83,18 @@ export class ItemImportExecutorService {
         );
         const existingSlugs = new Set<string>();
         const existingUrls = new Set<string>();
+        // Map source_url → existing item's slug. When `duplicate_strategy=update`
+        // matches a row by URL only and the incoming row's slug differs from
+        // the existing item's directory, the update must target the existing
+        // slug — otherwise `writeItem` (which skips `createItemDir` on update)
+        // tries to write into a directory that doesn't exist.
+        const urlToExistingSlug = new Map<string, string>();
         for (const item of existingItems) {
             if (item.slug) existingSlugs.add(item.slug);
-            if (item.source_url) existingUrls.add(item.source_url);
+            if (item.source_url) {
+                existingUrls.add(item.source_url);
+                if (item.slug) urlToExistingSlug.set(item.source_url, item.slug);
+            }
         }
 
         const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
@@ -156,13 +165,22 @@ export class ItemImportExecutorService {
                     skippedCount += 1;
                     continue;
                 }
-                plan.push({ kind: 'update', rowIndex: row.rowIndex, itemData });
+                const matchedBySlug = slug.length > 0 && existingSlugs.has(slug);
+                const sourceUrl =
+                    typeof itemData.source_url === 'string' ? itemData.source_url : undefined;
+                // If the row matched only by source_url and the incoming slug
+                // differs from the existing item's directory, rewrite the slug
+                // so `writeItem` targets the correct existing directory.
+                const existingSlug = sourceUrl ? urlToExistingSlug.get(sourceUrl) : undefined;
+                const updateData: MutableItemData =
+                    !matchedBySlug && existingSlug && existingSlug !== slug
+                        ? { ...itemData, slug: existingSlug }
+                        : itemData;
+                plan.push({ kind: 'update', rowIndex: row.rowIndex, itemData: updateData });
                 // Even on update, mark the URL as taken so a subsequent row
                 // with the same source_url is also routed to update / skip
                 // instead of trying to create a fresh item directory.
-                if (typeof itemData.source_url === 'string') {
-                    existingUrls.add(itemData.source_url);
-                }
+                if (sourceUrl) existingUrls.add(sourceUrl);
                 continue;
             }
 

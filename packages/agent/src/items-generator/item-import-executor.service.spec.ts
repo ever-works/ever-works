@@ -213,6 +213,41 @@ describe('ItemImportExecutorService', () => {
         expect(result.created).toBe(0);
     });
 
+    it("rewrites slug to existing item's when matched only by source_url ('update' strategy)", async () => {
+        const work = makeWork();
+        const git = makeGitFacade();
+        const repo = makeDataRepo({
+            getItems: jest
+                .fn()
+                .mockResolvedValue([
+                    { slug: 'existing-tool', source_url: 'https://shared.test/x' },
+                ]),
+        });
+        dataRepoCreateMock.mockResolvedValue(repo);
+        const service = new ItemImportExecutorService(git as any, itemImportService);
+
+        // Incoming row's slug ('incoming-tool') differs from the existing
+        // item's slug ('existing-tool'), but their source_url matches.
+        // writeItem must target 'existing-tool' — otherwise the update
+        // hits a non-existent directory because updates skip createItemDir.
+        await service.executeImport(work as any, { id: 'u-1' } as any, {
+            rows: [
+                row(0, {
+                    name: 'Incoming Tool',
+                    slug: 'incoming-tool',
+                    source_url: 'https://shared.test/x',
+                }),
+            ],
+            duplicate_strategy: 'update',
+        });
+
+        expect(repo.createItemDir).not.toHaveBeenCalled();
+        expect(repo.writeItem).toHaveBeenCalledTimes(1);
+        const writeArg = (repo.writeItem as jest.Mock).mock.calls[0][0];
+        expect(writeArg.slug).toBe('existing-tool');
+        expect(writeArg.source_url).toBe('https://shared.test/x');
+    });
+
     it('collects per-row errors without aborting the batch and still commits the successes', async () => {
         const work = makeWork();
         const git = makeGitFacade();
