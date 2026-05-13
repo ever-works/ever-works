@@ -541,8 +541,8 @@ export class StepPipelineExecutorService {
                 .finally(() => executing.delete(p));
             executing.add(p);
             if (executing.size >= limit) {
-                await Promise.race(executing).catch((error) => {
-                    firstError ??= error;
+                await Promise.race(executing).catch(() => {
+                    // The per-task catch above already captured the first failure.
                 });
             }
         }
