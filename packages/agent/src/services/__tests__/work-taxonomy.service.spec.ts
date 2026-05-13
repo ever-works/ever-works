@@ -382,11 +382,7 @@ describe('WorkTaxonomyService', () => {
                 '<svg viewBox="0 0 24 24"><circle fill="url(https://tracker.example/pixel)" cx="12" cy="12" r="6"/></svg>';
 
             await expect(
-                service.createCategory(
-                    'w-1',
-                    { name: 'Beacon', icon_svg: beacon } as any,
-                    'u-1',
-                ),
+                service.createCategory('w-1', { name: 'Beacon', icon_svg: beacon } as any, 'u-1'),
             ).rejects.toBeInstanceOf(BadRequestException);
             expect(dataGenerator.saveCategories).not.toHaveBeenCalled();
         });
@@ -582,12 +578,7 @@ describe('WorkTaxonomyService', () => {
             const malicious =
                 '<svg viewBox="0 0 24 24" onload="alert(1)"><script>steal()</script><path d="M0 0"/></svg>';
 
-            await service.updateCategory(
-                'w-1',
-                'a',
-                { icon_svg: malicious } as any,
-                'u-1',
-            );
+            await service.updateCategory('w-1', 'a', { icon_svg: malicious } as any, 'u-1');
 
             const [, , saved] = dataGenerator.saveCategories.mock.calls[0];
             expect(saved[0].icon_svg).not.toMatch(/\bonload=/i);
@@ -602,12 +593,7 @@ describe('WorkTaxonomyService', () => {
                 collections: [],
             });
 
-            await service.updateCategory(
-                'w-1',
-                'a',
-                { icon_svg: '' } as any,
-                'u-1',
-            );
+            await service.updateCategory('w-1', 'a', { icon_svg: '' } as any, 'u-1');
 
             const [, , saved] = dataGenerator.saveCategories.mock.calls[0];
             expect(saved[0].icon_svg).toBe('');
