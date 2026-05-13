@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThan, Repository } from 'typeorm';
+import { Brackets, In, MoreThan, Repository } from 'typeorm';
 import { WorkGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
 import {
@@ -116,16 +116,54 @@ export class WorkGenerationHistoryRepository {
         limit = 20,
         offset = 0,
         activityTypes?: WorkHistoryActivityType[],
+        before?: Date,
     ) {
-        return this.repository.find({
-            where: {
-                workId,
-                ...(activityTypes?.length ? { activityType: In(activityTypes) } : {}),
-            },
-            order: { startedAt: 'DESC', createdAt: 'DESC' },
-            take: limit,
-            skip: offset,
-        });
+        // No-cursor path keeps the simple TypeORM find() so we don't
+        // regress query plans for existing callers.
+        if (!before) {
+            return this.repository.find({
+                where: {
+                    workId,
+                    ...(activityTypes?.length ? { activityType: In(activityTypes) } : {}),
+                },
+                order: { startedAt: 'DESC', createdAt: 'DESC' },
+                take: limit,
+                skip: offset,
+            });
+        }
+
+        // Cursor path — the predicate must run in SQL, not in memory.
+        // Otherwise, when every row in the top-N batch is newer than the
+        // cursor (the common steady-state pagination case), the filter
+        // returns 0 entries and the next-cursor advance silently skips
+        // the older rows beyond the limit.
+        //
+        // Ordering is `startedAt DESC, createdAt DESC`, so the effective
+        // "row timestamp" is `COALESCE(startedAt, createdAt)`. Direct
+        // COALESCE won't work here because the two columns are bigint
+        // vs. timestamptz — express the same semantics as an OR over the
+        // two columns instead.
+        const beforeMs = before.getTime();
+        const qb = this.repository
+            .createQueryBuilder('h')
+            .where('h.workId = :workId', { workId })
+            .orderBy('h.startedAt', 'DESC')
+            .addOrderBy('h.createdAt', 'DESC')
+            .take(limit)
+            .skip(offset);
+        if (activityTypes?.length) {
+            qb.andWhere('h.activityType IN (:...activityTypes)', { activityTypes });
+        }
+        qb.andWhere(
+            new Brackets((b) => {
+                b.where('h.startedAt IS NOT NULL AND h.startedAt < :beforeMs', { beforeMs })
+                    .orWhere(
+                        'h.startedAt IS NULL AND h.createdAt < :beforeDate',
+                        { beforeDate: before },
+                    );
+            }),
+        );
+        return qb.getMany();
     }
 
     async countByWork(workId: string, activityTypes?: WorkHistoryActivityType[]): Promise<number> {

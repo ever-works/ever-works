@@ -159,18 +159,17 @@ export class ActivityFeedService {
         if (types !== null && types.length === 0) {
             return [];
         }
+        // Push the cursor predicate to the DB so older rows beyond `limit`
+        // aren't silently skipped when the top-N batch is all newer than
+        // the cursor.
         const rows = await this.generationHistoryRepository.findByWorkFiltered(
             ctx.workId,
             limit,
             0,
             types ?? undefined,
+            cursorTimestamp ? new Date(cursorTimestamp) : undefined,
         );
-        const filtered = cursorTimestamp
-            ? rows.filter(
-                  (r) => (r.startedAt?.getTime() ?? r.createdAt?.getTime() ?? 0) < cursorTimestamp,
-              )
-            : rows;
-        return filtered.map(toHistoryEntry);
+        return rows.map(toHistoryEntry);
     }
 }
 

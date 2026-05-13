@@ -44,10 +44,19 @@ export class PlatformSecretGuard implements CanActivate {
 
         const expectedBuf = Buffer.from(expected, 'utf8');
         const providedBuf = Buffer.from(provided, 'utf8');
-        if (
-            expectedBuf.length !== providedBuf.length ||
-            !timingSafeEqual(expectedBuf, providedBuf)
-        ) {
+
+        // Always call `timingSafeEqual` against an equal-length buffer so
+        // the comparison cost is uniform regardless of the submitted
+        // token length. A naive `length !== length || !timingSafeEqual`
+        // short-circuit lets a timing attacker binary-search the secret's
+        // byte length by varying the provided token's length, because the
+        // observable code path differs (one branch runs the comparison,
+        // the other doesn't).
+        const lengthsMatch = expectedBuf.length === providedBuf.length;
+        const comparisonBuf = lengthsMatch ? providedBuf : Buffer.alloc(expectedBuf.length);
+        const bytesMatch = timingSafeEqual(expectedBuf, comparisonBuf);
+
+        if (!lengthsMatch || !bytesMatch) {
             throw new UnauthorizedException('Invalid bearer token');
         }
         return true;

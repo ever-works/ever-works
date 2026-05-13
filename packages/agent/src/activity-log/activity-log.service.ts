@@ -179,8 +179,14 @@ export class ActivityLogService {
         if (!error || typeof error !== 'object') return false;
         const driverCode = (error as { driverError?: { code?: string } }).driverError?.code;
         const topCode = (error as { code?: string }).code;
-        // Postgres unique_violation
-        return driverCode === '23505' || topCode === '23505';
+        // Cross-driver unique-constraint codes:
+        //   Postgres: 23505 (unique_violation)
+        //   MySQL:    ER_DUP_ENTRY (numeric 1062)
+        //   SQLite:   SQLITE_CONSTRAINT (CI runs SQLite, so this catches
+        //             the race in tests too)
+        // Same convention as NotificationService.isUniqueConstraintError.
+        const codes = ['23505', 'ER_DUP_ENTRY', 'SQLITE_CONSTRAINT'];
+        return codes.includes(driverCode as string) || codes.includes(topCode as string);
     }
 
     async updateStatus(

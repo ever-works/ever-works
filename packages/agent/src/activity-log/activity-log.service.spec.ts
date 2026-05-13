@@ -186,6 +186,37 @@ describe('ActivityLogService', () => {
             expect(result).toBe(winner);
             expect(findByWorkAndIngestEventId).toHaveBeenCalledTimes(2);
         });
+
+        it.each([
+            ['SQLite SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT'],
+            ['MySQL ER_DUP_ENTRY', 'ER_DUP_ENTRY'],
+        ])('recovers from a %s unique-violation race (cross-DB)', async (_label, code) => {
+            // Pin the cross-driver code check — CI runs SQLite, so this
+            // also exercises the path that would fire in the test suite
+            // if a real concurrent race happened during a Jest run.
+            const winner = { id: 'al-winner', ingestEventId: 'evt-race' };
+            const repo = {
+                findByWorkAndIngestEventId: jest
+                    .fn()
+                    .mockResolvedValueOnce(null)
+                    .mockResolvedValueOnce(winner),
+                create: jest.fn().mockRejectedValue(Object.assign(new Error('dup'), { code })),
+            };
+            const workRepo = {
+                findById: jest.fn().mockResolvedValue({ id: 'work-1', userId: 'owner-1' }),
+            };
+            const svc = new ActivityLogService(repo as never, workRepo as never, {} as never);
+
+            const result = await svc.ingestFromWebsite({
+                workId: 'work-1',
+                eventId: 'evt-race',
+                actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
+                occurredAt: new Date('2024-01-15T10:00:00.000Z'),
+                summary: 'Raced signup',
+            });
+
+            expect(result).toBe(winner);
+        });
     });
 
     describe('formatGenerationCompletionSummary', () => {
