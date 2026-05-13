@@ -60,7 +60,10 @@ describe('WorkProposalsApiService', () => {
             markAccepted: jest.fn().mockResolvedValue(true),
             getForUser: jest.fn().mockResolvedValue({ id: 'p1' }),
         };
-        const limits = { assertCanRun: jest.fn().mockResolvedValue(undefined) };
+        const limits = {
+            assertCanRun: jest.fn().mockResolvedValue(undefined),
+            canRun: jest.fn().mockResolvedValue(true),
+        };
         const users = {
             findById: jest.fn(),
             update: jest.fn().mockResolvedValue(undefined),
@@ -102,6 +105,35 @@ describe('WorkProposalsApiService', () => {
         await flushMicrotasks();
         await flushMicrotasks();
         expect(proposals.generate).not.toHaveBeenCalled();
+    });
+
+    it('getRefreshStatus reports researching=false and canRefresh=true on a fresh user', async () => {
+        const { svc } = makeDeps();
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: false,
+            canRefresh: true,
+        });
+    });
+
+    it('getRefreshStatus reports canRefresh=false when daily limit reached', async () => {
+        const { svc, limits } = makeDeps();
+        limits.canRun.mockResolvedValue(false);
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: false,
+            canRefresh: false,
+            refreshDisabledReason: 'rate-limited',
+        });
+    });
+
+    it('getRefreshStatus reports researching=true while a run is in flight', async () => {
+        // Relies on getRefreshStatus reading inFlight.has(userId) synchronously
+        // before its first await — if that order ever changes, the pipeline
+        // microtask queued by refresh() could drain first and inFlight would
+        // be empty by the time we look. Reorder = flip; update the test then.
+        const { svc } = makeDeps();
+        await svc.refresh('u1');
+        const status = await svc.getRefreshStatus('u1');
+        expect(status.researching).toBe(true);
     });
 
     it('updates preferences via repo', async () => {

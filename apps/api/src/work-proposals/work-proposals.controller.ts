@@ -62,11 +62,13 @@ export class WorkProposalsController {
     }
 
     @Get('status')
-    @ApiOperation({ summary: 'Check whether a refresh is currently running for the caller' })
+    @ApiOperation({
+        summary:
+            'Refresh status: whether a run is in flight and whether the caller can start a new one',
+    })
     @HttpCode(HttpStatus.OK)
     async status(@CurrentUser() auth: AuthenticatedUser) {
-        const researching = await this.service.isResearching(auth.userId);
-        return { researching };
+        return this.service.getRefreshStatus(auth.userId);
     }
 
     @Post('refresh')

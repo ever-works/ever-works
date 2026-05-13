@@ -11,10 +11,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function DiscoverPage() {
     const [proposals, status] = await Promise.all([
         workProposalsAPI.list(['pending']).catch(() => []),
-        workProposalsAPI.status().catch(() => ({ researching: false })),
+        workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
     ]);
 
     return (
-        <DiscoverClient initialProposals={proposals} initiallyResearching={status.researching} />
+        <DiscoverClient
+            initialProposals={proposals}
+            initiallyResearching={status.researching}
+            initiallyCanRefresh={status.canRefresh}
+        />
     );
 }

@@ -480,7 +480,7 @@
             },
             "empty": {
                 "title": "No ideas right now.",
-                "subtitle": "Click 'Suggest more ideas' anytime to refresh."
+                "subtitle": "New suggestions will appear here when they are ready."
             },
             "errors": {
                 "rateLimited": "Daily limit reached. Try again tomorrow.",
@@ -488,8 +488,7 @@
             },
             "plugins": {
                 "label": "Suggested plugins"
-            },
-            "disclosure": "Drafted from your public profile. Manage in Settings."
+            }
         },
         "discover": {
             "title": "Discover",

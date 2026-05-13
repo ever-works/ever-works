@@ -34,6 +34,14 @@ describe('UserResearchLimitsService', () => {
         await expect(svc.assertCanRun('u1')).rejects.toBeInstanceOf(UserResearchRateLimitedError);
     });
 
+    it('canRun mirrors assertCanRun without throwing', async () => {
+        await expect(svc.canRun('u1')).resolves.toBe(true);
+        for (let i = 0; i < DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay; i++) {
+            await svc.incrementRuns('u1');
+        }
+        await expect(svc.canRun('u1')).resolves.toBe(false);
+    });
+
     it('isolates counters between users', async () => {
         for (let i = 0; i < DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay; i++) {
             await svc.incrementRuns('u1');
