@@ -1,7 +1,7 @@
 import type { Logger } from '@nestjs/common';
 import type { FacadeOptions, IAiFacade } from '@ever-works/plugin';
 
-import { sanitizeSvg, type SanitizeResult } from './svg-sanitizer';
+import { sanitizeSvg } from './svg-sanitizer';
 
 /**
  * Locked-down system prompt used to coax an LLM into emitting a single
@@ -41,8 +41,6 @@ const CATEGORY_DESCRIPTION_TEMPLATE = (description: string): string =>
     `Description (use this to inform what the icon depicts): "${description}"\n`;
 
 const MARKDOWN_FENCE_RE = /^```(?:svg|xml|html)?\s*\n?|\n?```\s*$/g;
-
-const PROVIDER_TASK_ID = 'category-icon-generation';
 
 export interface CategoryIconGenerateOptions {
     /** Category name (free-form, e.g. "Time Tracking", "Open-Source"). */
@@ -101,11 +99,6 @@ export async function generateCategoryIconSvg(
                 messages: [{ role: 'user', content: prompt }],
                 // Low temperature: we want consistency, not creativity.
                 temperature: 0.2,
-                routing: {
-                    // Cheapest tier — this is a tiny, well-bounded task.
-                    complexity: 'simple',
-                    taskId: PROVIDER_TASK_ID,
-                },
             },
             facadeOptions,
         );
@@ -125,15 +118,16 @@ export async function generateCategoryIconSvg(
 
     const stripped = stripMarkdownFences(raw).trim();
 
-    const sanitized: SanitizeResult = sanitizeSvg(stripped);
-    if (!sanitized.ok) {
+    const sanitized = sanitizeSvg(stripped);
+    if (sanitized.ok === false) {
+        const reason = sanitized.reason;
         logger?.warn(
-            `Category icon for "${name}" failed sanitization (${sanitized.reason}); model=${model}`,
+            `Category icon for "${name}" failed sanitization (${reason}); model=${model}`,
         );
         return {
             ok: false,
             reason: 'sanitize-failed',
-            detail: sanitized.reason,
+            detail: reason,
         };
     }
 

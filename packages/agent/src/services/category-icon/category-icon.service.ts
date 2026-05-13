@@ -5,10 +5,7 @@ import pMap from 'p-map';
 import type { Category, Collection, FacadeOptions } from '@ever-works/plugin';
 
 import { AiFacadeService } from '../../facades/ai.facade';
-import {
-    generateCategoryIconSvg,
-    type CategoryIconGenerateResult,
-} from './ai-generator';
+import { generateCategoryIconSvg } from './ai-generator';
 import {
     getFallbackIcon,
     lookupCuratedIcon,
@@ -109,7 +106,7 @@ export class CategoryIconService {
         const curated = lookupCuratedIcon(options.name);
         if (curated) {
             const sanitized = sanitizeSvg(curated.svg);
-            if (sanitized.ok) {
+            if (sanitized.ok === true) {
                 await this.writeCache(cacheKey, sanitized.svg);
                 return {
                     svg: sanitized.svg,
@@ -206,14 +203,14 @@ export class CategoryIconService {
     private async tryGenerate(
         options: EnsureCategoryIconOptions,
     ): Promise<CategoryIconResult | null> {
-        const result: CategoryIconGenerateResult = await generateCategoryIconSvg(this.aiFacade, {
+        const result = await generateCategoryIconSvg(this.aiFacade, {
             name: options.name,
             description: options.description,
             facadeOptions: options.facadeOptions,
             logger: this.logger,
         });
 
-        if (!result.ok) {
+        if (result.ok === false) {
             this.logger.debug(
                 `AI icon generation for "${options.name}" did not produce a usable SVG: ${result.reason}`,
             );
