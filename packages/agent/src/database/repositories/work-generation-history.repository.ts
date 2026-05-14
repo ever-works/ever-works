@@ -156,11 +156,11 @@ export class WorkGenerationHistoryRepository {
         }
         qb.andWhere(
             new Brackets((b) => {
-                b.where('h.startedAt IS NOT NULL AND h.startedAt < :beforeMs', { beforeMs })
-                    .orWhere(
-                        'h.startedAt IS NULL AND h.createdAt < :beforeDate',
-                        { beforeDate: before },
-                    );
+                b.where('h.startedAt IS NOT NULL AND h.startedAt < :beforeMs', {
+                    beforeMs,
+                }).orWhere('h.startedAt IS NULL AND h.createdAt < :beforeDate', {
+                    beforeDate: before,
+                });
             }),
         );
         return qb.getMany();

@@ -226,9 +226,11 @@ describe('ActivityFeedService', () => {
 
             // One call with the array of both types — not two parallel queries.
             expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
-            const types = (activityLogService.findByWork.mock.calls[0][0] as {
-                actionType: string[];
-            }).actionType;
+            const types = (
+                activityLogService.findByWork.mock.calls[0][0] as {
+                    actionType: string[];
+                }
+            ).actionType;
             expect([...types].sort()).toEqual(
                 [
                     ActivityActionType.WEBSITE_REPORT_FILED,

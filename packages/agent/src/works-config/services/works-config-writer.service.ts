@@ -136,11 +136,7 @@ export class WorksConfigWriterService {
         ) {
             return args.requested;
         }
-        if (
-            args.imported === 'pull' ||
-            args.imported === 'push' ||
-            args.imported === 'disabled'
-        ) {
+        if (args.imported === 'pull' || args.imported === 'push' || args.imported === 'disabled') {
             return args.imported;
         }
         const existing =

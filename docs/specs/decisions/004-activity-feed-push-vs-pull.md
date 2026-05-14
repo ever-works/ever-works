@@ -49,13 +49,13 @@ simultaneously and the directory's `works.yml` picks one per Work.
    review approved.
 3. **Dual-mode added back (this revision)**. The user wanted both
    options to coexist so site authors can choose:
-     - **Pull** is restored as the default to preserve historical
-       behaviour and to keep the "old way" available for directories
-       that already ship the template endpoint.
-     - **Push** stays as an opt-in for directories that prefer the
-       lighter-weight one-shot delivery model.
-     - **Disabled** lets an operator turn the website-sourced
-       categories off entirely.
+    - **Pull** is restored as the default to preserve historical
+      behaviour and to keep the "old way" available for directories
+      that already ship the template endpoint.
+    - **Push** stays as an opt-in for directories that prefer the
+      lighter-weight one-shot delivery model.
+    - **Disabled** lets an operator turn the website-sourced
+      categories off entirely.
 
 ## Decision
 
@@ -64,7 +64,7 @@ Each Work declares its transport via `activity_sync.mode` in
 
 ```yaml
 activity_sync:
-  mode: pull # pull | push | disabled (default: pull)
+    mode: pull # pull | push | disabled (default: pull)
 ```
 
 The platform projects the value onto `Work.activitySyncMode` and
@@ -171,15 +171,15 @@ Field rules (enforced by `IngestEventDto` + `class-validator`):
 
 Responses:
 
-| Status | Meaning                                                                                                              |
-| ------ | -------------------------------------------------------------------------------------------------------------------- |
-| 202    | Accepted. Response body: `{ id: <activity-log row id> }`.                                                            |
-| 400    | Validation failed (missing field, bad UUID, unknown action type, etc.).                                              |
-| 401    | Missing / invalid bearer token.                                                                                      |
-| 404    | `workId` does not exist.                                                                                             |
-| **409**| **`{ error: 'mode-mismatch', mode, message }` — the Work's `activitySyncMode` is `pull` or `disabled`, not `push`.** |
-| 429    | Rate limit (60 req / min / IP).                                                                                      |
-| 503    | `PLATFORM_API_SECRET_TOKEN` is not configured on the platform.                                                       |
+| Status  | Meaning                                                                                                              |
+| ------- | -------------------------------------------------------------------------------------------------------------------- |
+| 202     | Accepted. Response body: `{ id: <activity-log row id> }`.                                                            |
+| 400     | Validation failed (missing field, bad UUID, unknown action type, etc.).                                              |
+| 401     | Missing / invalid bearer token.                                                                                      |
+| 404     | `workId` does not exist.                                                                                             |
+| **409** | **`{ error: 'mode-mismatch', mode, message }` — the Work's `activitySyncMode` is `pull` or `disabled`, not `push`.** |
+| 429     | Rate limit (60 req / min / IP).                                                                                      |
+| 503     | `PLATFORM_API_SECRET_TOKEN` is not configured on the platform.                                                       |
 
 ## Disabled mode
 
@@ -230,19 +230,19 @@ explicitly in the eventual settings UI.
 
 `works` table (forward-only migration `1778746463309-AddActivityFeedSync`):
 
-| Column                          | Type                                | Notes                                                                                                                              |
-| ------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `activitySyncMode`              | varchar(16) NOT NULL DEFAULT 'pull' | Enum: pull / push / disabled.                                                                                                      |
-| `platformSyncSecretEncrypted`   | text, nullable                      | Pull-mode only. AES-256-GCM envelope.                                                                                              |
-| `platformSyncLastSuccessAt`     | bigint, nullable                    | Pull-mode observability. `@TimestampColumn` (ms-epoch bigint, SQLite/Postgres portable, matches the rest of the codebase pattern). |
-| `platformSyncLastErrorAt`       | bigint, nullable                    | "                                                                                                                                  |
-| `platformSyncLastErrorMessage`  | text, nullable                      | "                                                                                                                                  |
+| Column                         | Type                                | Notes                                                                                                                              |
+| ------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `activitySyncMode`             | varchar(16) NOT NULL DEFAULT 'pull' | Enum: pull / push / disabled.                                                                                                      |
+| `platformSyncSecretEncrypted`  | text, nullable                      | Pull-mode only. AES-256-GCM envelope.                                                                                              |
+| `platformSyncLastSuccessAt`    | bigint, nullable                    | Pull-mode observability. `@TimestampColumn` (ms-epoch bigint, SQLite/Postgres portable, matches the rest of the codebase pattern). |
+| `platformSyncLastErrorAt`      | bigint, nullable                    | "                                                                                                                                  |
+| `platformSyncLastErrorMessage` | text, nullable                      | "                                                                                                                                  |
 
 `activity_log` table (forward-only migration
 `1778677529777-AddActivityLogIngestEventId`):
 
-| Column          | Type                | Notes                                                                                          |
-| --------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
+| Column          | Type                 | Notes                                                                                        |
+| --------------- | -------------------- | -------------------------------------------------------------------------------------------- |
 | `ingestEventId` | varchar(64) nullable | Push-mode idempotency key. Partial unique index on `(workId, ingestEventId) WHERE NOT NULL`. |
 
 Also: 4 new enum values in `ActivityActionType`
@@ -301,8 +301,8 @@ The PR delivers the dual-mode surface across 8 phases:
 3. **Phase 2** — `DirectoryWebsiteClient` + HMAC signing
    (resurrected from `7add7cf5`, gated on `activitySyncMode === 'pull'`).
 4. **Phase 3** — `ActivityFeedService` routes by mode (pull → client
-   + status writes; push → activity-log with WEBSITE_* types;
-   disabled → neither, no degraded).
+    - status writes; push → activity-log with WEBSITE\_\* types;
+      disabled → neither, no degraded).
 5. **Phase 4** — Ingest endpoint returns 409 on mode-mismatch;
    `DeployService.setRequiredSecrets` pushes only the active
    transport's secrets.

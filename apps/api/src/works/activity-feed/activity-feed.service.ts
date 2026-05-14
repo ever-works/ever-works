@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType } from '@ever-works/agent/entities';
 import type { ActivityLog, Work } from '@ever-works/agent/entities';
-import {
-    WorkGenerationHistoryRepository,
-    WorkRepository,
-} from '@ever-works/agent/database';
+import { WorkGenerationHistoryRepository, WorkRepository } from '@ever-works/agent/database';
 import type { WorkGenerationHistory } from '@ever-works/agent/entities';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import type {
@@ -308,9 +305,7 @@ export class ActivityFeedService {
     }
 }
 
-function filterOutWebsiteTypes(
-    types: ActivityActionType[] | null,
-): ActivityActionType[] | null {
+function filterOutWebsiteTypes(types: ActivityActionType[] | null): ActivityActionType[] | null {
     if (types === null) {
         // `all` category — keep the "no filter" semantics but make the
         // findByWork pass filter post-hoc by switching to an explicit

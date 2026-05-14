@@ -6,10 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useSettings } from './SettingsContext';
-import {
-    rotateActivitySyncSecret,
-    updateActivitySyncMode,
-} from '@/app/actions/dashboard/works';
+import { rotateActivitySyncSecret, updateActivitySyncMode } from '@/app/actions/dashboard/works';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 

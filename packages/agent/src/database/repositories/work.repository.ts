@@ -216,10 +216,7 @@ export class WorkRepository {
      * Returns `true` if this caller wrote the value, `false` if another
      * caller beat us to it (loser must re-read).
      */
-    async setPlatformSyncSecretIfNull(
-        workId: string,
-        encrypted: string,
-    ): Promise<boolean> {
+    async setPlatformSyncSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
         const result = await this.repository
             .createQueryBuilder()
             .update(Work)

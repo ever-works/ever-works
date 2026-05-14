@@ -1073,10 +1073,7 @@ export async function updateCommunityPrSettings(
     }
 }
 
-export async function updateActivitySyncMode(
-    workId: string,
-    mode: 'pull' | 'push' | 'disabled',
-) {
+export async function updateActivitySyncMode(workId: string, mode: 'pull' | 'push' | 'disabled') {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -1120,10 +1117,7 @@ export async function rotateActivitySyncSecret(workId: string) {
         console.error('Failed to rotate activity sync secret:', error);
         return {
             success: false,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to rotate activity sync secret',
+            error: error instanceof Error ? error.message : 'Failed to rotate activity sync secret',
         };
     }
 }

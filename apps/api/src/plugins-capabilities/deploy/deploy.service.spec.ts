@@ -275,9 +275,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 const { secrets } = captureCalls(githubPlugin);
                 const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
                 expect(byKey.PLATFORM_API_URL).toBe('https://api.ever.works');
-                expect(byKey.PLATFORM_API_SECRET_TOKEN).toBe(
-                    'platform-shared-secret-value-32x',
-                );
+                expect(byKey.PLATFORM_API_SECRET_TOKEN).toBe('platform-shared-secret-value-32x');
                 // Push-mode deploys must never invoke the per-Work HMAC secret service.
                 expect(platformSyncSecretService.getOrGenerate).not.toHaveBeenCalled();
             });
