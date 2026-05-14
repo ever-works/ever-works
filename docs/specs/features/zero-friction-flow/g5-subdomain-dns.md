@@ -7,6 +7,7 @@
 
 When a Work deploys via the Ever Works pipeline (`deployProvider ===
 'ever-works'`), the platform MUST automatically:
+
 1. Template the Kubernetes ingress host as `${work.slug}.ever.works`
    (so the work is reachable at a stable subdomain).
 2. Provision a Cloudflare CNAME pointing that hostname at the
@@ -21,10 +22,10 @@ cert.
 
 - **FR-G5-1** A new `CloudflareDnsProvider` class wraps the Cloudflare
   v4 REST API. Methods:
-  - `ensureWorkSubdomain(slug)` — idempotent upsert of a CNAME
-    `<slug>.<rootDomain> → <targetHostname>`.
-  - `removeWorkSubdomain(slug)` — best-effort delete; no-op when the
-    record doesn't exist.
+    - `ensureWorkSubdomain(slug)` — idempotent upsert of a CNAME
+      `<slug>.<rootDomain> → <targetHostname>`.
+    - `removeWorkSubdomain(slug)` — best-effort delete; no-op when the
+      record doesn't exist.
 - **FR-G5-2** Slugs that fail `^[a-z0-9]+(?:-[a-z0-9]+)*$` MUST be
   rejected before any HTTP call (same regex as `CreateWorkDto.slug`).
 - **FR-G5-3** A `EverWorksDnsService` (Nest-injectable) reads env on
@@ -34,15 +35,15 @@ cert.
 - **FR-G5-4** `DeployService.deploy()` MUST, when
   `work.deployProvider === 'ever-works'` AND `dnsService.getProvider()`
   is non-null:
-  1. Merge `ingressHost = ${slug}.${EVER_WORKS_DOMAIN || 'ever.works'}`
-     into the deploy settings before
-     `plugin.getDeploymentSecrets(settings)` runs (so the k8s plugin
-     picks it up as `K8S_INGRESS_HOST`).
-  2. Fire `dnsService.ensureWorkSubdomain(slug)` asynchronously —
-     errors are logged inside the service so they NEVER abort a
-     deploy.
-  3. Leave settings untouched for non-platform providers (Vercel,
-     user's k8s) AND when DNS env is unset.
+    1. Merge `ingressHost = ${slug}.${EVER_WORKS_DOMAIN || 'ever.works'}`
+       into the deploy settings before
+       `plugin.getDeploymentSecrets(settings)` runs (so the k8s plugin
+       picks it up as `K8S_INGRESS_HOST`).
+    2. Fire `dnsService.ensureWorkSubdomain(slug)` asynchronously —
+       errors are logged inside the service so they NEVER abort a
+       deploy.
+    3. Leave settings untouched for non-platform providers (Vercel,
+       user's k8s) AND when DNS env is unset.
 - **FR-G5-5** Authentication MUST be a Bearer token in the
   `Authorization` header. The token MUST be scoped (Cloudflare API
   token, DNS:Edit on the `ever.works` zone only — NOT a global API
@@ -64,12 +65,12 @@ cert.
 
 ## Configuration (operator runbook)
 
-| Env var                          | Required | Description                                                |
-| -------------------------------- | -------- | ---------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`           | yes      | Scoped token, **DNS:Edit on the `ever.works` zone only**.  |
-| `CLOUDFLARE_ZONE_ID`             | yes      | The `ever.works` zone id (32-char hex).                    |
-| `EVER_WORKS_DEPLOY_LB_HOSTNAME`  | yes      | k8s-works ingress LB hostname (e.g. `lb.k8s-works.svc`).   |
-| `EVER_WORKS_DOMAIN`              | no       | Root domain. Defaults to `ever.works`.                     |
+| Env var                         | Required | Description                                               |
+| ------------------------------- | -------- | --------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`          | yes      | Scoped token, **DNS:Edit on the `ever.works` zone only**. |
+| `CLOUDFLARE_ZONE_ID`            | yes      | The `ever.works` zone id (32-char hex).                   |
+| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | yes      | k8s-works ingress LB hostname (e.g. `lb.k8s-works.svc`).  |
+| `EVER_WORKS_DOMAIN`             | no       | Root domain. Defaults to `ever.works`.                    |
 
 When any of the required vars is missing, the provider no-ops cleanly
 — deploys still succeed via the k8s plugin's existing LB hostname.
@@ -88,9 +89,9 @@ When any of the required vars is missing, the provider no-ops cleanly
 
 - A fresh Work with `slug=foo` and `deployProvider='ever-works'`
   deploys, and within ~2 min:
-  - `dig CNAME foo.ever.works` returns the configured LB hostname.
-  - `curl -sI https://foo.ever.works/` returns 200 with a valid TLS
-    chain.
+    - `dig CNAME foo.ever.works` returns the configured LB hostname.
+    - `curl -sI https://foo.ever.works/` returns 200 with a valid TLS
+      chain.
 - The same operation a second time (re-deploy) does not create a
   duplicate record — `ensureWorkSubdomain` is idempotent.
 

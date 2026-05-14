@@ -269,9 +269,7 @@ export class EverWorksDnsService {
         try {
             await provider.removeWorkSubdomain(slug);
         } catch (cause) {
-            this.logger.error(
-                `Failed to delete CNAME for ${slug}: ${(cause as Error).message}`,
-            );
+            this.logger.error(`Failed to delete CNAME for ${slug}: ${(cause as Error).message}`);
         }
     }
 

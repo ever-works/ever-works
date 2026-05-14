@@ -7,14 +7,16 @@ import {
 describe('CloudflareDnsProvider (EW-617 G5)', () => {
     type FetchCall = { url: string; init: RequestInit };
 
-    function buildProvider(opts: {
-        listResult?: any[];
-        createResult?: any;
-        updateResult?: any;
-        deleteOk?: boolean;
-        deleteStatus?: number;
-        deleteBody?: any;
-    } = {}) {
+    function buildProvider(
+        opts: {
+            listResult?: any[];
+            createResult?: any;
+            updateResult?: any;
+            deleteOk?: boolean;
+            deleteStatus?: number;
+            deleteBody?: any;
+        } = {},
+    ) {
         const calls: FetchCall[] = [];
         const fakeFetch = jest.fn(async (url: string, init: RequestInit) => {
             calls.push({ url, init });
@@ -167,10 +169,11 @@ describe('CloudflareDnsProvider (EW-617 G5)', () => {
     });
 
     it('throws CloudflareDnsError on a non-success API response', async () => {
-        const fakeFetch = jest.fn(async () =>
-            new Response(JSON.stringify({ success: false, errors: [{ code: 10000 }] }), {
-                status: 401,
-            }),
+        const fakeFetch = jest.fn(
+            async () =>
+                new Response(JSON.stringify({ success: false, errors: [{ code: 10000 }] }), {
+                    status: 401,
+                }),
         ) as any;
         const provider = new CloudflareDnsProvider(
             { apiToken: 'bad', zoneId: 'z', rootDomain: 'ever.works', targetHostname: 'lb' },

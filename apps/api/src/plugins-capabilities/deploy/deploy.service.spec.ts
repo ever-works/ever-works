@@ -569,7 +569,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const getDeploymentSecrets = jest.fn().mockResolvedValue({});
             const { service, githubPlugin, dnsService } = buildService({
                 deployProvider: 'ever-works',
-                plugin: { id: 'k8s', getWorkflowFilenames: () => ['deploy_k8s.yaml'], getDeploymentSecrets },
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
                 settings: { kubeconfig: 'apiVersion: v1' },
             });
             // Pretend DNS env is set — service emits a fake provider that
@@ -599,7 +603,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const getDeploymentSecrets = jest.fn().mockResolvedValue({});
             const { service, dnsService } = buildService({
                 deployProvider: 'vercel',
-                plugin: { id: 'vercel', getWorkflowFilenames: () => ['deploy_vercel.yaml'], getDeploymentSecrets },
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets,
+                },
                 settings: { token: 'v1' },
             });
 
@@ -615,7 +623,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const getDeploymentSecrets = jest.fn().mockResolvedValue({});
             const { service, dnsService } = buildService({
                 deployProvider: 'ever-works',
-                plugin: { id: 'k8s', getWorkflowFilenames: () => ['deploy_k8s.yaml'], getDeploymentSecrets },
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
                 settings: {},
             });
             (dnsService.getProvider as jest.Mock).mockReturnValue(null);
