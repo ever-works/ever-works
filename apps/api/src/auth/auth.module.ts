@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './services/auth.service';
 import { ApiKeyService } from './services/api-key.service';
+import { CaptchaVerifierService } from './services/captcha-verifier.service';
 import { AuthController } from './controllers/auth.controller';
 import { ApiKeysController } from './controllers/api-keys.controller';
 import { OAuthController } from './controllers/oauth.controller';
@@ -25,6 +26,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
     providers: [
         AuthService,
         ApiKeyService,
+        CaptchaVerifierService,
         AuthProviderService,
         AuthSyncService,
         SocialAuthService,
@@ -46,6 +48,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
     exports: [
         AuthService,
         ApiKeyService,
+        CaptchaVerifierService,
         AuthSessionGuard,
         AUTH_PROVIDER,
         AUTH_RUNTIME_INSTANCE,
