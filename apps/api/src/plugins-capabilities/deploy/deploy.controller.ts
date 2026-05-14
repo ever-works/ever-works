@@ -13,11 +13,17 @@ import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { WorkOwnershipService } from '@ever-works/agent/services';
+import { WorkDeploymentRepository } from '@ever-works/agent/database';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
-import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
-import { DeployWorkDto } from './dto/deploy.dto';
+import {
+    ActivityActionType,
+    ActivityStatus,
+    DeploymentEnvironment,
+    DeploymentTriggerSource,
+} from '@ever-works/agent/entities';
+import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
 
@@ -31,6 +37,7 @@ export class DeployController {
         private readonly deployFacade: DeployFacadeService,
         private readonly ownershipService: WorkOwnershipService,
         private readonly deploymentVerifier: DeploymentVerifierService,
+        private readonly deploymentRepository: WorkDeploymentRepository,
         private readonly activityLogService: ActivityLogService,
     ) {}
 
@@ -591,5 +598,86 @@ export class DeployController {
                 message: error?.message || 'Failed to verify domain',
             });
         }
+    }
+
+    @Get('/works/:id/deployments')
+    @ApiOperation({
+        summary: 'List deployments',
+        description: 'Deployment history for a work (production + previews)',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'List of deployments' })
+    async listDeployments(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        await this.ownershipService.ensureCanView(id, auth.userId);
+        const deployments = await this.deploymentRepository.findByWork(id, { limit: 50 });
+        return { status: 'success', deployments };
+    }
+
+    @Post('/works/:id/rollback')
+    @ApiOperation({
+        summary: 'Roll back to a previous deployment',
+        description: 'Redeploys the commit/branch of a previous production deployment',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Rollback initiated' })
+    async rollback(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: RollbackDto,
+    ) {
+        const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        const target = await this.deploymentRepository.findById(dto.deploymentId);
+        if (!target || target.workId !== id) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Deployment not found for this work.',
+            });
+        }
+        if (target.environment !== DeploymentEnvironment.PRODUCTION) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Only production deployments can be rolled back to.',
+            });
+        }
+
+        const { dispatched, deploymentId } = await this.deployService.deploy(
+            id,
+            isCreator ? auth.userId : work.user.id,
+            {
+                environment: DeploymentEnvironment.PRODUCTION,
+                branch: target.branch,
+                commitSha: target.commitSha,
+                triggerSource: DeploymentTriggerSource.MANUAL,
+            },
+        );
+
+        if (!dispatched) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Failed to dispatch rollback workflow.',
+            });
+        }
+
+        this.deploymentVerifier.startVerification(
+            work,
+            isCreator ? auth.userId : work.user.id,
+            undefined,
+            deploymentId,
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'deployment.rollback',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Rolled back ${work.name} to deployment ${target.id}`,
+                details: { rolledBackFromDeploymentId: target.id },
+            })
+            .catch(() => {});
+
+        return { status: 'pending', deploymentId, message: 'Rollback started' };
     }
 }
