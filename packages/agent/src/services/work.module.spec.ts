@@ -144,6 +144,7 @@ import { WorksConfigWriterService } from '@src/works-config/services/works-confi
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
@@ -217,6 +218,7 @@ describe('WorkModule', () => {
             EverWorksDeployQuotaService,
             PlatformSyncSecretService,
             EverWorksGitProvider,
+            ZeroFrictionFunnelService,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
@@ -291,10 +293,11 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 28-entry shape (25 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 29-entry shape (26 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
-            expect(meta('exports')).toHaveLength(28);
+            // Bumped to 29 with the EW-617 G8 ZeroFrictionFunnelService.
+            expect(meta('exports')).toHaveLength(29);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {
