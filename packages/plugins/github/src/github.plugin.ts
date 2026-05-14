@@ -79,12 +79,21 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			},
 			readPackagesPat: {
 				type: 'string',
-				title: 'Read packages PAT',
+				title: 'Read packages PAT (fine-grained)',
 				description:
-					'Used by the Kubernetes deploy provider to pull private GHCR images. Click "Connect" to authorize via GitHub (recommended — least-privilege token with `read:packages` + `write:packages` only) or paste a fine-grained PAT manually. Leave blank if your generated website repo is public.',
+					'Fine-grained PAT used by the Kubernetes deploy provider to pull private GHCR images. Click "Connect" to authorize via GitHub (recommended — least-privilege token with `read:packages` + `write:packages` only) or paste a fine-grained PAT manually. Leave blank if your generated website repo is public OR if you supply a classic PAT below. Note: GHCR has known compatibility issues with fine-grained PATs when packages are not explicitly repo-linked — the classic PAT below is more reliable.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-widget': 'github-packages-oauth'
+			},
+			readPackagesPatClassic: {
+				type: 'string',
+				title: 'Read packages PAT (classic)',
+				description:
+					'Classic GitHub PAT (`ghp_…`) used as the GHCR image-pull credential when deploying private container images to Kubernetes. Required when your generated website repo + GHCR image is private. Classic PATs honor org membership directly and avoid the repo-package link requirement that breaks fine-grained PATs for org-level packages. Required scopes: `repo`, `read:packages`, `write:packages`, `delete:packages`. Leave blank if your image is public or if you publish to one of the Ever Works-shared GitHub orgs (`ever-works`, `ever-works-cloud`) — the platform provides classic PATs for those.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-widget': 'password'
 			}
 		}
 	};
