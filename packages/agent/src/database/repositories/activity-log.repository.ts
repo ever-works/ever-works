@@ -68,7 +68,13 @@ export class ActivityLogRepository {
      */
     async findByWork(options: {
         workId: string;
-        actionType?: ActivityActionType;
+        /**
+         * Filter by a single action type or a set of types (issues a single
+         * `IN (...)` query instead of N parallel queries). Accepting an
+         * array lets the feed aggregator avoid the per-type fan-out that
+         * previously multiplied the row budget.
+         */
+        actionType?: ActivityActionType | ActivityActionType[];
         dateTo?: Date;
         limit?: number;
         offset?: number;
@@ -80,7 +86,17 @@ export class ActivityLogRepository {
             .orderBy('activity.createdAt', 'DESC');
 
         if (options.actionType) {
-            qb.andWhere('activity.actionType = :actionType', { actionType: options.actionType });
+            if (Array.isArray(options.actionType)) {
+                if (options.actionType.length > 0) {
+                    qb.andWhere('activity.actionType IN (:...actionTypes)', {
+                        actionTypes: options.actionType,
+                    });
+                }
+            } else {
+                qb.andWhere('activity.actionType = :actionType', {
+                    actionType: options.actionType,
+                });
+            }
         }
         if (options.dateTo) {
             qb.andWhere('activity.createdAt <= :dateTo', { dateTo: options.dateTo });

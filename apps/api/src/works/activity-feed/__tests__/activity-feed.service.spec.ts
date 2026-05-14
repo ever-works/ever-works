@@ -119,6 +119,26 @@ describe('ActivityFeedService', () => {
         );
     });
 
+    it('passes the FULL requested limit to each top-level source (no perSourceLimit division)', async () => {
+        // Codex P1 review fix (2026-05-13): the previous design divided
+        // `limit / sourceCount` per source, which could drop newer events
+        // from a dominant source. Pin the new contract: each source gets
+        // the caller's `limit` budget; `mergeEntries(..., limit)` still
+        // trims to the final budget.
+        activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+        historyRepo.findByWorkFiltered.mockResolvedValue([]);
+
+        const query = new FeedQueryDto();
+        query.limit = 50;
+        await service.compose('work-1', 'user-1', query);
+
+        const activityCall = activityLogService.findByWork.mock.calls[0][0] as { limit: number };
+        expect(activityCall.limit).toBe(50);
+        const historyCall = historyRepo.findByWorkFiltered.mock.calls[0];
+        // findByWorkFiltered(workId, limit, offset, types, before)
+        expect(historyCall[1]).toBe(50);
+    });
+
     it('does NOT pass userId to ActivityLogService — member viewers see owner-attributed rows', async () => {
         activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
 
@@ -181,32 +201,35 @@ describe('ActivityFeedService', () => {
             workRepo.findById.mockResolvedValue(makeWork({ activitySyncMode: 'push' }));
         });
 
-        it('users category queries activity-log with WEBSITE_USER_REGISTERED', async () => {
+        it('users category queries activity-log with WEBSITE_USER_REGISTERED (single IN query)', async () => {
             activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
             const query = new FeedQueryDto();
             query.category = 'users';
             await service.compose('work-1', 'user-1', query);
 
+            // One call (not per-type fan-out) with the type array.
             expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
-            expect(activityLogService.findByWork).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    workId: 'work-1',
-                    actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
-                }),
-            );
+            const call = activityLogService.findByWork.mock.calls[0][0] as {
+                workId: string;
+                actionType: string[];
+            };
+            expect(call.workId).toBe('work-1');
+            expect(call.actionType).toEqual([ActivityActionType.WEBSITE_USER_REGISTERED]);
             expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
         });
 
-        it('reports category queries both WEBSITE_REPORT_* types', async () => {
+        it('reports category queries both WEBSITE_REPORT_* types in a single IN query', async () => {
             activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
             const query = new FeedQueryDto();
             query.category = 'reports';
             await service.compose('work-1', 'user-1', query);
 
-            const types = activityLogService.findByWork.mock.calls.map(
-                (c) => (c[0] as { actionType: string }).actionType,
-            );
-            expect(types.sort()).toEqual(
+            // One call with the array of both types — not two parallel queries.
+            expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
+            const types = (activityLogService.findByWork.mock.calls[0][0] as {
+                actionType: string[];
+            }).actionType;
+            expect([...types].sort()).toEqual(
                 [
                     ActivityActionType.WEBSITE_REPORT_FILED,
                     ActivityActionType.WEBSITE_REPORT_RESOLVED,
@@ -241,12 +264,14 @@ describe('ActivityFeedService', () => {
             expect(directoryClient.fetchActivityFeed).toHaveBeenCalledTimes(1);
             const call = directoryClient.fetchActivityFeed.mock.calls[0];
             expect(call[1]).toEqual(expect.objectContaining({ types: ['users'] }));
-            // Activity-log path runs (the "all-except-WEBSITE_*" allow-list still
-            // matches deployment etc.), but never with a WEBSITE_* type.
-            const allTypes = activityLogService.findByWork.mock.calls.map(
-                (c) => (c[0] as { actionType: string | undefined }).actionType,
-            );
-            expect(allTypes).not.toContain(ActivityActionType.WEBSITE_USER_REGISTERED);
+            // Activity-log query (now a single IN-array call) must NOT
+            // include WEBSITE_* — those are the directory-client's job in
+            // pull mode.
+            const flatTypes = activityLogService.findByWork.mock.calls.flatMap((c) => {
+                const t = (c[0] as { actionType?: string | string[] }).actionType;
+                return Array.isArray(t) ? t : t ? [t] : [];
+            });
+            expect(flatTypes).not.toContain(ActivityActionType.WEBSITE_USER_REGISTERED);
         });
 
         it('surfaces directory-site degraded reason in response.degraded.directorySite', async () => {

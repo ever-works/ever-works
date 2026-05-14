@@ -307,10 +307,15 @@ export class ActivityLogService {
      * Per-Work activity lookup that bypasses the `userId` filter. Use for
      * the work-scoped Activity Feed; access must have been verified
      * upstream (controller layer). See repository docstring for context.
+     *
+     * `actionType` accepts an array — a single `IN (...)` query replaces
+     * the previous per-type fan-out so the feed aggregator can pass the
+     * full per-source limit without multiplying it by the number of
+     * action types in the category.
      */
     async findByWork(options: {
         workId: string;
-        actionType?: ActivityActionType;
+        actionType?: ActivityActionType | ActivityActionType[];
         dateTo?: Date;
         limit?: number;
         offset?: number;

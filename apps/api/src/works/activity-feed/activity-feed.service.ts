@@ -169,19 +169,20 @@ export class ActivityFeedService {
             ? filterOutWebsiteTypes(activityLogTypes)
             : activityLogTypes;
 
-        const sourceCount = countActiveSources(
-            filteredActivityLogTypes,
-            historyTypes,
-            directoryTypes,
-        );
-        const perSourceLimit =
-            sourceCount > 0 ? Math.max(Math.ceil(limit / sourceCount), 5) : limit;
-
+        // Pass the FULL requested `limit` to each top-level source. The
+        // previous design divided `limit / sourceCount` per source, which
+        // could drop newer events from a dominant source — e.g. a deploy
+        // burst on activity-log alongside a quiet history would lose
+        // newer activity rows to older history rows after the merge.
+        // Fetching `limit` from each source means we have up to
+        // `limit * sources` candidate rows; `mergeEntries(..., limit)`
+        // still trims to the caller's budget. Codex P1 review on
+        // activity-feed.service.ts:101 (2026-05-13).
         const [activityLogResults, historyEntries, directoryResult] = await Promise.all([
-            this.fetchActivityLog(ctx, perSourceLimit, filteredActivityLogTypes, cursorTimestamp),
-            this.fetchHistory(ctx, perSourceLimit, historyTypes, cursorTimestamp),
+            this.fetchActivityLog(ctx, limit, filteredActivityLogTypes, cursorTimestamp),
+            this.fetchHistory(ctx, limit, historyTypes, cursorTimestamp),
             isPullMode && !isDisabled
-                ? this.fetchDirectorySite(ctx, perSourceLimit, directoryTypes)
+                ? this.fetchDirectorySite(ctx, limit, directoryTypes)
                 : Promise.resolve<{
                       entries: DirectorySiteEntry[];
                       degraded?: FeedDegradedReason;
@@ -222,32 +223,24 @@ export class ActivityFeedService {
         if (types !== null && types.length === 0) {
             return [];
         }
-        const collected: PlatformActivityLogEntry[] = [];
-        const typeIterable = types && types.length > 0 ? types : [undefined];
+        // Single `IN (...)` query instead of N parallel per-type queries.
+        // Previously we fanned out one query per action type, which made
+        // the activity-log budget effectively `limit * types.length` —
+        // for the `settings` category that's 18× over-fetch. The
+        // repository now accepts an array (Codex P1 review followup).
+        //
         // Note: bypasses the userId filter on purpose. Access is enforced
         // upstream by WorkOwnershipService.ensureAccess (controller); the
         // feed must surface every row scoped to the Work, including the
         // owner-attributed website-ingested events for member viewers.
-        const results = await Promise.all(
-            typeIterable.map((actionType) =>
-                this.activityLogService.findByWork({
-                    workId: ctx.work.id,
-                    actionType,
-                    limit,
-                    offset: 0,
-                    dateTo: cursorTimestamp ? new Date(cursorTimestamp) : undefined,
-                }),
-            ),
-        );
-        const seen = new Set<string>();
-        for (const { activities } of results) {
-            for (const log of activities) {
-                if (seen.has(log.id)) continue;
-                seen.add(log.id);
-                collected.push(toActivityLogEntry(log));
-            }
-        }
-        return collected;
+        const { activities } = await this.activityLogService.findByWork({
+            workId: ctx.work.id,
+            actionType: types && types.length > 0 ? types : undefined,
+            limit,
+            offset: 0,
+            dateTo: cursorTimestamp ? new Date(cursorTimestamp) : undefined,
+        });
+        return activities.map(toActivityLogEntry);
     }
 
     private async fetchHistory(
@@ -329,18 +322,6 @@ function filterOutWebsiteTypes(
         ) as ActivityActionType[];
     }
     return types.filter((t) => !WEBSITE_ACTION_TYPES.has(t));
-}
-
-function countActiveSources(
-    activityLogTypes: ActivityActionType[] | null,
-    historyTypes: WorkHistoryActivityType[] | null,
-    directoryTypes: DirectoryEntryType[],
-): number {
-    let n = 0;
-    if (activityLogTypes === null || activityLogTypes.length > 0) n += 1;
-    if (historyTypes === null || historyTypes.length > 0) n += 1;
-    if (directoryTypes.length > 0) n += 1;
-    return n;
 }
 
 function toActivityLogEntry(log: ActivityLog): PlatformActivityLogEntry {
