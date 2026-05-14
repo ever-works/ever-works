@@ -195,7 +195,7 @@ describe('WorksController.quickCreateWork (EW-617 G4)', () => {
         expect(createWork).toHaveBeenCalledTimes(1);
     });
 
-    it("defaults organization to false when omitted", async () => {
+    it('defaults organization to false when omitted', async () => {
         const { controller, createWork } = makeController({});
 
         const dto: any = { ...baseDto };

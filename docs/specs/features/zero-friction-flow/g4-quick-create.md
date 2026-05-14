@@ -21,17 +21,17 @@ straight to this final step.
 - **FR-G4-2** A new `POST /api/works/quick-create` endpoint (authenticated
   by `AuthSessionGuard`, throttled 10/min per IP) accepts
   `QuickCreateWorkDto { slug, name, description, prompt, organization?,
-  owner?, gitProvider?, deployProvider?, storageProvider?,
-  websiteTemplateId?, model?, readmeConfig? }` and:
-  1. Calls `WorkLifecycleService.createWork` with the subset that maps to
-     `CreateWorkDto`. Provider defaults (`storage`/`deploy`/`git`) are
-     resolved from the user's onboarding state inside `createWork` — the
-     endpoint forwards explicit overrides only.
-  2. Calls `WorkGenerationService.generateItems(workId, { name, prompt,
-     model? }, user, /*awaitCompletion*/ false)` to dispatch generation
-     asynchronously.
-  3. Returns `202 Accepted` with `{ status: 'pending', work: { id, slug,
-     name }, generation: { historyId, message } }`.
+owner?, gitProvider?, deployProvider?, storageProvider?,
+websiteTemplateId?, model?, readmeConfig? }` and:
+    1. Calls `WorkLifecycleService.createWork` with the subset that maps to
+       `CreateWorkDto`. Provider defaults (`storage`/`deploy`/`git`) are
+       resolved from the user's onboarding state inside `createWork` — the
+       endpoint forwards explicit overrides only.
+    2. Calls `WorkGenerationService.generateItems(workId, { name, prompt,
+model? }, user, /*awaitCompletion*/ false)` to dispatch generation
+       asynchronously.
+    3. Returns `202 Accepted` with `{ status: 'pending', work: { id, slug,
+name }, generation: { historyId, message } }`.
 - **FR-G4-3** When `createWork` returns a non-success status the endpoint
   MUST throw `BadRequestException` and not attempt to start generation.
 - **FR-G4-4** Generation errors after a successful create MUST bubble up
@@ -74,7 +74,7 @@ straight to this final step.
 - A logged-in (or anonymous, post-G2) user with `prompt` populated on
   their wizard state can click "Generate now" and receive a 202 with a
   pending generation history id. Polling `GET
-  /works/:id/generation-history` shows the run progressing.
+/works/:id/generation-history` shows the run progressing.
 - Landing on `app.ever.works/onboarding#prompt=AI%20coding%20assistants`
   drops the user on the `create-work` step with the prompt pre-filled
   and the URL cleaned to `app.ever.works/onboarding`.

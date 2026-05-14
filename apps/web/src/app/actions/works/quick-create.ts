@@ -1,6 +1,10 @@
 'use server';
 
-import { worksAPI, type QuickCreateWorkRequest, type QuickCreateWorkResponse } from '@/lib/api/works';
+import {
+    worksAPI,
+    type QuickCreateWorkRequest,
+    type QuickCreateWorkResponse,
+} from '@/lib/api/works';
 import type { ActionResult } from '@/app/actions/plugins';
 
 /**

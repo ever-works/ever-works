@@ -448,9 +448,7 @@ function StepBody({
                                       storageProvider: flow.state.storage.choice,
                                   });
                                   if (!result.success) {
-                                      throw new Error(
-                                          result.error ?? 'Failed to start generation',
-                                      );
+                                      throw new Error(result.error ?? 'Failed to start generation');
                                   }
                                   return {
                                       workSlug: result.data?.work.slug,

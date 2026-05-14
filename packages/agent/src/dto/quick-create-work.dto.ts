@@ -91,8 +91,7 @@ export class QuickCreateWorkDto {
     gitProvider?: string;
 
     @ApiPropertyOptional({
-        description:
-            'Override deploy provider (default: from onboarding state, then "ever-works")',
+        description: 'Override deploy provider (default: from onboarding state, then "ever-works")',
     })
     @IsOptional()
     @IsString()
