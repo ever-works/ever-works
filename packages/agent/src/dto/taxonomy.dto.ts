@@ -4,6 +4,15 @@ import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 
 // Category DTOs
 
+/**
+ * Hard cap on inline SVG payload size — matches `MAX_SVG_LENGTH` in
+ * `services/category-icon/svg-sanitizer.ts`. Keep these aligned so the
+ * DTO rejects oversized payloads at the API boundary with a clear 400
+ * instead of silently falling through to the sanitizer's `too-large`
+ * branch (which surfaces as a generic fallback icon downstream).
+ */
+const MAX_ICON_SVG_LENGTH = 4000;
+
 export class CreateCategoryDto {
     @IsString()
     @MaxLength(100)
@@ -20,6 +29,11 @@ export class CreateCategoryDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()
@@ -44,6 +58,11 @@ export class UpdateCategoryDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()
@@ -70,6 +89,11 @@ export class CreateCollectionDto {
     @MaxLength(500)
     icon_url?: string;
 
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
+
     @IsNumber()
     @IsOptional()
     @Min(0)
@@ -93,6 +117,11 @@ export class UpdateCollectionDto {
     @IsOptional()
     @MaxLength(500)
     icon_url?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(MAX_ICON_SVG_LENGTH)
+    icon_svg?: string;
 
     @IsNumber()
     @IsOptional()

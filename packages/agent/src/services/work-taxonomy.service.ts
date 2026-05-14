@@ -17,6 +17,7 @@ import { WorkGenerationHistoryRepository } from '@src/database/repositories/work
 import { GenerateStatusType } from '@src/entities/types';
 import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '@src/utils/work-changelog.utils';
+import { sanitizeSvg } from './category-icon/svg-sanitizer';
 
 /**
  * Service for managing work taxonomy (categories and tags).
@@ -37,6 +38,25 @@ export class WorkTaxonomyService {
             throw new NotFoundException(`User not found: ${userId}`);
         }
         return user;
+    }
+
+    /**
+     * Run user-supplied icon_svg through the same sanitizer the generator
+     * pipeline uses. The frontend renders this via dangerouslySetInnerHTML
+     * (see CategoriesTab), so unsanitized input is a stored-XSS sink for
+     * any user with write access. Return shape:
+     *   - `undefined`  → field was not supplied; caller must skip the spread.
+     *   - `''`         → caller explicitly cleared the icon.
+     *   - `'<svg…/>'`  → sanitized SVG safe for inline injection.
+     */
+    private sanitizeIconSvgInput(input: string | undefined): string | undefined {
+        if (input === undefined) return undefined;
+        const trimmed = input.trim();
+        if (!trimmed) return '';
+        const result = sanitizeSvg(trimmed);
+        if (result.ok === true) return result.svg;
+        if (result.reason === 'empty') return '';
+        throw new BadRequestException(`Invalid icon_svg: ${result.reason}`);
     }
 
     private async recordTaxonomyHistory(params: {
@@ -96,6 +116,7 @@ export class WorkTaxonomyService {
             name: dto.name.trim(),
             description: dto.description?.trim(),
             icon_url: dto.icon_url?.trim(),
+            icon_svg: this.sanitizeIconSvgInput(dto.icon_svg),
             priority: dto.priority,
         };
 
@@ -159,6 +180,9 @@ export class WorkTaxonomyService {
             ...(dto.name && { name: dto.name.trim() }),
             ...(dto.description !== undefined && { description: dto.description?.trim() }),
             ...(dto.icon_url !== undefined && { icon_url: dto.icon_url?.trim() }),
+            ...(dto.icon_svg !== undefined && {
+                icon_svg: this.sanitizeIconSvgInput(dto.icon_svg),
+            }),
             ...(dto.priority !== undefined && { priority: dto.priority }),
         };
 
@@ -180,7 +204,9 @@ export class WorkTaxonomyService {
                     fieldsChanged: Object.keys(dto).filter(
                         (key) =>
                             (dto as Record<string, unknown>)[key] !== undefined &&
-                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                            ['name', 'description', 'icon_url', 'icon_svg', 'priority'].includes(
+                                key,
+                            ),
                     ),
                 },
             ],
@@ -442,6 +468,7 @@ export class WorkTaxonomyService {
             name: dto.name.trim(),
             description: dto.description?.trim(),
             icon_url: dto.icon_url?.trim(),
+            icon_svg: this.sanitizeIconSvgInput(dto.icon_svg),
             priority: dto.priority,
         };
 
@@ -505,6 +532,9 @@ export class WorkTaxonomyService {
             ...(dto.name && { name: dto.name.trim() }),
             ...(dto.description !== undefined && { description: dto.description?.trim() }),
             ...(dto.icon_url !== undefined && { icon_url: dto.icon_url?.trim() }),
+            ...(dto.icon_svg !== undefined && {
+                icon_svg: this.sanitizeIconSvgInput(dto.icon_svg),
+            }),
             ...(dto.priority !== undefined && { priority: dto.priority }),
         };
 
@@ -526,7 +556,9 @@ export class WorkTaxonomyService {
                     fieldsChanged: Object.keys(dto).filter(
                         (key) =>
                             (dto as Record<string, unknown>)[key] !== undefined &&
-                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                            ['name', 'description', 'icon_url', 'icon_svg', 'priority'].includes(
+                                key,
+                            ),
                     ),
                 },
             ],

@@ -14,6 +14,12 @@ export interface Category {
 	readonly name: string;
 	readonly description?: string;
 	readonly icon_url?: string;
+	/**
+	 * Inline SVG markup for the category icon. Populated by the
+	 * AI category-icon generator (curated lookup → AI fallback).
+	 * Sanitized server-side before persistence.
+	 */
+	readonly icon_svg?: string;
 	/** Lower numbers = higher priority (e.g., 1 = first, 2 = second, etc.) */
 	readonly priority?: number;
 }
@@ -34,6 +40,11 @@ export interface Collection {
 	readonly name: string;
 	readonly description?: string;
 	readonly icon_url?: string;
+	/**
+	 * Inline SVG markup for the collection icon. Same generator path
+	 * as `Category.icon_svg`; sanitized server-side.
+	 */
+	readonly icon_svg?: string;
 	/** Lower numbers = higher priority (e.g., 1 = first, 2 = second, etc.) */
 	readonly priority?: number;
 }

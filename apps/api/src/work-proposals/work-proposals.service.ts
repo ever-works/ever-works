@@ -58,6 +58,24 @@ export class WorkProposalsApiService {
         return this.inFlight.has(userId);
     }
 
+    /**
+     * Combined status used by the dashboard to decide whether to render
+     * the "Suggest more ideas" affordance. Reports both whether a refresh
+     * is currently running and whether the user has any daily quota left.
+     */
+    async getRefreshStatus(userId: string): Promise<{
+        researching: boolean;
+        canRefresh: boolean;
+        refreshDisabledReason?: 'rate-limited';
+    }> {
+        const researching = this.inFlight.has(userId);
+        const canRun = await this.limits.canRun(userId);
+        if (!canRun) {
+            return { researching, canRefresh: false, refreshDisabledReason: 'rate-limited' };
+        }
+        return { researching, canRefresh: true };
+    }
+
     async getPreferences(userId: string): Promise<{ optOut: boolean }> {
         const user = await this.users.findById(userId);
         return { optOut: user?.userResearchOptOut ?? false };
