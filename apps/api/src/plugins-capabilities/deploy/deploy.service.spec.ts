@@ -438,13 +438,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             await service.deploy('work-1', 'user-1', {});
 
             const { variables } = captureCalls(githubPlugin);
-            const deployProviderVar = variables.find(
-                (v: any) => v.key === 'DEPLOY_PROVIDER',
-            );
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
             expect(deployProviderVar?.value).toBe('ever-works');
         });
 
-        it("uses work.deployProvider when explicitly set (no override)", async () => {
+        it('uses work.deployProvider when explicitly set (no override)', async () => {
             const { service, githubPlugin } = buildService({
                 deployProvider: 'vercel',
                 plugin: {
@@ -456,9 +454,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             await service.deploy('work-1', 'user-1', {});
 
             const { variables } = captureCalls(githubPlugin);
-            const deployProviderVar = variables.find(
-                (v: any) => v.key === 'DEPLOY_PROVIDER',
-            );
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
             expect(deployProviderVar?.value).toBe('vercel');
         });
     });
