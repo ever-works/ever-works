@@ -58,3 +58,53 @@ export const workProposalsBatchSchema = z.object({
 });
 
 export type WorkProposalsBatch = z.infer<typeof workProposalsBatchSchema>;
+
+/**
+ * Permissive variant used as the structured-output schema for the LLM call.
+ * Lower-quality / free-tier models routinely violate the strict bounds
+ * (slug regex, exact enum, length min/max), which makes generateObject reject
+ * the whole batch with `No object generated: response did not match schema.`
+ *
+ * Strategy: accept loose shapes here, then run every draft through
+ * coerceWorkProposal() to clip, slugify and filter into the strict shape
+ * before persisting. Anything still un-salvageable is dropped, and we only
+ * fail if zero valid proposals remain.
+ */
+export const permissiveWorkProposalSchema = z.object({
+    title: z.string(),
+    description: z.string(),
+    slugSuggestion: z.string(),
+    suggestedCategories: z.array(
+        z.object({
+            name: z.string(),
+            slug: z.string(),
+        }),
+    ),
+    suggestedFields: z
+        .array(
+            z.object({
+                name: z.string(),
+                type: z.string(),
+            }),
+        )
+        .optional()
+        .default([]),
+    recommendedPlugins: z
+        .array(
+            z.object({
+                pluginId: z.string(),
+                reason: z.string(),
+            }),
+        )
+        .optional()
+        .default([]),
+    reasoning: z.string().optional().default(''),
+});
+
+export type PermissiveWorkProposalDraft = z.infer<typeof permissiveWorkProposalSchema>;
+
+export const permissiveWorkProposalsBatchSchema = z.object({
+    proposals: z.array(permissiveWorkProposalSchema),
+});
+
+export type PermissiveWorkProposalsBatch = z.infer<typeof permissiveWorkProposalsBatchSchema>;
