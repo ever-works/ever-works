@@ -65,7 +65,25 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
         trustedOrigins: getTrustedOrigins(),
         advanced: {
             database: {
-                generateId: 'uuid',
+                // Generate the row id in JS as a UUID string.
+                //
+                // The previous value `'uuid'` is a sentinel that tells
+                // `@better-auth/core/db/adapter/get-id-field.mjs` "the DB
+                // adapter supports UUIDs natively, let it generate." On
+                // Postgres (`supportsUUIDs=true`) better-auth then strips
+                // `id` from the INSERT payload entirely, expecting a
+                // `DEFAULT gen_random_uuid()` on the column. Our TypeORM
+                // `AuthAccount` entity uses `@PrimaryColumn({ type: 'varchar' })`
+                // with no default, so every `linkAccount` (the call path
+                // every register hits) failed with `null value in column "id"
+                // of relation "account" violates not-null constraint`.
+                //
+                // Passing a function bypasses the sentinel branch: better-auth
+                // calls this generator on every create and injects the value
+                // into the INSERT. Works on Postgres, sqlite, mysql alike,
+                // and matches the UUID format already used by the User
+                // entity's `@PrimaryGeneratedColumn('uuid')`.
+                generateId: () => randomUUID(),
             },
         },
         user: {
