@@ -434,9 +434,8 @@ function StepBody({
                                   // EW-617 G4: anonymous + claimed users alike
                                   // can one-click finish. The endpoint reads
                                   // provider defaults from onboarding state.
-                                  const { quickCreateWorkAction } = await import(
-                                      '@/app/actions/works/quick-create'
-                                  );
+                                  const { quickCreateWorkAction } =
+                                      await import('@/app/actions/works/quick-create');
                                   const slug = slugifyPrompt(prompt);
                                   const result = await quickCreateWorkAction({
                                       slug,

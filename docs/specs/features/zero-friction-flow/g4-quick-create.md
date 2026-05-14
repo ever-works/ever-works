@@ -22,15 +22,12 @@ straight to this final step.
   by `AuthSessionGuard`, throttled 10/min per IP) accepts
   `QuickCreateWorkDto { slug, name, description, prompt, organization?,
 owner?, gitProvider?, deployProvider?, storageProvider?,
-websiteTemplateId?, model?, readmeConfig? }` and:
-    1. Calls `WorkLifecycleService.createWork` with the subset that maps to
-       `CreateWorkDto`. Provider defaults (`storage`/`deploy`/`git`) are
-       resolved from the user's onboarding state inside `createWork` — the
-       endpoint forwards explicit overrides only.
-    2. Calls `WorkGenerationService.generateItems(workId, { name, prompt,
+websiteTemplateId?, model?, readmeConfig? }` and: 1. Calls `WorkLifecycleService.createWork` with the subset that maps to
+  `CreateWorkDto`. Provider defaults (`storage`/`deploy`/`git`) are
+  resolved from the user's onboarding state inside `createWork` — the
+  endpoint forwards explicit overrides only. 2. Calls `WorkGenerationService.generateItems(workId, { name, prompt,
 model? }, user, /*awaitCompletion*/ false)` to dispatch generation
-       asynchronously.
-    3. Returns `202 Accepted` with `{ status: 'pending', work: { id, slug,
+  asynchronously. 3. Returns `202 Accepted` with `{ status: 'pending', work: { id, slug,
 name }, generation: { historyId, message } }`.
 - **FR-G4-3** When `createWork` returns a non-success status the endpoint
   MUST throw `BadRequestException` and not attempt to start generation.
