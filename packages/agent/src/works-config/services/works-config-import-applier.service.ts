@@ -4,6 +4,7 @@ import { Work } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
 import { WorkScheduleService } from '@src/services/work-schedule.service';
+import { WorkRepository } from '@src/database/repositories/work.repository';
 
 @Injectable()
 export class WorksConfigImportApplierService {
@@ -12,7 +13,32 @@ export class WorksConfigImportApplierService {
     constructor(
         private readonly pluginOperationsService: PluginOperationsService,
         private readonly workScheduleService: WorkScheduleService,
+        private readonly workRepository: WorkRepository,
     ) {}
+
+    /**
+     * Project the `activity_sync.mode` field from a parsed `works.yml`
+     * onto the Work entity. EW-120 dual-mode transport: this is the read
+     * path used everywhere downstream (poller, ingest guard, feed router).
+     */
+    async applyActivitySyncMode(
+        workId: string,
+        worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
+    ): Promise<void> {
+        const mode = worksConfig?.activitySyncMode;
+        if (!mode) {
+            return;
+        }
+        try {
+            await this.workRepository.update(workId, { activitySyncMode: mode });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to apply activitySyncMode=${mode} for work ${workId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     async applyPipelineSettings(
         workId: string,

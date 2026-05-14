@@ -17,6 +17,10 @@ import type { ActivityActionType, ActivityStatus } from './activity-log.types';
 @Index(['userId', 'actionType'])
 @Index(['userId', 'workId'])
 @Index(['userId', 'status'])
+@Index('idx_activity_log_work_ingest_event', ['workId', 'ingestEventId'], {
+    unique: true,
+    where: '"ingestEventId" IS NOT NULL',
+})
 export class ActivityLog {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -53,6 +57,15 @@ export class ActivityLog {
 
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, any>;
+
+    /**
+     * Idempotency key for events ingested from the deployed directory site
+     * via POST /api/activity-log/ingest (EW-120). The composite unique
+     * index on (workId, ingestEventId) prevents duplicate rows when the
+     * website retries a POST.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    ingestEventId?: string;
 
     @Column({ type: 'varchar', nullable: true })
     ipAddress?: string;

@@ -5,6 +5,7 @@ import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
+import { PlatformSyncSecretService } from '@ever-works/agent/services';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -50,6 +51,7 @@ export class DeployService {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly platformSyncSecretService: PlatformSyncSecretService,
     ) {}
 
     /**
@@ -252,10 +254,62 @@ export class DeployService {
 
         await Promise.all([
             this.setSecret(ctx, 'TENANT_ID', work.id),
+            this.setSecret(ctx, 'WORK_ID', work.id),
             this.setSecret(ctx, 'DATA_REPOSITORY', work.getDataRepo()),
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
+
+        // EW-120 dual-mode Activity Feed sync — push the secrets for the
+        // active transport only. Disabled mode pushes nothing.
+        //
+        //   push:    PLATFORM_API_URL + PLATFORM_API_SECRET_TOKEN so the
+        //            deployed site can POST events to /api/activity-log/ingest.
+        //   pull:    PLATFORM_SYNC_SECRET (per-Work HMAC, lazily provisioned
+        //            via `PlatformSyncSecretService.getOrGenerate`) so the
+        //            deployed site can verify incoming GET requests from
+        //            the platform's DirectoryWebsiteClient.
+        //   disabled: skipped entirely — neither transport runs.
+        //
+        // All branches are best-effort: a failure here logs an error and
+        // continues. The Activity Feed degrades to platform-only sources
+        // until the next successful deploy.
+        const syncMode = work.activitySyncMode ?? 'pull';
+        if (syncMode === 'push') {
+            const platformApiUrl = process.env.PLATFORM_API_URL;
+            const platformApiSecret = process.env.PLATFORM_API_SECRET_TOKEN;
+            if (platformApiUrl && platformApiSecret) {
+                try {
+                    await Promise.all([
+                        this.setSecret(ctx, 'PLATFORM_API_URL', platformApiUrl),
+                        this.setSecret(ctx, 'PLATFORM_API_SECRET_TOKEN', platformApiSecret),
+                    ]);
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to push PLATFORM_API_* secrets for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
+            } else {
+                this.logger.debug(
+                    `PLATFORM_API_URL / PLATFORM_API_SECRET_TOKEN not configured on platform; skipping push-mode ingest secret push for work ${work.id}`,
+                );
+            }
+        } else if (syncMode === 'pull') {
+            try {
+                const platformSyncSecret = await this.platformSyncSecretService.getOrGenerate(
+                    work.id,
+                );
+                await this.setSecret(ctx, 'PLATFORM_SYNC_SECRET', platformSyncSecret);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to push PLATFORM_SYNC_SECRET for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
 
         // Plugin-specific extra secrets (k8s registry creds, namespace, etc.)
         // The plugin returns a Record<string, string> of secret name → value;

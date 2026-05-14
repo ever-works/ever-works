@@ -457,6 +457,14 @@ export class WorkLifecycleService {
                 updateData.committerEmail = updateDto.committerEmail || null;
             }
 
+            // EW-120 dual-mode Activity Feed sync mode. Writing here flips
+            // the platform-side read path immediately; works.yml gets
+            // round-tripped by the next WorksConfigRepositorySync trigger
+            // (deploy / generation / explicit settings save).
+            if (updateDto.activitySyncMode !== undefined) {
+                updateData.activitySyncMode = updateDto.activitySyncMode;
+            }
+
             const updatedWork = await this.workRepository.update(id, updateData);
 
             if (!updatedWork) {
