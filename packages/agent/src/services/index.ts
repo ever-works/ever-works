@@ -18,6 +18,7 @@ export * from './generator-form-schema.service';
 export * from './works-manifest.service';
 export * from './webhook-delivery.service';
 export * from './state-marker.service';
+export * from './platform-sync-secret.service';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';

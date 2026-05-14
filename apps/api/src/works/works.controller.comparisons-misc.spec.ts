@@ -145,6 +145,7 @@ function makeController(s: Stubs): WorksController {
         s.itemExportService as any,
         s.itemImportService as any,
         s.itemImportExecutor as any,
+        { rotate: jest.fn(), getOrGenerate: jest.fn() } as any,
     );
 }
 
@@ -596,6 +597,110 @@ describe('WorksController — comparisons + community-pr + source-validation end
                 } as any),
             ).rejects.toThrow('quota');
             expect(s.activityLogService.log).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('rotateActivitySyncSecret (EW-120)', () => {
+        const auth = { userId: 'auth-1' } as AuthenticatedUser;
+
+        // Pull the controller's `platformSyncSecretService` constructor stub
+        // out of the closure each test by replacing the makeController call
+        // with one that captures the mock. Simpler: use a fresh controller
+        // with a fresh stub per test.
+
+        function buildWithRotator(rotate: jest.Mock) {
+            const stubs = makeStubs();
+            stubs.activityLogService = { log: jest.fn().mockResolvedValue(undefined) };
+            const controller = new WorksController(
+                stubs.cacheManager as any,
+                stubs.cacheEntryRepository as any,
+                stubs.workQueryService as any,
+                stubs.workLifecycleService as any,
+                stubs.workGenerationService as any,
+                stubs.authService as any,
+                stubs.workDetailService as any,
+                stubs.workScheduleService as any,
+                stubs.workImportService as any,
+                stubs.repositoryManagementService as any,
+                stubs.workOwnershipService as any,
+                stubs.workAdvancedPromptsService as any,
+                stubs.workTaxonomyService as any,
+                stubs.generatorFormSchemaService as any,
+                stubs.itemHealthService as any,
+                stubs.communityPrProcessorService as any,
+                stubs.comparisonGenerationService as any,
+                stubs.workRepository as any,
+                stubs.sourceValidationService as any,
+                stubs.subscriptionService as any,
+                stubs.activityLogService as any,
+                stubs.templateCatalogService as any,
+                stubs.itemExportService as any,
+                stubs.itemImportService as any,
+                stubs.itemImportExecutor as any,
+                { rotate, getOrGenerate: jest.fn() } as any,
+            );
+            return { controller, stubs };
+        }
+
+        it('rotates the secret on pull-mode Works + emits the activity log', async () => {
+            const rotate = jest.fn().mockResolvedValue('new-secret-hex');
+            const { controller, stubs } = buildWithRotator(rotate);
+            stubs.workRepository.findById.mockResolvedValue({
+                id: 'work-1',
+                activitySyncMode: 'pull',
+            });
+
+            const result = await controller.rotateActivitySyncSecret(auth, 'work-1');
+
+            expect(rotate).toHaveBeenCalledWith('work-1');
+            expect(stubs.workOwnershipService.ensureAccess).toHaveBeenCalledWith(
+                'work-1',
+                'auth-1',
+            );
+            expect(result).toEqual({ status: 'success', redeployRequired: true });
+            // Activity-log write fires (best-effort, .catch() swallowed).
+            await new Promise((r) => setImmediate(r));
+            expect(stubs.activityLogService.log).toHaveBeenCalledWith(
+                expect.objectContaining({ action: 'work.activity_sync.secret_rotated' }),
+            );
+        });
+
+        it.each(['push', 'disabled'] as const)(
+            'returns 409 (mode-mismatch) when Work is in %s mode',
+            async (mode) => {
+                const rotate = jest.fn();
+                const { controller, stubs } = buildWithRotator(rotate);
+                stubs.workRepository.findById.mockResolvedValue({
+                    id: 'work-1',
+                    activitySyncMode: mode,
+                });
+
+                let captured: any;
+                try {
+                    await controller.rotateActivitySyncSecret(auth, 'work-1');
+                } catch (err) {
+                    captured = err;
+                }
+                expect(captured).toBeDefined();
+                const response = (captured as { getResponse: () => unknown }).getResponse() as {
+                    error: string;
+                    mode: string;
+                };
+                expect(response.error).toBe('mode-mismatch');
+                expect(response.mode).toBe(mode);
+                expect(rotate).not.toHaveBeenCalled();
+            },
+        );
+
+        it('returns 404 when the Work does not exist', async () => {
+            const rotate = jest.fn();
+            const { controller, stubs } = buildWithRotator(rotate);
+            stubs.workRepository.findById.mockResolvedValue(null);
+
+            await expect(controller.rotateActivitySyncSecret(auth, 'missing')).rejects.toThrow(
+                NotFoundException,
+            );
+            expect(rotate).not.toHaveBeenCalled();
         });
     });
 });

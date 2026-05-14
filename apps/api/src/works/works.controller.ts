@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Body,
+    ConflictException,
     Controller,
     Delete,
     Get,
@@ -88,6 +89,7 @@ import {
     ItemHealthService,
     ItemSourceValidationSchedulerService,
     type SourceValidationSettingsDto,
+    PlatformSyncSecretService,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
@@ -217,6 +219,7 @@ export class WorksController {
         private readonly itemExportService: ItemExportService,
         private readonly itemImportService: ItemImportService,
         private readonly itemImportExecutor: ItemImportExecutorService,
+        private readonly platformSyncSecretService: PlatformSyncSecretService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -343,6 +346,47 @@ export class WorksController {
             })
             .catch(() => {});
         return result;
+    }
+
+    @Post('works/:id/activity-sync/rotate-secret')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Rotate the per-Work pull-transport HMAC secret (EW-120)',
+        description:
+            'Generates a fresh `PLATFORM_SYNC_SECRET` and persists it AES-256-GCM-encrypted on the Work row. The new value only reaches the deployed site at the next deploy — the response includes `redeployRequired: true` so the settings UI can surface that warning. Pull-mode Works only; 409 returned for push/disabled.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Secret rotated; redeploy required to propagate' })
+    @ApiResponse({ status: 403, description: 'Caller is not a Work owner / manager' })
+    @ApiResponse({ status: 409, description: 'Work is not in pull mode' })
+    async rotateActivitySyncSecret(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        await this.workOwnershipService.ensureAccess(id, auth.userId);
+        const work = await this.workRepository.findById(id);
+        if (!work) {
+            throw new NotFoundException({ status: 'error', message: 'Work not found' });
+        }
+        if (work.activitySyncMode !== 'pull') {
+            throw new ConflictException({
+                error: 'mode-mismatch',
+                mode: work.activitySyncMode,
+                message: `Activity-sync secret rotation is only supported for pull-mode Works; current mode is "${work.activitySyncMode}".`,
+            });
+        }
+        await this.platformSyncSecretService.rotate(id);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.WORK_UPDATED,
+                action: 'work.activity_sync.secret_rotated',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Rotated Activity Feed sync secret (pull transport)',
+            })
+            .catch(() => {});
+        return { status: 'success', redeployRequired: true };
     }
 
     @Get('works/:id/items')

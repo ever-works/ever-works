@@ -69,6 +69,50 @@ name: My Site
         expect(absent.deployProvider).toBeUndefined();
     });
 
+    describe('activity_sync.mode (EW-120)', () => {
+        it.each([
+            ['pull', 'pull'],
+            ['push', 'push'],
+            ['disabled', 'disabled'],
+            ['  PUSH  ', 'push'],
+        ])('parses canonical activity_sync.mode = %p as %p', (input, expected) => {
+            const result = service.parse(`
+name: My Site
+activity_sync:
+  mode: ${input}
+`);
+            expect(result.activitySyncMode).toBe(expected);
+        });
+
+        it('tolerates camelCase activitySync.mode', () => {
+            const result = service.parse(`
+name: My Site
+activitySync:
+  mode: push
+`);
+            expect(result.activitySyncMode).toBe('push');
+        });
+
+        it('tolerates flat activity_sync_mode', () => {
+            const result = service.parse(`
+name: My Site
+activity_sync_mode: disabled
+`);
+            expect(result.activitySyncMode).toBe('disabled');
+        });
+
+        it('returns undefined when the field is absent or unrecognised', () => {
+            expect(service.parse('name: x').activitySyncMode).toBeUndefined();
+            expect(
+                service.parse(`
+name: x
+activity_sync:
+  mode: nonsense
+`).activitySyncMode,
+            ).toBeUndefined();
+        });
+    });
+
     it('supports object-based schedule config', () => {
         const result = service.parse(`
 prompt: Keep this repo up to date
