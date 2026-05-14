@@ -557,6 +557,45 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         errorSpy.mockRestore();
     });
 
+    describe('default deployProvider fallback (EW-617 G6)', () => {
+        // When work.deployProvider is null/empty (e.g. older row pre-migration
+        // or anonymous quick-create that hasn't picked a provider yet), the
+        // service must fall back to 'ever-works', not the legacy 'vercel'.
+        it("sets DEPLOY_PROVIDER='ever-works' when work.deployProvider is falsy", async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: '',
+                plugin: {
+                    id: 'ever-works',
+                    getWorkflowFilenames: () => ['deploy_ever_works.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { variables } = captureCalls(githubPlugin);
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
+            expect(deployProviderVar?.value).toBe('ever-works');
+        });
+
+        it('uses work.deployProvider when explicitly set (no override)', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml', 'deploy_prod.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { variables } = captureCalls(githubPlugin);
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
+            expect(deployProviderVar?.value).toBe('vercel');
+        });
+    });
+
     describe('EW-616 cluster-source enforcement + kubeconfig substitution', () => {
         const k8sPlugin = {
             id: 'k8s',
