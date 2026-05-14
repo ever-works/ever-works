@@ -1009,6 +1009,7 @@
             },
             "tabs": {
                 "overview": "概览",
+                "activity": "Activity Feed",
                 "items": "项目",
                 "generator": "生成器",
                 "schedule": "计划",
@@ -1440,11 +1441,49 @@
                 "dataRepository": "数据仓库"
             },
             "activity": {
-                "title": "最近活动",
+                "title": "Activity Feed",
+                "subtitle": "Everything that's happening on this directory",
                 "noActivity": "尚未有活动",
                 "created": "作品已创建",
                 "workCreated": "作品创建成功",
-                "justNow": "刚刚"
+                "justNow": "刚刚",
+                "empty": {
+                    "title": "No activity yet",
+                    "body": "Run a generation, add an item, or wait for visitors to see events here."
+                },
+                "actions": {
+                    "refresh": "Refresh",
+                    "viewAll": "View all"
+                },
+                "filters": {
+                    "label": "Filter by category",
+                    "all": "All",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "deployment": "Deployment",
+                    "settings": "Settings",
+                    "comparisons": "Comparisons",
+                    "communityPr": "Community PR",
+                    "users": "Users",
+                    "submissions": "Submissions",
+                    "reports": "Reports"
+                },
+                "degraded": {
+                    "title": {
+                        "not_provisioned": "Deployed-site events not yet available",
+                        "disabled": "Deployed-site sync is turned off in Settings",
+                        "timeout": "Deployed-site events temporarily unavailable",
+                        "unauthorized": "Deployed-site rejected the request",
+                        "upstream_5xx": "Deployed-site is currently unreachable",
+                        "network": "Network error reaching the deployed site",
+                        "parse_error": "Unexpected response from the deployed site"
+                    },
+                    "lastSuccess": "Last successful sync: {time}",
+                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                },
+                "entry": {
+                    "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
+                }
             },
             "items": {
                 "title": "作品项目",
@@ -2170,6 +2209,40 @@
                     "save": "保存提交者",
                     "saved": "提交者设置已保存",
                     "saveFailed": "保存提交者设置失败"
+                },
+                "activitySync": {
+                    "title": "Activity Feed sync (EW-120)",
+                    "subtitle": "Choose how the platform learns about user-facing events from this directory's deployed site (signups, item submissions, reports).",
+                    "defaultBadge": "default",
+                    "modeLegend": "Activity Feed sync transport",
+                    "modes": {
+                        "pull": {
+                            "label": "Pull",
+                            "description": "Platform fetches the deployed site on demand using a per-Work HMAC secret. Requires the template to expose a `/_platform/events` endpoint."
+                        },
+                        "push": {
+                            "label": "Push",
+                            "description": "Deployed site POSTs each event to the platform with a shared bearer token. Lighter coupling — template only needs to fire four fetch calls."
+                        },
+                        "disabled": {
+                            "label": "Disabled",
+                            "description": "Website events are not surfaced in the feed. Platform activity-log + generation history still appear."
+                        }
+                    },
+                    "modeUpdated": "Switched to {mode} mode",
+                    "modeUpdateFailed": "Failed to update sync mode",
+                    "rotate": {
+                        "label": "Rotate sync secret",
+                        "description": "Generates a new HMAC secret. The deployed site will start using the new value only after the next deploy — redeploy required.",
+                        "action": "Rotate secret"
+                    },
+                    "rotateConfirm": "Rotate the Activity Feed sync secret? The deployed site will start failing until you trigger a redeploy.",
+                    "rotateSuccess": "Secret rotated. Redeploy this directory to propagate.",
+                    "rotateFailed": "Failed to rotate sync secret",
+                    "status": {
+                        "lastSuccess": "Last successful pull: {time}",
+                        "lastError": "Last error: {error}"
+                    }
                 }
             },
             "deploy": {

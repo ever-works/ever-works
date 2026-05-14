@@ -128,6 +128,7 @@ function makeController(s: Stubs): WorksController {
         s.itemExportService as any,
         s.itemImportService as any,
         s.itemImportExecutor as any,
+        { rotate: jest.fn(), getOrGenerate: jest.fn() } as any,
     );
 }
 

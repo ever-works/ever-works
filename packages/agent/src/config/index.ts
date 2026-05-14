@@ -274,4 +274,14 @@ export const config = {
             },
         },
     },
+
+    // EW-120 Activity Feed pull-mode plumbing — per-Work HMAC secret is
+    // encrypted at rest with this key. AES-256-GCM expects a 32-byte key;
+    // the consumer service decodes hex / base64 / utf8 in that order.
+    // Pull mode is the default transport (see Work.activitySyncMode).
+    platformSync: {
+        getEncryptionKey() {
+            return process.env.PLATFORM_ENCRYPTION_KEY || '';
+        },
+    },
 };

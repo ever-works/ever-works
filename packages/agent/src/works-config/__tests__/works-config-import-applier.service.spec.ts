@@ -36,15 +36,18 @@ import { WorksConfigImportApplierService } from '../services/works-config-import
 describe('WorksConfigImportApplierService', () => {
     let pluginOperationsService: { enablePluginForWork: jest.Mock };
     let workScheduleService: { updateSchedule: jest.Mock };
+    let workRepository: { update: jest.Mock };
     let service: WorksConfigImportApplierService;
     let warnSpy: jest.SpyInstance;
 
     beforeEach(() => {
         pluginOperationsService = { enablePluginForWork: jest.fn().mockResolvedValue(undefined) };
         workScheduleService = { updateSchedule: jest.fn().mockResolvedValue(undefined) };
+        workRepository = { update: jest.fn().mockResolvedValue(undefined) };
         service = new WorksConfigImportApplierService(
             pluginOperationsService as never,
             workScheduleService as never,
+            workRepository as never,
         );
         warnSpy = jest
             .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
@@ -53,6 +56,34 @@ describe('WorksConfigImportApplierService', () => {
 
     afterEach(() => {
         jest.restoreAllMocks();
+    });
+
+    describe('applyActivitySyncMode (EW-120)', () => {
+        it.each(['pull', 'push', 'disabled'] as const)(
+            'projects activity_sync.mode=%p onto the Work row',
+            async (mode) => {
+                await service.applyActivitySyncMode('work-1', { activitySyncMode: mode } as never);
+                expect(workRepository.update).toHaveBeenCalledWith('work-1', {
+                    activitySyncMode: mode,
+                });
+            },
+        );
+
+        it('is a no-op when activitySyncMode is missing from the parsed config', async () => {
+            await service.applyActivitySyncMode('work-1', {} as never);
+            await service.applyActivitySyncMode('work-1', null);
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('swallows repository errors so the import flow keeps going', async () => {
+            workRepository.update.mockRejectedValueOnce(new Error('DB down'));
+            await expect(
+                service.applyActivitySyncMode('work-1', { activitySyncMode: 'push' } as never),
+            ).resolves.toBeUndefined();
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Failed to apply activitySyncMode'),
+            );
+        });
     });
 
     describe('applyPipelineSettings', () => {
