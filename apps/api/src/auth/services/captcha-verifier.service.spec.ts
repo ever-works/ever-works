@@ -49,10 +49,11 @@ describe('CaptchaVerifierService (EW-617 G7)', () => {
     it('POSTs to the Turnstile verify URL with secret+response and parses success', async () => {
         process.env.CAPTCHA_PROVIDER = 'turnstile';
         process.env.CAPTCHA_SECRET = 'sec';
-        const fakeFetch = jest.fn(async (url: string, init: RequestInit) =>
-            new Response(JSON.stringify({ success: true, hostname: 'ever.works' }), {
-                status: 200,
-            }),
+        const fakeFetch = jest.fn(
+            async (url: string, init: RequestInit) =>
+                new Response(JSON.stringify({ success: true, hostname: 'ever.works' }), {
+                    status: 200,
+                }),
         ) as any;
         const { svc } = buildSvc(fakeFetch);
 
@@ -77,10 +78,14 @@ describe('CaptchaVerifierService (EW-617 G7)', () => {
     it('treats success=false from provider as a failed verify (no throw)', async () => {
         process.env.CAPTCHA_PROVIDER = 'turnstile';
         process.env.CAPTCHA_SECRET = 'sec';
-        const fakeFetch = jest.fn(async () =>
-            new Response(JSON.stringify({ success: false, 'error-codes': ['invalid-input-response'] }), {
-                status: 200,
-            }),
+        const fakeFetch = jest.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({ success: false, 'error-codes': ['invalid-input-response'] }),
+                    {
+                        status: 200,
+                    },
+                ),
         ) as any;
         const { svc } = buildSvc(fakeFetch);
 
@@ -107,7 +112,9 @@ describe('CaptchaVerifierService (EW-617 G7)', () => {
         process.env.CAPTCHA_PROVIDER = 'turnstile';
         process.env.CAPTCHA_SECRET = 'sec';
         process.env.CAPTCHA_VERIFY_URL = 'https://staging-verify.local/siteverify';
-        const fakeFetch = jest.fn(async () => new Response(JSON.stringify({ success: true }))) as any;
+        const fakeFetch = jest.fn(
+            async () => new Response(JSON.stringify({ success: true })),
+        ) as any;
         const { svc } = buildSvc(fakeFetch);
 
         await svc.verify({ token: 't' });

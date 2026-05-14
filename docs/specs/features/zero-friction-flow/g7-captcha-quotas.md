@@ -25,23 +25,23 @@ already in place on `POST /api/auth/anonymous` (G2) and
   `success` is enough for our threat model).
 - **FR-G7-2** When `CAPTCHA_PROVIDER` is unset (default in dev /
   preview), the service short-circuits with `success: true, skipped:
-  true` — no HTTP call. The existing per-IP throttles remain the only
+true` — no HTTP call. The existing per-IP throttles remain the only
   defense, which is intentional for development ergonomics.
 - **FR-G7-3** When the verifier provider returns an outage (network
   error / 5xx), the service falls open with `success: true, skipped:
-  true, errorCodes: ['verifier-exception']`. **A flaky captcha MUST
+true, errorCodes: ['verifier-exception']`. **A flaky captcha MUST
   NOT block legitimate traffic.** Ops can spot the elevated rate via
   the `skipped: true` log warns.
 - **FR-G7-4** Empty / missing token returns `success: false,
-  errorCodes: ['missing-input-response']` without making the network
+errorCodes: ['missing-input-response']` without making the network
   call.
 - **FR-G7-5** Call sites that need captcha verification (currently
   scoped to the two zero-friction entry points) MUST:
-  1. Read the user-supplied token from a documented header
-     (`x-captcha-token`) or body field (`captchaToken`).
-  2. Call `captchaVerifier.verify({ token, remoteIp })`.
-  3. On `success: false`, return 401 with a JSON body that names the
-     `errorCodes` so the client can re-render the widget.
+    1. Read the user-supplied token from a documented header
+       (`x-captcha-token`) or body field (`captchaToken`).
+    2. Call `captchaVerifier.verify({ token, remoteIp })`.
+    3. On `success: false`, return 401 with a JSON body that names the
+       `errorCodes` so the client can re-render the widget.
 
 ## Non-functional requirements
 
@@ -54,12 +54,12 @@ already in place on `POST /api/auth/anonymous` (G2) and
 
 ## Configuration
 
-| Env var               | Required           | Description                                                          |
-| --------------------- | ------------------ | -------------------------------------------------------------------- |
-| `CAPTCHA_PROVIDER`    | yes for production | One of `turnstile`, `hcaptcha`, `recaptcha`. Unset = disabled.       |
-| `CAPTCHA_SECRET`      | yes for production | Provider-side secret token (server-only).                            |
-| `CAPTCHA_VERIFY_URL`  | no                 | Override the default verify URL (tests / staging mirrors).           |
-| `CAPTCHA_SITE_KEY`    | (web-side)         | Public site key. Lives on the website / app; not read by the API.    |
+| Env var              | Required           | Description                                                       |
+| -------------------- | ------------------ | ----------------------------------------------------------------- |
+| `CAPTCHA_PROVIDER`   | yes for production | One of `turnstile`, `hcaptcha`, `recaptcha`. Unset = disabled.    |
+| `CAPTCHA_SECRET`     | yes for production | Provider-side secret token (server-only).                         |
+| `CAPTCHA_VERIFY_URL` | no                 | Override the default verify URL (tests / staging mirrors).        |
+| `CAPTCHA_SITE_KEY`   | (web-side)         | Public site key. Lives on the website / app; not read by the API. |
 
 ## Global caps (deferred)
 
@@ -82,14 +82,14 @@ sub-task under EW-624.
 ## Tests
 
 - `captcha-verifier.service.spec.ts` covers:
-  - disabled provider returns success+skipped without an HTTP call,
-  - missing token returns failure with `missing-input-response`,
-  - turnstile success path POSTs to the official URL with the
-    expected body fields,
-  - provider-level `success: false` propagates as a failed verify,
-  - verifier exception falls open with `verifier-exception`,
-  - `CAPTCHA_VERIFY_URL` override is honored,
-  - unknown provider is treated as disabled (defense in depth).
+    - disabled provider returns success+skipped without an HTTP call,
+    - missing token returns failure with `missing-input-response`,
+    - turnstile success path POSTs to the official URL with the
+      expected body fields,
+    - provider-level `success: false` propagates as a failed verify,
+    - verifier exception falls open with `verifier-exception`,
+    - `CAPTCHA_VERIFY_URL` override is honored,
+    - unknown provider is treated as disabled (defense in depth).
 
 ## Out of scope (follow-ups)
 

@@ -61,7 +61,7 @@ export class CaptchaVerifierService {
         const secret = process.env.CAPTCHA_SECRET?.trim() || null;
         const verifyUrl =
             process.env.CAPTCHA_VERIFY_URL?.trim() ||
-            (provider ? DEFAULT_VERIFY_URLS[provider] ?? null : null);
+            (provider ? (DEFAULT_VERIFY_URLS[provider] ?? null) : null);
         this.cachedConfig = { provider, secret, verifyUrl };
         return this.cachedConfig;
     }
