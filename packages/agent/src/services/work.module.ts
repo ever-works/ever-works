@@ -32,6 +32,7 @@ import { WorksConfigService } from '@src/works-config/services/works-config.serv
 import { WorksConfigSyncListener } from '@src/works-config/services/works-config-sync.listener';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 import { ItemHealthService } from './item-health.service';
 import { ItemSourceValidationSchedulerService } from './item-source-validation-scheduler.service';
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
@@ -98,6 +99,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         SettingsSchemaValidatorService,
         EverWorksDeployQuotaService,
         PlatformSyncSecretService,
+        ZeroFrictionFunnelService,
         // EW-614 — `EverWorksGitProvider` creates the per-Work repository in
         // the platform GitHub org (`ever-works-cloud`) using a server-held
         // PAT, so users picking "Ever Works Git" don't need to bring their
@@ -142,6 +144,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorksConfigProjectionService,
         WorksConfigRepositorySyncService,
         PlatformSyncSecretService,
+        ZeroFrictionFunnelService,
         CommunityPrModule,
         ComparisonGeneratorModule,
         TemplateCatalogModule,
