@@ -68,6 +68,44 @@ export class UpdatePasswordDto {
     newPassword: string;
 }
 
+/**
+ * EW-617 G3: payload for `POST /api/auth/claim`. Anonymous users send
+ * this with their anon session bearer token to convert into a regular
+ * account; reuses the same password rules as `RegisterDto`.
+ */
+export class ClaimAccountDto {
+    @ApiProperty({ description: 'Email address to attach', example: 'john@example.com' })
+    @IsEmail()
+    @IsNotEmpty()
+    email: string;
+
+    @ApiProperty({
+        description:
+            'Password (min 6 chars, must contain lowercase letter and number/special char)',
+        example: 'MySecure123!',
+        minLength: 6,
+    })
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(6)
+    @Matches(/^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, {
+        message:
+            'Password must contain at least 1 lowercase letter and 1 number or special character',
+    })
+    password: string;
+
+    @ApiPropertyOptional({ description: 'Username to use after claim (defaults to current anon username)' })
+    @IsString()
+    @IsOptional()
+    @MinLength(3)
+    username?: string;
+
+    @ApiPropertyOptional({ description: 'Callback URL for email verification redirect' })
+    @IsString()
+    @IsOptional()
+    emailVerificationCallbackUrl?: string;
+}
+
 export class OAuthCallbackDto {
     @ApiProperty({ description: 'Authorization code from OAuth provider' })
     @IsString()

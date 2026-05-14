@@ -10,6 +10,7 @@ jest.mock('@ever-works/agent/activity-log', () => ({
 import { AuthController } from './auth.controller';
 import type { AuthService } from '../services/auth.service';
 import type { AnonymousAuthService } from '../services/anonymous-auth.service';
+import type { ClaimAccountService } from '../services/claim-account.service';
 import type { SocialAuthService } from '../services/social-auth.service';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
 import type { AuthProvider } from '../providers/auth-provider.abstract';
@@ -33,6 +34,7 @@ describe('AuthController', () => {
     >;
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
     let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
+    let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
         Pick<
@@ -62,6 +64,7 @@ describe('AuthController', () => {
         } as any;
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
         anonymousAuth = { createAnonymousUser: jest.fn() } as any;
+        claimAccount = { claim: jest.fn() } as any;
         activityLog = { log: jest.fn().mockResolvedValue(undefined) } as any;
         authProvider = {
             signUpEmail: jest.fn(),
@@ -76,9 +79,75 @@ describe('AuthController', () => {
             authService as unknown as AuthService,
             socialAuth as unknown as SocialAuthService,
             anonymousAuth as unknown as AnonymousAuthService,
+            claimAccount as unknown as ClaimAccountService,
             activityLog as unknown as ActivityLogService,
             authProvider as unknown as AuthProvider,
         );
+    });
+
+    describe('claim (POST /api/auth/claim) — EW-617 G3', () => {
+        it('delegates to claimAccountService and logs activity', async () => {
+            const claimed = {
+                id: 'u-anon-1',
+                email: 'jane@example.com',
+                username: 'jane-doe',
+                emailVerified: false,
+            };
+            claimAccount.claim.mockResolvedValue(claimed);
+
+            const req = {
+                user: { userId: 'u-anon-1' },
+                ip: '1.2.3.4',
+                headers: { 'user-agent': 'jest-agent' },
+            };
+
+            const result = await (controller as any).claimAccount(req, {
+                email: 'jane@example.com',
+                password: 'MySecure123!',
+                username: 'jane-doe',
+            });
+
+            expect(claimAccount.claim).toHaveBeenCalledWith({
+                userId: 'u-anon-1',
+                email: 'jane@example.com',
+                password: 'MySecure123!',
+                username: 'jane-doe',
+                emailVerificationCallbackUrl: undefined,
+            });
+            expect(result).toEqual(claimed);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u-anon-1',
+                    action: 'user.account_claimed',
+                    ipAddress: '1.2.3.4',
+                    userAgent: 'jest-agent',
+                }),
+            );
+        });
+
+        it('passes through emailVerificationCallbackUrl when provided', async () => {
+            claimAccount.claim.mockResolvedValue({
+                id: 'u-1',
+                email: 'a@b.com',
+                username: 'a',
+                emailVerified: false,
+            });
+
+            await (controller as any).claimAccount(
+                { user: { userId: 'u-1' }, headers: {} },
+                {
+                    email: 'a@b.com',
+                    password: 'MySecure123!',
+                    emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
+                },
+            );
+
+            expect(claimAccount.claim).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
+                }),
+            );
+        });
     });
 
     describe('anonymous (POST /api/auth/anonymous) — EW-617 G2', () => {

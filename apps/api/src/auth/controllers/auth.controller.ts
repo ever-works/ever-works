@@ -21,7 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { AnonymousAuthService } from '../services/anonymous-auth.service';
-import { RegisterDto, LoginDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { ClaimAccountService } from '../services/claim-account.service';
+import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { AuthSessionGuard } from '../guards/auth-session.guard';
@@ -44,6 +45,7 @@ export class AuthController {
         private authService: AuthService,
         private readonly socialAuthService: SocialAuthService,
         private readonly anonymousAuthService: AnonymousAuthService,
+        private readonly claimAccountService: ClaimAccountService,
         private activityLogService: ActivityLogService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
@@ -138,6 +140,63 @@ export class AuthController {
             .catch(() => {});
 
         return response;
+    }
+
+    @UseGuards(AuthSessionGuard)
+    @Post('claim')
+    // EW-617 G3: convert an anonymous user (G2) into a regular account.
+    // Throttled to dampen brute-force attempts at squatting taken emails.
+    @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } })
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Claim an anonymous account',
+        description:
+            'Converts an anonymous (zero-friction) account into a regular credentialed account. Attaches email + password, clears the TTL, fires verification email. The bearer token from POST /api/auth/anonymous stays valid.',
+    })
+    @ApiResponse({ status: 200, description: 'Account claimed, verification email sent' })
+    @ApiResponse({ status: 403, description: 'Account is not anonymous' })
+    @ApiResponse({
+        status: 409,
+        description: 'Email already in use by a different account',
+    })
+    async claimAccount(@Request() req, @Body() claimDto: ClaimAccountDto) {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return { message: 'unauthorized' };
+        }
+
+        const claimed = await this.claimAccountService.claim({
+            userId,
+            email: claimDto.email,
+            password: claimDto.password,
+            username: claimDto.username,
+            emailVerificationCallbackUrl: claimDto.emailVerificationCallbackUrl,
+        });
+
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+
+        this.activityLogService
+            .log({
+                userId: claimed.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.account_claimed',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Anonymous user claimed account',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
+
+        return claimed;
     }
 
     @Public()
