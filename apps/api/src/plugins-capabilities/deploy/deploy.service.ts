@@ -1,7 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    InternalServerErrorException,
+    Logger,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
-import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import {
+    DeployFacadeService,
+    GitFacadeService,
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
+} from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
@@ -14,6 +23,28 @@ import {
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
+import {
+    ClusterSource,
+    resolveKubeconfigForClusterSource,
+    validateClusterSourceForOwner,
+} from './cluster-source-matrix';
+
+const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = [
+    'k8s-works',
+    'k8s-gauzy',
+    'custom-kubeconfig',
+];
+
+function coerceClusterSource(value: unknown): ClusterSource {
+    if (typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value)) {
+        return value as ClusterSource;
+    }
+    // Back-compat: Works that pre-date the EW-616 dropdown have no
+    // `clusterSource` set in their plugin settings. Treat them as
+    // `custom-kubeconfig` so they keep working as long as their
+    // website repo is not in an Ever Works-shared org.
+    return 'custom-kubeconfig';
+}
 
 /**
  * Default workflow filenames to dispatch when a deployment plugin does not
@@ -81,6 +112,20 @@ export class DeployService {
 
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
+
+        // EW-616: enforce the deploy matrix for k8s deploys.
+        // - `k8s-gauzy` is admin-only (ever-works org).
+        // - Ever Works-shared GHCR + customer-provided cluster is rejected
+        //   to avoid cross-tenant credential exposure.
+        // The resolved kubeconfig replaces the user-pasted one for
+        // platform-managed sources.
+        const effectiveDeployToken = this.resolveDeployToken(
+            work.deployProvider,
+            websiteOwner,
+            settings ?? {},
+            token,
+        );
+
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
         await this.enableWorkflows({
@@ -90,7 +135,7 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, work, plugin, settings);
+        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, settings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
@@ -212,6 +257,55 @@ export class DeployService {
                 status: 'error',
                 message: error instanceof Error ? error.message : 'Unknown error',
             };
+        }
+    }
+
+    /**
+     * EW-616: Apply the deploy-matrix validation for the k8s provider and
+     * substitute the platform's kubeconfig env var when the user picked a
+     * platform-managed cluster source. For non-k8s providers (Vercel, etc.)
+     * this is a pass-through and the validation is skipped.
+     */
+    private resolveDeployToken(
+        deployProvider: string | undefined,
+        websiteOwner: string,
+        settings: Record<string, unknown>,
+        userToken: string,
+    ): string {
+        if (deployProvider !== 'k8s') {
+            return userToken;
+        }
+
+        // EW-616: the deploy facade returns a sentinel string when the
+        // user picked a platform-managed cluster without pasting a
+        // kubeconfig. Treat it as "no kubeconfig" for the validator and
+        // discard it before resolution so it can never leak into the
+        // pushed `K8S_TOKEN` secret on the website repo.
+        const realUserToken = userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
+
+        const clusterSource = coerceClusterSource(settings.clusterSource);
+        const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
+            hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
+        });
+        if (failure) {
+            this.logger.warn(
+                `EW-616 deploy-matrix violation [${failure.code}]: ${failure.message}`,
+            );
+            throw new BadRequestException(failure.message);
+        }
+
+        try {
+            return resolveKubeconfigForClusterSource(clusterSource, realUserToken);
+        } catch (error) {
+            // The only failure path here is a missing platform-managed
+            // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
+            // `EVER_WORKS_K8S_GAUZY_KUBECONFIG`). The user picked a
+            // valid option — this is a platform-provisioning gap, so
+            // surface it as 5xx, not 4xx, so on-call can distinguish it
+            // from genuine user-input errors.
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
+            throw new InternalServerErrorException(message);
         }
     }
 
