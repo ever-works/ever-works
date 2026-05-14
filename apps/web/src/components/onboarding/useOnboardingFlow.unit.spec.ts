@@ -165,6 +165,18 @@ describe('reduce', () => {
         expect(next.state.pluginsReviewed).toBe(true);
     });
 
+    // EW-617 G4: prompt round-trip through the reducer.
+    it('setPrompt stores the trimmed value and clears on whitespace-only input', () => {
+        const set = reduce(initialReducerState(), {
+            type: 'setPrompt',
+            value: '  AI coding assistants directory   ',
+        });
+        expect(set.state.prompt).toBe('AI coding assistants directory');
+
+        const cleared = reduce(set, { type: 'setPrompt', value: '   ' });
+        expect(cleared.state.prompt).toBeUndefined();
+    });
+
     it('mergeServerState replaces state and clamps the current step index', () => {
         const start = { ...initialReducerState(), stepIndex: 8 };
         const next = reduce(start, {
