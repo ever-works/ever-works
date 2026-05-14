@@ -168,10 +168,12 @@ export class GitHubAppOnboardingService {
                 lastLoginAt: new Date(),
             });
         } else {
-            const nextEmail =
-                input.email && user.email.endsWith('@users.noreply.ever.works')
-                    ? input.email
-                    : user.email;
+            // EW-617 G2: existing rows may now have null email (anonymous
+            // users who connected GitHub before claiming an account). Treat
+            // null the same as the placeholder noreply address — overwrite.
+            const isPlaceholderEmail =
+                !user.email || user.email.endsWith('@users.noreply.ever.works');
+            const nextEmail = input.email && isPlaceholderEmail ? input.email : user.email;
             user = await this.userRepository.update(user.id, {
                 username: user.username || input.login,
                 avatar: input.avatarUrl || user.avatar,

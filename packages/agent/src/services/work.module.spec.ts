@@ -123,6 +123,7 @@ import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
+import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
@@ -195,6 +196,7 @@ describe('WorkModule', () => {
             WorkDetailService,
             WorkScheduleService,
             WorkScheduleDispatcherService,
+            AnonymousUserCleanupService,
             WorkMemberService,
             WorkInvitationService,
             WorkImportService,
@@ -291,10 +293,12 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 28-entry shape (25 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 29-entry shape (26 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
-            expect(meta('exports')).toHaveLength(28);
+            // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
+            // (nightly cleanup of expired anonymous Users).
+            expect(meta('exports')).toHaveLength(29);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {
