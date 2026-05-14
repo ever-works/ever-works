@@ -1,5 +1,6 @@
 import {
     Body,
+    ConflictException,
     Controller,
     Get,
     HttpCode,
@@ -201,12 +202,33 @@ export class ActivityLogController {
     @ApiOperation({
         summary: 'Ingest a website-sourced activity event (EW-120)',
         description:
-            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`; rate-limited at 60 req/min per IP.',
+            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`; rate-limited at 60 req/min per IP. Returns 409 when the target Work is configured for a non-push transport (pull / disabled).',
     })
     @ApiResponse({ status: 202, description: 'Event accepted' })
     @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
     @ApiResponse({ status: 404, description: 'Work not found' })
+    @ApiResponse({
+        status: 409,
+        description: 'Work activitySyncMode is not "push" — ingest rejected (mode-mismatch).',
+    })
     async ingestWebsiteEvent(@Body() dto: IngestEventDto) {
+        // Mode-aware gate (EW-120 dual-mode). Reading the Work once here is
+        // cheaper than letting it slip through and surfacing the wrong
+        // events under the directory owner's feed. The 409 body carries the
+        // current mode so the template can recover (or stop retrying) on
+        // its own.
+        const work = await this.workRepository.findById(dto.workId);
+        if (!work) {
+            throw new NotFoundException(`Work ${dto.workId} not found`);
+        }
+        if (work.activitySyncMode !== 'push') {
+            throw new ConflictException({
+                error: 'mode-mismatch',
+                mode: work.activitySyncMode,
+                message: `Work activitySyncMode is "${work.activitySyncMode}"; ingest only accepts push-mode events.`,
+            });
+        }
+
         try {
             const activity = await this.activityLogService.ingestFromWebsite({
                 workId: dto.workId,

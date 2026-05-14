@@ -635,6 +635,14 @@ describe('ActivityLogController', () => {
             summary: 'User signed up',
         };
 
+        beforeEach(() => {
+            // Default to push-mode Work for the happy path tests.
+            workRepository.findById.mockResolvedValue({
+                id: dto.workId,
+                activitySyncMode: 'push',
+            } as never);
+        });
+
         it('delegates to ActivityLogService.ingestFromWebsite and returns the new id', async () => {
             (activityLogService as any).ingestFromWebsite.mockResolvedValueOnce({ id: 'al-new' });
             const result = await controller.ingestWebsiteEvent(dto as never);
@@ -649,6 +657,40 @@ describe('ActivityLogController', () => {
             });
             expect(result).toEqual({ id: 'al-new' });
         });
+
+        it('returns 404 when the Work does not exist', async () => {
+            workRepository.findById.mockResolvedValueOnce(null);
+            await expect(controller.ingestWebsiteEvent(dto as never)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect((activityLogService as any).ingestFromWebsite).not.toHaveBeenCalled();
+        });
+
+        it.each(['pull', 'disabled'] as const)(
+            'returns 409 (mode-mismatch) when Work is in %s mode',
+            async (mode) => {
+                workRepository.findById.mockResolvedValueOnce({
+                    id: dto.workId,
+                    activitySyncMode: mode,
+                } as never);
+
+                let captured: any;
+                try {
+                    await controller.ingestWebsiteEvent(dto as never);
+                } catch (err) {
+                    captured = err;
+                }
+                expect(captured).toBeDefined();
+                // ConflictException carries the typed body { error, mode, message }.
+                const response = (captured as { getResponse: () => unknown }).getResponse() as {
+                    error: string;
+                    mode: string;
+                };
+                expect(response.error).toBe('mode-mismatch');
+                expect(response.mode).toBe(mode);
+                expect((activityLogService as any).ingestFromWebsite).not.toHaveBeenCalled();
+            },
+        );
 
         it('rethrows "work … not found" as a 404 NotFoundException', async () => {
             (activityLogService as any).ingestFromWebsite.mockRejectedValueOnce(

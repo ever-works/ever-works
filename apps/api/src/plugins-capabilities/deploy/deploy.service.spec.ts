@@ -1,6 +1,7 @@
 jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
 jest.mock('@ever-works/agent/entities', () => ({ Work: class {}, User: class {} }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
+jest.mock('@ever-works/agent/services', () => ({ PlatformSyncSecretService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({
     DeployFacadeService: class {},
     GitFacadeService: class {},
@@ -42,6 +43,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
          *  Defaults to an empty object (no PAT saved). Tests for the GHCR PAT
          *  flow override this with `{ readPackagesPat: '...' }`. */
         githubPluginSettings?: Record<string, unknown>;
+        /** EW-120 dual-mode Activity Feed sync. Defaults to `push` to keep
+         *  pre-dual-mode tests behaving as before. */
+        activitySyncMode?: 'pull' | 'push' | 'disabled';
     }) => {
         const work = {
             id: 'work-1',
@@ -49,6 +53,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             deployProvider: overrides.deployProvider ?? 'k8s',
             gitProvider: 'github',
             websiteTemplateId: 'directory-web-template',
+            activitySyncMode: overrides.activitySyncMode ?? 'push',
             user: { id: 'user-1' },
             getRepoOwner: () => 'acme',
             getDataRepo: () => 'acme/data',
@@ -105,6 +110,10 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             emit: jest.fn(),
         };
 
+        const platformSyncSecretService = {
+            getOrGenerate: jest.fn().mockResolvedValue('hex'.repeat(21) + 'h'), // 64 hex chars
+        };
+
         const service = new DeployService(
             deployFacade as any,
             gitFacade as any,
@@ -113,6 +122,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             websiteUpdateService as any,
             websiteTemplateResolver as any,
             eventEmitter as any,
+            platformSyncSecretService as any,
         );
 
         return {
@@ -123,6 +133,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             pluginRegistry,
             githubPlugin,
             eventEmitter,
+            platformSyncSecretService,
         };
     };
 
@@ -226,7 +237,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         expect(keys.filter((k: string) => k.startsWith('K8S_INGRESS'))).toEqual([]);
     });
 
-    describe('Activity Feed ingest secrets (EW-120)', () => {
+    describe('Activity Feed dual-mode sync secrets (EW-120)', () => {
         const originalUrl = process.env.PLATFORM_API_URL;
         const originalToken = process.env.PLATFORM_API_SECRET_TOKEN;
 
@@ -235,9 +246,10 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             process.env.PLATFORM_API_SECRET_TOKEN = originalToken;
         });
 
-        it('always pushes WORK_ID alongside TENANT_ID', async () => {
+        it('always pushes WORK_ID alongside TENANT_ID (regardless of sync mode)', async () => {
             const { service, githubPlugin } = buildService({
                 plugin: { id: 'legacy' },
+                activitySyncMode: 'disabled',
             });
 
             await service.deploy('work-1', 'user-1', {});
@@ -248,39 +260,97 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             expect(byKey.WORK_ID).toBe('work-1');
         });
 
-        it('pushes PLATFORM_API_URL + PLATFORM_API_SECRET_TOKEN when both env vars are set', async () => {
-            process.env.PLATFORM_API_URL = 'https://api.ever.works';
-            process.env.PLATFORM_API_SECRET_TOKEN = 'platform-shared-secret-value-32x';
+        describe('push mode', () => {
+            it('pushes PLATFORM_API_URL + PLATFORM_API_SECRET_TOKEN when env vars are set', async () => {
+                process.env.PLATFORM_API_URL = 'https://api.ever.works';
+                process.env.PLATFORM_API_SECRET_TOKEN = 'platform-shared-secret-value-32x';
 
-            const { service, githubPlugin } = buildService({
-                plugin: { id: 'legacy' },
+                const { service, githubPlugin, platformSyncSecretService } = buildService({
+                    plugin: { id: 'legacy' },
+                    activitySyncMode: 'push',
+                });
+
+                await service.deploy('work-1', 'user-1', {});
+
+                const { secrets } = captureCalls(githubPlugin);
+                const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+                expect(byKey.PLATFORM_API_URL).toBe('https://api.ever.works');
+                expect(byKey.PLATFORM_API_SECRET_TOKEN).toBe(
+                    'platform-shared-secret-value-32x',
+                );
+                // Push-mode deploys must never invoke the per-Work HMAC secret service.
+                expect(platformSyncSecretService.getOrGenerate).not.toHaveBeenCalled();
             });
 
-            await service.deploy('work-1', 'user-1', {});
+            it('skips the PLATFORM_API_* push when env vars are not configured', async () => {
+                delete process.env.PLATFORM_API_URL;
+                delete process.env.PLATFORM_API_SECRET_TOKEN;
 
-            const { secrets } = captureCalls(githubPlugin);
-            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
-            expect(byKey.PLATFORM_API_URL).toBe('https://api.ever.works');
-            expect(byKey.PLATFORM_API_SECRET_TOKEN).toBe('platform-shared-secret-value-32x');
+                const { service, githubPlugin } = buildService({
+                    plugin: { id: 'legacy' },
+                    activitySyncMode: 'push',
+                });
+
+                await service.deploy('work-1', 'user-1', {});
+
+                const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+                expect(keys).not.toContain('PLATFORM_API_URL');
+                expect(keys).not.toContain('PLATFORM_API_SECRET_TOKEN');
+                // Deploy succeeds regardless — WORK_ID + TENANT_ID landed.
+                expect(keys).toContain('WORK_ID');
+            });
         });
 
-        it('skips the PLATFORM_API_* push when env vars are not configured', async () => {
-            delete process.env.PLATFORM_API_URL;
-            delete process.env.PLATFORM_API_SECRET_TOKEN;
+        describe('pull mode', () => {
+            it('pushes PLATFORM_SYNC_SECRET (per-Work HMAC) via the secret service', async () => {
+                const { service, githubPlugin, platformSyncSecretService } = buildService({
+                    plugin: { id: 'legacy' },
+                    activitySyncMode: 'pull',
+                });
 
-            const { service, githubPlugin } = buildService({
-                plugin: { id: 'legacy' },
+                await service.deploy('work-1', 'user-1', {});
+
+                expect(platformSyncSecretService.getOrGenerate).toHaveBeenCalledWith('work-1');
+                const byKey = Object.fromEntries(
+                    captureCalls(githubPlugin).secrets.map((s: any) => [s.key, s.value]),
+                );
+                expect(byKey.PLATFORM_SYNC_SECRET).toBe('hex'.repeat(21) + 'h');
+                // Pull-mode deploys must never push the push-mode bearer.
+                expect(byKey.PLATFORM_API_SECRET_TOKEN).toBeUndefined();
             });
 
-            await service.deploy('work-1', 'user-1', {});
+            it('still completes the deploy when secret service throws', async () => {
+                const { service, platformSyncSecretService } = buildService({
+                    plugin: { id: 'legacy' },
+                    activitySyncMode: 'pull',
+                });
+                platformSyncSecretService.getOrGenerate.mockRejectedValueOnce(
+                    new Error('encryption key missing'),
+                );
 
-            const { secrets } = captureCalls(githubPlugin);
-            const keys = secrets.map((s: any) => s.key);
-            expect(keys).not.toContain('PLATFORM_API_URL');
-            expect(keys).not.toContain('PLATFORM_API_SECRET_TOKEN');
-            // The deploy still succeeded — WORK_ID + TENANT_ID landed.
-            expect(keys).toContain('WORK_ID');
-            expect(keys).toContain('TENANT_ID');
+                await expect(service.deploy('work-1', 'user-1', {})).resolves.toBeDefined();
+            });
+        });
+
+        describe('disabled mode', () => {
+            it('pushes neither PLATFORM_API_* nor PLATFORM_SYNC_SECRET', async () => {
+                // Set env vars too — disabled mode must skip regardless of platform config.
+                process.env.PLATFORM_API_URL = 'https://api.ever.works';
+                process.env.PLATFORM_API_SECRET_TOKEN = 'platform-shared-secret-value-32x';
+
+                const { service, githubPlugin, platformSyncSecretService } = buildService({
+                    plugin: { id: 'legacy' },
+                    activitySyncMode: 'disabled',
+                });
+
+                await service.deploy('work-1', 'user-1', {});
+
+                const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+                expect(keys).not.toContain('PLATFORM_API_URL');
+                expect(keys).not.toContain('PLATFORM_API_SECRET_TOKEN');
+                expect(keys).not.toContain('PLATFORM_SYNC_SECRET');
+                expect(platformSyncSecretService.getOrGenerate).not.toHaveBeenCalled();
+            });
         });
     });
 
