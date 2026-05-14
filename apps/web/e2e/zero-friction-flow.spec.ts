@@ -100,9 +100,7 @@ test.describe.skip('EW-617 zero-friction flow — API contract', () => {
         request,
     }) => {
         // Mint an anon session first.
-        const session = await request
-            .post(`${APP_URL}/api/auth/anonymous`)
-            .then((r) => r.json());
+        const session = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
 
         const response = await request.post(`${APP_URL}/api/works/quick-create`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
@@ -131,9 +129,7 @@ test.describe.skip('EW-617 zero-friction flow — API contract', () => {
     });
 
     test('POST /api/auth/claim flips an anon user into a registered one', async ({ request }) => {
-        const session = await request
-            .post(`${APP_URL}/api/auth/anonymous`)
-            .then((r) => r.json());
+        const session = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
 
         const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const claim = await request.post(`${APP_URL}/api/auth/claim`, {
@@ -153,9 +149,7 @@ test.describe.skip('EW-617 zero-friction flow — API contract', () => {
 
         // Re-attempt with the same email should now 409 (a different
         // anon user trying to claim the same email).
-        const session2 = await request
-            .post(`${APP_URL}/api/auth/anonymous`)
-            .then((r) => r.json());
+        const session2 = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
         const dup = await request.post(`${APP_URL}/api/auth/claim`, {
             headers: { Authorization: `Bearer ${session2.access_token}` },
             data: {
