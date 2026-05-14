@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { apiUrl, loginViaAPI, authedHeaders } from './helpers/api';
-import { TEST_USER } from './helpers/test-user';
+import { apiUrl, registerUserViaAPI, authedHeaders } from './helpers/api';
 
 /**
  * v2 onboarding wizard end-to-end coverage.
@@ -14,8 +13,10 @@ import { TEST_USER } from './helpers/test-user';
  * Auth model: the endpoints live on the NestJS API at :3100, so
  * `page.request` against a relative path resolves to the Next.js web at
  * :3000 (no proxy → 404) AND cookies set on :3000 do not transfer to
- * :3100. We log in via API to obtain a Bearer token and authenticate the
- * `/api/onboarding/*` calls directly, mirroring `global-setup.ts`.
+ * :3100. We register a fresh user in beforeAll via `registerUserViaAPI`,
+ * which returns an access_token directly — avoids relying on TEST_USER,
+ * whose `Date.now()` suffix differs between the setup-project process
+ * (where it was registered) and a chromium-project worker process.
  */
 
 test.describe('Onboarding wizard v2 — choice-driven flow', () => {
@@ -24,11 +25,8 @@ test.describe('Onboarding wizard v2 — choice-driven flow', () => {
     test.beforeAll(async ({ playwright }) => {
         const ctx = await playwright.request.newContext();
         try {
-            const { access_token } = await loginViaAPI(ctx, {
-                email: TEST_USER.email,
-                password: TEST_USER.password,
-            });
-            auth = authedHeaders(access_token);
+            const user = await registerUserViaAPI(ctx, {});
+            auth = authedHeaders(user.access_token);
         } finally {
             await ctx.dispose();
         }
