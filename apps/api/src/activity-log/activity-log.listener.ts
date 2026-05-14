@@ -30,6 +30,24 @@ export class ActivityLogListener {
     @OnEvent(WorkCreatedEvent.EVENT_NAME)
     async onWorkCreated(event: WorkCreatedEvent) {
         try {
+            // When the platform provisions the underlying repo on the user's
+            // behalf (EW-614 — "Ever Works Git" storage), the event carries a
+            // `platformActor` payload. We record it under `metadata.actor` so
+            // the activity-log UI can show "Ever Works (on your behalf)"
+            // instead of attributing the action to the user alone.
+            const metadata = event.platformActor
+                ? {
+                      actor: {
+                          kind: event.platformActor.actorKind,
+                          id: event.platformActor.actor,
+                      },
+                      repository: {
+                          fullName: event.platformActor.repoFullName,
+                          htmlUrl: event.platformActor.htmlUrl,
+                      },
+                  }
+                : undefined;
+
             await this.activityLogService.log({
                 userId: event.work.userId,
                 workId: event.work.id,
@@ -37,6 +55,7 @@ export class ActivityLogListener {
                 action: 'work.created',
                 status: ActivityStatus.COMPLETED,
                 summary: `Created work: ${event.work.name}`,
+                metadata,
             });
         } catch (error) {
             this.logger.error('Failed to log work created activity:', error);

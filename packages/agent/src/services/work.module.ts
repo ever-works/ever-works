@@ -42,6 +42,7 @@ import { NotificationsModule } from '@src/notifications';
 import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
+    EverWorksGitProvider,
     type EverWorksDeployQuotaCounter,
 } from '@src/ever-works-providers';
 import { WorkRepository } from '@src/database/repositories/work.repository';
@@ -97,6 +98,11 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         SettingsSchemaValidatorService,
         EverWorksDeployQuotaService,
         PlatformSyncSecretService,
+        // EW-614 — `EverWorksGitProvider` creates the per-Work repository in
+        // the platform GitHub org (`ever-works-cloud`) using a server-held
+        // PAT, so users picking "Ever Works Git" don't need to bring their
+        // own GitHub. Consumed by `WorkLifecycleService.createWork`.
+        EverWorksGitProvider,
         {
             // The Ever Works Deploy quota service is repo-agnostic — it
             // takes a small `EverWorksDeployQuotaCounter` it can consult.

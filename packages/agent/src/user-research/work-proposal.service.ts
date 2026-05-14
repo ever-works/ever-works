@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateObject } from 'ai';
 import { AiFacadeService } from '../facades/ai.facade';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { WorkProposalRepository } from './work-proposal.repository';
-import { workProposalsBatchSchema, type WorkProposalsBatch } from './schemas';
+import { permissiveWorkProposalsBatchSchema, type WorkProposalDraft } from './schemas';
+import { coerceWorkProposal } from './proposal-coercion';
 import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
+import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
     type WorkProposal,
@@ -68,16 +69,17 @@ export class WorkProposalService {
             .map((p) => p.plugin.id)
             .filter(Boolean);
 
+        let resolvedModel;
         let providerName: string;
         let modelName: string;
-        let tokensUsed = 0;
-        let parsed: WorkProposalsBatch;
-
         try {
-            const providerConfig = await this.aiFacade.getProviderConfig({
+            const resolved = await resolveAiProviderForResearch(
+                this.aiFacade,
+                this.registry,
                 userId,
-            });
-            if (!providerConfig.baseUrl || !providerConfig.apiKey) {
+                this.logger,
+            );
+            if (!resolved) {
                 return {
                     status: 'error',
                     proposals: [],
@@ -85,46 +87,65 @@ export class WorkProposalService {
                     error: 'ai-provider-not-configured',
                 };
             }
-            const provider = createOpenAICompatible({
-                name: providerConfig.providerId,
-                baseURL: providerConfig.baseUrl,
-                apiKey: providerConfig.apiKey,
-            });
-            modelName =
-                providerConfig.routing.complexModel ??
-                providerConfig.routing.mediumModel ??
-                providerConfig.defaultModel ??
-                '';
-            if (!modelName) {
-                return {
-                    status: 'error',
-                    proposals: [],
-                    tokensUsed: 0,
-                    error: 'no-model-configured',
-                };
-            }
-            providerName = providerConfig.providerName ?? providerConfig.providerId;
+            resolvedModel = resolved.model;
+            providerName = resolved.providerName;
+            modelName = resolved.modelName;
+        } catch (err) {
+            const message = (err as Error).message;
+            this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
+            return { status: 'error', proposals: [], tokensUsed: 0, error: message };
+        }
 
+        let tokensUsed = 0;
+        let drafts: WorkProposalDraft[] = [];
+
+        try {
+            // Use the permissive schema so low-quality model output (sloppy
+            // slugs, wrong enum values, off-by-one length bounds) doesn't
+            // make generateObject reject the whole batch. coerceWorkProposal
+            // below clips/slugifies/filters each draft into the strict shape.
             const result = await generateObject({
-                model: provider(modelName),
-                schema: workProposalsBatchSchema,
+                model: resolvedModel,
+                schema: permissiveWorkProposalsBatchSchema,
                 system: PROPOSALS_SYSTEM_PROMPT,
                 prompt: buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
                 temperature: 0.4,
                 maxRetries: 2,
             });
 
-            parsed = workProposalsBatchSchema.parse(result.object);
+            const raw = result.object.proposals ?? [];
+            drafts = raw
+                .map((p) => coerceWorkProposal(p))
+                .filter((p): p is WorkProposalDraft => p !== null);
             tokensUsed = result.usage?.totalTokens ?? 0;
+
+            if (drafts.length === 0) {
+                this.logger.warn(
+                    `Proposal generation for ${userId} produced ${raw.length} raw draft(s) but none survived coercion`,
+                );
+                return {
+                    status: 'error',
+                    proposals: [],
+                    tokensUsed,
+                    error: 'no-valid-proposals',
+                };
+            }
+            if (drafts.length < raw.length) {
+                this.logger.log(
+                    `Proposal generation for ${userId}: kept ${drafts.length}/${raw.length} after coercion`,
+                );
+            }
         } catch (err) {
             const message = (err as Error).message;
             this.logger.warn(`Proposal generation failed for ${userId}: ${message}`);
             return { status: 'error', proposals: [], tokensUsed, error: message };
         }
 
-        // Drop plugin IDs the registry doesn't recognize.
+        // Drop plugin IDs the registry doesn't recognize. Casts mirror the
+        // pre-coercion code — zod 3.25 widens inner-object props to optional
+        // under our tsconfig, and the coercer already guarantees the shape.
         const pluginSet = new Set(availablePluginIds);
-        const inputs = parsed.proposals.map((p) => ({
+        const inputs = drafts.map((p) => ({
             userId,
             title: p.title,
             description: p.description,

@@ -313,10 +313,26 @@ describe('createAuthRuntimeInstance', () => {
     });
 
     describe('advanced.database', () => {
-        it('sets `generateId` to `"uuid"` so Better Auth issues UUIDs not nanoids', () => {
+        it('sets `generateId` to a function that delegates to node:crypto.randomUUID', () => {
+            // Why a function and not the `'uuid'` sentinel: better-auth's
+            // sentinel path strips the `id` from the INSERT payload on
+            // Postgres (assuming a column-level DEFAULT), but our TypeORM
+            // `AuthAccount` entity uses `@PrimaryColumn` with no default,
+            // so the INSERT failed with `null value in column "id"`. A
+            // function generator is invoked on every create and the value
+            // is preserved through to the INSERT.
+            randomUUIDMock
+                .mockReturnValueOnce('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01')
+                .mockReturnValueOnce('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee02');
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
-            expect(getCapturedOptions().advanced.database.generateId).toBe('uuid');
+            const generateId = getCapturedOptions().advanced.database.generateId;
+            expect(typeof generateId).toBe('function');
+
+            // Each invocation produces a fresh UUID by calling
+            // `node:crypto.randomUUID` (mocked above).
+            expect(generateId()).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01');
+            expect(generateId()).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee02');
         });
     });
 

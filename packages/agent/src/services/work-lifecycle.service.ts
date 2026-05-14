@@ -4,11 +4,17 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    ServiceUnavailableException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { randomUUID } from 'node:crypto';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import { WorksConfigSyncRequestedEvent } from '@src/events';
+import {
+    WorkCreatedEvent,
+    WorksConfigSyncRequestedEvent,
+    type WorkCreatedPlatformActor,
+} from '@src/events';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
@@ -29,7 +35,14 @@ import {
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
-import { EverWorksDeployQuotaService } from '@src/ever-works-providers';
+import {
+    EverWorksDeployQuotaService,
+    EverWorksGitDisabledError,
+    EverWorksGitMisconfiguredError,
+    EverWorksGitProvider,
+    EverWorksGitRequestError,
+    type EverWorksGitRepoRef,
+} from '@src/ever-works-providers';
 import { config } from '@src/config';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
@@ -78,6 +91,7 @@ export class WorkLifecycleService {
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
         private readonly everWorksDeployQuota: EverWorksDeployQuotaService,
+        private readonly everWorksGit: EverWorksGitProvider,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -217,7 +231,13 @@ export class WorkLifecycleService {
             await this.everWorksDeployQuota.assertWithinQuota(user.id);
         }
 
-        const workData: Partial<CreateWorkDto & { userId: string }> = {
+        // The shape we hand to `workRepository.create()` is a subset of
+        // `Partial<Work>` (TypeORM accepts the full entity shape on save).
+        // We layer the create-time DTO fields + an optional `id` (when the
+        // platform pre-generates a UUID for the EW-614 path) + the
+        // `sourceRepository` JSONB that records the resolved repo
+        // coordinates.
+        const workData: Partial<Work> = {
             slug,
             name,
             description,
@@ -231,6 +251,51 @@ export class WorkLifecycleService {
             organization,
         };
 
+        // EW-614 — when the user picks "Ever Works Git" AND the feature flag
+        // is on, the platform provisions the GitHub repo in the
+        // `ever-works-cloud` org BEFORE the Work is persisted. The repo
+        // identifier is then woven into the workData so:
+        //   - `work.owner` becomes the platform org (drives `getRepoOwner()`)
+        //   - `work.organization` is true (the owner is an org, not a user)
+        //   - `sourceRepository.relatedRepositories.work` records the
+        //     resolved repo coordinates (handles the collision-suffix path
+        //     the provider transparently does on `422 name already exists`)
+        //
+        // We pre-generate the Work UUID so `EverWorksGitProvider.buildRepoName`
+        // can derive a deterministic collision suffix from it. The same UUID
+        // is persisted on the DB row in a single TypeORM `save()`.
+        let everWorksRepo: EverWorksGitRepoRef | undefined;
+        if (storageProvider === 'ever-works-git' && this.everWorksGit.isEnabled()) {
+            const workId = randomUUID();
+            try {
+                everWorksRepo = await this.everWorksGit.createRepository({
+                    work: {
+                        id: workId,
+                        slug,
+                        userId: user.id,
+                        userSlug: user.username,
+                        description,
+                    },
+                });
+            } catch (error) {
+                this.rethrowEverWorksGitError(error);
+            }
+
+            workData.id = workId;
+            workData.owner = everWorksRepo!.owner;
+            workData.organization = true;
+            workData.sourceRepository = {
+                url: everWorksRepo!.htmlUrl,
+                owner: everWorksRepo!.owner,
+                repo: everWorksRepo!.repo,
+                type: 'data_repo',
+                importedAt: new Date(),
+                relatedRepositories: {
+                    work: { owner: everWorksRepo!.owner, repo: everWorksRepo!.repo },
+                },
+            };
+        }
+
         try {
             const dir = await this.workRepository.create(workData, user);
             dir.owner = dir.getRepoOwner();
@@ -242,6 +307,25 @@ export class WorkLifecycleService {
                 });
             }
 
+            // Emit `WorkCreatedEvent` so downstream listeners (activity log,
+            // work-proposal learning ingest) record the create. When the
+            // platform provisioned the repo, carry that fact as a
+            // `platformActor` payload so the audit row distinguishes
+            // "platform created this on the user's behalf" from a regular
+            // user-initiated repo create. EW-614.
+            const platformActor: WorkCreatedPlatformActor | undefined = everWorksRepo
+                ? {
+                      actorKind: 'platform',
+                      actor: everWorksRepo.owner,
+                      repoFullName: everWorksRepo.fullName,
+                      htmlUrl: everWorksRepo.htmlUrl,
+                  }
+                : undefined;
+            this.eventEmitter.emit(
+                WorkCreatedEvent.EVENT_NAME,
+                new WorkCreatedEvent(dir, platformActor),
+            );
+
             return {
                 status: 'success',
                 work: dir,
@@ -249,6 +333,38 @@ export class WorkLifecycleService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating work');
         }
+    }
+
+    /**
+     * Map EverWorks Git provider errors onto HTTP-shaped exceptions. The
+     * deploy facade lives behind the same boundary so this keeps the
+     * controller-level mapping consistent across both platform-default
+     * providers.
+     */
+    private rethrowEverWorksGitError(error: unknown): never {
+        if (error instanceof EverWorksGitDisabledError) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Ever Works Git storage is currently disabled.',
+                code: error.code,
+            });
+        }
+        if (error instanceof EverWorksGitMisconfiguredError) {
+            throw new ServiceUnavailableException({
+                status: 'error',
+                message:
+                    'Ever Works Git storage is misconfigured. Please contact support — your work was not created.',
+                code: error.code,
+            });
+        }
+        if (error instanceof EverWorksGitRequestError) {
+            throw new ServiceUnavailableException({
+                status: 'error',
+                message: `Ever Works Git storage is temporarily unavailable: ${error.message}`,
+                code: error.code,
+            });
+        }
+        throw error;
     }
 
     async updateWork(id: string, updateDto: UpdateWorkDto, user: User) {

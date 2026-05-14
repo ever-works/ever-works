@@ -119,6 +119,15 @@ jobs:
           RESEND_APIKEY: ${{ secrets.RESEND_APIKEY }}
           RESEND_EMAIL_FROM: ${{ secrets.RESEND_EMAIL_FROM }}
 
+          # Ever Works Git (EW-608) — onboarding-wizard-v2 storage provider.
+          # PAT is fine-grained, scoped to ever-works-cloud only. Non-secret
+          # config (flag, org, visibility) is inlined here; only the PAT
+          # comes from secrets. See deployment.md §1.
+          STORAGE_EVER_WORKS_GIT_ENABLED: 'true'
+          EVER_WORKS_CUSTOMERS_GITHUB_ORG: ever-works-cloud
+          EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
+          EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
+
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version

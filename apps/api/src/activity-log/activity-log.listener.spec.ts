@@ -119,7 +119,7 @@ describe('ActivityLogListener', () => {
     });
 
     describe('onWorkCreated', () => {
-        it('logs a WORK_CREATED activity with the correct fields', async () => {
+        it('logs a WORK_CREATED activity with the correct fields (no platform actor → no metadata)', async () => {
             const work: any = { id: 'w1', userId: 'u1', name: 'My Work' };
             await listener.onWorkCreated({ work } as WorkCreatedEvent);
 
@@ -130,6 +130,34 @@ describe('ActivityLogListener', () => {
                 action: 'work.created',
                 status: ActivityStatus.COMPLETED,
                 summary: 'Created work: My Work',
+                metadata: undefined,
+            });
+        });
+
+        it("EW-614: includes actor+repository metadata when the platform created the repo on the user's behalf", async () => {
+            const work: any = { id: 'w1', userId: 'u1', name: 'My Work' };
+            const platformActor = {
+                actorKind: 'platform' as const,
+                actor: 'ever-works-cloud',
+                repoFullName: 'ever-works-cloud/evereq-my-work',
+                htmlUrl: 'https://github.com/ever-works-cloud/evereq-my-work',
+            };
+            await listener.onWorkCreated({ work, platformActor } as WorkCreatedEvent);
+
+            expect(activityLogService.log).toHaveBeenCalledWith({
+                userId: 'u1',
+                workId: 'w1',
+                actionType: ActivityActionType.WORK_CREATED,
+                action: 'work.created',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Created work: My Work',
+                metadata: {
+                    actor: { kind: 'platform', id: 'ever-works-cloud' },
+                    repository: {
+                        fullName: 'ever-works-cloud/evereq-my-work',
+                        htmlUrl: 'https://github.com/ever-works-cloud/evereq-my-work',
+                    },
+                },
             });
         });
 

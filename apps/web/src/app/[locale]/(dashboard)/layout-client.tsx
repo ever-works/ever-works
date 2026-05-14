@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import React, { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -16,7 +16,9 @@ import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
+import { computeStepList } from '@/components/onboarding/useOnboardingFlow';
 import { dismissOnboarding } from '@/app/actions/onboarding/state';
+import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
 import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -74,10 +76,18 @@ export function DashboardLayoutClient({
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(false);
 
-    // The v2 wizard derives its own step list — we only need step + total
-    // counts for the header "x of N" badge. Approximating with the persisted
-    // `lastStep` is sufficient because the badge is informational only.
-    const onboardingTotalSteps = 9;
+    // The v2 wizard derives its own step list from the user's choices —
+    // config sub-steps are skipped when the user picks an Ever Works default
+    // for that bucket. Re-derive the same way here so the header "x of N"
+    // badge matches the actual flow length (7 with all defaults, up to 10
+    // with all BYOK + 'k8s' deploy). Hardcoding `9` drifted the badge any
+    // time the user picked Ever Works for at least one bucket. Greptile P2
+    // from PR #705.
+    const onboardingStepList = useMemo(
+        () => computeStepList(onboardingState.state ?? ONBOARDING_DEFAULT_STATE),
+        [onboardingState.state],
+    );
+    const onboardingTotalSteps = onboardingStepList.length;
     const onboardingCurrentStep = Math.min(
         (onboardingState.state?.lastStep ?? 0) + 1,
         onboardingTotalSteps,
@@ -88,8 +98,34 @@ export function DashboardLayoutClient({
     const shouldAutoOpenOnboarding =
         onboardingTotalWorks === 0 && !isOnboardingDismissed && !isOnboardingCompleted;
     const isOnboardingOpen = onboardingOpenManually || shouldAutoOpenOnboarding;
+    // Track header-badge dismissal separately from wizard dismissal — both share
+    // `dismissedAt` on the server, but dismissing the badge X must not require
+    // marking onboarding as completed, and dismissing the wizard must leave the
+    // badge visible. v1 kept the same split as `headerDismissed` in localStorage;
+    // keep the client-only convention to avoid an API/DB migration.
+    const headerDismissedKey = `ever-works-onboarding-header-dismissed:${user.id}`;
+    const [headerDismissed, setHeaderDismissed] = useState(false);
+    // Gate the badge on hydration so users who previously dismissed don't see
+    // a one-frame flash of the badge before the useEffect reads localStorage.
+    // Trade-off: all users see ~one frame without the badge instead — that's a
+    // strictly better failure mode for an informational element.
+    const [headerHydrated, setHeaderHydrated] = useState(false);
+    useEffect(() => {
+        try {
+            if (typeof window !== 'undefined') {
+                setHeaderDismissed(window.localStorage.getItem(headerDismissedKey) === '1');
+            }
+        } catch {
+            // localStorage unavailable (private mode, quota) — leave default.
+        }
+        setHeaderHydrated(true);
+    }, [headerDismissedKey]);
     const showOnboardingBadge =
-        onboardingTotalWorks === 0 && isOnboardingDismissed && !isOnboardingCompleted;
+        headerHydrated &&
+        onboardingTotalWorks === 0 &&
+        isOnboardingDismissed &&
+        !isOnboardingCompleted &&
+        !headerDismissed;
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -225,12 +261,21 @@ export function DashboardLayoutClient({
         void dismissOnboarding();
     }, []);
     const dismissOnboardingBadge = useCallback(() => {
+        setHeaderDismissed(true);
+        try {
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(headerDismissedKey, '1');
+            }
+        } catch {
+            // localStorage unavailable; state update alone hides the badge for
+            // this session, which is still better than the prior no-op.
+        }
         setOnboardingState((prev) => ({
             ...prev,
             dismissedAt: prev.dismissedAt ?? new Date().toISOString(),
         }));
         void dismissOnboarding();
-    }, []);
+    }, [headerDismissedKey]);
 
     // Ensure chat is in resizable (non-expanded) mode. Used when user interacts
     // with the sidebar so we collapse the expanded view back to the resizable width.

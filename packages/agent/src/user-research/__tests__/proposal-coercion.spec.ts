@@ -1,0 +1,134 @@
+import { coerceWorkProposal } from '../proposal-coercion';
+import type { PermissiveWorkProposalDraft } from '../schemas';
+
+function makeDraft(over: Partial<PermissiveWorkProposalDraft> = {}): PermissiveWorkProposalDraft {
+    return {
+        title: 'Open Source AI Tools',
+        description:
+            'A curated directory of AI tools for developers, organized by category and use case.',
+        slugSuggestion: 'open-source-ai-tools',
+        suggestedCategories: [
+            { name: 'Models', slug: 'models' },
+            { name: 'Agents', slug: 'agents' },
+        ],
+        suggestedFields: [
+            { name: 'github_url', type: 'url' },
+            { name: 'description', type: 'markdown' },
+        ],
+        recommendedPlugins: [{ pluginId: 'github', reason: 'pulls README' }],
+        reasoning: 'Matches user expertise.',
+        ...over,
+    };
+}
+
+describe('coerceWorkProposal', () => {
+    it('passes through a clean draft', () => {
+        const result = coerceWorkProposal(makeDraft());
+        expect(result).not.toBeNull();
+        expect(result!.slugSuggestion).toBe('open-source-ai-tools');
+        expect(result!.suggestedFields).toHaveLength(2);
+    });
+
+    it('slugifies a non-kebab-case slug suggestion (strict regex: no underscores)', () => {
+        const result = coerceWorkProposal(makeDraft({ slugSuggestion: 'My_Cool Tools!' }));
+        expect(result?.slugSuggestion).toBe('my-cool-tools');
+    });
+
+    it('falls back to title-derived slug when the LLM omits the slug', () => {
+        const result = coerceWorkProposal(makeDraft({ slugSuggestion: '' }));
+        expect(result?.slugSuggestion).toBe('open-source-ai-tools');
+    });
+
+    it('aliases sloppy field types (text → string, link → url, etc.)', () => {
+        const result = coerceWorkProposal(
+            makeDraft({
+                suggestedFields: [
+                    { name: 'about', type: 'text' },
+                    { name: 'site', type: 'link' },
+                    { name: 'count', type: 'int' },
+                ],
+            }),
+        );
+        expect(result?.suggestedFields).toEqual([
+            { name: 'about', type: 'string' },
+            { name: 'site', type: 'url' },
+            { name: 'count', type: 'number' },
+        ]);
+    });
+
+    it('drops fields with unrecognized types', () => {
+        const result = coerceWorkProposal(
+            makeDraft({
+                suggestedFields: [
+                    { name: 'ok', type: 'string' },
+                    { name: 'bad', type: 'datetime' },
+                ],
+            }),
+        );
+        expect(result?.suggestedFields).toEqual([{ name: 'ok', type: 'string' }]);
+    });
+
+    it('clips an over-long title to the strict max', () => {
+        const longTitle = 'A'.repeat(200);
+        const result = coerceWorkProposal(makeDraft({ title: longTitle }));
+        expect(result?.title.length).toBeLessThanOrEqual(80);
+    });
+
+    it('clips an over-long reasoning to 280 chars', () => {
+        const reasoning = 'because '.repeat(100);
+        const result = coerceWorkProposal(makeDraft({ reasoning }));
+        expect(result?.reasoning.length).toBeLessThanOrEqual(280);
+    });
+
+    it('drops drafts whose title is too short to be salvaged', () => {
+        expect(coerceWorkProposal(makeDraft({ title: 'AI' }))).toBeNull();
+    });
+
+    it('drops drafts whose description is too short', () => {
+        expect(coerceWorkProposal(makeDraft({ description: 'short' }))).toBeNull();
+    });
+
+    it('drops drafts that end up with fewer than 2 valid categories', () => {
+        expect(
+            coerceWorkProposal(
+                makeDraft({ suggestedCategories: [{ name: 'Only One', slug: 'only-one' }] }),
+            ),
+        ).toBeNull();
+    });
+
+    it('caps oversized arrays to schema maximums', () => {
+        const cats = Array.from({ length: 12 }, (_, i) => ({
+            name: `Cat ${i}`,
+            slug: `cat-${i}`,
+        }));
+        const plugins = Array.from({ length: 10 }, (_, i) => ({
+            pluginId: `plugin-${i}`,
+            reason: 'r',
+        }));
+        const result = coerceWorkProposal(
+            makeDraft({ suggestedCategories: cats, recommendedPlugins: plugins }),
+        );
+        expect(result?.suggestedCategories).toHaveLength(8);
+        expect(result?.recommendedPlugins).toHaveLength(5);
+    });
+
+    it('handles optional fields being absent', () => {
+        const result = coerceWorkProposal({
+            title: 'Open Source AI Tools',
+            description:
+                'A curated directory of AI tools for developers, organized by category and use case.',
+            slugSuggestion: 'open-source-ai-tools',
+            suggestedCategories: [
+                { name: 'Models', slug: 'models' },
+                { name: 'Agents', slug: 'agents' },
+            ],
+            suggestedFields: [],
+            recommendedPlugins: [],
+            reasoning: '',
+        });
+        expect(result).not.toBeNull();
+        expect(result!.suggestedFields).toEqual([]);
+        expect(result!.recommendedPlugins).toEqual([]);
+        expect(result!.reasoning).toBe('');
+    });
+});

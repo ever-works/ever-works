@@ -70,43 +70,70 @@ accidentally touch the `ever-works` source org.
 
 ### 1.4 Store the PAT
 
-Three deployment surfaces need the value:
+**The deploy pipeline does NOT use a k8s `Secret` resource.** The
+`ever-works-api` deployment on `do-sfo2-k8s-gauzy` has its env values
+inlined directly into the Deployment spec, which is rendered at
+release time by `envsubst < .deploy/k8s/k8s-manifest.<env>.yaml` inside
+the `Deploy to DO <env>` GitHub Actions workflow. The substitution
+source is **GitHub Actions repo secrets** plus inlined non-secret
+values in the workflow `env:` block.
 
-| Surface                                                                  | Where                                                                    | Key                               |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------- |
-| DigitalOcean k8s `default` namespace, `do-sfo2-k8s-gauzy`                | Secret `ever-works-secrets` (used by the `ever-works-api-*` deployments) | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
-| GitHub Actions repo secrets (for CI deploys that template the manifests) | `https://github.com/ever-works/ever-works/settings/secrets/actions`      | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
-| Local `.env` for ad-hoc dev                                              | `C:/Coding/Workspace/.config/ever-works.env` (gitignored)                | same                              |
+Two surfaces need the PAT value:
 
-```powershell
-# DO k8s secret update (Windows shell)
-$env:KUBECONFIG = "C:\Coding\Workspace\.config\k8s-gauzy-kubeconfig.yaml"
-kubectl --context do-sfo2-k8s-gauzy -n default `
-  patch secret ever-works-secrets `
-  -p "{\"stringData\":{\"EVER_WORKS_CUSTOMERS_GITHUB_PAT\":\"github_pat_xxx\"}}"
-```
+| Surface                         | Where                                                                                                                                                 | Key                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| **GitHub Actions repo secrets** | `https://github.com/ever-works/ever-works/settings/secrets/actions` (consumed by all three `deploy-do-{dev,stage,prod}.yml` workflows via `envsubst`) | `EVER_WORKS_CUSTOMERS_GITHUB_PAT` |
+| **Local `.env` for ad-hoc dev** | `C:/Coding/Workspace/.config/ever-works.env` (gitignored, loaded manually before `pnpm dev:api`)                                                      | same                              |
 
 ```bash
-# GitHub Actions repo secret
+# GitHub Actions repo secret (only step that ships the PAT to prod/stage/dev pods)
 gh secret set EVER_WORKS_CUSTOMERS_GITHUB_PAT \
   -R ever-works/ever-works \
   -b 'github_pat_xxx'
 ```
 
-### 1.5 Flip the flags
+The non-secret companions (`STORAGE_EVER_WORKS_GIT_ENABLED`,
+`EVER_WORKS_CUSTOMERS_GITHUB_ORG`, `EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY`)
+are checked in as plain values in each `deploy-do-<env>.yml` workflow's
+`env:` block — they're config, not secrets, so no need to roundtrip
+them through `secrets.*`.
 
-Also set in the same secret / GH Actions secrets / `.env`:
+### 1.5 Roll out the change
 
-```env
-STORAGE_EVER_WORKS_GIT_ENABLED=true
-EVER_WORKS_CUSTOMERS_GITHUB_ORG=ever-works-cloud
-EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY=private
+The wiring lives in the repo. Each `deploy-do-<env>.yml` workflow already
+contains:
+
+```yaml
+env:
+    STORAGE_EVER_WORKS_GIT_ENABLED: 'true'
+    EVER_WORKS_CUSTOMERS_GITHUB_ORG: ever-works-cloud
+    EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
+    EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
 ```
 
-Then `kubectl rollout restart deploy/ever-works-api -n default` (and
-`-stage` / `-dev` per env). The catalog endpoint flips the **Ever Works
-Git** card from Planned to live within seconds — the wizard refreshes on
-next dashboard load.
+and each `.deploy/k8s/k8s-manifest.<env>.yaml` references those via
+`$VAR` placeholders that `envsubst` fills.
+
+To roll out: merge to the target branch. The post-build `Deploy to DO <env>`
+workflow runs, `envsubst`s the new env values into the Deployment spec,
+applies the manifest, and the trailing `kubectl rollout restart deployment/ever-works-api`
+picks up the new env. The catalog endpoint flips the **Ever Works Git**
+card from Planned → live within seconds — the wizard refreshes on next
+dashboard load.
+
+To verify after the deploy workflow finishes:
+
+```bash
+KUBECONFIG=C:/Coding/Workspace/.config/k8s-gauzy-kubeconfig.yaml \
+  kubectl --context do-sfo2-k8s-gauzy -n default \
+  get deploy ever-works-api \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="STORAGE_EVER_WORKS_GIT_ENABLED")].value}'
+# should print: true
+```
+
+To roll back without a code revert: clear the GH Actions secret or set
+the workflow's `STORAGE_EVER_WORKS_GIT_ENABLED` to `'false'` and rerun
+the deploy workflow.
 
 ---
 
