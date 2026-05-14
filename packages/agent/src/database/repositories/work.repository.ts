@@ -207,6 +207,54 @@ export class WorkRepository {
         return await this.findById(id);
     }
 
+    /**
+     * Conditional UPDATE for the lazy bootstrap of `platformSyncSecretEncrypted`
+     * (EW-120 pull transport). Two concurrent deploys can both call
+     * `getOrGenerate` and both generate fresh plaintext; this method makes
+     * only one of them win by gating the write on the column still being NULL.
+     *
+     * Returns `true` if this caller wrote the value, `false` if another
+     * caller beat us to it (loser must re-read).
+     */
+    async setPlatformSyncSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ platformSyncSecretEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('platformSyncSecretEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Update platform-sync observability columns after a pull-transport
+     * round-trip. Pass `lastSuccessAt` on success or
+     * `{ lastErrorAt, lastErrorMessage }` on failure — partial updates are
+     * fine, columns not in the payload are left unchanged.
+     */
+    async updatePlatformSyncStatus(
+        workId: string,
+        status: {
+            lastSuccessAt?: Date;
+            lastErrorAt?: Date;
+            lastErrorMessage?: string | null;
+        },
+    ): Promise<void> {
+        const patch: Partial<Work> = {};
+        if (status.lastSuccessAt !== undefined) {
+            patch.platformSyncLastSuccessAt = status.lastSuccessAt;
+        }
+        if (status.lastErrorAt !== undefined) {
+            patch.platformSyncLastErrorAt = status.lastErrorAt;
+        }
+        if (status.lastErrorMessage !== undefined) {
+            patch.platformSyncLastErrorMessage = status.lastErrorMessage;
+        }
+        if (Object.keys(patch).length === 0) return;
+        await this.repository.update(workId, patch);
+    }
+
     async increment(id: string, column: keyof Work, value: number): Promise<void> {
         await this.repository.increment({ id }, column as string, value);
     }

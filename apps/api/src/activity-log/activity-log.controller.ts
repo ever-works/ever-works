@@ -1,12 +1,17 @@
 import {
+    Body,
+    ConflictException,
     Controller,
     Get,
+    HttpCode,
+    NotFoundException,
     Param,
+    Post,
     Query,
     Res,
     DefaultValuePipe,
     ParseIntPipe,
-    NotFoundException,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -16,11 +21,15 @@ import {
     ApiQuery,
     ApiParam,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { WorkRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
+import { IngestEventDto } from './dto/ingest-event.dto';
+import { PlatformSecretGuard } from './guards/platform-secret.guard';
 
 type CsvResponse = {
     setHeader(name: string, value: string): void;
@@ -179,6 +188,63 @@ export class ActivityLogController {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename=activity-log.csv');
         res.send(csv);
+    }
+
+    @Post('ingest')
+    @Public()
+    @UseGuards(PlatformSecretGuard)
+    // The shared `PLATFORM_API_SECRET_TOKEN` is pushed to every deployed
+    // site, so its blast radius if leaked is wide. Cap per-IP throughput to
+    // 60/min on top of the bearer check, mitigating spam even if a token
+    // is compromised before rotation lands.
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @HttpCode(202)
+    @ApiOperation({
+        summary: 'Ingest a website-sourced activity event (EW-120)',
+        description:
+            'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`; rate-limited at 60 req/min per IP. Returns 409 when the target Work is configured for a non-push transport (pull / disabled).',
+    })
+    @ApiResponse({ status: 202, description: 'Event accepted' })
+    @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+    @ApiResponse({ status: 404, description: 'Work not found' })
+    @ApiResponse({
+        status: 409,
+        description: 'Work activitySyncMode is not "push" — ingest rejected (mode-mismatch).',
+    })
+    async ingestWebsiteEvent(@Body() dto: IngestEventDto) {
+        // Mode-aware gate (EW-120 dual-mode). Reading the Work once here is
+        // cheaper than letting it slip through and surfacing the wrong
+        // events under the directory owner's feed. The 409 body carries the
+        // current mode so the template can recover (or stop retrying) on
+        // its own.
+        const work = await this.workRepository.findById(dto.workId);
+        if (!work) {
+            throw new NotFoundException(`Work ${dto.workId} not found`);
+        }
+        if (work.activitySyncMode !== 'push') {
+            throw new ConflictException({
+                error: 'mode-mismatch',
+                mode: work.activitySyncMode,
+                message: `Work activitySyncMode is "${work.activitySyncMode}"; ingest only accepts push-mode events.`,
+            });
+        }
+
+        try {
+            const activity = await this.activityLogService.ingestFromWebsite({
+                workId: dto.workId,
+                eventId: dto.eventId,
+                actionType: dto.actionType,
+                occurredAt: new Date(dto.occurredAt),
+                summary: dto.summary,
+                metadata: dto.metadata,
+            });
+            return { id: activity.id };
+        } catch (err) {
+            if (err instanceof Error && /not found/i.test(err.message)) {
+                throw new NotFoundException(err.message);
+            }
+            throw err;
+        }
     }
 
     @Get(':id')
