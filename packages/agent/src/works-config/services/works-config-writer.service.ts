@@ -18,6 +18,11 @@ export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'nam
      * the works-config layer never branches on the value.
      */
     deployProvider?: string | null;
+    /**
+     * Activity Feed sync transport (EW-120). Written under
+     * `activity_sync.mode` in works.yml.
+     */
+    activitySyncMode?: 'pull' | 'push' | 'disabled' | null;
 };
 
 export type WriteWorksConfigOptions = {
@@ -88,6 +93,22 @@ export class WorksConfigWriterService {
             delete baseRaw.deploy_provider;
         }
 
+        const activitySyncMode = this.resolveActivitySyncMode({
+            requested: request.activitySyncMode,
+            imported: imported?.activitySyncMode,
+            existing:
+                (baseRaw.activity_sync as { mode?: unknown } | undefined)?.mode ??
+                (baseRaw.activitySync as { mode?: unknown } | undefined)?.mode,
+            workValue: options.work.activitySyncMode,
+        });
+        // Round-trip under the snake_case nested shape canonically; drop
+        // any legacy camelCase alias so we don't end up with both.
+        delete baseRaw.activitySync;
+        delete baseRaw.activity_sync_mode;
+        delete baseRaw.activitySyncMode;
+        const activitySyncBlock =
+            activitySyncMode !== undefined ? { mode: activitySyncMode } : undefined;
+
         return this.withoutUndefined({
             ...baseRaw,
             name: request.name || imported?.name || options.work.name,
@@ -97,7 +118,38 @@ export class WorksConfigWriterService {
             website_repo: websiteRepo,
             schedule: this.buildSchedule(options.work, imported),
             deployProvider,
+            activity_sync: activitySyncBlock,
         });
+    }
+
+    private resolveActivitySyncMode(args: {
+        requested?: 'pull' | 'push' | 'disabled' | null;
+        imported?: 'pull' | 'push' | 'disabled' | null;
+        existing?: unknown;
+        workValue?: 'pull' | 'push' | 'disabled';
+    }): 'pull' | 'push' | 'disabled' | undefined {
+        if (args.requested === null) return undefined;
+        if (
+            args.requested === 'pull' ||
+            args.requested === 'push' ||
+            args.requested === 'disabled'
+        ) {
+            return args.requested;
+        }
+        if (
+            args.imported === 'pull' ||
+            args.imported === 'push' ||
+            args.imported === 'disabled'
+        ) {
+            return args.imported;
+        }
+        const existing =
+            typeof args.existing === 'string' ? args.existing.trim().toLowerCase() : '';
+        if (existing === 'pull' || existing === 'push' || existing === 'disabled') {
+            return existing;
+        }
+        if (args.workValue) return args.workValue;
+        return undefined;
     }
 
     private resolveDeployProvider(args: {
