@@ -128,6 +128,10 @@ jobs:
           EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
           EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
 
+          # EW-616 — kubeconfigs for platform-managed clusterSource values.
+          EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
+          EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
+
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version
