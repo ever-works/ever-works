@@ -60,6 +60,30 @@ describe('ActivityFeedClient', () => {
         );
     });
 
+    it('surfaces the degraded banner when the API reports a pull-mode failure', async () => {
+        // Phase 5 (EW-120 dual-mode): pull-mode degraded reasons come back in
+        // `response.degraded.directorySite`. The banner uses its own scoped
+        // `useTranslations('...activity.degraded')` namespace, so the mocked
+        // `t(key)` echoes just the relative key.
+        mockGetActivityFeed.mockResolvedValue(
+            emptySuccess({
+                degraded: {
+                    directorySite: {
+                        reason: 'timeout',
+                        lastSuccessAt: '2026-05-12T10:00:00.000Z',
+                    },
+                },
+            }),
+        );
+
+        render(<ActivityFeedClient workId="work-1" initialCategory="all" />);
+
+        await waitFor(() => {
+            expect(screen.getByRole('status')).toBeInTheDocument();
+        });
+        expect(screen.getByText('title.timeout')).toBeInTheDocument();
+    });
+
     it('updates URL when filter chip is clicked', async () => {
         mockGetActivityFeed.mockResolvedValue(emptySuccess());
 

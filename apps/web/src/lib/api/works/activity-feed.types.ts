@@ -58,12 +58,46 @@ export interface GenerationHistoryEntry extends FeedEntryBase {
     durationInSeconds?: number | null;
 }
 
-export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry;
+/**
+ * Pull-mode entry produced by `DirectoryWebsiteClient` after an HMAC-signed
+ * fetch against the deployed directory site. Only appears in feeds for Works
+ * whose `activitySyncMode === 'pull'`; push-mode equivalents arrive as
+ * ordinary `platform-activity-log` rows via the ingest endpoint.
+ */
+export interface DirectorySiteEntry extends FeedEntryBase {
+    source: 'directory-site';
+    type: 'user_registered' | 'item_created' | 'item_status_changed' | 'report_created';
+    actor: { id: string; name: string; email?: string | null } | null;
+    target: { id: string; type: 'user' | 'item' | 'report'; name: string; adminUrl: string };
+}
+
+export type FeedEntry = PlatformActivityLogEntry | GenerationHistoryEntry | DirectorySiteEntry;
+
+/**
+ * Pull-mode degraded reason — set by the platform aggregator when the
+ * HMAC-signed fetch against the deployed site failed. Push-mode and disabled
+ * Works never populate this field; the banner only renders for pull-mode.
+ */
+export interface FeedDegradedReason {
+    reason:
+        | 'not_provisioned'
+        | 'disabled'
+        | 'timeout'
+        | 'unauthorized'
+        | 'upstream_5xx'
+        | 'network'
+        | 'parse_error';
+    detail?: string;
+    lastSuccessAt?: string | null;
+}
 
 export interface FeedResponse {
     entries: FeedEntry[];
     nextCursor?: string | null;
     serverTime: string;
+    degraded?: {
+        directorySite?: FeedDegradedReason;
+    };
 }
 
 export interface GetActivityFeedParams {

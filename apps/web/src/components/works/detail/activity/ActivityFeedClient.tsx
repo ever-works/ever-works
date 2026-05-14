@@ -6,7 +6,13 @@ import { useSearchParams } from 'next/navigation';
 import { useRouter, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getActivityFeed } from '@/app/actions/dashboard/activity-feed';
-import type { FeedCategory, FeedEntry, FeedResponse } from '@/lib/api/works/activity-feed.types';
+import type {
+    FeedCategory,
+    FeedDegradedReason,
+    FeedEntry,
+    FeedResponse,
+} from '@/lib/api/works/activity-feed.types';
+import { DegradedBanner } from './DegradedBanner';
 import { FeedFilterChips } from './FeedFilterChips';
 import { FeedRow } from './FeedRow';
 import { EmptyState } from './EmptyState';
@@ -28,6 +34,7 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
 
     const [category, setCategory] = useState<FeedCategory>(initialCategory);
     const [entries, setEntries] = useState<FeedEntry[] | null>(null);
+    const [degraded, setDegraded] = useState<FeedDegradedReason | undefined>();
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const requestIdRef = useRef(0);
@@ -46,6 +53,10 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
                 if (result.success) {
                     const data: FeedResponse = result.data;
                     setEntries(data.entries);
+                    // Pull-mode degraded reasons surface here; push-mode and
+                    // disabled responses leave the field undefined so the
+                    // banner stays hidden.
+                    setDegraded(data.degraded?.directorySite);
                     setError(null);
                 } else {
                     setError(result.error);
@@ -113,6 +124,11 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
     }, [category, fetchFeed]);
 
     const isInitialLoading = entries === null && !error;
+    // When the pull-mode sync is permanently broken (template hasn't shipped
+    // the endpoint, or admin disabled it), dim the website-only chips so the
+    // user doesn't keep clicking into an empty Users/Submissions/Reports tab.
+    const isDirectorySyncBroken =
+        degraded?.reason === 'disabled' || degraded?.reason === 'not_provisioned';
 
     return (
         <div className="space-y-4">
@@ -157,7 +173,13 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
                 </button>
             </header>
 
-            <FeedFilterChips value={category} onChange={handleCategoryChange} />
+            <FeedFilterChips
+                value={category}
+                onChange={handleCategoryChange}
+                directorySiteDisabled={isDirectorySyncBroken}
+            />
+
+            {degraded && <DegradedBanner degraded={degraded} />}
 
             {error && (
                 <div
