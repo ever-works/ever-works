@@ -339,6 +339,7 @@ export class WorkImportService {
                     user.id,
                     worksConfig,
                 );
+                await this.worksConfigRestoreService.applyActivitySyncMode(work.id, worksConfig);
             }
 
             const updateData: Partial<Work> = {
@@ -911,6 +912,7 @@ export class WorkImportService {
 
         await this.worksConfigRestoreService.applyScheduleOverrides(work, user, worksConfig);
         await this.worksConfigRestoreService.applyPipelineSettings(work.id, user.id, worksConfig);
+        await this.worksConfigRestoreService.applyActivitySyncMode(work.id, worksConfig);
 
         return this.importExecutor.importFromWorksConfig({
             work,
@@ -975,6 +977,7 @@ export class WorkImportService {
             user.id,
             parsedWorksConfig,
         );
+        await this.worksConfigRestoreService.applyActivitySyncMode(work.id, parsedWorksConfig);
 
         return this.worksConfigRestoreService.toResolved(parsedWorksConfig);
     }

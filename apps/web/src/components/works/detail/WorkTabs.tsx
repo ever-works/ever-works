@@ -40,6 +40,26 @@ export function WorkTabs({ work }: WorkTabsProps) {
             isActive: pathname.endsWith(`/works/${work.id}`),
         },
         {
+            name: t('activity'),
+            href: ROUTES.DASHBOARD_WORK_ACTIVITY(work.id),
+            icon: (
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 12h3l3-9 6 18 3-9h3"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/activity'),
+        },
+        {
             name: t('items'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/items`,
             icon: (

@@ -167,6 +167,7 @@ describe('FacadesModule + barrel re-exports', () => {
                     'OAuthFacadeService',
                     'OAuthNotSupportedError',
                     'OAuthProviderNotFoundError',
+                    'PLATFORM_MANAGED_KUBECONFIG_SENTINEL',
                     'PromptFacadeService',
                     'ProviderNotFoundError',
                     'ScreenshotFacadeError',

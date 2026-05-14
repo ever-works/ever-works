@@ -14,6 +14,7 @@ import { CommunityPrSettings } from './CommunityPrSettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
 import { ItemImportExportSettings } from './ItemImportExportSettings';
 import { CommitterSettings } from './CommitterSettings';
+import { ActivitySyncSettings } from './ActivitySyncSettings';
 interface SettingsFormProps {
     work: Work;
     user: AuthUser;
@@ -49,6 +50,9 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
 
                 {/* Item Import & Export Settings (EW-533) */}
                 <ItemImportExportSettings workId={work.id} />
+
+                {/* Activity Feed sync mode (EW-120 dual-mode) */}
+                <ActivitySyncSettings />
 
                 {/* Git Committer Settings */}
                 <CommitterSettings />

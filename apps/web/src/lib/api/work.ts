@@ -94,6 +94,8 @@ export interface UpdateWorkDto {
     communityPrAutoClose?: boolean;
     committerName?: string | null;
     committerEmail?: string | null;
+    /** EW-120 Activity Feed sync transport. */
+    activitySyncMode?: 'pull' | 'push' | 'disabled';
 }
 
 export interface DeleteWorkDto {
@@ -204,6 +206,11 @@ export interface Work {
     // Git committer overrides
     committerName?: string | null;
     committerEmail?: string | null;
+    // EW-120 Activity Feed sync (dual-mode)
+    activitySyncMode?: 'pull' | 'push' | 'disabled';
+    platformSyncLastSuccessAt?: string | null;
+    platformSyncLastErrorAt?: string | null;
+    platformSyncLastErrorMessage?: string | null;
 }
 
 export interface WorksResponse {

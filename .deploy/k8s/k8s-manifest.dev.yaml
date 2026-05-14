@@ -1,4 +1,18 @@
 ---
+# EW-616: Platform-managed kubeconfigs for k8s deploys to shared clusters.
+# Stored as base64 in GH Actions secrets; Kubernetes decodes Secret.data
+# values automatically when mounting via `secretKeyRef`, so the container
+# receives the raw kubeconfig YAML in the env var.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ever-works-platform-kubeconfigs-dev
+type: Opaque
+data:
+  EVER_WORKS_K8S_WORKS_KUBECONFIG: "$EVER_WORKS_K8S_WORKS_KUBECONFIG_B64"
+  EVER_WORKS_K8S_GAUZY_KUBECONFIG: "$EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64"
+
+---
 kind: Service
 apiVersion: v1
 metadata:
@@ -177,6 +191,18 @@ spec:
               value: "$EVER_WORKS_CUSTOMERS_GITHUB_PAT"
             - name: EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY
               value: "$EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY"
+
+            # EW-616 — platform-managed kubeconfigs.
+            - name: EVER_WORKS_K8S_WORKS_KUBECONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: ever-works-platform-kubeconfigs-dev
+                  key: EVER_WORKS_K8S_WORKS_KUBECONFIG
+            - name: EVER_WORKS_K8S_GAUZY_KUBECONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: ever-works-platform-kubeconfigs-dev
+                  key: EVER_WORKS_K8S_GAUZY_KUBECONFIG
 
           resources:
             requests:

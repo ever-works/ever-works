@@ -5,8 +5,21 @@ export interface GitHubSettings {
 	/** Fine-grained GitHub PAT with `read:packages` scope.
 	 * Used by the Kubernetes deploy provider to mint an imagePullSecret
 	 * for private GHCR images. Optional — only required when the
-	 * generated website repo (and therefore its GHCR image) is private. */
+	 * generated website repo (and therefore its GHCR image) is private.
+	 * Note: GHCR has known compatibility issues with fine-grained PATs
+	 * when packages are not explicitly repo-linked (`org.opencontainers.image.source`
+	 * auto-link does not fire reliably). Prefer `readPackagesPatClassic`. */
 	readonly readPackagesPat?: string;
+	/** Classic GitHub PAT (`ghp_…`) with `repo` + `read:packages` +
+	 * `write:packages` + `delete:packages` scopes. Used as the GHCR
+	 * image-pull credential when deploying private images to Kubernetes.
+	 * Classic PATs honor org membership directly and avoid the repo-package
+	 * link requirement that breaks fine-grained PATs for org-level packages.
+	 * The platform provides classic PATs for Works that publish to
+	 * `ever-works` / `ever-works-cloud` orgs — this field is only needed
+	 * for customer-owned GitHub orgs (cells B and D of the deploy matrix,
+	 * see EW-615). */
+	readonly readPackagesPatClassic?: string;
 }
 
 export interface GitHubWorkflow {

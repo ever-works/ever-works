@@ -4,6 +4,7 @@ import {
     IsString,
     IsBoolean,
     IsEmail,
+    IsIn,
     ValidateNested,
     MaxLength,
 } from 'class-validator';
@@ -86,4 +87,13 @@ export class UpdateWorkDto {
     @IsEmail()
     @IsOptional()
     committerEmail?: string | null;
+
+    @ApiPropertyOptional({
+        description:
+            'EW-120 Activity Feed sync transport (pull / push / disabled). Source of truth is `activity_sync.mode` in works.yml; this field is the platform-side read path. Settings updates flow here then get round-tripped to works.yml by the WorksConfigRepositorySync flow.',
+        enum: ['pull', 'push', 'disabled'],
+    })
+    @IsOptional()
+    @IsIn(['pull', 'push', 'disabled'])
+    activitySyncMode?: 'pull' | 'push' | 'disabled';
 }
