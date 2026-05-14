@@ -38,11 +38,17 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         token?: string;
         settings?: Record<string, unknown>;
         deployProvider?: string;
+        /** Owner returned by `work.getRepoOwner('website')`. Defaults to
+         *  the customer-owned org `'acme'` so most tests run on the
+         *  permissive EW-616 cell. Tests that exercise the platform-owned
+         *  orgs override this. */
+        websiteOwner?: string;
         /** Settings returned by deployFacade.getOtherPluginSettings('github', ...).
          *  Defaults to an empty object (no PAT saved). Tests for the GHCR PAT
          *  flow override this with `{ readPackagesPat: '...' }`. */
         githubPluginSettings?: Record<string, unknown>;
     }) => {
+        const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
             id: 'work-1',
             slug: 'my-site',
@@ -50,9 +56,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             gitProvider: 'github',
             websiteTemplateId: 'directory-web-template',
             user: { id: 'user-1' },
-            getRepoOwner: () => 'acme',
-            getDataRepo: () => 'acme/data',
-            getWebsiteRepo: () => 'acme-site',
+            getRepoOwner: () => websiteOwner,
+            getDataRepo: () => `${websiteOwner}/data`,
+            getWebsiteRepo: () => `${websiteOwner}-site`,
             resolveCommitter: () => ({ name: 'a', email: 'a@b' }),
         };
 
@@ -423,5 +429,130 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         );
 
         errorSpy.mockRestore();
+    });
+
+    describe('EW-616 cluster-source enforcement + kubeconfig substitution', () => {
+        const k8sPlugin = {
+            id: 'k8s',
+            getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+            getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+        };
+
+        const originalEnv = process.env;
+
+        beforeEach(() => {
+            process.env = { ...originalEnv };
+            delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+            delete process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG;
+        });
+
+        afterEach(() => {
+            process.env = originalEnv;
+        });
+
+        it('back-compat: no clusterSource + customer-owned org + user kubeconfig → uses user kubeconfig as K8S_TOKEN', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-pasted-yaml',
+                settings: {},
+                websiteOwner: 'acme',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('user-pasted-yaml');
+        });
+
+        it('k8s-works + ever-works-cloud → substitutes EVER_WORKS_K8S_WORKS_KUBECONFIG as K8S_TOKEN', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'platform-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-pasted-yaml-should-be-ignored',
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('platform-yaml');
+        });
+
+        it('k8s-gauzy + ever-works → substitutes EVER_WORKS_K8S_GAUZY_KUBECONFIG (admin path)', async () => {
+            process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG = 'gauzy-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-yaml-ignored',
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'ever-works',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')?.value).toBe('gauzy-yaml');
+        });
+
+        it('rejects ever-works-cloud + custom-kubeconfig with a BadRequest (cell C)', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'custom-kubeconfig' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /cross-tenant exposure/i,
+            );
+        });
+
+        it('rejects customer-owned + k8s-gauzy with a BadRequest (admin-only)', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'acme',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /'k8s-gauzy' is the Ever Works internal platform cluster/,
+            );
+        });
+
+        it('rejects k8s-works when EVER_WORKS_K8S_WORKS_KUBECONFIG is not provisioned', async () => {
+            // env var intentionally absent
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /EVER_WORKS_K8S_WORKS_KUBECONFIG is not configured/,
+            );
+        });
+
+        it('skips matrix enforcement entirely for non-k8s providers', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                // these would trip the k8s matrix but vercel must not care
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'ever-works-cloud',
+                token: 'vercel-deploy-token',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'VERCEL_TOKEN')?.value).toBe(
+                'vercel-deploy-token',
+            );
+        });
     });
 });

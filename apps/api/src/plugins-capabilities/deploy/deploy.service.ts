@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
 import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
@@ -13,6 +13,28 @@ import {
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
+import {
+    ClusterSource,
+    resolveKubeconfigForClusterSource,
+    validateClusterSourceForOwner,
+} from './cluster-source-matrix';
+
+const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = [
+    'k8s-works',
+    'k8s-gauzy',
+    'custom-kubeconfig',
+];
+
+function coerceClusterSource(value: unknown): ClusterSource {
+    if (typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value)) {
+        return value as ClusterSource;
+    }
+    // Back-compat: Works that pre-date the EW-616 dropdown have no
+    // `clusterSource` set in their plugin settings. Treat them as
+    // `custom-kubeconfig` so they keep working as long as their
+    // website repo is not in an Ever Works-shared org.
+    return 'custom-kubeconfig';
+}
 
 /**
  * Default workflow filenames to dispatch when a deployment plugin does not
@@ -79,6 +101,20 @@ export class DeployService {
 
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
+
+        // EW-616: enforce the deploy matrix for k8s deploys.
+        // - `k8s-gauzy` is admin-only (ever-works org).
+        // - Ever Works-shared GHCR + customer-provided cluster is rejected
+        //   to avoid cross-tenant credential exposure.
+        // The resolved kubeconfig replaces the user-pasted one for
+        // platform-managed sources.
+        const effectiveDeployToken = this.resolveDeployToken(
+            work.deployProvider,
+            websiteOwner,
+            settings ?? {},
+            token,
+        );
+
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
         await this.enableWorkflows({
@@ -88,7 +124,7 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, work, plugin, settings);
+        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, settings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
@@ -210,6 +246,42 @@ export class DeployService {
                 status: 'error',
                 message: error instanceof Error ? error.message : 'Unknown error',
             };
+        }
+    }
+
+    /**
+     * EW-616: Apply the deploy-matrix validation for the k8s provider and
+     * substitute the platform's kubeconfig env var when the user picked a
+     * platform-managed cluster source. For non-k8s providers (Vercel, etc.)
+     * this is a pass-through and the validation is skipped.
+     */
+    private resolveDeployToken(
+        deployProvider: string | undefined,
+        websiteOwner: string,
+        settings: Record<string, unknown>,
+        userToken: string,
+    ): string {
+        if (deployProvider !== 'k8s') {
+            return userToken;
+        }
+
+        const clusterSource = coerceClusterSource(settings.clusterSource);
+        const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
+            hasKubeconfig: Boolean(userToken && userToken.trim()),
+        });
+        if (failure) {
+            this.logger.warn(
+                `EW-616 deploy-matrix violation [${failure.code}]: ${failure.message}`,
+            );
+            throw new BadRequestException(failure.message);
+        }
+
+        try {
+            return resolveKubeconfigForClusterSource(clusterSource, userToken);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
+            throw new BadRequestException(message);
         }
     }
 
