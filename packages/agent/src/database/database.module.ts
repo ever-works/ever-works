@@ -5,6 +5,8 @@ import { ApiKeyRepository } from './repositories/api-key.repository';
 import { WorkRepository } from './repositories/work.repository';
 import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
 import { WorkCustomDomainRepository } from './repositories/work-custom-domain.repository';
+import { WorkDeploymentRepository } from './repositories/work-deployment.repository';
+import { WorkCodeUpdateRepository } from './repositories/work-code-update.repository';
 import { WorkMemberRepository } from './repositories/work-member.repository';
 import { WorkInvitationRepository } from './repositories/work-invitation.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
@@ -47,6 +49,8 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         WorkRepository,
         WorkAdvancedPromptsRepository,
         WorkCustomDomainRepository,
+        WorkDeploymentRepository,
+        WorkCodeUpdateRepository,
         WorkMemberRepository,
         WorkInvitationRepository,
         RefreshTokenRepository,
@@ -74,6 +78,8 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         WorkRepository,
         WorkAdvancedPromptsRepository,
         WorkCustomDomainRepository,
+        WorkDeploymentRepository,
+        WorkCodeUpdateRepository,
         WorkMemberRepository,
         WorkInvitationRepository,
         UserRepository,
