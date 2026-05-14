@@ -18,4 +18,5 @@ export * from './plugins-capabilities/oauth';
 export * from './account-transfer.types';
 export * from './github-app';
 export * from './templates';
+export * from './code-update';
 export * from './types';

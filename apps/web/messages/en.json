@@ -1045,10 +1045,31 @@
                 "schedule": "Schedule",
                 "history": "History",
                 "comparisons": "Comparisons",
+                "codegen": "AI Codegen",
                 "plugins": "Plugins",
                 "deploy": "Deploy",
                 "members": "Members",
                 "settings": "Settings"
+            },
+            "codegen": {
+                "promptTitle": "Describe the change you want",
+                "promptHelp": "Claude Code customises your site code based on this prompt. We open a PR for review, deploy a preview, and let you Apply or Reject.",
+                "titlePlaceholder": "Optional title (used as PR title)",
+                "promptPlaceholder": "e.g. Add a pricing table to the homepage with three tiers, and use lavender for the brand accent.",
+                "submit": "Generate update",
+                "historyTitle": "Code updates",
+                "historyEmpty": "No code updates yet. Submit a prompt above to get started.",
+                "apply": "Apply",
+                "reject": "Reject",
+                "openPr": "Open PR #{number}",
+                "status": {
+                    "pending": "Queued",
+                    "generating": "Generating",
+                    "proposed": "Proposed",
+                    "applied": "Applied",
+                    "rejected": "Rejected",
+                    "failed": "Failed"
+                }
             },
             "members": {
                 "title": "Team Members",
@@ -3329,6 +3350,7 @@
             "generator": "Generator",
             "settings": "Settings",
             "deploy": "Deploy",
+            "codegen": "AI Codegen",
             "members": "Members",
             "history": "History",
             "comparisons": "Comparisons",
