@@ -43,6 +43,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksDnsService,
     type EverWorksDeployQuotaCounter,
 } from '@src/ever-works-providers';
 import { WorkRepository } from '@src/database/repositories/work.repository';
@@ -103,6 +104,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         // PAT, so users picking "Ever Works Git" don't need to bring their
         // own GitHub. Consumed by `WorkLifecycleService.createWork`.
         EverWorksGitProvider,
+        EverWorksDnsService,
         {
             // The Ever Works Deploy quota service is repo-agnostic — it
             // takes a small `EverWorksDeployQuotaCounter` it can consult.
