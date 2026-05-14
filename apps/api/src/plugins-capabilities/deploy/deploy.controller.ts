@@ -155,25 +155,24 @@ export class DeployController {
             });
         }
 
-        // Deploy
-        const deploymentInitiated = await this.deployService.deploy(
+        const { dispatched, deploymentId } = await this.deployService.deploy(
             id,
             isCreator ? auth.userId : work.user.id,
             { teamScope: deployDto.teamScope },
         );
 
-        if (!deploymentInitiated) {
+        if (!dispatched) {
             throw new BadRequestException({
                 status: 'error',
                 message: `Failed to initiate ${providerName} deployment. Check that the repository has the provider workflow configured.`,
             });
         }
 
-        // Start verification after the workflow dispatch has actually succeeded.
         this.deploymentVerifier.startVerification(
             work,
             isCreator ? auth.userId : work.user.id,
             deployDto.teamScope,
+            deploymentId,
         );
 
         this.activityLogService
