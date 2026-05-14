@@ -5,7 +5,8 @@ import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { WorkProposalRepository } from './work-proposal.repository';
-import { workProposalsBatchSchema, type WorkProposalsBatch } from './schemas';
+import { permissiveWorkProposalsBatchSchema, type WorkProposalDraft } from './schemas';
+import { coerceWorkProposal } from './proposal-coercion';
 import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
@@ -96,29 +97,55 @@ export class WorkProposalService {
         }
 
         let tokensUsed = 0;
-        let parsed: WorkProposalsBatch;
+        let drafts: WorkProposalDraft[] = [];
 
         try {
+            // Use the permissive schema so low-quality model output (sloppy
+            // slugs, wrong enum values, off-by-one length bounds) doesn't
+            // make generateObject reject the whole batch. coerceWorkProposal
+            // below clips/slugifies/filters each draft into the strict shape.
             const result = await generateObject({
                 model: resolvedModel,
-                schema: workProposalsBatchSchema,
+                schema: permissiveWorkProposalsBatchSchema,
                 system: PROPOSALS_SYSTEM_PROMPT,
                 prompt: buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
                 temperature: 0.4,
                 maxRetries: 2,
             });
 
-            parsed = workProposalsBatchSchema.parse(result.object);
+            const raw = result.object.proposals ?? [];
+            drafts = raw
+                .map((p) => coerceWorkProposal(p))
+                .filter((p): p is WorkProposalDraft => p !== null);
             tokensUsed = result.usage?.totalTokens ?? 0;
+
+            if (drafts.length === 0) {
+                this.logger.warn(
+                    `Proposal generation for ${userId} produced ${raw.length} raw draft(s) but none survived coercion`,
+                );
+                return {
+                    status: 'error',
+                    proposals: [],
+                    tokensUsed,
+                    error: 'no-valid-proposals',
+                };
+            }
+            if (drafts.length < raw.length) {
+                this.logger.log(
+                    `Proposal generation for ${userId}: kept ${drafts.length}/${raw.length} after coercion`,
+                );
+            }
         } catch (err) {
             const message = (err as Error).message;
             this.logger.warn(`Proposal generation failed for ${userId}: ${message}`);
             return { status: 'error', proposals: [], tokensUsed, error: message };
         }
 
-        // Drop plugin IDs the registry doesn't recognize.
+        // Drop plugin IDs the registry doesn't recognize. Casts mirror the
+        // pre-coercion code — zod 3.25 widens inner-object props to optional
+        // under our tsconfig, and the coercer already guarantees the shape.
         const pluginSet = new Set(availablePluginIds);
-        const inputs = parsed.proposals.map((p) => ({
+        const inputs = drafts.map((p) => ({
             userId,
             title: p.title,
             description: p.description,
