@@ -166,6 +166,80 @@ export class CodeUpdateGeneratorService {
         }
     }
 
+    /**
+     * Apply a PROPOSED code update by merging its PR. The merge to the
+     * default branch triggers the existing production-deploy pipeline; no
+     * extra dispatch needed here.
+     */
+    async apply(codeUpdateId: string): Promise<void> {
+        const record = await this.codeUpdateRepository.findById(codeUpdateId);
+        if (!record) throw new Error('Code update not found');
+        if (record.status !== WorkCodeUpdateStatus.PROPOSED) {
+            throw new Error(`Code update is ${record.status}; can only apply PROPOSED records`);
+        }
+        if (!record.prNumber) {
+            throw new Error('Code update has no PR to merge');
+        }
+
+        const work = await this.workRepository.findById(record.workId);
+        if (!work) throw new Error('Work not found');
+
+        await this.gitFacade.mergePullRequest(
+            work.getRepoOwner('website'),
+            work.getWebsiteRepo(),
+            record.prNumber,
+            { mergeMethod: 'squash', commitTitle: record.title ?? `AI: ${record.prompt.slice(0, 64)}` },
+            { userId: work.userId, providerId: work.gitProvider, workId: work.id },
+        );
+
+        await this.codeUpdateRepository.markApplied(codeUpdateId);
+    }
+
+    /**
+     * Reject a code update by closing its PR (no merge). Idempotent —
+     * closing an already-closed PR is silently absorbed by the provider.
+     */
+    async reject(codeUpdateId: string): Promise<void> {
+        const record = await this.codeUpdateRepository.findById(codeUpdateId);
+        if (!record) throw new Error('Code update not found');
+        if (
+            record.status !== WorkCodeUpdateStatus.PROPOSED &&
+            record.status !== WorkCodeUpdateStatus.PENDING
+        ) {
+            throw new Error(`Code update is ${record.status}; cannot reject`);
+        }
+
+        const work = await this.workRepository.findById(record.workId);
+        if (!work) throw new Error('Work not found');
+
+        if (record.prNumber) {
+            try {
+                await this.gitFacade.closePullRequest(
+                    work.getRepoOwner('website'),
+                    work.getWebsiteRepo(),
+                    record.prNumber,
+                    { userId: work.userId, providerId: work.gitProvider, workId: work.id },
+                );
+            } catch (err) {
+                this.logger.warn(
+                    `Failed to close PR for code update ${codeUpdateId}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+
+        await this.codeUpdateRepository.markRejected(codeUpdateId);
+    }
+
+    list(workId: string): Promise<WorkCodeUpdate[]> {
+        return this.codeUpdateRepository.findByWork(workId);
+    }
+
+    get(codeUpdateId: string): Promise<WorkCodeUpdate | null> {
+        return this.codeUpdateRepository.findById(codeUpdateId);
+    }
+
     private buildCommitMessage(record: WorkCodeUpdate): string {
         const headline = record.title ?? `AI: ${record.prompt.slice(0, 64)}`;
         return `${headline}\n\nRequested via Ever Works codegen (${record.id})`;
