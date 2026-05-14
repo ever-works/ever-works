@@ -64,7 +64,7 @@ export class Work {
     @Column({ default: 'user-github' })
     storageProvider: string; // 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git'
 
-    @Column({ default: 'vercel', nullable: true })
+    @Column({ default: 'ever-works', nullable: true })
     deployProvider?: string; // 'ever-works' | 'vercel' | 'k8s' | 'netlify' | ...
 
     @Column({ nullable: true })

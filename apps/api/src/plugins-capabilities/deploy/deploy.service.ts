@@ -241,7 +241,7 @@ export class DeployService {
         plugin?: IDeploymentPlugin,
         settings?: Record<string, unknown>,
     ) {
-        const provider = work.deployProvider || 'vercel';
+        const provider = work.deployProvider || 'ever-works';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
         } catch (error) {
