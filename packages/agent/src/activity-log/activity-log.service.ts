@@ -92,13 +92,101 @@ export class ActivityLogService {
         });
     }
 
-    async log(entry: CreateActivityLogDto): Promise<ActivityLog> {
-        const activity = await this.repository.create(entry);
+    async log(entry: CreateActivityLogDto, overrides?: { createdAt?: Date }): Promise<ActivityLog> {
+        const activity = await this.repository.create(entry, overrides);
         this.dispatchAnalytics(activity);
         this.logger.debug(
             `Activity logged: [${entry.actionType}] ${entry.summary} (user: ${entry.userId})`,
         );
         return activity;
+    }
+
+    /**
+     * Persist an event POSTed by a deployed directory site (EW-120).
+     *
+     * Idempotent by `(workId, eventId)` — a retry from the website lands on
+     * the same row instead of creating duplicates. The attribution `userId`
+     * is the Work owner so the event surfaces in their per-Work Activity
+     * Feed without authenticating the end-user that triggered it.
+     */
+    async ingestFromWebsite(payload: {
+        workId: string;
+        eventId: string;
+        actionType: ActivityActionType;
+        occurredAt: Date;
+        summary: string;
+        metadata?: Record<string, unknown>;
+    }): Promise<ActivityLog> {
+        const existing = await this.repository.findByWorkAndIngestEventId(
+            payload.workId,
+            payload.eventId,
+        );
+        if (existing) {
+            return existing;
+        }
+
+        const work = await this.workRepository.findById(payload.workId);
+        if (!work) {
+            throw new Error(`Work ${payload.workId} not found`);
+        }
+
+        // Clamp future timestamps to "now" so a misbehaving template
+        // can't pin a row above every genuine event by sending
+        // `occurredAt: 2099-01-01`. The original value is preserved in
+        // `metadata.occurredAt` for forensics.
+        const now = new Date();
+        const createdAt = payload.occurredAt > now ? now : payload.occurredAt;
+
+        // Pin `createdAt` to the website's `occurredAt` so the feed
+        // orders by "when it happened" rather than "when the platform
+        // got around to recording it". TypeORM's @CreateDateColumn only
+        // auto-populates when the value is left undefined.
+        try {
+            return await this.log(
+                {
+                    userId: work.userId,
+                    workId: payload.workId,
+                    actionType: payload.actionType,
+                    action: `website.${payload.actionType}`,
+                    status: ActivityStatus.COMPLETED,
+                    summary: payload.summary,
+                    metadata: {
+                        ...(payload.metadata ?? {}),
+                        occurredAt: payload.occurredAt.toISOString(),
+                    },
+                    ingestEventId: payload.eventId,
+                },
+                { createdAt },
+            );
+        } catch (error) {
+            // The check-then-insert above isn't atomic: two concurrent
+            // retries with the same (workId, eventId) can both pass the
+            // existence check and race to INSERT. The second one trips the
+            // partial unique index. Treat that as the idempotent outcome
+            // it should have been and return the row that won the race.
+            if (this.isUniqueViolation(error)) {
+                const winner = await this.repository.findByWorkAndIngestEventId(
+                    payload.workId,
+                    payload.eventId,
+                );
+                if (winner) return winner;
+            }
+            throw error;
+        }
+    }
+
+    private isUniqueViolation(error: unknown): boolean {
+        if (!error || typeof error !== 'object') return false;
+        const driverCode = (error as { driverError?: { code?: string } }).driverError?.code;
+        const topCode = (error as { code?: string }).code;
+        // Cross-driver unique-constraint codes:
+        //   Postgres: 23505 (unique_violation)
+        //   MySQL:    ER_DUP_ENTRY (numeric 1062)
+        //   SQLite:   SQLITE_CONSTRAINT (CI runs SQLite, so this catches
+        //             the race in tests too)
+        // Same convention as NotificationService.isUniqueConstraintError.
+        const codes = ['23505', 'ER_DUP_ENTRY', 'SQLITE_CONSTRAINT'];
+        return codes.includes(driverCode as string) || codes.includes(topCode as string);
     }
 
     async updateStatus(
@@ -213,6 +301,26 @@ export class ActivityLogService {
         query: ActivityLogQueryOptions,
     ): Promise<{ activities: ActivityLog[]; total: number }> {
         return this.repository.findByUserId(query);
+    }
+
+    /**
+     * Per-Work activity lookup that bypasses the `userId` filter. Use for
+     * the work-scoped Activity Feed; access must have been verified
+     * upstream (controller layer). See repository docstring for context.
+     *
+     * `actionType` accepts an array — a single `IN (...)` query replaces
+     * the previous per-type fan-out so the feed aggregator can pass the
+     * full per-source limit without multiplying it by the number of
+     * action types in the category.
+     */
+    async findByWork(options: {
+        workId: string;
+        actionType?: ActivityActionType | ActivityActionType[];
+        dateTo?: Date;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        return this.repository.findByWork(options);
     }
 
     async countRunning(userId: string): Promise<number> {

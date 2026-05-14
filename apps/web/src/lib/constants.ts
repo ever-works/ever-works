@@ -71,6 +71,7 @@ export const ROUTES = {
     DASHBOARD_WORKS: '/works',
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
+    DASHBOARD_WORK_ACTIVITY: (id: string) => `/works/${id}/activity`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,
     DASHBOARD_WORK_GENERATOR: (id: string) => `/works/${id}/generator`,
     DASHBOARD_WORK_SCHEDULE: (id: string) => `/works/${id}/generator/schedule`,

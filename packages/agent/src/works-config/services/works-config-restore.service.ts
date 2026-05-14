@@ -89,4 +89,11 @@ export class WorksConfigRestoreService {
     ): Promise<void> {
         await this.applier.applyScheduleOverrides(work, user, worksConfig);
     }
+
+    async applyActivitySyncMode(
+        workId: string,
+        worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
+    ): Promise<void> {
+        await this.applier.applyActivitySyncMode(workId, worksConfig);
+    }
 }

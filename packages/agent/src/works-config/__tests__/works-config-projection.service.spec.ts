@@ -45,6 +45,7 @@ describe('WorksConfigProjectionService', () => {
                 screenshot: 'screenshotone',
                 contentExtractor: 'firecrawl',
             },
+            activitySyncMode: null,
         });
     });
 
@@ -81,6 +82,7 @@ describe('WorksConfigProjectionService', () => {
             name: 'Compare Cloud Pricing',
             model: null,
             providers: { ai: 'openai', screenshot: 'screenshotone' },
+            activitySyncMode: null,
         });
     });
 
@@ -101,6 +103,29 @@ describe('WorksConfigProjectionService', () => {
             name: 'Compare Cloud Pricing',
             model: null,
             providers: null,
+            activitySyncMode: null,
+        });
+    });
+
+    it('projects work.activitySyncMode onto the write request when set (EW-120)', async () => {
+        const scheduleRepository = {
+            findByWorkId: jest.fn().mockResolvedValue({ providerOverrides: null }),
+        };
+        const workPluginRepository = {
+            findEnabledByWork: jest.fn().mockResolvedValue([]),
+            findActiveByCapability: jest.fn().mockResolvedValue(null),
+        };
+        const service = new WorksConfigProjectionService(
+            scheduleRepository as any,
+            workPluginRepository as any,
+        );
+        const workWithMode = { ...work, activitySyncMode: 'push' as const };
+
+        await expect(service.buildWriteRequest(workWithMode)).resolves.toEqual({
+            name: 'Compare Cloud Pricing',
+            model: null,
+            providers: null,
+            activitySyncMode: 'push',
         });
     });
 });

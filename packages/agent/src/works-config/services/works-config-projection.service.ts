@@ -26,6 +26,7 @@ export class WorksConfigProjectionService {
             name: work.name,
             model: pipelineModel ?? null,
             providers: this.mergeProviders(activeProviders, scheduleProviders) ?? null,
+            activitySyncMode: work.activitySyncMode ?? null,
         };
     }
 

@@ -60,6 +60,14 @@ export enum ActivityActionType {
 
     // Community
     COMMUNITY_PR_MERGED = 'community_pr_merged',
+
+    // Website-sourced events ingested from the deployed directory site
+    // via POST /api/activity-log/ingest (EW-120). The work owner sees
+    // these in the per-Work Activity Feed tab.
+    WEBSITE_USER_REGISTERED = 'website_user_registered',
+    WEBSITE_ITEM_SUBMITTED = 'website_item_submitted',
+    WEBSITE_REPORT_FILED = 'website_report_filed',
+    WEBSITE_REPORT_RESOLVED = 'website_report_resolved',
 }
 
 export enum ActivityStatus {
@@ -81,6 +89,7 @@ export interface CreateActivityLogDto {
     metadata?: Record<string, any>;
     ipAddress?: string;
     userAgent?: string;
+    ingestEventId?: string;
 }
 
 export interface ActivityLogQueryOptions {

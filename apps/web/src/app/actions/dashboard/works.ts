@@ -24,7 +24,7 @@ import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
 import { slugify } from '@ever-works/plugin';
-import { ApiResponseError } from '@/lib/api/server-api';
+import { ApiResponseError, serverMutation } from '@/lib/api/server-api';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -1069,6 +1069,55 @@ export async function updateCommunityPrSettings(
             success: false,
             error:
                 error instanceof Error ? error.message : 'Failed to update community PR settings',
+        };
+    }
+}
+
+export async function updateActivitySyncMode(workId: string, mode: 'pull' | 'push' | 'disabled') {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await workAPI.update(workId, { activitySyncMode: mode });
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update activity sync mode:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update activity sync mode',
+        };
+    }
+}
+
+export async function rotateActivitySyncSecret(workId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await serverMutation<{ status: string; redeployRequired: boolean }>({
+            endpoint: `/works/${workId}/activity-sync/rotate-secret`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+        revalidatePath(`/works/${workId}/settings`);
+        return {
+            success: response.status === 'success',
+            redeployRequired: response.redeployRequired ?? false,
+        };
+    } catch (error) {
+        console.error('Failed to rotate activity sync secret:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to rotate activity sync secret',
         };
     }
 }

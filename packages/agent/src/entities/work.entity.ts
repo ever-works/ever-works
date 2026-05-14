@@ -206,6 +206,39 @@ export class Work {
     @TimestampColumn({ nullable: true })
     sourceValidationLastRunAt?: Date | null;
 
+    // Activity Feed Sync (EW-120) — per-Work transport for surfacing
+    // website-side events (signups, item submissions, reports) in the
+    // platform Activity Feed tab. See ADR-004.
+    //
+    //   pull     — platform fetches on-demand via DirectoryWebsiteClient
+    //              (HMAC-signed), using `platformSyncSecretEncrypted` as
+    //              the per-Work shared secret.
+    //   push     — deployed site POSTs each event to
+    //              /api/activity-log/ingest using the platform-wide
+    //              `PLATFORM_API_SECRET_TOKEN` bearer.
+    //   disabled — feed shows only platform-internal categories.
+    //
+    // Source-of-truth is the directory's `works.yml` activity_sync.mode;
+    // this column is the read path used everywhere on the platform.
+    @Column({ type: 'varchar', length: 16, default: 'pull' })
+    activitySyncMode: 'pull' | 'push' | 'disabled';
+
+    // Pull-mode only. AES-256-GCM-encrypted per-Work HMAC secret used by
+    // DirectoryWebsiteClient to sign outbound requests to the deployed
+    // site. NULL until the next deploy lazily provisions it.
+    @Column({ type: 'text', nullable: true })
+    platformSyncSecretEncrypted?: string | null;
+
+    // Pull-mode observability — drives the degraded banner UX.
+    @TimestampColumn({ nullable: true })
+    platformSyncLastSuccessAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    platformSyncLastErrorAt?: Date | null;
+
+    @Column({ type: 'text', nullable: true })
+    platformSyncLastErrorMessage?: string | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;
