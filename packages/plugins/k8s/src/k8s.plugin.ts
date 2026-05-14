@@ -152,8 +152,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				default: 'custom-kubeconfig',
 				title: 'Target cluster',
 				description:
-					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org owning the website repo — see EW-616.",
-				'x-widget': 'k8s-cluster-source'
+					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org owning the website repo — see EW-616. The form renderer's generic enum widget shows this as a Select."
 			},
 			kubeconfig: {
 				type: 'string',
@@ -162,12 +161,18 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 					"Paste the contents of your ~/.kube/config or a service-account-scoped equivalent. Only used when 'Target cluster' is 'custom-kubeconfig' — ignored otherwise.",
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-widget': 'textarea'
+				'x-widget': 'textarea',
+				// EW-616: hide the kubeconfig field when the user picked a
+				// platform-managed cluster; the deploy service substitutes
+				// the platform's kubeconfig from env at deploy time.
+				'x-showIf': { field: 'clusterSource', value: 'custom-kubeconfig' }
 			},
 			kubeContext: {
 				type: 'string',
 				title: 'Context (optional)',
-				description: "Defaults to the kubeconfig's current-context."
+				description: "Defaults to the kubeconfig's current-context.",
+				// EW-616: only meaningful with a user-pasted kubeconfig.
+				'x-showIf': { field: 'clusterSource', value: 'custom-kubeconfig' }
 			},
 			namespace: {
 				type: 'string',
