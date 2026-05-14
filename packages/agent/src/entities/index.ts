@@ -2,6 +2,8 @@ export * from './api-key.entity';
 export * from './work.entity';
 export * from './work-advanced-prompts.entity';
 export * from './work-custom-domain.entity';
+export * from './work-deployment.entity';
+export * from './work-code-update.entity';
 export * from './work-member.entity';
 export * from './work-invitation.entity';
 export * from './user.entity';
