@@ -4,14 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
-import {
-    ExternalLink,
-    Loader2,
-    CheckCircle2,
-    XCircle,
-    AlertCircle,
-    Sparkles,
-} from 'lucide-react';
+import { ExternalLink, Loader2, CheckCircle2, XCircle, AlertCircle, Sparkles } from 'lucide-react';
 import type { WorkCodeUpdate, WorkCodeUpdateStatus } from '@/lib/api';
 
 interface CodegenPanelProps {
@@ -45,6 +38,10 @@ export function CodegenPanel({ workId, initialCodeUpdates }: CodegenPanelProps) 
     const [title, setTitle] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setCodeUpdates(initialCodeUpdates);
+    }, [initialCodeUpdates]);
 
     const hasInFlight = useMemo(
         () => codeUpdates.some((c) => c.status === 'pending' || c.status === 'generating'),
@@ -82,7 +79,14 @@ export function CodegenPanel({ workId, initialCodeUpdates }: CodegenPanelProps) 
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data?.message ?? 'Failed to create code update');
+                throw new Error(data?.message ?? data?.error ?? 'Failed to create code update');
+            }
+            const data = await res.json().catch(() => ({}));
+            if (data?.codeUpdate) {
+                setCodeUpdates((current) => [
+                    data.codeUpdate,
+                    ...current.filter((c) => c.id !== data.codeUpdate.id),
+                ]);
             }
             setPrompt('');
             setTitle('');
@@ -101,7 +105,15 @@ export function CodegenPanel({ workId, initialCodeUpdates }: CodegenPanelProps) 
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data?.message ?? `Failed to ${action}`);
+                throw new Error(data?.message ?? data?.error ?? `Failed to ${action}`);
+            }
+            const data = await res.json().catch(() => ({}));
+            if (data?.codeUpdate) {
+                setCodeUpdates((current) =>
+                    current.map((codeUpdate) =>
+                        codeUpdate.id === data.codeUpdate.id ? data.codeUpdate : codeUpdate,
+                    ),
+                );
             }
             router.refresh();
         } catch (err) {

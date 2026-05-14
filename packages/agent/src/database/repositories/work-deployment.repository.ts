@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-    WorkDeployment,
-    DeploymentEnvironment,
-} from '../../entities/work-deployment.entity';
+import { WorkDeployment, DeploymentEnvironment } from '../../entities/work-deployment.entity';
 
 @Injectable()
 export class WorkDeploymentRepository {
@@ -36,10 +33,7 @@ export class WorkDeploymentRepository {
         });
     }
 
-    findLatest(
-        workId: string,
-        environment: DeploymentEnvironment,
-    ): Promise<WorkDeployment | null> {
+    findLatest(workId: string, environment: DeploymentEnvironment): Promise<WorkDeployment | null> {
         return this.repository.findOne({
             where: { workId, environment },
             order: { createdAt: 'DESC' },
@@ -62,17 +56,19 @@ export class WorkDeploymentRepository {
         state: 'READY' | 'ERROR' | 'CANCELED' | 'TIMEOUT',
         fields: Partial<WorkDeployment> = {},
     ): Promise<void> {
-        await this.repository.update(
-            { id },
-            { state, completedAt: new Date(), ...fields },
-        );
+        await this.repository.update({ id }, { state, completedAt: new Date(), ...fields });
     }
 
-    async deleteOlderThan(cutoff: Date, environment: DeploymentEnvironment): Promise<number> {
+    async deleteOlderThan(
+        workId: string,
+        cutoff: Date,
+        environment: DeploymentEnvironment,
+    ): Promise<number> {
         const result = await this.repository
             .createQueryBuilder()
             .delete()
-            .where('environment = :env', { env: environment })
+            .where('workId = :workId', { workId })
+            .andWhere('environment = :env', { env: environment })
             .andWhere('createdAt < :cutoff', { cutoff })
             .execute();
         return result.affected ?? 0;

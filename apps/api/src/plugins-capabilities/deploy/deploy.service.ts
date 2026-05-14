@@ -164,6 +164,7 @@ export class DeployService {
             env.environment,
             targetBranch,
             env.prNumber,
+            env.commitSha,
         );
 
         if (!dispatched) {
@@ -236,7 +237,6 @@ export class DeployService {
                     } else {
                         failCount++;
                     }
-
                 } else {
                     failCount++;
                     results.push({
@@ -447,6 +447,7 @@ export class DeployService {
         environment: DeploymentEnvironment = DeploymentEnvironment.PRODUCTION,
         branchOverride?: string,
         prNumber?: number,
+        commitSha?: string,
     ): Promise<boolean> {
         const workflowFilesToTry = plugin?.getWorkflowFilenames
             ? plugin.getWorkflowFilenames()
@@ -459,6 +460,9 @@ export class DeployService {
         const inputs: Record<string, string> = { environment };
         if (prNumber !== undefined) {
             inputs.pr_number = String(prNumber);
+        }
+        if (commitSha) {
+            inputs.commit_sha = commitSha;
         }
 
         const tryDispatch = async (): Promise<boolean> => {

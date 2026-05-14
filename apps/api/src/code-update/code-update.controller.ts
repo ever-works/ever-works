@@ -1,12 +1,4 @@
-import {
-    BadRequestException,
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    UseGuards,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '../auth/types/auth.types';
@@ -44,19 +36,18 @@ export class CodeUpdateController {
         @Body() dto: CreateCodeUpdateDto,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(workId, auth.userId);
-        const user = await this.userRepository.findById(
-            isCreator ? auth.userId : work.user.id,
-        );
+        const user = await this.userRepository.findById(isCreator ? auth.userId : work.user.id);
         if (!user) {
             throw new BadRequestException({ status: 'error', message: 'User not found' });
         }
 
-        const record = await this.codeUpdateService.request(
-            work,
-            user,
-            { prompt: dto.prompt, title: dto.title, aiModel: dto.aiModel },
-            { autoExecute: true },
-        );
+        const record = await this.codeUpdateService.request(work, user, {
+            prompt: dto.prompt,
+            title: dto.title,
+            aiModel: dto.aiModel,
+        });
+
+        void this.codeUpdateService.execute(record.id, user).catch(() => {});
 
         this.activityLogService
             .log({
@@ -105,6 +96,11 @@ export class CodeUpdateController {
         @Param('codeUpdateId') codeUpdateId: string,
     ) {
         await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const record = await this.codeUpdateService.get(codeUpdateId);
+        if (!record || record.workId !== workId) {
+            throw new BadRequestException({ status: 'error', message: 'Code update not found' });
+        }
+
         try {
             await this.codeUpdateService.apply(codeUpdateId);
         } catch (err) {
@@ -137,6 +133,11 @@ export class CodeUpdateController {
         @Param('codeUpdateId') codeUpdateId: string,
     ) {
         await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const record = await this.codeUpdateService.get(codeUpdateId);
+        if (!record || record.workId !== workId) {
+            throw new BadRequestException({ status: 'error', message: 'Code update not found' });
+        }
+
         try {
             await this.codeUpdateService.reject(codeUpdateId);
         } catch (err) {

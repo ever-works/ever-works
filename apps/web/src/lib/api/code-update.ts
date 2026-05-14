@@ -52,8 +52,7 @@ export type CodeUpdateResponse = APIResponse<{ codeUpdate: WorkCodeUpdate | null
 export type CodeUpdateListResponse = APIResponse<{ codeUpdates: WorkCodeUpdate[] }>;
 
 export const codeUpdateAPI = {
-    list: (workId: string) =>
-        serverFetch<CodeUpdateListResponse>(`/works/${workId}/code-updates`),
+    list: (workId: string) => serverFetch<CodeUpdateListResponse>(`/works/${workId}/code-updates`),
 
     create: (workId: string, data: CreateCodeUpdateDto) =>
         serverMutation<CodeUpdateResponse>({

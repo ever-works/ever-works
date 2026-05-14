@@ -17,6 +17,10 @@ type DeploymentReadyState =
     | 'READY'
     | 'CANCELED'
     | 'TIMEOUT';
+type DeploymentTerminalState = 'READY' | 'ERROR' | 'CANCELED' | 'TIMEOUT';
+
+const isTerminalState = (state: DeploymentReadyState): state is DeploymentTerminalState =>
+    state === 'READY' || state === 'ERROR' || state === 'CANCELED' || state === 'TIMEOUT';
 
 /**
  * DeploymentVerifierService monitors deployment progress and updates work status.
@@ -43,20 +47,12 @@ export class DeploymentVerifierService {
      * verification updates that row alongside Work.deploymentState (the latter
      * only when environment=production, preserving the EW-610 UI contract).
      */
-    async startVerification(
-        work: Work,
-        userId: string,
-        teamScope?: string,
-        deploymentId?: string,
-    ) {
+    async startVerification(work: Work, userId: string, teamScope?: string, deploymentId?: string) {
         this.logger.log(`Starting verification for work ${work.id}`);
 
         this.cancelVerification(work.id);
 
-        this.queue.set(
-            work.id,
-            await this.verifyDeployment(work, userId, teamScope, deploymentId),
-        );
+        this.queue.set(work.id, await this.verifyDeployment(work, userId, teamScope, deploymentId));
     }
 
     private cancelVerification(workId: string) {
@@ -103,7 +99,7 @@ export class DeploymentVerifierService {
         let fetchTries = 0;
         let inVerification = false;
 
-        const cleanup = (state?: DeploymentReadyState, error?: string) => {
+        const cleanup = (state?: DeploymentTerminalState, error?: string) => {
             if (terminated) {
                 this.logger.debug(
                     `Skipping duplicate cleanup for work ${work.id} (already terminal)`,
@@ -184,7 +180,7 @@ export class DeploymentVerifierService {
 
                 this.logger.log(`Deployment for work ${work.id} is ${state || 'UNKNOWN'}`);
 
-                if (state && ['READY', 'ERROR', 'CANCELED'].includes(state)) {
+                if (state && isTerminalState(state)) {
                     cleanup(state);
                 } else if (Date.now() - startedAt > TIMEOUT) {
                     cleanup('TIMEOUT');

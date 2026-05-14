@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import {
-    WorkCodeUpdate,
-    WorkCodeUpdateStatus,
-} from '../../entities/work-code-update.entity';
+import { WorkCodeUpdate, WorkCodeUpdateStatus } from '../../entities/work-code-update.entity';
 
 @Injectable()
 export class WorkCodeUpdateRepository {
@@ -27,9 +24,7 @@ export class WorkCodeUpdateRepository {
         opts: { statuses?: WorkCodeUpdateStatus[]; limit?: number } = {},
     ): Promise<WorkCodeUpdate[]> {
         return this.repository.find({
-            where: opts.statuses?.length
-                ? { workId, status: In(opts.statuses) }
-                : { workId },
+            where: opts.statuses?.length ? { workId, status: In(opts.statuses) } : { workId },
             order: { createdAt: 'DESC' },
             take: opts.limit ?? 50,
         });

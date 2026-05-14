@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
-import {
-    WorkCodeUpdateRepository,
-    WorkRepository,
-} from '../../database';
+import { WorkCodeUpdateRepository, WorkRepository } from '../../database';
 import {
     Work,
     User,
@@ -72,8 +69,11 @@ export class CodeUpdateGeneratorService {
             this.logger.warn(`Code update ${codeUpdateId} not found`);
             return;
         }
-        if (record.status === WorkCodeUpdateStatus.APPLIED) {
-            this.logger.debug(`Code update ${codeUpdateId} already applied; skipping`);
+        if (
+            record.status === WorkCodeUpdateStatus.APPLIED ||
+            record.status === WorkCodeUpdateStatus.PROPOSED
+        ) {
+            this.logger.debug(`Code update ${codeUpdateId} is ${record.status}; skipping`);
             return;
         }
 
@@ -188,7 +188,10 @@ export class CodeUpdateGeneratorService {
             work.getRepoOwner('website'),
             work.getWebsiteRepo(),
             record.prNumber,
-            { mergeMethod: 'squash', commitTitle: record.title ?? `AI: ${record.prompt.slice(0, 64)}` },
+            {
+                mergeMethod: 'squash',
+                commitTitle: record.title ?? `AI: ${record.prompt.slice(0, 64)}`,
+            },
             { userId: work.userId, providerId: work.gitProvider, workId: work.id },
         );
 
