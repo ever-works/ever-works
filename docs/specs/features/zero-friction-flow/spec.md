@@ -2,7 +2,7 @@
 
 > Epic: **EW-617** &nbsp;|&nbsp; Sub-tasks: EW-618 (G1), EW-619 (G2), EW-620 (G3), EW-621 (G4), EW-622 (G5), EW-623 (G6), EW-624 (G7), EW-625 (G8)
 >
-> Status: G6 merged (#752). G2 in-flight (this PR).
+> Status: G6 merged (#752). G2 PR #756 open. G3 (this PR) builds on G2.
 
 ## Goal
 
@@ -30,12 +30,54 @@ PR.
 |----|----------------------------------------------------------------|---------|----------|
 | G1 | Landing-page prompt input + handoff to app.ever.works          | EW-618  | Planned  |
 | G2 | Anonymous / temporary user auth                                | EW-619  | This PR  |
-| G3 | Claim-Account flow (anon → registered)                         | EW-620  | Planned  |
+| G3 | Claim-Account flow (anon → registered)                         | EW-620  | This PR  |
 | G4 | Wizard "Finish & Generate with Defaults" + `/api/works/quick-create` | EW-621 | Planned |
 | G5 | Subdomain ingress + Cloudflare DNS automation                  | EW-622  | Planned  |
 | G6 | Default `work.deployProvider` `'vercel'` → `'ever-works'`      | EW-623  | Merged (#752) |
 | G7 | Quotas + abuse protection                                      | EW-624  | Planned  |
 | G8 | Telemetry events + ops runbook                                 | EW-625  | Planned  |
+
+## G3 — Claim-Account flow (anonymous → registered)
+
+### Functional requirements
+
+- **FR-G3-1** `POST /api/auth/claim` MUST require an authenticated
+  session (via `AuthSessionGuard`) and MUST reject (403) when the
+  caller's `User` row is not `is_anonymous = true`. This prevents
+  hijacking an already-registered account.
+- **FR-G3-2** The endpoint accepts `{ email, password, username?,
+  emailVerificationCallbackUrl? }` (validated by `ClaimAccountDto`
+  with the same password rules as `RegisterDto`).
+- **FR-G3-3** If `email` (normalized to lowercase, trimmed) matches a
+  different existing user, the endpoint MUST return 409 Conflict.
+  Auto-merging is intentionally forbidden — it's a footgun. The
+  client UI should redirect to `/login` instead.
+- **FR-G3-4** On success the service MUST in a single update set
+  `email`, `username` (defaulting to the existing anon username),
+  `password` (hash), `is_anonymous=false`, clear
+  `anonymous_expires_at`, set `registration_provider='local'`, reset
+  `email_verified=false`.
+- **FR-G3-5** A verification email MUST be triggered via
+  `AuthService.sendVerificationEmail` so the existing pipeline
+  (`UserCreatedEvent` → `MailService`) handles it. A failure to send
+  MUST NOT roll back the claim — the user can request resend via
+  `POST /api/auth/send-verification`.
+- **FR-G3-6** The caller's existing session token MUST stay valid.
+  Works ownership is by `user_id`, which doesn't change, so no Work
+  transfer is needed.
+- **FR-G3-7** The endpoint MUST be throttled (default: 10/hour per
+  IP) to dampen email-squatting brute force.
+
+### Non-functional requirements
+
+- **NFR-G3-1** Email comparison MUST be case-insensitive and
+  whitespace-trimmed.
+- **NFR-G3-2** Password hashing MUST go through the same Better Auth
+  credential adapter used by `/register` so `/login` works without
+  any additional sync step.
+- **NFR-G3-3** When username is omitted the existing `anon-<hex>`
+  value is kept rather than auto-derived from email — the user can
+  edit it via `PUT /api/auth/profile` later.
 
 ## G2 — Anonymous / temporary user auth
 

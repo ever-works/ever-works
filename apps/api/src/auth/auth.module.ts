@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './services/auth.service';
 import { AnonymousAuthService } from './services/anonymous-auth.service';
+import { ClaimAccountService } from './services/claim-account.service';
 import { ApiKeyService } from './services/api-key.service';
 import { AuthController } from './controllers/auth.controller';
 import { ApiKeysController } from './controllers/api-keys.controller';
@@ -26,6 +27,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
     providers: [
         AuthService,
         AnonymousAuthService,
+        ClaimAccountService,
         ApiKeyService,
         AuthProviderService,
         AuthSyncService,
@@ -48,6 +50,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
     exports: [
         AuthService,
         AnonymousAuthService,
+        ClaimAccountService,
         ApiKeyService,
         AuthSessionGuard,
         AUTH_PROVIDER,
