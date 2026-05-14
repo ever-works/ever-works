@@ -129,7 +129,18 @@ describe('KubernetesPlugin metadata', () => {
 		const cs = plugin.settingsSchema.properties?.clusterSource as Record<string, unknown>;
 		expect(cs?.enum).toEqual(['k8s-works', 'k8s-gauzy', 'custom-kubeconfig']);
 		expect(cs?.default).toBe('custom-kubeconfig');
-		expect(cs?.['x-widget']).toBe('k8s-cluster-source');
+	});
+
+	it('hides kubeconfig + kubeContext when clusterSource is platform-managed (EW-616 UI)', () => {
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.kubeconfig?.['x-showIf']).toEqual({
+			field: 'clusterSource',
+			value: 'custom-kubeconfig'
+		});
+		expect(props.kubeContext?.['x-showIf']).toEqual({
+			field: 'clusterSource',
+			value: 'custom-kubeconfig'
+		});
 	});
 
 	it('registry sub-form is a oneOf with three branches (github default)', () => {
