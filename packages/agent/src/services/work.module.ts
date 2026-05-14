@@ -16,6 +16,7 @@ import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
+import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
@@ -76,6 +77,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkDetailService,
         WorkScheduleService,
         WorkScheduleDispatcherService,
+        AnonymousUserCleanupService,
         WorkMemberService,
         WorkInvitationService,
         WorkImportService,
@@ -123,6 +125,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkDetailService,
         WorkScheduleService,
         WorkScheduleDispatcherService,
+        AnonymousUserCleanupService,
         WorkMemberService,
         WorkInvitationService,
         WorkImportService,

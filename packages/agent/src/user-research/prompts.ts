@@ -68,7 +68,11 @@ export function buildSeedPrompt(user: User, socials: string[]): string {
     const lines: string[] = [];
     lines.push(`User to research:`);
     lines.push(`- Name: ${user.username}`);
-    lines.push(`- Email: ${user.email}`);
+    // EW-617 G2: anonymous users have no email until they claim the account;
+    // user-research only runs after onboarding so this is mostly defensive.
+    if (user.email) {
+        lines.push(`- Email: ${user.email}`);
+    }
     if (user.registrationProvider && user.registrationProvider !== 'local') {
         lines.push(`- OAuth provider: ${user.registrationProvider}`);
     }
@@ -80,7 +84,7 @@ export function buildSeedPrompt(user: User, socials: string[]): string {
     if (socials.length > 0) {
         lines.push(`- Linked social profiles: ${socials.join(', ')}`);
     }
-    const domain = user.email.split('@')[1];
+    const domain = user.email?.split('@')[1];
     if (domain) {
         lines.push(`- Email domain: ${domain}`);
     }
