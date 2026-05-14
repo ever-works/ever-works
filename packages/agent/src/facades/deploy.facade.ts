@@ -782,6 +782,24 @@ export class DeployFacadeService implements IDeployFacade {
                 includeSecrets: true,
             });
 
+            // EW-616: for the k8s plugin, when the user picked a
+            // platform-managed cluster (`k8s-works` / `k8s-gauzy`) the
+            // pasted kubeconfig is intentionally empty —
+            // `DeployService.resolveDeployToken()` substitutes the
+            // platform's kubeconfig from `EVER_WORKS_K8S_*_KUBECONFIG`
+            // env vars at deploy time. Return a non-empty sentinel here
+            // so the facade considers the work "configured" and lets the
+            // deploy proceed; the sentinel is discarded downstream.
+            if (pluginId === 'k8s') {
+                const clusterSource = settings.clusterSource?.value as string | undefined;
+                if (clusterSource === 'k8s-works' || clusterSource === 'k8s-gauzy') {
+                    return (
+                        (settings.kubeconfig?.value as string) ||
+                        PLATFORM_MANAGED_KUBECONFIG_SENTINEL
+                    );
+                }
+            }
+
             // Look for provider primary credential fields.
             // Vercel uses apiToken; Kubernetes uses kubeconfig; other
             // providers commonly use token/accessToken.
@@ -797,3 +815,16 @@ export class DeployFacadeService implements IDeployFacade {
         }
     }
 }
+
+/**
+ * Sentinel value returned by `getTokenFromSettings` for k8s deploys
+ * targeting a platform-managed cluster (`k8s-works` / `k8s-gauzy`).
+ * The deploy facade only checks that a token is non-empty before
+ * deciding the work is "configured", so any unique string works.
+ * `DeployService.resolveDeployToken()` discards this sentinel and
+ * substitutes the real platform kubeconfig from
+ * `EVER_WORKS_K8S_*_KUBECONFIG` env vars at deploy time.
+ *
+ * Exported so callers (or tests) can pattern-match on it if needed.
+ */
+export const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';

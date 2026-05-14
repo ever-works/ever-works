@@ -9,6 +9,10 @@ jest.mock('@ever-works/agent/entities', () => ({
         WORK_CREATED: 'WORK_CREATED',
         GENERATION: 'GENERATION',
         DEPLOYMENT: 'DEPLOYMENT',
+        WEBSITE_USER_REGISTERED: 'website_user_registered',
+        WEBSITE_ITEM_SUBMITTED: 'website_item_submitted',
+        WEBSITE_REPORT_FILED: 'website_report_filed',
+        WEBSITE_REPORT_RESOLVED: 'website_report_resolved',
     },
     ActivityStatus: {
         IN_PROGRESS: 'in_progress',
@@ -67,6 +71,7 @@ describe('ActivityLogController', () => {
             summarizeStatuses: jest.fn(),
             exportCsv: jest.fn(),
             findByIdAndUserId: jest.fn(),
+            ingestFromWebsite: jest.fn(),
         } as any;
         workRepository = {
             findById: jest.fn(),
@@ -618,6 +623,94 @@ describe('ActivityLogController', () => {
             await expect(controller.getActivity(auth, 'someone-elses')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+    });
+
+    describe('ingestWebsiteEvent (EW-120)', () => {
+        const dto = {
+            workId: '11111111-1111-1111-1111-111111111111',
+            eventId: '22222222-2222-2222-2222-222222222222',
+            actionType: 'website_user_registered' as never,
+            occurredAt: '2026-05-13T10:00:00.000Z',
+            summary: 'User signed up',
+        };
+
+        beforeEach(() => {
+            // Default to push-mode Work for the happy path tests.
+            workRepository.findById.mockResolvedValue({
+                id: dto.workId,
+                activitySyncMode: 'push',
+            } as never);
+        });
+
+        it('delegates to ActivityLogService.ingestFromWebsite and returns the new id', async () => {
+            (activityLogService as any).ingestFromWebsite.mockResolvedValueOnce({ id: 'al-new' });
+            const result = await controller.ingestWebsiteEvent(dto as never);
+
+            expect((activityLogService as any).ingestFromWebsite).toHaveBeenCalledWith({
+                workId: dto.workId,
+                eventId: dto.eventId,
+                actionType: dto.actionType,
+                occurredAt: new Date(dto.occurredAt),
+                summary: dto.summary,
+                metadata: undefined,
+            });
+            expect(result).toEqual({ id: 'al-new' });
+        });
+
+        it('returns 404 when the Work does not exist', async () => {
+            workRepository.findById.mockResolvedValueOnce(null);
+            await expect(controller.ingestWebsiteEvent(dto as never)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect((activityLogService as any).ingestFromWebsite).not.toHaveBeenCalled();
+        });
+
+        it.each(['pull', 'disabled'] as const)(
+            'returns 409 (mode-mismatch) when Work is in %s mode',
+            async (mode) => {
+                workRepository.findById.mockResolvedValueOnce({
+                    id: dto.workId,
+                    activitySyncMode: mode,
+                } as never);
+
+                let captured: any;
+                try {
+                    await controller.ingestWebsiteEvent(dto as never);
+                } catch (err) {
+                    captured = err;
+                }
+                expect(captured).toBeDefined();
+                // ConflictException carries the typed body { error, mode, message }.
+                const response = (captured as { getResponse: () => unknown }).getResponse() as {
+                    error: string;
+                    mode: string;
+                };
+                expect(response.error).toBe('mode-mismatch');
+                expect(response.mode).toBe(mode);
+                expect((activityLogService as any).ingestFromWebsite).not.toHaveBeenCalled();
+            },
+        );
+
+        it('rethrows "work … not found" as a 404 NotFoundException', async () => {
+            (activityLogService as any).ingestFromWebsite.mockRejectedValueOnce(
+                new Error('Work missing not found'),
+            );
+
+            await expect(controller.ingestWebsiteEvent(dto as never)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        });
+
+        it('forwards optional metadata to the service unchanged', async () => {
+            (activityLogService as any).ingestFromWebsite.mockResolvedValueOnce({ id: 'al-meta' });
+            await controller.ingestWebsiteEvent({
+                ...dto,
+                metadata: { itemId: 'i-1', actor: 'bob' },
+            } as never);
+
+            const call = (activityLogService as any).ingestFromWebsite.mock.calls[0]![0];
+            expect(call.metadata).toEqual({ itemId: 'i-1', actor: 'bob' });
         });
     });
 });

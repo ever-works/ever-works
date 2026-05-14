@@ -18,6 +18,13 @@ export interface WorksConfigSummary {
      * time; the works-config layer itself is provider-agnostic.
      */
     deployProvider?: string;
+    /**
+     * Activity Feed sync transport for this directory (EW-120). Read from
+     * `activity_sync.mode` in `works.yml`; values: `pull` (default),
+     * `push`, `disabled`. Reflected onto `Work.activitySyncMode` at apply
+     * time. See ADR-004.
+     */
+    activitySyncMode?: 'pull' | 'push' | 'disabled';
 }
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
@@ -77,7 +84,28 @@ export class WorksConfigService {
                 ]),
             ),
             deployProvider: this.readString(raw, ['deployProvider', 'deploy_provider']),
+            activitySyncMode: this.readActivitySyncMode(raw),
         };
+    }
+
+    private readActivitySyncMode(
+        raw: Record<string, unknown>,
+    ): 'pull' | 'push' | 'disabled' | undefined {
+        // Accept snake_case (canonical works.yml style) + camelCase
+        // tolerance for hand-edited files.
+        const candidates: Array<unknown> = [
+            (raw.activity_sync as { mode?: unknown } | undefined)?.mode,
+            (raw.activitySync as { mode?: unknown } | undefined)?.mode,
+            raw.activity_sync_mode,
+            raw.activitySyncMode,
+        ];
+        for (const value of candidates) {
+            const normalized = typeof value === 'string' ? value.trim().toLowerCase() : undefined;
+            if (normalized === 'pull' || normalized === 'push' || normalized === 'disabled') {
+                return normalized;
+            }
+        }
+        return undefined;
     }
 
     private async loadRawFromRepository(

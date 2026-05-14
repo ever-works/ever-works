@@ -137,7 +137,8 @@ export class GitHubSyncService {
             });
 
             const user = await this.userRepository.findById(userId);
-            const committer = user ? { name: user.username, email: user.email } : undefined;
+            const committer =
+                user && user.email ? { name: user.username, email: user.email } : undefined;
 
             // Clone or pull the repo
             const dir = await this.gitFacade.cloneOrPull(
@@ -182,7 +183,8 @@ export class GitHubSyncService {
 
         try {
             const user = await this.userRepository.findById(userId);
-            const committer = user ? { name: user.username, email: user.email } : undefined;
+            const committer =
+                user && user.email ? { name: user.username, email: user.email } : undefined;
 
             const dir = await this.gitFacade.cloneOrPull(
                 { owner: config.repoOwner, repo: config.repoName, committer },
@@ -227,7 +229,8 @@ export class GitHubSyncService {
 
         try {
             const user = await this.userRepository.findById(userId);
-            const committer = user ? { name: user.username, email: user.email } : undefined;
+            const committer =
+                user && user.email ? { name: user.username, email: user.email } : undefined;
 
             const dir = await this.gitFacade.cloneOrPull(
                 { owner: config.repoOwner, repo: config.repoName, committer },

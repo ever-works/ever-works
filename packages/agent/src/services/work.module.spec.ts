@@ -123,6 +123,7 @@ import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
+import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
@@ -143,6 +144,7 @@ import { WorksConfigSyncListener } from '@src/works-config/services/works-config
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
+import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
@@ -194,6 +196,7 @@ describe('WorkModule', () => {
             WorkDetailService,
             WorkScheduleService,
             WorkScheduleDispatcherService,
+            AnonymousUserCleanupService,
             WorkMemberService,
             WorkInvitationService,
             WorkImportService,
@@ -214,6 +217,7 @@ describe('WorkModule', () => {
             PluginOperationsService,
             SettingsSchemaValidatorService,
             EverWorksDeployQuotaService,
+            PlatformSyncSecretService,
             EverWorksGitProvider,
         ];
 
@@ -222,9 +226,9 @@ describe('WorkModule', () => {
         });
 
         it('keeps the providers list at the documented shape (class providers + the EverWorks quota counter factory)', () => {
-            // 29 class providers + 1 factory provider object for the
-            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 30 entries total.
-            // (EW-614 added EverWorksGitProvider.)
+            // 30 class providers + 1 factory provider object for the
+            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 31 entries total.
+            // (EW-120 added PlatformSyncSecretService; EW-614 added EverWorksGitProvider.)
             expect(meta('providers')).toHaveLength(expectedProviders.length + 1);
         });
 
@@ -289,8 +293,12 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 27-entry shape (24 services + 3 re-exported modules)', () => {
-            expect(meta('exports')).toHaveLength(27);
+        it('keeps the exports list at the documented 29-entry shape (26 services + 3 re-exported modules)', () => {
+            // Bumped to 28 with the PlatformSyncSecretService resurrection for
+            // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
+            // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
+            // (nightly cleanup of expired anonymous Users).
+            expect(meta('exports')).toHaveLength(29);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -91,6 +91,44 @@ export function EverWorksOnboardingWizard({
             void completeOnboarding();
         },
     });
+
+    // EW-617 G4 + G1 — landing-page hand-off. When the wizard mounts and
+    // the URL carries `?prompt=…` (or hash `#prompt=…`, used as a poor-man's
+    // signed-token transport), seed the wizard state and jump straight to
+    // the final step so the user sees "Generate now" without scrolling
+    // through choices. We do this once per mount; subsequent renders read
+    // from the persisted state.
+    const promptHydratedRef = useRef(false);
+    useEffect(() => {
+        if (!mounted || promptHydratedRef.current) return;
+        if (flow.state.prompt) {
+            // Already hydrated from server state — no URL work needed.
+            promptHydratedRef.current = true;
+            return;
+        }
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        const fromQuery = url.searchParams.get('prompt');
+        const fromHash = readHashParam(url.hash, 'prompt');
+        const raw = (fromQuery || fromHash || '').trim();
+        if (!raw) return;
+
+        promptHydratedRef.current = true;
+        flow.setPrompt(raw);
+        // Skip to the final step so the user lands on "Generate now".
+        const createIndex = flow.steps.findIndex((s) => s.kind === 'create-work');
+        if (createIndex >= 0) {
+            flow.jumpTo(createIndex);
+        }
+
+        // Strip the prompt from the URL so a reload doesn't re-trigger the
+        // hand-off (and so we don't leak the prompt to analytics referers).
+        url.searchParams.delete('prompt');
+        if (fromHash) {
+            url.hash = stripHashParam(url.hash, 'prompt');
+        }
+        window.history.replaceState({}, '', url.toString());
+    }, [mounted, flow]);
 
     const refreshConnections = async (pluginId?: string) => {
         const target = pluginId ? plugins.filter((p) => p.pluginId === pluginId) : plugins;
@@ -386,7 +424,40 @@ function StepBody({
                 />
             );
         case 'create-work':
-            return <CreateWorkStep onLeave={() => flow.finish()} />;
+            return (
+                <CreateWorkStep
+                    onLeave={() => flow.finish()}
+                    prompt={flow.state.prompt}
+                    onQuickCreate={
+                        flow.state.prompt
+                            ? async (prompt) => {
+                                  // EW-617 G4: anonymous + claimed users alike
+                                  // can one-click finish. The endpoint reads
+                                  // provider defaults from onboarding state.
+                                  const { quickCreateWorkAction } =
+                                      await import('@/app/actions/works/quick-create');
+                                  const slug = slugifyPrompt(prompt);
+                                  const result = await quickCreateWorkAction({
+                                      slug,
+                                      name: deriveNameFromPrompt(prompt),
+                                      description: prompt.slice(0, 500),
+                                      prompt,
+                                      organization: false,
+                                      deployProvider: flow.state.deploy.choice,
+                                      storageProvider: flow.state.storage.choice,
+                                  });
+                                  if (!result.success) {
+                                      throw new Error(result.error ?? 'Failed to start generation');
+                                  }
+                                  return {
+                                      workSlug: result.data?.work.slug,
+                                      generationHistoryId: result.data?.generation.historyId,
+                                  };
+                              }
+                            : undefined
+                    }
+                />
+            );
         default:
             return null;
     }
@@ -396,6 +467,56 @@ function StepBody({
 
 function isConfigKind(kind: WizardStep['kind']): boolean {
     return kind === 'ai-config' || kind === 'storage-config' || kind === 'deploy-config';
+}
+
+// EW-617 G4: extract `prompt=…` from a URL hash fragment. The landing
+// page (G1) hands off via fragment so the prompt never hits the server
+// access logs as a querystring. We parse defensively; bad input returns
+// `null` and we fall back to the existing /works/new flow.
+function readHashParam(hash: string, key: string): string | null {
+    if (!hash) return null;
+    const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+    try {
+        const params = new URLSearchParams(raw);
+        return params.get(key);
+    } catch {
+        return null;
+    }
+}
+
+function stripHashParam(hash: string, key: string): string {
+    if (!hash) return '';
+    const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+    try {
+        const params = new URLSearchParams(raw);
+        params.delete(key);
+        const remaining = params.toString();
+        return remaining ? `#${remaining}` : '';
+    } catch {
+        return hash;
+    }
+}
+
+// EW-617 G4: derive a DNS-safe slug from the user's prompt.
+// The slug column has the same `^[a-z0-9]+(?:-[a-z0-9]+)*$` constraint
+// as `CreateWorkDto.slug`, so we strip everything else and bound the
+// length. Adds a short timestamp suffix so two users typing the same
+// prompt don't collide.
+function slugifyPrompt(prompt: string): string {
+    const base = prompt
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40);
+    const suffix = Math.random().toString(36).slice(2, 8);
+    return base ? `${base}-${suffix}` : `quick-${suffix}`;
+}
+
+// Pull the first ~80 chars of the prompt as a display name. Title-cased
+// so it looks like a name in the dashboard list.
+function deriveNameFromPrompt(prompt: string): string {
+    const head = prompt.slice(0, 80).trim();
+    return head.charAt(0).toUpperCase() + head.slice(1);
 }
 
 function pluginIdForStep(

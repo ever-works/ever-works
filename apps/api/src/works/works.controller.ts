@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Body,
+    ConflictException,
     Controller,
     Delete,
     Get,
@@ -30,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import {
     CreateWorkDto,
+    QuickCreateWorkDto,
     UpdateWorkDto,
     UpdateWorkAdvancedPromptsDto,
     CreateCategoryDto,
@@ -88,6 +90,7 @@ import {
     ItemHealthService,
     ItemSourceValidationSchedulerService,
     type SourceValidationSettingsDto,
+    PlatformSyncSecretService,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
@@ -217,6 +220,7 @@ export class WorksController {
         private readonly itemExportService: ItemExportService,
         private readonly itemImportService: ItemImportService,
         private readonly itemImportExecutor: ItemImportExecutorService,
+        private readonly platformSyncSecretService: PlatformSyncSecretService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -306,6 +310,88 @@ export class WorksController {
         return this.workLifecycleService.createWork(createWorkDto, user);
     }
 
+    @Post('works/quick-create')
+    @HttpCode(HttpStatus.ACCEPTED)
+    // EW-617 G4: one-call combined create-Work + start-generation for the
+    // wizard's "Generate now" button. Throttled because each call kicks off
+    // an AI pipeline + repo provisioning — same per-IP envelope as the
+    // existing /works/:id/generate path.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Quick-create + generate a work',
+        description:
+            'Creates a Work using onboarding defaults and immediately kicks off AI item generation in a single request. Returns the new work id + generation history id; the client polls /works/:id/generation-history for status.',
+    })
+    @ApiResponse({ status: 202, description: 'Work created and generation started' })
+    @ApiResponse({ status: 400, description: 'Invalid input data' })
+    @ApiResponse({ status: 409, description: 'Slug already taken' })
+    async quickCreateWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: QuickCreateWorkDto,
+    ): Promise<{
+        status: 'pending';
+        work: { id: string; slug: string; name: string };
+        generation: { historyId: string; message: string };
+    }> {
+        const user = await this.authService.getUser(auth.userId);
+
+        // 1. Create the Work via the existing pipeline. Provider defaults
+        //    (storage/deploy/git) are resolved from the user's
+        //    onboardingState inside createWork — no special handling here.
+        const createDto: CreateWorkDto = Object.assign(new CreateWorkDto(), {
+            slug: dto.slug,
+            name: dto.name,
+            description: dto.description,
+            owner: dto.owner,
+            organization: dto.organization ?? false,
+            gitProvider: dto.gitProvider ?? 'github',
+            deployProvider: dto.deployProvider,
+            storageProvider: dto.storageProvider,
+            websiteTemplateId: dto.websiteTemplateId,
+            readmeConfig: dto.readmeConfig,
+        });
+        const created = await this.workLifecycleService.createWork(createDto, user);
+        if (!created || created.status !== 'success' || !created.work) {
+            throw new BadRequestException('Failed to create work');
+        }
+        const work = created.work;
+
+        this.activityLogService
+            .log({
+                userId: user.id,
+                workId: work.id,
+                actionType: ActivityActionType.WORK_CREATED,
+                action: 'work.quick_create',
+                status: ActivityStatus.COMPLETED,
+                summary: `Quick-create kicked off generation for ${work.slug}`,
+            })
+            .catch(() => {});
+
+        // 2. Kick off generation async — the standard generation pipeline
+        //    handles persistence + dispatch.  awaitCompletion=false means
+        //    we return immediately with the historyId for status polling.
+        const generatorDto = Object.assign(new CreateItemsGeneratorDto(), {
+            name: dto.name,
+            prompt: dto.prompt,
+            ...(dto.model ? { model: dto.model } : {}),
+        });
+        const generation = await this.workGenerationService.generateItems(
+            work.id,
+            generatorDto,
+            user,
+            false,
+        );
+
+        return {
+            status: 'pending',
+            work: { id: work.id, slug: work.slug, name: work.name },
+            generation: {
+                historyId: generation.historyId ?? '',
+                message: generation.message ?? 'Generation started',
+            },
+        };
+    }
+
     @Get('works/:id')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Get work', description: 'Get a specific work by ID' })
@@ -343,6 +429,47 @@ export class WorksController {
             })
             .catch(() => {});
         return result;
+    }
+
+    @Post('works/:id/activity-sync/rotate-secret')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Rotate the per-Work pull-transport HMAC secret (EW-120)',
+        description:
+            'Generates a fresh `PLATFORM_SYNC_SECRET` and persists it AES-256-GCM-encrypted on the Work row. The new value only reaches the deployed site at the next deploy — the response includes `redeployRequired: true` so the settings UI can surface that warning. Pull-mode Works only; 409 returned for push/disabled.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Secret rotated; redeploy required to propagate' })
+    @ApiResponse({ status: 403, description: 'Caller is not a Work owner / manager' })
+    @ApiResponse({ status: 409, description: 'Work is not in pull mode' })
+    async rotateActivitySyncSecret(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        await this.workOwnershipService.ensureAccess(id, auth.userId);
+        const work = await this.workRepository.findById(id);
+        if (!work) {
+            throw new NotFoundException({ status: 'error', message: 'Work not found' });
+        }
+        if (work.activitySyncMode !== 'pull') {
+            throw new ConflictException({
+                error: 'mode-mismatch',
+                mode: work.activitySyncMode,
+                message: `Activity-sync secret rotation is only supported for pull-mode Works; current mode is "${work.activitySyncMode}".`,
+            });
+        }
+        await this.platformSyncSecretService.rotate(id);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.WORK_UPDATED,
+                action: 'work.activity_sync.secret_rotated',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Rotated Activity Feed sync secret (pull transport)',
+            })
+            .catch(() => {});
+        return { status: 'success', redeployRequired: true };
     }
 
     @Get('works/:id/items')

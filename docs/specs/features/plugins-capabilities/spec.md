@@ -146,7 +146,7 @@ true`.
   secrets on every dispatch (`TENANT_ID = work.id`, `DATA_REPOSITORY =
 work.getDataRepo()`, `<PROVIDER>_TOKEN = deployToken`, `DEPLOY_TOKEN =
 deployToken`) and one repository variable (`DEPLOY_PROVIDER =
-work.deployProvider || 'vercel'`). `DEPLOY_PROVIDER` is set as a
+work.deployProvider || 'ever-works'`). `DEPLOY_PROVIDER` is set as a
   variable, not a secret, because GitHub Actions templates need it
   available in `if:` conditions.
 - **FR-11** The deploy service MUST set two optional secrets when their
