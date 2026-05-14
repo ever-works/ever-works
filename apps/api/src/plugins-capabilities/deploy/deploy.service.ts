@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    InternalServerErrorException,
+    Logger,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
-import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import {
+    DeployFacadeService,
+    GitFacadeService,
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
+} from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
@@ -265,9 +274,16 @@ export class DeployService {
             return userToken;
         }
 
+        // EW-616: the deploy facade returns a sentinel string when the
+        // user picked a platform-managed cluster without pasting a
+        // kubeconfig. Treat it as "no kubeconfig" for the validator and
+        // discard it before resolution so it can never leak into the
+        // pushed `K8S_TOKEN` secret on the website repo.
+        const realUserToken = userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
+
         const clusterSource = coerceClusterSource(settings.clusterSource);
         const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
-            hasKubeconfig: Boolean(userToken && userToken.trim()),
+            hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
         });
         if (failure) {
             this.logger.warn(
@@ -277,11 +293,17 @@ export class DeployService {
         }
 
         try {
-            return resolveKubeconfigForClusterSource(clusterSource, userToken);
+            return resolveKubeconfigForClusterSource(clusterSource, realUserToken);
         } catch (error) {
+            // The only failure path here is a missing platform-managed
+            // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
+            // `EVER_WORKS_K8S_GAUZY_KUBECONFIG`). The user picked a
+            // valid option — this is a platform-provisioning gap, so
+            // surface it as 5xx, not 4xx, so on-call can distinguish it
+            // from genuine user-input errors.
             const message = error instanceof Error ? error.message : String(error);
             this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
-            throw new BadRequestException(message);
+            throw new InternalServerErrorException(message);
         }
     }
 

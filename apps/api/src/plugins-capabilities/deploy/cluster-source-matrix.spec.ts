@@ -12,9 +12,8 @@ describe('cluster-source-matrix — EW-616 deploy matrix', () => {
             'returns true for %s',
             (owner) => expect(isEverWorksSharedOrg(owner)).toBe(true),
         );
-        it.each(['acme', 'octocat', 'ever-works-customer', ''])(
-            'returns false for %s',
-            (owner) => expect(isEverWorksSharedOrg(owner)).toBe(false),
+        it.each(['acme', 'octocat', 'ever-works-customer', ''])('returns false for %s', (owner) =>
+            expect(isEverWorksSharedOrg(owner)).toBe(false),
         );
     });
 
@@ -136,9 +135,9 @@ describe('cluster-source-matrix — EW-616 deploy matrix', () => {
                 EVER_WORKS_K8S_WORKS_KUBECONFIG: 'platform-yaml',
                 EVER_WORKS_K8S_GAUZY_KUBECONFIG: 'gauzy-yaml',
             };
-            expect(
-                resolveKubeconfigForClusterSource('custom-kubeconfig', 'user-yaml', env),
-            ).toBe('user-yaml');
+            expect(resolveKubeconfigForClusterSource('custom-kubeconfig', 'user-yaml', env)).toBe(
+                'user-yaml',
+            );
         });
     });
 });

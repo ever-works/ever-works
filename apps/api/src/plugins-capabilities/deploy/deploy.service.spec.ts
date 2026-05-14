@@ -520,7 +520,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             );
         });
 
-        it('rejects k8s-works when EVER_WORKS_K8S_WORKS_KUBECONFIG is not provisioned', async () => {
+        it('rejects k8s-works with InternalServerError when EVER_WORKS_K8S_WORKS_KUBECONFIG is not provisioned (operator gap, not user error)', async () => {
             // env var intentionally absent
             const { service } = buildService({
                 plugin: k8sPlugin,
@@ -528,9 +528,39 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 websiteOwner: 'ever-works-cloud',
             });
 
+            const InternalServerErrorException =
+                require('@nestjs/common').InternalServerErrorException;
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toBeInstanceOf(
+                InternalServerErrorException,
+            );
             await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
                 /EVER_WORKS_K8S_WORKS_KUBECONFIG is not configured/,
             );
+        });
+
+        it('discards the PLATFORM_MANAGED sentinel token from the facade when substituting kubeconfig', async () => {
+            // When the user picked a platform-managed source without
+            // pasting a kubeconfig, DeployFacade returns a sentinel token.
+            // DeployService.resolveDeployToken() must ignore it and read
+            // the platform env var instead.
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'real-platform-yaml';
+            const sentinel = '__ever-works-platform-managed-kubeconfig__';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: sentinel,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('real-platform-yaml');
+            // The sentinel must never leak into any pushed secret.
+            for (const s of secrets) {
+                expect(s.value).not.toBe(sentinel);
+            }
         });
 
         it('skips matrix enforcement entirely for non-k8s providers', async () => {

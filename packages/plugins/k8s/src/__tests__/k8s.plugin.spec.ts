@@ -230,16 +230,16 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 
 	it('emits K8S_CLUSTER_SOURCE (defaulting to custom-kubeconfig for back-compat) (EW-616)', async () => {
 		expect((await plugin.getDeploymentSecrets({})).K8S_CLUSTER_SOURCE).toBe('custom-kubeconfig');
-		expect(
-			(await plugin.getDeploymentSecrets({ clusterSource: 'k8s-works' })).K8S_CLUSTER_SOURCE,
-		).toBe('k8s-works');
-		expect(
-			(await plugin.getDeploymentSecrets({ clusterSource: 'k8s-gauzy' })).K8S_CLUSTER_SOURCE,
-		).toBe('k8s-gauzy');
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-works' })).K8S_CLUSTER_SOURCE).toBe(
+			'k8s-works'
+		);
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-gauzy' })).K8S_CLUSTER_SOURCE).toBe(
+			'k8s-gauzy'
+		);
 		// Garbage values fall through to the back-compat default.
-		expect(
-			(await plugin.getDeploymentSecrets({ clusterSource: 'nope' })).K8S_CLUSTER_SOURCE,
-		).toBe('custom-kubeconfig');
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'nope' })).K8S_CLUSTER_SOURCE).toBe(
+			'custom-kubeconfig'
+		);
 	});
 
 	it('passes optional fields through when set', async () => {
