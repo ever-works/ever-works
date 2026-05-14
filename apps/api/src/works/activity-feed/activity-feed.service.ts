@@ -1,21 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType } from '@ever-works/agent/entities';
-import type { ActivityLog } from '@ever-works/agent/entities';
-import { WorkGenerationHistoryRepository } from '@ever-works/agent/database';
+import type { ActivityLog, Work } from '@ever-works/agent/entities';
+import {
+    WorkGenerationHistoryRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import type { WorkGenerationHistory } from '@ever-works/agent/entities';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import type {
+    DirectorySiteEntry,
     FeedCategory,
     FeedEntry,
     GenerationHistoryEntry,
     PlatformActivityLogEntry,
 } from './dto/feed-entry.dto';
-import type { FeedResponse } from './dto/feed-response.dto';
+import type { FeedDegradedReason, FeedResponse } from './dto/feed-response.dto';
 import type { FeedQueryDto } from './dto/feed-query.dto';
+import {
+    DirectoryWebsiteClient,
+    type DirectoryEntryType,
+} from './directory-website-client.service';
 
 const DEFAULT_LIMIT = 50;
 
+/**
+ * Push-mode mapping: website-sourced categories are populated by activity-log
+ * rows ingested via `POST /api/activity-log/ingest`, so they appear as ordinary
+ * WEBSITE_* action types in the activity-log query.
+ */
 const ACTIVITY_LOG_TYPES_BY_CATEGORY: Record<FeedCategory, ActivityActionType[] | null> = {
     all: null,
     generation: [ActivityActionType.GENERATION, ActivityActionType.COMPARISON_GENERATION],
@@ -47,13 +60,18 @@ const ACTIVITY_LOG_TYPES_BY_CATEGORY: Record<FeedCategory, ActivityActionType[] 
     ],
     comparisons: [ActivityActionType.COMPARISON_GENERATION],
     communityPr: [ActivityActionType.COMMUNITY_PR_MERGED],
-    // Website-sourced categories — populated by activity-log rows ingested
-    // from the deployed directory site via POST /api/activity-log/ingest
-    // (EW-120 push flow).
     users: [ActivityActionType.WEBSITE_USER_REGISTERED],
     submissions: [ActivityActionType.WEBSITE_ITEM_SUBMITTED],
     reports: [ActivityActionType.WEBSITE_REPORT_FILED, ActivityActionType.WEBSITE_REPORT_RESOLVED],
 };
+
+/** Set of action types that represent website-ingested events (push transport). */
+const WEBSITE_ACTION_TYPES: ReadonlySet<ActivityActionType> = new Set([
+    ActivityActionType.WEBSITE_USER_REGISTERED,
+    ActivityActionType.WEBSITE_ITEM_SUBMITTED,
+    ActivityActionType.WEBSITE_REPORT_FILED,
+    ActivityActionType.WEBSITE_REPORT_RESOLVED,
+]);
 
 const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] | null> = {
     all: null,
@@ -71,46 +89,128 @@ const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] 
     reports: [],
 };
 
+/**
+ * Pull-mode mapping: website-sourced categories are populated by an on-demand
+ * fetch against the deployed site (DirectoryWebsiteClient). The values map to
+ * the upstream `types[]` filter.
+ */
+const DIRECTORY_TYPES_BY_CATEGORY: Record<FeedCategory, DirectoryEntryType[]> = {
+    all: ['all'],
+    generation: [],
+    items: ['items'],
+    deployment: [],
+    settings: [],
+    comparisons: [],
+    communityPr: [],
+    users: ['users'],
+    submissions: ['items'],
+    reports: ['reports'],
+};
+
 interface ComposeContext {
-    workId: string;
+    work: Work;
     limit: number;
     category: FeedCategory;
+    cursor?: string;
 }
 
+/**
+ * Aggregator for the per-Work Activity Feed (EW-120). Composes three sources:
+ *
+ *  1. Platform activity-log (always)
+ *  2. Per-Work generation history (always)
+ *  3. Deployed-site events — populated by **one of two** transports based on
+ *     `Work.activitySyncMode`:
+ *       - `pull`    → on-demand HMAC-signed GET via DirectoryWebsiteClient
+ *       - `push`    → ordinary activity-log rows ingested via the platform
+ *                     `/api/activity-log/ingest` endpoint (WEBSITE_* types)
+ *       - `disabled`→ never queried; users / submissions / reports chips empty
+ *
+ * Push-mode + Disabled-mode never set `response.degraded`. Pull-mode failures
+ * surface via `response.degraded.directorySite` so the web client renders the
+ * degraded banner with rotation / redeploy hints.
+ */
 @Injectable()
 export class ActivityFeedService {
+    private readonly logger = new Logger(ActivityFeedService.name);
+
     constructor(
         private readonly activityLogService: ActivityLogService,
         private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly directoryClient: DirectoryWebsiteClient,
     ) {}
 
     async compose(workId: string, _userId: string, query: FeedQueryDto): Promise<FeedResponse> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            // Controller's WorkOwnershipService.ensureAccess already rejects
+            // missing/forbidden Works upstream; this is a defence-in-depth
+            // fallback (no row → no events, no degraded).
+            return { entries: [], nextCursor: null, serverTime: new Date().toISOString() };
+        }
+
         const limit = query.limit ?? DEFAULT_LIMIT;
         const category = query.category ?? 'all';
         const cursorTimestamp = parseCursor(query.cursor);
+        const ctx: ComposeContext = { work, limit, category, cursor: query.cursor };
 
-        const ctx: ComposeContext = { workId, limit, category };
+        const isPullMode = work.activitySyncMode === 'pull';
+        const isDisabled = work.activitySyncMode === 'disabled';
+
         const activityLogTypes = ACTIVITY_LOG_TYPES_BY_CATEGORY[category];
         const historyTypes = HISTORY_TYPES_BY_CATEGORY[category];
+        const directoryTypes = isPullMode ? DIRECTORY_TYPES_BY_CATEGORY[category] : [];
 
-        const sourceCount = countActiveSources(activityLogTypes, historyTypes);
+        // In pull mode, the website chips are populated by DirectoryWebsiteClient,
+        // so the activity-log query should NOT return WEBSITE_* rows (any present
+        // would be stale push-mode leftovers from a prior mode flip).
+        const filteredActivityLogTypes = isPullMode
+            ? filterOutWebsiteTypes(activityLogTypes)
+            : activityLogTypes;
+
+        const sourceCount = countActiveSources(
+            filteredActivityLogTypes,
+            historyTypes,
+            directoryTypes,
+        );
         const perSourceLimit =
             sourceCount > 0 ? Math.max(Math.ceil(limit / sourceCount), 5) : limit;
 
-        const [activityLogResults, historyEntries] = await Promise.all([
-            this.fetchActivityLog(ctx, perSourceLimit, activityLogTypes, cursorTimestamp),
+        const [activityLogResults, historyEntries, directoryResult] = await Promise.all([
+            this.fetchActivityLog(ctx, perSourceLimit, filteredActivityLogTypes, cursorTimestamp),
             this.fetchHistory(ctx, perSourceLimit, historyTypes, cursorTimestamp),
+            isPullMode && !isDisabled
+                ? this.fetchDirectorySite(ctx, perSourceLimit, directoryTypes)
+                : Promise.resolve<{
+                      entries: DirectorySiteEntry[];
+                      degraded?: FeedDegradedReason;
+                  }>({ entries: [] }),
         ]);
 
-        const merged = mergeEntries([...activityLogResults, ...historyEntries], limit);
+        const merged = mergeEntries(
+            [...activityLogResults, ...historyEntries, ...directoryResult.entries],
+            limit,
+        );
         const nextCursor =
             merged.length === limit ? (merged[merged.length - 1]?.timestamp ?? null) : null;
 
-        return {
+        // Best-effort observability for pull-mode runs — never blocks the response.
+        if (isPullMode) {
+            this.recordSyncStatus(work, directoryResult.degraded).catch((err) =>
+                this.logger.debug(`Failed to update platformSync* columns: ${err.message}`),
+            );
+        }
+
+        const response: FeedResponse = {
             entries: merged,
             nextCursor,
             serverTime: new Date().toISOString(),
         };
+        if (directoryResult.degraded) {
+            response.degraded = { directorySite: directoryResult.degraded };
+        }
+        return response;
     }
 
     private async fetchActivityLog(
@@ -131,7 +231,7 @@ export class ActivityFeedService {
         const results = await Promise.all(
             typeIterable.map((actionType) =>
                 this.activityLogService.findByWork({
-                    workId: ctx.workId,
+                    workId: ctx.work.id,
                     actionType,
                     limit,
                     offset: 0,
@@ -163,7 +263,7 @@ export class ActivityFeedService {
         // aren't silently skipped when the top-N batch is all newer than
         // the cursor.
         const rows = await this.generationHistoryRepository.findByWorkFiltered(
-            ctx.workId,
+            ctx.work.id,
             limit,
             0,
             types ?? undefined,
@@ -171,15 +271,75 @@ export class ActivityFeedService {
         );
         return rows.map(toHistoryEntry);
     }
+
+    private async fetchDirectorySite(
+        ctx: ComposeContext,
+        limit: number,
+        types: DirectoryEntryType[],
+    ): Promise<{ entries: DirectorySiteEntry[]; degraded?: FeedDegradedReason }> {
+        if (types.length === 0) {
+            return { entries: [] };
+        }
+        const result = await this.directoryClient.fetchActivityFeed(ctx.work, {
+            limit,
+            types,
+            since: ctx.cursor,
+        });
+        if (result.ok === true) {
+            return { entries: result.entries };
+        }
+        return {
+            entries: [],
+            degraded: {
+                ...result.degraded,
+                lastSuccessAt: ctx.work.platformSyncLastSuccessAt?.toISOString() ?? null,
+            },
+        };
+    }
+
+    private async recordSyncStatus(
+        work: Work,
+        degraded: FeedDegradedReason | undefined,
+    ): Promise<void> {
+        if (degraded) {
+            await this.workRepository.updatePlatformSyncStatus(work.id, {
+                lastErrorAt: new Date(),
+                lastErrorMessage: `${degraded.reason}: ${degraded.detail ?? ''}`.trim(),
+            });
+        } else {
+            await this.workRepository.updatePlatformSyncStatus(work.id, {
+                lastSuccessAt: new Date(),
+                lastErrorMessage: null,
+            });
+        }
+    }
+}
+
+function filterOutWebsiteTypes(
+    types: ActivityActionType[] | null,
+): ActivityActionType[] | null {
+    if (types === null) {
+        // `all` category — keep the "no filter" semantics but make the
+        // findByWork pass filter post-hoc by switching to an explicit
+        // allow-list of everything EXCEPT website types. We accept the
+        // verbosity here because the pull path is the legacy default and
+        // misrouting WEBSITE_* rows there would surface duplicates.
+        return Object.values(ActivityActionType).filter(
+            (t) => !WEBSITE_ACTION_TYPES.has(t),
+        ) as ActivityActionType[];
+    }
+    return types.filter((t) => !WEBSITE_ACTION_TYPES.has(t));
 }
 
 function countActiveSources(
     activityLogTypes: ActivityActionType[] | null,
     historyTypes: WorkHistoryActivityType[] | null,
+    directoryTypes: DirectoryEntryType[],
 ): number {
     let n = 0;
     if (activityLogTypes === null || activityLogTypes.length > 0) n += 1;
     if (historyTypes === null || historyTypes.length > 0) n += 1;
+    if (directoryTypes.length > 0) n += 1;
     return n;
 }
 

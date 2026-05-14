@@ -51,6 +51,18 @@ import { FeedQueryDto } from '../dto/feed-query.dto';
 
 type ActivityLogMock = { findByWork: jest.Mock };
 type HistoryRepoMock = { findByWorkFiltered: jest.Mock };
+type WorkRepoMock = { findById: jest.Mock; updatePlatformSyncStatus: jest.Mock };
+type DirectoryClientMock = { fetchActivityFeed: jest.Mock };
+
+function makeWork(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'work-1',
+        activitySyncMode: 'push', // default for tests that don't care
+        website: 'https://example.com',
+        platformSyncLastSuccessAt: null,
+        ...overrides,
+    };
+}
 
 function makeActivityLog(overrides: Record<string, unknown> = {}) {
     return {
@@ -87,19 +99,27 @@ function makeHistoryRow(overrides: Record<string, unknown> = {}) {
 describe('ActivityFeedService', () => {
     let activityLogService: ActivityLogMock;
     let historyRepo: HistoryRepoMock;
+    let workRepo: WorkRepoMock;
+    let directoryClient: DirectoryClientMock;
     let service: ActivityFeedService;
 
     beforeEach(() => {
         activityLogService = { findByWork: jest.fn() };
         historyRepo = { findByWorkFiltered: jest.fn() };
-        service = new ActivityFeedService(activityLogService as never, historyRepo as never);
+        workRepo = {
+            findById: jest.fn().mockResolvedValue(makeWork()),
+            updatePlatformSyncStatus: jest.fn().mockResolvedValue(undefined),
+        };
+        directoryClient = { fetchActivityFeed: jest.fn() };
+        service = new ActivityFeedService(
+            activityLogService as never,
+            historyRepo as never,
+            workRepo as never,
+            directoryClient as never,
+        );
     });
 
     it('does NOT pass userId to ActivityLogService — member viewers see owner-attributed rows', async () => {
-        // P1 review fix: the prior implementation filtered by ctx.userId,
-        // hiding website-ingested events (attributed to the Work owner)
-        // from member viewers. Pin the new contract: only workId is
-        // forwarded; access is verified upstream by the controller.
         activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
 
         const query = new FeedQueryDto();
@@ -141,7 +161,6 @@ describe('ActivityFeedService', () => {
                 '2026-05-12T12:00:00.000Z',
                 '2026-05-12T11:00:00.000Z',
             ]);
-            // When limit is exactly matched, nextCursor is set to oldest entry.
             expect(response.nextCursor).toBe('2026-05-12T11:00:00.000Z');
         });
 
@@ -157,10 +176,13 @@ describe('ActivityFeedService', () => {
         });
     });
 
-    describe('category filtering', () => {
-        it('users category queries activity-log with WEBSITE_USER_REGISTERED and skips history', async () => {
-            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+    describe('push-mode category filtering (default)', () => {
+        beforeEach(() => {
+            workRepo.findById.mockResolvedValue(makeWork({ activitySyncMode: 'push' }));
+        });
 
+        it('users category queries activity-log with WEBSITE_USER_REGISTERED', async () => {
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
             const query = new FeedQueryDto();
             query.category = 'users';
             await service.compose('work-1', 'user-1', query);
@@ -172,17 +194,15 @@ describe('ActivityFeedService', () => {
                     actionType: ActivityActionType.WEBSITE_USER_REGISTERED,
                 }),
             );
-            expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
+            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
         });
 
-        it('reports category queries both WEBSITE_REPORT_FILED and WEBSITE_REPORT_RESOLVED', async () => {
+        it('reports category queries both WEBSITE_REPORT_* types', async () => {
             activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
-
             const query = new FeedQueryDto();
             query.category = 'reports';
             await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findByWork).toHaveBeenCalledTimes(2);
             const types = activityLogService.findByWork.mock.calls.map(
                 (c) => (c[0] as { actionType: string }).actionType,
             );
@@ -192,23 +212,119 @@ describe('ActivityFeedService', () => {
                     ActivityActionType.WEBSITE_REPORT_RESOLVED,
                 ].sort(),
             );
+            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
         });
 
-        it('deployment category only queries activity-log', async () => {
+        it('never sets response.degraded in push mode', async () => {
             activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+            historyRepo.findByWorkFiltered.mockResolvedValue([]);
+
+            const response = await service.compose('work-1', 'user-1', new FeedQueryDto());
+            expect(response.degraded).toBeUndefined();
+        });
+    });
+
+    describe('pull-mode routing (EW-120)', () => {
+        beforeEach(() => {
+            workRepo.findById.mockResolvedValue(makeWork({ activitySyncMode: 'pull' }));
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+            historyRepo.findByWorkFiltered.mockResolvedValue([]);
+        });
+
+        it('users category invokes the directory client, NOT the activity-log query', async () => {
+            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
 
             const query = new FeedQueryDto();
-            query.category = 'deployment';
+            query.category = 'users';
             await service.compose('work-1', 'user-1', query);
 
-            expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
-            expect(activityLogService.findByWork).toHaveBeenCalledWith(
+            expect(directoryClient.fetchActivityFeed).toHaveBeenCalledTimes(1);
+            const call = directoryClient.fetchActivityFeed.mock.calls[0];
+            expect(call[1]).toEqual(expect.objectContaining({ types: ['users'] }));
+            // Activity-log path runs (the "all-except-WEBSITE_*" allow-list still
+            // matches deployment etc.), but never with a WEBSITE_* type.
+            const allTypes = activityLogService.findByWork.mock.calls.map(
+                (c) => (c[0] as { actionType: string | undefined }).actionType,
+            );
+            expect(allTypes).not.toContain(ActivityActionType.WEBSITE_USER_REGISTERED);
+        });
+
+        it('surfaces directory-site degraded reason in response.degraded.directorySite', async () => {
+            directoryClient.fetchActivityFeed.mockResolvedValue({
+                ok: false,
+                degraded: { reason: 'timeout', detail: 'after 5s' },
+            });
+
+            const query = new FeedQueryDto();
+            query.category = 'users';
+            const response = await service.compose('work-1', 'user-1', query);
+
+            expect(response.degraded?.directorySite?.reason).toBe('timeout');
+        });
+
+        it('writes platformSyncLastErrorMessage on degraded run', async () => {
+            directoryClient.fetchActivityFeed.mockResolvedValue({
+                ok: false,
+                degraded: { reason: 'unauthorized', detail: 'stale secret' },
+            });
+
+            const query = new FeedQueryDto();
+            query.category = 'users';
+            await service.compose('work-1', 'user-1', query);
+            await new Promise((resolve) => setImmediate(resolve));
+
+            expect(workRepo.updatePlatformSyncStatus).toHaveBeenCalledWith(
+                'work-1',
                 expect.objectContaining({
-                    workId: 'work-1',
-                    actionType: ActivityActionType.DEPLOYMENT,
+                    lastErrorMessage: expect.stringContaining('unauthorized'),
                 }),
             );
-            expect(historyRepo.findByWorkFiltered).not.toHaveBeenCalled();
+        });
+
+        it('writes platformSyncLastSuccessAt on successful run', async () => {
+            directoryClient.fetchActivityFeed.mockResolvedValue({ ok: true, entries: [] });
+
+            const query = new FeedQueryDto();
+            query.category = 'users';
+            await service.compose('work-1', 'user-1', query);
+            await new Promise((resolve) => setImmediate(resolve));
+
+            expect(workRepo.updatePlatformSyncStatus).toHaveBeenCalledWith(
+                'work-1',
+                expect.objectContaining({
+                    lastSuccessAt: expect.any(Date),
+                    lastErrorMessage: null,
+                }),
+            );
+        });
+    });
+
+    describe('disabled-mode routing (EW-120)', () => {
+        beforeEach(() => {
+            workRepo.findById.mockResolvedValue(makeWork({ activitySyncMode: 'disabled' }));
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+            historyRepo.findByWorkFiltered.mockResolvedValue([]);
+        });
+
+        it('never queries the directory client', async () => {
+            const query = new FeedQueryDto();
+            query.category = 'users';
+            await service.compose('work-1', 'user-1', query);
+
+            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
+        });
+
+        it('never sets response.degraded', async () => {
+            const response = await service.compose('work-1', 'user-1', new FeedQueryDto());
+            expect(response.degraded).toBeUndefined();
+        });
+    });
+
+    describe('defensive guards', () => {
+        it('returns an empty response when the work cannot be found', async () => {
+            workRepo.findById.mockResolvedValue(null);
+            const response = await service.compose('missing', 'user-1', new FeedQueryDto());
+            expect(response.entries).toEqual([]);
         });
     });
 });
