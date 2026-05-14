@@ -8,9 +8,14 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 interface DiscoverClientProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
+    initiallyCanRefresh: boolean;
 }
 
-export function DiscoverClient({ initialProposals, initiallyResearching }: DiscoverClientProps) {
+export function DiscoverClient({
+    initialProposals,
+    initiallyResearching,
+    initiallyCanRefresh,
+}: DiscoverClientProps) {
     const t = useTranslations('dashboard.discover');
 
     return (
@@ -30,6 +35,7 @@ export function DiscoverClient({ initialProposals, initiallyResearching }: Disco
             <WorkProposalsSection
                 initialProposals={initialProposals}
                 initiallyResearching={initiallyResearching}
+                initiallyCanRefresh={initiallyCanRefresh}
             />
         </div>
     );

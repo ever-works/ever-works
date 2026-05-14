@@ -30,6 +30,9 @@ module.exports = {
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../contracts/src/$1/index.ts',
+        // p-map is ESM-only and ts-jest can't load it. Substitute a
+        // Promise.all-based stub for all specs (see test/jest-mocks/p-map.ts).
+        '^p-map$': '<rootDir>/../test/jest-mocks/p-map.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

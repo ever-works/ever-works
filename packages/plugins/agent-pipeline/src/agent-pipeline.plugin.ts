@@ -433,7 +433,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			const result = await execContext.dataSourceFacade.queryAll({
 				workId: work.id,
 				userId,
-				pluginConfig: request.config as Record<string, Record<string, unknown>> | undefined,
+				pluginConfig: request.pluginConfig,
 				filterContext: { prompt: request.prompt, subject: work.name, keywords }
 			});
 

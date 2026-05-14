@@ -19,6 +19,7 @@ interface DashboardClientProps {
     activeWebsites: number;
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
+    initiallyCanRefresh: boolean;
 }
 
 export default function DashboardClient({
@@ -29,6 +30,7 @@ export default function DashboardClient({
     activeWebsites,
     initialProposals,
     initiallyResearching,
+    initiallyCanRefresh,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -54,6 +56,7 @@ export default function DashboardClient({
             <WorkProposalsSection
                 initialProposals={initialProposals}
                 initiallyResearching={initiallyResearching}
+                initiallyCanRefresh={initiallyCanRefresh}
                 username={user.username}
             />
 

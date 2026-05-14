@@ -62,6 +62,15 @@ export class UserResearchLimitsService {
         }
     }
 
+    /**
+     * Non-throwing counterpart of assertCanRun. Lets a controller show
+     * "limit reached" UX without surfacing a 4xx for a read query.
+     */
+    async canRun(userId: string): Promise<boolean> {
+        const runs = await this.read('runs', userId);
+        return runs < this.config.maxRunsPerDay;
+    }
+
     async incrementRuns(userId: string): Promise<number> {
         return this.increment('runs', userId);
     }

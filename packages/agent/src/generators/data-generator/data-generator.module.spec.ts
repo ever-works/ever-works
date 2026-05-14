@@ -53,7 +53,7 @@ describe('DataGeneratorModule', () => {
         expect(exports).toHaveLength(1);
     });
 
-    it('imports the documented 4 modules by name', () => {
+    it('imports the documented 5 modules by name', () => {
         const imports = meta('imports') as Array<{ name?: string }>;
         const names = imports.map((m) => m?.name);
         expect(names).toEqual(
@@ -62,9 +62,10 @@ describe('DataGeneratorModule', () => {
                 'PipelineModule',
                 'DatabaseModule',
                 'WorkOperationsModule',
+                'CategoryIconModule',
             ]),
         );
-        expect(imports).toHaveLength(4);
+        expect(imports).toHaveLength(5);
     });
 });
 
