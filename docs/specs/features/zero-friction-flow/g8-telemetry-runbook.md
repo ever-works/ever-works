@@ -35,16 +35,16 @@ answer:
 
 ## Emit sites (one row per funnel step)
 
-| Step | Event                                 | Where to emit                                                          | Status        |
-| ---- | ------------------------------------- | ---------------------------------------------------------------------- | ------------- |
-| 1    | `zero_friction.landing_prompt_submit` | website: `LandingPromptForm.onSubmit`                                  | wiring TBD    |
-| 2    | `zero_friction.anon_user_created`     | platform: `AnonymousAuthService.createAnonymousUser`                   | wiring TBD    |
-| 3    | `zero_friction.wizard_finished`       | platform: `EverWorksOnboardingWizard` (just before quick-create call)  | wiring TBD    |
-| 4    | `zero_friction.work_created`          | platform: `WorksController.quickCreateWork` (after `createWork`)       | wiring TBD    |
-| 5    | `zero_friction.repos_pushed`          | platform: `WorkLifecycleService.createWork` (EW-614 path)              | wiring TBD    |
-| 6    | `zero_friction.deploy_started`        | platform: `DeployService.deploy` (right before workflow dispatch)      | wiring TBD    |
-| 7    | `zero_friction.deploy_ready`          | platform: `DeploymentVerifierService` (poll succeeds)                  | wiring TBD    |
-| 8    | `zero_friction.claim_account`         | platform: `ClaimAccountService.claim` (on success)                     | wiring TBD    |
+| Step | Event                                 | Where to emit                                                         | Status     |
+| ---- | ------------------------------------- | --------------------------------------------------------------------- | ---------- |
+| 1    | `zero_friction.landing_prompt_submit` | website: `LandingPromptForm.onSubmit`                                 | wiring TBD |
+| 2    | `zero_friction.anon_user_created`     | platform: `AnonymousAuthService.createAnonymousUser`                  | wiring TBD |
+| 3    | `zero_friction.wizard_finished`       | platform: `EverWorksOnboardingWizard` (just before quick-create call) | wiring TBD |
+| 4    | `zero_friction.work_created`          | platform: `WorksController.quickCreateWork` (after `createWork`)      | wiring TBD |
+| 5    | `zero_friction.repos_pushed`          | platform: `WorkLifecycleService.createWork` (EW-614 path)             | wiring TBD |
+| 6    | `zero_friction.deploy_started`        | platform: `DeployService.deploy` (right before workflow dispatch)     | wiring TBD |
+| 7    | `zero_friction.deploy_ready`          | platform: `DeploymentVerifierService` (poll succeeds)                 | wiring TBD |
+| 8    | `zero_friction.claim_account`         | platform: `ClaimAccountService.claim` (on success)                    | wiring TBD |
 
 "wiring TBD" means the schema + service exist; the actual
 `funnelService.emit(...)` call sites are deliberately deferred so each
