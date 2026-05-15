@@ -9,6 +9,8 @@ jest.mock('@ever-works/agent/activity-log', () => ({
 
 import { AuthController } from './auth.controller';
 import type { AuthService } from '../services/auth.service';
+import type { AnonymousAuthService } from '../services/anonymous-auth.service';
+import type { ClaimAccountService } from '../services/claim-account.service';
 import type { SocialAuthService } from '../services/social-auth.service';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
 import type { AuthProvider } from '../providers/auth-provider.abstract';
@@ -31,6 +33,8 @@ describe('AuthController', () => {
         >
     >;
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
+    let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
+    let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
         Pick<
@@ -59,6 +63,8 @@ describe('AuthController', () => {
             validatePasswordResetToken: jest.fn(),
         } as any;
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
+        anonymousAuth = { createAnonymousUser: jest.fn() } as any;
+        claimAccount = { claim: jest.fn() } as any;
         activityLog = { log: jest.fn().mockResolvedValue(undefined) } as any;
         authProvider = {
             signUpEmail: jest.fn(),
@@ -72,9 +78,131 @@ describe('AuthController', () => {
         controller = new AuthController(
             authService as unknown as AuthService,
             socialAuth as unknown as SocialAuthService,
+            anonymousAuth as unknown as AnonymousAuthService,
+            claimAccount as unknown as ClaimAccountService,
             activityLog as unknown as ActivityLogService,
             authProvider as unknown as AuthProvider,
         );
+    });
+
+    describe('claim (POST /api/auth/claim) — EW-617 G3', () => {
+        it('delegates to claimAccountService and logs activity', async () => {
+            const claimed = {
+                id: 'u-anon-1',
+                email: 'jane@example.com',
+                username: 'jane-doe',
+                emailVerified: false,
+            };
+            claimAccount.claim.mockResolvedValue(claimed);
+
+            const req = {
+                user: { userId: 'u-anon-1' },
+                ip: '1.2.3.4',
+                headers: { 'user-agent': 'jest-agent' },
+            };
+
+            const result = await (controller as any).claimAccount(req, {
+                email: 'jane@example.com',
+                password: 'MySecure123!',
+                username: 'jane-doe',
+            });
+
+            expect(claimAccount.claim).toHaveBeenCalledWith({
+                userId: 'u-anon-1',
+                email: 'jane@example.com',
+                password: 'MySecure123!',
+                username: 'jane-doe',
+                emailVerificationCallbackUrl: undefined,
+            });
+            expect(result).toEqual(claimed);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u-anon-1',
+                    action: 'user.account_claimed',
+                    ipAddress: '1.2.3.4',
+                    userAgent: 'jest-agent',
+                }),
+            );
+        });
+
+        it('passes through emailVerificationCallbackUrl when provided', async () => {
+            claimAccount.claim.mockResolvedValue({
+                id: 'u-1',
+                email: 'a@b.com',
+                username: 'a',
+                emailVerified: false,
+            });
+
+            await (controller as any).claimAccount(
+                { user: { userId: 'u-1' }, headers: {} },
+                {
+                    email: 'a@b.com',
+                    password: 'MySecure123!',
+                    emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
+                },
+            );
+
+            expect(claimAccount.claim).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
+                }),
+            );
+        });
+    });
+
+    describe('anonymous (POST /api/auth/anonymous) — EW-617 G2', () => {
+        it('mints an anonymous session and logs the creation', async () => {
+            const tokenResponse = {
+                access_token: 'tok-anon-1',
+                user: {
+                    id: 'u-anon-1',
+                    email: null,
+                    username: 'anon-deadbeef',
+                    isAnonymous: true,
+                    anonymousExpiresAt: '2026-05-21T00:00:00.000Z',
+                },
+            };
+            anonymousAuth.createAnonymousUser.mockResolvedValue(tokenResponse as any);
+
+            const req = {
+                ip: '1.2.3.4',
+                headers: { 'user-agent': 'jest-agent', 'x-forwarded-for': '10.0.0.1, 1.2.3.4' },
+            };
+
+            const result = await (controller as any).anonymous(req);
+
+            expect(anonymousAuth.createAnonymousUser).toHaveBeenCalledWith({
+                ipAddress: '1.2.3.4',
+                userAgent: 'jest-agent',
+            });
+            expect(result).toEqual(tokenResponse);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u-anon-1',
+                    action: 'user.anonymous_created',
+                    ipAddress: '1.2.3.4',
+                    userAgent: 'jest-agent',
+                }),
+            );
+        });
+
+        it('falls back to x-forwarded-for first hop when req.ip is missing', async () => {
+            anonymousAuth.createAnonymousUser.mockResolvedValue({
+                access_token: 'tok',
+                user: { id: 'u', email: null, username: 'anon-x', isAnonymous: true },
+            } as any);
+
+            const req = {
+                headers: { 'x-forwarded-for': ' 8.8.8.8 , 9.9.9.9 ' },
+            };
+
+            await (controller as any).anonymous(req);
+
+            expect(anonymousAuth.createAnonymousUser).toHaveBeenCalledWith({
+                ipAddress: '8.8.8.8',
+                userAgent: null,
+            });
+        });
     });
 
     describe('getConfiguredProviders (GET /api/auth/providers)', () => {

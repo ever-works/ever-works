@@ -123,6 +123,7 @@ import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
+import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
 import { WorkMemberService } from './work-member.service';
 import { WorkInvitationService } from './work-invitation.service';
 import { WorkImportService } from './work-import.service';
@@ -144,6 +145,8 @@ import { WorksConfigWriterService } from '@src/works-config/services/works-confi
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
+import { EverWorksDnsService } from '../ever-works-providers/cloudflare-dns.provider';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
@@ -195,6 +198,7 @@ describe('WorkModule', () => {
             WorkDetailService,
             WorkScheduleService,
             WorkScheduleDispatcherService,
+            AnonymousUserCleanupService,
             WorkMemberService,
             WorkInvitationService,
             WorkImportService,
@@ -217,6 +221,8 @@ describe('WorkModule', () => {
             EverWorksDeployQuotaService,
             PlatformSyncSecretService,
             EverWorksGitProvider,
+            EverWorksDnsService,
+            ZeroFrictionFunnelService,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
@@ -273,10 +279,13 @@ describe('WorkModule', () => {
                     provider === SettingsSchemaValidatorService ||
                     provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
-                    provider === EverWorksGitProvider
+                    provider === EverWorksGitProvider ||
+                    provider === EverWorksDnsService
                 ) {
                     // EW-614: EverWorksGitProvider is consumed inside the
                     // module (by WorkLifecycleService.createWork); not exported.
+                    // EW-617 G5: EverWorksDnsService is consumed by DeployService;
+                    // not exported through WorkModule.
                     expect(exports).not.toContain(provider);
                 } else {
                     expect(exports).toContain(provider);
@@ -291,10 +300,13 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 28-entry shape (25 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 30-entry shape (27 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
-            expect(meta('exports')).toHaveLength(28);
+            // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
+            // (nightly cleanup of expired anonymous Users).
+            // Bumped to 30 with the EW-617 G8 ZeroFrictionFunnelService.
+            expect(meta('exports')).toHaveLength(30);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

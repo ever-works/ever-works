@@ -39,14 +39,28 @@ export class User {
     @Column()
     username: string;
 
-    @Column({ unique: true })
-    email: string;
+    // EW-617 G2: anonymous (zero-friction) users have no email/password until
+    // they claim the account via POST /api/auth/claim. Existing rows keep
+    // their non-null values; new anonymous rows persist NULLs here.
+    @Column({ unique: true, nullable: true })
+    email: string | null;
 
-    @Column()
-    password: string;
+    @Column({ nullable: true })
+    password: string | null;
 
     @Column({ default: 'local' })
-    registrationProvider: string; // 'local', 'github', 'google' - how user initially signed up
+    registrationProvider: string; // 'local', 'github', 'google', 'anonymous' - how user initially signed up
+
+    // EW-617 G2: zero-friction anonymous users.
+    // `isAnonymous=true` rows have nullable email/password and live until
+    // `anonymousExpiresAt`. The nightly cleanup task deletes expired rows
+    // and cascades to their Works. Claim-account flow flips this to false
+    // and clears the TTL.
+    @Column({ default: false })
+    isAnonymous: boolean;
+
+    @TimestampColumn({ nullable: true })
+    anonymousExpiresAt?: Date | null;
 
     @Column({ nullable: true })
     avatar: string;
@@ -138,9 +152,14 @@ export class User {
     local: boolean = false;
 
     asCommitter(): { name: string; email: string } {
+        // Anonymous users have null email; only happens before claim-account.
+        // Repo-touching paths (git commit, deploy) require a real email, so
+        // we surface a parseable but obviously-synthetic address that won't
+        // collide with anything real and signals 'fix before commit'.
+        const fallbackEmail = `anon-${this.id}@anonymous.ever.works`;
         return {
             name: this.committerName || this.username,
-            email: this.committerEmail || this.email,
+            email: this.committerEmail || this.email || fallbackEmail,
         };
     }
 }
