@@ -51,7 +51,7 @@
         "@scalar/nestjs-api-reference": "^1.1.6",
         "axios": "^1.15.2",
         "bcrypt": "^6.0.0",
-        "better-auth": "^1.5.6",
+        "better-auth": "^1.6.2",
         "better-sqlite3": "^12.5.0",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.3",
