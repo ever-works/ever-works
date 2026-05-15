@@ -142,6 +142,9 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
         // 9th DI arg added on develop post-EW-616 — Ever Works DNS service.
         // No deploy path under test reaches it, so a typeless stub is fine.
         const dnsService = {};
+        // 10th DI arg — zero-friction funnel telemetry. Stub emit() so
+        // calls during a successful deploy don't blow up.
+        const funnel = { emit: jest.fn().mockResolvedValue(undefined) };
 
         const prevEnv = { ...process.env };
         delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
@@ -158,6 +161,7 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
             eventEmitter,
             platformSyncSecretService as any,
             dnsService as any,
+            funnel as any,
         );
 
         const restoreEnv = () => {
