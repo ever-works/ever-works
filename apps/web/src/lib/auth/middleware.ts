@@ -4,17 +4,20 @@ import { getAuthAccessCookie } from './cookies';
 
 export type AuthUser = {
     id: string;
-    email: string;
+    // EW-617 G2: anonymous (zero-friction) users have no email until they
+    // claim the account via POST /api/auth/claim.
+    email: string | null;
     username: string;
     emailVerified: boolean;
     avatar: string | null;
     provider?: string | null;
     isActive?: boolean;
+    isAnonymous?: boolean;
 };
 
 export type JwtPayload = {
     sub: string;
-    email: string;
+    email: string | null;
     provider: string;
     username: string;
     emailVerified: boolean;
@@ -24,6 +27,8 @@ export type JwtPayload = {
     iss: string;
     aud: string;
     exp: number;
+    // EW-617 G2: set to `true` for anonymous JWTs.
+    isAnonymous?: boolean;
 };
 
 function isLikelyJwt(token: string) {

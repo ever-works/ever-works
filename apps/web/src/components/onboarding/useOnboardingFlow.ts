@@ -71,6 +71,7 @@ type FlowAction =
     | { type: 'setAiChoice'; value: OnboardingAiChoice }
     | { type: 'setStorageChoice'; value: OnboardingStorageChoice }
     | { type: 'setDeployChoice'; value: OnboardingDeployChoice }
+    | { type: 'setPrompt'; value: string }
     | { type: 'recordSkip'; stepId: string }
     | { type: 'setPluginsReviewed'; value: boolean }
     | { type: 'mergeServerState'; value: OnboardingWizardStateV2 }
@@ -124,6 +125,17 @@ function reduce(state: FlowReducerState, action: FlowAction): FlowReducerState {
             return {
                 ...state,
                 state: { ...state.state, deploy: { choice: action.value } },
+            };
+        case 'setPrompt':
+            // EW-617 G4: prompt carried from landing-page input through the
+            // wizard into the quick-create endpoint. Trimmed empty strings
+            // map back to `undefined` so we don't persist whitespace.
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    prompt: action.value.trim() || undefined,
+                },
             };
         case 'recordSkip': {
             if (state.state.skippedSteps.includes(action.stepId)) return state;
@@ -181,6 +193,7 @@ export interface UseOnboardingFlowResult {
     readonly setStorageChoice: (value: OnboardingStorageChoice) => void;
     readonly setDeployChoice: (value: OnboardingDeployChoice) => void;
     readonly setPluginsReviewed: (value: boolean) => void;
+    readonly setPrompt: (value: string) => void;
     readonly goNext: () => void;
     readonly goBack: () => void;
     readonly skip: () => void;
@@ -291,6 +304,14 @@ export function useOnboardingFlow({
         [],
     );
 
+    const setPrompt = useCallback(
+        (value: string) => {
+            trackEvent('onboarding_prompt_set', { hasValue: Boolean(value.trim()) });
+            dispatch({ type: 'setPrompt', value });
+        },
+        [trackEvent],
+    );
+
     const refresh = useCallback(() => {
         const stepKind = currentStep?.kind ?? 'welcome';
         trackEvent('onboarding_plugin_refresh_clicked', { stepKind });
@@ -340,6 +361,7 @@ export function useOnboardingFlow({
         setStorageChoice,
         setDeployChoice,
         setPluginsReviewed,
+        setPrompt,
         goNext,
         goBack,
         skip,
@@ -352,7 +374,7 @@ export function useOnboardingFlow({
 
 function stripVersion(state: OnboardingWizardStateV2) {
     // The patch endpoint deep-merges by field; `version` is server-managed.
-    const { lastStep, ai, storage, deploy, skippedSteps, pluginsReviewed } = state;
+    const { lastStep, ai, storage, deploy, skippedSteps, pluginsReviewed, prompt } = state;
     return {
         lastStep,
         ai: { choice: ai.choice },
@@ -360,6 +382,7 @@ function stripVersion(state: OnboardingWizardStateV2) {
         deploy: { choice: deploy.choice },
         skippedSteps: [...skippedSteps],
         pluginsReviewed,
+        ...(prompt ? { prompt } : {}),
     };
 }
 

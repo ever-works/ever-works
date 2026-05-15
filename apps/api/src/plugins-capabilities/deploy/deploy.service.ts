@@ -15,6 +15,7 @@ import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
 import { PlatformSyncSecretService } from '@ever-works/agent/services';
+import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -83,6 +84,7 @@ export class DeployService {
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
+        private readonly dnsService: EverWorksDnsService,
     ) {}
 
     /**
@@ -135,7 +137,14 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, settings);
+        // EW-617 G5: when the platform is the deploy target, template the
+        // ingress host as `${slug}.ever.works` (or whatever
+        // EVER_WORKS_DOMAIN says) and provision the Cloudflare CNAME so
+        // the user's directory is reachable at that subdomain without any
+        // manual DNS. If env vars are missing the DNS service no-ops; the
+        // k8s plugin's default LB hostname remains the fallback.
+        const deploySettings = await this.applyEverWorksSubdomain(work, settings);
+        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
@@ -330,6 +339,45 @@ export class DeployService {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
+    /**
+     * EW-617 G5: when `deployProvider === 'ever-works'` AND the Cloudflare
+     * DNS env is configured, derive `ingressHost = ${slug}.ever.works`,
+     * merge it into the deploy settings (so the k8s plugin's
+     * `getDeploymentSecrets` picks it up as `K8S_INGRESS_HOST`), and
+     * provision the CNAME via Cloudflare. Returns a shallow copy of
+     * `settings` with the override applied; original object is not
+     * mutated so subsequent reads stay deterministic.
+     *
+     * No-ops cleanly when:
+     *  - the work is on a non-platform provider (Vercel, user's k8s), OR
+     *  - env vars are missing (dev / preview),
+     * letting the existing k8s plugin LB hostname remain the fallback.
+     */
+    private async applyEverWorksSubdomain(
+        work: Work,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | undefined> {
+        if (work.deployProvider !== 'ever-works') {
+            return settings;
+        }
+        const provider = this.dnsService.getProvider();
+        if (!provider) {
+            return settings;
+        }
+
+        const ingressHost = this.dnsService.ingressHostFor(work.slug);
+
+        // Provision asynchronously — DNS propagation runs in parallel with
+        // the workflow dispatch. Errors are logged inside the service so
+        // they never abort the deploy.
+        void this.dnsService.ensureWorkSubdomain(work.slug);
+
+        return {
+            ...(settings ?? {}),
+            ingressHost,
+        };
+    }
+
     private async setRequiredSecrets(
         ctx: RepoContext,
         deployToken: string,
@@ -337,7 +385,7 @@ export class DeployService {
         plugin?: IDeploymentPlugin,
         settings?: Record<string, unknown>,
     ) {
-        const provider = work.deployProvider || 'vercel';
+        const provider = work.deployProvider || 'ever-works';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
         } catch (error) {

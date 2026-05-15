@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOneOptions, Repository } from 'typeorm';
+import { FindOneOptions, LessThan, Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
 import { config } from '../../config';
 import { randomUUID } from 'node:crypto';
@@ -57,6 +57,30 @@ export class UserRepository {
         );
 
         return (result.affected || 0) > 0;
+    }
+
+    /**
+     * EW-617 G2: anonymous user TTL cleanup.
+     * Returns all rows where `isAnonymous=true AND anonymousExpiresAt < now`.
+     * Caller (Trigger.dev nightly task) is expected to delete them; ON DELETE
+     * CASCADE on `work.userId` removes the orphan Works.
+     */
+    async findExpiredAnonymous(now: Date = new Date()): Promise<User[]> {
+        return await this.repository.find({
+            where: {
+                isAnonymous: true,
+                anonymousExpiresAt: LessThan(now),
+            },
+        });
+    }
+
+    /**
+     * EW-617 G2: hard-delete an anonymous user. Cascades to its Works via
+     * `work.user` ON DELETE CASCADE. Safe to call only after the row has been
+     * verified `isAnonymous=true` to avoid wiping a real account by mistake.
+     */
+    async deleteAnonymous(id: string): Promise<void> {
+        await this.repository.delete({ id, isAnonymous: true });
     }
 
     async createOrGetLocalUser(): Promise<User> {
