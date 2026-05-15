@@ -31,7 +31,8 @@ import type {
 import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import * as path from 'path';
+// POSIX path joins keep BASE_TEMP_DIR-derived paths stable across platforms.
+import * as path from 'path/posix';
 import * as https from 'https';
 
 import type { ClaudeCodeStepId } from './types.js';

@@ -1,6 +1,10 @@
 // Mock the agent runtime tree at module scope so importing the controller does
 // not pull in the agent's NestJS DI graph.
-jest.mock('@ever-works/agent/dto', () => ({}));
+jest.mock('@ever-works/agent/dto', () => ({
+    // Controller does `new CreateWorkDto()` to build the input for createWork —
+    // stub with a class so the test doesn't fail with `not a constructor`.
+    CreateWorkDto: class CreateWorkDto {},
+}));
 jest.mock('@ever-works/agent/items-generator', () => ({
     CreateItemsGeneratorDto: class CreateItemsGeneratorDto {
         name?: string;

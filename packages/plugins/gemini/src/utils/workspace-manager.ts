@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
+// POSIX path joins keep test assertions stable across platforms.
+import * as path from 'path/posix';
 import { BASE_TEMP_DIR } from '../types.js';
 import {
 	cleanupWorkspace as cleanupCliWorkspace,

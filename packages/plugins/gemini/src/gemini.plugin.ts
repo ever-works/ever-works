@@ -31,7 +31,8 @@ import { buildSuccessPipelineResult, buildDefaultCodeEditSystemPrompt, substitut
 import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import * as path from 'path';
+// POSIX joins keep BASE_TEMP_DIR-derived paths stable across platforms.
+import * as path from 'path/posix';
 import * as https from 'https';
 
 import type { GeminiStepId } from './types.js';

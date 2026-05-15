@@ -39,7 +39,8 @@ import {
 } from '@ever-works/plugin';
 import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import * as fs from 'fs';
-import * as path from 'path';
+// POSIX joins keep BASE_TEMP_DIR-derived paths stable across platforms.
+import * as path from 'path/posix';
 import * as https from 'https';
 
 import type { CodexStepId } from './types.js';

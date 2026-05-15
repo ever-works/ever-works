@@ -3,6 +3,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'node:crypto';
 
+// Internal joins use native `path` so absolute paths on Windows (drive
+// letters) resolve correctly for fs ops. We normalize the return values
+// (env-var-visible strings) to POSIX form so cross-platform tests stay
+// stable. Node accepts forward slashes on Windows for fs APIs.
+const toPosix = (p: string): string => p.replace(/\\/g, '/');
+
 import type { PluginSettings } from '@ever-works/plugin';
 import { createPipelineRuntimeHelpers } from '@ever-works/plugin';
 
@@ -107,7 +113,7 @@ export async function materializeDeviceAuthHome(authJson: string, baseDir?: stri
 	await fs.mkdir(codexHome, { recursive: true });
 	await fs.writeFile(path.join(codexHome, 'auth.json'), authJson, 'utf-8');
 
-	return codexHome;
+	return toPosix(codexHome);
 }
 
 export async function cleanupDeviceAuthHome(codexHome: string): Promise<void> {

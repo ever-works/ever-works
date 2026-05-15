@@ -7,6 +7,7 @@ import {
 	readGeneratedItems,
 	cleanupWorkspace
 } from '../utils/workspace-manager';
+import { BASE_TEMP_DIR } from '../types';
 import type { ItemData, Category } from '@ever-works/plugin';
 
 vi.mock('fs/promises');
@@ -17,16 +18,21 @@ describe('workspace-manager', () => {
 	});
 
 	describe('createWorkspace', () => {
+		// BASE_TEMP_DIR derives from `os.tmpdir()`; anchor against live value
+		// so the test passes on both Linux (`/tmp/...`) and Windows
+		// (`C:/.../Temp/...`).
+		const workspaceRoot = `${BASE_TEMP_DIR}/user1/dir1`;
+
 		it('should create a per-run workspace and create _meta work', async () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
-			vi.mocked(fs.mkdtemp).mockResolvedValue('/tmp/opencode-generator/user1/dir1/run-123');
+			vi.mocked(fs.mkdtemp).mockResolvedValue(`${workspaceRoot}/run-123`);
 
 			const result = await createWorkspace('user1', 'dir1');
 
-			expect(fs.mkdir).toHaveBeenCalledWith('/tmp/opencode-generator/user1/dir1', { recursive: true });
-			expect(fs.mkdtemp).toHaveBeenCalledWith('/tmp/opencode-generator/user1/dir1/run-');
+			expect(fs.mkdir).toHaveBeenCalledWith(workspaceRoot, { recursive: true });
+			expect(fs.mkdtemp).toHaveBeenCalledWith(`${workspaceRoot}/run-`);
 			expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('_meta'), { recursive: true });
-			expect(result).toBe('/tmp/opencode-generator/user1/dir1/run-123');
+			expect(result).toBe(`${workspaceRoot}/run-123`);
 		});
 	});
 

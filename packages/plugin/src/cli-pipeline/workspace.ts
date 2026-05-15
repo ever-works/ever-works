@@ -1,5 +1,8 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
+// All path construction in this module uses `path.posix.join` so the produced
+// strings are stable across platforms (Node accepts forward slashes on
+// Windows just fine for filesystem ops). Tests assert on POSIX paths.
+import * as path from 'path/posix';
 import { createHash } from 'node:crypto';
 import type { Brand, Category, ItemData, Tag } from '../common/index.js';
 import type { ReferenceEntry } from '../pipeline/references.js';
