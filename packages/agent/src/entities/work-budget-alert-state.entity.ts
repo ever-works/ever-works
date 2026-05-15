@@ -8,6 +8,7 @@ import {
     Index,
 } from 'typeorm';
 import type { ClassToObject } from './types';
+import { PortableDateColumn } from './_types';
 import { Work } from './work.entity';
 import { WorkBudget } from './work-budget.entity';
 
@@ -50,7 +51,10 @@ export class WorkBudgetAlertState {
     @Column({ type: 'varchar', length: 16 })
     threshold: WorkBudgetAlertThreshold;
 
-    @Column({ type: 'timestamp' })
+    // EW-602 fix: `type: 'timestamp'` is Postgres-only and breaks the
+    // internal-cli boot under better-sqlite3 in CI. PortableDateColumn
+    // (`type: Date`) lets TypeORM pick the right column type per dialect.
+    @PortableDateColumn()
     periodStart: Date;
 
     @CreateDateColumn()
