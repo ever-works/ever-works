@@ -1,4 +1,4 @@
-import type { IPlugin } from '../plugin.js';
+import type { IPlugin } from '../plugin.interface.js';
 
 /**
  * Code-edit capability — produced by AI agents that run inside a checked-out

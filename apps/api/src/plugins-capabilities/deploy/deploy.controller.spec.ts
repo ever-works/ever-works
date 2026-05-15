@@ -1,9 +1,14 @@
-jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
+jest.mock('@ever-works/agent/database', () => ({
+    WorkRepository: class {},
+    WorkDeploymentRepository: class {},
+}));
 jest.mock('@ever-works/agent/entities', () => ({
     Work: class {},
     User: class {},
     ActivityActionType: { DEPLOYMENT: 'deployment' },
-    ActivityStatus: { COMPLETED: 'completed' },
+    ActivityStatus: { COMPLETED: 'completed', IN_PROGRESS: 'in_progress' },
+    DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
+    DeploymentTriggerSource: { MANUAL: 'manual', SCHEDULED: 'scheduled', CODE_UPDATE: 'code-update' },
 }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({
@@ -35,6 +40,7 @@ import { DeployController } from './deploy.controller';
 import type { DeployFacadeService } from '@ever-works/agent/facades';
 import type { WorkOwnershipService } from '@ever-works/agent/services';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
+import type { WorkDeploymentRepository } from '@ever-works/agent/database';
 import type { DeployService } from './deploy.service';
 import type { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
@@ -64,6 +70,10 @@ describe('DeployController', () => {
     let deploymentVerifier: {
         startVerification: jest.Mock;
         lookupExistingDeployment: jest.Mock;
+    };
+    let deploymentRepository: {
+        findById: jest.Mock;
+        findByWork: jest.Mock;
     };
     let activityLogService: { log: jest.Mock };
     let controller: DeployController;
@@ -106,6 +116,10 @@ describe('DeployController', () => {
             startVerification: jest.fn(),
             lookupExistingDeployment: jest.fn(),
         };
+        deploymentRepository = {
+            findById: jest.fn(),
+            findByWork: jest.fn().mockResolvedValue([]),
+        };
         activityLogService = { log: jest.fn().mockResolvedValue(undefined) };
 
         controller = new DeployController(
@@ -113,6 +127,7 @@ describe('DeployController', () => {
             deployFacade as unknown as DeployFacadeService,
             ownershipService as unknown as WorkOwnershipService,
             deploymentVerifier as unknown as DeploymentVerifierService,
+            deploymentRepository as unknown as WorkDeploymentRepository,
             activityLogService as unknown as ActivityLogService,
         );
     });
@@ -318,7 +333,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue(false);
+            deployService.deploy.mockResolvedValue({ dispatched: false, deploymentId: "dep-1" });
 
             await expect(controller.deploy(auth, dto, 'work-1')).rejects.toMatchObject({
                 response: {
@@ -339,7 +354,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
 
             const order: string[] = [];
             ownershipService.ensureCanEdit.mockImplementation(async () => {
@@ -356,7 +371,7 @@ describe('DeployController', () => {
             });
             deployService.deploy.mockImplementation(async () => {
                 order.push('deploy');
-                return true;
+                return { dispatched: true, deploymentId: 'dep-1' };
             });
             deploymentVerifier.startVerification.mockImplementation(() => {
                 order.push('startVerification');
@@ -383,6 +398,7 @@ describe('DeployController', () => {
                 work,
                 'caller-1',
                 'team-x',
+                'dep-1',
             );
             expect(activityLogService.log).toHaveBeenCalledWith({
                 userId: 'caller-1',
@@ -410,7 +426,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
 
             await controller.deploy(auth, dto, 'work-1');
 
@@ -421,6 +437,7 @@ describe('DeployController', () => {
                 work,
                 'owner-1',
                 'team-x',
+                'dep-1',
             );
             // log payload userId is ALWAYS the caller, not the owner — pinned
             expect(activityLogService.log).toHaveBeenCalledWith(
@@ -436,7 +453,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
             activityLogService.log.mockRejectedValue(new Error('log down'));
 
             const result = await controller.deploy(auth, dto, 'work-1');
