@@ -776,7 +776,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 token: 'vercel-deploy-token',
             });
 
-            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
 
             const { secrets } = captureCalls(githubPlugin);
             expect(secrets.find((s: any) => s.key === 'VERCEL_TOKEN')?.value).toBe(
