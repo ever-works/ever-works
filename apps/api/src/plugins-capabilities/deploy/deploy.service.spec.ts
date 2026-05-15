@@ -1,7 +1,10 @@
 jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
 jest.mock('@ever-works/agent/entities', () => ({ Work: class {}, User: class {} }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
-jest.mock('@ever-works/agent/services', () => ({ PlatformSyncSecretService: class {} }));
+jest.mock('@ever-works/agent/services', () => ({
+    PlatformSyncSecretService: class {},
+    ZeroFrictionFunnelService: class {},
+}));
 jest.mock('@ever-works/agent/facades', () => ({
     DeployFacadeService: class {},
     GitFacadeService: class {},
@@ -131,6 +134,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             removeWorkSubdomain: jest.fn().mockResolvedValue(undefined),
         };
 
+        // EW-617 G8: funnel emit sink — no-op stub by default.
+        const funnel = { emit: jest.fn() };
+
         const service = new DeployService(
             deployFacade as any,
             gitFacade as any,
@@ -141,6 +147,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             eventEmitter as any,
             platformSyncSecretService as any,
             dnsService as any,
+            funnel as any,
         );
 
         return {
@@ -153,6 +160,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             eventEmitter,
             platformSyncSecretService,
             dnsService,
+            funnel,
         };
     };
 

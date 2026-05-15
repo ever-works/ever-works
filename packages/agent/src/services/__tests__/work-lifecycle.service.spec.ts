@@ -111,6 +111,8 @@ describe('WorkLifecycleService', () => {
             removeWorkSubdomain: jest.fn().mockResolvedValue(undefined),
             ingressHostFor: jest.fn((slug: string) => `${slug}.ever.works`),
         } as never;
+        // EW-617 G8: funnel emit sink — no-op stub.
+        const funnel = { emit: jest.fn() } as never;
 
         service = new WorkLifecycleService(
             workRepository,
@@ -126,6 +128,7 @@ describe('WorkLifecycleService', () => {
             everWorksDeployQuota,
             everWorksGit,
             everWorksDns,
+            funnel,
             eventEmitter as never,
         );
     });
