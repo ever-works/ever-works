@@ -48,7 +48,7 @@ import {
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
 import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
-import { buildCodeEditSystemPrompt, readGitStatus } from './utils/code-edit-helpers.js';
+import { buildDefaultCodeEditSystemPrompt, computeWorkspaceFileChanges } from '@ever-works/plugin';
 import {
 	buildSystemPromptVariables,
 	buildUserPromptVariables,
@@ -1137,7 +1137,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		const maxTurns = request.maxTurns ?? (settings.maxTurns as number | undefined) ?? DEFAULT_MAX_TURNS;
 		const maxBudgetUsd = request.maxBudgetUsd ?? (settings.maxBudgetUsd as number | undefined);
 
-		const systemPrompt = buildCodeEditSystemPrompt(request);
+		const systemPrompt = buildDefaultCodeEditSystemPrompt(request);
 
 		try {
 			const { promise, kill } = executeClaudeCode({
@@ -1168,7 +1168,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				};
 			}
 
-			const filesChanged = await readGitStatus(request.workspaceDir);
+			const filesChanged = await computeWorkspaceFileChanges(request.workspaceDir);
 			const success = result.exitCode === 0 && filesChanged.length > 0;
 			const summary = success
 				? `Claude Code modified ${filesChanged.length} file(s) in ${Math.round((Date.now() - startTime) / 1000)}s`

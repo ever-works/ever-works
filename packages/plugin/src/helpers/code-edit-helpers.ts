@@ -1,10 +1,10 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { CodeEditFileChange, CodeEditRequest } from '@ever-works/plugin';
+import type { CodeEditFileChange, CodeEditRequest } from '../contracts/capabilities/code-edit-plugin.interface.js';
 
 const execAsync = promisify(exec);
 
-const CODE_EDIT_SYSTEM_PROMPT = `You are Claude Code running inside an Ever Works directory site repository.
+const BASE_CODE_EDIT_SYSTEM_PROMPT = `You are an AI agent running inside an Ever Works directory site repository.
 
 Your job: apply the user's requested change directly to the codebase. You have full
 file-edit permissions. Make the smallest set of focused changes that satisfy the request.
@@ -21,15 +21,14 @@ Guidelines:
 - Do not commit. The platform commits and opens a pull request after you finish.
 - When you are done, output a short plain-text summary of what you changed.`;
 
-export function buildCodeEditSystemPrompt(request: CodeEditRequest): string {
-	const lines = [CODE_EDIT_SYSTEM_PROMPT];
+/**
+ * Default system prompt for code-edit runs. Plugins may extend or override it.
+ */
+export function buildDefaultCodeEditSystemPrompt(request: CodeEditRequest): string {
+	const lines = [BASE_CODE_EDIT_SYSTEM_PROMPT];
 
 	if (request.allowedPaths && request.allowedPaths.length > 0) {
-		lines.push(
-			'',
-			'Restrict edits to the following paths only:',
-			...request.allowedPaths.map((p) => `  - ${p}`)
-		);
+		lines.push('', 'Restrict edits to the following paths only:', ...request.allowedPaths.map((p) => `  - ${p}`));
 	}
 
 	return lines.join('\n');
@@ -38,8 +37,12 @@ export function buildCodeEditSystemPrompt(request: CodeEditRequest): string {
 /**
  * Compute which files changed in a workspace by parsing `git status --porcelain`.
  * Falls back to an empty list if git is unavailable or the directory is not a repo.
+ *
+ * Plugins that produce code edits all benefit from this — every CLI tool we use
+ * runs against a checked-out git working tree and we surface the diff to the
+ * user via the platform's PR flow.
  */
-export async function readGitStatus(workspaceDir: string): Promise<CodeEditFileChange[]> {
+export async function computeWorkspaceFileChanges(workspaceDir: string): Promise<CodeEditFileChange[]> {
 	try {
 		const { stdout } = await execAsync('git status --porcelain=v1 -uall', {
 			cwd: workspaceDir,
@@ -55,7 +58,6 @@ function parsePorcelain(output: string): CodeEditFileChange[] {
 	const changes: CodeEditFileChange[] = [];
 	for (const line of output.split('\n')) {
 		if (!line.trim()) continue;
-		// Porcelain v1: XY <path>  (XY is 2-char status; rename uses "R  old -> new")
 		const code = line.slice(0, 2);
 		const rest = line.slice(3);
 		const path = rest.includes(' -> ') ? rest.split(' -> ')[1] : rest;
