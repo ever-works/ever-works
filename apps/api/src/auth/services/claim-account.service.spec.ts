@@ -157,7 +157,10 @@ describe('ClaimAccountService (EW-617 G3)', () => {
     it('returns 409 when the email belongs to a different user', async () => {
         const ctx = buildService();
         ctx.findByIdResults['u-1'] = anonUser();
-        ctx.findByEmailResults['jane@example.com'] = { id: 'u-someone-else', email: 'jane@example.com' };
+        ctx.findByEmailResults['jane@example.com'] = {
+            id: 'u-someone-else',
+            email: 'jane@example.com',
+        };
 
         await expect(
             ctx.service.claim({

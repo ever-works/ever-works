@@ -49,9 +49,7 @@ export class AnonymousUserCleanupService {
                 summary.failed += 1;
                 const error = cause instanceof Error ? cause.message : String(cause);
                 summary.failures.push({ userId: user.id, error });
-                this.logger.error(
-                    `Failed to delete expired anonymous user ${user.id}: ${error}`,
-                );
+                this.logger.error(`Failed to delete expired anonymous user ${user.id}: ${error}`);
             }
         }
 
