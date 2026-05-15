@@ -19,8 +19,9 @@ import {
     DeploymentEnvironment,
     DeploymentTriggerSource,
 } from '@ever-works/agent/entities';
-import { PlatformSyncSecretService } from '@ever-works/agent/services';
+import { PlatformSyncSecretService, ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
+import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -69,6 +70,7 @@ interface RepoContext {
 
 export interface DeployOptions {
     teamScope?: string;
+    correlationId?: string;
     environment?: DeploymentEnvironment;
     branch?: string;
     prNumber?: number;
@@ -106,6 +108,7 @@ export class DeployService {
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
         private readonly dnsService: EverWorksDnsService,
+        private readonly funnel: ZeroFrictionFunnelService,
     ) {}
 
     /**
@@ -211,6 +214,28 @@ export class DeployService {
             triggeredByUserId: userId,
             state: 'INITIALIZING',
         });
+
+        // EW-617 G8 — funnel step 6: deploy started. Emit just before the
+        // dispatch so the timestamp lines up with the workflow kick-off,
+        // not the secret-pushing prep. Gated on correlationId so non-funnel
+        // deploys (dashboard "Deploy" button, batch jobs) stay quiet.
+        const effectiveCorrelationId =
+            options.correlationId || work.lastDeployCorrelationId || undefined;
+        if (effectiveCorrelationId) {
+            const ingressHostValue =
+                deploySettings && typeof deploySettings.ingressHost === 'string'
+                    ? deploySettings.ingressHost
+                    : null;
+            this.funnel.emit({
+                event: ZERO_FRICTION_FUNNEL_EVENTS.DEPLOY_STARTED,
+                funnelStep: 6,
+                timestamp: new Date().toISOString(),
+                correlationId: effectiveCorrelationId,
+                workId,
+                deployProvider: work.deployProvider || 'ever-works',
+                ingressHost: ingressHostValue,
+            });
+        }
 
         const dispatched = await this.dispatchWithRetry(
             work,

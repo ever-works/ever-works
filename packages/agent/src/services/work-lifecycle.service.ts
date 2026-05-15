@@ -46,6 +46,8 @@ import {
 } from '@src/ever-works-providers';
 import { config } from '@src/config';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
+import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
+import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 
 /**
  * Map a wizard "storage" choice onto the existing `gitProvider` field.
@@ -94,6 +96,7 @@ export class WorkLifecycleService {
         private readonly everWorksDeployQuota: EverWorksDeployQuotaService,
         private readonly everWorksGit: EverWorksGitProvider,
         private readonly everWorksDns: EverWorksDnsService,
+        private readonly funnel: ZeroFrictionFunnelService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -251,6 +254,10 @@ export class WorkLifecycleService {
             websiteTemplateId: selectedWebsiteTemplateId,
             readmeConfig,
             organization,
+            // EW-617 G8 — persist the funnel correlation id so the async
+            // DEPLOY_READY poller can emit with the same id later. Nullable
+            // when the caller is not a zero-friction quick-create.
+            lastDeployCorrelationId: createWorkDto.correlationId ?? null,
         };
 
         // EW-614 — when the user picks "Ever Works Git" AND the feature flag
@@ -327,6 +334,25 @@ export class WorkLifecycleService {
                 WorkCreatedEvent.EVENT_NAME,
                 new WorkCreatedEvent(dir, platformActor),
             );
+
+            // EW-617 G8 — funnel step 5: repos pushed. Only emit when the
+            // caller threaded a correlation id (i.e. this is part of the
+            // zero-friction quick-create funnel). Skipped on error paths
+            // because failure means no repos were actually pushed.
+            if (createWorkDto.correlationId) {
+                const repos: string[] = [];
+                if (everWorksRepo) {
+                    repos.push(everWorksRepo.fullName);
+                }
+                this.funnel.emit({
+                    event: ZERO_FRICTION_FUNNEL_EVENTS.REPOS_PUSHED,
+                    funnelStep: 5,
+                    timestamp: new Date().toISOString(),
+                    correlationId: createWorkDto.correlationId,
+                    workId: dir.id,
+                    repos,
+                });
+            }
 
             return {
                 status: 'success',
