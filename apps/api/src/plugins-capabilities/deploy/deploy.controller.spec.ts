@@ -8,7 +8,11 @@ jest.mock('@ever-works/agent/entities', () => ({
     ActivityActionType: { DEPLOYMENT: 'deployment' },
     ActivityStatus: { COMPLETED: 'completed', IN_PROGRESS: 'in_progress' },
     DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
-    DeploymentTriggerSource: { MANUAL: 'manual', SCHEDULED: 'scheduled', CODE_UPDATE: 'code-update' },
+    DeploymentTriggerSource: {
+        MANUAL: 'manual',
+        SCHEDULED: 'scheduled',
+        CODE_UPDATE: 'code-update',
+    },
 }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({
@@ -333,7 +337,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue({ dispatched: false, deploymentId: "dep-1" });
+            deployService.deploy.mockResolvedValue({ dispatched: false, deploymentId: 'dep-1' });
 
             await expect(controller.deploy(auth, dto, 'work-1')).rejects.toMatchObject({
                 response: {
@@ -354,7 +358,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-1' });
 
             const order: string[] = [];
             ownershipService.ensureCanEdit.mockImplementation(async () => {
@@ -426,7 +430,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-1' });
 
             await controller.deploy(auth, dto, 'work-1');
 
@@ -453,7 +457,7 @@ describe('DeployController', () => {
             ]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
-            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: "dep-1" });
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-1' });
             activityLogService.log.mockRejectedValue(new Error('log down'));
 
             const result = await controller.deploy(auth, dto, 'work-1');

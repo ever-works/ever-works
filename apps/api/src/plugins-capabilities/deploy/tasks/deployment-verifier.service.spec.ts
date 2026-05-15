@@ -55,7 +55,9 @@ describe('DeploymentVerifierService', () => {
     });
 
     let repository: jest.Mocked<Pick<WorkRepository, 'update'>>;
-    let deploymentRepository: jest.Mocked<Pick<WorkDeploymentRepository, 'findById' | 'update' | 'markTerminal'>>;
+    let deploymentRepository: jest.Mocked<
+        Pick<WorkDeploymentRepository, 'findById' | 'update' | 'markTerminal'>
+    >;
     let deployFacade: jest.Mocked<Pick<DeployFacadeService, 'lookupExistingDeployment'>>;
     let pluginRegistry: jest.Mocked<Pick<PluginRegistryService, 'get'>>;
     let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
