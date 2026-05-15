@@ -1,4 +1,5 @@
 export * from './create-work.dto';
+export * from './quick-create-work.dto';
 export * from './generate-data.dto';
 export * from './update-work.dto';
 export * from './work-advanced-prompts.dto';

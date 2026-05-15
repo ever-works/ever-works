@@ -115,8 +115,32 @@ describe('KubernetesPlugin metadata', () => {
 		expect(s?.['x-widget']).toBe('textarea');
 	});
 
-	it('only requires kubeconfig (registry has a default)', () => {
-		expect(plugin.settingsSchema.required).toEqual(['kubeconfig']);
+	it('makes kubeconfig conditionally required only when clusterSource is custom-kubeconfig', () => {
+		// Top-level `required` is no longer hard-coded — instead an
+		// `allOf` clause requires `kubeconfig` only when the user picked
+		// `custom-kubeconfig` (the back-compat default).
+		expect(plugin.settingsSchema.required).toBeUndefined();
+		const allOf = plugin.settingsSchema.allOf;
+		expect(allOf).toHaveLength(1);
+		expect(allOf?.[0].then?.required).toEqual(['kubeconfig']);
+	});
+
+	it('exposes the cluster-source dropdown enum (EW-616)', () => {
+		const cs = plugin.settingsSchema.properties?.clusterSource as Record<string, unknown>;
+		expect(cs?.enum).toEqual(['k8s-works', 'k8s-gauzy', 'custom-kubeconfig']);
+		expect(cs?.default).toBe('custom-kubeconfig');
+	});
+
+	it('hides kubeconfig + kubeContext when clusterSource is platform-managed (EW-616 UI)', () => {
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.kubeconfig?.['x-showIf']).toEqual({
+			field: 'clusterSource',
+			value: 'custom-kubeconfig'
+		});
+		expect(props.kubeContext?.['x-showIf']).toEqual({
+			field: 'clusterSource',
+			value: 'custom-kubeconfig'
+		});
 	});
 
 	it('registry sub-form is a oneOf with three branches (github default)', () => {
@@ -156,6 +180,17 @@ describe('KubernetesPlugin.validateConnection', () => {
 		const r = await plugin.validateConnection({});
 		expect(r.success).toBe(false);
 		expect(r.message).toMatch(/paste a kubeconfig/i);
+	});
+
+	it('skips kubeconfig validation for platform-managed cluster sources (EW-616)', async () => {
+		const works = await plugin.validateConnection({ clusterSource: 'k8s-works' });
+		expect(works.success).toBe(true);
+		expect(works.message).toMatch(/platform-managed cluster 'k8s-works'/);
+		expect((works.details as { clusterSource?: string })?.clusterSource).toBe('k8s-works');
+
+		const gauzy = await plugin.validateConnection({ clusterSource: 'k8s-gauzy' });
+		expect(gauzy.success).toBe(true);
+		expect(gauzy.message).toMatch(/platform-managed cluster 'k8s-gauzy'/);
 	});
 
 	it('returns rich cluster details on success', async () => {
@@ -202,6 +237,20 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 	it('always sets K8S_NAMESPACE (defaulting to ever-works)', async () => {
 		const out = await plugin.getDeploymentSecrets({});
 		expect(out.K8S_NAMESPACE).toBe('ever-works');
+	});
+
+	it('emits K8S_CLUSTER_SOURCE (defaulting to custom-kubeconfig for back-compat) (EW-616)', async () => {
+		expect((await plugin.getDeploymentSecrets({})).K8S_CLUSTER_SOURCE).toBe('custom-kubeconfig');
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-works' })).K8S_CLUSTER_SOURCE).toBe(
+			'k8s-works'
+		);
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-gauzy' })).K8S_CLUSTER_SOURCE).toBe(
+			'k8s-gauzy'
+		);
+		// Garbage values fall through to the back-compat default.
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'nope' })).K8S_CLUSTER_SOURCE).toBe(
+			'custom-kubeconfig'
+		);
 	});
 
 	it('passes optional fields through when set', async () => {

@@ -1,11 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    InternalServerErrorException,
+    Logger,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
-import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import {
+    DeployFacadeService,
+    GitFacadeService,
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
+} from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
 import { PlatformSyncSecretService } from '@ever-works/agent/services';
+import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -14,6 +24,28 @@ import {
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
+import {
+    ClusterSource,
+    resolveKubeconfigForClusterSource,
+    validateClusterSourceForOwner,
+} from './cluster-source-matrix';
+
+const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = [
+    'k8s-works',
+    'k8s-gauzy',
+    'custom-kubeconfig',
+];
+
+function coerceClusterSource(value: unknown): ClusterSource {
+    if (typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value)) {
+        return value as ClusterSource;
+    }
+    // Back-compat: Works that pre-date the EW-616 dropdown have no
+    // `clusterSource` set in their plugin settings. Treat them as
+    // `custom-kubeconfig` so they keep working as long as their
+    // website repo is not in an Ever Works-shared org.
+    return 'custom-kubeconfig';
+}
 
 /**
  * Default workflow filenames to dispatch when a deployment plugin does not
@@ -52,6 +84,7 @@ export class DeployService {
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
+        private readonly dnsService: EverWorksDnsService,
     ) {}
 
     /**
@@ -81,6 +114,20 @@ export class DeployService {
 
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
+
+        // EW-616: enforce the deploy matrix for k8s deploys.
+        // - `k8s-gauzy` is admin-only (ever-works org).
+        // - Ever Works-shared GHCR + customer-provided cluster is rejected
+        //   to avoid cross-tenant credential exposure.
+        // The resolved kubeconfig replaces the user-pasted one for
+        // platform-managed sources.
+        const effectiveDeployToken = this.resolveDeployToken(
+            work.deployProvider,
+            websiteOwner,
+            settings ?? {},
+            token,
+        );
+
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
         await this.enableWorkflows({
@@ -90,7 +137,14 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, work, plugin, settings);
+        // EW-617 G5: when the platform is the deploy target, template the
+        // ingress host as `${slug}.ever.works` (or whatever
+        // EVER_WORKS_DOMAIN says) and provision the Cloudflare CNAME so
+        // the user's directory is reachable at that subdomain without any
+        // manual DNS. If env vars are missing the DNS service no-ops; the
+        // k8s plugin's default LB hostname remains the fallback.
+        const deploySettings = await this.applyEverWorksSubdomain(work, settings);
+        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
@@ -215,6 +269,55 @@ export class DeployService {
         }
     }
 
+    /**
+     * EW-616: Apply the deploy-matrix validation for the k8s provider and
+     * substitute the platform's kubeconfig env var when the user picked a
+     * platform-managed cluster source. For non-k8s providers (Vercel, etc.)
+     * this is a pass-through and the validation is skipped.
+     */
+    private resolveDeployToken(
+        deployProvider: string | undefined,
+        websiteOwner: string,
+        settings: Record<string, unknown>,
+        userToken: string,
+    ): string {
+        if (deployProvider !== 'k8s') {
+            return userToken;
+        }
+
+        // EW-616: the deploy facade returns a sentinel string when the
+        // user picked a platform-managed cluster without pasting a
+        // kubeconfig. Treat it as "no kubeconfig" for the validator and
+        // discard it before resolution so it can never leak into the
+        // pushed `K8S_TOKEN` secret on the website repo.
+        const realUserToken = userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
+
+        const clusterSource = coerceClusterSource(settings.clusterSource);
+        const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
+            hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
+        });
+        if (failure) {
+            this.logger.warn(
+                `EW-616 deploy-matrix violation [${failure.code}]: ${failure.message}`,
+            );
+            throw new BadRequestException(failure.message);
+        }
+
+        try {
+            return resolveKubeconfigForClusterSource(clusterSource, realUserToken);
+        } catch (error) {
+            // The only failure path here is a missing platform-managed
+            // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
+            // `EVER_WORKS_K8S_GAUZY_KUBECONFIG`). The user picked a
+            // valid option — this is a platform-provisioning gap, so
+            // surface it as 5xx, not 4xx, so on-call can distinguish it
+            // from genuine user-input errors.
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
+            throw new InternalServerErrorException(message);
+        }
+    }
+
     private async createRepoContext(
         owner: string,
         repo: string,
@@ -236,6 +339,45 @@ export class DeployService {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
+    /**
+     * EW-617 G5: when `deployProvider === 'ever-works'` AND the Cloudflare
+     * DNS env is configured, derive `ingressHost = ${slug}.ever.works`,
+     * merge it into the deploy settings (so the k8s plugin's
+     * `getDeploymentSecrets` picks it up as `K8S_INGRESS_HOST`), and
+     * provision the CNAME via Cloudflare. Returns a shallow copy of
+     * `settings` with the override applied; original object is not
+     * mutated so subsequent reads stay deterministic.
+     *
+     * No-ops cleanly when:
+     *  - the work is on a non-platform provider (Vercel, user's k8s), OR
+     *  - env vars are missing (dev / preview),
+     * letting the existing k8s plugin LB hostname remain the fallback.
+     */
+    private async applyEverWorksSubdomain(
+        work: Work,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | undefined> {
+        if (work.deployProvider !== 'ever-works') {
+            return settings;
+        }
+        const provider = this.dnsService.getProvider();
+        if (!provider) {
+            return settings;
+        }
+
+        const ingressHost = this.dnsService.ingressHostFor(work.slug);
+
+        // Provision asynchronously — DNS propagation runs in parallel with
+        // the workflow dispatch. Errors are logged inside the service so
+        // they never abort the deploy.
+        void this.dnsService.ensureWorkSubdomain(work.slug);
+
+        return {
+            ...(settings ?? {}),
+            ingressHost,
+        };
+    }
+
     private async setRequiredSecrets(
         ctx: RepoContext,
         deployToken: string,
@@ -243,7 +385,7 @@ export class DeployService {
         plugin?: IDeploymentPlugin,
         settings?: Record<string, unknown>,
     ) {
-        const provider = work.deployProvider || 'vercel';
+        const provider = work.deployProvider || 'ever-works';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
         } catch (error) {
@@ -339,15 +481,48 @@ export class DeployService {
     }
 
     /**
-     * For k8s deploys, push the GitHub `read:packages` PAT (if the user
-     * has saved one on their GitHub plugin settings) as a separate GitHub
-     * Actions secret. The `deploy_k8s.yaml` workflow prefers this over
-     * the workflow's built-in `GITHUB_TOKEN` for the imagePullSecret
-     * because `GITHUB_TOKEN` does not have `packages:read` for GHCR
-     * images owned by a different repo than the workflow itself.
+     * For k8s deploys, push GHCR image-pull credentials to the website
+     * repo as GitHub Actions secrets, so the `deploy_k8s.yaml` workflow
+     * can mint a Kubernetes `<work-slug>-pull` imagePullSecret that
+     * kubelet uses to fetch the private container image.
      *
-     * For non-k8s providers, or when the user hasn't saved a PAT, this
-     * is a no-op. The Vercel path doesn't read this secret.
+     * Three secrets are written (when a credential is available):
+     *
+     *   - `REGISTRY_PASSWORD` — classic GitHub PAT (`ghp_…`). The
+     *     workflow's docker-registry secret step uses this first.
+     *     Classic PATs honor org membership directly and bypass the
+     *     fragile package↔repo auto-link required by fine-grained
+     *     PATs. See `Workspace/knowledge/runbooks/EVER_WORKS_K8S_DEPLOY_TROUBLESHOOTING.md`
+     *     gotcha #1 for the full why.
+     *   - `REGISTRY_USERNAME` — the PAT owner's GitHub login. Without
+     *     this, the workflow defaults to `github.actor` which may be
+     *     the platform's deploy bot rather than the PAT owner.
+     *   - `GITHUB_READ_PACKAGES_TOKEN` — fine-grained PAT, legacy slot
+     *     kept for back-compat. Workflow uses it as a fallback when
+     *     `REGISTRY_PASSWORD` is unset.
+     *
+     * Source priority per PAT:
+     *
+     *   1. The user's GitHub plugin settings (`readPackagesPatClassic`
+     *      for the classic PAT, `readPackagesPat` for the fine-grained
+     *      one). Required for Works that push to a customer-owned
+     *      GitHub org — cells B/D of the EW-615 deploy matrix.
+     *   2. Platform-side env vars when the website repo owner matches
+     *      an Ever Works org — `EVER_WORKS_GITHUB_PAT_CLASSIC` /
+     *      `EVER_WORKS_GITHUB_PAT` for `ever-works` org,
+     *      `EVER_WORKS_CUSTOMERS_GITHUB_PAT_CLASSIC` /
+     *      `EVER_WORKS_CUSTOMERS_GITHUB_PAT` for `ever-works-cloud`.
+     *      Covers cells A/C — the customer doesn't supply any PAT.
+     *   3. If neither source has a value, that secret is skipped. The
+     *      workflow has its own fallback chain
+     *      (REGISTRY_PASSWORD → GITHUB_READ_PACKAGES_TOKEN → DEPLOY_TOKEN
+     *      → GITHUB_TOKEN), so a fully-skipped path still attempts pull
+     *      with the workflow's auto-issued GITHUB_TOKEN — which works
+     *      only when the package lives in the same repo as the workflow.
+     *
+     * For non-k8s providers this is a no-op. Errors are logged but
+     * never thrown — a failed secret push degrades to "image pull may
+     * 403" rather than blocking the whole deploy.
      */
     private async setKubernetesGhcrPullSecret(ctx: RepoContext, work: Work, userId: string) {
         if (work.deployProvider !== 'k8s') {
@@ -358,28 +533,103 @@ export class DeployService {
                 userId,
                 workId: work.id,
             });
-            const pat =
+            const userClassic =
+                typeof githubSettings?.readPackagesPatClassic === 'string'
+                    ? githubSettings.readPackagesPatClassic.trim()
+                    : '';
+            const userFineGrained =
                 typeof githubSettings?.readPackagesPat === 'string'
                     ? githubSettings.readPackagesPat.trim()
                     : '';
-            if (!pat) {
+
+            // Platform-side fallback by website repo owner.
+            const platformDefaults = this.getPlatformGhcrCredentials(ctx.owner);
+
+            const classicPat = userClassic || platformDefaults.classic;
+            const fineGrainedPat = userFineGrained || platformDefaults.fineGrained;
+            const registryUsername =
+                userClassic || userFineGrained
+                    ? platformDefaults.username // fall back to platform login if user didn't tell us their own
+                    : platformDefaults.username;
+
+            const writes: Promise<unknown>[] = [];
+            const written: string[] = [];
+
+            if (classicPat) {
+                writes.push(this.setSecret(ctx, 'REGISTRY_PASSWORD', classicPat));
+                written.push('REGISTRY_PASSWORD');
+                if (registryUsername) {
+                    writes.push(this.setSecret(ctx, 'REGISTRY_USERNAME', registryUsername));
+                    written.push('REGISTRY_USERNAME');
+                }
+            }
+
+            if (fineGrainedPat) {
+                writes.push(this.setSecret(ctx, 'GITHUB_READ_PACKAGES_TOKEN', fineGrainedPat));
+                written.push('GITHUB_READ_PACKAGES_TOKEN');
+            }
+
+            if (writes.length === 0) {
                 // Workflow falls back to GITHUB_TOKEN; that works when the
                 // image and the workflow are in the same repo (the default
                 // case for the generated website's own GHCR image).
                 return;
             }
-            await this.setSecret(ctx, 'GITHUB_READ_PACKAGES_TOKEN', pat);
+
+            await Promise.all(writes);
             this.logger.log(
-                `Pushed GITHUB_READ_PACKAGES_TOKEN to ${ctx.owner}/${ctx.repo} for k8s GHCR pull`,
+                `Pushed GHCR pull credentials to ${ctx.owner}/${ctx.repo} for k8s deploy: ${written.join(', ')}`,
             );
         } catch (error) {
             // Don't block the deploy on this — the workflow has a safe
             // fallback. Just log so operators can debug if pulls fail.
             this.logger.warn(
-                `Failed to push GITHUB_READ_PACKAGES_TOKEN for ${ctx.owner}/${ctx.repo}: ${
+                `Failed to push GHCR pull credentials for ${ctx.owner}/${ctx.repo}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
+        }
+    }
+
+    /**
+     * Look up platform-side GHCR credentials for a website-repo owner.
+     * These are used as a fallback when the customer hasn't entered
+     * their own PATs in the GitHub plugin settings — the typical case
+     * for Works that publish to an Ever Works-shared GitHub org
+     * (cells A and C of the EW-615 deploy matrix).
+     *
+     * The platform reads these from env vars at boot (sourced from
+     * the DO k8s Secret `ever-works-secrets` in prod, or
+     * `Workspace/.config/ever-works.env` in local dev). Missing env
+     * vars are treated as "no platform default available", and the
+     * caller degrades accordingly.
+     *
+     * Adding a new Ever Works-shared org: extend the switch below
+     * with a new case and provision the matching env vars. Document
+     * in `Workspace/.config/ever-works.env`.
+     */
+    private getPlatformGhcrCredentials(websiteRepoOwner: string): {
+        classic: string;
+        fineGrained: string;
+        username: string;
+    } {
+        const empty = { classic: '', fineGrained: '', username: '' };
+        const username = (process.env.EVER_WORKS_GITHUB_PAT_OWNER || '').trim();
+        switch (websiteRepoOwner.toLowerCase()) {
+            case 'ever-works':
+                return {
+                    classic: (process.env.EVER_WORKS_GITHUB_PAT_CLASSIC || '').trim(),
+                    fineGrained: (process.env.EVER_WORKS_GITHUB_PAT || '').trim(),
+                    username,
+                };
+            case 'ever-works-cloud':
+                return {
+                    classic: (process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT_CLASSIC || '').trim(),
+                    fineGrained: (process.env.EVER_WORKS_CUSTOMERS_GITHUB_PAT || '').trim(),
+                    username,
+                };
+            default:
+                return empty;
         }
     }
 

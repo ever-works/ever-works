@@ -36,12 +36,19 @@ import {
 	type DnsResolver
 } from './domain.handler.js';
 import type {
+	ClusterSource,
 	IngressClassDescriptor,
 	KubernetesSettings,
 	RegistryConfig,
 	RegistryDeployContext,
 	ResolvedImageVisibility
 } from './types.js';
+
+const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works', 'k8s-gauzy', 'custom-kubeconfig'];
+
+function isClusterSource(value: unknown): value is ClusterSource {
+	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
+}
 
 const DEFAULT_NAMESPACE = 'ever-works';
 const DEFAULT_REPLICAS = 1;
@@ -139,18 +146,33 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
+			clusterSource: {
+				type: 'string',
+				enum: ['k8s-works', 'k8s-gauzy', 'custom-kubeconfig'],
+				default: 'custom-kubeconfig',
+				title: 'Target cluster',
+				description:
+					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org owning the website repo — see EW-616. The form renderer's generic enum widget shows this as a Select."
+			},
 			kubeconfig: {
 				type: 'string',
 				title: 'kubeconfig',
-				description: 'Paste the contents of your ~/.kube/config or a service-account-scoped equivalent.',
+				description:
+					"Paste the contents of your ~/.kube/config or a service-account-scoped equivalent. Only used when 'Target cluster' is 'custom-kubeconfig' — ignored otherwise.",
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-widget': 'textarea'
+				'x-widget': 'textarea',
+				// EW-616: hide the kubeconfig field when the user picked a
+				// platform-managed cluster; the deploy service substitutes
+				// the platform's kubeconfig from env at deploy time.
+				'x-showIf': { field: 'clusterSource', value: 'custom-kubeconfig' }
 			},
 			kubeContext: {
 				type: 'string',
 				title: 'Context (optional)',
-				description: "Defaults to the kubeconfig's current-context."
+				description: "Defaults to the kubeconfig's current-context.",
+				// EW-616: only meaningful with a user-pasted kubeconfig.
+				'x-showIf': { field: 'clusterSource', value: 'custom-kubeconfig' }
 			},
 			namespace: {
 				type: 'string',
@@ -181,7 +203,21 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				maximum: 10
 			}
 		},
-		required: ['kubeconfig']
+		// `kubeconfig` is only required when `clusterSource === 'custom-kubeconfig'`
+		// (the default for back-compat). When `clusterSource` is a platform-managed
+		// value the platform substitutes the kubeconfig at deploy time and the
+		// pasted field is ignored. See EW-616.
+		allOf: [
+			{
+				if: {
+					anyOf: [
+						{ not: { required: ['clusterSource'] } },
+						{ properties: { clusterSource: { const: 'custom-kubeconfig' } } }
+					]
+				},
+				then: { required: ['kubeconfig'] }
+			}
+		]
 	};
 
 	private context?: PluginContext;
@@ -276,6 +312,19 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
 		const cfg = this.coerceSettings(settings);
+		const clusterSource: ClusterSource = cfg.clusterSource ?? 'custom-kubeconfig';
+
+		// Platform-managed cluster sources don't use the pasted kubeconfig —
+		// the platform substitutes the right one at deploy time. There is
+		// nothing to verify here from the user's session.
+		if (clusterSource !== 'custom-kubeconfig') {
+			return {
+				success: true,
+				message: `Will deploy to platform-managed cluster '${clusterSource}'.`,
+				details: { clusterSource }
+			};
+		}
+
 		if (!cfg.kubeconfig || !cfg.kubeconfig.trim()) {
 			return { success: false, message: 'Paste a kubeconfig before validating.' };
 		}
@@ -614,7 +663,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	async getDeploymentSecrets(settings: Record<string, unknown>): Promise<Record<string, string>> {
 		const cfg = this.coerceSettings(settings);
 		const out: Record<string, string> = {
-			K8S_NAMESPACE: cfg.namespace?.trim() || DEFAULT_NAMESPACE
+			K8S_NAMESPACE: cfg.namespace?.trim() || DEFAULT_NAMESPACE,
+			K8S_CLUSTER_SOURCE: cfg.clusterSource ?? 'custom-kubeconfig'
 		};
 		if (cfg.kubeContext) out.K8S_KUBE_CONTEXT = cfg.kubeContext;
 		if (cfg.ingressClass) out.K8S_INGRESS_CLASS = cfg.ingressClass;
@@ -649,6 +699,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	private coerceSettings(raw: Record<string, unknown>): KubernetesSettings {
 		const out: KubernetesSettings = {};
+		if (isClusterSource(raw.clusterSource)) out.clusterSource = raw.clusterSource;
 		if (typeof raw.kubeconfig === 'string') out.kubeconfig = raw.kubeconfig;
 		if (typeof raw.kubeContext === 'string') out.kubeContext = raw.kubeContext;
 		if (typeof raw.namespace === 'string') out.namespace = raw.namespace;

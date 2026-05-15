@@ -39,6 +39,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         token?: string;
         settings?: Record<string, unknown>;
         deployProvider?: string;
+        /** Owner returned by `work.getRepoOwner('website')`. Defaults to
+         *  the customer-owned org `'acme'` so most tests run on the
+         *  permissive EW-616 cell. Tests that exercise the platform-owned
+         *  orgs override this. */
+        websiteOwner?: string;
         /** Settings returned by deployFacade.getOtherPluginSettings('github', ...).
          *  Defaults to an empty object (no PAT saved). Tests for the GHCR PAT
          *  flow override this with `{ readPackagesPat: '...' }`. */
@@ -47,6 +52,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
          *  pre-dual-mode tests behaving as before. */
         activitySyncMode?: 'pull' | 'push' | 'disabled';
     }) => {
+        const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
             id: 'work-1',
             slug: 'my-site',
@@ -55,9 +61,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             websiteTemplateId: 'directory-web-template',
             activitySyncMode: overrides.activitySyncMode ?? 'push',
             user: { id: 'user-1' },
-            getRepoOwner: () => 'acme',
-            getDataRepo: () => 'acme/data',
-            getWebsiteRepo: () => 'acme-site',
+            getRepoOwner: () => websiteOwner,
+            getDataRepo: () => `${websiteOwner}/data`,
+            getWebsiteRepo: () => `${websiteOwner}-site`,
             resolveCommitter: () => ({ name: 'a', email: 'a@b' }),
         };
 
@@ -114,6 +120,17 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             getOrGenerate: jest.fn().mockResolvedValue('hex'.repeat(21) + 'h'), // 64 hex chars
         };
 
+        // EW-617 G5: DNS automation no-ops in tests (no env vars). The
+        // dns service still needs to be present so the constructor wires
+        // — `getProvider` returns null and `ensureWorkSubdomain` is a
+        // safe stub.
+        const dnsService = {
+            getProvider: jest.fn(() => null),
+            ingressHostFor: jest.fn((slug: string) => `${slug}.ever.works`),
+            ensureWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+            removeWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+        };
+
         const service = new DeployService(
             deployFacade as any,
             gitFacade as any,
@@ -123,6 +140,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             websiteTemplateResolver as any,
             eventEmitter as any,
             platformSyncSecretService as any,
+            dnsService as any,
         );
 
         return {
@@ -134,6 +152,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             githubPlugin,
             eventEmitter,
             platformSyncSecretService,
+            dnsService,
         };
     };
 
@@ -549,5 +568,277 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         );
 
         errorSpy.mockRestore();
+    });
+
+    describe('EW-617 G5 — ever-works subdomain templating', () => {
+        it('overrides ingressHost to ${slug}.ever.works when deployProvider=ever-works and DNS is configured', async () => {
+            const getDeploymentSecrets = jest.fn().mockResolvedValue({});
+            const { service, githubPlugin, dnsService } = buildService({
+                deployProvider: 'ever-works',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                settings: { kubeconfig: 'apiVersion: v1' },
+            });
+            // Pretend DNS env is set — service emits a fake provider that
+            // does nothing, but signals "active".
+            (dnsService.getProvider as jest.Mock).mockReturnValue({});
+
+            await service.deploy('work-1', 'user-1', {});
+
+            // The plugin's getDeploymentSecrets MUST have been called with
+            // settings carrying the templated ingressHost.
+            expect(getDeploymentSecrets).toHaveBeenCalledTimes(1);
+            const settingsArg = getDeploymentSecrets.mock.calls[0][0];
+            expect(settingsArg.ingressHost).toBe('my-site.ever.works');
+            // Original settings still contain whatever was there.
+            expect(settingsArg.kubeconfig).toBe('apiVersion: v1');
+
+            expect(dnsService.ensureWorkSubdomain).toHaveBeenCalledWith('my-site');
+
+            // Tag the variable assertion onto the GA secrets path too —
+            // K8S_INGRESS_HOST is what the plugin returns from
+            // getDeploymentSecrets when settings.ingressHost is set.
+            // (Plugin is mocked here, so we only assert on the call.)
+            void githubPlugin; // silence unused
+        });
+
+        it('leaves settings unchanged for non-ever-works providers', async () => {
+            const getDeploymentSecrets = jest.fn().mockResolvedValue({});
+            const { service, dnsService } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets,
+                },
+                settings: { token: 'v1' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(getDeploymentSecrets).toHaveBeenCalledTimes(1);
+            const settingsArg = getDeploymentSecrets.mock.calls[0][0];
+            expect(settingsArg.ingressHost).toBeUndefined();
+            expect(dnsService.ensureWorkSubdomain).not.toHaveBeenCalled();
+        });
+
+        it('no-ops the DNS override when env is unset (dnsService.getProvider returns null)', async () => {
+            const getDeploymentSecrets = jest.fn().mockResolvedValue({});
+            const { service, dnsService } = buildService({
+                deployProvider: 'ever-works',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                settings: {},
+            });
+            (dnsService.getProvider as jest.Mock).mockReturnValue(null);
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const settingsArg = getDeploymentSecrets.mock.calls[0][0];
+            // Without an active DNS provider we leave the settings alone —
+            // the k8s plugin's existing fallback hostname is used instead.
+            expect(settingsArg.ingressHost).toBeUndefined();
+            expect(dnsService.ensureWorkSubdomain).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('default deployProvider fallback (EW-617 G6)', () => {
+        // When work.deployProvider is null/empty (e.g. older row pre-migration
+        // or anonymous quick-create that hasn't picked a provider yet), the
+        // service must fall back to 'ever-works', not the legacy 'vercel'.
+        it("sets DEPLOY_PROVIDER='ever-works' when work.deployProvider is falsy", async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: '',
+                plugin: {
+                    id: 'ever-works',
+                    getWorkflowFilenames: () => ['deploy_ever_works.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { variables } = captureCalls(githubPlugin);
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
+            expect(deployProviderVar?.value).toBe('ever-works');
+        });
+
+        it('uses work.deployProvider when explicitly set (no override)', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml', 'deploy_prod.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { variables } = captureCalls(githubPlugin);
+            const deployProviderVar = variables.find((v: any) => v.key === 'DEPLOY_PROVIDER');
+            expect(deployProviderVar?.value).toBe('vercel');
+        });
+    });
+
+    describe('EW-616 cluster-source enforcement + kubeconfig substitution', () => {
+        const k8sPlugin = {
+            id: 'k8s',
+            getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+            getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+        };
+
+        const originalEnv = process.env;
+
+        beforeEach(() => {
+            process.env = { ...originalEnv };
+            delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+            delete process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG;
+        });
+
+        afterEach(() => {
+            process.env = originalEnv;
+        });
+
+        it('back-compat: no clusterSource + customer-owned org + user kubeconfig → uses user kubeconfig as K8S_TOKEN', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-pasted-yaml',
+                settings: {},
+                websiteOwner: 'acme',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('user-pasted-yaml');
+        });
+
+        it('k8s-works + ever-works-cloud → substitutes EVER_WORKS_K8S_WORKS_KUBECONFIG as K8S_TOKEN', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'platform-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-pasted-yaml-should-be-ignored',
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('platform-yaml');
+        });
+
+        it('k8s-gauzy + ever-works → substitutes EVER_WORKS_K8S_GAUZY_KUBECONFIG (admin path)', async () => {
+            process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG = 'gauzy-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-yaml-ignored',
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'ever-works',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')?.value).toBe('gauzy-yaml');
+        });
+
+        it('rejects ever-works-cloud + custom-kubeconfig with a BadRequest (cell C)', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'custom-kubeconfig' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /cross-tenant exposure/i,
+            );
+        });
+
+        it('rejects customer-owned + k8s-gauzy with a BadRequest (admin-only)', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'acme',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /'k8s-gauzy' is the Ever Works internal platform cluster/,
+            );
+        });
+
+        it('rejects k8s-works with InternalServerError when EVER_WORKS_K8S_WORKS_KUBECONFIG is not provisioned (operator gap, not user error)', async () => {
+            // env var intentionally absent
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            const InternalServerErrorException =
+                require('@nestjs/common').InternalServerErrorException;
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toBeInstanceOf(
+                InternalServerErrorException,
+            );
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /EVER_WORKS_K8S_WORKS_KUBECONFIG is not configured/,
+            );
+        });
+
+        it('discards the PLATFORM_MANAGED sentinel token from the facade when substituting kubeconfig', async () => {
+            // When the user picked a platform-managed source without
+            // pasting a kubeconfig, DeployFacade returns a sentinel token.
+            // DeployService.resolveDeployToken() must ignore it and read
+            // the platform env var instead.
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'real-platform-yaml';
+            const sentinel = '__ever-works-platform-managed-kubeconfig__';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: sentinel,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works-cloud',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
+            expect(k8sToken?.value).toBe('real-platform-yaml');
+            // The sentinel must never leak into any pushed secret.
+            for (const s of secrets) {
+                expect(s.value).not.toBe(sentinel);
+            }
+        });
+
+        it('skips matrix enforcement entirely for non-k8s providers', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                // these would trip the k8s matrix but vercel must not care
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'ever-works-cloud',
+                token: 'vercel-deploy-token',
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'VERCEL_TOKEN')?.value).toBe(
+                'vercel-deploy-token',
+            );
+        });
     });
 });

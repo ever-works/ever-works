@@ -1,4 +1,4 @@
-import { DeployFacadeService } from '../deploy.facade';
+import { DeployFacadeService, PLATFORM_MANAGED_KUBECONFIG_SENTINEL } from '../deploy.facade';
 
 describe('DeployFacadeService', () => {
     const createService = (args: {
@@ -100,6 +100,70 @@ describe('DeployFacadeService', () => {
             id: 'k8s',
             enabled: true,
             configured: false,
+        });
+    });
+
+    describe('EW-616 platform-managed kubeconfig sentinel', () => {
+        it('returns the sentinel for k8s + clusterSource=k8s-works when no kubeconfig is saved', async () => {
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
+            await expect(
+                service.isConfigured({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBe(true);
+        });
+
+        it('returns the sentinel for k8s + clusterSource=k8s-gauzy when no kubeconfig is saved', async () => {
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-gauzy' } },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
+        });
+
+        it('prefers a user-pasted kubeconfig over the sentinel when both are present', async () => {
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: {
+                    clusterSource: { value: 'k8s-works' },
+                    kubeconfig: { value: 'apiVersion: v1\nkind: Config\n' },
+                },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toContain('apiVersion: v1');
+        });
+
+        it('does NOT return the sentinel for clusterSource=custom-kubeconfig — back-compat path still requires a real kubeconfig', async () => {
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'custom-kubeconfig' } },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBeNull();
+        });
+
+        it('does NOT return the sentinel for non-k8s plugins even with a clusterSource setting', async () => {
+            const { service } = createService({
+                deployProvider: 'vercel',
+                pluginId: 'vercel',
+                settings: { clusterSource: { value: 'k8s-works' } },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBeNull();
         });
     });
 });
