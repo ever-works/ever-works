@@ -1,67 +1,75 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget alert for {{workName}} on {{appName}}</title>
-    <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; }
-        .logo-section { padding: 40px 20px 30px; text-align: center; }
-        .logo-title { font-size: 28px; font-weight: 600; color: #1e293b; margin: 0; }
-        .logo-subtitle { font-size: 14px; color: #94a3b8; margin: 5px 0 0; }
-        .main-card { margin: 0 20px 40px; background-color: #ffffff; border-radius: 8px; padding: 40px 30px; }
-        .icon { text-align: center; font-size: 40px; margin-bottom: 20px; }
-        .title { font-size: 24px; color: #1e293b; font-weight: 600; text-align: center; margin: 0 0 10px; }
-        .subtitle { text-align: center; color: #64748b; margin: 0 0 20px; font-size: 16px; }
-        .progress-wrap { background: #f1f5f9; border-radius: 999px; height: 12px; overflow: hidden; margin: 20px 0 8px; }
-        .progress-bar { height: 100%; background: {{progressColor}}; border-radius: 999px; }
-        .progress-label { font-size: 13px; color: #64748b; text-align: center; margin: 0 0 24px; }
-        .details-box { background-color: #f8fafc; border-radius: 6px; padding: 20px; margin: 20px 0; }
-        .details-text { font-size: 14px; color: #475569; margin: 0; line-height: 1.8; }
-        .details-row { display: flex; justify-content: space-between; padding: 4px 0; }
-        .details-key { color: #94a3b8; }
-        .details-val { color: #1e293b; font-weight: 500; }
-        .button-container { text-align: center; margin-top: 28px; }
-        .button { display: inline-block; text-decoration: none; font-size: 16px; font-weight: 500; border-radius: 6px; background-color: #1e293b; color: #ffffff; padding: 12px 32px; }
-        .footer { padding: 20px; text-align: center; color: #94a3b8; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="logo-section">
-            <h1 class="logo-title">{{appName}}</h1>
-            <p class="logo-subtitle">Budget alert</p>
-        </div>
-        <div class="main-card">
-            <div class="icon">{{thresholdIcon}}</div>
-            <h2 class="title">{{thresholdTitle}}</h2>
-            <p class="subtitle">{{thresholdSubtitle}}</p>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>Budget alert for {{workName}} on {{appName}}</title>
+        <style>
+            body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; line-height: 1.6; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .logo-section { padding: 40px 20px 30px; text-align: center; }
+            .logo-title { font-size: 28px; font-weight: 600; color: #1e293b; margin: 0; }
+            .logo-subtitle { font-size: 14px; color: #94a3b8; margin: 5px 0 0; }
+            .main-card { margin: 0 20px 40px; background-color: #ffffff; border-radius: 8px; padding: 40px 30px; }
+            .icon { text-align: center; font-size: 40px; margin-bottom: 20px; }
+            .title { font-size: 24px; color: #1e293b; font-weight: 600; text-align: center; margin: 0 0 10px; }
+            .subtitle { text-align: center; color: #64748b; margin: 0 0 20px; font-size: 16px; }
+            .progress-wrap { background: #f1f5f9; border-radius: 999px; height: 12px; overflow: hidden; margin: 20px 0 8px; }
+            .progress-bar { height: 100%; background:{{progressColor}}; border-radius: 999px; }
+                    .progress-label { font-size: 13px; color: #64748b; text-align: center; margin: 0 0 24px; }
+                    .details-box { background-color: #f8fafc; border-radius: 6px; padding: 20px; margin: 20px 0; }
+                    .details-text { font-size: 14px; color: #475569; margin: 0; line-height: 1.8; }
+                    .details-row { display: flex; justify-content: space-between; padding: 4px 0; }
+                    .details-key { color: #94a3b8; }
+                    .details-val { color: #1e293b; font-weight: 500; }
+                    .button-container { text-align: center; margin-top: 28px; }
+                    .button { display: inline-block; text-decoration: none; font-size: 16px; font-weight: 500; border-radius: 6px; background-color: #1e293b; color: #ffffff; padding: 12px 32px; }
+                    .footer { padding: 20px; text-align: center; color: #94a3b8; font-size: 12px; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='logo-section'>
+                <h1 class='logo-title'>{{appName}}</h1>
+                <p class='logo-subtitle'>Budget alert</p>
+            </div>
+            <div class='main-card'>
+                <div class='icon'>{{thresholdIcon}}</div>
+                <h2 class='title'>{{thresholdTitle}}</h2>
+                <p class='subtitle'>{{thresholdSubtitle}}</p>
 
-            <div class="progress-wrap"><div class="progress-bar" style="width: {{progressWidth}};"></div></div>
-            <p class="progress-label">{{spentLabel}} of {{capLabel}} used ({{percentLabel}})</p>
+                <div class='progress-wrap'><div
+                        class='progress-bar'
+                        style='width: {{progressWidth}};'
+                    ></div></div>
+                <p class='progress-label'>{{spentLabel}} of {{capLabel}} used ({{percentLabel}})</p>
 
-            <div class="details-box">
-                <p class="details-text">
-                    <strong>Directory:</strong> {{workName}}<br>
-                    <strong>Scope:</strong> {{scopeLabel}}<br>
-                    <strong>Period:</strong> {{periodLabel}}<br>
-                    {{#if pluginId}}<strong>Plugin:</strong> {{pluginId}}<br>{{/if}}
-                    <strong>Capability:</strong> {{capability}}
+                <div class='details-box'>
+                    <p class='details-text'>
+                        <strong>Directory:</strong>
+                        {{workName}}<br />
+                        <strong>Scope:</strong>
+                        {{scopeLabel}}<br />
+                        <strong>Period:</strong>
+                        {{periodLabel}}<br />
+                        {{#if pluginId}}<strong>Plugin:</strong> {{pluginId}}<br />{{/if}}
+                        <strong>Capability:</strong>
+                        {{capability}}
+                    </p>
+                </div>
+
+                <p style='text-align: center; color: #475569; font-size: 15px; margin: 0;'>
+                    {{actionGuidance}}
                 </p>
+
+                <div class='button-container'>
+                    <a href='{{settingsUrl}}' class='button'>Open Budgets &amp; Usage</a>
+                </div>
             </div>
-
-            <p style="text-align: center; color: #475569; font-size: 15px; margin: 0;">
-                {{actionGuidance}}
-            </p>
-
-            <div class="button-container">
-                <a href="{{settingsUrl}}" class="button">Open Budgets &amp; Usage</a>
+            <div class='footer'>
+                &copy;
+                {{currentYear}}
+                {{companyOwner}}. You can disable budget-alert emails in your profile settings.
             </div>
         </div>
-        <div class="footer">
-            &copy; {{currentYear}} {{companyOwner}}. You can disable budget-alert emails in your profile settings.
-        </div>
-    </div>
-</body>
+    </body>
 </html>
