@@ -14,8 +14,9 @@ import {
 import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Work, User } from '@ever-works/agent/entities';
-import { PlatformSyncSecretService } from '@ever-works/agent/services';
+import { PlatformSyncSecretService, ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
+import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
@@ -85,6 +86,7 @@ export class DeployService {
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
         private readonly dnsService: EverWorksDnsService,
+        private readonly funnel: ZeroFrictionFunnelService,
     ) {}
 
     /**
@@ -93,7 +95,7 @@ export class DeployService {
     async deploy(
         workId: string,
         userId: string,
-        options: { teamScope?: string },
+        options: { teamScope?: string; correlationId?: string },
     ): Promise<boolean> {
         const { plugin, token, work, settings } =
             await this.deployFacade.getPluginAndTokenAndSettings({
@@ -148,6 +150,26 @@ export class DeployService {
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
+
+        // EW-617 G8 — funnel step 6: deploy started. Emit just before the
+        // dispatch so the timestamp lines up with the workflow kick-off,
+        // not the secret-pushing prep. Gated on correlationId so non-funnel
+        // deploys (dashboard "Deploy" button, batch jobs) stay quiet.
+        if (options.correlationId) {
+            const ingressHostValue =
+                deploySettings && typeof deploySettings.ingressHost === 'string'
+                    ? deploySettings.ingressHost
+                    : null;
+            this.funnel.emit({
+                event: ZERO_FRICTION_FUNNEL_EVENTS.DEPLOY_STARTED,
+                funnelStep: 6,
+                timestamp: new Date().toISOString(),
+                correlationId: options.correlationId,
+                workId,
+                deployProvider: work.deployProvider || 'ever-works',
+                ingressHost: ingressHostValue,
+            });
+        }
 
         const dispatched = await this.dispatchWithRetry(work, user, gitToken, plugin);
 

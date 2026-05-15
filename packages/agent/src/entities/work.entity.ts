@@ -136,6 +136,16 @@ export class Work {
     @TimestampColumn({ nullable: true })
     deploymentStartedAt?: Date;
 
+    /**
+     * EW-617 G8 — last zero-friction funnel correlation id observed for
+     * this work. Set by `WorkLifecycleService.createWork` when the create
+     * DTO carries one, so the async DEPLOY_READY poller can emit with the
+     * same correlationId the rest of the funnel used. Nullable so existing
+     * rows + non-funnel creates keep working unchanged.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    lastDeployCorrelationId?: string | null;
+
     // Repository FIELDS
     @Column('simple-json', { nullable: true })
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };

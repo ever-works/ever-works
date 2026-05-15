@@ -360,6 +360,11 @@ export class WorksController {
         // 1. Create the Work via the existing pipeline. Provider defaults
         //    (storage/deploy/git) are resolved from the user's
         //    onboardingState inside createWork — no special handling here.
+        //
+        // EW-617 G8: thread the funnel correlationId all the way through so
+        // `WorkLifecycleService.createWork` emits the REPOS_PUSHED event with
+        // the same id and persists it on `work.lastDeployCorrelationId` for
+        // the async DEPLOY_READY poller.
         const createDto: CreateWorkDto = Object.assign(new CreateWorkDto(), {
             slug: dto.slug,
             name: dto.name,
@@ -371,6 +376,7 @@ export class WorksController {
             storageProvider: dto.storageProvider,
             websiteTemplateId: dto.websiteTemplateId,
             readmeConfig: dto.readmeConfig,
+            correlationId: dto.correlationId,
         });
         const created = await this.workLifecycleService.createWork(createDto, user);
         if (!created || created.status !== 'success' || !created.work) {
@@ -406,6 +412,15 @@ export class WorksController {
         // 2. Kick off generation async — the standard generation pipeline
         //    handles persistence + dispatch.  awaitCompletion=false means
         //    we return immediately with the historyId for status polling.
+        //
+        // TODO(EW-617 G8): the downstream generation flow eventually calls
+        // `DeployService.deploy(workId, userId, options)` from a different
+        // entry point (deploy.controller / workflow listener). Threading the
+        // correlationId through `workGenerationService.generateItems` and on
+        // into deploy options is non-trivial and out of scope for this PR.
+        // For now, DEPLOY_STARTED is only emitted when callers explicitly
+        // pass `options.correlationId`. The DEPLOY_READY poller still emits
+        // with `work.lastDeployCorrelationId`, which we persisted above.
         const generatorDto = Object.assign(new CreateItemsGeneratorDto(), {
             name: dto.name,
             prompt: dto.prompt,
