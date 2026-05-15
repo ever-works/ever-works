@@ -20,6 +20,13 @@ export interface OnboardingWizardStateV2 {
 	readonly deploy: { readonly choice: OnboardingDeployChoice };
 	readonly skippedSteps: readonly string[];
 	readonly pluginsReviewed: boolean;
+	/**
+	 * EW-617 G4: prompt carried over from the landing-page input
+	 * (`ever.works/?prompt=…`) so the wizard's "Generate now" step can
+	 * kick off generation without re-asking the user. Bounded by the
+	 * same 5000-char limit as `CreateItemsGeneratorDto.prompt`.
+	 */
+	readonly prompt?: string;
 }
 
 /** Wire shape of `GET /api/onboarding/state`. */
@@ -42,6 +49,7 @@ export interface OnboardingStatePatchRequest {
 		readonly deploy: Partial<{ choice: OnboardingDeployChoice }>;
 		readonly skippedSteps: readonly string[];
 		readonly pluginsReviewed: boolean;
+		readonly prompt: string;
 	}>;
 }
 

@@ -18,6 +18,7 @@ export * from './generator-form-schema.service';
 export * from './works-manifest.service';
 export * from './webhook-delivery.service';
 export * from './state-marker.service';
+export * from './anonymous-user-cleanup.service';
 export * from './platform-sync-secret.service';
 export * from './zero-friction-funnel.service';
 export * from './utils/error-classification.utils';
