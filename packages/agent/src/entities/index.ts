@@ -11,6 +11,7 @@ export * from './subscription-plan.entity';
 export * from './user-subscription.entity';
 export * from './work-schedule.entity';
 export * from './usage-ledger-entry.entity';
+export * from './plugin-usage-event.entity';
 export * from './notification.entity';
 export * from './notification.types';
 export * from './activity-log.entity';
