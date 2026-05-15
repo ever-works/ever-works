@@ -13,6 +13,7 @@ import {
     Post,
     Put,
     Query,
+    Req,
     Res,
     Logger,
     UseGuards,
@@ -111,6 +112,9 @@ import { getDefaultWebsiteTemplateId } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { WorkRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
+import { CaptchaVerifierService } from '../auth/services/captcha-verifier.service';
+import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
+import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { GenerateWorkDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
@@ -221,6 +225,8 @@ export class WorksController {
         private readonly itemImportService: ItemImportService,
         private readonly itemImportExecutor: ItemImportExecutorService,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
+        private readonly captchaVerifier: CaptchaVerifierService,
+        private readonly funnel: ZeroFrictionFunnelService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -328,11 +334,27 @@ export class WorksController {
     async quickCreateWork(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() dto: QuickCreateWorkDto,
+        @Req() req?: { ip?: string; headers?: Record<string, string | string[] | undefined> },
     ): Promise<{
         status: 'pending';
         work: { id: string; slug: string; name: string };
         generation: { historyId: string; message: string };
     }> {
+        // EW-617 G7: captcha gate. No-ops in dev when CAPTCHA_PROVIDER is unset.
+        if (this.captchaVerifier.isEnabled()) {
+            const fwd = req?.headers?.['x-forwarded-for'];
+            const ipAddress =
+                (typeof req?.ip === 'string' && req.ip) ||
+                (typeof fwd === 'string' ? fwd.split(',')[0].trim() : null);
+            const result = await this.captchaVerifier.verify({
+                token: dto.captchaToken,
+                remoteIp: ipAddress,
+            });
+            if (!result.success) {
+                throw new BadRequestException('captcha verification failed');
+            }
+        }
+
         const user = await this.authService.getUser(auth.userId);
 
         // 1. Create the Work via the existing pipeline. Provider defaults
@@ -366,6 +388,20 @@ export class WorksController {
                 summary: `Quick-create kicked off generation for ${work.slug}`,
             })
             .catch(() => {});
+
+        // EW-617 G8 — funnel step 4: work created (via quick-create).
+        if (dto.correlationId) {
+            this.funnel.emit({
+                event: ZERO_FRICTION_FUNNEL_EVENTS.WORK_CREATED,
+                funnelStep: 4,
+                timestamp: new Date().toISOString(),
+                correlationId: dto.correlationId,
+                userId: user.id,
+                workId: work.id,
+                workSlug: work.slug,
+                viaQuickCreate: true,
+            });
+        }
 
         // 2. Kick off generation async — the standard generation pipeline
         //    handles persistence + dispatch.  awaitCompletion=false means

@@ -106,6 +106,14 @@ export class ClaimAccountDto {
     @IsString()
     @IsOptional()
     emailVerificationCallbackUrl?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Optional UUID v4 minted at funnel entry (landing page → wizard). Threaded into the zero-friction telemetry funnel; ignored when absent.',
+    })
+    @IsString()
+    @IsOptional()
+    correlationId?: string;
 }
 
 export class OAuthCallbackDto {

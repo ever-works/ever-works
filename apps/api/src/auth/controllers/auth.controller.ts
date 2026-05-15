@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
+    BadRequestException,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -22,6 +23,9 @@ import {
 import { AuthService } from '../services/auth.service';
 import { AnonymousAuthService } from '../services/anonymous-auth.service';
 import { ClaimAccountService } from '../services/claim-account.service';
+import { CaptchaVerifierService } from '../services/captcha-verifier.service';
+import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
+import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
@@ -46,10 +50,29 @@ export class AuthController {
         private readonly socialAuthService: SocialAuthService,
         private readonly anonymousAuthService: AnonymousAuthService,
         private readonly claimAccountService: ClaimAccountService,
+        private readonly captchaVerifier: CaptchaVerifierService,
+        private readonly funnel: ZeroFrictionFunnelService,
         private activityLogService: ActivityLogService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
     ) {}
+
+    /**
+     * EW-617 G8 — best-effort /24 (IPv4) or /48 (IPv6) prefix for telemetry.
+     * Truncating to a prefix means we never persist raw IPs in funnel events.
+     */
+    private truncateIp(ip: string | null): string | null {
+        if (!ip) return null;
+        if (ip.includes('.')) {
+            const parts = ip.split('.');
+            if (parts.length === 4) return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
+            return null;
+        }
+        // IPv6 — keep first 3 hextets (~/48), drop the rest.
+        const v6 = ip.split(':');
+        if (v6.length >= 3) return `${v6[0]}:${v6[1]}:${v6[2]}::/48`;
+        return null;
+    }
 
     @Public()
     @Get('providers')
@@ -101,7 +124,8 @@ export class AuthController {
     @Public()
     @Post('anonymous')
     // EW-617 G2: zero-friction onboarding entrypoint. Rate-limited per IP to
-    // prevent abuse; G7 will layer on stricter limits + captcha when needed.
+    // prevent abuse; G7 layers on optional captcha when CAPTCHA_PROVIDER +
+    // CAPTCHA_SECRET are configured (no-op in dev).
     @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } })
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -110,8 +134,12 @@ export class AuthController {
             'Mints a temporary User row + session token. The row + its Works are wiped automatically after ANONYMOUS_USER_TTL_DAYS (default 7) days unless the user calls POST /api/auth/claim first.',
     })
     @ApiResponse({ status: 201, description: 'Anonymous session issued' })
+    @ApiResponse({ status: 400, description: 'Captcha verification failed' })
     @ApiResponse({ status: 429, description: 'Rate limit exceeded for this IP' })
-    async anonymous(@Request() req) {
+    async anonymous(
+        @Request() req,
+        @Body() body?: { captchaToken?: string; correlationId?: string },
+    ) {
         const ipAddress =
             (typeof req.ip === 'string' && req.ip) ||
             (typeof req.headers['x-forwarded-for'] === 'string'
@@ -121,6 +149,19 @@ export class AuthController {
             typeof req.headers['user-agent'] === 'string'
                 ? (req.headers['user-agent'] as string)
                 : null;
+
+        // EW-617 G7: captcha gate. The verifier no-ops when CAPTCHA_PROVIDER
+        // is unset (dev/preview), so this is a hard requirement only on
+        // properly configured environments.
+        if (this.captchaVerifier.isEnabled()) {
+            const result = await this.captchaVerifier.verify({
+                token: body?.captchaToken,
+                remoteIp: ipAddress,
+            });
+            if (!result.success) {
+                throw new BadRequestException('captcha verification failed');
+            }
+        }
 
         const response = await this.anonymousAuthService.createAnonymousUser({
             ipAddress,
@@ -138,6 +179,19 @@ export class AuthController {
                 userAgent,
             })
             .catch(() => {});
+
+        // EW-617 G8 — funnel step 2: anon-user created.
+        if (body?.correlationId) {
+            this.funnel.emit({
+                event: ZERO_FRICTION_FUNNEL_EVENTS.ANON_USER_CREATED,
+                funnelStep: 2,
+                timestamp: new Date().toISOString(),
+                correlationId: body.correlationId,
+                anonUserId: response.user.id,
+                anonymousExpiresAt: String(response.user.anonymousExpiresAt ?? ''),
+                ipPrefix: this.truncateIp(ipAddress),
+            });
+        }
 
         return response;
     }
@@ -195,6 +249,18 @@ export class AuthController {
                 userAgent,
             })
             .catch(() => {});
+
+        // EW-617 G8 — funnel step 8: claim-account (anon → registered).
+        if (claimDto.correlationId) {
+            this.funnel.emit({
+                event: ZERO_FRICTION_FUNNEL_EVENTS.CLAIM_ACCOUNT,
+                funnelStep: 8,
+                timestamp: new Date().toISOString(),
+                correlationId: claimDto.correlationId,
+                userId: claimed.id,
+                viaZeroFriction: true,
+            });
+        }
 
         return claimed;
     }
