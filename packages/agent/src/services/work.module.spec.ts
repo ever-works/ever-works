@@ -148,6 +148,7 @@ import { PluginOperationsService } from '../plugins/services/plugin-operations.s
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
+import { DeployReadyPollerService } from './deploy-ready-poller.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
@@ -224,6 +225,7 @@ describe('WorkModule', () => {
             EverWorksGitProvider,
             EverWorksDnsService,
             ZeroFrictionFunnelService,
+            DeployReadyPollerService,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
@@ -301,13 +303,14 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 30-entry shape (27 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 31-entry shape (28 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
             // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
             // (nightly cleanup of expired anonymous Users).
             // Bumped to 30 with the EW-617 G8 ZeroFrictionFunnelService.
-            expect(meta('exports')).toHaveLength(30);
+            // Bumped to 31 with the EW-617 G8 DeployReadyPollerService.
+            expect(meta('exports')).toHaveLength(31);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {
