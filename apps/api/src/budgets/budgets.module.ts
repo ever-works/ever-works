@@ -5,6 +5,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import { MailModule } from '@src/mail/mail.module';
 import { BudgetAlertHandler } from './budget-alert.handler';
 import { UsageController } from './usage.controller';
+import { BudgetsController } from './budgets.controller';
 
 /**
  * EW-602 — apps/api glue for the budget enforcement layer. Imports the
@@ -21,7 +22,7 @@ import { UsageController } from './usage.controller';
  */
 @Module({
     imports: [DatabaseModule, AgentBudgetsModule, AgentNotificationsModule, MailModule],
-    controllers: [UsageController],
+    controllers: [UsageController, BudgetsController],
     providers: [BudgetAlertHandler],
     exports: [AgentBudgetsModule],
 })
