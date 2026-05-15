@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import {
     createBudget,
@@ -42,6 +43,10 @@ export function BudgetsUsageClient({
     initialSummary,
     initialBudgets,
 }: BudgetsUsageClientProps) {
+    const t = useTranslations('dashboard.workDetail.settings.budgets');
+    const tGlobal = useTranslations('dashboard.workDetail.settings.budgets.globalCap');
+    const tPlugin = useTranslations('dashboard.workDetail.settings.budgets.pluginCaps');
+    const tBreakdown = useTranslations('dashboard.workDetail.settings.budgets.spendByPlugin');
     const [isPending, startTransition] = useTransition();
 
     const globalBudget = useMemo(
@@ -65,13 +70,19 @@ export function BudgetsUsageClient({
         return map;
     }, [perPlugin]);
 
-    const runAction = (label: string, fn: () => Promise<{ success: boolean; error: string | null }>) => {
+    const runAction = (
+        successKey: 'createSuccess' | 'updateSuccess' | 'deleteSuccess',
+        errorKey: 'createError' | 'updateError' | 'deleteError',
+        scope: 'globalCap' | 'pluginCaps',
+        fn: () => Promise<{ success: boolean; error: string | null }>,
+    ) => {
+        const tForScope = scope === 'globalCap' ? tGlobal : tPlugin;
         startTransition(async () => {
             const result = await fn();
             if (result.success) {
-                toast.success(`${label} succeeded`);
+                toast.success(tForScope(successKey));
             } else {
-                toast.error(result.error ?? `${label} failed`);
+                toast.error(result.error ?? tForScope(errorKey));
             }
         });
     };
@@ -80,11 +91,10 @@ export function BudgetsUsageClient({
         <div className="space-y-8">
             <header>
                 <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                    Budgets &amp; Usage
+                    {t('title')}
                 </h1>
                 <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at
-                    100% new plugin calls are blocked unless overage is allowed.
+                    {t('description')}
                 </p>
             </header>
 
@@ -96,10 +106,13 @@ export function BudgetsUsageClient({
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark">
                     <div className="flex items-baseline justify-between">
                         <h2 className="text-lg font-medium text-text dark:text-text-dark">
-                            Global cap
+                            {tGlobal('heading')}
                         </h2>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {periodLabel} · spent {formatCents(totalSpendCents, currency)}
+                            {t('periodLabel', {
+                                period: periodLabel,
+                                spent: formatCents(totalSpendCents, currency),
+                            })}
                         </p>
                     </div>
 
@@ -109,15 +122,17 @@ export function BudgetsUsageClient({
                         existing={globalBudget}
                         disabled={isPending}
                         onCreate={(data) =>
-                            runAction('Create global budget', () => createBudget(workId, data))
+                            runAction('createSuccess', 'createError', 'globalCap', () =>
+                                createBudget(workId, data),
+                            )
                         }
                         onUpdate={(budgetId, patch) =>
-                            runAction('Update global budget', () =>
+                            runAction('updateSuccess', 'updateError', 'globalCap', () =>
                                 updateBudget(workId, budgetId, patch),
                             )
                         }
                         onDelete={(budgetId) =>
-                            runAction('Delete global budget', () =>
+                            runAction('deleteSuccess', 'deleteError', 'globalCap', () =>
                                 deleteBudget(workId, budgetId),
                             )
                         }
@@ -133,16 +148,16 @@ export function BudgetsUsageClient({
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark space-y-4">
                     <div className="flex items-baseline justify-between">
                         <h2 className="text-lg font-medium text-text dark:text-text-dark">
-                            Per-plugin caps
+                            {tPlugin('heading')}
                         </h2>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            Optional. Caps a single plugin alongside the global cap.
+                            {tPlugin('subheading')}
                         </p>
                     </div>
 
                     {pluginBudgets.length === 0 ? (
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            No per-plugin caps. Add one below.
+                            {tPlugin('empty')}
                         </p>
                     ) : (
                         <ul className="divide-y divide-card-border dark:divide-border-dark">
@@ -157,13 +172,19 @@ export function BudgetsUsageClient({
                                         spendCents={spend}
                                         disabled={isPending}
                                         onUpdate={(budgetId, patch) =>
-                                            runAction('Update plugin budget', () =>
-                                                updateBudget(workId, budgetId, patch),
+                                            runAction(
+                                                'updateSuccess',
+                                                'updateError',
+                                                'pluginCaps',
+                                                () => updateBudget(workId, budgetId, patch),
                                             )
                                         }
                                         onDelete={(budgetId) =>
-                                            runAction('Delete plugin budget', () =>
-                                                deleteBudget(workId, budgetId),
+                                            runAction(
+                                                'deleteSuccess',
+                                                'deleteError',
+                                                'pluginCaps',
+                                                () => deleteBudget(workId, budgetId),
                                             )
                                         }
                                     />
@@ -178,7 +199,9 @@ export function BudgetsUsageClient({
                         existingPluginIds={new Set(pluginBudgets.map((b) => b.pluginId ?? ''))}
                         disabled={isPending}
                         onCreate={(data) =>
-                            runAction('Create plugin budget', () => createBudget(workId, data))
+                            runAction('createSuccess', 'createError', 'pluginCaps', () =>
+                                createBudget(workId, data),
+                            )
                         }
                     />
                 </div>
@@ -191,25 +214,29 @@ export function BudgetsUsageClient({
             >
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark">
                     <h2 className="text-lg font-medium text-text dark:text-text-dark">
-                        Spend by plugin
+                        {tBreakdown('heading')}
                     </h2>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
-                        {periodLabel} — read-only breakdown sourced from PluginUsageEvent.
+                        {tBreakdown('subheading', { period: periodLabel })}
                     </p>
 
                     {perPlugin.length === 0 ? (
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            No usage recorded this period.
+                            {tBreakdown('empty')}
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-left text-xs uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                        <th className="pb-2">Plugin</th>
-                                        <th className="pb-2">Capability</th>
-                                        <th className="pb-2 text-right">Units</th>
-                                        <th className="pb-2 text-right">Cost</th>
+                                        <th className="pb-2">{tBreakdown('columnPlugin')}</th>
+                                        <th className="pb-2">{tBreakdown('columnCapability')}</th>
+                                        <th className="pb-2 text-right">
+                                            {tBreakdown('columnUnits')}
+                                        </th>
+                                        <th className="pb-2 text-right">
+                                            {tBreakdown('columnCost')}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-card-border dark:divide-border-dark">
@@ -258,6 +285,7 @@ function GlobalCapForm({
     onUpdate,
     onDelete,
 }: GlobalCapFormProps) {
+    const tGlobal = useTranslations('dashboard.workDetail.settings.budgets.globalCap');
     const [capInput, setCapInput] = useState(
         existing ? (existing.monthlyCapCents / 100).toFixed(2) : '',
     );
@@ -268,7 +296,7 @@ function GlobalCapForm({
         setError(null);
         const cents = dollarsToCents(capInput);
         if (cents === null) {
-            setError('Enter a positive cap value (e.g. 50.00).');
+            setError(tGlobal('errorPositive'));
             return;
         }
         if (existing) {
@@ -286,7 +314,7 @@ function GlobalCapForm({
         <div className="mt-4 space-y-3">
             <div className="flex flex-wrap items-end gap-3">
                 <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                    Monthly cap ({currency.toUpperCase()})
+                    {tGlobal('capLabel', { currency: currency.toUpperCase() })}
                     <input
                         type="number"
                         min="0.01"
@@ -306,7 +334,7 @@ function GlobalCapForm({
                         onChange={(e) => setAllowOverage(e.target.checked)}
                         disabled={disabled}
                     />
-                    Allow overage (warn but don&apos;t block at 100%)
+                    {tGlobal('allowOverageLabel')}
                 </label>
 
                 <button
@@ -315,7 +343,7 @@ function GlobalCapForm({
                     disabled={disabled}
                     className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 >
-                    {existing ? 'Save' : 'Create global cap'}
+                    {existing ? tGlobal('saveButton') : tGlobal('createButton')}
                 </button>
 
                 {existing && (
@@ -325,7 +353,7 @@ function GlobalCapForm({
                         disabled={disabled}
                         className="inline-flex items-center gap-1 rounded-md border border-red-500/40 text-red-500 px-3 py-1.5 text-sm font-medium hover:bg-red-500/10 disabled:opacity-60"
                     >
-                        <Trash2 className="w-4 h-4" /> Remove
+                        <Trash2 className="w-4 h-4" /> {tGlobal('removeButton')}
                     </button>
                 )}
             </div>
@@ -356,6 +384,7 @@ function PluginBudgetRow({
     onUpdate,
     onDelete,
 }: PluginBudgetRowProps) {
+    const tPlugin = useTranslations('dashboard.workDetail.settings.budgets.pluginCaps');
     const [capInput, setCapInput] = useState((budget.monthlyCapCents / 100).toFixed(2));
     const [allowOverage, setAllowOverage] = useState(budget.allowOverage);
     const [error, setError] = useState<string | null>(null);
@@ -369,7 +398,7 @@ function PluginBudgetRow({
         setError(null);
         const cents = dollarsToCents(capInput);
         if (cents === null) {
-            setError('Enter a positive cap.');
+            setError(tPlugin('errorPositive'));
             return;
         }
         const patch: { monthlyCapCents?: number; allowOverage?: boolean } = {};
@@ -386,9 +415,12 @@ function PluginBudgetRow({
                     {budget.pluginId}
                 </p>
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    Spent {formatCents(spendCents, currency)} of{' '}
-                    {formatCents(budget.monthlyCapCents, currency)} ({percent}%)
-                    {budget.allowOverage ? ' · overage allowed' : ''}
+                    {tPlugin('rowSpend', {
+                        spent: formatCents(spendCents, currency),
+                        cap: formatCents(budget.monthlyCapCents, currency),
+                        percent,
+                    })}
+                    {budget.allowOverage ? tPlugin('overageSuffix') : ''}
                 </p>
             </div>
 
@@ -409,7 +441,7 @@ function PluginBudgetRow({
                     onChange={(e) => setAllowOverage(e.target.checked)}
                     disabled={disabled}
                 />
-                Overage
+                {tPlugin('allowOverageLabel')}
             </label>
 
             <button
@@ -418,14 +450,14 @@ function PluginBudgetRow({
                 disabled={disabled}
                 className="rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
             >
-                Save
+                {tPlugin('saveButton')}
             </button>
             <button
                 type="button"
                 onClick={() => onDelete(budget.id)}
                 disabled={disabled}
                 className="rounded-md border border-red-500/40 text-red-500 px-2 py-1.5 hover:bg-red-500/10 disabled:opacity-60"
-                aria-label="Delete budget"
+                aria-label={tPlugin('deleteAria')}
             >
                 <Trash2 className="w-4 h-4" />
             </button>
@@ -459,6 +491,7 @@ function PluginBudgetForm({
     disabled,
     onCreate,
 }: PluginBudgetFormProps) {
+    const tPlugin = useTranslations('dashboard.workDetail.settings.budgets.pluginCaps');
     const [pluginId, setPluginId] = useState('');
     const [capInput, setCapInput] = useState('');
     const [allowOverage, setAllowOverage] = useState(false);
@@ -468,16 +501,16 @@ function PluginBudgetForm({
         setError(null);
         const trimmedPlugin = pluginId.trim();
         if (!trimmedPlugin) {
-            setError('Plugin id is required.');
+            setError(tPlugin('errorPluginRequired'));
             return;
         }
         if (existingPluginIds.has(trimmedPlugin)) {
-            setError('A budget for this plugin already exists.');
+            setError(tPlugin('errorPluginDuplicate'));
             return;
         }
         const cents = dollarsToCents(capInput);
         if (cents === null) {
-            setError('Enter a positive cap value.');
+            setError(tPlugin('errorPositive'));
             return;
         }
         onCreate({
@@ -494,22 +527,22 @@ function PluginBudgetForm({
     return (
         <div className="border-t border-card-border dark:border-border-dark pt-4 space-y-2">
             <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark uppercase tracking-wide">
-                Add plugin cap
+                {tPlugin('addHeading')}
             </p>
             <div className="flex flex-wrap items-end gap-3">
                 <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                    Plugin id
+                    {tPlugin('pluginIdLabel')}
                     <input
                         type="text"
                         value={pluginId}
                         onChange={(e) => setPluginId(e.target.value)}
                         disabled={disabled}
-                        placeholder="e.g. openai"
+                        placeholder={tPlugin('pluginIdPlaceholder')}
                         className="mt-1 w-44 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
                     />
                 </label>
                 <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                    Monthly cap ({currency.toUpperCase()})
+                    {tPlugin('capLabel', { currency: currency.toUpperCase() })}
                     <input
                         type="number"
                         min="0.01"
@@ -528,7 +561,7 @@ function PluginBudgetForm({
                         onChange={(e) => setAllowOverage(e.target.checked)}
                         disabled={disabled}
                     />
-                    Allow overage
+                    {tPlugin('allowOverageLabel')}
                 </label>
                 <button
                     type="button"
@@ -536,7 +569,7 @@ function PluginBudgetForm({
                     disabled={disabled}
                     className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 >
-                    <Plus className="w-4 h-4" /> Add cap
+                    <Plus className="w-4 h-4" /> {tPlugin('addButton')}
                 </button>
             </div>
             {error && (

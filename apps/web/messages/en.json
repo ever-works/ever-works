@@ -985,6 +985,17 @@
             "activeWebsites": "Active Websites",
             "fromLastMonth": "from last month"
         },
+        "budgets": {
+            "overviewTitle": "Spend in {period}",
+            "overviewProgressLabel": "{percent}% of {cap} cap",
+            "overviewOverageSuffix": " (overage allowed)",
+            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
+            "topPluginsTitle": "Top plugins by spend",
+            "topPluginsEmpty": "No usage recorded yet this period.",
+            "trendTitle": "Daily spend — {period}",
+            "trendEmpty": "No usage recorded yet this period.",
+            "trendDayLabel": "Day {day}"
+        },
         "workCard": {
             "status": {
                 "active": "Active",
@@ -1979,7 +1990,66 @@
                 "tabs": {
                     "general": "General",
                     "members": "Members",
+                    "budgets": "Budgets",
                     "navigationLabel": "Settings tabs"
+                },
+                "budgets": {
+                    "title": "Budgets & Usage",
+                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
+                    "periodLabel": "{period} · spent {spent}",
+                    "globalCap": {
+                        "heading": "Global cap",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
+                        "createButton": "Create global cap",
+                        "saveButton": "Save",
+                        "removeButton": "Remove",
+                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
+                        "createSuccess": "Create global budget succeeded",
+                        "createError": "Create global budget failed",
+                        "updateSuccess": "Update global budget succeeded",
+                        "updateError": "Update global budget failed",
+                        "deleteSuccess": "Delete global budget succeeded",
+                        "deleteError": "Delete global budget failed"
+                    },
+                    "pluginCaps": {
+                        "heading": "Per-plugin caps",
+                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
+                        "empty": "No per-plugin caps. Add one below.",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "addHeading": "Add plugin cap",
+                        "pluginIdLabel": "Plugin id",
+                        "pluginIdPlaceholder": "e.g. openai",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage",
+                        "addButton": "Add cap",
+                        "saveButton": "Save",
+                        "deleteAria": "Delete budget",
+                        "errorPluginRequired": "Plugin id is required.",
+                        "errorPluginDuplicate": "A budget for this plugin already exists.",
+                        "errorPositive": "Enter a positive cap value.",
+                        "createSuccess": "Create plugin budget succeeded",
+                        "createError": "Create plugin budget failed",
+                        "updateSuccess": "Update plugin budget succeeded",
+                        "updateError": "Update plugin budget failed",
+                        "deleteSuccess": "Delete plugin budget succeeded",
+                        "deleteError": "Delete plugin budget failed"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Spend by plugin",
+                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
+                        "empty": "No usage recorded this period.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capability",
+                        "columnUnits": "Units",
+                        "columnCost": "Cost"
+                    },
+                    "export": {
+                        "downloadCsv": "Download CSV",
+                        "downloadingCsv": "Preparing CSV…",
+                        "csvFailed": "CSV export failed"
+                    }
                 },
                 "sourceSettings": "Source Repository",
                 "originalSource": "Original Source",

@@ -1,6 +1,9 @@
+'use client';
+
 import { cn } from '@/lib/utils/cn';
 import { TrendingUp } from 'lucide-react';
-import type { PerPluginSpend } from '@/lib/api/budgets';
+import { useTranslations } from 'next-intl';
+import type { PerPluginSpend } from '@/lib/api/types-only';
 
 interface TopPluginsCardProps {
     perPlugin: PerPluginSpend[];
@@ -29,6 +32,7 @@ function capabilityBadge(capability: PerPluginSpend['capability']): string {
 }
 
 export function TopPluginsCard({ perPlugin, currency }: TopPluginsCardProps) {
+    const t = useTranslations('dashboard.budgets');
     const top = perPlugin.slice(0, 5);
 
     return (
@@ -50,13 +54,13 @@ export function TopPluginsCard({ perPlugin, currency }: TopPluginsCardProps) {
                         <TrendingUp className="w-4.5 h-4.5 text-violet-500" strokeWidth={1.3} />
                     </div>
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        Top plugins by spend
+                        {t('topPluginsTitle')}
                     </p>
                 </div>
 
                 {top.length === 0 ? (
                     <p className="mt-4 text-xs text-text-muted dark:text-text-muted-dark">
-                        No usage recorded yet this period.
+                        {t('topPluginsEmpty')}
                     </p>
                 ) : (
                     <ul className="mt-3 space-y-2">

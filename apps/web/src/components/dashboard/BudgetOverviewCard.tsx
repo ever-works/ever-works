@@ -1,6 +1,9 @@
+'use client';
+
 import { cn } from '@/lib/utils/cn';
 import { Wallet } from 'lucide-react';
-import type { GlobalBudgetSummary } from '@/lib/api/budgets';
+import { useTranslations } from 'next-intl';
+import type { GlobalBudgetSummary } from '@/lib/api/types-only';
 
 interface BudgetOverviewCardProps {
     totalSpendCents: number;
@@ -30,6 +33,7 @@ export function BudgetOverviewCard({
     periodLabel,
     globalBudget,
 }: BudgetOverviewCardProps) {
+    const t = useTranslations('dashboard.budgets');
     const cap = globalBudget?.monthlyCapCents ?? 0;
     const percent = globalBudget && cap > 0 ? Math.min(150, globalBudget.percentUsed) : 0;
     const visibleWidth = Math.min(100, percent);
@@ -58,7 +62,7 @@ export function BudgetOverviewCard({
                         <Wallet className="w-4.5 h-4.5 text-blue-500" strokeWidth={1.3} />
                     </div>
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        Spend in {periodLabel}
+                        {t('overviewTitle', { period: periodLabel })}
                     </p>
                 </div>
 
@@ -75,13 +79,16 @@ export function BudgetOverviewCard({
                             />
                         </div>
                         <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
-                            {percent}% of {formatCents(cap, currency)} cap
-                            {globalBudget.allowOverage ? ' (overage allowed)' : ''}
+                            {t('overviewProgressLabel', {
+                                percent,
+                                cap: formatCents(cap, currency),
+                            })}
+                            {globalBudget.allowOverage ? t('overviewOverageSuffix') : ''}
                         </p>
                     </>
                 ) : (
                     <p className="mt-4 text-xs text-text-muted dark:text-text-muted-dark">
-                        No monthly cap set. Add one in Budgets &amp; Usage to enable alerts.
+                        {t('overviewEmpty')}
                     </p>
                 )}
             </div>

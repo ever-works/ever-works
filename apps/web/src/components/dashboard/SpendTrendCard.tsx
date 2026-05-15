@@ -3,7 +3,8 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/utils/cn';
 import { Activity } from 'lucide-react';
-import type { DailySpendBucket } from '@/lib/api/budgets';
+import { useTranslations } from 'next-intl';
+import type { DailySpendBucket } from '@/lib/api/types-only';
 
 interface SpendTrendCardProps {
     buckets: DailySpendBucket[];
@@ -20,6 +21,7 @@ function formatCents(cents: number, currency: string): string {
 }
 
 export function SpendTrendCard({ buckets, currency, periodLabel }: SpendTrendCardProps) {
+    const t = useTranslations('dashboard.budgets');
     const chartData = buckets.map((b) => ({
         day: b.day.slice(5),
         costCents: b.costCents,
@@ -45,13 +47,13 @@ export function SpendTrendCard({ buckets, currency, periodLabel }: SpendTrendCar
                         <Activity className="w-4.5 h-4.5 text-emerald-500" strokeWidth={1.3} />
                     </div>
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        Daily spend — {periodLabel}
+                        {t('trendTitle', { period: periodLabel })}
                     </p>
                 </div>
 
                 {chartData.length === 0 ? (
                     <p className="mt-4 text-xs text-text-muted dark:text-text-muted-dark">
-                        No usage recorded yet this period.
+                        {t('trendEmpty')}
                     </p>
                 ) : (
                     <div className="mt-4 h-32 w-full">
@@ -76,7 +78,7 @@ export function SpendTrendCard({ buckets, currency, periodLabel }: SpendTrendCar
                                 />
                                 <Tooltip
                                     formatter={(value: number) => formatCents(value, currency)}
-                                    labelFormatter={(label) => `Day ${label}`}
+                                    labelFormatter={(label) => t('trendDayLabel', { day: label })}
                                     contentStyle={{
                                         background: 'rgba(15, 23, 42, 0.9)',
                                         border: '1px solid rgba(148, 163, 184, 0.2)',

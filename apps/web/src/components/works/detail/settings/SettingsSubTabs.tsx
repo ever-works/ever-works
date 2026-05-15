@@ -43,7 +43,7 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
             isActive: pathname.includes('/settings/members'),
         },
         {
-            name: 'Budgets',
+            name: t('budgets'),
             href: budgetsHref,
             icon: Wallet,
             isActive: pathname.includes('/settings/budgets-usage'),
