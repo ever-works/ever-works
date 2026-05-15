@@ -26,13 +26,13 @@ existing layers — only the validators, types, and surface widgets change.
 
 ## 2. Tech Choices
 
-| Concern             | Choice                                              | Rationale                                                                  |
-| ------------------- | --------------------------------------------------- | -------------------------------------------------------------------------- |
-| Editor widget       | Plain `<Textarea>` (existing UI primitive)          | Smallest possible change; users already author markdown elsewhere in this UI. |
-| Preview renderer    | `react-markdown` + `remark-gfm` (already in `apps/web`) | No new dep; same renderer used by `ChatMarkdown` for consistency.          |
-| Preview loading     | `next/dynamic` import                                | Defers the renderer chunk until a user opens the preview pane.             |
-| Validation          | class-validator `@IsOptional @IsString @MaxLength(100000)` | Matches existing DTO style in `items-generator/dto/`.                      |
-| Persistence channel | Existing `<slug>.md` file + YAML `markdown` mirror   | Already what the generator and site renderer expect (Principle III).        |
+| Concern             | Choice                                                     | Rationale                                                                     |
+| ------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Editor widget       | Plain `<Textarea>` (existing UI primitive)                 | Smallest possible change; users already author markdown elsewhere in this UI. |
+| Preview renderer    | `react-markdown` + `remark-gfm` (already in `apps/web`)    | No new dep; same renderer used by `ChatMarkdown` for consistency.             |
+| Preview loading     | `next/dynamic` import                                      | Defers the renderer chunk until a user opens the preview pane.                |
+| Validation          | class-validator `@IsOptional @IsString @MaxLength(100000)` | Matches existing DTO style in `items-generator/dto/`.                         |
+| Persistence channel | Existing `<slug>.md` file + YAML `markdown` mirror         | Already what the generator and site renderer expect (Principle III).          |
 
 ## 3. Data Model
 
@@ -60,10 +60,10 @@ migrate.
 
 No new endpoints. Both affected endpoints gain an optional field.
 
-| Method | Endpoint                                       | Field added | Validation                |
-| ------ | ---------------------------------------------- | ----------- | ------------------------- |
-| `POST` | `/api/works/:id/items/submit` (existing)       | `markdown`  | optional, string, ≤100000 |
-| `PUT`  | `/api/works/:id/items/update` (existing)       | `markdown`  | optional, string, ≤100000 |
+| Method | Endpoint                                 | Field added | Validation                |
+| ------ | ---------------------------------------- | ----------- | ------------------------- |
+| `POST` | `/api/works/:id/items/submit` (existing) | `markdown`  | optional, string, ≤100000 |
+| `PUT`  | `/api/works/:id/items/update` (existing) | `markdown`  | optional, string, ≤100000 |
 
 Existing auth, rate-limit, and error response shapes are unchanged.
 
@@ -123,12 +123,12 @@ omitting the field reproduces the pre-change behaviour byte-for-byte.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                                      | Likelihood | Impact | Mitigation                                                                                  |
-| ------------------------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------- |
-| Authors use MDX custom components and expect them to render in preview    | Medium     | Low    | Spec §6 documents that the platform preview is GFM-only; site continues to render MDX.       |
-| 100,000-char cap is too low or too high                                   | Low        | Low    | Easy to revise — single `@MaxLength` constant. Spec §8 leaves it as an open question.        |
-| Empty-string updates inadvertently overwrite existing bodies              | Low        | Medium | `markdownChanged` guard in the service only writes when DTO value differs from existing.    |
-| `react-markdown` chunk shipped on every dashboard load                    | Medium     | Low    | `MarkdownBodyField` uses `next/dynamic` so the chunk only loads on preview-toggle.           |
+| Risk                                                                   | Likelihood | Impact | Mitigation                                                                               |
+| ---------------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------- |
+| Authors use MDX custom components and expect them to render in preview | Medium     | Low    | Spec §6 documents that the platform preview is GFM-only; site continues to render MDX.   |
+| 100,000-char cap is too low or too high                                | Low        | Low    | Easy to revise — single `@MaxLength` constant. Spec §8 leaves it as an open question.    |
+| Empty-string updates inadvertently overwrite existing bodies           | Low        | Medium | `markdownChanged` guard in the service only writes when DTO value differs from existing. |
+| `react-markdown` chunk shipped on every dashboard load                 | Medium     | Low    | `MarkdownBodyField` uses `next/dynamic` so the chunk only loads on preview-toggle.       |
 
 ## 12. Constitution Reconciliation
 
