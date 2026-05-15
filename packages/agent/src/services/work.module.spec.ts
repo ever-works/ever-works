@@ -145,6 +145,7 @@ import { WorksConfigWriterService } from '@src/works-config/services/works-confi
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { EverWorksDnsService } from '../ever-works-providers/cloudflare-dns.provider';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
@@ -219,6 +220,7 @@ describe('WorkModule', () => {
             EverWorksDeployQuotaService,
             PlatformSyncSecretService,
             EverWorksGitProvider,
+            EverWorksDnsService,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
@@ -275,10 +277,13 @@ describe('WorkModule', () => {
                     provider === SettingsSchemaValidatorService ||
                     provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
-                    provider === EverWorksGitProvider
+                    provider === EverWorksGitProvider ||
+                    provider === EverWorksDnsService
                 ) {
                     // EW-614: EverWorksGitProvider is consumed inside the
                     // module (by WorkLifecycleService.createWork); not exported.
+                    // EW-617 G5: EverWorksDnsService is consumed by DeployService;
+                    // not exported through WorkModule.
                     expect(exports).not.toContain(provider);
                 } else {
                     expect(exports).toContain(provider);
