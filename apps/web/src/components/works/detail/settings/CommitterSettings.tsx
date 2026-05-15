@@ -70,7 +70,7 @@ export function CommitterSettings() {
                     type="email"
                     value={committerEmail}
                     onChange={(e) => setCommitterEmail(e.target.value)}
-                    placeholder={defaultEmail}
+                    placeholder={defaultEmail || undefined}
                     variant="form"
                 />
 
