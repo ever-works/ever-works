@@ -6,6 +6,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import { User, Work } from '@ever-works/agent/entities';
 import { MailModule } from '@src/mail/mail.module';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { IsPlatformAdminGuard } from '@src/auth/guards/platform-admin.guard';
 import { BudgetAlertHandler } from './budget-alert.handler';
 import { UsageController } from './usage.controller';
 import { BudgetsController } from './budgets.controller';
@@ -34,7 +35,16 @@ import { PluginUsageCleanupService } from './plugin-usage-cleanup.service';
         TypeOrmModule.forFeature([User, Work]),
     ],
     controllers: [UsageController, BudgetsController, AdminUsageController],
-    providers: [BudgetAlertHandler, PluginUsageCleanupService, DistributedTaskLockService],
+    providers: [
+        BudgetAlertHandler,
+        PluginUsageCleanupService,
+        DistributedTaskLockService,
+        // EW-602: AdminUsageController @UseGuards(IsPlatformAdminGuard) — the
+        // guard is instantiated per request and resolves UserRepository from
+        // the imported DatabaseModule, so it must be a provider of the
+        // module that owns the controller. Codex/Greptile review feedback.
+        IsPlatformAdminGuard,
+    ],
     exports: [AgentBudgetsModule],
 })
 export class BudgetsModule {}

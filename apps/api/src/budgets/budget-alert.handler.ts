@@ -99,7 +99,11 @@ export class BudgetAlertHandler {
                 event.budget.scope === 'plugin' && event.budget.pluginId
                     ? `plugin '${event.budget.pluginId}'`
                     : 'directory-wide';
-            const settingsUrl = `${config.webAppUrl()}/settings/budgets-usage`;
+            // EW-602 review fix (Greptile P1): budgets settings page lives at
+            // /works/:workId/settings/budgets-usage (per-Work), not the
+            // per-User /settings namespace. A bare /settings/budgets-usage
+            // link in the email leads to a 404.
+            const settingsUrl = `${config.webAppUrl()}/works/${event.workId}/settings/budgets-usage`;
 
             await this.mailService.sendBudgetAlertEmail(user.email, user.username ?? 'there', {
                 workName: event.budget.work?.name ?? event.workId,

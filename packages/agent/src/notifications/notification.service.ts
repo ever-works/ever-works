@@ -249,7 +249,9 @@ export class NotificationService {
             category: NotificationCategory.AI_CREDITS,
             title: titleByThreshold[args.threshold],
             message: `${scopeLabel} has used ${args.currentSpendCents} / ${args.capCents} ${args.currency.toUpperCase()} cents this period.`,
-            actionUrl: '/settings/budgets-usage',
+            // EW-602 review fix (Codex P2 + Greptile P1): per-Work page,
+            // not the per-User /settings namespace.
+            actionUrl: `/works/${args.workId}/settings/budgets-usage`,
             actionLabel: 'Manage budgets',
             isPersistent: isError,
             metadata: {

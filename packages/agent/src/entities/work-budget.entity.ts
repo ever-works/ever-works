@@ -6,7 +6,6 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
-    Index,
 } from 'typeorm';
 import type { ClassToObject } from './types';
 import { Work } from './work.entity';
@@ -25,8 +24,16 @@ export enum WorkBudgetScope {
  * pluginId. When current-period spend reaches `monthlyCapCents`, the
  * BudgetGuardService blocks subsequent plugin calls UNLESS `allowOverage`
  * is true (in which case warnings continue but the call is permitted).
+ *
+ * Uniqueness ("one global per Work" + "one per plugin per Work") is
+ * enforced by two partial unique indexes declared in
+ * `1778866612310-AddWorkBudgets`: a single index on
+ * `(workId, scope, pluginId)` would not work because Postgres treats
+ * NULL as distinct, so the global rows (with `pluginId = NULL`) would
+ * not collide. The decorator-level `@Index` is intentionally omitted
+ * here to keep TypeORM's `synchronize` (used only by the in-memory
+ * SQLite test driver) from generating a non-partial duplicate.
  */
-@Index(['workId', 'scope', 'pluginId'], { unique: true })
 @Entity({ name: 'work_budgets' })
 export class WorkBudget {
     @PrimaryGeneratedColumn('uuid')

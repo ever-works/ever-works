@@ -150,13 +150,19 @@ export class PluginUsageRepository {
         periodStart: Date,
         periodEnd: Date,
     ): Promise<PluginUsageEvent[]> {
-        return this.repository.find({
-            where: {
-                workId,
-                occurredAt: Between(periodStart, periodEnd),
-            },
-            order: { occurredAt: 'ASC' },
-        });
+        // EW-602 review fix (Codex P2 + Greptile P1):
+        //   The summary / trend aggregates use `occurredAt >= start AND
+        //   occurredAt < end` (half-open). Earlier this used TypeORM's
+        //   Between() which is inclusive on BOTH ends, so the first
+        //   instant of the next month bled into the previous month's CSV
+        //   export and totals didn't reconcile with the dashboard.
+        return this.repository
+            .createQueryBuilder('e')
+            .where('e.workId = :workId', { workId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .orderBy('e.occurredAt', 'ASC')
+            .getMany();
     }
 
     async pruneOlderThan(cutoff: Date): Promise<number> {

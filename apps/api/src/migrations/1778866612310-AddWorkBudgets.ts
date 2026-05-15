@@ -48,12 +48,30 @@ export class AddWorkBudgets1778866612310 implements MigrationInterface {
             }),
         );
 
+        // EW-602 review fix (Codex P1 + Greptile P1):
+        //   `pluginId` is nullable for `scope='global'` rows, and Postgres
+        //   treats NULLs as distinct in unique indexes. A single unique
+        //   constraint on (workId, scope, pluginId) therefore allows
+        //   multiple `(workId, 'global', NULL)` rows. We split into two
+        //   partial unique indexes so the "one global per Work" + "one per
+        //   plugin per Work" invariants are enforced atomically at the DB
+        //   level (not just by BudgetsController.create()'s read-then-write).
         await queryRunner.createIndex(
             'work_budgets',
             new TableIndex({
-                name: 'uq_work_budgets_work_scope_plugin',
-                columnNames: ['workId', 'scope', 'pluginId'],
+                name: 'uq_work_budgets_global_per_work',
+                columnNames: ['workId'],
                 isUnique: true,
+                where: `"scope" = 'global'`,
+            }),
+        );
+        await queryRunner.createIndex(
+            'work_budgets',
+            new TableIndex({
+                name: 'uq_work_budgets_plugin_per_work',
+                columnNames: ['workId', 'pluginId'],
+                isUnique: true,
+                where: `"scope" = 'plugin' AND "pluginId" IS NOT NULL`,
             }),
         );
 
