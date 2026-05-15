@@ -41,6 +41,7 @@ export const AddItemModal = memo(function AddItemModal({
         brand: '',
         brand_logo_url: '',
         images: [],
+        markdown: '',
     });
 
     const handleSubmit = useCallback(
@@ -75,6 +76,7 @@ export const AddItemModal = memo(function AddItemModal({
                         brand: formData.brand || undefined,
                         brand_logo_url: formData.brand_logo_url || undefined,
                         images: formData.images.length > 0 ? formData.images : undefined,
+                        markdown: formData.markdown.trim() ? formData.markdown : undefined,
                         // Pass the create_pull_request flag to the backend
                         create_pull_request: updateWithPR,
                     };
@@ -104,6 +106,7 @@ export const AddItemModal = memo(function AddItemModal({
                             brand: '',
                             brand_logo_url: '',
                             images: [],
+                            markdown: '',
                         });
                     } else {
                         toast.error(result.message || t('failed'));

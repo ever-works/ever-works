@@ -236,6 +236,38 @@ describe('items-generator/dto', () => {
             });
             expect(constraintNames(errors)).toContain('isBoolean');
         });
+
+        it('accepts an optional markdown string body', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: '# Updated\n\nNew body.',
+            });
+            expect(errors).toEqual([]);
+        });
+
+        it('accepts an empty markdown string (treated as authored-empty by the service)', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: '',
+            });
+            expect(errors).toEqual([]);
+        });
+
+        it('rejects non-string markdown', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: 42,
+            });
+            expect(constraintNames(errors)).toContain('isString');
+        });
+
+        it('rejects markdown longer than 100000 characters (MaxLength)', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: 'a'.repeat(100001),
+            });
+            expect(constraintNames(errors)).toContain('maxLength');
+        });
     });
 
     // ───────────────────────────────────────────────────────────────────
@@ -339,6 +371,40 @@ describe('items-generator/dto', () => {
         it('rejects non-integer order values', async () => {
             const { errors } = await validateDto(SubmitItemDto, { ...valid, order: 1.5 });
             expect(constraintNames(errors)).toContain('isInt');
+        });
+
+        it('accepts an optional markdown string body', async () => {
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...valid,
+                markdown: '# Heading\n\nBody text with `code` and a [link](https://x.test).',
+            });
+            expect(errors).toEqual([]);
+        });
+
+        it('accepts an empty markdown string (still optional, empty allowed)', async () => {
+            const { errors } = await validateDto(SubmitItemDto, { ...valid, markdown: '' });
+            expect(errors).toEqual([]);
+        });
+
+        it('rejects non-string markdown', async () => {
+            const { errors } = await validateDto(SubmitItemDto, { ...valid, markdown: 42 });
+            expect(constraintNames(errors)).toContain('isString');
+        });
+
+        it('rejects markdown longer than 100000 characters (MaxLength)', async () => {
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...valid,
+                markdown: 'a'.repeat(100001),
+            });
+            expect(constraintNames(errors)).toContain('maxLength');
+        });
+
+        it('accepts markdown exactly at the 100000-character boundary', async () => {
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...valid,
+                markdown: 'a'.repeat(100000),
+            });
+            expect(errors).toEqual([]);
         });
     });
 

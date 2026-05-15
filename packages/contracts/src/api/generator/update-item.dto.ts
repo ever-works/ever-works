@@ -12,4 +12,7 @@ export interface UpdateItemDto {
 	order?: number;
 	/** Whether to create a pull request */
 	create_pull_request?: boolean;
+	/** Long-form markdown body. When provided, replaces the existing
+	 *  `data/<slug>/<slug>.md` file and mirrors onto the YAML `markdown` field. */
+	markdown?: string;
 }

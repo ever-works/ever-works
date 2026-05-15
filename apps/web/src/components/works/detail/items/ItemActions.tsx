@@ -35,9 +35,11 @@ import {
     Camera,
     ShieldAlert,
     Link2,
+    FileText,
 } from 'lucide-react';
 import { useItemsContext } from './ItemsContext';
 import { ScreenshotProviderDialog } from './ScreenshotProviderDialog';
+import { MarkdownBodyField } from './MarkdownBodyField';
 
 type ItemActionsProps = {
     item: ItemData;
@@ -53,6 +55,7 @@ export const ItemActions = memo(function ItemActions({
     const t = useTranslations('dashboard.workDetail.items');
     const { workId, screenshotProviders, activeScreenshotProvider } = useItemsContext();
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
+    const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
@@ -225,6 +228,13 @@ export const ItemActions = memo(function ItemActions({
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => setIsContentDialogOpen(true)}
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
+                    >
+                        <FileText className="w-4 h-4" />
+                        {t('editContent', { defaultValue: 'Edit content' })}
+                    </DropdownMenuItem>
                     {item.source_url && (
                         <DropdownMenuItem
                             onClick={handleCheckHealth}
@@ -280,6 +290,14 @@ export const ItemActions = memo(function ItemActions({
             <DisplayDialog
                 open={isDisplayDialogOpen}
                 onOpenChange={setIsDisplayDialogOpen}
+                item={item}
+                workId={workId}
+                onUpdate={onUpdate}
+            />
+
+            <EditContentDialog
+                open={isContentDialogOpen}
+                onOpenChange={setIsContentDialogOpen}
                 item={item}
                 workId={workId}
                 onUpdate={onUpdate}
@@ -396,6 +414,124 @@ const DisplayDialog = ({ open, onOpenChange, item, workId, onUpdate }: DisplayDi
                             })}
                         </p>
                     </div>
+
+                    <ToggleRow
+                        label={t('createPRLabel', { defaultValue: 'Create Pull Request' })}
+                        description={t('createPRHelp', {
+                            defaultValue:
+                                'If enabled, changes are proposed via PR instead of direct commit.',
+                        })}
+                        checked={createPr}
+                        onChange={setCreatePr}
+                    />
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        variant="secondary"
+                        onClick={() => onOpenChange(false)}
+                        disabled={isSubmitting}
+                    >
+                        {t('addModal.cancel')}
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={isSubmitting} loading={isSubmitting}>
+                        {t('updateItem', { defaultValue: 'Update item' })}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+type EditContentDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    item: ItemData;
+    workId: string;
+    onUpdate?: (item: Partial<ItemData>) => void;
+};
+
+const EditContentDialog = (props: EditContentDialogProps) => {
+    // Mount a fresh body when the dialog opens so the textarea reflects the
+    // current item.markdown; closing then reopening starts the buffer over.
+    // Wrapper kept thin so the inner component owns all React state.
+    return props.open ? <EditContentDialogInner {...props} /> : null;
+};
+
+const EditContentDialogInner = ({
+    open,
+    onOpenChange,
+    item,
+    workId,
+    onUpdate,
+}: EditContentDialogProps) => {
+    const t = useTranslations('dashboard.workDetail.items');
+    const [markdown, setMarkdown] = useState<string>(item.markdown ?? '');
+    const [createPr, setCreatePr] = useState<boolean>(false);
+    const [isSubmitting, startTransition] = useTransition();
+
+    const handleSubmit = () => {
+        if (markdown === (item.markdown ?? '')) {
+            // Nothing changed — close without a no-op commit.
+            onOpenChange(false);
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const result = await updateItem(workId, {
+                    item_slug: item.slug!,
+                    markdown,
+                    create_pull_request: createPr,
+                });
+
+                if (result.status === 'success') {
+                    toast.success(
+                        result.message ||
+                            t('editContentSuccess', { defaultValue: 'Item content updated.' }),
+                    );
+                    onUpdate?.({ markdown });
+                    onOpenChange(false);
+                } else {
+                    toast.error(
+                        result.message ||
+                            t('editContentFailed', {
+                                defaultValue: 'Failed to update item content.',
+                            }),
+                    );
+                }
+            } catch (error) {
+                toast.error(
+                    t('editContentError', {
+                        defaultValue: 'An error occurred while updating item content.',
+                    }),
+                );
+            }
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>
+                        {t('editContent', { defaultValue: 'Edit content' })}: {item.name}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {t('editContentDescription', {
+                            defaultValue:
+                                'Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.',
+                        })}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                    <MarkdownBodyField
+                        value={markdown}
+                        onChange={setMarkdown}
+                        disabled={isSubmitting}
+                        rows={14}
+                    />
 
                     <ToggleRow
                         label={t('createPRLabel', { defaultValue: 'Create Pull Request' })}
