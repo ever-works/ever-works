@@ -4,6 +4,7 @@ import { NotificationsModule as AgentNotificationsModule } from '@ever-works/age
 import { DatabaseModule } from '@ever-works/agent/database';
 import { MailModule } from '@src/mail/mail.module';
 import { BudgetAlertHandler } from './budget-alert.handler';
+import { UsageController } from './usage.controller';
 
 /**
  * EW-602 — apps/api glue for the budget enforcement layer. Imports the
@@ -11,9 +12,16 @@ import { BudgetAlertHandler } from './budget-alert.handler';
  * API modules can inject them, plus wires up the BudgetAlertHandler
  * which subscribes to BudgetThresholdCrossedEvent and dispatches the
  * in-app notification, email, and PostHog event.
+ *
+ * Also exposes the UsageController:
+ *   GET /api/works/:workId/usage/summary[?period=current|YYYY-MM]
+ *   GET /api/works/:workId/usage/trend[?period=...&granularity=day]
+ * Backed by PluginUsageRepository aggregations + BudgetService period
+ * helpers; access checked against work.userId / WorkMember.
  */
 @Module({
     imports: [DatabaseModule, AgentBudgetsModule, AgentNotificationsModule, MailModule],
+    controllers: [UsageController],
     providers: [BudgetAlertHandler],
     exports: [AgentBudgetsModule],
 })
