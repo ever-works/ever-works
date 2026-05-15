@@ -120,3 +120,28 @@ export const budgetsAPI = {
         });
     },
 };
+
+export interface AdminUsageRow {
+    userId: string;
+    username: string;
+    email: string | null;
+    workId: string;
+    workName: string;
+    units: number;
+    costCents: number;
+}
+
+export interface AdminUsageResponse {
+    periodStart: string;
+    periodEnd: string;
+    periodLabel: string;
+    totalSpendCents: number;
+    rows: AdminUsageRow[];
+}
+
+export const adminUsageAPI = {
+    list: async (period?: string): Promise<AdminUsageResponse> => {
+        const query = period ? `?period=${encodeURIComponent(period)}` : '';
+        return serverFetch<AdminUsageResponse>(`/admin/usage${query}`);
+    },
+};

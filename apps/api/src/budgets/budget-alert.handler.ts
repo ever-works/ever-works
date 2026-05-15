@@ -84,6 +84,12 @@ export class BudgetAlertHandler {
             if (!user.email) {
                 return;
             }
+            if (user.emailBudgetAlerts === false) {
+                this.logger.debug(
+                    `Budget alert: user ${event.userId} opted out of budget-alert emails — skipping send`,
+                );
+                return;
+            }
 
             const periodLabel = event.periodStart.toLocaleString('en-US', {
                 month: 'long',

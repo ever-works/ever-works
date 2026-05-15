@@ -18,6 +18,13 @@ export type DailySpendBucket = {
     costCents: number;
 };
 
+export type CrossUserSpendRow = {
+    userId: string;
+    workId: string;
+    units: number;
+    costCents: number;
+};
+
 @Injectable()
 export class PluginUsageRepository {
     constructor(
@@ -100,6 +107,42 @@ export class PluginUsageRepository {
             .getRawMany<{ day: string; costCents: string }>();
 
         return rows.map((r) => ({ day: r.day, costCents: Number(r.costCents ?? 0) }));
+    }
+
+    /**
+     * EW-602 — Cross-user, cross-Work aggregated spend for the
+     * platform-admin view. Returns one row per (userId, workId) with
+     * non-zero usage in the period. Sorted by spend descending so
+     * the admin sees biggest spenders first.
+     */
+    async getCrossUserSpend(
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<CrossUserSpendRow[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.userId', 'userId')
+            .addSelect('e.workId', 'workId')
+            .addSelect('SUM(e.units)', 'units')
+            .addSelect('SUM(e.costCents)', 'costCents')
+            .where('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .groupBy('e.userId')
+            .addGroupBy('e.workId')
+            .orderBy('"costCents"', 'DESC')
+            .getRawMany<{
+                userId: string;
+                workId: string;
+                units: string;
+                costCents: string;
+            }>();
+
+        return rows.map((r) => ({
+            userId: r.userId,
+            workId: r.workId,
+            units: Number(r.units ?? 0),
+            costCents: Number(r.costCents ?? 0),
+        }));
     }
 
     async findForExport(

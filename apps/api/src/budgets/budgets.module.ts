@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { BudgetsModule as AgentBudgetsModule } from '@ever-works/agent/budgets';
 import { NotificationsModule as AgentNotificationsModule } from '@ever-works/agent/notifications';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { User, Work } from '@ever-works/agent/entities';
 import { MailModule } from '@src/mail/mail.module';
 import { BudgetAlertHandler } from './budget-alert.handler';
 import { UsageController } from './usage.controller';
 import { BudgetsController } from './budgets.controller';
+import { AdminUsageController } from './admin-usage.controller';
 
 /**
  * EW-602 — apps/api glue for the budget enforcement layer. Imports the
@@ -21,8 +24,14 @@ import { BudgetsController } from './budgets.controller';
  * helpers; access checked against work.userId / WorkMember.
  */
 @Module({
-    imports: [DatabaseModule, AgentBudgetsModule, AgentNotificationsModule, MailModule],
-    controllers: [UsageController, BudgetsController],
+    imports: [
+        DatabaseModule,
+        AgentBudgetsModule,
+        AgentNotificationsModule,
+        MailModule,
+        TypeOrmModule.forFeature([User, Work]),
+    ],
+    controllers: [UsageController, BudgetsController, AdminUsageController],
     providers: [BudgetAlertHandler],
     exports: [AgentBudgetsModule],
 })

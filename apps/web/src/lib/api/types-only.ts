@@ -127,4 +127,6 @@ export type {
     UsageSummary,
     DailySpendBucket,
     UsageTrend,
+    AdminUsageRow,
+    AdminUsageResponse,
 } from './budgets';

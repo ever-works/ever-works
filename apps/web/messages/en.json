@@ -985,6 +985,19 @@
             "activeWebsites": "Active Websites",
             "fromLastMonth": "from last month"
         },
+        "adminUsage": {
+            "title": "Platform usage",
+            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
+            "periodLabel": "{period}",
+            "totalSpend": "Total spend: {amount}",
+            "empty": "No usage recorded this period.",
+            "columnUser": "User",
+            "columnEmail": "Email",
+            "columnWork": "Directory",
+            "columnUnits": "Units",
+            "columnCost": "Cost",
+            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
+        },
         "budgets": {
             "overviewTitle": "Spend in {period}",
             "overviewProgressLabel": "{percent}% of {cap} cap",
