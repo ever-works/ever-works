@@ -21,6 +21,7 @@ export * from './state-marker.service';
 export * from './anonymous-user-cleanup.service';
 export * from './platform-sync-secret.service';
 export * from './zero-friction-funnel.service';
+export * from './deploy-ready-poller.service';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';

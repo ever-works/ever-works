@@ -145,4 +145,12 @@ export class CreateWorkDto {
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)
     readmeConfig?: MarkdownReadmeConfigDto;
+
+    @ApiPropertyOptional({
+        description:
+            'EW-617 G8 zero-friction funnel correlation id. Minted on the landing form (G1) and threaded through the full funnel so REPOS_PUSHED / DEPLOY_STARTED emits stay joinable with the upstream WORK_CREATED event.',
+    })
+    @IsOptional()
+    @IsString()
+    correlationId?: string;
 }

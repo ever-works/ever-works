@@ -50,7 +50,7 @@ jobs:
           # API ENV
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           WEB_URL: https://appstage.ever.works
-          ALLOWED_ORIGINS: https://appstage.ever.works,https://apistage.ever.works
+          ALLOWED_ORIGINS: https://appstage.ever.works,https://apistage.ever.works,https://ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
           # Trigger.dev

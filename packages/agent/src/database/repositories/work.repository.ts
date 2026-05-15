@@ -208,6 +208,22 @@ export class WorkRepository {
     }
 
     /**
+     * EW-617 G8 — used by `DeployReadyPollerService` to fan out HTTP
+     * health probes against works the platform is still waiting on. The
+     * `take` cap is a safety net for backlog scenarios; the schedule
+     * cron tick will pick up any rows past the limit on the next run.
+     */
+    async findByDeploymentStates(states: string[], take = 200): Promise<Work[]> {
+        if (states.length === 0) {
+            return [];
+        }
+        return this.repository.find({
+            where: { deploymentState: In(states) },
+            take,
+        });
+    }
+
+    /**
      * Conditional UPDATE for the lazy bootstrap of `platformSyncSecretEncrypted`
      * (EW-120 pull transport). Two concurrent deploys can both call
      * `getOrGenerate` and both generate fresh plaintext; this method makes
