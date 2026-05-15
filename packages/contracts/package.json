@@ -38,6 +38,11 @@
 			"types": "./dist/api/index.d.ts",
 			"import": "./dist/api/index.js",
 			"require": "./dist/api/index.cjs"
+		},
+		"./telemetry": {
+			"types": "./dist/telemetry/index.d.ts",
+			"import": "./dist/telemetry/index.js",
+			"require": "./dist/telemetry/index.cjs"
 		}
 	},
 	"files": [

@@ -1,3 +1,4 @@
+export * from './anonymous-user-cleanup.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './work-generation.task';
 export * from './work-import.task';

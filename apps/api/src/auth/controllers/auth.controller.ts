@@ -20,7 +20,9 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { AnonymousAuthService } from '../services/anonymous-auth.service';
+import { ClaimAccountService } from '../services/claim-account.service';
+import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { AuthSessionGuard } from '../guards/auth-session.guard';
@@ -30,6 +32,7 @@ import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
 import { Inject } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { toHeaders } from '../providers/request-headers';
 import { SocialAuthService } from '../services/social-auth.service';
 
@@ -41,6 +44,8 @@ export class AuthController {
     constructor(
         private authService: AuthService,
         private readonly socialAuthService: SocialAuthService,
+        private readonly anonymousAuthService: AnonymousAuthService,
+        private readonly claimAccountService: ClaimAccountService,
         private activityLogService: ActivityLogService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
@@ -91,6 +96,107 @@ export class AuthController {
         }
 
         return response;
+    }
+
+    @Public()
+    @Post('anonymous')
+    // EW-617 G2: zero-friction onboarding entrypoint. Rate-limited per IP to
+    // prevent abuse; G7 will layer on stricter limits + captcha when needed.
+    @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } })
+    @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({
+        summary: 'Create an anonymous (zero-friction) user',
+        description:
+            'Mints a temporary User row + session token. The row + its Works are wiped automatically after ANONYMOUS_USER_TTL_DAYS (default 7) days unless the user calls POST /api/auth/claim first.',
+    })
+    @ApiResponse({ status: 201, description: 'Anonymous session issued' })
+    @ApiResponse({ status: 429, description: 'Rate limit exceeded for this IP' })
+    async anonymous(@Request() req) {
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+
+        const response = await this.anonymousAuthService.createAnonymousUser({
+            ipAddress,
+            userAgent,
+        });
+
+        this.activityLogService
+            .log({
+                userId: response.user.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.anonymous_created',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Anonymous user created (zero-friction flow)',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
+
+        return response;
+    }
+
+    @UseGuards(AuthSessionGuard)
+    @Post('claim')
+    // EW-617 G3: convert an anonymous user (G2) into a regular account.
+    // Throttled to dampen brute-force attempts at squatting taken emails.
+    @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } })
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Claim an anonymous account',
+        description:
+            'Converts an anonymous (zero-friction) account into a regular credentialed account. Attaches email + password, clears the TTL, fires verification email. The bearer token from POST /api/auth/anonymous stays valid.',
+    })
+    @ApiResponse({ status: 200, description: 'Account claimed, verification email sent' })
+    @ApiResponse({ status: 403, description: 'Account is not anonymous' })
+    @ApiResponse({
+        status: 409,
+        description: 'Email already in use by a different account',
+    })
+    async claimAccount(@Request() req, @Body() claimDto: ClaimAccountDto) {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return { message: 'unauthorized' };
+        }
+
+        const claimed = await this.claimAccountService.claim({
+            userId,
+            email: claimDto.email,
+            password: claimDto.password,
+            username: claimDto.username,
+            emailVerificationCallbackUrl: claimDto.emailVerificationCallbackUrl,
+        });
+
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+
+        this.activityLogService
+            .log({
+                userId: claimed.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.account_claimed',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Anonymous user claimed account',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
+
+        return claimed;
     }
 
     @Public()

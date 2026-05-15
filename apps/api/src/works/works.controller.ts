@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import {
     CreateWorkDto,
+    QuickCreateWorkDto,
     UpdateWorkDto,
     UpdateWorkAdvancedPromptsDto,
     CreateCategoryDto,
@@ -307,6 +308,88 @@ export class WorksController {
     async createWork(@CurrentUser() auth: AuthenticatedUser, @Body() createWorkDto: CreateWorkDto) {
         const user = await this.authService.getUser(auth.userId);
         return this.workLifecycleService.createWork(createWorkDto, user);
+    }
+
+    @Post('works/quick-create')
+    @HttpCode(HttpStatus.ACCEPTED)
+    // EW-617 G4: one-call combined create-Work + start-generation for the
+    // wizard's "Generate now" button. Throttled because each call kicks off
+    // an AI pipeline + repo provisioning — same per-IP envelope as the
+    // existing /works/:id/generate path.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Quick-create + generate a work',
+        description:
+            'Creates a Work using onboarding defaults and immediately kicks off AI item generation in a single request. Returns the new work id + generation history id; the client polls /works/:id/generation-history for status.',
+    })
+    @ApiResponse({ status: 202, description: 'Work created and generation started' })
+    @ApiResponse({ status: 400, description: 'Invalid input data' })
+    @ApiResponse({ status: 409, description: 'Slug already taken' })
+    async quickCreateWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: QuickCreateWorkDto,
+    ): Promise<{
+        status: 'pending';
+        work: { id: string; slug: string; name: string };
+        generation: { historyId: string; message: string };
+    }> {
+        const user = await this.authService.getUser(auth.userId);
+
+        // 1. Create the Work via the existing pipeline. Provider defaults
+        //    (storage/deploy/git) are resolved from the user's
+        //    onboardingState inside createWork — no special handling here.
+        const createDto: CreateWorkDto = Object.assign(new CreateWorkDto(), {
+            slug: dto.slug,
+            name: dto.name,
+            description: dto.description,
+            owner: dto.owner,
+            organization: dto.organization ?? false,
+            gitProvider: dto.gitProvider ?? 'github',
+            deployProvider: dto.deployProvider,
+            storageProvider: dto.storageProvider,
+            websiteTemplateId: dto.websiteTemplateId,
+            readmeConfig: dto.readmeConfig,
+        });
+        const created = await this.workLifecycleService.createWork(createDto, user);
+        if (!created || created.status !== 'success' || !created.work) {
+            throw new BadRequestException('Failed to create work');
+        }
+        const work = created.work;
+
+        this.activityLogService
+            .log({
+                userId: user.id,
+                workId: work.id,
+                actionType: ActivityActionType.WORK_CREATED,
+                action: 'work.quick_create',
+                status: ActivityStatus.COMPLETED,
+                summary: `Quick-create kicked off generation for ${work.slug}`,
+            })
+            .catch(() => {});
+
+        // 2. Kick off generation async — the standard generation pipeline
+        //    handles persistence + dispatch.  awaitCompletion=false means
+        //    we return immediately with the historyId for status polling.
+        const generatorDto = Object.assign(new CreateItemsGeneratorDto(), {
+            name: dto.name,
+            prompt: dto.prompt,
+            ...(dto.model ? { model: dto.model } : {}),
+        });
+        const generation = await this.workGenerationService.generateItems(
+            work.id,
+            generatorDto,
+            user,
+            false,
+        );
+
+        return {
+            status: 'pending',
+            work: { id: work.id, slug: work.slug, name: work.name },
+            generation: {
+                historyId: generation.historyId ?? '',
+                message: generation.message ?? 'Generation started',
+            },
+        };
     }
 
     @Get('works/:id')

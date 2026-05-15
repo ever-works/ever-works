@@ -46,10 +46,45 @@ export type RegistryKind = RegistryConfig['kind'];
 export type ResolvedImageVisibility = 'public' | 'private';
 
 /**
+ * Where the kubeconfig used to talk to the target cluster comes from.
+ *
+ * - `'k8s-works'`        — Ever Works shared customer cluster. The
+ *                          platform substitutes
+ *                          `process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG`
+ *                          for the `K8S_TOKEN` GitHub Actions secret at
+ *                          deploy time. The `kubeconfig` field below is
+ *                          ignored.
+ * - `'k8s-gauzy'`        — Ever Works internal platform cluster. Same
+ *                          shape as `'k8s-works'` but uses
+ *                          `process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG`.
+ *                          Only allowed when the Work's website repo is
+ *                          in the `ever-works` org (admin/internal
+ *                          path).
+ * - `'custom-kubeconfig'`— Customer pastes their own kubeconfig in the
+ *                          `kubeconfig` field below. Only allowed when
+ *                          the Work's website repo is NOT in an Ever
+ *                          Works-shared org (the cell C exclusion).
+ *
+ * Validation of the (website-repo-owner, clusterSource) combination
+ * happens in `DeployService.deploy()`. See the EW-615/EW-616 tickets
+ * and `Workspace/knowledge/runbooks/EVER_WORKS_K8S_DEPLOY_TROUBLESHOOTING.md`
+ * for the full supported-matrix table.
+ */
+export type ClusterSource = 'k8s-works' | 'k8s-gauzy' | 'custom-kubeconfig';
+
+/**
  * Plugin settings as stored in `plugin_settings`.
  */
 export interface KubernetesSettings {
-	/** Full kubeconfig YAML. Stored encrypted; never returned by the API. */
+	/** Where the kubeconfig for the target cluster comes from. Defaults
+	 *  to `'custom-kubeconfig'` so existing Works (which pre-date this
+	 *  field and have a user-pasted `kubeconfig`) keep working without
+	 *  re-saving their settings. */
+	clusterSource?: ClusterSource;
+	/** Full kubeconfig YAML. Stored encrypted; never returned by the API.
+	 *  Required when `clusterSource === 'custom-kubeconfig'`. Ignored
+	 *  when `clusterSource` is a platform-managed value — the platform
+	 *  substitutes the right env var at deploy time. */
 	kubeconfig?: string;
 	/** Override the kubeconfig's `current-context`. */
 	kubeContext?: string;
