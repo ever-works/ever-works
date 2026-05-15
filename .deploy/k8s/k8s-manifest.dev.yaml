@@ -204,6 +204,30 @@ spec:
                   name: ever-works-platform-kubeconfigs-dev
                   key: EVER_WORKS_K8S_GAUZY_KUBECONFIG
 
+            # EW-617 — zero-friction Ever Works deploy provider.
+            # Gates the 'ever-works' choice in the deploy facade; default is
+            # vercel until this is on. Also turns the subdomain DNS
+            # automation live when paired with the CLOUDFLARE_* secrets.
+            - name: DEPLOY_EVER_WORKS_ENABLED
+              value: "$DEPLOY_EVER_WORKS_ENABLED"
+            - name: EVER_WORKS_DOMAIN
+              value: "$EVER_WORKS_DOMAIN"
+            - name: EVER_WORKS_DEPLOY_LB_HOSTNAME
+              value: "$EVER_WORKS_DEPLOY_LB_HOSTNAME"
+            - name: CLOUDFLARE_API_TOKEN
+              value: "$CLOUDFLARE_API_TOKEN"
+            - name: CLOUDFLARE_ZONE_ID
+              value: "$CLOUDFLARE_ZONE_ID"
+
+            # EW-617 G7 — captcha verifier. Provider-agnostic
+            # (Turnstile/hCaptcha/reCAPTCHA). No-ops when CAPTCHA_PROVIDER
+            # is empty so we can ship the env wiring without enabling
+            # captcha at the same time.
+            - name: CAPTCHA_PROVIDER
+              value: "$CAPTCHA_PROVIDER"
+            - name: CAPTCHA_SECRET
+              value: "$CAPTCHA_SECRET"
+
           resources:
             requests:
               memory: "512Mi"

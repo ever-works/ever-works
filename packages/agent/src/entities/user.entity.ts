@@ -145,7 +145,7 @@ export class User {
     @OneToMany(() => WorkMember, (member) => member.user, { lazy: true })
     workMemberships?: Promise<ClassToObject<WorkMember>[]>;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     defaultPlanId?: string | null;
 
     @ManyToOne(() => SubscriptionPlan, { nullable: true, eager: true })

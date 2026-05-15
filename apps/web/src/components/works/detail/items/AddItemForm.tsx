@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { CategoriesField } from './CategoriesField';
 import { useItemsContext } from './ItemsContext';
 import { ScreenshotProviderDialog } from './ScreenshotProviderDialog';
+import { MarkdownBodyField } from './MarkdownBodyField';
 
 export interface ItemFormData {
     name: string;
@@ -34,6 +35,7 @@ export interface ItemFormData {
     brand: string;
     brand_logo_url: string;
     images: string[];
+    markdown: string;
 }
 
 interface AddItemFormProps {
@@ -371,6 +373,13 @@ export const AddItemForm = memo(function AddItemForm({
                     onChange={(e) => setFormData({ ...formData, brand_logo_url: e.target.value })}
                     placeholder={t('brandLogoUrlPlaceholder')}
                     variant="form"
+                    disabled={isPending}
+                />
+
+                {/* Long-form markdown body (optional) */}
+                <MarkdownBodyField
+                    value={formData.markdown}
+                    onChange={(value) => setFormData({ ...formData, markdown: value })}
                     disabled={isPending}
                 />
 

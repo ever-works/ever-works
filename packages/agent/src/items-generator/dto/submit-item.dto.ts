@@ -7,6 +7,7 @@ import {
     IsArray,
     IsInt,
     Min,
+    MaxLength,
     ValidateIf,
     ArrayMinSize,
 } from 'class-validator';
@@ -96,4 +97,14 @@ export class SubmitItemDto implements ISubmitItemDto {
     @IsOptional()
     @IsBoolean()
     create_pull_request?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            'Long-form markdown body. Stored as `data/<slug>/<slug>.md` and mirrored on the YAML `markdown` field. When omitted, the generator writes a stub body built from name + description + source_url.',
+        maxLength: 100000,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100000)
+    markdown?: string;
 }
