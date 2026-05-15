@@ -42,8 +42,11 @@ export class BudgetGuardService {
         userId: string,
         capability: PluginUsageCapability,
         pluginId: string,
-        now: Date = new Date(),
+        options: { estimatedCostCents?: number; now?: Date } = {},
     ): Promise<void> {
+        const now = options.now ?? new Date();
+        const estimatedCostCents = Math.max(0, Math.round(options.estimatedCostCents ?? 0));
+
         const { global, plugin } = await this.budgetService.getApplicableBudgets(
             workId,
             pluginId,
@@ -73,6 +76,7 @@ export class BudgetGuardService {
             );
         }
 
+        // Post-flight: a previous call already pushed spend to or past the cap.
         const blocking = evaluations.find((e) => e.blocked);
         if (blocking) {
             throw new BudgetExceededException({
@@ -83,6 +87,28 @@ export class BudgetGuardService {
                 capCents: blocking.capCents,
                 currency: blocking.budget.currency,
             });
+        }
+
+        // Pre-flight: this call's estimated max cost would push us past the
+        // cap on a budget that doesn't allow overage. Block before invoking
+        // the plugin so a single expensive request can't blow the cap by
+        // an order of magnitude.
+        if (estimatedCostCents > 0) {
+            const preflightBlocking = evaluations.find(
+                (e) =>
+                    !e.budget.allowOverage &&
+                    e.currentSpendCents + estimatedCostCents > e.capCents,
+            );
+            if (preflightBlocking) {
+                throw new BudgetExceededException({
+                    workId,
+                    scope: preflightBlocking.budget.scope as WorkBudgetScope,
+                    pluginId: preflightBlocking.budget.pluginId,
+                    currentSpendCents: preflightBlocking.currentSpendCents,
+                    capCents: preflightBlocking.capCents,
+                    currency: preflightBlocking.budget.currency,
+                });
+            }
         }
     }
 
