@@ -135,6 +135,24 @@ jobs:
           EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
           EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
 
+          # EW-617 — Ever Works zero-friction deploy + DNS automation.
+          # DEPLOY_EVER_WORKS_ENABLED gates the 'ever-works' deploy
+          # provider choice. CLOUDFLARE_* drive the subdomain DNS
+          # automation. EVER_WORKS_DEPLOY_LB_HOSTNAME is the anchor record
+          # that {slug}.ever.works CNAMEs target (resolves to the
+          # k8s-works ingress LB at 157.230.74.11).
+          DEPLOY_EVER_WORKS_ENABLED: 'true'
+          EVER_WORKS_DOMAIN: ever.works
+          EVER_WORKS_DEPLOY_LB_HOSTNAME: lb.ever.works
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
+          # EW-617 G7 — captcha verifier. Empty defaults keep captcha
+          # disabled; flip CAPTCHA_PROVIDER + CAPTCHA_SECRET when the
+          # Turnstile widget is provisioned + client integration ships.
+          CAPTCHA_PROVIDER: ${{ secrets.CAPTCHA_PROVIDER }}
+          CAPTCHA_SECRET: ${{ secrets.CAPTCHA_SECRET }}
+
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version
