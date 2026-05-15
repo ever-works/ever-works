@@ -12,6 +12,8 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../usage/plugin-usage.service';
+import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class ScreenshotFacadeError extends FacadeError {
@@ -30,6 +32,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        @Optional() private readonly pluginUsageService?: PluginUsageService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -60,6 +63,24 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
             cacheTtl: options.cacheTtl,
             settings,
         });
+
+        if (result.success) {
+            const pricing = (await plugin.getPricing?.()) ?? null;
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                pluginId: plugin.id,
+                capability: PluginUsageCapability.SCREENSHOT,
+                units: 1,
+                costCents: pricing?.costPerCallCents ?? 0,
+                currency: pricing?.currency,
+                metadata: {
+                    operation: 'capture',
+                    url: options.url,
+                    fullPage: options.fullPage ?? false,
+                },
+            });
+        }
 
         return {
             success: result.success,

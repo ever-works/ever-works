@@ -15,6 +15,8 @@ import {
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../usage/plugin-usage.service';
+import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import {
     BaseFacadeService,
     FacadeError,
@@ -61,6 +63,7 @@ export class ContentExtractorFacadeService
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        @Optional() private readonly pluginUsageService?: PluginUsageService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -153,6 +156,22 @@ export class ContentExtractorFacadeService
                     providerName: candidate.name,
                     success: true,
                     contentLength: rawContent.length,
+                });
+
+                const pricing = (await candidate.plugin.getPricing?.()) ?? null;
+                await this.pluginUsageService?.record({
+                    workId: facadeOptions.workId,
+                    userId: facadeOptions.userId,
+                    pluginId: candidate.id,
+                    capability: PluginUsageCapability.EXTRACTOR,
+                    units: 1,
+                    costCents: pricing?.costPerCallCents ?? 0,
+                    currency: pricing?.currency,
+                    metadata: {
+                        operation: 'extract',
+                        url,
+                        contentLength: rawContent.length,
+                    },
                 });
 
                 return {

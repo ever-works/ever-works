@@ -21,6 +21,8 @@ import { jsonrepair } from '@ever-works/plugin/ai';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../usage/plugin-usage.service';
+import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
 import type { ModelCatalogEntry } from './model-catalog';
@@ -46,6 +48,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        @Optional() private readonly pluginUsageService?: PluginUsageService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -89,6 +92,21 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
 
         const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
+
+        await this.pluginUsageService?.record({
+            workId: facadeOptions.workId,
+            userId: facadeOptions.userId,
+            pluginId: plugin.id,
+            capability: PluginUsageCapability.AI,
+            units: response.usage?.totalTokens ?? 1,
+            costCents: cost != null ? cost * 100 : 0,
+            modelId: response.model,
+            metadata: {
+                operation: 'askJson',
+                promptTokens: response.usage?.promptTokens,
+                completionTokens: response.usage?.completionTokens,
+            },
+        });
 
         return {
             result: validated.data,
@@ -243,7 +261,25 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             settings,
         };
 
-        return plugin.createChatCompletion(mergedOptions);
+        const response = await plugin.createChatCompletion(mergedOptions);
+
+        const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
+        await this.pluginUsageService?.record({
+            workId: facadeOptions.workId,
+            userId: facadeOptions.userId,
+            pluginId: plugin.id,
+            capability: PluginUsageCapability.AI,
+            units: response.usage?.totalTokens ?? 1,
+            costCents: cost != null ? cost * 100 : 0,
+            modelId: response.model,
+            metadata: {
+                operation: 'createChatCompletion',
+                promptTokens: response.usage?.promptTokens,
+                completionTokens: response.usage?.completionTokens,
+            },
+        });
+
+        return response;
     }
 
     async *createStreamingChatCompletion(
