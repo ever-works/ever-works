@@ -129,6 +129,10 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
         };
 
         const workRepository = { findById: jest.fn().mockResolvedValue(work) };
+        const deploymentRepository = {
+            create: jest.fn().mockResolvedValue({ id: 'deployment-1' }),
+            markTerminal: jest.fn().mockResolvedValue(undefined),
+        };
         const websiteUpdateService = {
             updateRepository: jest.fn().mockResolvedValue(undefined),
         };
@@ -139,6 +143,9 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
         const platformSyncSecretService = {
             getOrGenerate: jest.fn().mockResolvedValue('platform-sync-secret'),
         };
+        // 9th DI arg added on develop post-EW-616 — Ever Works DNS service.
+        // No deploy path under test reaches it, so a typeless stub is fine.
+        const dnsService = {};
 
         const prevEnv = { ...process.env };
         delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
@@ -149,11 +156,13 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
             deployFacade as any,
             gitFacade as any,
             workRepository as any,
+            deploymentRepository as any,
             pluginRegistry as any,
             websiteUpdateService as any,
             websiteTemplateResolver as any,
             eventEmitter,
             platformSyncSecretService as any,
+            dnsService as any,
         );
 
         const restoreEnv = () => {

@@ -34,9 +34,9 @@ export function CommitterSettings() {
     };
 
     // Placeholders show the auth defaults (actual fallback includes user-level settings).
-    // `user.email` is nullable post-EW-617 anonymous auth — coerce to undefined
-    // so the `Input` component (which doesn't accept `null` placeholders) is happy.
-    const defaultName = user.username;
+    // Better Auth user fields can be nullable; the Input component's
+    // placeholder accepts string | undefined, so coerce.
+    const defaultName = user.username ?? undefined;
     const defaultEmail = user.email ?? undefined;
 
     return (

@@ -26,12 +26,11 @@ module.exports = {
     testTimeout: 30000,
     moduleNameMapper: {
         '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
-        // `@src/items-generator/...` is an agent-package-internal alias (its own
-        // tsconfig maps `@src/*` to `packages/agent/src/*`). When a packages/agent
-        // entity that uses this alias is pulled into an apps/api test (via the
-        // entity barrel), the API's `@src` → `apps/api/src` mapping below cannot
-        // resolve it. Redirect it to the agent source tree explicitly.
-        '^@src/items-generator/(.*)$': '<rootDir>/../../../packages/agent/src/items-generator/$1.ts',
+        // Items-generator's source lives under @ever-works/agent, but
+        // entities import it via the api `@src/...` alias. Map it through
+        // so cross-package tests (claim-account.service.spec,
+        // deploy.e2e.spec, etc.) can load entities without TS2307.
+        '^@src/items-generator/(.*)$': '<rootDir>/../../../packages/agent/src/items-generator/$1',
         '^@src/(.*)$': '<rootDir>/$1',
         // Map workspace packages to their source TypeScript files for testing
         '^@ever-works/plugin$': '<rootDir>/../../../packages/plugin/src/index.ts',
