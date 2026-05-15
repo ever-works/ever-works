@@ -2,10 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { WorkBudgetAlertStateRepository } from '@src/database/repositories/work-budget-alert-state.repository';
-import {
-    WorkBudget,
-    WorkBudgetScope,
-} from '@src/entities/work-budget.entity';
+import { WorkBudget, WorkBudgetScope } from '@src/entities/work-budget.entity';
 import { WorkBudgetAlertThreshold } from '@src/entities/work-budget-alert-state.entity';
 import { BudgetService, BudgetEvaluation } from './budget.service';
 import { BudgetExceededException } from './budget-exceeded.exception';
@@ -47,10 +44,7 @@ export class BudgetGuardService {
         const now = options.now ?? new Date();
         const estimatedCostCents = Math.max(0, Math.round(options.estimatedCostCents ?? 0));
 
-        const { global, plugin } = await this.budgetService.getApplicableBudgets(
-            workId,
-            pluginId,
-        );
+        const { global, plugin } = await this.budgetService.getApplicableBudgets(workId, pluginId);
 
         const evaluations: BudgetEvaluation[] = [];
         if (global) {
@@ -96,8 +90,7 @@ export class BudgetGuardService {
         if (estimatedCostCents > 0) {
             const preflightBlocking = evaluations.find(
                 (e) =>
-                    !e.budget.allowOverage &&
-                    e.currentSpendCents + estimatedCostCents > e.capCents,
+                    !e.budget.allowOverage && e.currentSpendCents + estimatedCostCents > e.capCents,
             );
             if (preflightBlocking) {
                 throw new BudgetExceededException({

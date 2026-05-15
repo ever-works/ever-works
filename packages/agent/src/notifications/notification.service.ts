@@ -236,7 +236,9 @@ export class NotificationService {
     }): Promise<void> {
         const isError = args.threshold === '100' || args.threshold === 'overage';
         const scopeLabel =
-            args.scope === 'plugin' && args.pluginId ? `plugin '${args.pluginId}'` : 'this directory';
+            args.scope === 'plugin' && args.pluginId
+                ? `plugin '${args.pluginId}'`
+                : 'this directory';
         const titleByThreshold: Record<typeof args.threshold, string> = {
             '75': 'Budget at 75%',
             '90': 'Budget at 90%',

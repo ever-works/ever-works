@@ -35,9 +35,7 @@ export class PluginUsageCleanupService {
 
                 try {
                     const deleted = await this.usageRepository.pruneOlderThan(cutoff);
-                    this.logger.log(
-                        `Plugin usage cleanup completed: ${deleted} rows pruned`,
-                    );
+                    this.logger.log(`Plugin usage cleanup completed: ${deleted} rows pruned`);
                 } catch (error) {
                     this.logger.error('Plugin usage cleanup failed:', error);
                 }

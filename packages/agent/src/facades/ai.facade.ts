@@ -96,11 +96,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     ): Promise<number> {
         if (!modelId) return 0;
         try {
-            const modelInfo = await this.resolveModelMetadataForPlugin(
-                plugin,
-                modelId,
-                settings,
-            );
+            const modelInfo = await this.resolveModelMetadataForPlugin(plugin, modelId, settings);
             if (!modelInfo) return 0;
             const outputPrice = modelInfo.outputCostPer1k;
             const inputPrice = modelInfo.inputCostPer1k ?? 0;

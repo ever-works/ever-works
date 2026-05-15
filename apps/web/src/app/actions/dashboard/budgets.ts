@@ -41,11 +41,7 @@ export async function createBudget(workId: string, data: CreateBudgetInput) {
     }
 }
 
-export async function updateBudget(
-    workId: string,
-    budgetId: string,
-    data: UpdateBudgetInput,
-) {
+export async function updateBudget(workId: string, budgetId: string, data: UpdateBudgetInput) {
     await requireAuth();
     try {
         const result = await budgetsAPI.update(workId, budgetId, data);

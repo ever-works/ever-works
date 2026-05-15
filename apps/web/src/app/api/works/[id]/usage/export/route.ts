@@ -21,14 +21,11 @@ export async function GET(request: NextRequest, context: RouteParams) {
         headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const response = await fetch(
-        `${API_URL}/works/${id}/usage/export${request.nextUrl.search}`,
-        {
-            method: 'GET',
-            headers,
-            cache: 'no-store',
-        },
-    );
+    const response = await fetch(`${API_URL}/works/${id}/usage/export${request.nextUrl.search}`, {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+    });
 
     if (!response.ok) {
         return NextResponse.json(
@@ -39,8 +36,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     const csv = await response.text();
     const disposition =
-        response.headers.get('content-disposition') ??
-        `attachment; filename="usage-${id}.csv"`;
+        response.headers.get('content-disposition') ?? `attachment; filename="usage-${id}.csv"`;
 
     return new Response(csv, {
         status: 200,

@@ -17,10 +17,6 @@ export default async function BudgetsUsagePage({ params }: Params) {
     ]);
 
     return (
-        <BudgetsUsageClient
-            workId={id}
-            initialSummary={summary}
-            initialBudgets={list.budgets}
-        />
+        <BudgetsUsageClient workId={id} initialSummary={summary} initialBudgets={list.budgets} />
     );
 }

@@ -76,9 +76,7 @@ export class BudgetAlertHandler {
         try {
             const user = await this.userRepository.findById(event.userId);
             if (!user) {
-                this.logger.warn(
-                    `Budget alert: user ${event.userId} not found — skipping email`,
-                );
+                this.logger.warn(`Budget alert: user ${event.userId} not found — skipping email`);
                 return;
             }
             if (!user.email) {

@@ -11,9 +11,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * Forward-only, additive; existing rows pick up the defaults so no
  * backfill is needed.
  */
-export class AddUserPlatformAdminAndBudgetAlertEmail1778871104492
-    implements MigrationInterface
-{
+export class AddUserPlatformAdminAndBudgetAlertEmail1778871104492 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.addColumn(
             'users',

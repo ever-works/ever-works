@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, LessThan, Repository } from 'typeorm';
-import {
-    PluginUsageCapability,
-    PluginUsageEvent,
-} from '@src/entities/plugin-usage-event.entity';
+import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
 
 export type PerPluginSpend = {
     pluginId: string;
@@ -115,10 +112,7 @@ export class PluginUsageRepository {
      * non-zero usage in the period. Sorted by spend descending so
      * the admin sees biggest spenders first.
      */
-    async getCrossUserSpend(
-        periodStart: Date,
-        periodEnd: Date,
-    ): Promise<CrossUserSpendRow[]> {
+    async getCrossUserSpend(periodStart: Date, periodEnd: Date): Promise<CrossUserSpendRow[]> {
         const rows = await this.repository
             .createQueryBuilder('e')
             .select('e.userId', 'userId')

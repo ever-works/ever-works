@@ -1,9 +1,4 @@
-import {
-    CanActivate,
-    ExecutionContext,
-    ForbiddenException,
-    Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { UserRepository } from '@ever-works/agent/database';
 import type { AuthenticatedUser } from '../types/auth.types';
 

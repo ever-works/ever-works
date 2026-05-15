@@ -1,13 +1,4 @@
-import {
-    IsBoolean,
-    IsEnum,
-    IsInt,
-    IsOptional,
-    IsString,
-    Length,
-    Max,
-    Min,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
 import { WorkBudgetScope } from '@ever-works/agent/entities';
 
 /**

@@ -60,14 +60,10 @@ export class BudgetsController {
         await this.assertWriteAccess(workId, auth.userId);
 
         if (dto.scope === WorkBudgetScope.GLOBAL && dto.pluginId) {
-            throw new BadRequestException(
-                'pluginId must be omitted when scope = global',
-            );
+            throw new BadRequestException('pluginId must be omitted when scope = global');
         }
         if (dto.scope === WorkBudgetScope.PLUGIN && !dto.pluginId) {
-            throw new BadRequestException(
-                'pluginId is required when scope = plugin',
-            );
+            throw new BadRequestException('pluginId is required when scope = plugin');
         }
 
         const existing =

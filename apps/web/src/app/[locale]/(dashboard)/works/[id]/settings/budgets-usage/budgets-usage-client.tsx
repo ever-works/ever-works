@@ -5,16 +5,8 @@ import { Plus, Trash2, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import {
-    createBudget,
-    updateBudget,
-    deleteBudget,
-} from '@/app/actions/dashboard/budgets';
-import type {
-    UsageSummary,
-    WorkBudget,
-    PerPluginSpend,
-} from '@/lib/api/types-only';
+import { createBudget, updateBudget, deleteBudget } from '@/app/actions/dashboard/budgets';
+import type { UsageSummary, WorkBudget, PerPluginSpend } from '@/lib/api/types-only';
 
 interface BudgetsUsageClientProps {
     workId: string;
@@ -114,9 +106,7 @@ export function BudgetsUsageClient({
             link.remove();
             URL.revokeObjectURL(url);
         } catch (error) {
-            toast.error(
-                error instanceof Error ? error.message : tExport('csvFailed'),
-            );
+            toast.error(error instanceof Error ? error.message : tExport('csvFailed'));
         } finally {
             setIsExporting(false);
         }
@@ -145,9 +135,7 @@ export function BudgetsUsageClient({
             </header>
 
             <section
-                className={cn(
-                    'rounded-md p-1 border border-card-border dark:border-border-dark',
-                )}
+                className={cn('rounded-md p-1 border border-card-border dark:border-border-dark')}
             >
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark">
                     <div className="flex items-baseline justify-between">
@@ -187,9 +175,7 @@ export function BudgetsUsageClient({
             </section>
 
             <section
-                className={cn(
-                    'rounded-md p-1 border border-card-border dark:border-border-dark',
-                )}
+                className={cn('rounded-md p-1 border border-card-border dark:border-border-dark')}
             >
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark space-y-4">
                     <div className="flex items-baseline justify-between">
@@ -254,9 +240,7 @@ export function BudgetsUsageClient({
             </section>
 
             <section
-                className={cn(
-                    'rounded-md p-1 border border-card-border dark:border-border-dark',
-                )}
+                className={cn('rounded-md p-1 border border-card-border dark:border-border-dark')}
             >
                 <div className="rounded-sm p-5 bg-card dark:bg-surface-secondary-dark border border-card-border dark:border-border-dark">
                     <h2 className="text-lg font-medium text-text dark:text-text-dark">
@@ -318,7 +302,10 @@ interface GlobalCapFormProps {
     existing: WorkBudget | null;
     disabled: boolean;
     onCreate: (data: { scope: 'global'; monthlyCapCents: number; allowOverage: boolean }) => void;
-    onUpdate: (budgetId: string, patch: { monthlyCapCents?: number; allowOverage?: boolean }) => void;
+    onUpdate: (
+        budgetId: string,
+        patch: { monthlyCapCents?: number; allowOverage?: boolean },
+    ) => void;
     onDelete: (budgetId: string) => void;
 }
 
@@ -418,7 +405,10 @@ interface PluginBudgetRowProps {
     currency: string;
     spendCents: number;
     disabled: boolean;
-    onUpdate: (budgetId: string, patch: { monthlyCapCents?: number; allowOverage?: boolean }) => void;
+    onUpdate: (
+        budgetId: string,
+        patch: { monthlyCapCents?: number; allowOverage?: boolean },
+    ) => void;
     onDelete: (budgetId: string) => void;
 }
 
@@ -457,9 +447,7 @@ function PluginBudgetRow({
     return (
         <li className="py-3 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-0">
-                <p className="text-sm text-text dark:text-text-dark truncate">
-                    {budget.pluginId}
-                </p>
+                <p className="text-sm text-text dark:text-text-dark truncate">{budget.pluginId}</p>
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
                     {tPlugin('rowSpend', {
                         spent: formatCents(spendCents, currency),

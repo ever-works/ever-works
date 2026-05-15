@@ -1,8 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-    PluginUsageCapability,
-    PluginUsageEvent,
-} from '@src/entities/plugin-usage-event.entity';
+import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
 
 export type RecordPluginUsageInput = {

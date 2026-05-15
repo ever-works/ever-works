@@ -74,7 +74,10 @@ export function BudgetOverviewCard({
                     <>
                         <div className="mt-4 h-2 w-full rounded-full bg-surface dark:bg-white/6 overflow-hidden">
                             <div
-                                className={cn('h-full rounded-full transition-all', progressColor(percent))}
+                                className={cn(
+                                    'h-full rounded-full transition-all',
+                                    progressColor(percent),
+                                )}
                                 style={{ width: `${visibleWidth}%` }}
                             />
                         </div>

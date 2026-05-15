@@ -27,9 +27,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     const [username, setUsername] = useState(user.username);
     const [committerName, setCommitterName] = useState(user.committerName || '');
     const [committerEmail, setCommitterEmail] = useState(user.committerEmail || '');
-    const [emailBudgetAlerts, setEmailBudgetAlerts] = useState(
-        user.emailBudgetAlerts ?? true,
-    );
+    const [emailBudgetAlerts, setEmailBudgetAlerts] = useState(user.emailBudgetAlerts ?? true);
     const t = useTranslations('dashboard.settings.profile');
 
     const handleResendVerification = () => {

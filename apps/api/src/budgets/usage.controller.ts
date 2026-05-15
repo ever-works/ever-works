@@ -88,9 +88,7 @@ export class UsageController {
                       currency: globalBudget.currency,
                       percentUsed:
                           globalBudget.monthlyCapCents > 0
-                              ? Math.round(
-                                    (totalSpendCents / globalBudget.monthlyCapCents) * 100,
-                                )
+                              ? Math.round((totalSpendCents / globalBudget.monthlyCapCents) * 100)
                               : 0,
                   }
                 : null,
@@ -164,9 +162,7 @@ export class UsageController {
         }
         const body = lines.join('\n') + '\n';
 
-        const periodSlug = window.periodStart
-            .toISOString()
-            .slice(0, 7); // YYYY-MM
+        const periodSlug = window.periodStart.toISOString().slice(0, 7); // YYYY-MM
         const filename = `usage-${workId}-${periodSlug}.csv`;
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');

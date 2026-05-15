@@ -345,9 +345,13 @@ export class MailService {
             }
 
             const appName = config.branding.appName();
-            const percent = context.capCents > 0
-                ? Math.min(150, Math.round((context.currentSpendCents / context.capCents) * 100))
-                : 0;
+            const percent =
+                context.capCents > 0
+                    ? Math.min(
+                          150,
+                          Math.round((context.currentSpendCents / context.capCents) * 100),
+                      )
+                    : 0;
             const isError = context.threshold === '100' || context.threshold === 'overage';
             const thresholdIcon = isError ? '⛔' : '⚠️';
             const titleByThreshold: Record<typeof context.threshold, string> = {
@@ -365,7 +369,8 @@ export class MailService {
             const actionGuidance = isError
                 ? 'Raise the cap or toggle "Allow overage" in Budgets & Usage to continue.'
                 : 'Raise the cap, or wait for next period to reset usage.';
-            const progressColor = percent >= 100 ? '#ef4444' : percent >= 90 ? '#f59e0b' : '#3b82f6';
+            const progressColor =
+                percent >= 100 ? '#ef4444' : percent >= 90 ? '#f59e0b' : '#3b82f6';
             const formatCents = (cents: number): string => {
                 const dollars = cents / 100;
                 return new Intl.NumberFormat('en-US', {

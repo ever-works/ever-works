@@ -76,10 +76,7 @@ export class BudgetService {
         return this.usageRepository.getTotalSpendCents(workId, periodStart, periodEnd, pluginId);
     }
 
-    async evaluateBudget(
-        budget: WorkBudget,
-        now: Date = new Date(),
-    ): Promise<BudgetEvaluation> {
+    async evaluateBudget(budget: WorkBudget, now: Date = new Date()): Promise<BudgetEvaluation> {
         const currentSpendCents = await this.getCurrentSpendCents(
             budget.workId,
             budget.pluginId ?? undefined,
