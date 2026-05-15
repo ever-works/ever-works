@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
@@ -47,7 +47,9 @@ export function BudgetsUsageClient({
     const tGlobal = useTranslations('dashboard.workDetail.settings.budgets.globalCap');
     const tPlugin = useTranslations('dashboard.workDetail.settings.budgets.pluginCaps');
     const tBreakdown = useTranslations('dashboard.workDetail.settings.budgets.spendByPlugin');
+    const tExport = useTranslations('dashboard.workDetail.settings.budgets.export');
     const [isPending, startTransition] = useTransition();
+    const [isExporting, setIsExporting] = useState(false);
 
     const globalBudget = useMemo(
         () => initialBudgets.find((b) => b.scope === 'global') ?? null,
@@ -87,15 +89,59 @@ export function BudgetsUsageClient({
         });
     };
 
+    const downloadCsv = async () => {
+        setIsExporting(true);
+        try {
+            const response = await fetch(`/api/works/${workId}/usage/export?format=csv`, {
+                method: 'GET',
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const blob = await response.blob();
+            const filename = (() => {
+                const cd = response.headers.get('content-disposition') ?? '';
+                const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+                return match ? decodeURIComponent(match[1]) : `usage-${workId}.csv`;
+            })();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            toast.error(
+                error instanceof Error ? error.message : tExport('csvFailed'),
+            );
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
-            <header>
-                <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                    {t('title')}
-                </h1>
-                <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('description')}
-                </p>
+            <header className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('description')}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={downloadCsv}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-2 rounded-md border border-border dark:border-border-dark px-3 py-1.5 text-sm font-medium text-text dark:text-text-dark hover:bg-surface dark:hover:bg-white/6 disabled:opacity-60"
+                >
+                    <Download className="w-4 h-4" />
+                    {isExporting ? tExport('downloadingCsv') : tExport('downloadCsv')}
+                </button>
             </header>
 
             <section

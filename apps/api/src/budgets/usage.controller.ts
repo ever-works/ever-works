@@ -3,11 +3,23 @@ import {
     Controller,
     ForbiddenException,
     Get,
+    Header,
     NotFoundException,
     Param,
     Query,
+    Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
+/**
+ * Minimal Response surface for CSV streaming. Mirrors the convention
+ * established by works.controller.ts and activity-log.controller.ts —
+ * avoids pulling the full `import('express').Response` type.
+ */
+type DownloadResponse = {
+    setHeader(name: string, value: string): void;
+    send(body: string | Buffer): void;
+};
 import { BudgetService } from '@ever-works/agent/budgets';
 import {
     WorkRepository,
@@ -83,6 +95,83 @@ export class UsageController {
                   }
                 : null,
         };
+    }
+
+    @Get('export')
+    @ApiOperation({
+        summary: 'EW-602: download per-Work usage events as CSV for the billing period',
+    })
+    @Header('Cache-Control', 'no-store')
+    async exportCsv(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('workId') workId: string,
+        @Res() res: DownloadResponse,
+        @Query('period') period?: string,
+        @Query('format') format?: string,
+    ): Promise<void> {
+        await this.assertReadAccess(workId, auth.userId);
+
+        if (format && format !== 'csv') {
+            throw new BadRequestException(
+                `Unsupported format '${format}'. Only 'csv' is supported in V1.`,
+            );
+        }
+
+        const window = this.resolvePeriodWindow(period);
+        const events = await this.usageRepository.findForExport(
+            workId,
+            window.periodStart,
+            window.periodEnd,
+        );
+
+        const header = [
+            'occurredAt',
+            'pluginId',
+            'capability',
+            'units',
+            'costCents',
+            'currency',
+            'modelId',
+            'requestId',
+        ];
+        const escape = (value: unknown): string => {
+            if (value === null || value === undefined) return '';
+            const str = typeof value === 'string' ? value : String(value);
+            if (/[",\n\r]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const lines = [header.join(',')];
+        for (const event of events) {
+            lines.push(
+                [
+                    event.occurredAt instanceof Date
+                        ? event.occurredAt.toISOString()
+                        : String(event.occurredAt),
+                    event.pluginId,
+                    event.capability,
+                    event.units,
+                    event.costCents,
+                    event.currency,
+                    event.modelId,
+                    event.requestId,
+                ]
+                    .map(escape)
+                    .join(','),
+            );
+        }
+        const body = lines.join('\n') + '\n';
+
+        const periodSlug = window.periodStart
+            .toISOString()
+            .slice(0, 7); // YYYY-MM
+        const filename = `usage-${workId}-${periodSlug}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(body);
     }
 
     @Get('trend')
