@@ -145,13 +145,13 @@ sequenceDiagram
 
 ## 7. Risks and mitigations
 
-| Risk | Mitigation |
-| --- | --- |
-| Platform kubeconfig leaks into a customer's website repo as the `K8S_TOKEN` secret | The matrix forbids `Ever Works-shared GHCR + custom cluster` combos, which is the only path where a customer cluster would see the secret. |
-| Sentinel value leaks into a pushed secret if the facade invariant breaks in the future | `DeployService.resolveDeployToken` defensively strips it before the resolver; spec'd as FR-7 and pinned by `does not leak the sentinel` test. |
-| Missing env var silently succeeds with empty kubeconfig | `resolveKubeconfigForClusterSource` throws on `undefined` and on whitespace-only values; covered by 4 unit tests. |
-| Existing customer-org Works break after EW-616 deploys | Back-compat default (`coerceClusterSource` returns `custom-kubeconfig` for missing values) keeps them on the existing path. Covered by `back-compat: no clusterSource + customer-owned org + user kubeconfig → uses user kubeconfig` test. |
-| Long-lived platform kubeconfigs become a blast-radius problem if leaked | Out-of-scope follow-up to rotate to short-lived service-account tokens. Documented in spec §5. |
+| Risk                                                                                   | Mitigation                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Platform kubeconfig leaks into a customer's website repo as the `K8S_TOKEN` secret     | The matrix forbids `Ever Works-shared GHCR + custom cluster` combos, which is the only path where a customer cluster would see the secret.                                                                                                 |
+| Sentinel value leaks into a pushed secret if the facade invariant breaks in the future | `DeployService.resolveDeployToken` defensively strips it before the resolver; spec'd as FR-7 and pinned by `does not leak the sentinel` test.                                                                                              |
+| Missing env var silently succeeds with empty kubeconfig                                | `resolveKubeconfigForClusterSource` throws on `undefined` and on whitespace-only values; covered by 4 unit tests.                                                                                                                          |
+| Existing customer-org Works break after EW-616 deploys                                 | Back-compat default (`coerceClusterSource` returns `custom-kubeconfig` for missing values) keeps them on the existing path. Covered by `back-compat: no clusterSource + customer-owned org + user kubeconfig → uses user kubeconfig` test. |
+| Long-lived platform kubeconfigs become a blast-radius problem if leaked                | Out-of-scope follow-up to rotate to short-lived service-account tokens. Documented in spec §5.                                                                                                                                             |
 
 ## 8. Rollout
 

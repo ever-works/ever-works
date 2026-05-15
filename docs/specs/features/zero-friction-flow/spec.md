@@ -26,16 +26,16 @@ keep their Work.
 Each gap is tracked as a sub-task under EW-617 and shipped as its own
 PR.
 
-| #  | Title                                                          | Jira    | Status   |
-|----|----------------------------------------------------------------|---------|----------|
-| G1 | Landing-page prompt input + handoff to app.ever.works          | EW-618  | Planned  |
-| G2 | Anonymous / temporary user auth                                | EW-619  | This PR  |
-| G3 | Claim-Account flow (anon → registered)                         | EW-620  | This PR  |
-| G4 | Wizard "Finish & Generate with Defaults" + `/api/works/quick-create` | EW-621 | Planned |
-| G5 | Subdomain ingress + Cloudflare DNS automation                  | EW-622  | Planned  |
-| G6 | Default `work.deployProvider` `'vercel'` → `'ever-works'`      | EW-623  | Merged (#752) |
-| G7 | Quotas + abuse protection                                      | EW-624  | Planned  |
-| G8 | Telemetry events + ops runbook                                 | EW-625  | Planned  |
+| #   | Title                                                                | Jira   | Status        |
+| --- | -------------------------------------------------------------------- | ------ | ------------- |
+| G1  | Landing-page prompt input + handoff to app.ever.works                | EW-618 | Planned       |
+| G2  | Anonymous / temporary user auth                                      | EW-619 | This PR       |
+| G3  | Claim-Account flow (anon → registered)                               | EW-620 | This PR       |
+| G4  | Wizard "Finish & Generate with Defaults" + `/api/works/quick-create` | EW-621 | Planned       |
+| G5  | Subdomain ingress + Cloudflare DNS automation                        | EW-622 | Planned       |
+| G6  | Default `work.deployProvider` `'vercel'` → `'ever-works'`            | EW-623 | Merged (#752) |
+| G7  | Quotas + abuse protection                                            | EW-624 | Planned       |
+| G8  | Telemetry events + ops runbook                                       | EW-625 | Planned       |
 
 ## G3 — Claim-Account flow (anonymous → registered)
 
@@ -46,7 +46,7 @@ PR.
   caller's `User` row is not `is_anonymous = true`. This prevents
   hijacking an already-registered account.
 - **FR-G3-2** The endpoint accepts `{ email, password, username?,
-  emailVerificationCallbackUrl? }` (validated by `ClaimAccountDto`
+emailVerificationCallbackUrl? }` (validated by `ClaimAccountDto`
   with the same password rules as `RegisterDto`).
 - **FR-G3-3** If `email` (normalized to lowercase, trimmed) matches a
   different existing user, the endpoint MUST return 409 Conflict.
@@ -90,7 +90,7 @@ PR.
 - **FR-G2-3** `POST /api/auth/anonymous` MUST mint a fresh `User` row
   with `is_anonymous=true`, `email=NULL`, `password=NULL`,
   `registration_provider='anonymous'`, `anonymous_expires_at = now +
-  ANONYMOUS_USER_TTL_DAYS` (default 7), then issue an `AuthSession`
+ANONYMOUS_USER_TTL_DAYS` (default 7), then issue an `AuthSession`
   token and return `{ access_token, user }` in the same shape as
   `POST /api/auth/register`.
 - **FR-G2-4** `POST /api/auth/anonymous` MUST be rate-limited per IP
@@ -106,7 +106,7 @@ PR.
   reject anonymous users explicitly.
 - **FR-G2-7** A nightly Trigger.dev schedule `anonymous-user-cleanup`
   (cron `17 3 * * *`) MUST find users with `is_anonymous=true AND
-  anonymous_expires_at < now` and delete them. The existing `work.user`
+anonymous_expires_at < now` and delete them. The existing `work.user`
   `ON DELETE CASCADE` removes their Works. A single delete failure
   MUST log + continue so one stuck row cannot block the batch.
 - **FR-G2-8** The web-side `JwtPayload` type MUST expose `isAnonymous`
