@@ -842,6 +842,11 @@
             "profile": {
                 "title": "Profile Settings",
                 "subtitle": "Update your profile information and avatar",
+                "budgetAlerts": {
+                    "title": "Budget alert emails",
+                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
+                    "toggleLabel": "Email me budget alerts"
+                },
                 "fields": {
                     "name": "Name",
                     "username": "Username",

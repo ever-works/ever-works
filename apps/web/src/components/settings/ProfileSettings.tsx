@@ -16,6 +16,8 @@ interface ProfileSettingsProps {
         emailVerified?: boolean;
         committerName?: string | null;
         committerEmail?: string | null;
+        /** EW-602: per-user opt-out for budget alert emails. Defaults to true server-side. */
+        emailBudgetAlerts?: boolean;
     };
 }
 
@@ -25,6 +27,9 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     const [username, setUsername] = useState(user.username);
     const [committerName, setCommitterName] = useState(user.committerName || '');
     const [committerEmail, setCommitterEmail] = useState(user.committerEmail || '');
+    const [emailBudgetAlerts, setEmailBudgetAlerts] = useState(
+        user.emailBudgetAlerts ?? true,
+    );
     const t = useTranslations('dashboard.settings.profile');
 
     const handleResendVerification = () => {
@@ -57,6 +62,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                         username: username.trim(),
                         committerName: committerName.trim() || null,
                         committerEmail: committerEmail.trim() || null,
+                        emailBudgetAlerts,
                     });
 
                     if (result.success) {
@@ -148,6 +154,24 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                             placeholder={user.email}
                         />
                     </div>
+                </div>
+
+                {/* EW-602: per-user opt-out for budget alert emails */}
+                <div className="border-t border-border dark:border-border-dark pt-4">
+                    <p className="text-sm font-medium text-text dark:text-text-dark mb-1">
+                        {t('budgetAlerts.title')}
+                    </p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">
+                        {t('budgetAlerts.description')}
+                    </p>
+                    <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={emailBudgetAlerts}
+                            onChange={(e) => setEmailBudgetAlerts(e.target.checked)}
+                        />
+                        {t('budgetAlerts.toggleLabel')}
+                    </label>
                 </div>
 
                 {/* Save Button */}
