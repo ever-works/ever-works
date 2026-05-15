@@ -128,4 +128,20 @@ export class QuickCreateWorkDto {
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)
     readmeConfig?: MarkdownReadmeConfigDto;
+
+    @ApiPropertyOptional({
+        description:
+            'Captcha token (Cloudflare Turnstile / hCaptcha / reCAPTCHA). Required only when CAPTCHA_PROVIDER + CAPTCHA_SECRET are configured server-side; ignored in dev where captcha is disabled.',
+    })
+    @IsOptional()
+    @IsString()
+    captchaToken?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Optional UUID v4 minted at funnel entry (landing page → wizard). Threaded into the zero-friction telemetry funnel so ops can correlate `landing_prompt_submit` → `work_created` → `deploy_ready` across services.',
+    })
+    @IsOptional()
+    @IsString()
+    correlationId?: string;
 }

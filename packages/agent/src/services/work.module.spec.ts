@@ -105,6 +105,7 @@ jest.mock('@src/ever-works-providers', () => ({
     EVER_WORKS_DEPLOY_QUOTA_COUNTER: Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER'),
     EverWorksDeployQuotaService: class EverWorksDeployQuotaService {},
     EverWorksGitProvider: class EverWorksGitProvider {},
+    EverWorksDnsService: class EverWorksDnsService {},
 }));
 jest.mock('@src/database/repositories/work.repository', () => ({
     WorkRepository: class WorkRepository {},
@@ -115,6 +116,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksDnsService,
 } from '@src/ever-works-providers';
 import { WorkDetailService } from './work-detail.service';
 import { WorkOwnershipService } from './work-ownership.service';
@@ -146,7 +148,6 @@ import { PluginOperationsService } from '../plugins/services/plugin-operations.s
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
-import { EverWorksDnsService } from '../ever-works-providers/cloudflare-dns.provider';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
