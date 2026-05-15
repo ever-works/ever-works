@@ -115,3 +115,16 @@ export type {
 
 // Re-export plugin types for client components
 export type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';
+
+export type {
+    // From budgets.ts (EW-602)
+    BudgetScope,
+    WorkBudget,
+    CreateBudgetInput,
+    UpdateBudgetInput,
+    PerPluginSpend,
+    GlobalBudgetSummary,
+    UsageSummary,
+    DailySpendBucket,
+    UsageTrend,
+} from './budgets';

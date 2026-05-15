@@ -7,7 +7,7 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { useWorkPermissions } from '../WorkDetailContext';
-import { Settings, Users } from 'lucide-react';
+import { Settings, Users, Wallet } from 'lucide-react';
 
 interface SettingsSubTabsProps {
     workId: string;
@@ -23,6 +23,7 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
 
     const settingsBase = ROUTES.DASHBOARD_WORK_SETTINGS(workId);
     const membersHref = ROUTES.DASHBOARD_WORK_SETTINGS_MEMBERS(workId);
+    const budgetsHref = ROUTES.DASHBOARD_WORK_SETTINGS_BUDGETS(workId);
 
     const tabs = [
         {
@@ -31,7 +32,8 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
             icon: Settings,
             isActive:
                 (pathname.endsWith('/settings') || pathname.endsWith('/settings/')) &&
-                !pathname.includes('/settings/members'),
+                !pathname.includes('/settings/members') &&
+                !pathname.includes('/settings/budgets-usage'),
         },
         {
             name: t('members'),
@@ -39,6 +41,12 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
             icon: Users,
             visible: permissions.canManageMembers,
             isActive: pathname.includes('/settings/members'),
+        },
+        {
+            name: 'Budgets',
+            href: budgetsHref,
+            icon: Wallet,
+            isActive: pathname.includes('/settings/budgets-usage'),
         },
     ].filter((tab) => tab.visible !== false);
 

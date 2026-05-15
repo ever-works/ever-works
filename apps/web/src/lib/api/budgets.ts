@@ -1,5 +1,33 @@
 import 'server-only';
-import { serverFetch } from './server-api';
+import { serverFetch, serverMutation } from './server-api';
+
+export type BudgetScope = 'global' | 'plugin';
+
+export interface WorkBudget {
+    id: string;
+    workId: string;
+    scope: BudgetScope;
+    pluginId: string | null;
+    monthlyCapCents: number;
+    currency: string;
+    allowOverage: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateBudgetInput {
+    scope: BudgetScope;
+    pluginId?: string;
+    monthlyCapCents: number;
+    allowOverage?: boolean;
+    currency?: string;
+}
+
+export interface UpdateBudgetInput {
+    monthlyCapCents?: number;
+    allowOverage?: boolean;
+    currency?: string;
+}
 
 export interface PerPluginSpend {
     pluginId: string;
@@ -55,5 +83,40 @@ export const budgetsAPI = {
         if (period) params.set('period', period);
         params.set('granularity', granularity);
         return serverFetch<UsageTrend>(`/works/${workId}/usage/trend?${params.toString()}`);
+    },
+
+    list: async (workId: string): Promise<{ budgets: WorkBudget[] }> => {
+        return serverFetch<{ budgets: WorkBudget[] }>(`/works/${workId}/budgets`);
+    },
+
+    create: async (workId: string, data: CreateBudgetInput): Promise<{ budget: WorkBudget }> => {
+        return serverMutation<{ budget: WorkBudget }>({
+            endpoint: `/works/${workId}/budgets`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    update: async (
+        workId: string,
+        budgetId: string,
+        data: UpdateBudgetInput,
+    ): Promise<{ budget: WorkBudget }> => {
+        return serverMutation<{ budget: WorkBudget }>({
+            endpoint: `/works/${workId}/budgets/${budgetId}`,
+            data,
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    remove: async (workId: string, budgetId: string): Promise<{ deletedId: string }> => {
+        return serverMutation<{ deletedId: string }>({
+            endpoint: `/works/${workId}/budgets/${budgetId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
     },
 };
