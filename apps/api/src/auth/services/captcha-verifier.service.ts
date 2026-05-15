@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 /**
  * EW-617 G7 — Cloudflare Turnstile (or any compatible /siteverify
@@ -47,12 +47,16 @@ const DEFAULT_VERIFY_URLS: Record<string, string> = {
     recaptcha: 'https://www.google.com/recaptcha/api/siteverify',
 };
 
+export const CAPTCHA_FETCH = Symbol('CAPTCHA_FETCH');
+
 @Injectable()
 export class CaptchaVerifierService {
     private readonly logger = new Logger(CaptchaVerifierService.name);
     private cachedConfig: CaptchaConfig | undefined;
 
-    constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+    constructor(
+        @Optional() @Inject(CAPTCHA_FETCH) private readonly fetchImpl: typeof fetch = fetch,
+    ) {}
 
     /** Read env once and cache. Test hook: `resetCacheForTest`. */
     getConfig(): CaptchaConfig {

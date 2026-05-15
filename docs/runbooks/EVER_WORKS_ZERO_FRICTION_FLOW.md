@@ -125,12 +125,58 @@ user.isAnonymous: true }`.
 | Env var                         | Owned by | Notes                                                                     |
 | ------------------------------- | -------- | ------------------------------------------------------------------------- |
 | `ANONYMOUS_USER_TTL_DAYS`       | G2       | Default 7. Garbage values fall back to 7.                                 |
+| `CAPTCHA_PROVIDER`              | G7       | `turnstile` / `hcaptcha` / `recaptcha` or empty (disabled).               |
+| `CAPTCHA_SECRET`                | G7       | Server-side secret for the provider's `/siteverify`.                      |
 | `CLOUDFLARE_API_TOKEN`          | G5       | Scoped: DNS:Edit on the `ever.works` zone only. Never the global key.     |
 | `CLOUDFLARE_ZONE_ID`            | G5       | 32-char hex.                                                              |
 | `EVER_WORKS_DEPLOY_LB_HOSTNAME` | G5       | Cluster ingress LB DNS name. Required for DNS automation.                 |
 | `EVER_WORKS_DOMAIN`             | G5       | Defaults to `ever.works`.                                                 |
 | `DEPLOY_EVER_WORKS_ENABLED`     | EW-608   | Gates the `ever-works` deploy provider end-to-end.                        |
 | `NEXT_PUBLIC_APP_URL`           | G1       | Where the landing page sends users. Defaults to `https://app.ever.works`. |
+
+### Live values (dev / stage / prod, as of 2026-05-15)
+
+| Env var                         | Value (or source)                                              |
+| ------------------------------- | -------------------------------------------------------------- |
+| `DEPLOY_EVER_WORKS_ENABLED`     | `true` (inlined in deploy-do-{dev,stage,prod}.yml)             |
+| `EVER_WORKS_DOMAIN`             | `ever.works` (inlined in workflows)                            |
+| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | `lb.ever.works` → A `157.230.74.11` (k8s-works ingress LB)     |
+| `CLOUDFLARE_API_TOKEN`          | GH secret `CLOUDFLARE_API_TOKEN` (Zone:DNS edit on ever.works) |
+| `CLOUDFLARE_ZONE_ID`            | GH secret `CLOUDFLARE_ZONE_ID` → `14b28d7fd73db5679d4280e4278ec6cf` |
+| `CAPTCHA_PROVIDER`              | GH secret `CAPTCHA_PROVIDER` — **empty** until Turnstile widget + client wiring ship |
+| `CAPTCHA_SECRET`                | GH secret `CAPTCHA_SECRET` — **empty** until Turnstile widget + client wiring ship   |
+
+### Deploy mechanism
+
+Env vars land in pods via the `envsubst` step in
+`.github/workflows/deploy-do-{dev,stage,prod}.yml` against the
+`.deploy/k8s/k8s-manifest.{dev,stage,prod}.yaml` placeholders. Each
+workflow's `env:` map maps GH secrets / inline values → `$VAR` →
+container env. Adding a new env var = (a) declare `- name: VAR / value:
+"$VAR"` in the 3 manifest YAMLs, (b) pass `VAR: ${{ secrets.VAR }}` (or
+inline) in the 3 workflow YAMLs, (c) `gh secret set VAR --repo
+ever-works/ever-works`.
+
+### DNS anchor record
+
+`lb.ever.works → A 157.230.74.11` is the anchor that all customer
+`{slug}.ever.works` CNAMEs point at. Created via the Cloudflare API
+2026-05-15 (PR ${{TBD}}). To rotate the LB IP, update this A record
+once; every existing CNAME inherits the new target. The k8s-works
+LoadBalancer Service (`ingress-nginx/ingress-nginx-controller`) does not
+expose a hostname, only an IP, which is why the anchor record exists in
+the first place.
+
+### Cloudflare token security note
+
+The token currently in GH secrets has broader scope than strictly
+needed (Zone:DNS edit on ever.works is the only operation
+`EverWorksDnsService` performs, but the token currently used can also
+read other zones in the account). **Follow-up**: rotate to a
+zone-scoped token via the Cloudflare dashboard → My Profile → API
+Tokens → "Create Token" → "Edit zone DNS" template scoped to
+`ever.works` only. Update the `CLOUDFLARE_API_TOKEN` GH secret with
+the new value; the platform code path is unchanged.
 
 ## Dashboards
 

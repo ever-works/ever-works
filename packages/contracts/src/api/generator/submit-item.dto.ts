@@ -33,4 +33,8 @@ export interface SubmitItemDto {
 	images?: string[];
 	/** Whether to create a pull request */
 	create_pull_request?: boolean;
+	/** Long-form markdown body. Written to `data/<slug>/<slug>.md` and mirrored
+	 *  on the YAML `markdown` field. When omitted, the generator falls back
+	 *  to a stub built from name + description + source_url. */
+	markdown?: string;
 }
