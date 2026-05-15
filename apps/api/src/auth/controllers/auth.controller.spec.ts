@@ -6,11 +6,15 @@ jest.mock('@ever-works/agent/entities', () => ({
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
 }));
+jest.mock('@ever-works/agent/services', () => ({
+    ZeroFrictionFunnelService: class ZeroFrictionFunnelService {},
+}));
 
 import { AuthController } from './auth.controller';
 import type { AuthService } from '../services/auth.service';
 import type { AnonymousAuthService } from '../services/anonymous-auth.service';
 import type { ClaimAccountService } from '../services/claim-account.service';
+import type { CaptchaVerifierService } from '../services/captcha-verifier.service';
 import type { SocialAuthService } from '../services/social-auth.service';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
 import type { AuthProvider } from '../providers/auth-provider.abstract';
@@ -35,6 +39,8 @@ describe('AuthController', () => {
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
     let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
     let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
+    let captchaVerifier: jest.Mocked<Pick<CaptchaVerifierService, 'isEnabled' | 'verify'>>;
+    let funnel: { emit: jest.Mock };
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
         Pick<
@@ -65,6 +71,12 @@ describe('AuthController', () => {
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
         anonymousAuth = { createAnonymousUser: jest.fn() } as any;
         claimAccount = { claim: jest.fn() } as any;
+        // Default: captcha disabled (no-op) so existing tests pass through.
+        captchaVerifier = {
+            isEnabled: jest.fn().mockReturnValue(false),
+            verify: jest.fn().mockResolvedValue({ success: true, skipped: true }),
+        } as any;
+        funnel = { emit: jest.fn() };
         activityLog = { log: jest.fn().mockResolvedValue(undefined) } as any;
         authProvider = {
             signUpEmail: jest.fn(),
@@ -80,6 +92,8 @@ describe('AuthController', () => {
             socialAuth as unknown as SocialAuthService,
             anonymousAuth as unknown as AnonymousAuthService,
             claimAccount as unknown as ClaimAccountService,
+            captchaVerifier as unknown as CaptchaVerifierService,
+            funnel as any,
             activityLog as unknown as ActivityLogService,
             authProvider as unknown as AuthProvider,
         );
