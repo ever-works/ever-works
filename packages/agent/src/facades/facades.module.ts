@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { UsageModule } from '../usage/usage.module';
+import { BudgetsModule } from '../budgets/budgets.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -47,7 +48,7 @@ const FACADES = [
  * at the application root level. Do not import PluginsModule directly here.
  */
 @Module({
-    imports: [DatabaseModule, UsageModule],
+    imports: [DatabaseModule, UsageModule, BudgetsModule],
     providers: FACADES,
     exports: FACADES,
 })

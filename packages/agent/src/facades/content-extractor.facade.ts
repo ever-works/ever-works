@@ -16,6 +16,7 @@ import {
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
+import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import {
     BaseFacadeService,
@@ -64,6 +65,7 @@ export class ContentExtractorFacadeService
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional() private readonly budgetGuard?: BudgetGuardService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -114,6 +116,15 @@ export class ContentExtractorFacadeService
 
         for (const candidate of candidates) {
             try {
+                if (this.budgetGuard && facadeOptions.workId && facadeOptions.userId) {
+                    await this.budgetGuard.checkBudget(
+                        facadeOptions.workId,
+                        facadeOptions.userId,
+                        PluginUsageCapability.EXTRACTOR,
+                        candidate.id,
+                    );
+                }
+
                 const settings = await this.getResolvedSettings(candidate.id, facadeOptions);
                 const result = await candidate.plugin.extract({
                     url,

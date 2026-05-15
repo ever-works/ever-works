@@ -22,6 +22,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
+import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
@@ -49,8 +50,24 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional() private readonly budgetGuard?: BudgetGuardService,
     ) {
         super(registry, settingsService, workPluginRepository);
+    }
+
+    private async enforceBudget(
+        facadeOptions: { workId?: string; userId?: string },
+        pluginId: string,
+    ): Promise<void> {
+        if (!this.budgetGuard || !facadeOptions.workId || !facadeOptions.userId) {
+            return;
+        }
+        await this.budgetGuard.checkBudget(
+            facadeOptions.workId,
+            facadeOptions.userId,
+            PluginUsageCapability.AI,
+            pluginId,
+        );
     }
 
     async askJson<T, Template extends string = string>(
@@ -64,6 +81,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             facadeOptions.userId,
             facadeOptions.workId,
         );
+
+        await this.enforceBudget(facadeOptions, plugin.id);
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
@@ -249,6 +268,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             facadeOptions.workId,
         );
 
+        await this.enforceBudget(facadeOptions, plugin.id);
+
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
             workId: facadeOptions.workId,
@@ -291,6 +312,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             facadeOptions.userId,
             facadeOptions.workId,
         );
+
+        await this.enforceBudget(facadeOptions, plugin.id);
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,

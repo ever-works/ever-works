@@ -13,6 +13,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
+import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
@@ -33,6 +34,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional() private readonly budgetGuard?: BudgetGuardService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -46,6 +48,15 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
             facadeOptions.userId,
             facadeOptions.workId,
         );
+
+        if (this.budgetGuard && facadeOptions.workId && facadeOptions.userId) {
+            await this.budgetGuard.checkBudget(
+                facadeOptions.workId,
+                facadeOptions.userId,
+                PluginUsageCapability.SCREENSHOT,
+                plugin.id,
+            );
+        }
 
         const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
