@@ -60,13 +60,19 @@ export class CodeEditFacadeService {
             return registered.plugin;
         }
 
-        const candidates = this.registry.getByCapability(this.CAPABILITY).filter((p) => p.state === 'loaded');
+        const candidates = this.registry
+            .getByCapability(this.CAPABILITY)
+            .filter((p) => p.state === 'loaded');
         if (candidates.length === 0) {
-            throw new Error('No code-edit provider available — install claude-code, codex, gemini, or opencode');
+            throw new Error(
+                'No code-edit provider available — install claude-code, codex, gemini, or opencode',
+            );
         }
         const plugin = candidates[0].plugin;
         if (!isCodeEditPlugin(plugin)) {
-            throw new Error(`Default plugin ${plugin.id} does not implement the code-edit capability`);
+            throw new Error(
+                `Default plugin ${plugin.id} does not implement the code-edit capability`,
+            );
         }
         return plugin;
     }

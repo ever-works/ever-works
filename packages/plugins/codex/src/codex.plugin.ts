@@ -236,7 +236,9 @@ const RECOVERY_OUTPUT_SCHEMA = {
 	}
 } as const;
 
-export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, IDeviceAuthProvider, ICodeEditPlugin {
+export class CodexPlugin
+	implements IPlugin, IPipelinePlugin, IFormSchemaProvider, IDeviceAuthProvider, ICodeEditPlugin
+{
 	readonly id = 'codex';
 	readonly name = 'Codex Generator';
 	readonly providerName = 'OpenAI Codex';
@@ -1438,7 +1440,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			summary,
 			filesChanged,
 			duration: Date.now() - startTime,
-			error: success ? undefined : (result.stderr || `Exit ${result.exitCode}`),
+			error: success ? undefined : result.stderr || `Exit ${result.exitCode}`,
 			extra: { exitCode: result.exitCode }
 		};
 	}

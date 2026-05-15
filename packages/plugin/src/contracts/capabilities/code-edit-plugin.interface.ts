@@ -18,10 +18,7 @@ import type { IPlugin } from '../plugin.js';
 export interface ICodeEditPlugin extends IPlugin {
 	readonly providerName?: string;
 
-	executeCodeEdit(
-		request: CodeEditRequest,
-		options?: CodeEditOptions
-	): Promise<CodeEditResult>;
+	executeCodeEdit(request: CodeEditRequest, options?: CodeEditOptions): Promise<CodeEditResult>;
 
 	/** Optional cancel — invoked when the controller aborts the run. */
 	cancelCodeEdit?(): Promise<void>;

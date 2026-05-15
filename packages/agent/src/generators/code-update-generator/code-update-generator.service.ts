@@ -80,7 +80,13 @@ export class CodeUpdateGeneratorService {
 
             const edit = await this.runAgent(work, record, workspaceDir);
             await this.commitAndPush(work, user, workspaceDir, record);
-            const pr = await this.openProposalPr(work, branch, template.branch, record, edit.summary);
+            const pr = await this.openProposalPr(
+                work,
+                branch,
+                template.branch,
+                record,
+                edit.summary,
+            );
 
             await this.codeUpdateRepository.update(codeUpdateId, {
                 status: WorkCodeUpdateStatus.PROPOSED,

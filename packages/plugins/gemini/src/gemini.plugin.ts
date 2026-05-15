@@ -1100,7 +1100,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				summary,
 				filesChanged,
 				duration: Date.now() - startTime,
-				error: success ? undefined : (result.stderr || `Exit ${result.exitCode}`),
+				error: success ? undefined : result.stderr || `Exit ${result.exitCode}`,
 				extra: { exitCode: result.exitCode }
 			};
 		} finally {

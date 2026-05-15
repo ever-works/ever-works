@@ -1104,10 +1104,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	// owns clone/branch/commit/push — this method only handles the AI step.
 	// ─────────────────────────────────────────────────────────────────────
 
-	async executeCodeEdit(
-		request: CodeEditRequest,
-		options?: CodeEditOptions
-	): Promise<CodeEditResult> {
+	async executeCodeEdit(request: CodeEditRequest, options?: CodeEditOptions): Promise<CodeEditResult> {
 		const startTime = Date.now();
 		const execContext = options?.execContext as
 			| { resolveSettings?: () => Promise<Record<string, unknown>> }
