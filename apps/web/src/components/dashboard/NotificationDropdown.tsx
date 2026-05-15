@@ -141,14 +141,20 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         }
     }, [t]);
 
-    const fetchUnreadCount = useCallback(async () => {
+    // Returns the freshly-fetched count so the polling effect can compare
+    // previous-vs-current without racing the React commit (the
+    // `setUnreadCount` write isn't visible synchronously).
+    const fetchUnreadCount = useCallback(async (): Promise<number | null> => {
         try {
             const result = await getUnreadNotificationCount();
             if (result.success && result.count !== undefined) {
                 setUnreadCount(result.count);
+                return result.count;
             }
+            return null;
         } catch (error) {
             console.error('Failed to fetch unread count:', error);
+            return null;
         }
     }, []);
 
@@ -190,12 +196,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     useEffect(() => {
         const updateUnreadCount = async () => {
             const previous = lastUnreadCountRef.current;
-            await fetchUnreadCount();
-            // Read latest unread count off the state setter via a microtask:
-            // we just wrote it via setUnreadCount; access via the ref pattern
-            // by re-fetching via a getter. Simpler: track inside fetchUnreadCount
-            // via the ref directly.
-            const current = lastUnreadCountRef.current;
+            const current = await fetchUnreadCount();
+            if (current === null) return;
+            lastUnreadCountRef.current = current;
             if (current > previous || !hasInitializedSeenRef.current) {
                 await surfaceNewAiCreditsToasts();
             }
@@ -207,12 +210,6 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         }, POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [fetchUnreadCount, surfaceNewAiCreditsToasts]);
-
-    // Mirror unread count to the ref so the polling effect can compare
-    // without resubscribing on every count change.
-    useEffect(() => {
-        lastUnreadCountRef.current = unreadCount;
-    }, [unreadCount]);
 
     // Fetch notifications when dropdown opens
     useEffect(() => {

@@ -133,6 +133,104 @@ describe('NotificationDropdown — EW-602 auto-toast', () => {
         );
     });
 
+    it('fires a toast on the second poll when a new ai_credits notification appears (count grew)', async () => {
+        // Seed first poll: count=1, one existing alert (no toast for the seed)
+        getUnreadNotificationCount.mockResolvedValueOnce({ success: true, count: 1 });
+        getNotifications.mockResolvedValueOnce({
+            success: true,
+            notifications: [
+                makeNotif({ id: 'n-existing', type: 'warning', category: 'ai_credits' }),
+            ],
+        });
+        // Second poll: count grew to 2, a NEW ai_credits notification at the top
+        getUnreadNotificationCount.mockResolvedValueOnce({ success: true, count: 2 });
+        getNotifications.mockResolvedValueOnce({
+            success: true,
+            notifications: [
+                makeNotif({
+                    id: 'n-new',
+                    type: 'warning',
+                    category: 'ai_credits',
+                    title: 'Cap exceeded',
+                    message: 'You hit 100% on directory budget',
+                }),
+                makeNotif({ id: 'n-existing', type: 'warning', category: 'ai_credits' }),
+            ],
+        });
+
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            render(<NotificationDropdown />);
+            // Wait for the first (seed) poll to complete
+            await waitFor(() => {
+                expect(getNotifications).toHaveBeenCalledTimes(1);
+            });
+            expect(toastWarning).not.toHaveBeenCalled();
+
+            // Advance past POLL_INTERVAL (30s) → second poll fires
+            await act(async () => {
+                vi.advanceTimersByTime(30_000);
+            });
+            await waitFor(() => {
+                expect(getNotifications).toHaveBeenCalledTimes(2);
+            });
+            await waitFor(() => {
+                expect(toastWarning).toHaveBeenCalledWith('Cap exceeded', {
+                    description: 'You hit 100% on directory budget',
+                });
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('uses toast.error for type=error and toast.warning otherwise', async () => {
+        // Seed
+        getUnreadNotificationCount.mockResolvedValueOnce({ success: true, count: 0 });
+        getNotifications.mockResolvedValueOnce({ success: true, notifications: [] });
+        // Second poll: count grew, two new ai_credits notifs (1 error + 1 warning)
+        getUnreadNotificationCount.mockResolvedValueOnce({ success: true, count: 2 });
+        getNotifications.mockResolvedValueOnce({
+            success: true,
+            notifications: [
+                makeNotif({
+                    id: 'n-err',
+                    type: 'error',
+                    category: 'ai_credits',
+                    title: 'Hard stop',
+                    message: 'Budget exceeded',
+                }),
+                makeNotif({
+                    id: 'n-warn',
+                    type: 'warning',
+                    category: 'ai_credits',
+                    title: 'Approaching cap',
+                    message: '90% used',
+                }),
+            ],
+        });
+
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            render(<NotificationDropdown />);
+            await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(1));
+            await act(async () => {
+                vi.advanceTimersByTime(30_000);
+            });
+            await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(2));
+            await waitFor(() => {
+                expect(toastError).toHaveBeenCalledWith('Hard stop', {
+                    description: 'Budget exceeded',
+                });
+                expect(toastWarning).toHaveBeenCalledWith('Approaching cap', {
+                    description: '90% used',
+                });
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('cleans up the polling interval on unmount (no lingering setInterval calls)', async () => {
         const clearSpy = vi.spyOn(global, 'clearInterval');
         getUnreadNotificationCount.mockResolvedValue({ success: true, count: 0 });
