@@ -566,7 +566,8 @@ export class ItemSubmissionService {
             // field is only a fallback). Keep both channels in sync when the
             // body changes so the next site generation picks up the edit.
             if (markdownChanged) {
-                await data.writeItemMarkdown(updatedItem, updateItemDto.markdown ?? '');
+                // `markdownChanged` already guarantees `updateItemDto.markdown !== undefined`.
+                await data.writeItemMarkdown(updatedItem, updateItemDto.markdown!);
             }
 
             await this.gitFacade.addAll(provider, dest);

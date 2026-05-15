@@ -268,6 +268,14 @@ describe('items-generator/dto', () => {
             });
             expect(constraintNames(errors)).toContain('maxLength');
         });
+
+        it('accepts markdown exactly at the 100000-character boundary', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: 'a'.repeat(100000),
+            });
+            expect(errors).toEqual([]);
+        });
     });
 
     // ───────────────────────────────────────────────────────────────────

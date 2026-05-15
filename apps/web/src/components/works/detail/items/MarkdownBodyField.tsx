@@ -35,6 +35,16 @@ export const MarkdownBodyField = memo(function MarkdownBodyField({
 }: MarkdownBodyFieldProps) {
     const t = useTranslations('dashboard.workDetail.items.addModal');
     const [previewOpen, setPreviewOpen] = useState(false);
+
+    // Close the preview when the textarea is cleared. The toggle button is
+    // also disabled in that case (value.length === 0), so leaving previewOpen
+    // = true would render a disabled "Hide preview" button with no preview
+    // pane visible — label contradicts UI state. Doing this during render
+    // (vs. useEffect) is the React-recommended pattern for derived state.
+    if (previewOpen && value.length === 0) {
+        setPreviewOpen(false);
+    }
+
     const fieldLabel = label ?? t('markdown');
     const fieldPlaceholder = placeholder ?? t('markdownPlaceholder');
     const fieldHelp = help ?? t('markdownHelp');
