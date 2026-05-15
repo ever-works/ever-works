@@ -24,8 +24,16 @@
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
-jest.mock('@ever-works/agent/entities', () => ({ Work: class {}, User: class {} }));
+jest.mock('@ever-works/agent/database', () => ({
+    WorkRepository: class {},
+    WorkDeploymentRepository: class {},
+}));
+jest.mock('@ever-works/agent/entities', () => ({
+    Work: class {},
+    User: class {},
+    DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
+    DeploymentTriggerSource: { MANUAL: 'manual' },
+}));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/services', () => ({ PlatformSyncSecretService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({
@@ -128,7 +136,10 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
             })),
         };
 
-        const workRepository = { findById: jest.fn().mockResolvedValue(work) };
+        const workRepository = {
+            findById: jest.fn().mockResolvedValue(work),
+            update: jest.fn().mockResolvedValue(undefined),
+        };
         const deploymentRepository = {
             create: jest.fn().mockResolvedValue({ id: 'deployment-1' }),
             markTerminal: jest.fn().mockResolvedValue(undefined),
