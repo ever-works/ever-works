@@ -73,6 +73,7 @@ export {
     NoDeployProviderError,
     DeployProviderNotFoundError,
     NoDeployCredentialsError,
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
     type DeployFacadeFullOptions,
 } from './deploy.facade';
 

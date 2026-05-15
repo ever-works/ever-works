@@ -22,6 +22,21 @@ export class MailService {
     constructor(private readonly mailerService: MailerService) {}
 
     /**
+     * EW-617 G2: anonymous users have no email and must never receive
+     * transactional mail. All mail handlers early-return when the recipient
+     * has no email; in practice they shouldn't fire for anon users at all
+     * (we don't emit UserCreated/UserConfirmed/etc. for them) but the guard
+     * keeps the type-system honest and prevents accidental sends.
+     */
+    private requireEmail(email: string | null, context: string): string | null {
+        if (!email) {
+            this.logger.debug(`Skipping ${context}: recipient has no email (anonymous user?)`);
+            return null;
+        }
+        return email;
+    }
+
+    /**
      * Get branding context for email templates
      */
     private getBrandingContext() {
@@ -40,8 +55,12 @@ export class MailService {
     async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
         try {
             const appName = config.branding.appName();
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: `Confirm your ${appName} account`,
                 template: 'signup-confirmation',
                 context: {
@@ -68,8 +87,12 @@ export class MailService {
             const resetUrl = data.resetUrl;
             const appName = config.branding.appName();
 
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: `Reset your ${appName} password`,
                 template: 'forgot-password',
                 context: {
@@ -97,8 +120,12 @@ export class MailService {
             const secureAccountUrl = data.secureAccountUrl;
             const appName = config.branding.appName();
 
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: `Your ${appName} password has been changed`,
                 template: 'password-changed',
                 context: {
@@ -129,8 +156,12 @@ export class MailService {
             const dashboardUrl = data.dashboardUrl || `${config.webAppUrl()}/works/new`;
             const appName = config.branding.appName();
 
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: `Welcome to ${appName}!`,
                 template: 'welcome',
                 context: {
@@ -157,8 +188,12 @@ export class MailService {
             const secureAccountUrl = data.secureAccountUrl;
             const appName = config.branding.appName();
 
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: `New login to your ${appName} account`,
                 template: 'new-device-login',
                 context: {
@@ -191,8 +226,12 @@ export class MailService {
             const deleteUrl = data.deleteUrl;
             const keepAccountUrl = data.keepAccountUrl;
 
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
             await this.mailerService.sendMail({
-                to: data.user.email,
+                to: recipient,
                 subject: 'Confirm account deletion',
                 template: 'account-deletion',
                 context: {
