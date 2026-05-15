@@ -55,7 +55,14 @@ export function BudgetsUsageClient({
     const currency = globalBudget?.currency ?? initialSummary?.currency ?? 'usd';
     const totalSpendCents = initialSummary?.totalSpendCents ?? 0;
     const periodLabel = initialSummary?.periodLabel ?? 'this period';
-    const perPlugin: PerPluginSpend[] = initialSummary?.perPlugin ?? [];
+    // EW-602 review fix (lint): wrap perPlugin in useMemo so the
+    // pluginSpendById useMemo below has stable deps. Otherwise the
+    // `?? []` fallback creates a new array reference each render and
+    // forces the Map rebuild on every parent re-render.
+    const perPlugin: PerPluginSpend[] = useMemo(
+        () => initialSummary?.perPlugin ?? [],
+        [initialSummary?.perPlugin],
+    );
     const pluginSpendById = useMemo(() => {
         const map = new Map<string, PerPluginSpend>();
         for (const entry of perPlugin) {
