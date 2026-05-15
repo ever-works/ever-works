@@ -21,6 +21,12 @@ export interface QuickCreateWorkRequest {
     readonly storageProvider?: string;
     readonly websiteTemplateId?: string;
     readonly model?: string;
+    /** EW-617 G7 — Cloudflare Turnstile token; verified server-side
+     *  when `CAPTCHA_PROVIDER` is set on the API. */
+    readonly captchaToken?: string;
+    /** EW-617 G8 — funnel correlation UUID minted at wizard mount.
+     *  Threaded into telemetry events. */
+    readonly correlationId?: string;
 }
 
 export interface QuickCreateWorkResponse {
