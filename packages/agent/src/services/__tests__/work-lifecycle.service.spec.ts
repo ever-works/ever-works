@@ -103,6 +103,14 @@ describe('WorkLifecycleService', () => {
         eventEmitter = {
             emit: jest.fn(),
         };
+        // EW-617 G5: DNS provider mock — no-op by default so tests that
+        // don't deploy to ever-works see no extra calls.
+        const everWorksDns = {
+            getProvider: jest.fn().mockReturnValue(null),
+            ensureWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+            removeWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+            ingressHostFor: jest.fn((slug: string) => `${slug}.ever.works`),
+        } as never;
 
         service = new WorkLifecycleService(
             workRepository,
@@ -117,6 +125,7 @@ describe('WorkLifecycleService', () => {
             websiteRepositoryState,
             everWorksDeployQuota,
             everWorksGit,
+            everWorksDns,
             eventEmitter as never,
         );
     });
