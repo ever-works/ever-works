@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { CodeEditFacadeService } from '../../facades/code-edit.facade';
+import type { GitFacadeOptions } from '../../facades/git.facade';
 import { WorkCodeUpdateRepository, WorkRepository } from '../../database';
 import {
     Work,
@@ -11,10 +12,12 @@ import {
 } from '../../entities';
 import { WebsiteTemplateResolverService } from '../website-generator/website-template-resolver.service';
 import type { CodeUpdateRequest } from './types';
-
-export interface RequestCodeUpdateOptions {
-    autoExecute?: boolean;
-}
+import {
+    buildCodegenBranch,
+    buildCommitMessage,
+    buildCommitTitle,
+    buildPullRequestBody,
+} from './pr-templates';
 
 @Injectable()
 export class CodeUpdateGeneratorService {
@@ -28,20 +31,18 @@ export class CodeUpdateGeneratorService {
         private readonly templateResolver: WebsiteTemplateResolverService,
     ) {}
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Public API
+    // ─────────────────────────────────────────────────────────────────────
+
     /**
      * Create a code-update record. Heavy lifting (clone + edit + PR) is
      * deferred to `execute()` so callers can either run inline or hand off
-     * to a Trigger.dev task (see work-code-regeneration.task).
+     * to a Trigger.dev task.
      */
-    async request(
-        work: Work,
-        user: User,
-        dto: CodeUpdateRequest,
-        opts: RequestCodeUpdateOptions = {},
-    ): Promise<WorkCodeUpdate> {
+    async request(work: Work, user: User, dto: CodeUpdateRequest): Promise<WorkCodeUpdate> {
         const template = await this.templateResolver.resolveForWork(work);
-
-        const record = await this.codeUpdateRepository.create({
+        return this.codeUpdateRepository.create({
             workId: work.id,
             requestedByUserId: user.id,
             prompt: dto.prompt,
@@ -51,31 +52,16 @@ export class CodeUpdateGeneratorService {
             source: dto.source ?? WorkCodeUpdateSource.MANUAL,
             status: WorkCodeUpdateStatus.PENDING,
         });
-
-        if (opts.autoExecute) {
-            await this.execute(record.id, user);
-        }
-
-        return record;
     }
 
     /**
-     * Run the full code-update flow against an existing record. Idempotent
-     * for the failure case — re-execution restarts from a fresh workspace.
+     * Run the full code-update flow against an existing record. Each step
+     * lives in its own private method so failures are localised and so
+     * the flow can be re-read top-to-bottom.
      */
     async execute(codeUpdateId: string, user: User): Promise<void> {
         const record = await this.codeUpdateRepository.findById(codeUpdateId);
-        if (!record) {
-            this.logger.warn(`Code update ${codeUpdateId} not found`);
-            return;
-        }
-        if (
-            record.status === WorkCodeUpdateStatus.APPLIED ||
-            record.status === WorkCodeUpdateStatus.PROPOSED
-        ) {
-            this.logger.debug(`Code update ${codeUpdateId} is ${record.status}; skipping`);
-            return;
-        }
+        if (!record || this.isAlreadyHandled(record)) return;
 
         const work = await this.workRepository.findById(record.workId);
         if (!work) {
@@ -87,101 +73,31 @@ export class CodeUpdateGeneratorService {
             status: WorkCodeUpdateStatus.GENERATING,
         });
 
-        const branch = `ai/codegen-${Date.now()}`;
-        const websiteOwner = work.getRepoOwner('website');
-        const websiteRepo = work.getWebsiteRepo();
-        const template = await this.templateResolver.resolveForWork(work);
-
         try {
-            const workspaceDir = await this.gitFacade.cloneOrPull(
-                {
-                    owner: websiteOwner,
-                    repo: websiteRepo,
-                    branch: template.branch,
-                    committer: work.resolveCommitter(user),
-                },
-                {
-                    userId: work.userId,
-                    providerId: work.gitProvider,
-                    workId: work.id,
-                },
-            );
+            const branch = buildCodegenBranch();
+            const template = await this.templateResolver.resolveForWork(work);
+            const workspaceDir = await this.cloneOnBranch(work, user, template.branch, branch);
 
-            await this.gitFacade.switchBranch(work.gitProvider, workspaceDir, branch, true);
-
-            const editResult = await this.codeEditFacade.execute(
-                {
-                    workspaceDir,
-                    prompt: record.prompt,
-                    model: record.aiModel ?? undefined,
-                },
-                {
-                    userId: work.userId,
-                    workId: work.id,
-                },
-                {
-                    onLogLine: (stream, line) => {
-                        this.logger.debug(`[code-edit:${stream}] ${line}`);
-                    },
-                },
-            );
-
-            if (!editResult.success) {
-                throw new Error(editResult.error ?? editResult.summary);
-            }
-
-            if (editResult.filesChanged.length === 0) {
-                throw new Error('AI agent produced no file changes');
-            }
-
-            await this.gitFacade.addAll(work.gitProvider, workspaceDir);
-            await this.gitFacade.commit(
-                work.gitProvider,
-                workspaceDir,
-                this.buildCommitMessage(record),
-                work.resolveCommitter(user),
-            );
-            await this.gitFacade.push(
-                { dir: workspaceDir },
-                {
-                    userId: work.userId,
-                    providerId: work.gitProvider,
-                    workId: work.id,
-                },
-            );
-
-            const pr = await this.gitFacade.createPullRequest(
-                {
-                    owner: websiteOwner,
-                    repo: websiteRepo,
-                    head: branch,
-                    base: template.branch,
-                    title: record.title ?? `AI: ${record.prompt.slice(0, 64)}`,
-                    body: this.buildPrBody(record, editResult.summary),
-                },
-                {
-                    userId: work.userId,
-                    providerId: work.gitProvider,
-                    workId: work.id,
-                },
-            );
+            const edit = await this.runAgent(work, record, workspaceDir);
+            await this.commitAndPush(work, user, workspaceDir, record);
+            const pr = await this.openProposalPr(work, branch, template.branch, record, edit.summary);
 
             await this.codeUpdateRepository.update(codeUpdateId, {
                 status: WorkCodeUpdateStatus.PROPOSED,
                 branch,
                 prNumber: pr.number,
                 prUrl: pr.url,
-                diff: editResult.filesChanged.map((f) => ({
+                diff: edit.filesChanged.map((f) => ({
                     path: f.path,
                     status: f.status,
                     additions: f.additions,
                     deletions: f.deletions,
                 })),
-                summary: editResult.summary,
+                summary: edit.summary,
             });
 
             this.logger.log(
-                `Code update ${codeUpdateId} proposed on ${websiteOwner}/${websiteRepo}#${pr.number}`,
+                `Code update ${codeUpdateId} proposed on ${work.getRepoOwner('website')}/${work.getWebsiteRepo()}#${pr.number}`,
             );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -192,39 +108,25 @@ export class CodeUpdateGeneratorService {
 
     /**
      * Apply a PROPOSED code update by merging its PR. The merge to the
-     * default branch triggers the existing production-deploy pipeline; no
-     * extra dispatch needed here.
+     * default branch triggers the existing production-deploy pipeline.
      */
     async apply(codeUpdateId: string): Promise<void> {
-        const record = await this.codeUpdateRepository.findById(codeUpdateId);
-        if (!record) throw new Error('Code update not found');
-        if (record.status !== WorkCodeUpdateStatus.PROPOSED) {
-            throw new Error(`Code update is ${record.status}; can only apply PROPOSED records`);
-        }
-        if (!record.prNumber) {
-            throw new Error('Code update has no PR to merge');
-        }
-
-        const work = await this.workRepository.findById(record.workId);
-        if (!work) throw new Error('Work not found');
+        const { record, work } = await this.loadProposed(codeUpdateId);
+        if (!record.prNumber) throw new Error('Code update has no PR to merge');
 
         await this.gitFacade.mergePullRequest(
             work.getRepoOwner('website'),
             work.getWebsiteRepo(),
             record.prNumber,
-            {
-                mergeMethod: 'squash',
-                commitTitle: record.title ?? `AI: ${record.prompt.slice(0, 64)}`,
-            },
-            { userId: work.userId, providerId: work.gitProvider, workId: work.id },
+            { mergeMethod: 'squash', commitTitle: buildCommitTitle(record) },
+            this.workToGitOptions(work),
         );
-
         await this.codeUpdateRepository.markApplied(codeUpdateId);
     }
 
     /**
-     * Reject a code update by closing its PR (no merge). Idempotent —
-     * closing an already-closed PR is silently absorbed by the provider.
+     * Reject a code update by closing its PR (no merge). Provider-side
+     * already-closed errors are absorbed.
      */
     async reject(codeUpdateId: string): Promise<void> {
         const record = await this.codeUpdateRepository.findById(codeUpdateId);
@@ -240,22 +142,19 @@ export class CodeUpdateGeneratorService {
         if (!work) throw new Error('Work not found');
 
         if (record.prNumber) {
-            try {
-                await this.gitFacade.closePullRequest(
+            await this.gitFacade
+                .closePullRequest(
                     work.getRepoOwner('website'),
                     work.getWebsiteRepo(),
                     record.prNumber,
-                    { userId: work.userId, providerId: work.gitProvider, workId: work.id },
+                    this.workToGitOptions(work),
+                )
+                .catch((err) =>
+                    this.logger.warn(
+                        `Failed to close PR for code update ${codeUpdateId}: ${err instanceof Error ? err.message : String(err)}`,
+                    ),
                 );
-            } catch (err) {
-                this.logger.warn(
-                    `Failed to close PR for code update ${codeUpdateId}: ${
-                        err instanceof Error ? err.message : String(err)
-                    }`,
-                );
-            }
         }
-
         await this.codeUpdateRepository.markRejected(codeUpdateId);
     }
 
@@ -267,30 +166,107 @@ export class CodeUpdateGeneratorService {
         return this.codeUpdateRepository.findById(codeUpdateId);
     }
 
-    private buildCommitMessage(record: WorkCodeUpdate): string {
-        const headline = record.title ?? `AI: ${record.prompt.slice(0, 64)}`;
-        return `${headline}\n\nRequested via Ever Works codegen (${record.id})`;
+    // ─────────────────────────────────────────────────────────────────────
+    // Orchestration steps (used by execute())
+    // ─────────────────────────────────────────────────────────────────────
+
+    private async cloneOnBranch(
+        work: Work,
+        user: User,
+        baseBranch: string,
+        newBranch: string,
+    ): Promise<string> {
+        const workspaceDir = await this.gitFacade.cloneOrPull(
+            {
+                owner: work.getRepoOwner('website'),
+                repo: work.getWebsiteRepo(),
+                branch: baseBranch,
+                committer: work.resolveCommitter(user),
+            },
+            this.workToGitOptions(work),
+        );
+        await this.gitFacade.switchBranch(work.gitProvider, workspaceDir, newBranch, true);
+        return workspaceDir;
     }
 
-    private buildPrBody(record: WorkCodeUpdate, summary: string): string {
-        return [
-            '## AI code update',
-            '',
-            `**Code update id:** ${record.id}`,
-            `**Source:** ${record.source}`,
-            `**Model:** ${record.aiModel ?? 'unspecified'}`,
-            '',
-            '### Prompt',
-            '',
-            record.prompt,
-            '',
-            '### Summary',
-            '',
-            summary,
-            '',
-            '---',
-            '',
-            'Review the diff and `Apply` / `Reject` from the Ever Works Codegen tab to merge or close this PR.',
-        ].join('\n');
+    private async runAgent(work: Work, record: WorkCodeUpdate, workspaceDir: string) {
+        const result = await this.codeEditFacade.execute(
+            {
+                workspaceDir,
+                prompt: record.prompt,
+                model: record.aiModel ?? undefined,
+            },
+            { userId: work.userId, workId: work.id },
+            {
+                onLogLine: (stream, line) => this.logger.debug(`[code-edit:${stream}] ${line}`),
+            },
+        );
+        if (!result.success) throw new Error(result.error ?? result.summary);
+        if (result.filesChanged.length === 0) throw new Error('AI agent produced no file changes');
+        return result;
+    }
+
+    private async commitAndPush(
+        work: Work,
+        user: User,
+        workspaceDir: string,
+        record: WorkCodeUpdate,
+    ): Promise<void> {
+        await this.gitFacade.addAll(work.gitProvider, workspaceDir);
+        await this.gitFacade.commit(
+            work.gitProvider,
+            workspaceDir,
+            buildCommitMessage(record),
+            work.resolveCommitter(user),
+        );
+        await this.gitFacade.push({ dir: workspaceDir }, this.workToGitOptions(work));
+    }
+
+    private async openProposalPr(
+        work: Work,
+        head: string,
+        base: string,
+        record: WorkCodeUpdate,
+        summary: string,
+    ) {
+        return this.gitFacade.createPullRequest(
+            {
+                owner: work.getRepoOwner('website'),
+                repo: work.getWebsiteRepo(),
+                head,
+                base,
+                title: buildCommitTitle(record),
+                body: buildPullRequestBody(record, summary),
+            },
+            this.workToGitOptions(work),
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────
+
+    private isAlreadyHandled(record: WorkCodeUpdate): boolean {
+        return (
+            record.status === WorkCodeUpdateStatus.APPLIED ||
+            record.status === WorkCodeUpdateStatus.PROPOSED
+        );
+    }
+
+    private workToGitOptions(work: Work): GitFacadeOptions {
+        return { userId: work.userId, providerId: work.gitProvider, workId: work.id };
+    }
+
+    private async loadProposed(
+        codeUpdateId: string,
+    ): Promise<{ record: WorkCodeUpdate; work: Work }> {
+        const record = await this.codeUpdateRepository.findById(codeUpdateId);
+        if (!record) throw new Error('Code update not found');
+        if (record.status !== WorkCodeUpdateStatus.PROPOSED) {
+            throw new Error(`Code update is ${record.status}; can only act on PROPOSED records`);
+        }
+        const work = await this.workRepository.findById(record.workId);
+        if (!work) throw new Error('Work not found');
+        return { record, work };
     }
 }
