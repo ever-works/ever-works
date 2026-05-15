@@ -13,6 +13,7 @@ import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
+import { useTurnstile } from './use-turnstile';
 import { AI_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
 import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
 import { completeOnboarding, patchOnboardingState } from '@/app/actions/onboarding/state';
@@ -69,6 +70,24 @@ export function EverWorksOnboardingWizard({
     const [connections, setConnections] = useState(initialConnections);
     const [deviceAuthStatuses, setDeviceAuthStatuses] = useState(initialDeviceAuthStatuses);
     const [isStatusLoading, setIsStatusLoading] = useState(false);
+
+    // EW-617 G7 — Turnstile token producer. Renders a hidden Managed
+    // widget once at wizard mount; getToken() executes on demand
+    // before each captcha-gated API call. No-ops cleanly when the
+    // server's CAPTCHA_PROVIDER is unset.
+    const turnstile = useTurnstile();
+
+    // EW-617 G8 — correlation UUID minted on wizard mount, threaded
+    // into telemetry events server-side so ops can trace the full
+    // funnel (landing → wizard → work created → deploy ready).
+    const correlationId = useMemo(() => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        // Fallback for environments without crypto.randomUUID — only
+        // used in legacy browsers / older Node test envs.
+        return `corr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }, []);
 
     const flow = useOnboardingFlow({
         initial: initialState,
@@ -195,6 +214,8 @@ export function EverWorksOnboardingWizard({
                                 connections={connections}
                                 deviceAuthStatuses={deviceAuthStatuses}
                                 isStatusLoading={isStatusLoading}
+                                turnstile={turnstile}
+                                correlationId={correlationId}
                             />
                         </div>
                         <WizardFooter
@@ -325,6 +346,8 @@ function StepBody({
     connections,
     deviceAuthStatuses,
     isStatusLoading,
+    turnstile,
+    correlationId,
 }: {
     step: WizardStep;
     flow: ReturnType<typeof useOnboardingFlow>;
@@ -333,6 +356,8 @@ function StepBody({
     connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
     deviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
     isStatusLoading: boolean;
+    turnstile: ReturnType<typeof useTurnstile>;
+    correlationId: string;
 }) {
     switch (step.kind) {
         case 'welcome':
@@ -434,6 +459,10 @@ function StepBody({
                                   // EW-617 G4: anonymous + claimed users alike
                                   // can one-click finish. The endpoint reads
                                   // provider defaults from onboarding state.
+                                  // EW-617 G7: fetch a fresh Turnstile token
+                                  // right before the call. Empty when captcha
+                                  // is disabled — server is OK with that.
+                                  const captchaToken = await turnstile.getToken();
                                   const { quickCreateWorkAction } =
                                       await import('@/app/actions/works/quick-create');
                                   const slug = slugifyPrompt(prompt);
@@ -445,6 +474,8 @@ function StepBody({
                                       organization: false,
                                       deployProvider: flow.state.deploy.choice,
                                       storageProvider: flow.state.storage.choice,
+                                      captchaToken: captchaToken || undefined,
+                                      correlationId,
                                   });
                                   if (!result.success) {
                                       throw new Error(result.error ?? 'Failed to start generation');
