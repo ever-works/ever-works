@@ -30,9 +30,9 @@ import type {
 import {
 	buildSuccessPipelineResult,
 	buildDefaultCodeEditSystemPrompt,
-	computeWorkspaceFileChanges,
 	substituteVariables
 } from '@ever-works/plugin';
+import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';

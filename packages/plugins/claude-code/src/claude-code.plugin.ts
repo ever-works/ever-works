@@ -48,7 +48,8 @@ import {
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
 import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
-import { buildDefaultCodeEditSystemPrompt, computeWorkspaceFileChanges } from '@ever-works/plugin';
+import { buildDefaultCodeEditSystemPrompt } from '@ever-works/plugin';
+import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import {
 	buildSystemPromptVariables,
 	buildUserPromptVariables,

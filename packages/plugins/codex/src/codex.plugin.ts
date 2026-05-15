@@ -32,12 +32,12 @@ import type {
 import {
 	buildSuccessPipelineResult,
 	buildDefaultCodeEditSystemPrompt,
-	computeWorkspaceFileChanges,
 	normalizeItemTags,
 	PLUGIN_CAPABILITIES,
 	substituteVariables,
 	type ItemData
 } from '@ever-works/plugin';
+import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
