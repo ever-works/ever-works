@@ -880,7 +880,10 @@ export class DataRepository {
     async updateItemMetadata(
         slug: string,
         updates: Partial<
-            Pick<ItemData, 'featured' | 'order' | 'source_url' | 'health' | 'source_validation'>
+            Pick<
+                ItemData,
+                'featured' | 'order' | 'source_url' | 'health' | 'source_validation' | 'markdown'
+            >
         >,
     ): Promise<ItemData | null> {
         return this.updateItem(slug, updates);

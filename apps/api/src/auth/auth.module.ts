@@ -4,7 +4,7 @@ import { AuthService } from './services/auth.service';
 import { AnonymousAuthService } from './services/anonymous-auth.service';
 import { ClaimAccountService } from './services/claim-account.service';
 import { ApiKeyService } from './services/api-key.service';
-import { CaptchaVerifierService } from './services/captcha-verifier.service';
+import { CAPTCHA_FETCH, CaptchaVerifierService } from './services/captcha-verifier.service';
 import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { AuthController } from './controllers/auth.controller';
 import { ApiKeysController } from './controllers/api-keys.controller';
@@ -31,6 +31,10 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         AnonymousAuthService,
         ClaimAccountService,
         ApiKeyService,
+        {
+            provide: CAPTCHA_FETCH,
+            useFactory: () => fetch,
+        },
         CaptchaVerifierService,
         // EW-617 G8: registered here (not imported from WorkModule) to keep
         // AuthModule free of a WorkModule dependency. The service is stateless
