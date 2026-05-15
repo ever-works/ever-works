@@ -40,7 +40,7 @@ EW-616 splits the configuration into an explicit `clusterSource ∈ {k8s-works, 
 
 - **Given** I open the Kubernetes plugin settings, **when** the form loads, **then** I see a new **Target cluster** dropdown with three options: `k8s-works` (Ever Works shared customer cluster), `k8s-gauzy` (Ever Works internal cluster — admin-only), and `custom-kubeconfig` (paste my own). The default is `custom-kubeconfig` for back-compat.
 - **Given** I pick `custom-kubeconfig`, **when** the form re-renders, **then** the **kubeconfig** textarea and the optional **Context** field are visible and **kubeconfig** is required to save.
-- **Given** I pick `k8s-works` or `k8s-gauzy`, **when** the form re-renders, **then** the **kubeconfig** textarea and **Context** field are hidden, the form can be saved without a kubeconfig, and **Save & verify** succeeds with the message *"Will deploy to platform-managed cluster '<name>'."* (no live cluster check — the platform owns the credentials).
+- **Given** I pick `k8s-works` or `k8s-gauzy`, **when** the form re-renders, **then** the **kubeconfig** textarea and **Context** field are hidden, the form can be saved without a kubeconfig, and **Save & verify** succeeds with the message _"Will deploy to platform-managed cluster '<name>'."_ (no live cluster check — the platform owns the credentials).
 - **Given** my Work's website repo is in `ever-works-cloud` and I picked `clusterSource: 'k8s-works'`, **when** I deploy, **then** the deploy service substitutes `process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG` as the workflow's `K8S_TOKEN` secret, the dispatched `deploy_k8s.yaml` workflow uses it to talk to the shared customer cluster, and the deploy succeeds without me touching cluster credentials.
 - **Given** my Work's website repo is in `ever-works` (admin path) and I picked `clusterSource: 'k8s-gauzy'`, **when** I deploy, **then** the deploy service substitutes `process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG` and the deploy targets the internal platform cluster.
 - **Given** my Work's website repo is customer-owned (any org other than `ever-works` / `ever-works-cloud`) and I picked `clusterSource: 'custom-kubeconfig'`, **when** I deploy, **then** the platform reads my pasted kubeconfig (the existing path, unchanged) and `K8S_TOKEN` is exactly that value.
@@ -49,11 +49,11 @@ EW-616 splits the configuration into an explicit `clusterSource ∈ {k8s-works, 
 
 The deploy service rejects four of the nine `(websiteOwner, clusterSource)` combinations:
 
-| Website owner | `k8s-works` | `k8s-gauzy` | `custom-kubeconfig` |
-| --- | --- | --- | --- |
-| `ever-works` | ✅ | ✅ admin path | ❌ `CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG` |
-| `ever-works-cloud` | ✅ default | ❌ `K8S_GAUZY_NOT_ALLOWED` | ❌ `CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG` |
-| customer-owned org | ✅ | ❌ `K8S_GAUZY_NOT_ALLOWED` | ✅ BYOC default |
+| Website owner      | `k8s-works` | `k8s-gauzy`                | `custom-kubeconfig`                               |
+| ------------------ | ----------- | -------------------------- | ------------------------------------------------- |
+| `ever-works`       | ✅          | ✅ admin path              | ❌ `CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG` |
+| `ever-works-cloud` | ✅ default  | ❌ `K8S_GAUZY_NOT_ALLOWED` | ❌ `CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG` |
+| customer-owned org | ✅          | ❌ `K8S_GAUZY_NOT_ALLOWED` | ✅ BYOC default                                   |
 
 - **Given** a customer Work in `ever-works-cloud` picks `custom-kubeconfig`, **when** the deploy starts, **then** the platform returns `400 Bad Request` with `code: CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG` and a message that explains the cross-tenant exposure risk and the two valid alternatives (pick `k8s-works`, or move the Work to the customer's own org).
 - **Given** a customer Work in any non-`ever-works` org picks `k8s-gauzy`, **when** the deploy starts, **then** the platform returns `400 Bad Request` with `code: K8S_GAUZY_NOT_ALLOWED` explaining that `k8s-gauzy` is admin-only and pointing to the two valid alternatives.
@@ -103,7 +103,7 @@ The deploy service rejects four of the nine `(websiteOwner, clusterSource)` comb
 
 - **NFR-1. Security.** The kubeconfig env vars are platform-cluster-admin credentials. They MUST never be returned by any API response, logged with their value, or echoed to terminals. Operator-side probes (key-name listing, byte-length checks) are allowed; value-revealing probes (`printenv`, `kubectl get secret -o yaml | grep KUBECONFIG`) are not.
 - **NFR-2. Fail-closed.** Missing env vars MUST fail the deploy with a 5xx, not silently use a wrong kubeconfig or skip the substitution.
-- **NFR-3. Error-message clarity.** All four rejection reasons (`CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG`, `K8S_GAUZY_NOT_ALLOWED`, `CUSTOM_KUBECONFIG_MISSING_KUBECONFIG`, missing env var) MUST tell the user (or operator) both *why* the deploy was rejected and what valid alternatives exist.
+- **NFR-3. Error-message clarity.** All four rejection reasons (`CUSTOM_KUBECONFIG_NOT_ALLOWED_FOR_SHARED_ORG`, `K8S_GAUZY_NOT_ALLOWED`, `CUSTOM_KUBECONFIG_MISSING_KUBECONFIG`, missing env var) MUST tell the user (or operator) both _why_ the deploy was rejected and what valid alternatives exist.
 - **NFR-4. Owner string handling.** Owner comparisons MUST be case-insensitive and whitespace-trimmed — so `ever-works-cloud`, `EVER-WORKS-CLOUD`, and `  ever-works-cloud  ` resolve identically.
 
 ---

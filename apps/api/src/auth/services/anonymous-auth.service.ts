@@ -40,10 +40,12 @@ export class AnonymousAuthService {
         return days * 24 * 60 * 60 * 1000;
     }
 
-    async createAnonymousUser(opts: {
-        ipAddress?: string | null;
-        userAgent?: string | null;
-    } = {}): Promise<TokenResponse> {
+    async createAnonymousUser(
+        opts: {
+            ipAddress?: string | null;
+            userAgent?: string | null;
+        } = {},
+    ): Promise<TokenResponse> {
         const expiresAt = new Date(Date.now() + this.getTtlMs());
         const username = `anon-${randomBytes(4).toString('hex')}`;
 
