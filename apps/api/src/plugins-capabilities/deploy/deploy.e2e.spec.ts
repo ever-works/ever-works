@@ -117,9 +117,7 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
             setActionSecret: jest.fn().mockResolvedValue(undefined),
             setActionVariable: jest.fn().mockResolvedValue(undefined),
             dispatchWorkflow: jest.fn().mockResolvedValue(undefined),
-            getRepositoryPublicKey: jest
-                .fn()
-                .mockResolvedValue({ key_id: 'k', key: 'pubkey' }),
+            getRepositoryPublicKey: jest.fn().mockResolvedValue({ key_id: 'k', key: 'pubkey' }),
             enableDeploymentWorkflows: jest.fn().mockResolvedValue(undefined),
         };
         const pluginRegistry = {
