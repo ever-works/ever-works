@@ -42,6 +42,9 @@ export class User {
     // EW-617 G2: anonymous (zero-friction) users have no email/password until
     // they claim the account via POST /api/auth/claim. Existing rows keep
     // their non-null values; new anonymous rows persist NULLs here.
+    // Explicit `type: 'varchar'` because TS reflect-metadata flattens
+    // `string | null` to `Object`, which better-sqlite3 (used by internal
+    // CLI tests) refuses with DataTypeNotSupportedError.
     @Column({ type: 'varchar', unique: true, nullable: true })
     email: string | null;
 

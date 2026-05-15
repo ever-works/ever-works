@@ -146,6 +146,11 @@ function makeController(s: Stubs): WorksController {
         s.itemImportService as any,
         s.itemImportExecutor as any,
         { rotate: jest.fn(), getOrGenerate: jest.fn() } as any,
+        {
+            isEnabled: jest.fn().mockReturnValue(false),
+            verify: jest.fn().mockResolvedValue({ success: true, skipped: true }),
+        } as any,
+        { emit: jest.fn() } as any,
     );
 }
 
@@ -638,6 +643,11 @@ describe('WorksController — comparisons + community-pr + source-validation end
                 stubs.itemImportService as any,
                 stubs.itemImportExecutor as any,
                 { rotate, getOrGenerate: jest.fn() } as any,
+                {
+                    isEnabled: jest.fn().mockReturnValue(false),
+                    verify: jest.fn().mockResolvedValue({ success: true, skipped: true }),
+                } as any,
+                { emit: jest.fn() } as any,
             );
             return { controller, stubs };
         }

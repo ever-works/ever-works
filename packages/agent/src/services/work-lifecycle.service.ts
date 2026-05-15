@@ -37,6 +37,7 @@ import { TemplateCatalogService } from '../template-catalog/template-catalog.ser
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 import {
     EverWorksDeployQuotaService,
+    EverWorksDnsService,
     EverWorksGitDisabledError,
     EverWorksGitMisconfiguredError,
     EverWorksGitProvider,
@@ -92,6 +93,7 @@ export class WorkLifecycleService {
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
         private readonly everWorksDeployQuota: EverWorksDeployQuotaService,
         private readonly everWorksGit: EverWorksGitProvider,
+        private readonly everWorksDns: EverWorksDnsService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -767,6 +769,15 @@ export class WorkLifecycleService {
                 this.markdownGenerator.cleanup(work),
                 this.websiteGenerator.cleanup(work),
             ]).catch((error) => this.logger.error('Failed to cleanup repositories:', error));
+
+            // EW-617 G5: tear down the platform-managed CNAME so the slug is
+            // immediately reusable. Only applies when the work deployed to
+            // `ever-works` — for other providers ensureWorkSubdomain was never
+            // called so the DNS record won't exist. No-ops when Cloudflare env
+            // is not configured (dev).
+            if (work.deployProvider === 'ever-works') {
+                await this.everWorksDns.removeWorkSubdomain(work.slug);
+            }
 
             return {
                 status: 'success',

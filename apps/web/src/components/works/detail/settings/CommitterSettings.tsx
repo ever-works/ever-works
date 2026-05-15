@@ -33,9 +33,11 @@ export function CommitterSettings() {
         });
     };
 
-    // Placeholders show the auth defaults (actual fallback includes user-level settings)
-    const defaultName = user.username;
-    const defaultEmail = user.email;
+    // Placeholders show the auth defaults (actual fallback includes user-level settings).
+    // Better Auth's `user.email` is typed `string | null`; the Input
+    // component's `placeholder` accepts `string | undefined`, so coerce.
+    const defaultName = user.username ?? undefined;
+    const defaultEmail = user.email ?? undefined;
 
     return (
         <div

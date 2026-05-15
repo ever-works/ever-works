@@ -54,6 +54,12 @@ interface MockDeps {
     userRepo: { findById: jest.Mock };
     quota: { assertWithinQuota: jest.Mock };
     everWorksGit: { isEnabled: jest.Mock; createRepository: jest.Mock };
+    everWorksDns: {
+        getProvider: jest.Mock;
+        ensureWorkSubdomain: jest.Mock;
+        removeWorkSubdomain: jest.Mock;
+        ingressHostFor: jest.Mock;
+    };
     eventEmitter: { emit: jest.Mock };
 }
 
@@ -90,6 +96,14 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
 
     const eventEmitter = { emit: jest.fn() };
 
+    // EW-617 G5: DNS provider mock — no-op by default.
+    const everWorksDns = {
+        getProvider: jest.fn().mockReturnValue(null),
+        ensureWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+        removeWorkSubdomain: jest.fn().mockResolvedValue(undefined),
+        ingressHostFor: jest.fn((slug: string) => `${slug}.ever.works`),
+    };
+
     const service = new WorkLifecycleService(
         workRepo as never,
         userRepo as never,
@@ -103,10 +117,14 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         {} as never,
         quota as never,
         everWorksGit as never,
+        everWorksDns as never,
         eventEmitter as never,
     );
 
-    return { service, deps: { workRepo, userRepo, quota, everWorksGit, eventEmitter } };
+    return {
+        service,
+        deps: { workRepo, userRepo, quota, everWorksGit, everWorksDns, eventEmitter },
+    };
 }
 
 describe('WorkLifecycleService.createWork — provider defaults + quota', () => {
