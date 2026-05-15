@@ -2,6 +2,10 @@ import type {
 	IPlugin,
 	IPipelinePlugin,
 	IFormSchemaProvider,
+	ICodeEditPlugin,
+	CodeEditRequest,
+	CodeEditOptions,
+	CodeEditResult,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -23,7 +27,14 @@ import type {
 	AiModel,
 	ConnectionValidationResult
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
+import {
+	buildSuccessPipelineResult,
+	buildDefaultCodeEditSystemPrompt,
+	computeWorkspaceFileChanges,
+	substituteVariables
+} from '@ever-works/plugin';
+import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import * as https from 'https';
 
@@ -172,12 +183,13 @@ function buildIsolatedGeminiEnv(configDir: string, env: Record<string, string>):
  * Runs a single Gemini CLI session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
+export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ICodeEditPlugin {
 	readonly id = 'gemini';
 	readonly name = 'Gemini Generator';
+	readonly providerName = 'Gemini CLI';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider', 'code-edit'] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
 
@@ -1015,6 +1027,90 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		const { result, state } = buildCancelledResult(this.state, startTime);
 		this.state = state;
 		return result;
+	}
+
+	// ─────────────────────────────────────────────────────────────────────
+	// Code-edit capability (ICodeEditPlugin)
+	// ─────────────────────────────────────────────────────────────────────
+
+	async executeCodeEdit(request: CodeEditRequest, options?: CodeEditOptions): Promise<CodeEditResult> {
+		const startTime = Date.now();
+		const settings =
+			((options?.execContext as { settings?: Record<string, unknown> })?.settings as Record<string, unknown>) ??
+			{};
+
+		const authEnv = resolveAuthEnv(settings as Parameters<typeof resolveAuthEnv>[0]);
+		if (Object.keys(authEnv).length === 0) {
+			return {
+				success: false,
+				summary: 'No Gemini credentials configured',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Configure GEMINI_API_KEY (or equivalent) in plugin settings.'
+			};
+		}
+
+		const cliVersion = (settings.version as string) || DEFAULT_CLI_VERSION;
+		const cliCommand = ensureBinary(cliVersion, this.context?.logger);
+		const configDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-code-edit-'));
+
+		const model = request.model ?? (settings.model as string | undefined) ?? DEFAULT_MODEL;
+		const systemPrompt = buildDefaultCodeEditSystemPrompt(request);
+
+		try {
+			const executionEnv = buildIsolatedGeminiEnv(configDir, authEnv);
+
+			const { promise, kill } = executeGemini({
+				command: cliCommand.command,
+				commandArgs: cliCommand.args,
+				prompt: request.prompt,
+				systemPrompt,
+				cwd: request.workspaceDir,
+				env: executionEnv,
+				model,
+				signal: options?.signal,
+				onStdoutLine: options?.onLogLine ? (line) => options.onLogLine!('stdout', line) : undefined,
+				onStderrLine: options?.onLogLine ? (line) => options.onLogLine!('stderr', line) : undefined
+			});
+
+			this.killProcess = kill;
+			const result = await promise;
+			this.killProcess = null;
+
+			if (result.killed || options?.signal?.aborted) {
+				return {
+					success: false,
+					summary: 'Code edit cancelled',
+					filesChanged: [],
+					duration: Date.now() - startTime,
+					error: 'Cancelled'
+				};
+			}
+
+			const filesChanged = await computeWorkspaceFileChanges(request.workspaceDir);
+			const success = result.exitCode === 0 && filesChanged.length > 0;
+			const summary = success
+				? `Gemini modified ${filesChanged.length} file(s) in ${Math.round((Date.now() - startTime) / 1000)}s`
+				: result.exitCode === 0
+					? 'Gemini ran but produced no changes'
+					: `Gemini exited with code ${result.exitCode}`;
+
+			return {
+				success,
+				summary,
+				filesChanged,
+				duration: Date.now() - startTime,
+				error: success ? undefined : (result.stderr || `Exit ${result.exitCode}`),
+				extra: { exitCode: result.exitCode }
+			};
+		} finally {
+			await fs.rm(configDir, { recursive: true, force: true }).catch(() => {});
+		}
+	}
+
+	async cancelCodeEdit(): Promise<void> {
+		this.killProcess?.();
+		this.killProcess = null;
 	}
 }
 
