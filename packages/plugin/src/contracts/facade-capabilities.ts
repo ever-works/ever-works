@@ -6,6 +6,7 @@ export const PLUGIN_CAPABILITIES = {
 	DATA_SOURCE: 'data-source',
 	PIPELINE: 'pipeline',
 	PIPELINE_MODIFIER: 'pipeline-modifier',
+	CODE_EDIT: 'code-edit',
 	FORM_SCHEMA_PROVIDER: 'form-schema-provider',
 	DEPLOYMENT: 'deployment',
 	GIT_PROVIDER: 'git-provider',

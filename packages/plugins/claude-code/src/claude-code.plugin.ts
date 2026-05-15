@@ -2,6 +2,11 @@ import type {
 	IPlugin,
 	IPipelinePlugin,
 	IFormSchemaProvider,
+	ICodeEditPlugin,
+	CodeEditRequest,
+	CodeEditOptions,
+	CodeEditResult,
+	CodeEditFileChange,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -43,6 +48,7 @@ import {
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
 import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
+import { buildCodeEditSystemPrompt, readGitStatus } from './utils/code-edit-helpers.js';
 import {
 	buildSystemPromptVariables,
 	buildUserPromptVariables,
@@ -163,12 +169,13 @@ interface ClaudeCodeLogOptions {
  * Runs a single Claude Code session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
+export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ICodeEditPlugin {
 	readonly id = 'claude-code';
 	readonly name = 'Claude Code Generator';
+	readonly providerName = 'Claude Code';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider', 'code-edit'] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
 
@@ -1088,6 +1095,103 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		const { result, state } = buildCancelledResult(this.state, startTime);
 		this.state = state;
 		return result;
+	}
+
+	// ─────────────────────────────────────────────────────────────────────
+	// Code-edit capability (ICodeEditPlugin)
+	// Runs the Claude Code CLI inside an already-checked-out workspace and
+	// reports back which files changed. The caller (CodeUpdateGenerator)
+	// owns clone/branch/commit/push — this method only handles the AI step.
+	// ─────────────────────────────────────────────────────────────────────
+
+	async executeCodeEdit(
+		request: CodeEditRequest,
+		options?: CodeEditOptions
+	): Promise<CodeEditResult> {
+		const startTime = Date.now();
+		const execContext = options?.execContext as
+			| { resolveSettings?: () => Promise<Record<string, unknown>> }
+			| undefined;
+		const settings = (
+			execContext?.resolveSettings
+				? await execContext.resolveSettings()
+				: ((options?.execContext as Record<string, unknown>)?.settings ?? {})
+		) as Record<string, unknown>;
+
+		const authEnv = resolveAuthEnv(settings as Parameters<typeof resolveAuthEnv>[0]);
+		if (Object.keys(authEnv).length === 0) {
+			return {
+				success: false,
+				summary: 'No Claude Code credentials configured',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Configure CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY in plugin settings.'
+			};
+		}
+
+		const cliVersion = (settings.version as string) || DEFAULT_CLI_VERSION;
+		const binaryPath = await ensureBinary(cliVersion);
+		const configDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-code-edit-'));
+
+		const model = request.model ?? (settings.model as string | undefined);
+		const maxTurns = request.maxTurns ?? (settings.maxTurns as number | undefined) ?? DEFAULT_MAX_TURNS;
+		const maxBudgetUsd = request.maxBudgetUsd ?? (settings.maxBudgetUsd as number | undefined);
+
+		const systemPrompt = buildCodeEditSystemPrompt(request);
+
+		try {
+			const { promise, kill } = executeClaudeCode({
+				binaryPath,
+				prompt: request.prompt,
+				systemPrompt,
+				cwd: request.workspaceDir,
+				env: { ...authEnv, CLAUDE_CODE_CONFIG_DIR: configDir },
+				maxTurns,
+				maxBudgetUsd,
+				model,
+				signal: options?.signal,
+				onStdoutLine: options?.onLogLine ? (line) => options.onLogLine!('stdout', line) : undefined,
+				onStderrLine: options?.onLogLine ? (line) => options.onLogLine!('stderr', line) : undefined
+			});
+
+			this.killProcess = kill;
+			const result = await promise;
+			this.killProcess = null;
+
+			if (result.killed || options?.signal?.aborted) {
+				return {
+					success: false,
+					summary: 'Code edit cancelled',
+					filesChanged: [],
+					duration: Date.now() - startTime,
+					error: 'Cancelled'
+				};
+			}
+
+			const filesChanged = await readGitStatus(request.workspaceDir);
+			const success = result.exitCode === 0 && filesChanged.length > 0;
+			const summary = success
+				? `Claude Code modified ${filesChanged.length} file(s) in ${Math.round((Date.now() - startTime) / 1000)}s`
+				: result.exitCode === 0
+					? 'Claude Code ran but produced no changes'
+					: `Claude Code exited with code ${result.exitCode}`;
+
+			return {
+				success,
+				summary,
+				filesChanged,
+				duration: Date.now() - startTime,
+				error: success ? undefined : this.extractErrorDetail(result),
+				extra: { exitCode: result.exitCode }
+			};
+		} finally {
+			await fs.rm(configDir, { recursive: true, force: true }).catch(() => {});
+		}
+	}
+
+	async cancelCodeEdit(): Promise<void> {
+		this.killProcess?.();
+		this.killProcess = null;
 	}
 }
 

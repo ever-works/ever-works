@@ -77,6 +77,13 @@ export {
     type DeployFacadeFullOptions,
 } from './deploy.facade';
 
+// Code Edit Facade
+export {
+    CodeEditFacadeService,
+    type CodeEditFacadeOptions,
+    type CodeEditProviderInfo,
+} from './code-edit.facade';
+
 // Prompt Facade
 export { PromptFacadeService } from './prompt.facade';
 

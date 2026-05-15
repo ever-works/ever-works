@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
+import { CodeEditFacadeService } from '../../facades/code-edit.facade';
 import { WorkCodeUpdateRepository, WorkRepository } from '../../database';
 import {
     Work,
@@ -9,7 +10,6 @@ import {
     WorkCodeUpdateStatus,
 } from '../../entities';
 import { WebsiteTemplateResolverService } from '../website-generator/website-template-resolver.service';
-import { AiCodeEditorService } from './ai-code-editor.service';
 import type { CodeUpdateRequest } from './types';
 
 export interface RequestCodeUpdateOptions {
@@ -22,10 +22,10 @@ export class CodeUpdateGeneratorService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
+        private readonly codeEditFacade: CodeEditFacadeService,
         private readonly workRepository: WorkRepository,
         private readonly codeUpdateRepository: WorkCodeUpdateRepository,
         private readonly templateResolver: WebsiteTemplateResolverService,
-        private readonly aiCodeEditor: AiCodeEditorService,
     ) {}
 
     /**
@@ -109,11 +109,30 @@ export class CodeUpdateGeneratorService {
 
             await this.gitFacade.switchBranch(work.gitProvider, workspaceDir, branch, true);
 
-            const editResult = await this.aiCodeEditor.apply({
-                workspaceDir,
-                prompt: record.prompt,
-                model: record.aiModel ?? undefined,
-            });
+            const editResult = await this.codeEditFacade.execute(
+                {
+                    workspaceDir,
+                    prompt: record.prompt,
+                    model: record.aiModel ?? undefined,
+                },
+                {
+                    userId: work.userId,
+                    workId: work.id,
+                },
+                {
+                    onLogLine: (stream, line) => {
+                        this.logger.debug(`[code-edit:${stream}] ${line}`);
+                    },
+                },
+            );
+
+            if (!editResult.success) {
+                throw new Error(editResult.error ?? editResult.summary);
+            }
+
+            if (editResult.filesChanged.length === 0) {
+                throw new Error('AI agent produced no file changes');
+            }
 
             await this.gitFacade.addAll(work.gitProvider, workspaceDir);
             await this.gitFacade.commit(
@@ -152,7 +171,12 @@ export class CodeUpdateGeneratorService {
                 branch,
                 prNumber: pr.number,
                 prUrl: pr.url,
-                diff: editResult.diff,
+                diff: editResult.filesChanged.map((f) => ({
+                    path: f.path,
+                    status: f.status,
+                    additions: f.additions,
+                    deletions: f.deletions,
+                })),
                 summary: editResult.summary,
             });
 
