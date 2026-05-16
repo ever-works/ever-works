@@ -13,3 +13,7 @@ export * from './work/index.js';
 
 // Agent / zero-friction onboarding types
 export * from './onboarding/index.js';
+
+// EW-628 data-repo instant-sync — activity-row wire payload shared by
+// API (emitter) and web (renderer).
+export * from './data-sync/index.js';

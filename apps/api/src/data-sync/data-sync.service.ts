@@ -9,6 +9,13 @@ import { WorkRepository } from '@ever-works/agent/database';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { config } from '@ever-works/agent/config';
 import type {
+    SyncEventErrorClass,
+    SyncEventFailed,
+    SyncEventPayload,
+    SyncEventSkipped,
+    SyncEventSuccess,
+} from '@ever-works/contracts/api';
+import type {
     DataSyncOutcome,
     DataSyncSuccessStats,
     SyncReason,
@@ -229,90 +236,107 @@ export class DataSyncService {
         return work?.user?.id ?? 'system';
     }
 
-    private async emitSuccess(
-        workId: string,
-        source: SyncSource,
-        stats: DataSyncSuccessStats,
-    ): Promise<void> {
+    /**
+     * Single emit point — types the `details` payload as the canonical
+     * `SyncEventPayload` discriminated union from `@ever-works/contracts`
+     * so the API emitter and the web `SyncEventRow` renderer cannot
+     * drift. Resolves the actor user once per emit (so a Gate 1
+     * short-circuit row still gets the right userId attribution).
+     *
+     * Catches and warns on its own — activity-log failures must NEVER
+     * propagate to the caller, since they cannot rescue a missed row.
+     */
+    private async emit(workId: string, payload: SyncEventPayload): Promise<void> {
         try {
             const userId = await this.resolveActor(workId);
+            const { actionType, status, action, summary } = describePayload(payload);
             await this.activityLogService.log({
                 userId,
                 workId,
-                actionType: ActivityActionType.DATA_SYNC_SUCCESS,
-                action: 'data-sync.success',
-                status: ActivityStatus.COMPLETED,
-                summary: `Synced data repo (${stats.filesChanged} file${stats.filesChanged === 1 ? '' : 's'} updated)`,
-                details: {
-                    kind: 'success',
-                    source,
-                    beforeSha: stats.beforeSha,
-                    afterSha: stats.afterSha,
-                    filesChanged: stats.filesChanged,
-                    durationMs: stats.durationMs,
-                },
+                actionType,
+                action,
+                status,
+                summary,
+                details: payload as unknown as Record<string, unknown>,
             });
         } catch (err) {
             this.logger.warn(
-                `Failed to write data_sync_success row for work=${workId}: ${(err as Error).message ?? err}`,
+                `Failed to write ${payload.kind} activity row for work=${workId}: ${(err as Error).message ?? err}`,
             );
         }
     }
 
-    private async emitSkipped(
-        workId: string,
-        source: SyncSource,
-        reason: SyncReason,
-    ): Promise<void> {
-        try {
-            const userId = await this.resolveActor(workId);
-            await this.activityLogService.log({
-                userId,
-                workId,
-                actionType: ActivityActionType.DATA_SYNC_SKIPPED,
-                action: 'data-sync.skipped',
-                status: ActivityStatus.CANCELLED,
-                summary: `Sync skipped: ${reason}`,
-                details: {
-                    kind: 'skipped',
-                    source,
-                    reason,
-                },
-            });
-        } catch (err) {
-            this.logger.warn(
-                `Failed to write data_sync_skipped row for work=${workId}: ${(err as Error).message ?? err}`,
-            );
-        }
+    private emitSuccess(workId: string, source: SyncSource, stats: DataSyncSuccessStats) {
+        const payload: SyncEventSuccess = {
+            kind: 'success',
+            source,
+            beforeSha: stats.beforeSha,
+            afterSha: stats.afterSha,
+            filesChanged: stats.filesChanged,
+            durationMs: stats.durationMs,
+        };
+        return this.emit(workId, payload);
     }
 
-    private async emitFailed(
+    private emitSkipped(workId: string, source: SyncSource, reason: SyncReason) {
+        const payload: SyncEventSkipped = {
+            kind: 'skipped',
+            source,
+            reason,
+        };
+        return this.emit(workId, payload);
+    }
+
+    private emitFailed(
         workId: string,
         source: SyncSource,
-        errorClass: string,
+        errorClass: SyncEventErrorClass,
         errorTail: string,
-    ): Promise<void> {
-        try {
-            const userId = await this.resolveActor(workId);
-            await this.activityLogService.log({
-                userId,
-                workId,
+    ) {
+        const payload: SyncEventFailed = {
+            kind: 'failed',
+            source,
+            errorClass,
+            errorTail,
+        };
+        return this.emit(workId, payload);
+    }
+}
+
+/**
+ * Project the typed `SyncEventPayload` into the legacy CreateActivityLogDto
+ * fields the `activity_log` row carries — keeps the JSON `details` shape
+ * canonical while letting the existing summary / actionType / status
+ * machinery feed dashboards that pivot on those columns directly.
+ */
+function describePayload(payload: SyncEventPayload): {
+    actionType: ActivityActionType;
+    status: ActivityStatus;
+    action: string;
+    summary: string;
+} {
+    switch (payload.kind) {
+        case 'success':
+            return {
+                actionType: ActivityActionType.DATA_SYNC_SUCCESS,
+                status: ActivityStatus.COMPLETED,
+                action: 'data-sync.success',
+                summary: `Synced data repo (${payload.filesChanged} file${payload.filesChanged === 1 ? '' : 's'} updated)`,
+            };
+        case 'skipped':
+            return {
+                actionType: ActivityActionType.DATA_SYNC_SKIPPED,
+                status: ActivityStatus.CANCELLED,
+                action: 'data-sync.skipped',
+                summary: `Sync skipped: ${payload.reason}`,
+            };
+        case 'failed':
+            return {
                 actionType: ActivityActionType.DATA_SYNC_FAILED,
-                action: 'data-sync.failed',
                 status: ActivityStatus.FAILED,
-                summary: `Sync failed: ${errorClass}`,
-                details: {
-                    kind: 'failed',
-                    source,
-                    errorClass,
-                    errorTail,
-                },
-            });
-        } catch (err) {
-            this.logger.warn(
-                `Failed to write data_sync_failed row for work=${workId}: ${(err as Error).message ?? err}`,
-            );
-        }
+                action: 'data-sync.failed',
+                summary: `Sync failed: ${payload.errorClass}`,
+            };
     }
 }
 
@@ -322,7 +346,7 @@ export class DataSyncService {
  * deliberately small per spec §5.6 — adding a new class is a deliberate
  * schema decision, not an autopilot fallback.
  */
-function classifyError(err: unknown): string {
+function classifyError(err: unknown): SyncEventErrorClass {
     const message = extractErrorMessage(err).toLowerCase();
 
     if (/\b(404|not found|enotfound|getaddrinfo)\b/.test(message)) {

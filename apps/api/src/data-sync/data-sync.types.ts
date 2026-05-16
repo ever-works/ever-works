@@ -6,7 +6,20 @@
  * `DataSyncService` exposes `runDataSync(workId, source)`, the EW-628
  * dispatcher (Phase 4) fans out into it from both webhook and poller
  * paths, and the activity feed (Phase 7) renders the outcomes.
+ *
+ * The wire-format types (`SyncEventSource` / `SyncEventSkipReason` /
+ * `SyncEventErrorClass`) live in `@ever-works/contracts/api` so the API
+ * emitter and the web `SyncEventRow` renderer share a single source of
+ * truth. The aliases re-exported below keep the existing call sites
+ * compiling and document the intent — the API service speaks in
+ * `SyncSource` and `SyncReason`, both of which ARE the contract types.
  */
+
+import type {
+    SyncEventErrorClass,
+    SyncEventSkipReason,
+    SyncEventSource,
+} from '@ever-works/contracts/api';
 
 /**
  * Which transport surfaced this sync attempt.
@@ -18,7 +31,7 @@
  * - `manual` — operator hit the force-sync endpoint
  *   (`POST /api/works/:id/sync`, Phase 6).
  */
-export type SyncSource = 'webhook' | 'poll' | 'manual';
+export type SyncSource = SyncEventSource;
 
 /**
  * Why a sync attempt was skipped (logged on the `data-sync.skipped`
@@ -26,18 +39,13 @@ export type SyncSource = 'webhook' | 'poll' | 'manual';
  * three values here; `no-changes` and `app-not-installed-and-no-credentials`
  * are emitted upstream by the dispatcher before the lock attempt.
  */
-export type SyncReason =
-    | 'retry-backoff'
-    | 'sync-in-progress'
-    | 'generation-in-progress'
-    | 'no-changes'
-    | 'app-not-installed-and-no-credentials';
+export type SyncReason = SyncEventSkipReason;
 
 /** Terminal outcome of a `runDataSync` invocation. */
 export type DataSyncOutcome =
     | { status: 'success'; stats: DataSyncSuccessStats }
     | { status: 'skipped'; reason: SyncReason }
-    | { status: 'failed'; errorClass: string; errorTail: string };
+    | { status: 'failed'; errorClass: SyncEventErrorClass; errorTail: string };
 
 export type DataSyncSuccessStats = {
     /** Data-repo SHA before the sync's clone/pull. May be undefined until gitFacade SHA helper lands (EW-628 Phase 2 follow-up). */

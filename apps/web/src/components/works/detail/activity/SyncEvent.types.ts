@@ -1,40 +1,31 @@
 /**
- * EW-628 sync-event row types. Extracted from {@link ./SyncEventRow.tsx}
- * so consumers (the upcoming FeedRow adapter, API-client glue, fixtures)
- * can import the discriminated union without pulling the component
- * implementation — keeps test-only and SSR-only call sites lean.
+ * EW-628 sync-event row types. The canonical wire format lives in
+ * `@ever-works/contracts/api` as `SyncEventPayload` so the API emitter
+ * (`apps/api/src/data-sync/data-sync.service.ts`) and the
+ * `SyncEventRow` renderer share a single source of truth — adding a
+ * new `kind`, `reason`, or `errorClass` requires touching the contract
+ * file in one place.
+ *
+ * The local `SyncEvent` alias is preserved so existing
+ * `SyncEventRow` / fixture imports continue to compile.
  *
  * Spec: `docs/specs/features/data-repo-instant-sync/spec.md` §5.6.
- *
- * The shape mirrors the API-side `DataSyncOutcome` in
- * `apps/api/src/data-sync/data-sync.types.ts`, but uses `kind` instead
- * of `status` to align with the activity-feed convention where
- * `kind` discriminates row types and `status` is reserved for HTTP /
- * pipeline lifecycle values.
  */
 
-export type SyncEventSource = 'webhook' | 'poll' | 'manual';
+import type {
+    SyncEventErrorClass,
+    SyncEventKind,
+    SyncEventPayload,
+    SyncEventSkipReason,
+    SyncEventSource,
+} from '@ever-works/contracts/api';
 
-export type SyncEvent =
-    | {
-          kind: 'success';
-          source: SyncEventSource;
-          beforeSha?: string;
-          afterSha?: string;
-          filesChanged: number;
-          durationMs?: number;
-      }
-    | {
-          kind: 'skipped';
-          source: SyncEventSource;
-          reason: string;
-      }
-    | {
-          kind: 'failed';
-          source: SyncEventSource;
-          errorClass: string;
-          errorTail: string;
-      };
+export type { SyncEventErrorClass, SyncEventKind, SyncEventSkipReason, SyncEventSource };
 
-/** Narrow `kind` values used as React keys and `data-event-kind` attrs. */
-export type SyncEventKind = SyncEvent['kind'];
+/**
+ * Local alias for the discriminated union. New consumers should prefer
+ * importing `SyncEventPayload` from `@ever-works/contracts/api`
+ * directly; this alias exists so the in-tree imports of `SyncEvent`
+ * keep working without a sweeping rename.
+ */
+export type SyncEvent = SyncEventPayload;
