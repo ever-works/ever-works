@@ -214,3 +214,25 @@ try {
 ```
 
 Consumers can listen for error events to log cache failures without disrupting the request flow.
+
+## Future Considerations — Pluggable Backend (Redis option)
+
+`CacheFactory` ships two backends today: `InMemory()` (dev / single-instance) and `TypeORM(...)` (default, multi-instance, persistent). The TypeORM backend remains the **default and fully supported** option and will continue to be — no plan to drop it.
+
+For high-scale hosted deployments we additionally want to support **Redis** as an optional backend, selectable per deployment via environment configuration:
+
+```typescript
+// Future API (not yet implemented — tracked in EW-629)
+CacheFactory.Redis({
+	url: process.env.REDIS_URL,
+	ttl: 60_000,
+	namespace: 'my-cache',
+	isGlobal: true
+});
+```
+
+Selection driven by `EVER_WORKS_CACHE_BACKEND={typeorm,redis,memory}`. Default: `typeorm`. Existing deployments need no config change to keep their current behaviour.
+
+The matching change applies to [`DistributedTaskLockService`](../agent-services/distributed-task-lock.md) — see the "Future Considerations" section there. Both changes are **additive**: the PostgreSQL backend stays the default. The point is to let advanced operators with existing Redis investments opt in without forking, and to give high-volume deployments a way to offload hot cache traffic from the primary database.
+
+Design rationale and rollout plan: [ADR-005: Cache and Lock Pluggability](../specs/decisions/005-cache-and-lock-pluggability.md). Implementation tracked in [EW-629](https://evertech.atlassian.net/browse/EW-629).
