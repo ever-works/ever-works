@@ -33,6 +33,7 @@ import {
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
+import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { RemoteCallDto } from './dto/remote-call.dto';
@@ -62,6 +63,8 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly templateRepository: TemplateRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
+        // EW-628 G7 — dispatcher fanned out from the data-repo-sync cron.
+        private readonly dataSyncDispatcher: DataSyncDispatcherService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -81,6 +84,8 @@ export class TriggerInternalController implements OnModuleInit {
             CacheManager: this.cacheManager,
             WorkScheduleDispatcherService: this.scheduleDispatcher,
             WorkScheduleService: this.workScheduleService,
+            // EW-628 G7 — exposed for the data-repo-sync dispatcher cron.
+            DataSyncDispatcherService: this.dataSyncDispatcher,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

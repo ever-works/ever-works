@@ -12,7 +12,7 @@ describe('FeedFilterChips', () => {
     it('renders one chip per category and marks the active one', () => {
         render(<FeedFilterChips value="generation" onChange={() => undefined} />);
         const tabs = screen.getAllByRole('tab');
-        expect(tabs).toHaveLength(10);
+        expect(tabs).toHaveLength(11);
         const active = tabs.find((b) => b.getAttribute('aria-selected') === 'true');
         expect(active).toBeDefined();
         expect(active?.textContent).toBe('generation');
