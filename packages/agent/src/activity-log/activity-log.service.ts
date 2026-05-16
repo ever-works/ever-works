@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
-import { ActivityLogRepository } from '@src/database/repositories/activity-log.repository';
-import { WorkRepository } from '@src/database/repositories/work.repository';
+import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
+import { ActivityLogRepository } from '../database/repositories/activity-log.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { formatGenerationCountsSummary, formatStoredActivitySummary } from './activity-log-summary';
 import {
     ActivityActionType,
@@ -11,7 +11,7 @@ import {
 } from '../entities/activity-log.types';
 import type { ActivityLog } from '../entities/activity-log.entity';
 import type { Work } from '../entities/work.entity';
-import { GenerateStatusType } from '@src/entities/types';
+import { GenerateStatusType } from '../entities/types';
 import {
     ACTIVITY_LOG_ANALYTICS_DISPATCHER,
     type ActivityLogAnalyticsDispatcher,

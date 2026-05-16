@@ -28,6 +28,20 @@ jest.mock('@ever-works/agent/plugins', () => ({
     UserPluginRepository: class UserPluginRepository {},
     WorkPluginRepository: class WorkPluginRepository {},
 }));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
+    ActivityLogModule: class ActivityLogModule {},
+}));
+jest.mock('@ever-works/agent/generators', () => ({
+    MarkdownGeneratorService: class MarkdownGeneratorService {},
+    MarkdownGeneratorModule: class MarkdownGeneratorModule {},
+}));
+jest.mock('@ever-works/monitoring', () => ({
+    AnalyticsService: class AnalyticsService {},
+}));
+jest.mock('../data-sync/data-sync-dispatcher.service', () => ({
+    DataSyncDispatcherService: class DataSyncDispatcherService {},
+}));
 jest.mock('../work-proposals/work-proposals.service', () => ({
     WorkProposalsApiService: class WorkProposalsApiService {},
 }));

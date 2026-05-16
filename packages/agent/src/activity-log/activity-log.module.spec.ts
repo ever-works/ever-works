@@ -1,4 +1,4 @@
-jest.mock('@src/database/database.module', () => ({
+jest.mock('../database/database.module', () => ({
     DatabaseModule: class DatabaseModule {},
 }));
 
