@@ -150,4 +150,48 @@ describe('GitHubAppSyncService', () => {
 
         expect(result).toBeNull();
     });
+
+    // EW-628 Phase 5 — pin the `push` event branch added to handleWebhook so
+    // future event-name additions / refactors don't accidentally regress it.
+    // The handler body is currently a structured TODO (Work resolve + UPDATE
+    // arrives in the Phase 5 follow-up alongside the webhookEnabled flag);
+    // these tests pin the routing and early-exit shape.
+    describe('handleWebhook — push event (EW-628 Phase 5)', () => {
+        it('accepts a `push` event with repository.full_name without throwing', async () => {
+            const { service, gitHubAppInstallationRepository } = createService();
+
+            await expect(
+                service.handleWebhook('push', {
+                    repository: { full_name: 'octocat/awesome-time-tracking-data' },
+                } as any),
+            ).resolves.toBeUndefined();
+
+            // Push branch must NOT touch the installation upsert path that
+            // the installation/installation_repositories branches own.
+            expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
+            expect(gitHubAppInstallationRepository.markDeleted).not.toHaveBeenCalled();
+        });
+
+        it('drops a `push` event whose payload has no repository.full_name (timing-safe early return)', async () => {
+            const { service, gitHubAppInstallationRepository } = createService();
+
+            await expect(service.handleWebhook('push', {} as any)).resolves.toBeUndefined();
+            await expect(
+                service.handleWebhook('push', { repository: {} } as any),
+            ).resolves.toBeUndefined();
+
+            expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
+        });
+
+        it('ignores unknown event names (regression guard for the if/if/if dispatch chain)', async () => {
+            const { service, gitHubAppInstallationRepository } = createService();
+
+            await expect(
+                service.handleWebhook('ping', { zen: 'Speak like a human.' } as any),
+            ).resolves.toBeUndefined();
+
+            expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
+            expect(gitHubAppInstallationRepository.markDeleted).not.toHaveBeenCalled();
+        });
+    });
 });
