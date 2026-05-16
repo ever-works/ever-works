@@ -37,7 +37,16 @@ import { test, expect } from '@playwright/test';
  */
 
 const APP_URL = process.env.PLAYWRIGHT_APP_URL || 'http://localhost:3000';
+const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || 'http://localhost:3100';
+
+// `WEBSITE_URL` is the marketing landing page (`ever.works`), which lives
+// in a separate repository and is NOT started by this monorepo's e2e CI.
+// The UI tests that hit it (`landing-prompt-*` testIDs) only work against
+// a deployed marketing site, so they're auto-skipped when `WEBSITE_URL`
+// is left at its localhost default. Set `PLAYWRIGHT_WEBSITE_URL` to a
+// real deployment to opt in.
 const WEBSITE_URL = process.env.PLAYWRIGHT_WEBSITE_URL || 'http://localhost:4000';
+const WEBSITE_AVAILABLE = !!process.env.PLAYWRIGHT_WEBSITE_URL;
 
 /**
  * EW-617 G7 — stub Cloudflare Turnstile so the wizard can mint tokens
@@ -74,6 +83,13 @@ async function installTurnstileStub(page: import('@playwright/test').Page) {
 }
 
 test.describe('EW-617 zero-friction flow — UI surface', () => {
+    // Skip entire suite when the marketing site (WEBSITE_URL) is not reachable.
+    // The landing page lives in a separate repo; tests below depend on it.
+    test.skip(
+        !WEBSITE_AVAILABLE,
+        'PLAYWRIGHT_WEBSITE_URL not set — marketing site (landing page) is not part of this monorepo and is not started by CI.',
+    );
+
     test.beforeEach(async ({ page }) => {
         await installTurnstileStub(page);
     });
@@ -128,7 +144,7 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
     // the request body. We omit the field by default because all
     // captcha-gated endpoints accept an empty token in the no-op path.
     test('POST /api/auth/anonymous returns 201 + anon user shape', async ({ request }) => {
-        const response = await request.post(`${APP_URL}/api/auth/anonymous`);
+        const response = await request.post(`${API_URL}/api/auth/anonymous`);
         expect(response.status()).toBe(201);
         const body = await response.json();
         expect(body).toMatchObject({
@@ -151,7 +167,7 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
     test.skip('POST /api/auth/anonymous is throttled at 5/hour per IP', async ({ request }) => {
         // Six rapid requests from the same IP — the 6th MUST be 429.
         const attempts = await Promise.all(
-            Array.from({ length: 6 }, () => request.post(`${APP_URL}/api/auth/anonymous`)),
+            Array.from({ length: 6 }, () => request.post(`${API_URL}/api/auth/anonymous`)),
         );
         const statuses = attempts.map((r) => r.status());
         // First 5 succeed, 6th hits the throttle.
@@ -163,9 +179,9 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
         request,
     }) => {
         // Mint an anon session first.
-        const session = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
+        const session = await request.post(`${API_URL}/api/auth/anonymous`).then((r) => r.json());
 
-        const response = await request.post(`${APP_URL}/api/works/quick-create`, {
+        const response = await request.post(`${API_URL}/api/works/quick-create`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
             data: {
                 slug: `e2e-${Date.now().toString(36)}`,
@@ -192,10 +208,10 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
     });
 
     test('POST /api/auth/claim flips an anon user into a registered one', async ({ request }) => {
-        const session = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
+        const session = await request.post(`${API_URL}/api/auth/anonymous`).then((r) => r.json());
 
         const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const claim = await request.post(`${APP_URL}/api/auth/claim`, {
+        const claim = await request.post(`${API_URL}/api/auth/claim`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
             data: {
                 email: `claim-${suffix}@test.local`,
@@ -212,8 +228,8 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
 
         // Re-attempt with the same email should now 409 (a different
         // anon user trying to claim the same email).
-        const session2 = await request.post(`${APP_URL}/api/auth/anonymous`).then((r) => r.json());
-        const dup = await request.post(`${APP_URL}/api/auth/claim`, {
+        const session2 = await request.post(`${API_URL}/api/auth/anonymous`).then((r) => r.json());
+        const dup = await request.post(`${API_URL}/api/auth/claim`, {
             headers: { Authorization: `Bearer ${session2.access_token}` },
             data: {
                 email: `claim-${suffix}@test.local`,
@@ -225,6 +241,14 @@ test.describe('EW-617 zero-friction flow — API contract', () => {
 });
 
 test.describe('EW-617 zero-friction flow — full UI journey', () => {
+    // Same dependency as the UI-surface suite: the journey starts on the
+    // marketing landing page (WEBSITE_URL), which is not part of this
+    // monorepo. Skip unless explicitly pointed at a real deployment.
+    test.skip(
+        !WEBSITE_AVAILABLE,
+        'PLAYWRIGHT_WEBSITE_URL not set — marketing site (landing page) is not part of this monorepo and is not started by CI.',
+    );
+
     test.beforeEach(async ({ page }) => {
         await installTurnstileStub(page);
     });
