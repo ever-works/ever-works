@@ -59,7 +59,11 @@ export class MarkdownGeneratorService {
         private readonly workOperations: WorkOperationsService,
     ) {}
 
-    async initialize(work: Work, user: User, options: InitializeOptions = {}) {
+    async initialize(
+        work: Work,
+        user: User,
+        options: InitializeOptions = {},
+    ): Promise<{ filesChanged: number }> {
         throwIfGenerationCancelled(options.signal);
 
         const workOwner = getWorkOwner(work);
@@ -311,6 +315,13 @@ export class MarkdownGeneratorService {
             } else {
                 this.logger.log(`Pushed changes to main branch for ${work.slug}`);
             }
+
+            // EW-628: surface the per-run filesystem write count so
+            // callers (notably the data-sync entry below) can record
+            // `filesChanged` on the activity row without an extra git
+            // diff. Existing callers ignore the return value, so this
+            // is backwards compatible.
+            return { filesChanged: markdownRepo.getWriteCount() };
         } catch (err) {
             this.logger.error('Error during markdown generation', err);
             throw err;
@@ -319,7 +330,7 @@ export class MarkdownGeneratorService {
 
     /**
      * Render-only sync entry — EW-628 Path A (webhook) and Path B (poller)
-     * both converge here via the new `DataSyncService` introduced in Phase 3.
+     * both converge here via the `DataSyncService` introduced in Phase 3.
      *
      * Behaviour is intentionally identical to `initialize()` minus the
      * upstream `ItemsGeneratorService` invocation: clone main + data repos,
@@ -328,11 +339,23 @@ export class MarkdownGeneratorService {
      *
      * Spec: `docs/specs/features/data-repo-instant-sync/spec.md` §5.4.
      *
-     * Returns timing + (future) SHA/filesChanged stats so the dispatcher can
-     * record them in the activity feed. The SHA and filesChanged fields are
-     * currently stubbed and will be wired in a follow-up commit once the
-     * shared git-layer helper exists; the dispatcher persists what it gets
-     * back and accepts undefined for the unwired fields.
+     * Stats wired in EW-628 G5:
+     *   - `beforeSha` — `work.lastSyncedDataRepoSha` at entry, i.e. the
+     *     SHA the previous sync rendered against. May be `undefined` for
+     *     a Work's first sync.
+     *   - `afterSha` — current data-repo HEAD SHA fetched via the git
+     *     provider plugin AFTER `initialize` finishes (so we record the
+     *     SHA we actually rendered against, not whatever races a webhook
+     *     into HEAD mid-flight).
+     *   - `filesChanged` — `MarkdownRepository.getWriteCount()` returned
+     *     by `initialize`. Counts README, per-item detail markdowns,
+     *     license writes, plus any `removeDetails` calls.
+     *   - `durationMs` — wall-clock from entry to push completion.
+     *
+     * If the remote SHA fetch fails (provider down / stale token),
+     * `afterSha` is left `undefined` rather than failing the whole sync
+     * — the activity row degrades gracefully, the caller's success
+     * outcome still counts.
      */
     async syncFromDataRepo(
         work: Work,
@@ -340,13 +363,57 @@ export class MarkdownGeneratorService {
         options: SyncFromDataRepoOptions = {},
     ): Promise<SyncFromDataRepoResult> {
         const startedAt = Date.now();
-        await this.initialize(work, user, { signal: options.signal });
+        const beforeSha = work.lastSyncedDataRepoSha ?? undefined;
+
+        const { filesChanged } = await this.initialize(work, user, { signal: options.signal });
+
+        const afterSha = await this.captureDataRepoHeadSha(work, user).catch((err) => {
+            this.logger.warn(
+                `EW-628: failed to capture data-repo HEAD SHA for work=${work.id}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return undefined;
+        });
+
         return {
-            beforeSha: undefined, // TODO(EW-628 Phase 2 follow-up): capture via gitFacade pre-clone
-            afterSha: undefined, // TODO(EW-628 Phase 2 follow-up): capture via gitFacade post-pull
-            filesChanged: 0, // TODO(EW-628 Phase 2 follow-up): count writes in MarkdownRepository
+            beforeSha,
+            afterSha,
+            filesChanged,
             durationMs: Date.now() - startedAt,
         };
+    }
+
+    /**
+     * Resolve the current data-repo HEAD SHA via the git provider plugin
+     * (one remote API call). Pulled out of `syncFromDataRepo` so the
+     * error-swallowing wrapper at the call site stays readable and the
+     * happy path is one expression.
+     */
+    private async captureDataRepoHeadSha(work: Work, user: User): Promise<string | undefined> {
+        const workOwner = getWorkOwner(work);
+        const dataRepoOwner = work.getRepoOwner('data');
+        const dataRepoName = work.getDataRepo();
+        const facadeOptions = {
+            userId: workOwner.id,
+            providerId: work.gitProvider,
+            workId: work.id,
+        };
+
+        const repo = await this.gitFacade.getRepository(dataRepoOwner, dataRepoName, facadeOptions);
+        const branch = repo?.defaultBranch ?? 'main';
+
+        const commit = await this.gitFacade.getLatestCommit(
+            dataRepoOwner,
+            dataRepoName,
+            branch,
+            facadeOptions,
+        );
+        // `user` is unused on the happy path but kept on the signature so
+        // future stats (e.g. `lastSyncedAtForUser`) can attribute without
+        // a churn.
+        void user;
+        return commit?.sha;
     }
 
     async removeItemDetail(work: Work, user: User, slug: string, branch?: string) {
