@@ -21,6 +21,9 @@ import { jsonrepair } from '@ever-works/plugin/ai';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../usage/plugin-usage.service';
+import { BudgetGuardService } from '../budgets/budget-guard.service';
+import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
 import type { ModelCatalogEntry } from './model-catalog';
@@ -46,8 +49,80 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional() private readonly budgetGuard?: BudgetGuardService,
     ) {
         super(registry, settingsService, workPluginRepository);
+    }
+
+    private async enforceBudget(
+        facadeOptions: { workId?: string; userId?: string },
+        plugin: IAiProviderPlugin,
+        modelId: string | undefined,
+        settings: Record<string, unknown>,
+        requestedMaxTokens?: number,
+    ): Promise<void> {
+        if (!this.budgetGuard || !facadeOptions.workId || !facadeOptions.userId) {
+            return;
+        }
+        const estimatedCostCents = await this.estimateMaxCostCents(
+            plugin,
+            modelId,
+            settings,
+            requestedMaxTokens,
+        );
+        await this.budgetGuard.checkBudget(
+            facadeOptions.workId,
+            facadeOptions.userId,
+            PluginUsageCapability.AI,
+            plugin.id,
+            { estimatedCostCents },
+        );
+    }
+
+    /**
+     * EW-602 pre-flight estimation: worst-case dollar amount for the
+     * upcoming AI call, in cents. Uses the model's outputCostPer1k as
+     * the dominant component (output is typically priced higher than
+     * input and the pre-flight is meant to catch single-call blowouts).
+     * Returns 0 when pricing or token cap can't be resolved — better to
+     * fall back to post-flight enforcement than block on incomplete data.
+     */
+    private async estimateMaxCostCents(
+        plugin: IAiProviderPlugin,
+        modelId: string | undefined,
+        settings: Record<string, unknown>,
+        requestedMaxTokens?: number,
+    ): Promise<number> {
+        if (!modelId) return 0;
+        try {
+            const modelInfo = await this.resolveModelMetadataForPlugin(plugin, modelId, settings);
+            if (!modelInfo) return 0;
+            const outputPrice = modelInfo.outputCostPer1k;
+            const inputPrice = modelInfo.inputCostPer1k ?? 0;
+            if (typeof outputPrice !== 'number' || outputPrice <= 0) return 0;
+
+            const maxOutputTokens =
+                requestedMaxTokens ??
+                modelInfo.capabilities.maxOutputTokens ??
+                modelInfo.capabilities.maxContextLength;
+            if (!maxOutputTokens || maxOutputTokens <= 0) return 0;
+
+            const outputUsd = (maxOutputTokens * outputPrice) / 1000;
+            // Assume input is at most ~25% of context (rough heuristic); good
+            // enough to flag pathologically expensive calls without a full
+            // tokenizer round-trip.
+            const inputUsd =
+                inputPrice > 0
+                    ? (Math.min(maxOutputTokens, modelInfo.capabilities.maxContextLength) *
+                          inputPrice) /
+                      1000 /
+                      4
+                    : 0;
+            return Math.ceil((outputUsd + inputUsd) * 100);
+        } catch {
+            return 0;
+        }
     }
 
     async askJson<T, Template extends string = string>(
@@ -68,6 +143,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         });
 
         const model = this.resolveModel(plugin, settings, options?.routing);
+
+        await this.enforceBudget(facadeOptions, plugin, model, settings);
+
         const prompt = substituteVariables(promptTemplate, options?.variables);
 
         const call = (callModel?: string) =>
@@ -89,6 +167,21 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
 
         const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
+
+        await this.pluginUsageService?.record({
+            workId: facadeOptions.workId,
+            userId: facadeOptions.userId,
+            pluginId: plugin.id,
+            capability: PluginUsageCapability.AI,
+            units: response.usage?.totalTokens ?? 1,
+            costCents: cost != null ? cost * 100 : 0,
+            modelId: response.model,
+            metadata: {
+                operation: 'askJson',
+                promptTokens: response.usage?.promptTokens,
+                completionTokens: response.usage?.completionTokens,
+            },
+        });
 
         return {
             result: validated.data,
@@ -237,13 +330,40 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+
+        await this.enforceBudget(
+            facadeOptions,
+            plugin,
+            options.model ?? model,
+            settings,
+            options.maxTokens,
+        );
+
         const mergedOptions: ChatCompletionOptions = {
             ...options,
             model: options.model ?? model,
             settings,
         };
 
-        return plugin.createChatCompletion(mergedOptions);
+        const response = await plugin.createChatCompletion(mergedOptions);
+
+        const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
+        await this.pluginUsageService?.record({
+            workId: facadeOptions.workId,
+            userId: facadeOptions.userId,
+            pluginId: plugin.id,
+            capability: PluginUsageCapability.AI,
+            units: response.usage?.totalTokens ?? 1,
+            costCents: cost != null ? cost * 100 : 0,
+            modelId: response.model,
+            metadata: {
+                operation: 'createChatCompletion',
+                promptTokens: response.usage?.promptTokens,
+                completionTokens: response.usage?.completionTokens,
+            },
+        });
+
+        return response;
     }
 
     async *createStreamingChatCompletion(
@@ -262,6 +382,15 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+
+        await this.enforceBudget(
+            facadeOptions,
+            plugin,
+            options.model ?? model,
+            settings,
+            options.maxTokens,
+        );
+
         const mergedOptions: ChatCompletionOptions = {
             ...options,
             model: options.model ?? model,

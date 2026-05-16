@@ -16,6 +16,9 @@ import { SubscriptionPlanRepository } from './repositories/subscription-plan.rep
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
 import { WorkScheduleRepository } from './repositories/work-schedule.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
+import { PluginUsageRepository } from './repositories/plugin-usage.repository';
+import { WorkBudgetRepository } from './repositories/work-budget.repository';
+import { WorkBudgetAlertStateRepository } from './repositories/work-budget-alert-state.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
@@ -57,6 +60,9 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         UserSubscriptionRepository,
         WorkScheduleRepository,
         UsageLedgerRepository,
+        PluginUsageRepository,
+        WorkBudgetRepository,
+        WorkBudgetAlertStateRepository,
         NotificationRepository,
         ActivityLogRepository,
         ConversationRepository,
@@ -84,6 +90,9 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         UserSubscriptionRepository,
         WorkScheduleRepository,
         UsageLedgerRepository,
+        PluginUsageRepository,
+        WorkBudgetRepository,
+        WorkBudgetAlertStateRepository,
         NotificationRepository,
         ActivityLogRepository,
         ConversationRepository,

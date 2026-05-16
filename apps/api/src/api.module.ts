@@ -15,6 +15,7 @@ import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
@@ -63,6 +64,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        BudgetsModule,
         ScreenshotModule,
         SearchModule,
         AgentPluginsModule.forRootAsync({

@@ -84,6 +84,7 @@ export const ROUTES = {
     DASHBOARD_WORK_SETTINGS: (id: string) => `/works/${id}/settings`,
     DASHBOARD_WORK_SETTINGS_GENERAL: (id: string) => `/works/${id}/settings`,
     DASHBOARD_WORK_SETTINGS_MEMBERS: (id: string) => `/works/${id}/settings/members`,
+    DASHBOARD_WORK_SETTINGS_BUDGETS: (id: string) => `/works/${id}/settings/budgets-usage`,
     DASHBOARD_WORK_PLUGINS: (id: string) => `/works/${id}/plugins`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',

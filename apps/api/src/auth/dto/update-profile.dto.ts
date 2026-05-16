@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, IsUrl, IsEmail } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsUrl, IsEmail, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -29,4 +29,13 @@ export class UpdateProfileDto {
     @IsEmail()
     @IsOptional()
     committerEmail?: string | null;
+
+    @ApiPropertyOptional({
+        description:
+            'EW-602: receive budget threshold alert emails (75/90/100/overage). ' +
+            'The in-app notification always fires; this only gates the email channel.',
+    })
+    @IsBoolean()
+    @IsOptional()
+    emailBudgetAlerts?: boolean;
 }
