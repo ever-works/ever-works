@@ -21,6 +21,35 @@ type InitializeOptions = {
     signal?: AbortSignal;
 };
 
+/**
+ * Input for {@link MarkdownGeneratorService.syncFromDataRepo} — the
+ * render-only entrypoint introduced by EW-628 (data-repo instant sync).
+ *
+ * Unlike `initialize`, this entry is intended to be called *outside* the
+ * generation pipeline (from the EW-628 dispatcher), and so it deliberately
+ * never runs the AI items-generator — it just re-renders the main repo
+ * against whatever the data repo currently holds.
+ *
+ * `expectedSourceSha` is informational only: if the data repo HEAD has
+ * already advanced past it by the time we clone, we render against
+ * current HEAD anyway. A stale webhook is not a reason to skip a sync.
+ */
+export type SyncFromDataRepoOptions = {
+    expectedSourceSha?: string;
+    signal?: AbortSignal;
+};
+
+export type SyncFromDataRepoResult = {
+    /** Data-repo HEAD SHA before this sync's clone/pull. TODO(EW-628): wire when stats helper lands. */
+    beforeSha?: string;
+    /** Data-repo HEAD SHA the main repo was rendered against. TODO(EW-628): wire when stats helper lands. */
+    afterSha?: string;
+    /** Number of files written to the main repo. TODO(EW-628): wire from MarkdownRepository write counters. */
+    filesChanged: number;
+    /** Wall-clock duration of the sync run in ms (start to push). */
+    durationMs: number;
+};
+
 @Injectable()
 export class MarkdownGeneratorService {
     private readonly logger = new Logger(MarkdownGeneratorService.name);
@@ -286,6 +315,38 @@ export class MarkdownGeneratorService {
             this.logger.error('Error during markdown generation', err);
             throw err;
         }
+    }
+
+    /**
+     * Render-only sync entry — EW-628 Path A (webhook) and Path B (poller)
+     * both converge here via the new `DataSyncService` introduced in Phase 3.
+     *
+     * Behaviour is intentionally identical to `initialize()` minus the
+     * upstream `ItemsGeneratorService` invocation: clone main + data repos,
+     * regenerate `README.md` + `details/*.md` from current data-repo HEAD,
+     * commit and push. The AI items pipeline never runs from this path.
+     *
+     * Spec: `docs/specs/features/data-repo-instant-sync/spec.md` §5.4.
+     *
+     * Returns timing + (future) SHA/filesChanged stats so the dispatcher can
+     * record them in the activity feed. The SHA and filesChanged fields are
+     * currently stubbed and will be wired in a follow-up commit once the
+     * shared git-layer helper exists; the dispatcher persists what it gets
+     * back and accepts undefined for the unwired fields.
+     */
+    async syncFromDataRepo(
+        work: Work,
+        user: User,
+        options: SyncFromDataRepoOptions = {},
+    ): Promise<SyncFromDataRepoResult> {
+        const startedAt = Date.now();
+        await this.initialize(work, user, { signal: options.signal });
+        return {
+            beforeSha: undefined, // TODO(EW-628 Phase 2 follow-up): capture via gitFacade pre-clone
+            afterSha: undefined, // TODO(EW-628 Phase 2 follow-up): capture via gitFacade post-pull
+            filesChanged: 0, // TODO(EW-628 Phase 2 follow-up): count writes in MarkdownRepository
+            durationMs: Date.now() - startedAt,
+        };
     }
 
     async removeItemDetail(work: Work, user: User, slug: string, branch?: string) {
