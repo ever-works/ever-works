@@ -1,7 +1,7 @@
 import { Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '@src/auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '@src/auth/types/authenticated-user.type';
+import { CurrentUser } from '@src/auth/decorators/user.decorator';
+import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { DataSyncService } from './data-sync.service';
 import type { DataSyncOutcome } from './data-sync.types';
 

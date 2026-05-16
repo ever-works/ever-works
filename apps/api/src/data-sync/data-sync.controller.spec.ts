@@ -1,7 +1,33 @@
+// `DataSyncService` (imported transitively via the controller) reaches
+// into `@ever-works/agent/{activity-log,generators,database,config}`
+// whose barrels use the agent-side `@src/...` alias. The API jest
+// config rewrites that alias to a non-existent directory, so we stub
+// the barrels here just like the unit specs do.
+jest.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
+}));
+jest.mock('@ever-works/agent/generators', () => ({
+    MarkdownGeneratorService: class MarkdownGeneratorService {},
+}));
+jest.mock('@ever-works/agent/database', () => ({
+    WorkRepository: class WorkRepository {},
+}));
+jest.mock('@ever-works/agent/config', () => ({
+    config: {
+        subscriptions: {
+            dataSync: {
+                getLockTtlSeconds: () => 300,
+                getRetryBackoffSeconds: () => 300,
+                getGenInProgressNoiseWindowMs: () => 900_000,
+            },
+        },
+    },
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSyncController } from './data-sync.controller';
 import { DataSyncService } from './data-sync.service';
-import type { AuthenticatedUser } from '@src/auth/types/authenticated-user.type';
+import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 import type { DataSyncOutcome, DataSyncSuccessStats } from './data-sync.types';
 
 /**
