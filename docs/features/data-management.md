@@ -272,3 +272,29 @@ The Data Management section in Settings provides three panels:
 3. **GitHub Sync** — repository setup, push/pull buttons, secrets toggle, status display with last sync timestamps
 
 All operations provide toast notifications for success/failure and display detailed warnings in the import results.
+
+## Data Repository Instant Sync (EW-628)
+
+When a Work is split across a **data repository** (Markdown + YAML edited directly by humans) and a **main repository** (rendered HTML/SSR build output), edits to the data repo can flow into the main repo on a sub-minute path instead of waiting for the next full generation tick.
+
+Two transports drive the sync:
+
+- **Webhook (default when the Ever Works GitHub App is installed)** — push events on the data repo's default branch debounce for 30 seconds, then call `MarkdownGeneratorService.syncFromDataRepo()` and push the resulting diff to the main repo. End-to-end latency is typically well under one minute.
+- **Poller (fallback when the App is not installed)** — `WorkScheduleDispatcherService` ticks every minute and, for each Work whose `lastDataRepoCheckedAt` is older than `syncIntervalMinutes`, calls GitHub to compare the data-repo HEAD against `lastSyncedDataRepoSha`. A delta enqueues the same `syncFromDataRepo` path used by the webhook.
+
+Both transports share a single `runExclusive` mutex on the Work, so an in-progress generation pipeline blocks a sync (and vice versa) — the deferred attempt is reflected as a `data-sync.skipped { reason: "generation-in-progress" }` row in the activity feed and resumes on the next tick.
+
+Two feature flags gate the runtime:
+
+- `DATA_SYNC_WEBHOOK_ENABLED` (default `false`) — when `true`, the GitHub App webhook handler routes `push` payloads through the data-sync queue.
+- `DATA_SYNC_DISPATCHER_ENABLED` (default `false`) — when `true`, the scheduler ticks for Works without the App installed.
+
+A force-sync endpoint is also exposed for operators and dashboards:
+
+```
+POST /api/works/:id/sync
+```
+
+It returns `202` with either `{ status: "enqueued", activityRowId }` or `{ status: "skipped", reason }` (the latter when the mutex / generation pipeline blocks the run). It never throws on the "already in progress" path — that is a normal, expected outcome.
+
+For the full design — debounce / lock TTL tunables, telemetry contract, render-parity guarantees, and acceptance matrix — see [`docs/specs/features/data-repo-instant-sync/spec.md`](../specs/features/data-repo-instant-sync/spec.md) and the linked decision record [`docs/specs/decisions/005-cache-and-lock-pluggability.md`](../specs/decisions/005-cache-and-lock-pluggability.md).
