@@ -33,16 +33,16 @@ Keep the main repo in sync with the data repo within ~60 seconds (App installed)
 - Bi-directional sync (main → data). The main repo is a render target.
 - Reverting hand-edits to `README.md` / `details/*` in the main repo — the next sync overwrites them. Intended contract, surfaced in onboarding copy.
 - Replacing the scheduled full-generation pipeline; this feature lives alongside it.
-- Adding Redis to the platform. The mutex, debounce, and caching all run on the existing `cache_entries` PostgreSQL table — same backend as [`DistributedTaskLockService`](../../../agent-services/distributed-task-lock.md). A future ticket explores adding Redis as an *optional, additional* provider for advanced deployments — see [ADR 005](../../decisions/005-cache-and-lock-pluggability.md) and [EW-629](https://evertech.atlassian.net/browse/EW-629). It does not block or replace this feature.
+- Adding Redis to the platform. The mutex, debounce, and caching all run on the existing `cache_entries` PostgreSQL table — same backend as [`DistributedTaskLockService`](../../../agent-services/distributed-task-lock.md). A future ticket explores adding Redis as an _optional, additional_ provider for advanced deployments — see [ADR 005](../../decisions/005-cache-and-lock-pluggability.md) and [EW-629](https://evertech.atlassian.net/browse/EW-629). It does not block or replace this feature.
 
 ## 4. Concepts
 
-| Term                | Meaning                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Sync run**        | A single attempt to re-render the main repo from the data repo. Fast (no AI), idempotent, observable in the activity feed. |
-| **Sync source**     | `webhook` (Path A) or `poll` (Path B). Recorded on every activity row.                                                   |
-| **Sync lock**       | Per-Work mutex held via `DistributedTaskLockService.runExclusive('data-sync:<workId>', ...)`. Also serves as the cross-task signal that prevents the scheduled generation pipeline from starting while a sync is mid-flight. |
-| **Render-only entrypoint** | New public `syncFromDataRepo()` on `MarkdownGeneratorService` that reuses the existing render block but skips `ItemsGeneratorService`. |
+| Term                       | Meaning                                                                                                                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sync run**               | A single attempt to re-render the main repo from the data repo. Fast (no AI), idempotent, observable in the activity feed.                                                                                                   |
+| **Sync source**            | `webhook` (Path A) or `poll` (Path B). Recorded on every activity row.                                                                                                                                                       |
+| **Sync lock**              | Per-Work mutex held via `DistributedTaskLockService.runExclusive('data-sync:<workId>', ...)`. Also serves as the cross-task signal that prevents the scheduled generation pipeline from starting while a sync is mid-flight. |
+| **Render-only entrypoint** | New public `syncFromDataRepo()` on `MarkdownGeneratorService` that reuses the existing render block but skips `ItemsGeneratorService`.                                                                                       |
 
 ## 5. Architecture
 
@@ -146,11 +146,11 @@ We rely on `DistributedTaskLockService`'s 15-min default TTL (we override to 5 m
 
 Three new event types:
 
-| Event                | Payload                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `data-sync.success`  | `{ source, beforeSha, afterSha, filesChanged, durationMs }`                              |
-| `data-sync.skipped`  | `{ source, reason: 'no-changes' \| 'sync-in-progress' \| 'generation-in-progress' \| 'app-not-installed-and-no-credentials' \| 'retry-backoff', sha }` |
-| `data-sync.failed`   | `{ source, sha, errorClass, errorTail: string (last 200 chars of stderr) }`              |
+| Event               | Payload                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data-sync.success` | `{ source, beforeSha, afterSha, filesChanged, durationMs }`                                                                                            |
+| `data-sync.skipped` | `{ source, reason: 'no-changes' \| 'sync-in-progress' \| 'generation-in-progress' \| 'app-not-installed-and-no-credentials' \| 'retry-backoff', sha }` |
+| `data-sync.failed`  | `{ source, sha, errorClass, errorTail: string (last 200 chars of stderr) }`                                                                            |
 
 Surfaced on the existing `Works > Activity` page with a `Sync` filter chip and an icon distinct from `Generate`.
 
@@ -158,13 +158,13 @@ Surfaced on the existing `Works > Activity` page with a `Sync` filter chip and a
 
 Five new columns on `Work` (`apps/api/src/work/work.entity.ts`, mirrored in `packages/agent`):
 
-| Column                      | Type           | Default | Purpose                                                                                       |
-| --------------------------- | -------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `lastSyncedDataRepoSha`     | `varchar(40)`  | `null`  | Most recent data-repo SHA the main repo has been rendered against.                            |
-| `pendingSyncRequestedAt`    | `timestamptz`  | `null`  | Set by webhook handler. Cleared by successful sync. Drives Path A's debounce + retry.         |
-| `syncIntervalMinutes`       | `int`          | `5`     | Poller cadence in minutes (1–60). Ignored when App installed.                                 |
-| `githubAppInstalled`        | `boolean`      | `false` | Selector between Path A / Path B. Denormalised from `github_app_installation`.                |
-| `lastPolledAt`              | `timestamptz`  | `null`  | Last time Path B's `ls-remote` ran. Updated regardless of SHA delta.                          |
+| Column                   | Type          | Default | Purpose                                                                               |
+| ------------------------ | ------------- | ------- | ------------------------------------------------------------------------------------- |
+| `lastSyncedDataRepoSha`  | `varchar(40)` | `null`  | Most recent data-repo SHA the main repo has been rendered against.                    |
+| `pendingSyncRequestedAt` | `timestamptz` | `null`  | Set by webhook handler. Cleared by successful sync. Drives Path A's debounce + retry. |
+| `syncIntervalMinutes`    | `int`         | `5`     | Poller cadence in minutes (1–60). Ignored when App installed.                         |
+| `githubAppInstalled`     | `boolean`     | `false` | Selector between Path A / Path B. Denormalised from `github_app_installation`.        |
+| `lastPolledAt`           | `timestamptz` | `null`  | Last time Path B's `ls-remote` ran. Updated regardless of SHA delta.                  |
 
 No Redis-only fields, no `syncLockReason`. The lock state lives in `cache_entries` and is owned by `DistributedTaskLockService`.
 
@@ -172,14 +172,14 @@ Migration: `apps/api/src/database/migrations/<timestamp>-data-repo-instant-sync.
 
 ## 7. Configuration
 
-| Setting                                | Source                                              | Default          |
-| -------------------------------------- | --------------------------------------------------- | ---------------- |
-| Webhook debounce quiet-period          | `subscriptions.dataSync.debounceMs`                 | `30000` (30 s)   |
-| Dispatcher cron                        | hard-coded in `dataRepoSyncDispatcherTask`          | `*/1 * * * *`    |
-| Per-Work poll cadence (min)            | `Work.syncIntervalMinutes`                          | `5`              |
-| Sync lock TTL                          | `subscriptions.dataSync.lockTtlSeconds`             | `300` (5 min)    |
-| Retry backoff after a failed sync      | `subscriptions.dataSync.retryBackoffSeconds`        | `300` (5 min)    |
-| Skip-noise rate-limit for `no-changes` | `subscriptions.dataSync.skipNoiseWindowMs`          | `3600000` (1 h)  |
+| Setting                                | Source                                       | Default         |
+| -------------------------------------- | -------------------------------------------- | --------------- |
+| Webhook debounce quiet-period          | `subscriptions.dataSync.debounceMs`          | `30000` (30 s)  |
+| Dispatcher cron                        | hard-coded in `dataRepoSyncDispatcherTask`   | `*/1 * * * *`   |
+| Per-Work poll cadence (min)            | `Work.syncIntervalMinutes`                   | `5`             |
+| Sync lock TTL                          | `subscriptions.dataSync.lockTtlSeconds`      | `300` (5 min)   |
+| Retry backoff after a failed sync      | `subscriptions.dataSync.retryBackoffSeconds` | `300` (5 min)   |
+| Skip-noise rate-limit for `no-changes` | `subscriptions.dataSync.skipNoiseWindowMs`   | `3600000` (1 h) |
 
 ## 8. Telemetry
 
@@ -193,9 +193,9 @@ PostHog / Sentry counters:
 
 ## 9. Open questions
 
-- **Q1**: Should `dataRepoSyncDispatcherTask` run at 30-second granularity (via Trigger.dev `interval`) to halve webhook latency, or keep the 60-s cron to align with other dispatchers? *Tentative*: start at 60 s; revisit if the 30–60 s tail bothers users.
-- **Q2**: Does `MarkdownGeneratorService` currently mutate any shared state outside the local clone that would make `syncFromDataRepo()` unsafe to call out-of-pipeline? *To verify in plan phase.*
-- **Q3**: Should we expose an admin "force sync now" endpoint? *Tentative*: yes, `POST /api/works/:id/sync` (returns the activity-row id) — cheap to add and useful for support.
+- **Q1**: Should `dataRepoSyncDispatcherTask` run at 30-second granularity (via Trigger.dev `interval`) to halve webhook latency, or keep the 60-s cron to align with other dispatchers? _Tentative_: start at 60 s; revisit if the 30–60 s tail bothers users.
+- **Q2**: Does `MarkdownGeneratorService` currently mutate any shared state outside the local clone that would make `syncFromDataRepo()` unsafe to call out-of-pipeline? _To verify in plan phase._
+- **Q3**: Should we expose an admin "force sync now" endpoint? _Tentative_: yes, `POST /api/works/:id/sync` (returns the activity-row id) — cheap to add and useful for support.
 
 ## 10. Risks
 

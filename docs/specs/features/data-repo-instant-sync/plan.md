@@ -48,17 +48,17 @@ docs/architecture/caching.md                      # add "Future Considerations" 
 
 ## 2. Tech choices
 
-| Concern                           | Choice                                                                                              | Rationale                                                                                |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Debounce mechanism                | Single `Work.pendingSyncRequestedAt` column + dispatcher's 30-s quiet-period eligibility filter      | No queue, no Redis, no in-process timer. Multiple webhooks within 30 s naturally collapse |
-| Mutex                             | `DistributedTaskLockService.runExclusive('data-sync:<workId>', fn, { ttlMs: 300_000 })`             | Already in `packages/agent/src/cache/`. Token-bound release, heartbeat refresh, 24-h cap |
-| Mutex backend                     | `cache_entries` table (PostgreSQL) — same as community-PR locks                                      | No new infrastructure. Redis option deferred to [EW-629](#) (see ADR 005)                |
-| Background task scheduler         | One Trigger.dev `schedules.task` (`*/1 * * * *`) handling both webhook flush and poller             | Halves the moving parts vs. two tasks. Matches `WorkScheduleDispatcherTask` style        |
-| Remote SHA probe                  | `git ls-remote <url> HEAD` via `isomorphic-git`                                                     | Matches existing data-generator git layer; works inside the Trigger.dev sandbox          |
-| Render-only entry                 | New public `syncFromDataRepo(workId, opts)` on `MarkdownGeneratorService`                            | Reuses 95% of existing `initialize()` body via a private `renderToMainRepo(ctx)` helper  |
-| Activity feed integration         | Reuse `ActivityLogService.record()` from EW-120                                                      | Avoids a parallel logging schema                                                         |
-| Migration                         | One TypeORM migration: 5 columns + 1 composite index for the dispatcher's poller query              | Single commit revertable                                                                 |
-| Force-sync endpoint               | Authenticated `POST /api/works/:id/sync` returning `{ activityRowId, status }`                       | Matches existing `POST /api/works/:id/generate` ergonomics                               |
+| Concern                   | Choice                                                                                          | Rationale                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Debounce mechanism        | Single `Work.pendingSyncRequestedAt` column + dispatcher's 30-s quiet-period eligibility filter | No queue, no Redis, no in-process timer. Multiple webhooks within 30 s naturally collapse |
+| Mutex                     | `DistributedTaskLockService.runExclusive('data-sync:<workId>', fn, { ttlMs: 300_000 })`         | Already in `packages/agent/src/cache/`. Token-bound release, heartbeat refresh, 24-h cap  |
+| Mutex backend             | `cache_entries` table (PostgreSQL) — same as community-PR locks                                 | No new infrastructure. Redis option deferred to [EW-629](#) (see ADR 005)                 |
+| Background task scheduler | One Trigger.dev `schedules.task` (`*/1 * * * *`) handling both webhook flush and poller         | Halves the moving parts vs. two tasks. Matches `WorkScheduleDispatcherTask` style         |
+| Remote SHA probe          | `git ls-remote <url> HEAD` via `isomorphic-git`                                                 | Matches existing data-generator git layer; works inside the Trigger.dev sandbox           |
+| Render-only entry         | New public `syncFromDataRepo(workId, opts)` on `MarkdownGeneratorService`                       | Reuses 95% of existing `initialize()` body via a private `renderToMainRepo(ctx)` helper   |
+| Activity feed integration | Reuse `ActivityLogService.record()` from EW-120                                                 | Avoids a parallel logging schema                                                          |
+| Migration                 | One TypeORM migration: 5 columns + 1 composite index for the dispatcher's poller query          | Single commit revertable                                                                  |
+| Force-sync endpoint       | Authenticated `POST /api/works/:id/sync` returning `{ activityRowId, status }`                  | Matches existing `POST /api/works/:id/generate` ergonomics                                |
 
 ## 3. Sequence — Path A (webhook)
 
@@ -197,8 +197,8 @@ Sync wins ties — a single sync run is short (~30–60 s); a generation run tha
 ```ts
 // <ts>-data-repo-instant-sync.ts
 export class DataRepoInstantSync1747400000000 implements MigrationInterface {
-    public async up(q: QueryRunner): Promise<void> {
-        await q.query(`
+	public async up(q: QueryRunner): Promise<void> {
+		await q.query(`
             ALTER TABLE "work"
             ADD COLUMN "last_synced_data_repo_sha" varchar(40) NULL,
             ADD COLUMN "pending_sync_requested_at" timestamptz NULL,
@@ -206,28 +206,28 @@ export class DataRepoInstantSync1747400000000 implements MigrationInterface {
             ADD COLUMN "github_app_installed" boolean NOT NULL DEFAULT false,
             ADD COLUMN "last_polled_at" timestamptz NULL
         `);
-        // Composite index for the dispatcher's poller-path query
-        await q.query(`
+		// Composite index for the dispatcher's poller-path query
+		await q.query(`
             CREATE INDEX "idx_work_sync_poller"
             ON "work" ("github_app_installed", "sync_interval_minutes", "last_polled_at")
             WHERE "github_app_installed" = false
         `);
-        // Partial index for the dispatcher's webhook-flush query
-        await q.query(`
+		// Partial index for the dispatcher's webhook-flush query
+		await q.query(`
             CREATE INDEX "idx_work_sync_webhook"
             ON "work" ("pending_sync_requested_at")
             WHERE "pending_sync_requested_at" IS NOT NULL
         `);
-        // Backfill App-installed flag for existing Works with installation rows
-        await q.query(`
+		// Backfill App-installed flag for existing Works with installation rows
+		await q.query(`
             UPDATE "work" SET "github_app_installed" = true
             WHERE "github_app_installation_id" IS NOT NULL
         `);
-    }
-    public async down(q: QueryRunner): Promise<void> {
-        await q.query(`DROP INDEX "idx_work_sync_webhook"`);
-        await q.query(`DROP INDEX "idx_work_sync_poller"`);
-        await q.query(`
+	}
+	public async down(q: QueryRunner): Promise<void> {
+		await q.query(`DROP INDEX "idx_work_sync_webhook"`);
+		await q.query(`DROP INDEX "idx_work_sync_poller"`);
+		await q.query(`
             ALTER TABLE "work"
             DROP COLUMN "last_polled_at",
             DROP COLUMN "github_app_installed",
@@ -235,7 +235,7 @@ export class DataRepoInstantSync1747400000000 implements MigrationInterface {
             DROP COLUMN "pending_sync_requested_at",
             DROP COLUMN "last_synced_data_repo_sha"
         `);
-    }
+	}
 }
 ```
 
