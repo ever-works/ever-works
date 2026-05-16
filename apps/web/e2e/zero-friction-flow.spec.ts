@@ -18,13 +18,18 @@ import { test, expect } from '@playwright/test';
  * Suite status (post-EW-617-finale):
  *   - "UI surface"        — ACTIVE (renders only, no API). Runs against
  *                           localhost dev or PLAYWRIGHT_*_URL overrides.
- *   - "API contract"      — STILL `.skip`. Hits real /api/auth/anonymous
- *                           which is throttled at 5/hour per IP; running
- *                           the suite back-to-back trips the throttle.
- *                           Captcha is now wired in prod too, so this
- *                           suite needs Cloudflare's test sitekey/secret
- *                           (1x00000000000000000000AA + always-pass) to
- *                           run reliably against deployed envs.
+ *   - "API contract"      — ACTIVE against localhost dev (CAPTCHA_PROVIDER
+ *                           is empty there, so the captcha verifier
+ *                           no-ops and the stub token passes through).
+ *                           For runs against deployed envs, set on the
+ *                           target API: CAPTCHA_PROVIDER=turnstile +
+ *                           CAPTCHA_SECRET=1x0000000000000000000000000000000AA
+ *                           (Cloudflare's documented always-pass test
+ *                           secret) so the stub token from
+ *                           `installTurnstileStub` clears /siteverify.
+ *                           ONE test inside this suite remains `.skip`:
+ *                           the throttle assertion (5/hour per IP)
+ *                           interferes with back-to-back runs.
  *   - "Full UI journey"   — ACTIVE. Uses Playwright route mocks for
  *                           /api/works/quick-create + a Turnstile stub
  *                           via `installTurnstileStub`, so the suite is
@@ -112,7 +117,16 @@ test.describe('EW-617 zero-friction flow — UI surface', () => {
     });
 });
 
-test.describe.skip('EW-617 zero-friction flow — API contract', () => {
+test.describe('EW-617 zero-friction flow — API contract', () => {
+    // The API contract tests POST directly via Playwright's `request`
+    // fixture — no page → no Turnstile widget renders → no
+    // `captchaToken` is sent. On localhost dev CAPTCHA_PROVIDER is empty
+    // so the verifier no-ops and these pass. On deployed envs, set
+    // CAPTCHA_PROVIDER=turnstile + CAPTCHA_SECRET to Cloudflare's
+    // always-pass test secret `1x0000000000000000000000000000000AA` and
+    // include `captchaToken: '1x00000000000000000000AA.dummy.token'` in
+    // the request body. We omit the field by default because all
+    // captcha-gated endpoints accept an empty token in the no-op path.
     test('POST /api/auth/anonymous returns 201 + anon user shape', async ({ request }) => {
         const response = await request.post(`${APP_URL}/api/auth/anonymous`);
         expect(response.status()).toBe(201);
@@ -129,7 +143,12 @@ test.describe.skip('EW-617 zero-friction flow — API contract', () => {
         });
     });
 
-    test('POST /api/auth/anonymous is throttled at 5/hour per IP', async ({ request }) => {
+    // Throttle is genuinely flaky in CI: 5 anon-creates / hour / IP, and
+    // every back-to-back run of this suite consumes 5 of the budget, so
+    // the 6th request only flips to 429 on the first run. Re-enable in
+    // dedicated nightly with a fresh API instance, or rewrite to assert
+    // the throttle via NestJS testing module rather than the live route.
+    test.skip('POST /api/auth/anonymous is throttled at 5/hour per IP', async ({ request }) => {
         // Six rapid requests from the same IP — the 6th MUST be 429.
         const attempts = await Promise.all(
             Array.from({ length: 6 }, () => request.post(`${APP_URL}/api/auth/anonymous`)),
