@@ -136,13 +136,13 @@ user.isAnonymous: true }`.
 
 ### Live values (dev / stage / prod, as of 2026-05-15)
 
-| Env var                         | Value (or source)                                              |
-| ------------------------------- | -------------------------------------------------------------- |
-| `DEPLOY_EVER_WORKS_ENABLED`     | `true` (inlined in deploy-do-{dev,stage,prod}.yml)             |
-| `EVER_WORKS_DOMAIN`             | `ever.works` (inlined in workflows)                            |
-| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | `lb.ever.works` → A `157.230.74.11` (k8s-works ingress LB)     |
-| `CLOUDFLARE_API_TOKEN`          | GH secret `CLOUDFLARE_API_TOKEN` (Zone:DNS edit on ever.works) |
-| `CLOUDFLARE_ZONE_ID`            | GH secret `CLOUDFLARE_ZONE_ID` → `14b28d7fd73db5679d4280e4278ec6cf` |
+| Env var                         | Value (or source)                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `DEPLOY_EVER_WORKS_ENABLED`     | `true` (inlined in deploy-do-{dev,stage,prod}.yml)                                   |
+| `EVER_WORKS_DOMAIN`             | `ever.works` (inlined in workflows)                                                  |
+| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | `lb.ever.works` → A `157.230.74.11` (k8s-works ingress LB)                           |
+| `CLOUDFLARE_API_TOKEN`          | GH secret `CLOUDFLARE_API_TOKEN` (Zone:DNS edit on ever.works)                       |
+| `CLOUDFLARE_ZONE_ID`            | GH secret `CLOUDFLARE_ZONE_ID` → `14b28d7fd73db5679d4280e4278ec6cf`                  |
 | `CAPTCHA_PROVIDER`              | GH secret `CAPTCHA_PROVIDER` — **empty** until Turnstile widget + client wiring ship |
 | `CAPTCHA_SECRET`                | GH secret `CAPTCHA_SECRET` — **empty** until Turnstile widget + client wiring ship   |
 

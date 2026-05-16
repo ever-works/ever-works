@@ -317,6 +317,107 @@ export class MailService {
     }
 
     /**
+     * EW-602 — send a budget threshold alert email. Non-event entrypoint:
+     * the BudgetAlertHandler in apps/api/src/budgets/ does the event
+     * subscription and user resolution, then calls this with already-
+     * normalised display values. Keeps MailService focused on sending.
+     */
+    async sendBudgetAlertEmail(
+        toEmail: string,
+        recipientName: string,
+        context: {
+            workName: string;
+            scopeLabel: string;
+            pluginId?: string | null;
+            capability: string;
+            threshold: '75' | '90' | '100' | 'overage';
+            currentSpendCents: number;
+            capCents: number;
+            currency: string;
+            periodLabel: string;
+            settingsUrl: string;
+        },
+    ): Promise<void> {
+        try {
+            const recipient = this.requireEmail(toEmail, 'budget alert');
+            if (!recipient) {
+                return;
+            }
+
+            const appName = config.branding.appName();
+            const percent =
+                context.capCents > 0
+                    ? Math.min(
+                          150,
+                          Math.round((context.currentSpendCents / context.capCents) * 100),
+                      )
+                    : 0;
+            const isError = context.threshold === '100' || context.threshold === 'overage';
+            const thresholdIcon = isError ? '⛔' : '⚠️';
+            const titleByThreshold: Record<typeof context.threshold, string> = {
+                '75': 'You are approaching your budget cap',
+                '90': 'You are about to hit your budget cap',
+                '100': 'Budget cap reached',
+                overage: 'Budget overage in progress',
+            };
+            const subtitleByThreshold: Record<typeof context.threshold, string> = {
+                '75': '75% of this period’s cap is now used.',
+                '90': '90% of this period’s cap is now used.',
+                '100': 'New plugin calls will be blocked until next period unless overage is enabled.',
+                overage: 'Calls are continuing past the cap because overage is enabled.',
+            };
+            const actionGuidance = isError
+                ? 'Raise the cap or toggle "Allow overage" in Budgets & Usage to continue.'
+                : 'Raise the cap, or wait for next period to reset usage.';
+            const progressColor =
+                percent >= 100 ? '#ef4444' : percent >= 90 ? '#f59e0b' : '#3b82f6';
+            const formatCents = (cents: number): string => {
+                const dollars = cents / 100;
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: context.currency.toUpperCase(),
+                    maximumFractionDigits: 2,
+                }).format(dollars);
+            };
+
+            const subject =
+                context.threshold === '100' || context.threshold === 'overage'
+                    ? `[${appName}] Budget cap reached for ${context.workName}`
+                    : `[${appName}] Budget at ${context.threshold}% for ${context.workName}`;
+
+            await this.mailerService.sendMail({
+                to: recipient,
+                subject,
+                template: 'budget-alert',
+                context: {
+                    ...this.getBrandingContext(),
+                    firstName: recipientName,
+                    workName: context.workName,
+                    scopeLabel: context.scopeLabel,
+                    pluginId: context.pluginId,
+                    capability: context.capability,
+                    thresholdIcon,
+                    thresholdTitle: titleByThreshold[context.threshold],
+                    thresholdSubtitle: subtitleByThreshold[context.threshold],
+                    spentLabel: formatCents(context.currentSpendCents),
+                    capLabel: formatCents(context.capCents),
+                    percentLabel: `${percent}%`,
+                    progressWidth: `${Math.min(100, percent)}%`,
+                    progressColor,
+                    periodLabel: context.periodLabel,
+                    actionGuidance,
+                    settingsUrl: context.settingsUrl,
+                },
+            });
+        } catch (error) {
+            this.logger.error(
+                `Failed to send budget-alert email to ${toEmail}`,
+                error?.stack ?? error,
+            );
+        }
+    }
+
+    /**
      * Helper method to format role name for display
      */
     private formatRoleName(role: string): string {

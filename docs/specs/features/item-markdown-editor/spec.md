@@ -108,11 +108,11 @@ repository.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept    | Description                                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Entity / concept    | Description                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `ItemData.markdown` | Existing optional long-form body field on an item; already serialised into YAML and into `<slug>.md` by the generator. |
-| `<slug>.md` file    | The canonical source the directory-web-template renders; takes precedence over the YAML `markdown` field.            |
-| Content dialog      | New UI surface in the item's dropdown menu for editing the body of an existing item without re-creating it.          |
+| `<slug>.md` file    | The canonical source the directory-web-template renders; takes precedence over the YAML `markdown` field.              |
+| Content dialog      | New UI surface in the item's dropdown menu for editing the body of an existing item without re-creating it.            |
 
 ## 6. Out of Scope
 
@@ -145,11 +145,11 @@ repository.
 ## 8. Open Questions
 
 - `[NEEDS CLARIFICATION: should we add a soft warning at, say, 50,000 chars
-  for unusually long bodies, or trust the hard 100k cap?]` — Punt, hard cap
+for unusually long bodies, or trust the hard 100k cap?]` — Punt, hard cap
   only for now.
 - `[NEEDS CLARIFICATION: do we want a follow-up to mirror the markdown
-  field on the platform's Item dashboard list / ItemCard (so users can see
-  whether an item has authored content)?]` — Tracked as a follow-up.
+field on the platform's Item dashboard list / ItemCard (so users can see
+whether an item has authored content)?]` — Tracked as a follow-up.
 
 ## 9. Constitution Gates
 

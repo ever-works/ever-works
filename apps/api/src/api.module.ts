@@ -15,6 +15,7 @@ import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
@@ -28,6 +29,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
+import { TelemetryModule } from './telemetry/telemetry.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -62,6 +64,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        BudgetsModule,
         ScreenshotModule,
         SearchModule,
         AgentPluginsModule.forRootAsync({
@@ -79,6 +82,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         OnboardingModule,
         TemplateCatalogModule,
         WorkProposalsModule,
+        TelemetryModule,
     ],
     providers: [
         {

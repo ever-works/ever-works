@@ -30,6 +30,8 @@ export async function updateProfile(data: {
     username: string;
     committerName?: string | null;
     committerEmail?: string | null;
+    /** EW-602: per-user opt-out for budget alert emails. */
+    emailBudgetAlerts?: boolean;
 }) {
     const t = await getTranslations('actions.settings.profile');
     const tAuth = await getTranslations('validation.auth');
@@ -44,6 +46,7 @@ export async function updateProfile(data: {
             ),
         committerName: z.string().nullable().optional(),
         committerEmail: z.string().email().nullable().optional().or(z.literal('')),
+        emailBudgetAlerts: z.boolean().optional(),
     });
 
     try {

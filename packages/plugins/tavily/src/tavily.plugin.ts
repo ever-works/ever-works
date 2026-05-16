@@ -118,6 +118,21 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		};
 	}
 
+	/**
+	 * EW-602 — Tavily's published list price is ~$0.005 per search call
+	 * (rounds to 1 cent for budget tracking). Free tier covers the first
+	 * 1,000 searches/month; once that's exhausted the per-call estimate
+	 * kicks in. The platform records this against PluginUsageEvent on
+	 * every search invocation via the SearchFacade.
+	 */
+	getPricing(): { costPerCallCents: number; currency: string; note: string } {
+		return {
+			costPerCallCents: 1,
+			currency: 'usd',
+			note: 'Approx. $0.005/search (free tier: 1,000/month).'
+		};
+	}
+
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const client = this.getClient(options.settings);
 		const startTime = Date.now();

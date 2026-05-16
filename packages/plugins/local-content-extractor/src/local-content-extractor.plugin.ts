@@ -263,6 +263,21 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		return ['text', 'html', 'markdown'];
 	}
 
+	/**
+	 * EW-602 — Local extractor runs in-process (jsdom + readability),
+	 * so there's no per-call provider cost. Reporting 0 cents lets the
+	 * platform still record units of usage on PluginUsageEvent for
+	 * dashboards and per-plugin breakdown, while not contributing to
+	 * the budget cap.
+	 */
+	getPricing(): { costPerCallCents: number; currency: string; note: string } {
+		return {
+			costPerCallCents: 0,
+			currency: 'usd',
+			note: 'In-process extraction; no external cost.'
+		};
+	}
+
 	private extractMetadata(document: Document, baseUrl: string): PageMetadata {
 		const getMeta = (names: string[]): string | undefined => {
 			for (const name of names) {
