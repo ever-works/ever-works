@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CacheEntry } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import type { DataSyncOutcome, SyncSource } from './data-sync.types';
 
@@ -32,16 +35,26 @@ import type { DataSyncOutcome, SyncSource } from './data-sync.types';
  *
  * NOTE: Phase 3 (this commit) lands the module + service surface and
  * wires `DistributedTaskLockService`. The gate logic, MarkdownGenerator
- * call, activity-feed writes, and `isLocked` body all throw `not yet
- * implemented` so dependent phases (4-6) can import the symbols and
- * compile. The actual three-gate body lands in the follow-up `feat:`
- * commit for Phase 3 — kept separate so the change is reviewable.
+ * call, and activity-feed writes follow in EW-628 G3.
+ *
+ * Lock-key format (matches {@link DistributedTaskLockService} convention):
+ *
+ *   - `runExclusive` is called with `data-sync:<workId>` →
+ *     `DistributedTaskLockService.buildKey` prefixes with `task-lock:` →
+ *     full `cache_entries.key` is `task-lock:data-sync:<workId>`.
+ *
+ * `isLocked` peeks that same row directly so it stays O(1) (single
+ * primary-key lookup) and doesn't compete for the lock itself.
  */
 @Injectable()
 export class DataSyncService {
     private readonly logger = new Logger(DataSyncService.name);
 
-    constructor(private readonly taskLockService: DistributedTaskLockService) {}
+    constructor(
+        private readonly taskLockService: DistributedTaskLockService,
+        @InjectRepository(CacheEntry)
+        private readonly cacheEntryRepository: Repository<CacheEntry>,
+    ) {}
 
     /**
      * Run one sync attempt for `workId` with three ordered gates inside
@@ -52,31 +65,46 @@ export class DataSyncService {
      * `{ status: 'failed', ... }` and write the retry-backoff cache
      * entry so the dispatcher backs off naturally.
      *
-     * TODO(EW-628 Phase 3 follow-up): implement the three gates per
-     * `plan.md` §6 pseudo-code. The signature is final; only the body
-     * is missing.
+     * TODO(EW-628 G3): implement the three gates per `plan.md` §6
+     * pseudo-code. The signature is final; only the body is missing.
      */
     async runDataSync(workId: string, source: SyncSource): Promise<DataSyncOutcome> {
         this.logger.warn(
-            `DataSyncService.runDataSync stub called for work=${workId} source=${source} — gate logic lands in EW-628 Phase 3 follow-up`,
+            `DataSyncService.runDataSync stub called for work=${workId} source=${source} — gate logic lands in EW-628 G3`,
         );
         // Voiding the unused-arg lints; the real impl will use these.
         void this.taskLockService;
-        throw new Error('DataSyncService.runDataSync not yet implemented (EW-628 Phase 3)');
+        throw new Error('DataSyncService.runDataSync not yet implemented (EW-628 G3)');
     }
 
     /**
-     * Peek whether a `data-sync:<workId>` lock is currently held. Used
-     * by the schedule dispatcher to defer generation runs while a sync
-     * is mid-flight (spec §5.5).
+     * Peek whether the per-Work `data-sync:<workId>` lock is currently
+     * held by reading `cache_entries` directly. O(1) primary-key lookup
+     * so the schedule dispatcher can call this for every eligible Work
+     * on each tick without flooding the lock service.
      *
-     * TODO(EW-628 Phase 3 follow-up): probe the `cache_entries` row
-     * `task-lock:data-sync:<workId>` directly so this stays O(1).
+     * Returns `true` only when a non-expired row exists. `expiresAt` is
+     * stored as bigint epoch-ms by {@link DistributedTaskLockService};
+     * a `null` value means the lock has no TTL (defensive — never
+     * written by the current code path, but treated as held to err on
+     * the side of safety).
+     *
+     * Used by `WorkScheduleDispatcherService.dispatchDue` per spec §5.5
+     * to defer a full-generation tick on a Work whose data-sync is
+     * mid-flight.
      */
     async isLocked(workId: string): Promise<boolean> {
-        this.logger.debug(`DataSyncService.isLocked stub for work=${workId}`);
-        // Conservative: return false until the gate logic is real, so the
-        // generation dispatcher's behaviour doesn't change in this commit.
-        return false;
+        const lockKey = `task-lock:data-sync:${workId}`;
+        const row = await this.cacheEntryRepository.findOne({
+            where: { key: lockKey },
+            select: ['key', 'expiresAt'],
+        });
+        if (!row) {
+            return false;
+        }
+        if (row.expiresAt === null) {
+            return true;
+        }
+        return row.expiresAt > Date.now();
     }
 }
