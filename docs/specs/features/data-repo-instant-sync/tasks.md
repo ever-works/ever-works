@@ -35,7 +35,7 @@
     - generation-in-progress (first call within noise window) → one skip row emitted + noise entry written.
     - generation-in-progress (repeat call within noise window) → silent (no skip row written) but still returns the right outcome.
     - retry-backoff → backoff key present → one skip row, never reaches pipeline check.
-    - sync-in-progress → `onLocked` callback fires + emits skip row.
+    - sync-in-progress → `onLocked` callback fires; assertion must verify the skip activity row is actually persisted (not just that the function returns the `'sync-in-progress'` status), since a swallowed `activity.record()` write would otherwise leave the operator without a trace.
     - failed → `data-sync.failed` row + retry-backoff key written + `pendingSyncRequestedAt` left intact.
 - [ ] **T14**. Add a public `isLocked(workId)` helper on `DataSyncService` that wraps a `cache_entries` peek. Amend `WorkScheduleDispatcherService.dispatchDue()` to skip locked Works.
 
