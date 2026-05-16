@@ -1,11 +1,32 @@
-import { GitHubAppSyncService } from './github-app-sync.service';
-
+// EW-628 G6 — the `agentConfig` import below is the live agent-side
+// config object that reads `process.env.DATA_SYNC_WEBHOOK_ENABLED`. We
+// stub it so tests can flip the flag without touching env vars.
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/import', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
+jest.mock('@ever-works/agent/config', () => ({
+    config: {
+        subscriptions: {
+            dataSync: {
+                webhookEnabled: jest.fn().mockReturnValue(true),
+            },
+        },
+    },
+}));
+
+import { GitHubAppSyncService } from './github-app-sync.service';
+import { config as agentConfig } from '@ever-works/agent/config';
+
+const webhookEnabledMock = agentConfig.subscriptions.dataSync.webhookEnabled as jest.Mock;
 
 describe('GitHubAppSyncService', () => {
+    beforeEach(() => {
+        // Default the EW-628 webhook flag back to enabled before each
+        // test so the legacy assertions keep observing the happy path.
+        webhookEnabledMock.mockReturnValue(true);
+    });
+
     const createService = () => {
         const gitHubAppService = {
             listInstallationRepositories: jest.fn(),
@@ -28,6 +49,10 @@ describe('GitHubAppSyncService', () => {
         const workImportService = {
             onboardLinkedRepository: jest.fn(),
         };
+        const workRepository = {
+            findByDataRepoFullName: jest.fn().mockResolvedValue([]),
+            update: jest.fn().mockResolvedValue(null),
+        };
 
         const service = new GitHubAppSyncService(
             gitHubAppService as any,
@@ -35,11 +60,13 @@ describe('GitHubAppSyncService', () => {
             gitHubAppInstallationRepoRepository as any,
             sourceRepoAnalyzerService as any,
             workImportService as any,
+            workRepository as any,
         );
 
         return {
             service,
             gitHubAppInstallationRepository,
+            workRepository,
         };
     };
 
@@ -151,14 +178,12 @@ describe('GitHubAppSyncService', () => {
         expect(result).toBeNull();
     });
 
-    // EW-628 Phase 5 — pin the `push` event branch added to handleWebhook so
-    // future event-name additions / refactors don't accidentally regress it.
-    // The handler body is currently a structured TODO (Work resolve + UPDATE
-    // arrives in the Phase 5 follow-up alongside the webhookEnabled flag);
-    // these tests pin the routing and early-exit shape.
-    describe('handleWebhook — push event (EW-628 Phase 5)', () => {
-        it('accepts a `push` event with repository.full_name without throwing', async () => {
-            const { service, gitHubAppInstallationRepository } = createService();
+    // EW-628 G6 — `push` handler now resolves the data-repo full_name to
+    // matching Works and stamps `pendingSyncRequestedAt` on each one.
+    // The dispatcher's debounce window collapses bursts into a single sync.
+    describe('handleWebhook — push event (EW-628 G6)', () => {
+        it('does NOT touch the installation upsert path on push (routing is isolated)', async () => {
+            const { service, gitHubAppInstallationRepository, workRepository } = createService();
 
             await expect(
                 service.handleWebhook('push', {
@@ -166,25 +191,29 @@ describe('GitHubAppSyncService', () => {
                 } as any),
             ).resolves.toBeUndefined();
 
-            // Push branch must NOT touch the installation upsert path that
-            // the installation/installation_repositories branches own.
             expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
             expect(gitHubAppInstallationRepository.markDeleted).not.toHaveBeenCalled();
+            // The resolve-by-full-name lookup IS invoked even when zero
+            // matches — that's how we keep response timing stable for
+            // unmanaged repos pinging the App.
+            expect(workRepository.findByDataRepoFullName).toHaveBeenCalledWith(
+                'octocat/awesome-time-tracking-data',
+            );
         });
 
-        it('drops a `push` event whose payload has no repository.full_name (timing-safe early return)', async () => {
-            const { service, gitHubAppInstallationRepository } = createService();
+        it('drops a push without repository.full_name without invoking the work lookup', async () => {
+            const { service, workRepository } = createService();
 
             await expect(service.handleWebhook('push', {} as any)).resolves.toBeUndefined();
             await expect(
                 service.handleWebhook('push', { repository: {} } as any),
             ).resolves.toBeUndefined();
 
-            expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
+            expect(workRepository.findByDataRepoFullName).not.toHaveBeenCalled();
         });
 
         it('ignores unknown event names (regression guard for the if/if/if dispatch chain)', async () => {
-            const { service, gitHubAppInstallationRepository } = createService();
+            const { service, gitHubAppInstallationRepository, workRepository } = createService();
 
             await expect(
                 service.handleWebhook('ping', { zen: 'Speak like a human.' } as any),
@@ -192,6 +221,83 @@ describe('GitHubAppSyncService', () => {
 
             expect(gitHubAppInstallationRepository.upsertFromGithub).not.toHaveBeenCalled();
             expect(gitHubAppInstallationRepository.markDeleted).not.toHaveBeenCalled();
+            expect(workRepository.findByDataRepoFullName).not.toHaveBeenCalled();
+        });
+
+        it('flag-gated: skips the lookup + UPDATE when subscriptions.dataSync.webhookEnabled is false', async () => {
+            const { service, workRepository } = createService();
+            webhookEnabledMock.mockReturnValue(false);
+
+            await service.handleWebhook('push', {
+                repository: { full_name: 'octocat/data' },
+            } as any);
+
+            expect(workRepository.findByDataRepoFullName).not.toHaveBeenCalled();
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('updates pendingSyncRequestedAt on every matching Work when the flag is on', async () => {
+            const { service, workRepository } = createService();
+            workRepository.findByDataRepoFullName.mockResolvedValue([
+                { id: 'work-a' },
+                { id: 'work-b' },
+            ]);
+
+            await service.handleWebhook('push', {
+                repository: { full_name: 'octocat/data' },
+            } as any);
+
+            expect(workRepository.findByDataRepoFullName).toHaveBeenCalledWith('octocat/data');
+            expect(workRepository.update).toHaveBeenCalledTimes(2);
+            expect(workRepository.update).toHaveBeenCalledWith(
+                'work-a',
+                expect.objectContaining({ pendingSyncRequestedAt: expect.any(Date) }),
+            );
+            expect(workRepository.update).toHaveBeenCalledWith(
+                'work-b',
+                expect.objectContaining({ pendingSyncRequestedAt: expect.any(Date) }),
+            );
+        });
+
+        it('zero matches → no UPDATEs (silent return; timing-safe for unmanaged repos)', async () => {
+            const { service, workRepository } = createService();
+            workRepository.findByDataRepoFullName.mockResolvedValue([]);
+
+            await service.handleWebhook('push', {
+                repository: { full_name: 'somebody-else/random' },
+            } as any);
+
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('swallows lookup errors so a webhook 5xx never blocks GitHub retries', async () => {
+            const { service, workRepository } = createService();
+            workRepository.findByDataRepoFullName.mockRejectedValue(new Error('DB down'));
+
+            await expect(
+                service.handleWebhook('push', {
+                    repository: { full_name: 'octocat/data' },
+                } as any),
+            ).resolves.toBeUndefined();
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('swallows UPDATE errors after a partial fan-out (one row failing does not throw the request)', async () => {
+            const { service, workRepository } = createService();
+            workRepository.findByDataRepoFullName.mockResolvedValue([
+                { id: 'work-a' },
+                { id: 'work-b' },
+            ]);
+            workRepository.update.mockImplementation(async (id: string) => {
+                if (id === 'work-b') throw new Error('row locked');
+                return null;
+            });
+
+            await expect(
+                service.handleWebhook('push', {
+                    repository: { full_name: 'octocat/data' },
+                } as any),
+            ).resolves.toBeUndefined();
         });
     });
 });

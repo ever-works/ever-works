@@ -208,6 +208,39 @@ export class WorkRepository {
     }
 
     /**
+     * EW-628 — webhook handler lookup. Returns every Work whose data
+     * repository matches `<owner>/<repo>` AND has the GitHub App
+     * installed (so a stray push to an unmanaged fork can't enqueue a
+     * sync). Multiple Works may share a single data repo (e.g. an
+     * organisation that runs two sites off the same source), so we
+     * return an array — the caller UPDATEs each row.
+     *
+     * `sourceRepository` is a `simple-json` column, so we can't filter
+     * the JSON in SQL portably across SQLite + Postgres without raw
+     * dialect-specific predicates. Instead we read the (small)
+     * `githubAppInstalled = true` set and filter in-memory. The
+     * `idx_work_sync_webhook` composite index makes the SELECT cheap;
+     * the per-installation cardinality is bounded by how many Works
+     * the App is installed on.
+     */
+    async findByDataRepoFullName(fullName: string): Promise<Work[]> {
+        if (!fullName || !fullName.includes('/')) {
+            return [];
+        }
+        const works = await this.repository.find({
+            where: { githubAppInstalled: true },
+        });
+        const target = fullName.toLowerCase();
+        return works.filter((work) => {
+            const data = work.sourceRepository?.relatedRepositories?.data;
+            if (!data?.owner || !data?.repo) {
+                return false;
+            }
+            return `${data.owner}/${data.repo}`.toLowerCase() === target;
+        });
+    }
+
+    /**
      * EW-617 G8 — used by `DeployReadyPollerService` to fan out HTTP
      * health probes against works the platform is still waiting on. The
      * `take` cap is a safety net for backlog scenarios; the schedule

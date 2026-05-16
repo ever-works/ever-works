@@ -112,7 +112,7 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
         it('maps failed outcome to { status: "failed", errorClass, errorTail }', async () => {
             dataSyncService.runDataSync.mockResolvedValue({
                 status: 'failed',
-                errorClass: 'GitPushRejected',
+                errorClass: 'main-repo-push-rejected',
                 errorTail: 'fatal: non-fast-forward',
             });
 
@@ -120,7 +120,7 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
 
             expect(result).toEqual({
                 status: 'failed',
-                errorClass: 'GitPushRejected',
+                errorClass: 'main-repo-push-rejected',
                 errorTail: 'fatal: non-fast-forward',
             });
         });
