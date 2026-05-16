@@ -3,7 +3,7 @@
 **Feature ID**: `data-repo-instant-sync`
 **Acceptance spec**: [`./acceptance.md`](./acceptance.md)
 **Implementation PR**: ever-works/ever-works#799
-**Status**: G11 — quality gate snapshot at end of implementation phase.
+**Status**: G12 — PR #799 ready for review. Coverage snapshot finalised at end of implementation phase.
 
 The 16 acceptance criteria in `acceptance.md` are pinned to one or more test locations below. Every AC either has automated coverage in the branch, or carries an explicit `manual` row pointing at the operator-driven verification step.
 
