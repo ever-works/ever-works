@@ -7,6 +7,9 @@
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
 }));
+jest.mock('@ever-works/monitoring', () => ({
+    AnalyticsService: class AnalyticsService {},
+}));
 jest.mock('@ever-works/agent/generators', () => ({
     MarkdownGeneratorService: class MarkdownGeneratorService {},
 }));
@@ -32,6 +35,7 @@ import { CACHE_MANAGER, DistributedTaskLockService } from '@ever-works/agent/cac
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { WorkRepository } from '@ever-works/agent/database';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
+import { AnalyticsService } from '@ever-works/monitoring';
 import { DataSyncService } from './data-sync.service';
 import type { SyncSource } from './data-sync.types';
 
@@ -56,6 +60,7 @@ describe('DataSyncService (EW-628)', () => {
     let activityLogService: { log: jest.Mock };
     let workRepository: { findById: jest.Mock; update: jest.Mock };
     let markdownGenerator: { syncFromDataRepo: jest.Mock };
+    let analyticsService: { track: jest.Mock };
 
     /**
      * Resolve `runExclusive` for the acquired path: invoke the callback,
@@ -87,6 +92,7 @@ describe('DataSyncService (EW-628)', () => {
             update: jest.fn().mockResolvedValue({}),
         };
         markdownGenerator = { syncFromDataRepo: jest.fn() };
+        analyticsService = { track: jest.fn() };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -97,6 +103,7 @@ describe('DataSyncService (EW-628)', () => {
                 { provide: ActivityLogService, useValue: activityLogService },
                 { provide: WorkRepository, useValue: workRepository },
                 { provide: MarkdownGeneratorService, useValue: markdownGenerator },
+                { provide: AnalyticsService, useValue: analyticsService },
             ],
         }).compile();
 
@@ -359,6 +366,111 @@ describe('DataSyncService (EW-628)', () => {
             });
             expect(markdownGenerator.syncFromDataRepo).not.toHaveBeenCalled();
             expect(workRepository.update).not.toHaveBeenCalled();
+        });
+    });
+
+    // EW-628 G10 — telemetry counter increments via the optional
+    // AnalyticsService. Names locked by DATA_SYNC_METRICS in
+    // packages/agent/src/cache/data-sync-metrics.ts and the Phase 8
+    // contract spec (data-sync-metrics.spec.ts).
+    describe('telemetry counters (EW-628 G10)', () => {
+        beforeEach(() => stubLockServiceAcquired());
+
+        it('lock contention emits data_sync_lock_contention_total once with the source label', async () => {
+            stubLockServiceContended();
+            await service.runDataSync('work-busy', 'webhook');
+            expect(analyticsService.track).toHaveBeenCalledWith(
+                'work-busy',
+                'data_sync_lock_contention_total',
+                expect.objectContaining({ source: 'webhook' }),
+            );
+        });
+
+        it('success emits data_sync_success_total + data_sync_duration_ms with stats labels', async () => {
+            cacheManager.get.mockResolvedValue(null);
+            workRepository.findById.mockResolvedValue({
+                id: 'w-ok',
+                user: { id: 'owner-1' },
+                generateStatus: { status: GenerateStatusType.GENERATED },
+            });
+            markdownGenerator.syncFromDataRepo.mockResolvedValue({
+                afterSha: 'sha-x',
+                filesChanged: 4,
+                durationMs: 250,
+            });
+
+            await service.runDataSync('w-ok', 'manual');
+
+            expect(analyticsService.track).toHaveBeenCalledWith('w-ok', 'data_sync_success_total', {
+                source: 'manual',
+            });
+            expect(analyticsService.track).toHaveBeenCalledWith(
+                'w-ok',
+                'data_sync_duration_ms',
+                expect.objectContaining({ source: 'manual', value: 250, filesChanged: 4 }),
+            );
+        });
+
+        it('skipped emits data_sync_skipped_total with reason + source labels', async () => {
+            cacheManager.get.mockImplementation(async (key: string) =>
+                key === 'data-sync:retry-after:w-skip' ? '1' : null,
+            );
+
+            await service.runDataSync('w-skip', 'poll');
+
+            expect(analyticsService.track).toHaveBeenCalledWith(
+                'w-skip',
+                'data_sync_skipped_total',
+                expect.objectContaining({ source: 'poll', reason: 'retry-backoff' }),
+            );
+        });
+
+        it('failed emits data_sync_failed_total with errorClass + source labels (errorTail not sent)', async () => {
+            cacheManager.get.mockResolvedValue(null);
+            workRepository.findById.mockResolvedValue({
+                id: 'w-fail',
+                user: { id: 'owner-1' },
+                generateStatus: { status: GenerateStatusType.GENERATED },
+            });
+            markdownGenerator.syncFromDataRepo.mockRejectedValue(
+                Object.assign(new Error('404 Not Found'), {
+                    stderr: 'remote: Repository not found.',
+                }),
+            );
+
+            await service.runDataSync('w-fail', 'webhook');
+
+            const failCall = analyticsService.track.mock.calls.find(
+                (c) => c[1] === 'data_sync_failed_total',
+            );
+            expect(failCall).toBeDefined();
+            expect(failCall![0]).toBe('w-fail');
+            expect(failCall![2]).toEqual({
+                source: 'webhook',
+                errorClass: 'data-repo-unreachable',
+            });
+            // errorTail (potentially PII / high-cardinality) must NOT leak into PostHog.
+            expect(failCall![2]).not.toHaveProperty('errorTail');
+        });
+
+        it('telemetry failures never break the sync path', async () => {
+            analyticsService.track.mockImplementation(() => {
+                throw new Error('PostHog down');
+            });
+            cacheManager.get.mockResolvedValue(null);
+            workRepository.findById.mockResolvedValue({
+                id: 'w-resilient',
+                user: { id: 'owner-1' },
+                generateStatus: { status: GenerateStatusType.GENERATED },
+            });
+            markdownGenerator.syncFromDataRepo.mockResolvedValue({
+                afterSha: 'sha-y',
+                filesChanged: 1,
+                durationMs: 10,
+            });
+
+            const outcome = await service.runDataSync('w-resilient', 'webhook');
+            expect(outcome.status).toBe('success');
         });
     });
 });

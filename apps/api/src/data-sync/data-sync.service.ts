@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CacheEntry } from '@ever-works/agent/entities';
@@ -8,6 +8,8 @@ import { ActivityActionType, ActivityStatus, GenerateStatusType } from '@ever-wo
 import { WorkRepository } from '@ever-works/agent/database';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { config } from '@ever-works/agent/config';
+import { DATA_SYNC_METRICS, type DataSyncMetricName } from '@ever-works/agent/cache';
+import { AnalyticsService } from '@ever-works/monitoring';
 import type {
     SyncEventErrorClass,
     SyncEventFailed,
@@ -79,7 +81,36 @@ export class DataSyncService {
         private readonly activityLogService: ActivityLogService,
         private readonly workRepository: WorkRepository,
         private readonly markdownGenerator: MarkdownGeneratorService,
+        // EW-628 G10 — `MonitoringModule` is `@Global()` and registered
+        // unconditionally by `api.module.ts`, but mark `@Optional()` so
+        // unit specs that don't bootstrap monitoring still compile.
+        // When PostHog isn't configured at runtime, `trackEvent` becomes
+        // a no-op upstream, so the absent-binding path is also safe.
+        @Optional() private readonly analyticsService?: AnalyticsService,
     ) {}
+
+    /**
+     * Increment a `data_sync_*` metric via the PostHog analytics service.
+     * Never throws — telemetry failures must never break the sync path.
+     * Uses the workId as the distinctId so per-Work funnels can pivot on
+     * source / reason / errorClass labels without leaking user ids.
+     */
+    private recordMetric(
+        workId: string,
+        metric: DataSyncMetricName,
+        properties?: Record<string, unknown>,
+    ): void {
+        if (!this.analyticsService) return;
+        try {
+            this.analyticsService.track(workId, metric, properties);
+        } catch (err) {
+            this.logger.debug(
+                `Telemetry failure for ${metric} (work=${workId}): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
 
     /**
      * Run one sync attempt for `workId` with three ordered gates inside
@@ -98,6 +129,9 @@ export class DataSyncService {
             {
                 ttlMs: lockTtlMs,
                 onLocked: () => {
+                    // EW-628 G10 — lock contention counter increments once per
+                    // tick where another worker held the lock. Spec §8.
+                    this.recordMetric(workId, DATA_SYNC_METRICS.lockContentionTotal, { source });
                     void this.emitSkipped(workId, source, 'sync-in-progress');
                 },
             },
@@ -267,6 +301,13 @@ export class DataSyncService {
     }
 
     private emitSuccess(workId: string, source: SyncSource, stats: DataSyncSuccessStats) {
+        // EW-628 G10 — successTotal + durationMs histogram (Prom/PostHog).
+        this.recordMetric(workId, DATA_SYNC_METRICS.successTotal, { source });
+        this.recordMetric(workId, DATA_SYNC_METRICS.durationMs, {
+            source,
+            value: stats.durationMs,
+            filesChanged: stats.filesChanged,
+        });
         const payload: SyncEventSuccess = {
             kind: 'success',
             source,
@@ -279,6 +320,12 @@ export class DataSyncService {
     }
 
     private emitSkipped(workId: string, source: SyncSource, reason: SyncReason) {
+        // EW-628 G10 — skippedTotal{reason, source}. The
+        // lockContentionTotal increment lives on the `onLocked` callback
+        // because by the time emitSkipped runs we have already lost the
+        // race and want both counters to fire (lockContention is the
+        // root cause; skipped is the user-facing outcome).
+        this.recordMetric(workId, DATA_SYNC_METRICS.skippedTotal, { source, reason });
         const payload: SyncEventSkipped = {
             kind: 'skipped',
             source,
@@ -293,6 +340,10 @@ export class DataSyncService {
         errorClass: SyncEventErrorClass,
         errorTail: string,
     ) {
+        // EW-628 G10 — failedTotal{errorClass, source}. `errorTail` is
+        // NOT sent to PostHog (high-cardinality and may carry PII from
+        // git stderr); it stays on the activity row only.
+        this.recordMetric(workId, DATA_SYNC_METRICS.failedTotal, { source, errorClass });
         const payload: SyncEventFailed = {
             kind: 'failed',
             source,
