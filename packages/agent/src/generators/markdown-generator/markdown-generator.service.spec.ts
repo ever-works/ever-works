@@ -1100,4 +1100,72 @@ describe('MarkdownGeneratorService', () => {
             expect(yTags[0]).toBe(xTags[0]);
         });
     });
+
+    // EW-628 Phase 2 — syncFromDataRepo is the public render-only entry
+    // the new DataSyncService (Phase 3) calls from both webhook and poller
+    // paths. It delegates to initialize() and returns timing stats; SHA /
+    // filesChanged stats are stubbed until the gitFacade SHA helper lands.
+    describe('syncFromDataRepo — EW-628 render-only entry', () => {
+        it('delegates to initialize() with the caller-supplied signal and returns a non-negative durationMs', async () => {
+            const gitFacade = createGitFacadeMock();
+            const workOps = createWorkOpsMock();
+            fsMock.readdir.mockResolvedValueOnce([]);
+            mountDataRepoMock({
+                getMarkdown: jest.fn().mockResolvedValue(undefined),
+                getItem: jest.fn().mockResolvedValue(undefined),
+            });
+
+            const service = new MarkdownGeneratorService(gitFacade, workOps);
+            const initializeSpy = jest.spyOn(service, 'initialize');
+            const work = createWork();
+            const user = createUser();
+            const ac = new AbortController();
+
+            const result = await service.syncFromDataRepo(work, user, { signal: ac.signal });
+
+            expect(initializeSpy).toHaveBeenCalledTimes(1);
+            expect(initializeSpy).toHaveBeenCalledWith(work, user, { signal: ac.signal });
+            expect(result.durationMs).toBeGreaterThanOrEqual(0);
+            // Stats stubbed until the gitFacade SHA helper lands (Phase 2 follow-up).
+            expect(result.filesChanged).toBe(0);
+            expect(result.beforeSha).toBeUndefined();
+            expect(result.afterSha).toBeUndefined();
+        });
+
+        it('propagates AbortSignal — pre-aborted signal throws and skips downstream git calls', async () => {
+            const gitFacade = createGitFacadeMock();
+            const workOps = createWorkOpsMock();
+            const service = new MarkdownGeneratorService(gitFacade, workOps);
+
+            const ac = new AbortController();
+            ac.abort();
+
+            await expect(
+                service.syncFromDataRepo(createWork(), createUser(), { signal: ac.signal }),
+            ).rejects.toThrow();
+
+            expect(gitFacade.createRepository).not.toHaveBeenCalled();
+            expect(cloneFreshRepositoryMock).not.toHaveBeenCalled();
+        });
+
+        it('default options object — no signal, no expectedSourceSha — still returns a SyncFromDataRepoResult', async () => {
+            const gitFacade = createGitFacadeMock();
+            const workOps = createWorkOpsMock();
+            fsMock.readdir.mockResolvedValueOnce([]);
+            mountDataRepoMock({
+                getMarkdown: jest.fn().mockResolvedValue(undefined),
+                getItem: jest.fn().mockResolvedValue(undefined),
+            });
+
+            const service = new MarkdownGeneratorService(gitFacade, workOps);
+            const result = await service.syncFromDataRepo(createWork(), createUser());
+
+            expect(result).toEqual(
+                expect.objectContaining({
+                    filesChanged: 0,
+                    durationMs: expect.any(Number),
+                }),
+            );
+        });
+    });
 });
