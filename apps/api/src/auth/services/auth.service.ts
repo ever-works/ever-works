@@ -296,6 +296,8 @@ export class AuthService {
             updateFields.committerName = updateData.committerName || null;
         if (updateData.committerEmail !== undefined)
             updateFields.committerEmail = updateData.committerEmail || null;
+        if (typeof updateData.emailBudgetAlerts === 'boolean')
+            updateFields.emailBudgetAlerts = updateData.emailBudgetAlerts;
 
         await this.userRepository.update(userId, updateFields);
 

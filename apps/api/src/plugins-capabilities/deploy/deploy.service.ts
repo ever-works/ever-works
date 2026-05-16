@@ -155,7 +155,14 @@ export class DeployService {
         // dispatch so the timestamp lines up with the workflow kick-off,
         // not the secret-pushing prep. Gated on correlationId so non-funnel
         // deploys (dashboard "Deploy" button, batch jobs) stay quiet.
-        if (options.correlationId) {
+        //
+        // Fallback: when the caller didn't thread `correlationId` through
+        // (e.g. quick-create → WorkGenerationService → … → deploy), use
+        // the one persisted on the work by `WorkLifecycleService.createWork`
+        // so the funnel chain stays unbroken from REPOS_PUSHED onwards.
+        const effectiveCorrelationId =
+            options.correlationId || work.lastDeployCorrelationId || undefined;
+        if (effectiveCorrelationId) {
             const ingressHostValue =
                 deploySettings && typeof deploySettings.ingressHost === 'string'
                     ? deploySettings.ingressHost
@@ -164,7 +171,7 @@ export class DeployService {
                 event: ZERO_FRICTION_FUNNEL_EVENTS.DEPLOY_STARTED,
                 funnelStep: 6,
                 timestamp: new Date().toISOString(),
-                correlationId: options.correlationId,
+                correlationId: effectiveCorrelationId,
                 workId,
                 deployProvider: work.deployProvider || 'ever-works',
                 ingressHost: ingressHostValue,

@@ -223,6 +223,50 @@ export class NotificationService {
         });
     }
 
+    async notifyBudgetThresholdCrossed(args: {
+        userId: string;
+        workId: string;
+        budgetId: string;
+        threshold: '75' | '90' | '100' | 'overage';
+        scope: 'global' | 'plugin';
+        pluginId?: string | null;
+        currentSpendCents: number;
+        capCents: number;
+        currency: string;
+    }): Promise<void> {
+        const isError = args.threshold === '100' || args.threshold === 'overage';
+        const scopeLabel =
+            args.scope === 'plugin' && args.pluginId
+                ? `plugin '${args.pluginId}'`
+                : 'this directory';
+        const titleByThreshold: Record<typeof args.threshold, string> = {
+            '75': 'Budget at 75%',
+            '90': 'Budget at 90%',
+            '100': 'Budget cap reached',
+            overage: 'Budget overage in progress',
+        };
+        await this.create({
+            userId: args.userId,
+            type: isError ? NotificationType.ERROR : NotificationType.WARNING,
+            category: NotificationCategory.AI_CREDITS,
+            title: titleByThreshold[args.threshold],
+            message: `${scopeLabel} has used ${args.currentSpendCents} / ${args.capCents} ${args.currency.toUpperCase()} cents this period.`,
+            // EW-602 review fix (Codex P2 + Greptile P1): per-Work page,
+            // not the per-User /settings namespace.
+            actionUrl: `/works/${args.workId}/settings/budgets-usage`,
+            actionLabel: 'Manage budgets',
+            isPersistent: isError,
+            metadata: {
+                workId: args.workId,
+                budgetId: args.budgetId,
+                threshold: args.threshold,
+                scope: args.scope,
+                pluginId: args.pluginId,
+            },
+            deduplicationKey: `budget_${args.budgetId}_${args.threshold}`,
+        });
+    }
+
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
         await this.create({
             userId,

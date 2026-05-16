@@ -5,6 +5,7 @@ import { WorkStatusCard } from '@/components/works/detail/WorkStatusCard';
 import { WorkInfo } from '@/components/works/detail/overview/WorkInfo';
 import { WorkStats } from '@/components/works/detail/overview/WorkStats';
 import { WorkConfig } from '@/components/works/detail/overview/WorkConfig';
+import { BudgetSummarySection } from '@/components/dashboard/BudgetSummarySection';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { notFound } from 'next/navigation';
 
@@ -57,6 +58,9 @@ export default async function WorkOverviewPage({ params }: Params) {
                 comparisonsCount={countRes.comparisons || 0}
                 work={work}
             />
+
+            {/* EW-602: per-Work budget overview + top plugins + spend trend */}
+            <BudgetSummarySection workId={id} />
 
             {/* Work Info and Config side by side */}
             <div className="grid @3xl/main:grid-cols-2 gap-6">
