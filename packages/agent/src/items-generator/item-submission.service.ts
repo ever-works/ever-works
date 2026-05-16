@@ -516,8 +516,13 @@ export class ItemSubmissionService {
                 updateItemDto.source_url !== undefined &&
                 updateItemDto.source_url !== existingItem.source_url;
 
+            // Use `typeof === 'string'` (not `!== undefined`) so a client
+            // sending `"markdown": null` does NOT slip into the write branch
+            // — `class-validator`'s `@IsOptional()` short-circuits on null,
+            // so the DTO accepts it, but `fs.writeFile(path, null)` would
+            // throw downstream. Codex P1 on PR #786.
             const markdownChanged =
-                updateItemDto.markdown !== undefined &&
+                typeof updateItemDto.markdown === 'string' &&
                 updateItemDto.markdown !== existingItem.markdown;
 
             const itemUpdates: {
@@ -566,7 +571,9 @@ export class ItemSubmissionService {
             // field is only a fallback). Keep both channels in sync when the
             // body changes so the next site generation picks up the edit.
             if (markdownChanged) {
-                await data.writeItemMarkdown(updatedItem, updateItemDto.markdown ?? '');
+                // `markdownChanged` is a `typeof === 'string'` check, so the
+                // non-null assertion is provably safe here (null is excluded).
+                await data.writeItemMarkdown(updatedItem, updateItemDto.markdown!);
             }
 
             await this.gitFacade.addAll(provider, dest);

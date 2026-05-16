@@ -158,6 +158,33 @@ export const config = {
             const usd = parseFloat(process.env.PAY_PER_USE_PRICE_USD || '5');
             return Math.max(0, Math.round(usd * 100));
         },
+        // EW-628 data-repo instant-sync feature flags + tunables (Phase 8).
+        // Both flags default to FALSE so the new code paths are inert in
+        // production until the soak window completes; flip via env.
+        // Spec: docs/specs/features/data-repo-instant-sync/spec.md §7.
+        dataSync: {
+            webhookEnabled() {
+                return process.env.DATA_SYNC_WEBHOOK_ENABLED === 'true';
+            },
+            dispatcherEnabled() {
+                return process.env.DATA_SYNC_DISPATCHER_ENABLED === 'true';
+            },
+            getDebounceMs() {
+                return parseInt(process.env.DATA_SYNC_DEBOUNCE_MS || '30000');
+            },
+            getLockTtlSeconds() {
+                return parseInt(process.env.DATA_SYNC_LOCK_TTL_SECONDS || '300');
+            },
+            getRetryBackoffSeconds() {
+                return parseInt(process.env.DATA_SYNC_RETRY_BACKOFF_SECONDS || '300');
+            },
+            getSkipNoiseWindowMs() {
+                return parseInt(process.env.DATA_SYNC_SKIP_NOISE_WINDOW_MS || '3600000');
+            },
+            getGenInProgressNoiseWindowMs() {
+                return parseInt(process.env.DATA_SYNC_GEN_IN_PROGRESS_NOISE_WINDOW_MS || '900000');
+            },
+        },
     },
 
     websiteTemplate: {

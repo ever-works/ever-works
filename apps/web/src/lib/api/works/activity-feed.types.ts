@@ -18,7 +18,8 @@ export type FeedCategory =
     | 'communityPr'
     | 'users'
     | 'submissions'
-    | 'reports';
+    | 'reports'
+    | 'sync';
 
 export const FEED_CATEGORIES: readonly FeedCategory[] = [
     'all',
@@ -31,6 +32,9 @@ export const FEED_CATEGORIES: readonly FeedCategory[] = [
     'users',
     'submissions',
     'reports',
+    // EW-628 — Sync chip surfaces the `data_sync_*` activity rows
+    // emitted by `DataSyncService.runDataSync` (G3) / dispatcher (G7).
+    'sync',
 ];
 
 interface FeedEntryBase {

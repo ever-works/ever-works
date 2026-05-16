@@ -178,4 +178,43 @@ describe('MarkdownRepository', () => {
             );
         });
     });
+
+    // EW-628 G5 — `syncFromDataRepo` reads `getWriteCount()` to populate the
+    // `filesChanged` activity-row stat. The counter must accumulate across
+    // every writing method and be observable without a real fs round-trip.
+    describe('getWriteCount (EW-628 G5)', () => {
+        it('starts at zero', () => {
+            expect(new MarkdownRepository(dir).getWriteCount()).toBe(0);
+        });
+
+        it('increments once per writeReadme / writeDetails / writeLicense / removeDetails', async () => {
+            const repo = new MarkdownRepository(dir);
+            await repo.writeReadme('a');
+            await repo.writeDetails('s1', 'b');
+            await repo.writeDetails('s2', 'c');
+            await repo.writeLicense('mit');
+            await repo.removeDetails('s1');
+            expect(repo.getWriteCount()).toBe(5);
+        });
+
+        it('increments once per non-allowlisted entry inside resetFiles()', async () => {
+            fsMock.readdir.mockResolvedValueOnce([
+                '.git', // allowlisted
+                'README.md', // counts
+                'old', // counts
+            ] as unknown as string[]);
+            const repo = new MarkdownRepository(dir);
+            await repo.resetFiles();
+            expect(repo.getWriteCount()).toBe(2);
+        });
+
+        it('persists the running total across mixed calls in a single sync run', async () => {
+            fsMock.readdir.mockResolvedValueOnce(['old.md'] as unknown as string[]);
+            const repo = new MarkdownRepository(dir);
+            await repo.resetFiles(); // +1
+            await repo.writeReadme('readme'); // +1
+            await repo.writeDetails('s', 'details'); // +1
+            expect(repo.getWriteCount()).toBe(3);
+        });
+    });
 });

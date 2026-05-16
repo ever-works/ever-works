@@ -207,6 +207,19 @@ If you have customized the Template, you may encounter merge conflicts when pull
 3. **Review release notes** before upgrading to understand what files have changed.
 4. **Test thoroughly** after resolving conflicts by running `pnpm lint`, `pnpm tsc --noEmit`, and `pnpm build`.
 
+## Recent Platform Changes
+
+### EW-628 — Data Repository Instant Sync
+
+Adds a sub-minute sync path from a Work's data repository to its main repository, decoupled from the full generation pipeline. Both webhook (GitHub App) and poller (no App) transports share a single mutex with the existing generator and emit a new `data-sync.*` activity row family (success / skipped / failed) to the activity feed.
+
+Gated behind two flags that default to `false` until the soak window completes:
+
+- `DATA_SYNC_WEBHOOK_ENABLED`
+- `DATA_SYNC_DISPATCHER_ENABLED`
+
+See the [Data Management feature doc](features/data-management.md#data-repository-instant-sync-ew-628) and the spec at [`docs/specs/features/data-repo-instant-sync/spec.md`](specs/features/data-repo-instant-sync/spec.md).
+
 ## Changelog Format
 
 Release notes follow this structure:

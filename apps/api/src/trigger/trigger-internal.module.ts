@@ -5,6 +5,7 @@ import { WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
+import { DataSyncModule } from '../data-sync/data-sync.module';
 
 @Module({
     imports: [
@@ -13,6 +14,10 @@ import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
         NotificationsModule,
         FacadesModule,
         WorkProposalsModule,
+        // EW-628 G7 — exposes DataSyncDispatcherService through the
+        // remote-proxy controller so the Trigger.dev worker can call it
+        // each cron tick without importing the full API stack.
+        DataSyncModule,
     ],
     controllers: [TriggerInternalController],
 })
