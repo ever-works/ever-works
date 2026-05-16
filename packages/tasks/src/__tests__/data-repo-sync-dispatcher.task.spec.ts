@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Phase 4 (EW-628) tests — pin the schedule registration shape and the
- * lifecycle behaviour of {@link dataRepoSyncDispatcherTask}. Logic is
- * intentionally inert in this commit (the body is a TODO waiting on
- * DataSyncDispatcherService); these tests pin the contract so the
- * follow-up commit can swap the body in without breaking the cron id
- * or the schedule registration.
+ * EW-628 tests — pin the schedule registration shape and the lifecycle
+ * behaviour of {@link dataRepoSyncDispatcherTask}. G7 wires the body to
+ * the API-side `DataSyncDispatcherService` via the trigger internal RPC
+ * channel; these tests assert that the cron resolves the proxy and
+ * fans out to `dispatchDue()`.
  */
+const DATA_SYNC_DISPATCHER_SERVICE_TOKEN = 'DataSyncDispatcherService';
+
 const {
     schedulesTaskMock,
     createApplicationContextMock,
@@ -37,6 +38,7 @@ vi.mock('@nestjs/core', () => ({
 
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
     TriggerInternalModule: StubInternalModule,
+    DATA_SYNC_DISPATCHER_SERVICE: DATA_SYNC_DISPATCHER_SERVICE_TOKEN,
 }));
 
 vi.mock('../trigger/worker/trigger-logger', () => ({
@@ -62,18 +64,35 @@ const importTask = async (cronOverride?: string): Promise<ScheduleConfig> => {
     return lastCall[0] as ScheduleConfig;
 };
 
-describe('dataRepoSyncDispatcherTask (EW-628 Phase 4)', () => {
+describe('dataRepoSyncDispatcherTask (EW-628)', () => {
     let appContext: {
         useLogger: ReturnType<typeof vi.fn>;
         get: ReturnType<typeof vi.fn>;
         close: ReturnType<typeof vi.fn>;
     };
+    let dispatchDueMock: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        dispatchDueMock = vi.fn().mockResolvedValue({
+            limit: 25,
+            dueCount: 0,
+            dispatched: 0,
+            skipped: 0,
+            failed: 0,
+            entries: [],
+        });
         appContext = {
             useLogger: vi.fn(),
-            get: vi.fn().mockReturnValue(undefined),
+            // EW-628 G7: the cron resolves DataSyncDispatcherService via
+            // the proxy token. For the "NestFactoryStaticLogger" lookup
+            // (logger fallback) return undefined so console is used.
+            get: vi.fn().mockImplementation((token: unknown) => {
+                if (token === DATA_SYNC_DISPATCHER_SERVICE_TOKEN) {
+                    return { dispatchDue: dispatchDueMock };
+                }
+                return undefined;
+            }),
             close: vi.fn().mockResolvedValue(undefined),
         };
         createApplicationContextMock.mockResolvedValue(appContext);
@@ -102,7 +121,7 @@ describe('dataRepoSyncDispatcherTask (EW-628 Phase 4)', () => {
         });
     });
 
-    describe('run() — Phase 4 inert body', () => {
+    describe('run() — G7 wired body', () => {
         it('boots a Nest application context using TriggerInternalModule', async () => {
             const cfg = await importTask();
             await cfg.run();
@@ -119,11 +138,33 @@ describe('dataRepoSyncDispatcherTask (EW-628 Phase 4)', () => {
             expect(appContext.useLogger).toHaveBeenCalledWith(triggerLoggerInstance);
         });
 
-        it('returns the inert summary envelope while the body is a TODO', async () => {
+        it('resolves DataSyncDispatcherService through the proxy token and calls dispatchDue', async () => {
+            const cfg = await importTask();
+            await cfg.run();
+
+            expect(appContext.get).toHaveBeenCalledWith(DATA_SYNC_DISPATCHER_SERVICE_TOKEN);
+            expect(dispatchDueMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns the summary envelope from dispatchDue (dueCount/dispatched/skipped/failed)', async () => {
+            dispatchDueMock.mockResolvedValueOnce({
+                limit: 25,
+                dueCount: 4,
+                dispatched: 3,
+                skipped: 1,
+                failed: 0,
+                entries: [],
+            });
             const cfg = await importTask('*/1 * * * *');
             const result = await cfg.run();
 
-            expect(result).toEqual({ cron: '*/1 * * * *', dispatched: 0, skipped: 0 });
+            expect(result).toEqual({
+                cron: '*/1 * * * *',
+                dueCount: 4,
+                dispatched: 3,
+                skipped: 1,
+                failed: 0,
+            });
         });
 
         it('always closes the appContext (try/finally) — even when close() rejects, the error surfaces', async () => {

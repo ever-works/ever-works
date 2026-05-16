@@ -1,45 +1,48 @@
 import { schedules } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
+import {
+    DATA_SYNC_DISPATCHER_SERVICE,
+    TriggerInternalModule,
+} from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 /**
- * EW-628 data-repo instant-sync dispatcher (Phase 4).
+ * EW-628 data-repo instant-sync dispatcher.
  *
  * Spec: `docs/specs/features/data-repo-instant-sync/spec.md` §5.3.
  *
- * Single `schedules.task` that fires every minute and runs BOTH:
+ * Single `schedules.task` that fires every minute and runs BOTH paths
+ * by delegating to the API-side `DataSyncDispatcherService` over the
+ * trigger internal RPC channel:
  *
- * - **Path A** (webhook flush): pick Works where
- *   `pendingSyncRequestedAt <= now() - 30s` (quiet-period debounce) and
- *   fan out a `data-repo-sync` task call with `source='webhook'`.
- * - **Path B** (poller fallback): pick Works where
- *   `githubAppInstalled = false AND (lastPolledAt IS NULL OR lastPolledAt
- *   + syncIntervalMinutes·minutes <= now())`. For each, run `ls-remote
- *   HEAD` synchronously and only fan out when the SHA differs from
- *   `lastSyncedDataRepoSha`; otherwise emit a rate-limited
- *   `data-sync.skipped reason=no-changes` row.
+ * - **Path A** (webhook flush): Works where the GitHub App `push`
+ *   handler set `pendingSyncRequestedAt` ≥ debounceMs ago.
+ * - **Path B** (poller fallback): Works without the App installed
+ *   whose `lastPolledAt` is older than `syncIntervalMinutes`.
  *
  * Both paths converge on `DataSyncService.runDataSync(workId, source)`
- * (Phase 3 surface), which acquires the per-Work
- * `data-sync:<workId>` lock via {@link DistributedTaskLockService} and
- * runs the three gates documented in spec §5.4.
+ * (G3 body) which acquires the per-Work `data-sync:<workId>` lock and
+ * runs the three gates (retry-backoff / generation-in-progress / render).
  *
- * Flag gating (Phase 8): the body short-circuits when
- * `subscriptions.dataSync.dispatcherEnabled = false` so the cron stays
+ * Flag gating: `subscriptions.dataSync.dispatcherEnabled = false` makes
+ * the dispatcher service return an empty summary so the cron stays
  * registered (Trigger.dev requires a stable schedule list) but does
  * nothing in production until the flag is flipped.
- *
- * NOTE: Phase 4 (this commit) lands the registered schedule + the
- * NestJS bootstrap shell. The actual `DataSyncDispatcherService` that
- * runs the bulk SQL eligibility query and fans out per-Work lands in
- * a follow-up commit on the same PR so reviewers can read the
- * scheduling change separately from the dispatcher logic.
  */
 
 // Cron fixed at every minute per spec §7 ("Dispatcher cron"). Made
 // overridable via env so soak tests can dial it down without redeploying.
 const cronExpression = process.env.DATA_SYNC_DISPATCHER_CRON ?? '*/1 * * * *';
+
+interface DataSyncDispatcher {
+    dispatchDue: (limit?: number) => Promise<{
+        limit: number;
+        dueCount: number;
+        dispatched: number;
+        skipped: number;
+        failed: number;
+    }>;
+}
 
 export const dataRepoSyncDispatcherTask = schedules.task({
     id: 'data-repo-sync-dispatcher',
@@ -50,17 +53,20 @@ export const dataRepoSyncDispatcherTask = schedules.task({
         const logger = appContext.get('NestFactoryStaticLogger', { strict: false }) ?? console;
 
         try {
-            // TODO(EW-628 Phase 4 follow-up): inject DataSyncDispatcherService
-            // and call dispatchDue() — bulk SELECT eligible Works, fan out
-            // to data-repo-sync.task per row, return summary for trigger
-            // run history. Until then this task is registered but inert
-            // (matches the default-off subscriptions.dataSync.dispatcherEnabled
-            // flag landing in Phase 8).
+            const dispatcher = appContext.get<DataSyncDispatcher>(DATA_SYNC_DISPATCHER_SERVICE);
+            const summary = await dispatcher.dispatchDue();
+
             (logger as { log?: (m: string) => void }).log?.(
-                'EW-628 dispatcher stub — Phase 4 follow-up wires DataSyncDispatcherService',
+                `EW-628 dispatch tick — due=${summary.dueCount} dispatched=${summary.dispatched} skipped=${summary.skipped} failed=${summary.failed}`,
             );
 
-            return { cron: cronExpression, dispatched: 0, skipped: 0 };
+            return {
+                cron: cronExpression,
+                dueCount: summary.dueCount,
+                dispatched: summary.dispatched,
+                skipped: summary.skipped,
+                failed: summary.failed,
+            };
         } finally {
             await appContext.close();
         }

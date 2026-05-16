@@ -6,6 +6,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { MarkdownGeneratorModule } from '@ever-works/agent/generators';
 import { DataSyncController } from './data-sync.controller';
+import { DataSyncDispatcherService } from './data-sync-dispatcher.service';
 import { DataSyncService } from './data-sync.service';
 
 /**
@@ -44,7 +45,7 @@ import { DataSyncService } from './data-sync.service';
         MarkdownGeneratorModule,
     ],
     controllers: [DataSyncController],
-    providers: [DataSyncService, DistributedTaskLockService],
-    exports: [DataSyncService],
+    providers: [DataSyncService, DataSyncDispatcherService, DistributedTaskLockService],
+    exports: [DataSyncService, DataSyncDispatcherService],
 })
 export class DataSyncModule {}
