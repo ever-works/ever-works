@@ -1,9 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CacheEntry } from '@ever-works/agent/entities';
-import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import type { DataSyncOutcome, SyncSource } from './data-sync.types';
+import { CACHE_MANAGER, Cache, DistributedTaskLockService } from '@ever-works/agent/cache';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus, GenerateStatusType } from '@ever-works/agent/entities';
+import { WorkRepository } from '@ever-works/agent/database';
+import { MarkdownGeneratorService } from '@ever-works/agent/generators';
+import { config } from '@ever-works/agent/config';
+import type {
+    DataSyncOutcome,
+    DataSyncSuccessStats,
+    SyncReason,
+    SyncSource,
+} from './data-sync.types';
 
 /**
  * Owns the per-Work sync run lifecycle for EW-628 (data-repo instant-sync).
@@ -19,23 +29,27 @@ import type { DataSyncOutcome, SyncSource } from './data-sync.types';
  *   and runs three gates in order inside the callback:
  *
  *     1. Retry-backoff gate — short-circuits if a recent failure wrote
- *        `data-sync:retry-after:<workId>` to `cache_entries`.
+ *        `data-sync:retry-after:<workId>` to the cache.
  *     2. Pipeline-RUNNING gate — defers when the full generation
  *        pipeline is mid-flight; rate-limits the `generation-in-progress`
  *        skip row via `data-sync:gen-in-progress-noise:<workId>` so a
- *        long generation run doesn't drown the activity feed.
+ *        long generation run does not drown the activity feed.
  *     3. Render gate — calls
- *        `MarkdownGeneratorService.syncFromDataRepo` (Phase 2 entry).
+ *        {@link MarkdownGeneratorService.syncFromDataRepo} (Phase 2 entry),
+ *        then UPDATEs `lastSyncedDataRepoSha`, clears
+ *        `pendingSyncRequestedAt`, stamps `lastPolledAt`, and writes a
+ *        `data_sync_success` activity row.
  *
- * - `isLocked(workId)` — non-mutating peek the schedule dispatcher
- *   (`WorkScheduleDispatcherService.dispatchDue`) uses to skip Works
- *   whose sync is currently in flight. Symmetric mutex; the generation
- *   side defers when this returns true, sync side checks pipelineStatus
- *   inside its lock. See spec §5.5.
+ *   Never throws — failures are caught, converted to `data_sync_failed`
+ *   rows, and a short retry-backoff is set in the cache so the dispatcher
+ *   does not hot-loop a broken Work. The terminal `DataSyncOutcome`
+ *   returned by this method is what the force-sync controller and the
+ *   dispatcher surface to their callers.
  *
- * NOTE: Phase 3 (this commit) lands the module + service surface and
- * wires `DistributedTaskLockService`. The gate logic, MarkdownGenerator
- * call, and activity-feed writes follow in EW-628 G3.
+ * - `isLocked(workId)` — non-mutating peek the schedule dispatcher uses
+ *   to skip Works whose sync is currently in flight. Symmetric mutex;
+ *   the generation side defers when this returns true, sync side checks
+ *   `generateStatus.status === GENERATING` inside its lock. See spec §5.5.
  *
  * Lock-key format (matches {@link DistributedTaskLockService} convention):
  *
@@ -44,7 +58,7 @@ import type { DataSyncOutcome, SyncSource } from './data-sync.types';
  *     full `cache_entries.key` is `task-lock:data-sync:<workId>`.
  *
  * `isLocked` peeks that same row directly so it stays O(1) (single
- * primary-key lookup) and doesn't compete for the lock itself.
+ * primary-key lookup) and does not compete for the lock itself.
  */
 @Injectable()
 export class DataSyncService {
@@ -54,27 +68,41 @@ export class DataSyncService {
         private readonly taskLockService: DistributedTaskLockService,
         @InjectRepository(CacheEntry)
         private readonly cacheEntryRepository: Repository<CacheEntry>,
+        @Inject(CACHE_MANAGER) private readonly cache: Cache,
+        private readonly activityLogService: ActivityLogService,
+        private readonly workRepository: WorkRepository,
+        private readonly markdownGenerator: MarkdownGeneratorService,
     ) {}
 
     /**
      * Run one sync attempt for `workId` with three ordered gates inside
      * the lock. See class-level JSDoc and spec §5.4 for the contract.
      *
-     * Returns the terminal outcome the caller will log in the activity
-     * feed. Never throws; failures inside the lock return
-     * `{ status: 'failed', ... }` and write the retry-backoff cache
-     * entry so the dispatcher backs off naturally.
-     *
-     * TODO(EW-628 G3): implement the three gates per `plan.md` §6
-     * pseudo-code. The signature is final; only the body is missing.
+     * Never throws — caller gets one of:
+     *   - `{ status: 'success', stats }`
+     *   - `{ status: 'skipped', reason }` (5 documented reasons)
+     *   - `{ status: 'failed', errorClass, errorTail }`
      */
     async runDataSync(workId: string, source: SyncSource): Promise<DataSyncOutcome> {
-        this.logger.warn(
-            `DataSyncService.runDataSync stub called for work=${workId} source=${source} — gate logic lands in EW-628 G3`,
+        const lockTtlMs = config.subscriptions.dataSync.getLockTtlSeconds() * 1000;
+        const lockResult = await this.taskLockService.runExclusive(
+            `data-sync:${workId}`,
+            async () => this.runGates(workId, source),
+            {
+                ttlMs: lockTtlMs,
+                onLocked: () => {
+                    void this.emitSkipped(workId, source, 'sync-in-progress');
+                },
+            },
         );
-        // Voiding the unused-arg lints; the real impl will use these.
-        void this.taskLockService;
-        throw new Error('DataSyncService.runDataSync not yet implemented (EW-628 G3)');
+
+        if (!lockResult.acquired) {
+            return { status: 'skipped', reason: 'sync-in-progress' };
+        }
+
+        // `runGates` never throws (every branch returns a DataSyncOutcome),
+        // so `result` is guaranteed defined on the acquired path.
+        return lockResult.result as DataSyncOutcome;
     }
 
     /**
@@ -88,10 +116,6 @@ export class DataSyncService {
      * a `null` value means the lock has no TTL (defensive — never
      * written by the current code path, but treated as held to err on
      * the side of safety).
-     *
-     * Used by `WorkScheduleDispatcherService.dispatchDue` per spec §5.5
-     * to defer a full-generation tick on a Work whose data-sync is
-     * mid-flight.
      */
     async isLocked(workId: string): Promise<boolean> {
         const lockKey = `task-lock:data-sync:${workId}`;
@@ -107,4 +131,232 @@ export class DataSyncService {
         }
         return row.expiresAt > Date.now();
     }
+
+    /**
+     * The three-gate body that runs INSIDE the lock callback. Split out
+     * so `runDataSync` keeps the acquire / onLocked branches readable.
+     */
+    private async runGates(workId: string, source: SyncSource): Promise<DataSyncOutcome> {
+        // Gate 1 — retry-backoff after a recent failure. Without this gate,
+        // the dispatcher re-enqueues every minute and we re-run the broken
+        // render every tick. The cache entry's TTL drives when we retry.
+        const retryAfterKey = `data-sync:retry-after:${workId}`;
+        const backoff = await this.cache.get<string>(retryAfterKey);
+        if (backoff) {
+            await this.emitSkipped(workId, source, 'retry-backoff');
+            return { status: 'skipped', reason: 'retry-backoff' };
+        }
+
+        // Gate 2 — generation pipeline already running. Rate-limit the
+        // skip row via `gen-in-progress-noise` so a long generation run
+        // does not flood the activity feed with ~120 skip rows.
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            // Work was deleted between dispatcher enqueue and lock acquire.
+            // Surface as `failed` with a stable error class so dashboards
+            // can pivot on it without parsing free-form text.
+            await this.emitFailed(workId, source, 'work-not-found', `Work ${workId} not found`);
+            return {
+                status: 'failed',
+                errorClass: 'work-not-found',
+                errorTail: tailString(`Work ${workId} not found`),
+            };
+        }
+        if (work.generateStatus?.status === GenerateStatusType.GENERATING) {
+            const noiseKey = `data-sync:gen-in-progress-noise:${workId}`;
+            const recentNoise = await this.cache.get<string>(noiseKey);
+            if (!recentNoise) {
+                await this.emitSkipped(workId, source, 'generation-in-progress');
+                await this.cache.set(
+                    noiseKey,
+                    '1',
+                    config.subscriptions.dataSync.getGenInProgressNoiseWindowMs(),
+                );
+            }
+            return { status: 'skipped', reason: 'generation-in-progress' };
+        }
+
+        // Gate 3 — render. The owner user comes off the work row (eager
+        // `relations: ['user']` in `WorkRepository.findById`).
+        const startedAt = Date.now();
+        try {
+            const stats = await this.markdownGenerator.syncFromDataRepo(work, work.user, {});
+            const successStats: DataSyncSuccessStats = {
+                beforeSha: stats.beforeSha,
+                afterSha: stats.afterSha,
+                filesChanged: stats.filesChanged,
+                durationMs: stats.durationMs ?? Date.now() - startedAt,
+            };
+
+            await this.workRepository.update(workId, {
+                ...(successStats.afterSha ? { lastSyncedDataRepoSha: successStats.afterSha } : {}),
+                pendingSyncRequestedAt: null,
+                lastPolledAt: new Date(),
+            });
+
+            // Clear the gen-in-progress noise window so the next blocked
+            // generation run can emit again immediately.
+            await this.cache.del(`data-sync:gen-in-progress-noise:${workId}`);
+
+            await this.emitSuccess(workId, source, successStats);
+            return { status: 'success', stats: successStats };
+        } catch (err) {
+            const errorClass = classifyError(err);
+            const errorTail = tailString(extractErrorMessage(err));
+
+            await this.emitFailed(workId, source, errorClass, errorTail);
+
+            // pendingSyncRequestedAt intentionally NOT cleared — the
+            // dispatcher's next tick will retry once the backoff expires.
+            await this.cache.set(
+                `data-sync:retry-after:${workId}`,
+                '1',
+                config.subscriptions.dataSync.getRetryBackoffSeconds() * 1000,
+            );
+
+            return { status: 'failed', errorClass, errorTail };
+        }
+    }
+
+    /**
+     * Resolve a userId for the activity-log row. Synthetic system events
+     * (e.g. Work not found) cannot use `work.user.id` because we never
+     * loaded the work. Use the system marker `'system'` so listeners can
+     * filter / route accordingly.
+     */
+    private async resolveActor(workId: string): Promise<string> {
+        const work = await this.workRepository.findById(workId);
+        return work?.user?.id ?? 'system';
+    }
+
+    private async emitSuccess(
+        workId: string,
+        source: SyncSource,
+        stats: DataSyncSuccessStats,
+    ): Promise<void> {
+        try {
+            const userId = await this.resolveActor(workId);
+            await this.activityLogService.log({
+                userId,
+                workId,
+                actionType: ActivityActionType.DATA_SYNC_SUCCESS,
+                action: 'data-sync.success',
+                status: ActivityStatus.COMPLETED,
+                summary: `Synced data repo (${stats.filesChanged} file${stats.filesChanged === 1 ? '' : 's'} updated)`,
+                details: {
+                    kind: 'success',
+                    source,
+                    beforeSha: stats.beforeSha,
+                    afterSha: stats.afterSha,
+                    filesChanged: stats.filesChanged,
+                    durationMs: stats.durationMs,
+                },
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to write data_sync_success row for work=${workId}: ${(err as Error).message ?? err}`,
+            );
+        }
+    }
+
+    private async emitSkipped(
+        workId: string,
+        source: SyncSource,
+        reason: SyncReason,
+    ): Promise<void> {
+        try {
+            const userId = await this.resolveActor(workId);
+            await this.activityLogService.log({
+                userId,
+                workId,
+                actionType: ActivityActionType.DATA_SYNC_SKIPPED,
+                action: 'data-sync.skipped',
+                status: ActivityStatus.CANCELLED,
+                summary: `Sync skipped: ${reason}`,
+                details: {
+                    kind: 'skipped',
+                    source,
+                    reason,
+                },
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to write data_sync_skipped row for work=${workId}: ${(err as Error).message ?? err}`,
+            );
+        }
+    }
+
+    private async emitFailed(
+        workId: string,
+        source: SyncSource,
+        errorClass: string,
+        errorTail: string,
+    ): Promise<void> {
+        try {
+            const userId = await this.resolveActor(workId);
+            await this.activityLogService.log({
+                userId,
+                workId,
+                actionType: ActivityActionType.DATA_SYNC_FAILED,
+                action: 'data-sync.failed',
+                status: ActivityStatus.FAILED,
+                summary: `Sync failed: ${errorClass}`,
+                details: {
+                    kind: 'failed',
+                    source,
+                    errorClass,
+                    errorTail,
+                },
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to write data_sync_failed row for work=${workId}: ${(err as Error).message ?? err}`,
+            );
+        }
+    }
+}
+
+/**
+ * Map a thrown error to a stable, low-cardinality `errorClass` string the
+ * activity feed renders verbatim and dashboards pivot on. The set is
+ * deliberately small per spec §5.6 — adding a new class is a deliberate
+ * schema decision, not an autopilot fallback.
+ */
+function classifyError(err: unknown): string {
+    const message = extractErrorMessage(err).toLowerCase();
+
+    if (/\b(404|not found|enotfound|getaddrinfo)\b/.test(message)) {
+        return 'data-repo-unreachable';
+    }
+    if (/\b(403|forbidden|permission denied)\b/.test(message)) {
+        return 'data-repo-unreachable';
+    }
+    if (/\b(reject|non-fast-forward|protected branch|merge conflict)\b/.test(message)) {
+        return 'main-repo-push-rejected';
+    }
+    if (/\b(timeout|timed out|etimedout)\b/.test(message)) {
+        return 'timeout';
+    }
+    return 'unknown';
+}
+
+function extractErrorMessage(err: unknown): string {
+    if (typeof err === 'string') {
+        return err;
+    }
+    if (err && typeof err === 'object') {
+        const e = err as { stderr?: unknown; message?: unknown };
+        if (typeof e.stderr === 'string' && e.stderr.length > 0) {
+            return e.stderr;
+        }
+        if (typeof e.message === 'string') {
+            return e.message;
+        }
+    }
+    return String(err);
+}
+
+function tailString(input: string, max = 200): string {
+    if (!input) return '';
+    return input.length <= max ? input : input.slice(-max);
 }
