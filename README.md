@@ -1,6 +1,6 @@
 # Ever Works
 
-The Workshop for AI - an Open Agentic Runtime that Autonomously Builds and Maintains Content-Rich Web Apps and Git Repositories.
+The Workshop for AI. An open agentic runtime that autonomously researches, ships and maintains content-rich websites and Git repositories.
 
 ![visitors](https://visitor-badge.laobi.icu/badge?page_id=ever-co.ever-works-platform)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -10,7 +10,11 @@ The Workshop for AI - an Open Agentic Runtime that Autonomously Builds and Maint
 
 ## ⭐️ What is it?
 
-An open-source, extensible, agentic runtime for building content-rich web apps and git repositories that maintain themselves. AI pipelines generate code from templates, source and enrich content, deploy to any target, store data in Git, and continuously self-improve.
+Ever® Works™ is an open-source, extensible, agentic runtime that autonomously researches, ships, and maintains content-rich websites and Git repositories.
+
+Give it an idea, and AI agents handle the rest: research the topic, write the content, generate the code, deploy to any target, and keep the site improving over time. Code and content both live in Git — so you own everything, nothing is locked in, and the entire lifecycle is version-controlled.
+
+Think of it as a workshop for AI: runs on your machine, your cloud, or ours, and keeps working on a schedule, not just when you prompt it.
 
 ## 🍺 Contribute
 
