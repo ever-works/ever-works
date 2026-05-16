@@ -41,6 +41,10 @@ jest.mock('@ever-works/agent/entities', () => ({
         WEBSITE_ITEM_SUBMITTED: 'website_item_submitted',
         WEBSITE_REPORT_FILED: 'website_report_filed',
         WEBSITE_REPORT_RESOLVED: 'website_report_resolved',
+        // EW-628 — Sync chip surfaces these three action types.
+        DATA_SYNC_SUCCESS: 'data_sync_success',
+        DATA_SYNC_SKIPPED: 'data_sync_skipped',
+        DATA_SYNC_FAILED: 'data_sync_failed',
     },
 }));
 

@@ -35,6 +35,10 @@ jest.mock('@ever-works/agent/entities', () => ({
         WEBSITE_ITEM_SUBMITTED: 'website_item_submitted',
         WEBSITE_REPORT_FILED: 'website_report_filed',
         WEBSITE_REPORT_RESOLVED: 'website_report_resolved',
+        // EW-628 — Sync chip surfaces these three action types.
+        DATA_SYNC_SUCCESS: 'data_sync_success',
+        DATA_SYNC_SKIPPED: 'data_sync_skipped',
+        DATA_SYNC_FAILED: 'data_sync_failed',
     },
     ActivityStatus: {
         PENDING: 'pending',
@@ -246,6 +250,30 @@ describe('ActivityFeedService', () => {
 
             const response = await service.compose('work-1', 'user-1', new FeedQueryDto());
             expect(response.degraded).toBeUndefined();
+        });
+
+        it('EW-628 sync category queries the three DATA_SYNC_* action types in a single IN query', async () => {
+            activityLogService.findByWork.mockResolvedValue({ activities: [], total: 0 });
+            const query = new FeedQueryDto();
+            query.category = 'sync';
+            await service.compose('work-1', 'user-1', query);
+
+            expect(activityLogService.findByWork).toHaveBeenCalledTimes(1);
+            const types = (
+                activityLogService.findByWork.mock.calls[0][0] as {
+                    actionType: string[];
+                }
+            ).actionType;
+            expect([...types].sort()).toEqual(
+                [
+                    ActivityActionType.DATA_SYNC_SUCCESS,
+                    ActivityActionType.DATA_SYNC_SKIPPED,
+                    ActivityActionType.DATA_SYNC_FAILED,
+                ].sort(),
+            );
+            // The sync category is platform-only; the directory client
+            // doesn't surface it.
+            expect(directoryClient.fetchActivityFeed).not.toHaveBeenCalled();
         });
     });
 

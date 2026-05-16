@@ -60,6 +60,12 @@ const ACTIVITY_LOG_TYPES_BY_CATEGORY: Record<FeedCategory, ActivityActionType[] 
     users: [ActivityActionType.WEBSITE_USER_REGISTERED],
     submissions: [ActivityActionType.WEBSITE_ITEM_SUBMITTED],
     reports: [ActivityActionType.WEBSITE_REPORT_FILED, ActivityActionType.WEBSITE_REPORT_RESOLVED],
+    // EW-628 — data-repo instant-sync rows (G3 emit path, dispatcher G7).
+    sync: [
+        ActivityActionType.DATA_SYNC_SUCCESS,
+        ActivityActionType.DATA_SYNC_SKIPPED,
+        ActivityActionType.DATA_SYNC_FAILED,
+    ],
 };
 
 /** Set of action types that represent website-ingested events (push transport). */
@@ -84,6 +90,9 @@ const HISTORY_TYPES_BY_CATEGORY: Record<FeedCategory, WorkHistoryActivityType[] 
     users: [],
     submissions: [],
     reports: [],
+    // EW-628 — data-sync rows live in the activity log, not the
+    // generation history table.
+    sync: [],
 };
 
 /**
@@ -102,6 +111,9 @@ const DIRECTORY_TYPES_BY_CATEGORY: Record<FeedCategory, DirectoryEntryType[]> = 
     users: ['users'],
     submissions: ['items'],
     reports: ['reports'],
+    // EW-628 — sync rows are platform-side only; the deployed site
+    // doesn't surface them.
+    sync: [],
 };
 
 interface ComposeContext {
@@ -377,6 +389,14 @@ function categoryForActivityLog(type: ActivityActionType): FeedCategory {
         type === ActivityActionType.WEBSITE_REPORT_RESOLVED
     ) {
         return 'reports';
+    }
+    // EW-628 — data-repo instant-sync rows route to the Sync chip.
+    if (
+        type === ActivityActionType.DATA_SYNC_SUCCESS ||
+        type === ActivityActionType.DATA_SYNC_SKIPPED ||
+        type === ActivityActionType.DATA_SYNC_FAILED
+    ) {
+        return 'sync';
     }
     return 'settings';
 }
