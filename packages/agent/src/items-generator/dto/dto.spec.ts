@@ -268,6 +268,27 @@ describe('items-generator/dto', () => {
             });
             expect(constraintNames(errors)).toContain('maxLength');
         });
+
+        it('accepts markdown exactly at the 100000-character boundary', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: 'a'.repeat(100000),
+            });
+            expect(errors).toEqual([]);
+        });
+
+        // Codex P1 on PR #786: `@IsOptional()` in class-validator short-circuits
+        // on `null` as well as `undefined`, so the DTO accepts a `markdown: null`
+        // payload. The service-side guard (`typeof === 'string'`) is what
+        // protects `fs.writeFile` from a `null` second arg — this test pins
+        // the DTO behavior so a future stricter validator change is noticed.
+        it('accepts markdown: null at the DTO layer (service guards null downstream)', async () => {
+            const { errors } = await validateDto(UpdateItemDto, {
+                item_slug: 'foo',
+                markdown: null,
+            });
+            expect(errors).toEqual([]);
+        });
     });
 
     // ───────────────────────────────────────────────────────────────────
