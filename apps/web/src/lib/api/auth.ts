@@ -26,6 +26,8 @@ export interface UpdateProfileDto {
     avatar?: string;
     committerName?: string | null;
     committerEmail?: string | null;
+    /** EW-602: opt-in/out for budget threshold alert emails. */
+    emailBudgetAlerts?: boolean;
 }
 
 // DTOs - Email Verification
@@ -57,6 +59,10 @@ export interface UserProfile {
     emailVerified?: boolean;
     committerName?: string | null;
     committerEmail?: string | null;
+    /** EW-602: per-user toggle for budget alert emails. Defaults to true. */
+    emailBudgetAlerts?: boolean;
+    /** EW-602: self-hosted platform admin flag (gates /admin/usage). */
+    isPlatformAdmin?: boolean;
     oauthTokens?: Array<{
         provider: string;
         createdAt?: string;

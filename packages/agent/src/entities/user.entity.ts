@@ -123,6 +123,24 @@ export class User {
     @Column({ default: false })
     userResearchOptOut: boolean;
 
+    /**
+     * EW-602 — Self-hosted platform admin flag. Grants access to the
+     * cross-user admin view at /admin/usage. Default false; the
+     * self-hosted operator seeds it via SEED_PLATFORM_ADMIN_EMAIL on
+     * first boot, or by manual UPDATE.
+     */
+    @Column({ default: false })
+    isPlatformAdmin: boolean;
+
+    /**
+     * EW-602 — Per-user opt-out for budget-alert emails. Defaults to
+     * true (opt-in by default) so users can disable just the budget
+     * alert channel without touching the in-app notification, which
+     * always fires.
+     */
+    @Column({ default: true })
+    emailBudgetAlerts: boolean;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

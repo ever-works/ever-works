@@ -16,6 +16,9 @@ import { SubscriptionPlanRepository } from './repositories/subscription-plan.rep
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
 import { WorkScheduleRepository } from './repositories/work-schedule.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
+import { PluginUsageRepository } from './repositories/plugin-usage.repository';
+import { WorkBudgetRepository } from './repositories/work-budget.repository';
+import { WorkBudgetAlertStateRepository } from './repositories/work-budget-alert-state.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
@@ -56,7 +59,7 @@ describe('DatabaseModule decorator metadata', () => {
     }
 
     /**
-     * The 23 documented repository providers (kept here so adding a new
+     * The documented repository providers (kept here so adding a new
      * repository is an explicit, type-checked update — silently appending
      * a provider to `database.module.ts` without bumping this list will
      * break the regression-guard test). Order does not matter at runtime
@@ -73,6 +76,7 @@ describe('DatabaseModule decorator metadata', () => {
         GitHubAppUserLinkRepository,
         NotificationRepository,
         OnboardingRequestRepository,
+        PluginUsageRepository,
         RefreshTokenRepository,
         SubscriptionPlanRepository,
         TemplateCustomizationRepository,
@@ -83,6 +87,8 @@ describe('DatabaseModule decorator metadata', () => {
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
         WorkAdvancedPromptsRepository,
+        WorkBudgetAlertStateRepository,
+        WorkBudgetRepository,
         WorkCustomDomainRepository,
         WorkDeploymentRepository,
         WorkGenerationHistoryRepository,
@@ -100,10 +106,10 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('declares EXACTLY 26 providers (regression guard against silent additions)', () => {
+        it('declares EXACTLY 29 providers (regression guard against silent additions)', () => {
             const providers = getMeta('providers');
             expect(providers.length).toBe(REPOSITORY_PROVIDERS.length);
-            expect(providers.length).toBe(26);
+            expect(providers.length).toBe(29);
         });
 
         it('every provider is a class constructor (function with prototype) — pinned so a future `useClass`/`useFactory` swap is deliberate', () => {
@@ -143,12 +149,12 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('exports EXACTLY 27 symbols — TypeOrmModule + 26 repositories (regression guard)', () => {
+        it('exports EXACTLY 30 symbols — TypeOrmModule + 29 repositories (regression guard)', () => {
             // Pinned so a future "stop exporting WorkRepository" tweak (which
             // would orphan every consumer) breaks loudly.
             const exports = getMeta('exports');
             expect(exports.length).toBe(REPOSITORY_PROVIDERS.length + 1);
-            expect(exports.length).toBe(27);
+            expect(exports.length).toBe(30);
         });
 
         it('exports list is exactly the providers list + TypeOrmModule (no provider held back from consumers)', () => {
