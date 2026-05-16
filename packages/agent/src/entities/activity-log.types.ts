@@ -68,6 +68,15 @@ export enum ActivityActionType {
     WEBSITE_ITEM_SUBMITTED = 'website_item_submitted',
     WEBSITE_REPORT_FILED = 'website_report_filed',
     WEBSITE_REPORT_RESOLVED = 'website_report_resolved',
+
+    // EW-628 data-repo instant-sync — terminal outcomes of `runDataSync()`
+    // emitted by `DataSyncService`. The `details` JSON payload carries the
+    // discriminated `SyncEvent` union the activity feed renders via
+    // `SyncEventRow` (source / reason / errorClass / errorTail / SHAs /
+    // filesChanged).
+    DATA_SYNC_SUCCESS = 'data_sync_success',
+    DATA_SYNC_SKIPPED = 'data_sync_skipped',
+    DATA_SYNC_FAILED = 'data_sync_failed',
 }
 
 export enum ActivityStatus {
