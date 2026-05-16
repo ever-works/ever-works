@@ -126,11 +126,12 @@ For each row, the dispatcher invokes `dataRepoSyncTask.trigger({ workId, source 
 A Trigger.dev `task` invoked by the dispatcher:
 
 1. `await taskLockService.runExclusive('data-sync:' + workId, async () => { ... }, { ttlMs: 5 * 60_000 })`.
-2. Inside the lock:
-    - Read `Work.pipelineStatus`. If `RUNNING` → release lock (via natural return), emit `data-sync.skipped reason=generation-in-progress`, leave `pendingSyncRequestedAt` set so the next dispatcher tick retries.
-    - Otherwise call `MarkdownGeneratorService.syncFromDataRepo({ workId, source })`.
-    - On success: `UPDATE work SET last_synced_data_repo_sha = :sha, pending_sync_requested_at = NULL, last_polled_at = now() WHERE id = :id`. Emit `data-sync.success`.
-    - On failure: emit `data-sync.failed`; `pendingSyncRequestedAt` is **not** cleared so the dispatcher retries on the next tick (with a backoff via `data-sync:retry-after-<workId>` cache entry to avoid hot-looping a broken Work).
+2. **Inside the lock, gates run in order — first match short-circuits:**
+    1. **Retry-backoff gate.** Read `cache_entries['data-sync:retry-after:<workId>']`. If present (a recent failure set it), emit `data-sync.skipped reason=retry-backoff` and return. `pendingSyncRequestedAt` stays set; the next tick after the backoff TTL expires will re-attempt. Without this gate the failure path's backoff write is dead code — the dispatcher would re-enqueue every minute and the task would re-run the broken render every tick.
+    2. **Pipeline-running gate.** Read `Work.pipelineStatus`. If `RUNNING`, gated by a noise window: check `cache_entries['data-sync:gen-in-progress-noise:<workId>']`; if absent, emit `data-sync.skipped reason=generation-in-progress` and write the noise-window entry (15-min TTL by default); if present, skip silently (no row). Then return. `pendingSyncRequestedAt` stays set. This mirrors the `no-changes` rate-limit in §5.2 — a 2-hour generation run would otherwise produce ~120 skip rows per Work and drown the activity feed.
+    3. **Render.** Call `MarkdownGeneratorService.syncFromDataRepo({ workId, source })`.
+        - On success: `UPDATE work SET last_synced_data_repo_sha = :sha, pending_sync_requested_at = NULL, last_polled_at = now() WHERE id = :id`. Clear the noise-window entry (next gen run starts fresh). Emit `data-sync.success`.
+        - On failure: emit `data-sync.failed`; write `cache_entries['data-sync:retry-after:<workId>']` with TTL `retryBackoffSeconds` (default 5 min); `pendingSyncRequestedAt` is **not** cleared so the dispatcher re-enqueues after the backoff expires.
 3. If `runExclusive` returned `acquired: false` → emit `data-sync.skipped reason=sync-in-progress`, leave `pendingSyncRequestedAt` set, exit cleanly.
 
 ### 5.5 Mutex with the scheduled generation pipeline
@@ -172,14 +173,15 @@ Migration: `apps/api/src/database/migrations/<timestamp>-data-repo-instant-sync.
 
 ## 7. Configuration
 
-| Setting                                | Source                                       | Default         |
-| -------------------------------------- | -------------------------------------------- | --------------- |
-| Webhook debounce quiet-period          | `subscriptions.dataSync.debounceMs`          | `30000` (30 s)  |
-| Dispatcher cron                        | hard-coded in `dataRepoSyncDispatcherTask`   | `*/1 * * * *`   |
-| Per-Work poll cadence (min)            | `Work.syncIntervalMinutes`                   | `5`             |
-| Sync lock TTL                          | `subscriptions.dataSync.lockTtlSeconds`      | `300` (5 min)   |
-| Retry backoff after a failed sync      | `subscriptions.dataSync.retryBackoffSeconds` | `300` (5 min)   |
-| Skip-noise rate-limit for `no-changes` | `subscriptions.dataSync.skipNoiseWindowMs`   | `3600000` (1 h) |
+| Setting                                            | Source                                              | Default           |
+| -------------------------------------------------- | --------------------------------------------------- | ----------------- |
+| Webhook debounce quiet-period                      | `subscriptions.dataSync.debounceMs`                 | `30000` (30 s)    |
+| Dispatcher cron                                    | hard-coded in `dataRepoSyncDispatcherTask`          | `*/1 * * * *`     |
+| Per-Work poll cadence (min)                        | `Work.syncIntervalMinutes`                          | `5`               |
+| Sync lock TTL                                      | `subscriptions.dataSync.lockTtlSeconds`             | `300` (5 min)     |
+| Retry backoff after a failed sync                  | `subscriptions.dataSync.retryBackoffSeconds`        | `300` (5 min)     |
+| Skip-noise rate-limit for `no-changes`             | `subscriptions.dataSync.skipNoiseWindowMs`          | `3600000` (1 h)   |
+| Skip-noise rate-limit for `generation-in-progress` | `subscriptions.dataSync.genInProgressNoiseWindowMs` | `900000` (15 min) |
 
 ## 8. Telemetry
 

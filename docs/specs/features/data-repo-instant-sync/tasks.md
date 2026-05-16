@@ -26,8 +26,17 @@
 
 - [ ] **T10**. `apps/api/src/data-sync/data-sync.module.ts`, `data-sync.service.ts`, `data-sync.types.ts`.
 - [ ] **T11**. Import `CacheEntry` via `TypeOrmModule.forFeature` and provide `DistributedTaskLockService` per the canonical pattern in [`distributed-task-lock.md`](../../../agent-services/distributed-task-lock.md#module-wiring).
-- [ ] **T12**. `runDataSync(workId, source)` per the pseudo-code in `plan.md §6`: `runExclusive` with `onLocked` → activity row; pipeline-RUNNING check; success → clear `pendingSyncRequestedAt` + update `lastSyncedDataRepoSha`; failure → record + set `data-sync:retry-after:<workId>` cache row.
-- [ ] **T13**. Unit tests covering all four outcomes: success, generation-in-progress, sync-in-progress (lock held), failed.
+- [ ] **T12**. `runDataSync(workId, source)` per the pseudo-code in `plan.md §6`. Gates run in order inside the lock:
+    1. **Retry-backoff gate** — check `data-sync:retry-after:<workId>` cache entry; if present, emit `data-sync.skipped reason=retry-backoff` and return.
+    2. **Pipeline-RUNNING gate** — if `Work.pipelineStatus === 'RUNNING'`: write `data-sync.skipped reason=generation-in-progress` only if the `data-sync:gen-in-progress-noise:<workId>` entry is absent, then write that entry with TTL `genInProgressNoiseWindowMs / 1000`. Return.
+    3. **Render** — call `MarkdownGeneratorService.syncFromDataRepo`. Success: clear `pendingSyncRequestedAt`, update `lastSyncedDataRepoSha`, `cache.del('data-sync:gen-in-progress-noise:<workId>')`. Failure: write `data-sync:retry-after:<workId>` with TTL `retryBackoffSeconds` (paired with Gate 1).
+- [ ] **T13**. Unit tests covering all six branches:
+    - success → success row + `pendingSyncRequestedAt` cleared + gen-in-progress noise entry cleared.
+    - generation-in-progress (first call within noise window) → one skip row emitted + noise entry written.
+    - generation-in-progress (repeat call within noise window) → silent (no skip row written) but still returns the right outcome.
+    - retry-backoff → backoff key present → one skip row, never reaches pipeline check.
+    - sync-in-progress → `onLocked` callback fires + emits skip row.
+    - failed → `data-sync.failed` row + retry-backoff key written + `pendingSyncRequestedAt` left intact.
 - [ ] **T14**. Add a public `isLocked(workId)` helper on `DataSyncService` that wraps a `cache_entries` peek. Amend `WorkScheduleDispatcherService.dispatchDue()` to skip locked Works.
 
 ## Phase 4 — Trigger.dev dispatcher (1 PR commit)

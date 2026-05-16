@@ -154,11 +154,29 @@ async runDataSync(workId: string, source: SyncSource): Promise<DataSyncOutcome> 
     return this.taskLockService.runExclusive(
         `data-sync:${workId}`,
         async () => {
+            // Gate 1 — retry-backoff after a recent failure (paired with the `catch` block below).
+            // Without this gate, the dispatcher re-enqueues every minute and we re-run the broken
+            // render every tick. The cache entry's TTL drives when we retry.
+            const backoff = await this.cache.get(`data-sync:retry-after:${workId}`);
+            if (backoff) {
+                await this.activity.record('data-sync.skipped', {
+                    workId, source, reason: 'retry-backoff',
+                });
+                return { status: 'skipped' as const, reason: 'retry-backoff' as const };
+            }
+
+            // Gate 2 — pipeline already RUNNING. Rate-limit the skip row to one per noise window
+            // so a long generation run does not flood the activity feed with ~120 skip rows.
             const work = await this.workRepo.findOneOrFail(workId);
             if (work.pipelineStatus === 'RUNNING') {
-                await this.activity.record('data-sync.skipped', {
-                    workId, source, reason: 'generation-in-progress',
-                });
+                const noiseKey = `data-sync:gen-in-progress-noise:${workId}`;
+                const recentNoise = await this.cache.get(noiseKey);
+                if (!recentNoise) {
+                    await this.activity.record('data-sync.skipped', {
+                        workId, source, reason: 'generation-in-progress',
+                    });
+                    await this.cache.set(noiseKey, '1', this.genInProgressNoiseWindowMs / 1000);
+                }
                 return { status: 'skipped' as const, reason: 'generation-in-progress' as const };
             }
 
@@ -169,6 +187,8 @@ async runDataSync(workId: string, source: SyncSource): Promise<DataSyncOutcome> 
                     pendingSyncRequestedAt: null,
                     lastPolledAt: () => 'now()',
                 });
+                // Clear the gen-in-progress noise window so the next generation run can emit again.
+                await this.cache.del(`data-sync:gen-in-progress-noise:${workId}`);
                 await this.activity.record('data-sync.success', { workId, source, ...stats });
                 return { status: 'success' as const, stats };
             } catch (err) {
@@ -179,6 +199,7 @@ async runDataSync(workId: string, source: SyncSource): Promise<DataSyncOutcome> 
                 });
                 // pendingSyncRequestedAt intentionally NOT cleared — dispatcher retries.
                 // Short backoff via cache_entries to avoid hot-looping a broken Work.
+                // Gate 1 reads this on the next attempt.
                 await this.cache.set(`data-sync:retry-after:${workId}`, '1', this.retryBackoffSeconds);
                 return { status: 'failed' as const, error: err };
             }
@@ -242,7 +263,7 @@ export class DataRepoInstantSync1747400000000 implements MigrationInterface {
 ## 8. Testing strategy
 
 - **Unit (`packages/agent`, Jest)**: `syncFromDataRepo()` — happy path, expectedSourceSha mismatch (proceeds with note), abort signal, empty data repo, idempotent re-run on the same SHA (`filesChanged: 0`).
-- **Unit (`apps/api`, Jest)**: `data-sync.service.ts.runDataSync()` — lock contention (`onLocked` fires), `pipelineStatus = RUNNING` path, failure path leaves `pendingSyncRequestedAt` and writes retry-backoff.
+- **Unit (`apps/api`, Jest)**: `data-sync.service.ts.runDataSync()` — lock contention (`onLocked` fires), `pipelineStatus = RUNNING` path emits **one** skip row inside the noise window and is silent on subsequent calls, retry-backoff gate short-circuits when `data-sync:retry-after:<workId>` is present, failure path leaves `pendingSyncRequestedAt` set and writes the retry-backoff entry, success path clears the gen-in-progress noise entry.
 - **Unit (`apps/api`, Jest)**: `github-app-sync.service.ts.handlePushEvent` — known repo → UPDATE column; unknown repo → no-op; invalid signature handled by existing controller logic.
 - **Unit (`packages/tasks`, Vitest)**: `dataRepoSyncDispatcherTask` eligibility SQL produces correct rows (uses a test DB fixture).
 - **Integration (`apps/api`, Supertest)**: `POST /api/works/:id/sync` returns 202 + activity-row id; emits `data-sync.success` after worker finishes; emits `data-sync.skipped reason=generation-in-progress` when pipeline mocked RUNNING.
