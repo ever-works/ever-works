@@ -226,5 +226,62 @@ export class GitHubAppSyncService {
 
             return this.syncInstallation(String(installationId));
         }
+
+        // EW-628 Phase 5 — GitHub App `push` events on a Work's data repo
+        // surface here. Spec: docs/specs/features/data-repo-instant-sync/
+        // spec.md §5.1. The handler must:
+        //   1. Resolve repository.full_name to a Work via the work
+        //      repository (look up by `Work.dataRepo.fullName`).
+        //   2. UPDATE work SET pending_sync_requested_at = now() WHERE id = :id.
+        //      Multiple commits within the dispatcher's 30s quiet-period
+        //      naturally collapse to one column update — no debounce queue
+        //      needed.
+        //   3. Stay inert when subscriptions.dataSync.webhookEnabled is
+        //      false (default — flag lands in Phase 8). Push payload is
+        //      acknowledged with 200 OK regardless so GitHub doesn't retry.
+        //
+        // Phase 5 (this commit) lands the event-name branch + the
+        // structured handler stub. The body — Work resolution + UPDATE —
+        // arrives in the Phase 5 follow-up alongside the flag wiring.
+        if (eventName === 'push') {
+            return this.handlePushEvent(payload as PushWebhookPayload);
+        }
     }
+
+    /**
+     * EW-628 Phase 5 — handler invoked when the GitHub App receives a
+     * `push` event on a repo (typically a Work's data repo). Sets
+     * `Work.pendingSyncRequestedAt = now()` so the dispatcher's next tick
+     * picks the Work up after the 30s quiet-period debounce.
+     *
+     * TODO(EW-628 Phase 5 follow-up): wire the work-repository lookup
+     * and the UPDATE. Until then the handler logs and returns; unknown
+     * repos are dropped silently to avoid leaking installation→Work
+     * mapping via response timing.
+     */
+    private async handlePushEvent(payload: PushWebhookPayload): Promise<void> {
+        const repoFullName = payload?.repository?.full_name;
+        if (!repoFullName) {
+            return;
+        }
+        // TODO(EW-628 Phase 5 follow-up):
+        //   const work = await this.workRepository.findByDataRepoFullName(repoFullName);
+        //   if (!work || !this.subscriptions.dataSync.webhookEnabled) return;
+        //   await this.workRepository.update(work.id, {
+        //       pendingSyncRequestedAt: new Date(),
+        //   });
+        return;
+    }
+}
+
+/**
+ * Minimal subset of the GitHub `push` webhook payload that EW-628 cares
+ * about. We only need the repository full_name to resolve the Work; the
+ * rest of the payload (commits, pusher, ref, etc.) is irrelevant for
+ * the render-only sync that the dispatcher kicks off.
+ */
+interface PushWebhookPayload {
+    repository?: {
+        full_name?: string;
+    };
 }
