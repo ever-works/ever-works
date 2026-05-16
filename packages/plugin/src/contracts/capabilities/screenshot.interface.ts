@@ -1,4 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
+import type { PluginPricing } from '../pricing.types.js';
 import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
@@ -145,6 +146,13 @@ export interface IScreenshotPlugin extends IPlugin {
 	 * Get maximum viewport dimensions
 	 */
 	getMaxDimensions?(): { width: number; height: number };
+
+	/**
+	 * Optional: Declare per-call pricing for budget tracking (EW-602).
+	 * Returned cost is recorded against PluginUsageEvent on each capture.
+	 * Plugins that don't implement this contribute units only (cost = 0).
+	 */
+	getPricing?(): PluginPricing | Promise<PluginPricing>;
 }
 
 /**

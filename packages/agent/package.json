@@ -61,6 +61,14 @@
             "types": "./dist/subscriptions/index.d.ts",
             "default": "./dist/subscriptions/index.js"
         },
+        "./budgets": {
+            "types": "./dist/budgets/index.d.ts",
+            "default": "./dist/budgets/index.js"
+        },
+        "./usage": {
+            "types": "./dist/usage/index.d.ts",
+            "default": "./dist/usage/index.js"
+        },
         "./config": {
             "types": "./dist/config/index.d.ts",
             "default": "./dist/config/index.js"

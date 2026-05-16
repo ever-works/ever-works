@@ -328,6 +328,20 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 		return { width: 3840, height: 2160 };
 	}
 
+	/**
+	 * EW-602 — ScreenshotOne charges roughly $0.005 per screenshot on
+	 * the developer plan (rounds to 1 cent for budget tracking). Free
+	 * tier covers 100 shots/month; beyond that the platform attributes
+	 * the per-call cost to PluginUsageEvent on every successful capture.
+	 */
+	getPricing(): { costPerCallCents: number; currency: string; note: string } {
+		return {
+			costPerCallCents: 1,
+			currency: 'usd',
+			note: 'Approx. $0.005/screenshot (free tier: 100/month).'
+		};
+	}
+
 	// ============================================================================
 	// Private Helper Methods
 	// ============================================================================

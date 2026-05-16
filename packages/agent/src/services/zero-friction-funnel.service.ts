@@ -1,28 +1,60 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { ZeroFrictionFunnelPayload } from '@ever-works/contracts/telemetry';
+
+/**
+ * Minimal contract for a PostHog-style analytics client. Mirrors the
+ * signature on `@ever-works/monitoring`'s `AnalyticsService.track()`
+ * without taking a runtime dep on that package (the agent package keeps
+ * its DI graph free of `@ever-works/monitoring`).
+ */
+export interface FunnelAnalyticsSink {
+    track(
+        distinctId: string,
+        event: string,
+        properties?: Record<string, any>,
+        groups?: Record<string, string | number>,
+    ): void;
+    /**
+     * Optional readiness gate. When present and returning `false`, the
+     * funnel skips the `.track()` call. The real `AnalyticsService`
+     * exposes `isAvailable()`; we accept either name to stay tolerant
+     * of future renames.
+     */
+    isAvailable?(): boolean;
+    isInitialized?(): boolean;
+}
+
+/**
+ * DI token wiring an external `AnalyticsService` (e.g. PostHog) into
+ * `ZeroFrictionFunnelService` without the agent package importing the
+ * monitoring package directly. Consumers (api modules) bind this token
+ * to their actual `AnalyticsService` instance.
+ */
+export const ZERO_FRICTION_FUNNEL_ANALYTICS = Symbol('ZERO_FRICTION_FUNNEL_ANALYTICS');
 
 /**
  * EW-617 G8 — funnel emit service.
  *
- * Stage one keeps the emit surface tiny: every event lands as a single
- * structured Nest log line tagged `[zero-friction]` + the event name.
- * The existing platform log pipeline picks that up; downstream the ops
- * team can either grep raw logs, build a PostHog "Insights" view from
- * the JSON, or wire a custom OpenTelemetry exporter later.
+ * Every event lands as a single structured Nest log line tagged
+ * `[zero-friction]` + the event name. This is the durable fallback —
+ * platform log aggregation always picks it up regardless of whether
+ * PostHog is configured.
  *
- * Why not call PostHog directly here?
- *   - PostHogModule today only exposes an `isInitialized` flag — no
- *     `capture()` helper yet.
- *   - Adding the dependency cleanly would require either client
- *     instantiation logic or a global module hookup, neither of which
- *     I want to do in the same PR that defines the schema.
- *
- * A follow-up PR can swap the log call for a real PostHog/Open-
- * Telemetry sink without changing any of the emit call sites.
+ * In addition, when a `FunnelAnalyticsSink` is wired in via DI
+ * (typically `AnalyticsService` from `@ever-works/monitoring`), every
+ * event is also forwarded to PostHog via `.track()`. The sink is
+ * `@Optional()` so specs and modules that don't import monitoring keep
+ * working unchanged.
  */
 @Injectable()
 export class ZeroFrictionFunnelService {
     private readonly logger = new Logger('ZeroFrictionFunnel');
+
+    constructor(
+        @Optional()
+        @Inject(ZERO_FRICTION_FUNNEL_ANALYTICS)
+        private readonly analytics?: FunnelAnalyticsSink,
+    ) {}
 
     emit(payload: ZeroFrictionFunnelPayload): void {
         // Pin the timestamp here so call sites can omit it (it's not
@@ -41,5 +73,34 @@ export class ZeroFrictionFunnelService {
                 `[zero-friction] event=${enriched.event} correlationId=${enriched.correlationId}`,
             );
         }
+
+        // Mirror to PostHog (best-effort — never let analytics throw
+        // bubble out of the funnel emit). Skip when the sink isn't
+        // wired or reports itself as unavailable.
+        if (this.analytics && this.isSinkReady(this.analytics)) {
+            try {
+                const distinctId =
+                    (enriched as { userId?: string }).userId || enriched.correlationId;
+                const { event, ...properties } = enriched;
+                this.analytics.track(distinctId, event, properties);
+            } catch (err) {
+                this.logger.warn(
+                    `[zero-friction] analytics.track failed for event=${enriched.event}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+    }
+
+    private isSinkReady(sink: FunnelAnalyticsSink): boolean {
+        if (typeof sink.isAvailable === 'function') {
+            return sink.isAvailable();
+        }
+        if (typeof sink.isInitialized === 'function') {
+            return sink.isInitialized();
+        }
+        // Sink injected but doesn't advertise readiness — assume ready.
+        return true;
     }
 }

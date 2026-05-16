@@ -15,20 +15,64 @@ import { test, expect } from '@playwright/test';
  *     ↓
  *   GET https://<slug>.ever.works/  →  200 (after Cloudflare CNAME + cluster ready)
  *
- * Tests are marked `.skip` until every upstream PR has merged:
- *   #752 G6  · #756 G2  · #757 G3  · #758 G4  · #759 G5  ·
- *   #760 G8  · #761 G7  ·  ever-works-website#37 G1
- *
- * Once those land, flip the `.skip` to `.describe` on the suites you
- * want active in CI. Each spec uses Playwright's network mocking so
- * the wizard contract is exercised even before the deploy pipeline is
- * live in CI environments.
+ * Suite status (post-EW-617-finale):
+ *   - "UI surface"        — ACTIVE (renders only, no API). Runs against
+ *                           localhost dev or PLAYWRIGHT_*_URL overrides.
+ *   - "API contract"      — STILL `.skip`. Hits real /api/auth/anonymous
+ *                           which is throttled at 5/hour per IP; running
+ *                           the suite back-to-back trips the throttle.
+ *                           Captcha is now wired in prod too, so this
+ *                           suite needs Cloudflare's test sitekey/secret
+ *                           (1x00000000000000000000AA + always-pass) to
+ *                           run reliably against deployed envs.
+ *   - "Full UI journey"   — ACTIVE. Uses Playwright route mocks for
+ *                           /api/works/quick-create + a Turnstile stub
+ *                           via `installTurnstileStub`, so the suite is
+ *                           hermetic and doesn't depend on the API.
  */
 
 const APP_URL = process.env.PLAYWRIGHT_APP_URL || 'http://localhost:3000';
 const WEBSITE_URL = process.env.PLAYWRIGHT_WEBSITE_URL || 'http://localhost:4000';
 
-test.describe.skip('EW-617 zero-friction flow — UI surface', () => {
+/**
+ * EW-617 G7 — stub Cloudflare Turnstile so the wizard can mint tokens
+ * without an interactive challenge in headless. The real widget is
+ * domain-bound + requires interaction for "managed" mode bot detection;
+ * the stub returns a fake token immediately.
+ *
+ * For real-deploy E2E (against stage/prod), swap Cloudflare's test
+ * sitekey `1x00000000000000000000AA` + always-pass secret
+ * `1x0000000000000000000000000000000AA` into the API env instead of
+ * mocking. See docs/runbooks/EVER_WORKS_ZERO_FRICTION_FLOW.md.
+ */
+async function installTurnstileStub(page: import('@playwright/test').Page) {
+    await page.addInitScript(() => {
+        const widgetIds = new Map<string, (token: string) => void>();
+        (window as unknown as { turnstile: unknown }).turnstile = {
+            render: (
+                _container: HTMLElement | string,
+                options: { callback?: (token: string) => void },
+            ) => {
+                const id = `stub-${Math.random().toString(36).slice(2, 10)}`;
+                if (options.callback) widgetIds.set(id, options.callback);
+                return id;
+            },
+            execute: (id: string) => {
+                const cb = widgetIds.get(id);
+                if (cb) cb('stub-turnstile-token');
+            },
+            reset: () => {},
+            remove: (id: string) => widgetIds.delete(id),
+            getResponse: () => 'stub-turnstile-token',
+        };
+    });
+}
+
+test.describe('EW-617 zero-friction flow — UI surface', () => {
+    test.beforeEach(async ({ page }) => {
+        await installTurnstileStub(page);
+    });
+
     test('landing page renders prompt textarea + Generate button', async ({ page }) => {
         await page.goto(`${WEBSITE_URL}/`);
         await expect(page.getByTestId('landing-prompt-form')).toBeVisible();
@@ -161,7 +205,11 @@ test.describe.skip('EW-617 zero-friction flow — API contract', () => {
     });
 });
 
-test.describe.skip('EW-617 zero-friction flow — full UI journey', () => {
+test.describe('EW-617 zero-friction flow — full UI journey', () => {
+    test.beforeEach(async ({ page }) => {
+        await installTurnstileStub(page);
+    });
+
     test('landing → app → Generate now → polling', async ({ page, context }) => {
         // Block the actual deploy workflow dispatch in this test — we only
         // want to assert the wizard wiring + API contracts. Real CI runs

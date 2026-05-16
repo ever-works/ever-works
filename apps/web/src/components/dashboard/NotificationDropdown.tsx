@@ -121,6 +121,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     const [isLoading, setIsLoading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // EW-602: track unread count and last-seen notification id across polls so
+    // we can surface a toast when a new ai_credits (budget alert) notification
+    // arrives without requiring the user to open the bell dropdown. Refs keep
+    // the latest values without re-creating the polling effect on every render.
+    const lastUnreadCountRef = useRef(0);
+    const lastSeenNotificationIdRef = useRef<string | null>(null);
+    const hasInitializedSeenRef = useRef(false);
+
     const fetchNotifications = useCallback(async () => {
         try {
             const result = await getNotifications({ limit: 20 });
@@ -133,21 +141,67 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         }
     }, [t]);
 
-    const fetchUnreadCount = useCallback(async () => {
+    // Returns the freshly-fetched count so the polling effect can compare
+    // previous-vs-current without racing the React commit (the
+    // `setUnreadCount` write isn't visible synchronously).
+    const fetchUnreadCount = useCallback(async (): Promise<number | null> => {
         try {
             const result = await getUnreadNotificationCount();
             if (result.success && result.count !== undefined) {
                 setUnreadCount(result.count);
+                return result.count;
             }
+            return null;
         } catch (error) {
             console.error('Failed to fetch unread count:', error);
+            return null;
+        }
+    }, []);
+
+    // EW-602: when unread count grows between polls, fetch the latest
+    // notifications and surface a toast for any new ai_credits entries
+    // since the last seen id. The first poll only seeds the baseline so
+    // pre-existing unread alerts don't toast on every page load.
+    const surfaceNewAiCreditsToasts = useCallback(async () => {
+        try {
+            const result = await getNotifications({ limit: 10 });
+            if (!result.success || !result.notifications) return;
+            const fresh = result.notifications;
+
+            if (!hasInitializedSeenRef.current) {
+                lastSeenNotificationIdRef.current = fresh[0]?.id ?? null;
+                hasInitializedSeenRef.current = true;
+                return;
+            }
+
+            const lastSeenId = lastSeenNotificationIdRef.current;
+            const newOnes: typeof fresh = [];
+            for (const n of fresh) {
+                if (n.id === lastSeenId) break;
+                newOnes.push(n);
+            }
+            lastSeenNotificationIdRef.current = fresh[0]?.id ?? lastSeenId;
+
+            for (const n of newOnes.reverse()) {
+                if (n.category !== 'ai_credits' || n.isRead) continue;
+                const fire = n.type === 'error' ? toast.error : toast.warning;
+                fire(n.title, { description: n.message });
+            }
+        } catch (error) {
+            console.error('Failed to fetch notifications for toast surfacing:', error);
         }
     }, []);
 
     // Initial load and polling
     useEffect(() => {
         const updateUnreadCount = async () => {
-            await fetchUnreadCount();
+            const previous = lastUnreadCountRef.current;
+            const current = await fetchUnreadCount();
+            if (current === null) return;
+            lastUnreadCountRef.current = current;
+            if (current > previous || !hasInitializedSeenRef.current) {
+                await surfaceNewAiCreditsToasts();
+            }
         };
 
         void updateUnreadCount();
@@ -155,7 +209,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
             void updateUnreadCount();
         }, POLL_INTERVAL);
         return () => clearInterval(interval);
-    }, [fetchUnreadCount]);
+    }, [fetchUnreadCount, surfaceNewAiCreditsToasts]);
 
     // Fetch notifications when dropdown opens
     useEffect(() => {

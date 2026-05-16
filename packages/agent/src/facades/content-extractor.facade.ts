@@ -15,6 +15,9 @@ import {
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../usage/plugin-usage.service';
+import { BudgetGuardService } from '../budgets/budget-guard.service';
+import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import {
     BaseFacadeService,
     FacadeError,
@@ -61,6 +64,8 @@ export class ContentExtractorFacadeService
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional() private readonly budgetGuard?: BudgetGuardService,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -111,6 +116,15 @@ export class ContentExtractorFacadeService
 
         for (const candidate of candidates) {
             try {
+                if (this.budgetGuard && facadeOptions.workId && facadeOptions.userId) {
+                    await this.budgetGuard.checkBudget(
+                        facadeOptions.workId,
+                        facadeOptions.userId,
+                        PluginUsageCapability.EXTRACTOR,
+                        candidate.id,
+                    );
+                }
+
                 const settings = await this.getResolvedSettings(candidate.id, facadeOptions);
                 const result = await candidate.plugin.extract({
                     url,
@@ -153,6 +167,22 @@ export class ContentExtractorFacadeService
                     providerName: candidate.name,
                     success: true,
                     contentLength: rawContent.length,
+                });
+
+                const pricing = (await candidate.plugin.getPricing?.()) ?? null;
+                await this.pluginUsageService?.record({
+                    workId: facadeOptions.workId,
+                    userId: facadeOptions.userId,
+                    pluginId: candidate.id,
+                    capability: PluginUsageCapability.EXTRACTOR,
+                    units: 1,
+                    costCents: pricing?.costPerCallCents ?? 0,
+                    currency: pricing?.currency,
+                    metadata: {
+                        operation: 'extract',
+                        url,
+                        contentLength: rawContent.length,
+                    },
                 });
 
                 return {
