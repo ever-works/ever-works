@@ -29,6 +29,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
+import { TelemetryModule } from './telemetry/telemetry.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -81,6 +82,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         OnboardingModule,
         TemplateCatalogModule,
         WorkProposalsModule,
+        TelemetryModule,
     ],
     providers: [
         {

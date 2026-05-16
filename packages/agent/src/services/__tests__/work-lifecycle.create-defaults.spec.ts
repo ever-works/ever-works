@@ -60,6 +60,7 @@ interface MockDeps {
         removeWorkSubdomain: jest.Mock;
         ingressHostFor: jest.Mock;
     };
+    funnel: { emit: jest.Mock };
     eventEmitter: { emit: jest.Mock };
 }
 
@@ -104,6 +105,9 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         ingressHostFor: jest.fn((slug: string) => `${slug}.ever.works`),
     };
 
+    // EW-617 G8: funnel emit sink — no-op stub by default.
+    const funnel = { emit: jest.fn() };
+
     const service = new WorkLifecycleService(
         workRepo as never,
         userRepo as never,
@@ -118,12 +122,13 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         quota as never,
         everWorksGit as never,
         everWorksDns as never,
+        funnel as never,
         eventEmitter as never,
     );
 
     return {
         service,
-        deps: { workRepo, userRepo, quota, everWorksGit, everWorksDns, eventEmitter },
+        deps: { workRepo, userRepo, quota, everWorksGit, everWorksDns, funnel, eventEmitter },
     };
 }
 
