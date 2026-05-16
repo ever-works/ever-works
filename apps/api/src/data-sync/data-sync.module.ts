@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheEntry } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { DataSyncController } from './data-sync.controller';
 import { DataSyncService } from './data-sync.service';
 
 /**
@@ -25,6 +26,7 @@ import { DataSyncService } from './data-sync.service';
  */
 @Module({
     imports: [TypeOrmModule.forFeature([CacheEntry])],
+    controllers: [DataSyncController],
     providers: [DataSyncService, DistributedTaskLockService],
     exports: [DataSyncService],
 })
