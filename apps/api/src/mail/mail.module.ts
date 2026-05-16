@@ -56,5 +56,15 @@ import { MailerService } from './providers/mailer.service';
         MailerService,
         FakerMailerService,
     ],
+    // EW-602 follow-up: `BudgetAlertHandler` (in BudgetsModule) injects
+    // `MailService` to send threshold-crossed emails. Without an
+    // `exports` list, MailService is module-private and Nest fails at
+    // boot with `Nest can't resolve dependencies of the
+    // BudgetAlertHandler ... MailService at index [2] is available in
+    // the BudgetsModule module`. Exporting both the public surface
+    // (MailService) and the underlying transport wrapper (MailerService)
+    // lets downstream modules consume them; internal providers
+    // (RESEND_CLIENT, FakerMailerService) stay private as intended.
+    exports: [MailService, MailerService],
 })
 export class MailModule {}
