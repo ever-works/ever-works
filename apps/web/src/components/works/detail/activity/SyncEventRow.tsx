@@ -1,6 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
+import type { SyncEvent, SyncEventSource } from './SyncEvent.types';
+export type { SyncEvent, SyncEventSource };
 
 /**
  * Render one EW-628 `data-sync.*` activity row.
@@ -27,29 +29,6 @@ import { cn } from '@/lib/utils/cn';
  * adapter — those land on the Phase 7 follow-up so the type extension
  * and the cascade into FeedRow stay isolated from the row presentation.
  */
-
-export type SyncEventSource = 'webhook' | 'poll' | 'manual';
-
-export type SyncEvent =
-    | {
-          kind: 'success';
-          source: SyncEventSource;
-          beforeSha?: string;
-          afterSha?: string;
-          filesChanged: number;
-          durationMs?: number;
-      }
-    | {
-          kind: 'skipped';
-          source: SyncEventSource;
-          reason: string;
-      }
-    | {
-          kind: 'failed';
-          source: SyncEventSource;
-          errorClass: string;
-          errorTail: string;
-      };
 
 interface SyncEventRowProps {
     event: SyncEvent;
