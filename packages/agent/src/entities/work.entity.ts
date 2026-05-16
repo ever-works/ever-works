@@ -197,6 +197,41 @@ export class Work {
     @Column({ type: 'varchar', nullable: true })
     websiteTemplateLastError?: string | null;
 
+    // Data-repo Instant-Sync FIELDS (EW-628)
+    // See docs/specs/features/data-repo-instant-sync/{spec,plan}.md
+    /** Most recent data-repo SHA the main repo has been rendered against. Updated on successful sync. */
+    @Column({ type: 'varchar', length: 40, nullable: true })
+    lastSyncedDataRepoSha?: string | null;
+
+    /**
+     * Webhook flag — set to `now()` by the GitHub App `push` handler.
+     * The dispatcher flushes when the row is ≥ 30 s old (quiet-period
+     * debounce). Cleared by a successful sync. NULL when no sync is
+     * pending for this Work.
+     */
+    @TimestampColumn({ nullable: true })
+    pendingSyncRequestedAt?: Date | null;
+
+    /**
+     * Poller cadence (App-not-installed path). Allowed range 1–60.
+     * Ignored when `githubAppInstalled = true`.
+     */
+    @Column({ type: 'int', default: 5 })
+    syncIntervalMinutes: number;
+
+    /**
+     * Denormalised selector — `true` iff the Ever Works GitHub App is
+     * installed on this Work's data repo. Flipped by the App's
+     * `installation_repositories` webhook. Used by the dispatcher to pick
+     * Path A (webhook) vs Path B (poller).
+     */
+    @Column({ type: 'boolean', default: false })
+    githubAppInstalled: boolean;
+
+    /** Last time the poller probed `ls-remote HEAD`. Updated regardless of SHA delta. */
+    @TimestampColumn({ nullable: true })
+    lastPolledAt?: Date | null;
+
     @TimestampColumn({ nullable: true })
     websiteTemplateLastUpdatedAt?: Date | null;
 
