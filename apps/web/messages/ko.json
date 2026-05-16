@@ -1466,7 +1466,8 @@
                     "communityPr": "Community PR",
                     "users": "Users",
                     "submissions": "Submissions",
-                    "reports": "Reports"
+                    "reports": "Reports",
+                    "sync": "Sync"
                 },
                 "degraded": {
                     "title": {

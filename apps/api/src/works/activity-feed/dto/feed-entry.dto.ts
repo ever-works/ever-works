@@ -19,7 +19,8 @@ export type FeedCategory =
     | 'communityPr'
     | 'users'
     | 'submissions'
-    | 'reports';
+    | 'reports'
+    | 'sync';
 
 export const FEED_CATEGORIES: readonly FeedCategory[] = [
     'all',
@@ -32,6 +33,7 @@ export const FEED_CATEGORIES: readonly FeedCategory[] = [
     'users',
     'submissions',
     'reports',
+    'sync',
 ];
 
 /**

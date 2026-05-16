@@ -26,6 +26,7 @@ import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { DataSyncModule } from './data-sync/data-sync.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
@@ -80,6 +81,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         AiConversationModule,
         AccountModule,
         ActivityLogModule,
+        DataSyncModule,
         OnboardingModule,
         TemplateCatalogModule,
         WorkProposalsModule,

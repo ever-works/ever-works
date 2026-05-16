@@ -10,9 +10,16 @@ import { cn } from '@/lib/utils/cn';
 
 // react-markdown is ~50KB gzipped with remark-gfm; only load it when a user
 // actually opens the preview pane. The chunk is shared with ChatMarkdown.
-const MarkdownPreview = dynamic(() => import('./MarkdownPreview').then((m) => m.MarkdownPreview), {
-    ssr: false,
-});
+// Wrap the named export in `{ default: ... }` because `MarkdownPreview` is a
+// `memo()`-returned `NamedExoticComponent<P>`, which next/dynamic's Loader
+// type does NOT accept under React 19's stricter `ReactNode`. The default-
+// export shape (`ComponentModule<P>`) bypasses the mismatch. Without this,
+// `next build`'s prod type check fails (tsc --noEmit alone is too lenient
+// to catch it, which is why CI passes).
+const MarkdownPreview = dynamic(
+    () => import('./MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })),
+    { ssr: false },
+);
 
 interface MarkdownBodyFieldProps {
     value: string;
@@ -35,6 +42,16 @@ export const MarkdownBodyField = memo(function MarkdownBodyField({
 }: MarkdownBodyFieldProps) {
     const t = useTranslations('dashboard.workDetail.items.addModal');
     const [previewOpen, setPreviewOpen] = useState(false);
+
+    // Close the preview when the textarea is cleared. The toggle button is
+    // also disabled in that case (value.length === 0), so leaving previewOpen
+    // = true would render a disabled "Hide preview" button with no preview
+    // pane visible — label contradicts UI state. Doing this during render
+    // (vs. useEffect) is the React-recommended pattern for derived state.
+    if (previewOpen && value.length === 0) {
+        setPreviewOpen(false);
+    }
+
     const fieldLabel = label ?? t('markdown');
     const fieldPlaceholder = placeholder ?? t('markdownPlaceholder');
     const fieldHelp = help ?? t('markdownHelp');

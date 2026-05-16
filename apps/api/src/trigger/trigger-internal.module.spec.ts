@@ -10,8 +10,26 @@ jest.mock('@ever-works/agent/notifications', () => ({
 jest.mock('@ever-works/agent/facades', () => ({
     FacadesModule: class FacadesModule {},
 }));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
+    ActivityLogModule: class ActivityLogModule {},
+}));
+jest.mock('@ever-works/agent/generators', () => ({
+    MarkdownGeneratorService: class MarkdownGeneratorService {},
+    MarkdownGeneratorModule: class MarkdownGeneratorModule {},
+}));
+jest.mock('@ever-works/agent/database', () => ({
+    DatabaseModule: class DatabaseModule {},
+    WorkRepository: class WorkRepository {},
+}));
+jest.mock('@ever-works/monitoring', () => ({
+    AnalyticsService: class AnalyticsService {},
+}));
 jest.mock('../work-proposals/work-proposals.module', () => ({
     WorkProposalsModule: class WorkProposalsModule {},
+}));
+jest.mock('../data-sync/data-sync.module', () => ({
+    DataSyncModule: class DataSyncModule {},
 }));
 jest.mock('./trigger-internal.controller', () => ({
     TriggerInternalController: class TriggerInternalController {},
