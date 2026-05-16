@@ -38,7 +38,9 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         CaptchaVerifierService,
         // EW-617 G8: registered here (not imported from WorkModule) to keep
         // AuthModule free of a WorkModule dependency. The service is stateless
-        // (a logger wrapper), so the duplicate instance is harmless.
+        // (a logger wrapper), so the duplicate instance is harmless. The
+        // ZERO_FRICTION_FUNNEL_ANALYTICS DI token (→ PostHog) is bound
+        // globally by FunnelAnalyticsBindingModule at the app root.
         ZeroFrictionFunnelService,
         AuthProviderService,
         AuthSyncService,

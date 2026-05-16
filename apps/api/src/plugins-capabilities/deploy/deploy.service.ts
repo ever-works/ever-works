@@ -219,6 +219,11 @@ export class DeployService {
         // dispatch so the timestamp lines up with the workflow kick-off,
         // not the secret-pushing prep. Gated on correlationId so non-funnel
         // deploys (dashboard "Deploy" button, batch jobs) stay quiet.
+        //
+        // Fallback: when the caller didn't thread `correlationId` through
+        // (e.g. quick-create → WorkGenerationService → … → deploy), use
+        // the one persisted on the work by `WorkLifecycleService.createWork`
+        // so the funnel chain stays unbroken from REPOS_PUSHED onwards.
         const effectiveCorrelationId =
             options.correlationId || work.lastDeployCorrelationId || undefined;
         if (effectiveCorrelationId) {
