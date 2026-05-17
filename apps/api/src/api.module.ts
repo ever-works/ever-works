@@ -22,7 +22,6 @@ import { GitProviderModule } from './plugins-capabilities/git-provider/git-provi
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeviceAuthModule } from './plugins-capabilities/device-auth/device-auth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
-import { CodeUpdateModule } from './code-update/code-update.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
@@ -74,7 +73,6 @@ import { DatabaseModule } from '@ever-works/agent/database';
         OAuthModule,
         DeviceAuthModule,
         DeployModule,
-        CodeUpdateModule,
         AiConversationModule,
         AccountModule,
         ActivityLogModule,

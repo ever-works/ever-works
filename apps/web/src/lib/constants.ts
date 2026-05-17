@@ -80,7 +80,6 @@ export const ROUTES = {
     DASHBOARD_WORK_COMPARISON: (id: string, slug: string) =>
         `/works/${id}/generator/comparisons/${slug}`,
     DASHBOARD_WORK_DEPLOY: (id: string) => `/works/${id}/deploy`,
-    DASHBOARD_WORK_CODEGEN: (id: string) => `/works/${id}/codegen`,
     DASHBOARD_WORK_MEMBERS: (id: string) => `/works/${id}/settings/members`,
     DASHBOARD_WORK_SETTINGS: (id: string) => `/works/${id}/settings`,
     DASHBOARD_WORK_SETTINGS_GENERAL: (id: string) => `/works/${id}/settings`,

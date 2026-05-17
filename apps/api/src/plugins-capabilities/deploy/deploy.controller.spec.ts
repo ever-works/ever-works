@@ -11,7 +11,6 @@ jest.mock('@ever-works/agent/entities', () => ({
     DeploymentTriggerSource: {
         MANUAL: 'manual',
         SCHEDULED: 'scheduled',
-        CODE_UPDATE: 'code-update',
     },
 }));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));

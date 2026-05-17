@@ -32,7 +32,6 @@ import { TimestampColumn } from './_types';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkCustomDomain } from './work-custom-domain.entity';
 import { WorkDeployment } from './work-deployment.entity';
-import { WorkCodeUpdate } from './work-code-update.entity';
 import { WorkMember } from './work-member.entity';
 
 @Entity({ name: 'works' })
@@ -118,9 +117,6 @@ export class Work {
 
     @OneToMany(() => WorkDeployment, (deployment) => deployment.work)
     deployments?: ClassToObject<WorkDeployment>[];
-
-    @OneToMany(() => WorkCodeUpdate, (codeUpdate) => codeUpdate.work)
-    codeUpdates?: ClassToObject<WorkCodeUpdate>[];
 
     @Column({ type: 'boolean', default: false })
     scheduledUpdatesEnabled: boolean;

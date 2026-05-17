@@ -10,4 +10,3 @@
 export * from './data-generator';
 export * from './markdown-generator';
 export * from './website-generator';
-export * from './code-update-generator';

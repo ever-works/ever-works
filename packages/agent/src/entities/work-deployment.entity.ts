@@ -20,7 +20,6 @@ export enum DeploymentEnvironment {
 export enum DeploymentTriggerSource {
     MANUAL = 'manual',
     SCHEDULED = 'scheduled',
-    CODE_UPDATE = 'code-update',
 }
 
 /**

@@ -4,7 +4,6 @@ import { DatabaseModule } from './database.module';
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { WorkRepository } from './repositories/work.repository';
 import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
-import { WorkCodeUpdateRepository } from './repositories/work-code-update.repository';
 import { WorkCustomDomainRepository } from './repositories/work-custom-domain.repository';
 import { WorkDeploymentRepository } from './repositories/work-deployment.repository';
 import { WorkMemberRepository } from './repositories/work-member.repository';
@@ -84,7 +83,6 @@ describe('DatabaseModule decorator metadata', () => {
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
         WorkAdvancedPromptsRepository,
-        WorkCodeUpdateRepository,
         WorkCustomDomainRepository,
         WorkDeploymentRepository,
         WorkGenerationHistoryRepository,
@@ -102,10 +100,10 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('declares EXACTLY 27 providers (regression guard against silent additions)', () => {
+        it('declares EXACTLY 26 providers (regression guard against silent additions)', () => {
             const providers = getMeta('providers');
             expect(providers.length).toBe(REPOSITORY_PROVIDERS.length);
-            expect(providers.length).toBe(27);
+            expect(providers.length).toBe(26);
         });
 
         it('every provider is a class constructor (function with prototype) — pinned so a future `useClass`/`useFactory` swap is deliberate', () => {
@@ -145,12 +143,12 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('exports EXACTLY 28 symbols — TypeOrmModule + 27 repositories (regression guard)', () => {
+        it('exports EXACTLY 27 symbols — TypeOrmModule + 26 repositories (regression guard)', () => {
             // Pinned so a future "stop exporting WorkRepository" tweak (which
             // would orphan every consumer) breaks loudly.
             const exports = getMeta('exports');
             expect(exports.length).toBe(REPOSITORY_PROVIDERS.length + 1);
-            expect(exports.length).toBe(28);
+            expect(exports.length).toBe(27);
         });
 
         it('exports list is exactly the providers list + TypeOrmModule (no provider held back from consumers)', () => {

@@ -8,7 +8,6 @@ jest.mock('../entities', () => ({
     User: class User {},
     Work: class Work {},
     WorkAdvancedPrompts: class WorkAdvancedPrompts {},
-    WorkCodeUpdate: class WorkCodeUpdate {},
     WorkCustomDomain: class WorkCustomDomain {},
     WorkDeployment: class WorkDeployment {},
     WorkMember: class WorkMember {},
