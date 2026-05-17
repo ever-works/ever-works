@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
-import { isSafeWebhookUrl } from '@ever-works/plugin/helpers';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';

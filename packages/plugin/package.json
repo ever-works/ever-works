@@ -49,6 +49,11 @@
 			"import": "./dist/helpers/index.js",
 			"require": "./dist/helpers/index.cjs"
 		},
+		"./helpers/ssrf-guard": {
+			"types": "./dist/helpers/ssrf-guard.d.ts",
+			"import": "./dist/helpers/ssrf-guard.js",
+			"require": "./dist/helpers/ssrf-guard.cjs"
+		},
 		"./abstract": {
 			"types": "./dist/abstract/index.d.ts",
 			"import": "./dist/abstract/index.js",

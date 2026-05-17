@@ -17,7 +17,7 @@ import axios, { type AxiosError } from 'axios';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
-import { isSafeWebhookUrl } from '@ever-works/plugin/helpers';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly id = 'local-content-extractor';

@@ -10,4 +10,4 @@ export {
     type DnsLookupAddress,
     type DnsResolver,
     type SafeFetchOptions,
-} from '@ever-works/plugin/helpers';
+} from '@ever-works/plugin/helpers/ssrf-guard';

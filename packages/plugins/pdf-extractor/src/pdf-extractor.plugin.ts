@@ -11,7 +11,7 @@ import type {
 } from '@ever-works/plugin';
 
 import axios from 'axios';
-import { isSafeWebhookUrl } from '@ever-works/plugin/helpers';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { PdfTextExtractor } from './pdf-text-extractor.js';
 import { MistralOcrService } from './mistral-ocr.service.js';
 
