@@ -184,9 +184,35 @@ export async function readGeneratedItems(
 	return results.filter((item: ItemData | null): item is ItemData => item !== null);
 }
 
-export async function cleanupWorkspace(workspacePath: string): Promise<void> {
+/**
+ * L-32: defensive guard against catastrophic `fs.rm({ recursive: true, force: true })`
+ * if a caller ever passes an empty string, `/`, or a path that isn't actually under
+ * the configured temp dir. `createWorkspace` is the only safe producer, but a future
+ * caller could pass a tampered string from a payload — refusing anything that
+ * resolves to a short / non-temp path is much cheaper than the worst case.
+ *
+ * Pass `baseTempDir` when you can; when you can't, we still refuse `/`, `''`,
+ * the root drive on Windows, and any path with fewer than 5 segments.
+ */
+export async function cleanupWorkspace(workspacePath: string, baseTempDir?: string): Promise<void> {
 	try {
-		await fs.rm(workspacePath, { recursive: true, force: true });
+		if (typeof workspacePath !== 'string' || workspacePath.trim().length === 0) {
+			return;
+		}
+		const resolved = path.resolve(workspacePath);
+		// Refuse root / near-root paths regardless of OS.
+		if (resolved === '/' || /^[A-Za-z]:[\\/]?$/.test(resolved)) {
+			return;
+		}
+		// If a baseTempDir is supplied, the workspace MUST be inside it.
+		if (baseTempDir) {
+			const baseResolved = path.resolve(baseTempDir);
+			const relative = path.relative(baseResolved, resolved);
+			if (relative.startsWith('..') || path.isAbsolute(relative) || relative === '') {
+				return;
+			}
+		}
+		await fs.rm(resolved, { recursive: true, force: true });
 	} catch {
 		// Cleanup failures are non-fatal.
 	}

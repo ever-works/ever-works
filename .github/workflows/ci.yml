@@ -7,6 +7,13 @@ on:
     branches: [main, develop, stage]
   workflow_dispatch:
 
+# M-12: explicit minimum default permissions for every job. Individual jobs
+# can elevate to `write` only on the scope they need. Without this, any
+# compromised third-party action runs with whatever the repo default grants
+# (typically `contents: write`).
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -38,6 +45,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # H-15: fail the build if any production transitive dep has a HIGH or
+      # CRITICAL vulnerability. The existing `pnpm.overrides` block proves
+      # maintainers already patch high/critical drift; this just makes it
+      # CI-enforced so a new transitive doesn't slip through unnoticed.
+      # Moderate findings stay as Dependabot work (re-evaluate the threshold
+      # if the backlog becomes too noisy).
+      - name: Audit production dependencies (high+)
+        run: pnpm audit --prod --audit-level=high
 
       - name: Check formatting
         run: pnpm format:check

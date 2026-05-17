@@ -161,6 +161,13 @@ spec:
               value: "$DATABASE_SSL_MODE"
             - name: DATABASE_CA_CERT
               value: "$DATABASE_CA_CERT"
+            # C-07: schema migrations are run via the migration step in
+            # `.deploy/docker/api/entrypoint.sh`. TypeORM `synchronize` must
+            # NOT run in production — it can silently drop columns / re-create
+            # tables on the live DB, contradicting the project's own
+            # constitution (.specify/memory/constitution.md). Force it off.
+            - name: DATABASE_AUTOMIGRATE
+              value: "false"
 
             # Mail
             - name: MAILER_PROVIDER

@@ -8,6 +8,10 @@ jest.mock('@ever-works/agent/entities', () => ({
 const ORIGINAL_ENV = { ...process.env };
 beforeAll(() => {
     process.env.WEB_URL = 'https://app.test';
+    // C-04: callback-host allow-list — tests below use https://x.test/...
+    // as a custom callbackUrl, so that host must be in the allow-list.
+    // The platform's own host (app.test) is implicitly allowed.
+    process.env.ALLOWED_CALLBACK_HOSTS = 'x.test';
 });
 afterAll(() => {
     process.env = ORIGINAL_ENV;
@@ -371,12 +375,17 @@ describe('AuthService', () => {
     describe('forgotPassword', () => {
         it('returns generic message and skips emit when email unknown', async () => {
             userRepo.findByEmail.mockResolvedValue(null);
+            // H-03: timing-leveling does a throwaway bcrypt hash on the
+            // no-user branch. Mock it so the test runs fast.
+            const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
 
             const result = await service.forgotPassword({ email: 'no@one.test' } as any);
 
             expect(result).toEqual({ message: 'If the email exists, a reset link has been sent' });
             expect(emitter.emit).not.toHaveBeenCalled();
             expect(userRepo.update).not.toHaveBeenCalled();
+            // H-03 verification: the dummy hash was called even though no user matched.
+            expect(bcryptSpy).toHaveBeenCalledTimes(1);
         });
 
         it('issues reset token with 1h expiry, emits UserForgotPasswordEvent, and does NOT leak the token in the response (C-01)', async () => {
@@ -422,6 +431,40 @@ describe('AuthService', () => {
             expect(event.resetUrl).toBe(
                 `https://app.test/api/auth/reset-password?token=${persistedToken}`,
             );
+        });
+
+        it('rejects callbackUrl outside ALLOWED_CALLBACK_HOSTS and falls back to platform default (C-04)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.forgotPassword({
+                email: 'a@b.co',
+                resetPasswordCallbackUrl: 'https://attacker.example/steal',
+            } as any);
+
+            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
+            const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
+            // Attacker host was rejected → platform default URL used instead.
+            expect(event.resetUrl).toBe(
+                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
+            );
+        });
+
+        it('rejects javascript: scheme callbackUrl (C-04)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.forgotPassword({
+                email: 'a@b.co',
+                resetPasswordCallbackUrl: 'javascript:alert(1)',
+            } as any);
+
+            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
+            const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
+            expect(event.resetUrl).toBe(
+                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
+            );
+            expect(event.resetUrl.startsWith('javascript:')).toBe(false);
         });
 
         it('returns the same generic body shape whether or not the email exists (H-03 mitigation)', async () => {

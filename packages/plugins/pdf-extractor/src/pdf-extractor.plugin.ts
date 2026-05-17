@@ -11,8 +11,14 @@ import type {
 } from '@ever-works/plugin';
 
 import axios from 'axios';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers';
 import { PdfTextExtractor } from './pdf-text-extractor.js';
 import { MistralOcrService } from './mistral-ocr.service.js';
+
+// H-10: cap the PDF buffer size so an attacker who picks `source_url`
+// (community-PR LLM, anonymous submission) can't OOM the extractor with a
+// multi-GB PDF. 50 MB covers every legitimate PDF we'd extract content from.
+const PDF_MAX_BYTES = Number(process.env.PDF_EXTRACTOR_MAX_BYTES ?? 50 * 1024 * 1024);
 
 /**
  * Hybrid PDF extractor: text-layer extraction (pdf-parse) with Mistral OCR fallback
@@ -99,6 +105,18 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		const startTime = Date.now();
 		const { url, settings } = options;
 
+		// H-10 / C-13: refuse to fetch URLs pointing at private, loopback,
+		// link-local, or cloud-metadata IPs. `canExtract()` only enforces the
+		// `.pdf` suffix, which still admits `http://169.254.169.254/foo.pdf`.
+		if (!isSafeWebhookUrl(url)) {
+			return {
+				success: false,
+				url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
 		if (!this.pdfTextExtractor || !this.mistralOcrService) {
 			return {
 				success: false,
@@ -119,6 +137,8 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			const response = await axios.get(url, {
 				responseType: 'arraybuffer',
 				timeout,
+				maxContentLength: PDF_MAX_BYTES,
+				maxBodyLength: PDF_MAX_BYTES,
 				headers: {
 					'User-Agent': 'EverWorks/PDF-Extractor'
 				}

@@ -21,6 +21,7 @@ export class AuthService {
     private readonly logger = new Logger(AuthService.name);
 
     private webAppUrl: string;
+    private allowedCallbackHosts: Set<string>;
 
     constructor(
         private readonly userRepository: UserRepository,
@@ -28,6 +29,62 @@ export class AuthService {
         private eventEmitter: EventEmitter2,
     ) {
         this.webAppUrl = config.webAppUrl();
+        // C-04: parse ALLOWED_CALLBACK_HOSTS once at boot. The default always
+        // includes the host of WEB_URL (`webAppUrl`) — that's the host the
+        // platform itself emails links to. Operators can extend with their
+        // CLI-domain / admin-domain etc.
+        this.allowedCallbackHosts = this.parseAllowedCallbackHosts();
+    }
+
+    private parseAllowedCallbackHosts(): Set<string> {
+        const hosts = new Set<string>();
+        try {
+            hosts.add(new URL(this.webAppUrl).host.toLowerCase());
+        } catch {
+            // webAppUrl validated elsewhere at boot
+        }
+        const env = process.env.ALLOWED_CALLBACK_HOSTS;
+        if (env) {
+            for (const raw of env.split(',')) {
+                const v = raw.trim().toLowerCase();
+                if (v) hosts.add(v);
+            }
+        }
+        return hosts;
+    }
+
+    /**
+     * C-04: enforce a host allow-list on user-supplied verify / reset
+     * callback URLs. Without this, an attacker can pass
+     * `emailVerificationCallbackUrl=https://attacker.example/steal` and the
+     * platform will email the *victim* a link that exfiltrates the live
+     * token to the attacker's host on click.
+     *
+     * Returns the callbackUrl if its host is allowed, otherwise returns
+     * undefined so the caller falls back to the platform default.
+     */
+    private validateCallbackUrl(callbackUrl: string | undefined | null, kind: string): string | undefined {
+        if (!callbackUrl) return undefined;
+        let parsed: URL;
+        try {
+            parsed = new URL(callbackUrl);
+        } catch {
+            this.logger.warn(
+                `Rejected ${kind} callbackUrl: not a valid URL (${callbackUrl})`,
+            );
+            return undefined;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            this.logger.warn(`Rejected ${kind} callbackUrl: bad scheme (${parsed.protocol})`);
+            return undefined;
+        }
+        if (!this.allowedCallbackHosts.has(parsed.host.toLowerCase())) {
+            this.logger.warn(
+                `Rejected ${kind} callbackUrl: host '${parsed.host}' is not in ALLOWED_CALLBACK_HOSTS`,
+            );
+            return undefined;
+        }
+        return callbackUrl;
     }
 
     async assertCanRegister(email: string) {
@@ -123,8 +180,12 @@ export class AuthService {
             emailVerificationExpires: expires,
         });
 
-        if (callbackUrl && !callbackUrl.includes('token=')) {
-            callbackUrl += `?token=${verificationToken}`;
+        // C-04: validate the caller-supplied callback host before stitching
+        // the token into it; reject anything outside the allow-list and fall
+        // back to the platform default.
+        const validatedCallback = this.validateCallbackUrl(callbackUrl, 'verification');
+        if (validatedCallback && !validatedCallback.includes('token=')) {
+            callbackUrl = `${validatedCallback}?token=${verificationToken}`;
         } else {
             callbackUrl = `${this.webAppUrl}/api/auth/verify-email?token=${verificationToken}`;
         }
@@ -177,7 +238,13 @@ export class AuthService {
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
         const user = await this.userRepository.findByEmail(forgotPasswordDto.email);
         if (!user) {
-            // Don't reveal if email exists
+            // H-03: equalize the CPU cost of the no-user branch with the
+            // user-exists branch so an attacker can't distinguish via timing.
+            // The user-exists branch does a DB UPDATE that writes ~64 bytes
+            // of indexed columns + emits an event; doing a throwaway bcrypt
+            // here is a closer cost match than just returning immediately
+            // (bcrypt cost 10 ≈ ~50ms, similar to a single DB row update).
+            await this.randomHashedPassword().catch(() => undefined);
             return { message: 'If the email exists, a reset link has been sent' };
         }
 
@@ -190,9 +257,15 @@ export class AuthService {
             passwordResetExpires: expires,
         });
 
-        let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl || null;
-        if (callbackUrl && !callbackUrl.includes('token=')) {
-            callbackUrl += `?token=${resetToken}`;
+        // C-04: validate the caller-supplied callback host before stitching
+        // the reset token into it.
+        const validatedReset = this.validateCallbackUrl(
+            forgotPasswordDto.resetPasswordCallbackUrl,
+            'reset-password',
+        );
+        let callbackUrl: string;
+        if (validatedReset && !validatedReset.includes('token=')) {
+            callbackUrl = `${validatedReset}?token=${resetToken}`;
         } else {
             callbackUrl = `${this.webAppUrl}/api/auth/reset-password?token=${resetToken}`;
         }

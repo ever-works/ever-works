@@ -13,18 +13,24 @@ export class RegisterDto {
     @IsNotEmpty()
     email: string;
 
+    // H-02: regex previously was /^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, which
+    // looked like "lowercase + digit/special" but `\w` includes letters so
+    // the second lookahead is satisfied by any letter. "abcdef" passed at
+    // length 6. Use explicit lowercase + (digit or non-word) lookaheads,
+    // and raise the global minimum to 8 to match Better Auth's runtime
+    // setting (auth-runtime.instance.ts).
     @ApiProperty({
         description:
-            'Password (min 6 chars, must contain lowercase letter and number/special char)',
+            'Password (min 8 chars, must contain lowercase letter and number or special char)',
         example: 'MySecure123!',
-        minLength: 6,
+        minLength: 8,
     })
     @IsString()
     @IsNotEmpty()
-    @MinLength(6)
-    @Matches(/^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, {
+    @MinLength(8)
+    @Matches(/^(?=.*[a-z])(?=.*[\d\W_]).{8,}$/, {
         message:
-            'Password must contain at least 1 lowercase letter and 1 number or special character',
+            'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
     })
     password: string;
 
@@ -54,16 +60,16 @@ export class UpdatePasswordDto {
 
     @ApiProperty({
         description:
-            'New password (min 8 chars, must contain lowercase letter and number/special char)',
+            'New password (min 8 chars, must contain lowercase letter and number or special char)',
         example: 'NewSecure456!',
         minLength: 8,
     })
     @IsString()
     @IsNotEmpty()
     @MinLength(8)
-    @Matches(/^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, {
+    @Matches(/^(?=.*[a-z])(?=.*[\d\W_]).{8,}$/, {
         message:
-            'Password must contain at least 1 lowercase letter and 1 number or special character',
+            'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
     })
     newPassword: string;
 }
@@ -81,16 +87,16 @@ export class ClaimAccountDto {
 
     @ApiProperty({
         description:
-            'Password (min 6 chars, must contain lowercase letter and number/special char)',
+            'Password (min 8 chars, must contain lowercase letter and number or special char)',
         example: 'MySecure123!',
-        minLength: 6,
+        minLength: 8,
     })
     @IsString()
     @IsNotEmpty()
-    @MinLength(6)
-    @Matches(/^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, {
+    @MinLength(8)
+    @Matches(/^(?=.*[a-z])(?=.*[\d\W_]).{8,}$/, {
         message:
-            'Password must contain at least 1 lowercase letter and 1 number or special character',
+            'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
     })
     password: string;
 

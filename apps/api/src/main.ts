@@ -30,9 +30,16 @@ async function bootstrap() {
         }
     };
 
-    // Increase body-parser limit for large payloads
-    app.use(json({ limit: '10mb', verify: captureRawBody }));
-    app.use(urlencoded({ limit: '10mb', extended: true, verify: captureRawBody }));
+    // M-19: keep the JSON / urlencoded body-parser limit tight (1mb default,
+    // overridable via BODY_LIMIT) so a small public endpoint can't be used as
+    // a memory-amplification vector — a 4 KB endpoint like `/api/telemetry/funnel`
+    // used to let the parser buffer 10 MB before the controller's size check ran.
+    // File uploads go through multer (which has its own limits, set in the
+    // route's `FileInterceptor` options) and don't share this parser, so we
+    // don't have to leave headroom for CSV/XLSX imports here.
+    const bodyLimit = process.env.BODY_LIMIT || '1mb';
+    app.use(json({ limit: bodyLimit, verify: captureRawBody }));
+    app.use(urlencoded({ limit: bodyLimit, extended: true, verify: captureRawBody }));
 
     // Security configurations
     // The relaxed CSP only applies when /api/docs is actually mounted (non-production —
@@ -56,8 +63,23 @@ async function bootstrap() {
     });
 
     // CORS configuration
+    // H-19: fail-fast in production if ALLOWED_ORIGINS is unset. Without this,
+    // a misconfigured preview/prod deploy would silently fall back to a
+    // localhost-only allow-list while still serving `credentials: true`, which
+    // is both useless to real callers and a foot-gun for any future change
+    // that drops the credentials flag.
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+    if (process.env.NODE_ENV === 'production' && (!allowedOrigins || allowedOrigins.length === 0)) {
+        throw new Error(
+            'ALLOWED_ORIGINS must be configured in production. ' +
+                'Set it to a comma-separated list of origins permitted to call the API with credentials, e.g. ' +
+                '"https://app.ever.works,https://demo.ever.works".',
+        );
+    }
     app.enableCors({
-        origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+        origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'],
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],

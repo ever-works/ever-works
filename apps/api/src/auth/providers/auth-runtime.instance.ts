@@ -135,12 +135,26 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
         account: {
             accountLinking: {
                 enabled: true,
-                trustedProviders: ['google', 'github', 'facebook', 'linkedin'],
+                // M-01: Facebook is removed from trustedProviders. Facebook
+                // hard-codes `emailVerified: false` for its profile responses
+                // (see social-auth.service.ts), so a Facebook account with a
+                // forged/unverified email could otherwise auto-link to a
+                // pre-existing local account with the same email. LinkedIn
+                // and Google verify emails server-side; GitHub OAuth's
+                // primary email is verified server-side via the GitHub API.
+                trustedProviders: ['google', 'github', 'linkedin'],
             },
         },
         emailAndPassword: {
             enabled: true,
+            // H-07: require email verification before the user can sign in.
+            // Combined with C-02 (no verification token in HTTP response),
+            // this closes the loop where an attacker registers with a victim's
+            // email and immediately gains an authenticated session. Existing
+            // unverified users will be prompted to verify on next login
+            // (the platform currently has very few users, all internal).
             autoSignIn: true,
+            requireEmailVerification: true,
             minPasswordLength: 8,
             password: {
                 hash: async (password: string) => {

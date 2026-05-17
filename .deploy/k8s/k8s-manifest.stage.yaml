@@ -156,6 +156,11 @@ spec:
               value: "$DATABASE_SSL_MODE"
             - name: DATABASE_CA_CERT
               value: "$DATABASE_CA_CERT"
+            # C-07: schema migrations are run via the migration step in
+            # `.deploy/docker/api/entrypoint.sh`. TypeORM `synchronize` must
+            # NOT run against the shared stage DB.
+            - name: DATABASE_AUTOMIGRATE
+              value: "false"
 
             # Mail
             - name: MAILER_PROVIDER
