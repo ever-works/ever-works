@@ -5,11 +5,14 @@ import { AuthSession, User } from '@ever-works/agent/entities';
 import type { AuthenticatedUser, TokenResponse } from '../types/auth.types';
 import { AUTH_RUNTIME_INSTANCE } from './auth-provider.constants';
 import { AuthProvider } from './auth-provider.abstract';
-import {
-    createAuthRuntimeInstance,
-    getBcryptCost,
-    passwordNeedsRehash,
-} from './auth-runtime.instance';
+// `createAuthRuntimeInstance` is only referenced in a `typeof` position so
+// the import is type-only — keeps better-auth's ESM bundle out of the
+// service's runtime evaluation (matters for jest, which has cjs-only
+// transforms here).
+import type { createAuthRuntimeInstance } from './auth-runtime.instance';
+// L-07: imported from the standalone helper file so we don't load
+// better-auth's ESM bundle at service-spec evaluation time.
+import { getBcryptCost, passwordNeedsRehash } from './bcrypt-cost';
 import type { AuthRuntimeContext, AuthRuntimeUser } from './auth-provider.types';
 import { AuthSyncService } from './auth-sync.service';
 import * as bcrypt from 'bcrypt';

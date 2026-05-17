@@ -39,7 +39,7 @@ describe('AuthController', () => {
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
     let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
     let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
-    let captchaVerifier: jest.Mocked<Pick<CaptchaVerifierService, 'isEnabled' | 'verify'>>;
+    let captchaVerifier: jest.Mocked<Pick<CaptchaVerifierService, 'isEnabled' | 'isRequired' | 'verify'>>;
     let funnel: { emit: jest.Mock };
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
@@ -71,9 +71,12 @@ describe('AuthController', () => {
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
         anonymousAuth = { createAnonymousUser: jest.fn() } as any;
         claimAccount = { claim: jest.fn() } as any;
-        // Default: captcha disabled (no-op) so existing tests pass through.
+        // Default: captcha disabled + not-required (dev/test mode) so the
+        // existing tests pass through. H-05 added isRequired() — defaults to
+        // false here; production tests can override.
         captchaVerifier = {
             isEnabled: jest.fn().mockReturnValue(false),
+            isRequired: jest.fn().mockReturnValue(false),
             verify: jest.fn().mockResolvedValue({ success: true, skipped: true }),
         } as any;
         funnel = { emit: jest.fn() };
@@ -476,23 +479,37 @@ describe('AuthController', () => {
     });
 
     describe('verifyEmail (POST /api/auth/verify-email)', () => {
-        it('verifies token, then issues a session for the resolved user', async () => {
+        // H-04: verifyEmail now binds the new session to the requesting client.
+        function makeReq() {
+            return {
+                ip: '203.0.113.5',
+                headers: { 'user-agent': 'Mozilla/5.0' },
+            } as any;
+        }
+
+        it('verifies token, then issues a session bound to the requesting client', async () => {
             authService.verifyEmail.mockResolvedValue({ id: 'u1' } as any);
             authProvider.issueSession.mockResolvedValue({ access_token: 'tok' } as any);
 
-            const result = await controller.verifyEmail({ token: 'verif-tok' } as any);
+            const result = await controller.verifyEmail(
+                { token: 'verif-tok' } as any,
+                makeReq(),
+            );
 
             expect(authService.verifyEmail).toHaveBeenCalledWith('verif-tok');
-            expect(authProvider.issueSession).toHaveBeenCalledWith('u1');
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
+                ipAddress: '203.0.113.5',
+                userAgent: 'Mozilla/5.0',
+            });
             expect(result).toEqual({ access_token: 'tok' });
         });
 
         it('does not issue a session when verifyEmail rejects', async () => {
             authService.verifyEmail.mockRejectedValue(new Error('Invalid or expired token'));
 
-            await expect(controller.verifyEmail({ token: 'x' } as any)).rejects.toThrow(
-                'Invalid or expired token',
-            );
+            await expect(
+                controller.verifyEmail({ token: 'x' } as any, makeReq()),
+            ).rejects.toThrow('Invalid or expired token');
             expect(authProvider.issueSession).not.toHaveBeenCalled();
         });
     });

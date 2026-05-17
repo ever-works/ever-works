@@ -1,7 +1,17 @@
 import { BadRequestException, Controller, Get, Inject, Param, Query, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
 import { Public } from '../decorators/public.decorator';
+
+// Minimal duck-typed shapes — the platform deliberately doesn't depend on
+// `@types/express` (other controllers in apps/api use the same pattern).
+type OAuthRequest = {
+    ip?: string;
+    headers: Record<string, string | string[] | undefined>;
+};
+type OAuthResponse = {
+    getHeader(name: string): string | string[] | number | undefined;
+    setHeader(name: string, value: string | string[]): void;
+};
 import { SocialAuthService } from '../services/social-auth.service';
 import { OAuthStateService } from '../services/oauth-state.service';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
@@ -30,7 +40,7 @@ export class OAuthController {
     @ApiResponse({ status: 200, description: 'Returns the OAuth URL' })
     async getAuthUrl(
         @Param('providerId') providerId: string,
-        @Res({ passthrough: true }) res: Response,
+        @Res({ passthrough: true }) res: OAuthResponse,
     ) {
         // C-03: mint a server-side state nonce + set it as an HttpOnly
         // cookie. The previous design accepted a client-supplied `state` and
@@ -64,14 +74,18 @@ export class OAuthController {
         @Param('providerId') providerId: string,
         @Query('code') code: string,
         @Query('state') state: string,
-        @Req() req: Request,
-        @Res({ passthrough: true }) res: Response,
+        @Req() req: OAuthRequest,
+        @Res({ passthrough: true }) res: OAuthResponse,
     ) {
         // C-03: verify the callback's `state` query param against the
         // browser's `ew_oauth_state` cookie BEFORE we exchange the code.
         // Without this an attacker can complete a victim's OAuth flow.
+        const rawCookieHeader = req.headers.cookie;
+        const cookieHeader = Array.isArray(rawCookieHeader)
+            ? rawCookieHeader[0]
+            : rawCookieHeader;
         const stateResult = this.oauthState.verify({
-            cookieHeader: req.headers.cookie,
+            cookieHeader,
             stateQuery: typeof state === 'string' ? state : undefined,
             secure: process.env.NODE_ENV === 'production',
         });
@@ -81,13 +95,15 @@ export class OAuthController {
             throw new BadRequestException(`OAuth state verification failed: ${stateResult.reason}`);
         }
 
-        const userAgent = req.headers['user-agent'];
+        const userAgentHeader = req.headers['user-agent'];
+        const userAgent: string | null =
+            typeof userAgentHeader === 'string' ? userAgentHeader : null;
         const xForwardedFor = req.headers['x-forwarded-for'];
-        const ipAddress =
+        const ipAddress: string | null =
             (typeof req.ip === 'string' && req.ip) ||
             (typeof xForwardedFor === 'string'
                 ? xForwardedFor.split(',')[0].trim()
-                : Array.isArray(xForwardedFor)
+                : Array.isArray(xForwardedFor) && typeof xForwardedFor[0] === 'string'
                   ? xForwardedFor[0]
                   : null);
         const user = await this.socialAuthService.authenticate(providerId, code);

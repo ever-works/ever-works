@@ -295,7 +295,7 @@ describe('AuthService', () => {
                 expect.any(UserCreatedEvent),
             );
             const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
-            const rawToken = event.verificationToken;
+            const rawToken = event.confirmationToken;
             expect(typeof rawToken).toBe('string');
             // The persisted hash MUST be sha256(raw token) — verifies the
             // H-01 invariant on every call.
@@ -312,9 +312,9 @@ describe('AuthService', () => {
 
             const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
             // H-01: URL carries the raw token from the event; the DB has its hash.
-            expect(event.confirmationUrl).toBe(`https://x.test/verify?token=${event.verificationToken}`);
+            expect(event.confirmationUrl).toBe(`https://x.test/verify?token=${event.confirmationToken}`);
             expect(userRepo.update.mock.calls[0][1].emailVerificationToken).toBe(
-                createHash('sha256').update(event.verificationToken, 'utf8').digest('hex'),
+                createHash('sha256').update(event.confirmationToken, 'utf8').digest('hex'),
             );
         });
 
@@ -327,7 +327,7 @@ describe('AuthService', () => {
             const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
             // When token= already present, the service overrides with default URL.
             expect(event.confirmationUrl).toBe(
-                `https://app.test/api/auth/verify-email?token=${event.verificationToken}`,
+                `https://app.test/api/auth/verify-email?token=${event.confirmationToken}`,
             );
         });
     });
@@ -384,8 +384,11 @@ describe('AuthService', () => {
         it('returns generic message and skips emit when email unknown', async () => {
             userRepo.findByEmail.mockResolvedValue(null);
             // H-03: timing-leveling does a throwaway bcrypt hash on the
-            // no-user branch. Mock it so the test runs fast.
+            // no-user branch. Mock it so the test runs fast. mockClear() is
+            // important because other tests in the file may have set up the
+            // same spy first and we want to assert exactly THIS call.
             const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
+            bcryptSpy.mockClear();
 
             const result = await service.forgotPassword({ email: 'no@one.test' } as any);
 
@@ -539,14 +542,16 @@ describe('AuthService', () => {
             );
         });
 
-        it('returns the user when consumed', async () => {
+        it('returns the user when consumed; clear keyed on sha256(token) per H-01', async () => {
             const user = { id: 'u', passwordResetExpires: new Date(Date.now() + 1000) };
             userRepo.findOne.mockResolvedValue(user as any);
             userRepo.clearPasswordResetToken.mockResolvedValue(true);
 
             const result = await service.consumePasswordResetToken('t');
 
-            expect(userRepo.clearPasswordResetToken).toHaveBeenCalledWith('u', 't');
+            // H-01: DB stores sha256(token); clear is keyed on the hash.
+            const expectedHash = createHash('sha256').update('t', 'utf8').digest('hex');
+            expect(userRepo.clearPasswordResetToken).toHaveBeenCalledWith('u', expectedHash);
             expect(result).toBe(user);
         });
     });
