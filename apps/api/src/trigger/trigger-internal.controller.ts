@@ -87,15 +87,28 @@ const METHOD_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 function buildMethodAllowList(instance: object): Set<string> {
     const allowed = new Set<string>();
     if (!instance || typeof instance !== 'object') return allowed;
+
+    const considerName = (name: string) => {
+        if (DANGEROUS_METHOD_NAMES.has(name)) return;
+        if (!METHOD_NAME_RE.test(name)) return;
+        if (name.startsWith('_')) return; // convention: private
+        if (typeof (instance as Record<string, unknown>)[name] !== 'function') return;
+        allowed.add(name);
+    };
+
+    // Own-property methods first — covers arrow-function class fields bound in
+    // the constructor (`this.foo = () => ...`), which are how some NestJS
+    // services preserve `this` for callbacks. Without this, those methods
+    // would not be callable via the allow-list and the call would be rejected
+    // even though it's a legitimate method on the registered instance.
+    for (const name of Object.getOwnPropertyNames(instance)) considerName(name);
+
+    // Prototype chain — class methods declared with the `method() {}` shorthand
+    // live here. Stop at `Object.prototype` so we never expose `constructor`,
+    // `hasOwnProperty`, etc.
     let proto: object | null = Object.getPrototypeOf(instance);
     while (proto && proto !== Object.prototype) {
-        for (const name of Object.getOwnPropertyNames(proto)) {
-            if (DANGEROUS_METHOD_NAMES.has(name)) continue;
-            if (!METHOD_NAME_RE.test(name)) continue;
-            if (name.startsWith('_')) continue; // convention: private
-            if (typeof (instance as Record<string, unknown>)[name] !== 'function') continue;
-            allowed.add(name);
-        }
+        for (const name of Object.getOwnPropertyNames(proto)) considerName(name);
         proto = Object.getPrototypeOf(proto);
     }
     return allowed;

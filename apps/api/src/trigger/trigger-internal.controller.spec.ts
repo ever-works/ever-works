@@ -242,6 +242,11 @@ describe('TriggerInternalController', () => {
                 expect(d.toISOString()).toBe(fixedDate.toISOString());
                 return d;
             });
+            // C-05: the per-service allow-list is built in onModuleInit by
+            // walking the instance's prototype chain. We added `withDate` to
+            // the stub instance AFTER the beforeEach-built controller, so we
+            // need a fresh controller instance for the allow-list to include it.
+            controller = buildController();
 
             const out = await controller.callRemote(VALID_SECRET, {
                 name: 'PluginRepository',
@@ -263,7 +268,12 @@ describe('TriggerInternalController', () => {
             ).rejects.toThrow('Unknown remote target: NotARealTarget');
         });
 
-        it('throws BadRequestException for unknown method on a known target', async () => {
+        // C-05: unknown methods are now rejected by the per-service allow-list
+        // (built at onModuleInit from the instance's own prototype chain) BEFORE
+        // we reach the `typeof fn !== 'function'` check. The allow-list error
+        // names the service so an operator can see which target rejected the
+        // call.
+        it('throws BadRequestException for unknown method on a known target (allow-list)', async () => {
             await expect(
                 controller.callRemote(
                     VALID_SECRET,
@@ -275,7 +285,7 @@ describe('TriggerInternalController', () => {
                     VALID_SECRET,
                     buildBody({ name: 'PluginRepository', method: 'doesNotExist' }),
                 ),
-            ).rejects.toThrow('Unknown method: doesNotExist');
+            ).rejects.toThrow('Method not in allow-list for PluginRepository: doesNotExist');
         });
 
         it('throws ForbiddenException with wrong secret (and never invokes the remote)', async () => {
@@ -302,13 +312,15 @@ describe('TriggerInternalController', () => {
             ];
 
             for (const target of expectedTargets) {
+                // C-05: each target's allow-list is built independently so the
+                // service name is interpolated into the rejection.
                 await expect(
                     controller.callRemote(VALID_SECRET, {
                         name: target,
                         method: 'doesNotExist',
                         args: superjson.serialize([]) as any,
                     }),
-                ).rejects.toThrow('Unknown method: doesNotExist');
+                ).rejects.toThrow(`Method not in allow-list for ${target}: doesNotExist`);
             }
         });
 
