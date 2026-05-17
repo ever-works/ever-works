@@ -142,6 +142,21 @@ jobs:
           EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
           EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
 
+          # 2026-05-17 security audit env knobs — see PR ever-works#816 and
+          # the audit doc at
+          # Workspace/knowledge/security/audits/2026-05-17-ever-works-platform-security-audit.md
+          # C-08: AES-256-GCM key for plugin secretSettings encryption.
+          # Required in prod; without it the encryption service degrades to
+          # passthrough.
+          PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
+          # C-11: PRs auto-applied only when the PR author is a verified
+          # member of one of these GitHub orgs. Empty = author check off
+          # (the COMMUNITY_PR_AUTO_APPLY default-off gate still applies).
+          COMMUNITY_PR_VERIFIED_ORGS: ever-works
+          # H-24: structured audit log line on every agent-pipeline bash
+          # invocation. Lands in the existing log stream.
+          AGENT_BASH_AUDIT_LOG: 'true'
+
           # EW-616 — kubeconfigs for platform-managed `clusterSource`
           # values on the k8s deploy plugin. Both are base64-encoded
           # so envsubst can splice them into Secret.data fields without

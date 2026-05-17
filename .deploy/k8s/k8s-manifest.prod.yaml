@@ -189,6 +189,14 @@ spec:
             - name: DATABASE_AUTOMIGRATE
               value: "false"
 
+            # 2026-05-17 audit env (PR ever-works#816 — see THREAT-MODEL.md)
+            - name: PLUGIN_SECRET_ENCRYPTION_KEY
+              value: "$PLUGIN_SECRET_ENCRYPTION_KEY"
+            - name: COMMUNITY_PR_VERIFIED_ORGS
+              value: "$COMMUNITY_PR_VERIFIED_ORGS"
+            - name: AGENT_BASH_AUDIT_LOG
+              value: "$AGENT_BASH_AUDIT_LOG"
+
             # Mail
             - name: MAILER_PROVIDER
               value: "$MAILER_PROVIDER"

@@ -132,6 +132,11 @@ jobs:
           EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
           EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
 
+          # 2026-05-17 security audit env knobs (PR ever-works#816).
+          PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
+          COMMUNITY_PR_VERIFIED_ORGS: ever-works
+          AGENT_BASH_AUDIT_LOG: 'true'
+
           # EW-616 — kubeconfigs for platform-managed clusterSource values.
           EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
           EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
