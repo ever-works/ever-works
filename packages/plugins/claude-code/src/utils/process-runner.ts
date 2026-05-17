@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { MAX_BUFFER_SIZE, KILL_TIMEOUT_MS } from '../types.js';
+import { buildSubprocessEnv } from './subprocess-env.js';
 
 export interface ExecuteOptions {
 	/** Path to the Claude Code binary */
@@ -90,12 +91,18 @@ export function executeClaudeCode(options: ExecuteOptions): {
 			args.push('--model', options.model);
 		}
 
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
+		// C-10: build the subprocess env from an explicit allow-list instead of
+		// spreading `process.env`. The CLI runs with --dangerously-skip-permissions
+		// and is fed user prompts + scraped web content + community-PR text — any
+		// prompt-injection in those inputs can drive the model to `printenv` and
+		// exfiltrate every host secret. Mirror the codex / gemini / opencode
+		// pattern: only PATH/HOME/TMPDIR, proxy/CA vars, and ANTHROPIC_*/
+		// CLAUDE_CODE_* keys are forwarded.
+		const env: Record<string, string> = buildSubprocessEnv({
 			...options.env,
 			DISABLE_AUTOUPDATER: '1',
 			DISABLE_TELEMETRY: '1'
-		};
+		});
 
 		childProcess = spawn(options.binaryPath, args, {
 			cwd: options.cwd,

@@ -35,9 +35,12 @@ async function bootstrap() {
     app.use(urlencoded({ limit: '10mb', extended: true, verify: captureRawBody }));
 
     // Security configurations
-    // Use relaxed CSP for API docs to allow Scalar's inline scripts
+    // The relaxed CSP only applies when /api/docs is actually mounted (non-production —
+    // see C-09 gating below). In production the docs endpoint 404s and the default
+    // helmet() CSP applies to every request.
+    const docsEnabled = process.env.NODE_ENV !== 'production';
     app.use((req, res, next) => {
-        if (req.path.startsWith('/api/docs')) {
+        if (docsEnabled && req.path.startsWith('/api/docs')) {
             return helmet({
                 contentSecurityPolicy: {
                     directives: {
@@ -97,21 +100,27 @@ async function bootstrap() {
         .addTag('Members', 'Work member management')
         .build();
 
-    const document = SwaggerModule.createDocument(app, config);
+    // C-09: never expose Swagger UI, the Scalar reference, or the OpenAPI JSON spec
+    // in production. The OpenAPI document hands attackers a full inventory of public,
+    // internal, and @Public()-but-secret-guarded endpoints (plus DTO shapes), which
+    // materially reduces the cost of finding other bugs. Gate behind NODE_ENV.
+    if (docsEnabled) {
+        const document = SwaggerModule.createDocument(app, config);
 
-    // Serve OpenAPI JSON spec at /api/openapi.json
-    SwaggerModule.setup('api/swagger', app, document, {
-        jsonDocumentUrl: '/api/openapi.json',
-    });
+        // Serve OpenAPI JSON spec at /api/openapi.json
+        SwaggerModule.setup('api/swagger', app, document, {
+            jsonDocumentUrl: '/api/openapi.json',
+        });
 
-    // Serve Scalar API Reference at /api/docs
-    app.use(
-        '/api/docs',
-        apiReference({
-            url: '/api/openapi.json',
-            theme: 'kepler',
-        }),
-    );
+        // Serve Scalar API Reference at /api/docs
+        app.use(
+            '/api/docs',
+            apiReference({
+                url: '/api/openapi.json',
+                theme: 'kepler',
+            }),
+        );
+    }
 
     await app.listen(process.env.PORT ?? 3100);
 }

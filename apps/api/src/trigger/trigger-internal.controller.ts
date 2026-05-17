@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { WorkProposalsApiService } from '../work-proposals/work-proposals.service';
 import superjson from 'superjson';
+import { timingSafeEqual } from 'crypto';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
 import {
@@ -153,7 +154,19 @@ export class TriggerInternalController implements OnModuleInit {
             throw new ForbiddenException('Trigger internal secret is not configured');
         }
 
-        if (!secret || secret !== expectedSecret) {
+        // Constant-time comparison (C-05 / L-09). Always compares against an
+        // equal-length buffer so the timing cost is uniform regardless of the
+        // submitted secret's length — a naive `length !== length || compare`
+        // short-circuit would let an attacker binary-search the secret length.
+        if (typeof secret !== 'string' || secret.length === 0) {
+            throw new ForbiddenException('Invalid trigger secret');
+        }
+        const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+        const providedBuf = Buffer.from(secret, 'utf8');
+        const lengthsMatch = expectedBuf.length === providedBuf.length;
+        const comparisonBuf = lengthsMatch ? providedBuf : Buffer.alloc(expectedBuf.length);
+        const bytesMatch = timingSafeEqual(expectedBuf, comparisonBuf);
+        if (!lengthsMatch || !bytesMatch) {
             throw new ForbiddenException('Invalid trigger secret');
         }
     }

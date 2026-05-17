@@ -129,7 +129,7 @@ export class AuthService {
             callbackUrl = `${this.webAppUrl}/api/auth/verify-email?token=${verificationToken}`;
         }
 
-        // Emit event to send verification email
+        // Emit event to send verification email — the token travels via the email link only.
         this.eventEmitter.emit(
             UserCreatedEvent.EVENT_NAME,
             new UserCreatedEvent(user, verificationToken, callbackUrl),
@@ -137,9 +137,6 @@ export class AuthService {
 
         return {
             message: 'Verification email sent',
-            // Remove this in production
-            verificationToken,
-            expiresAt: expires,
         };
     }
 
@@ -200,7 +197,7 @@ export class AuthService {
             callbackUrl = `${this.webAppUrl}/api/auth/reset-password?token=${resetToken}`;
         }
 
-        // Emit event to send reset email
+        // Emit event to send reset email — the token travels via the email link only.
         this.eventEmitter.emit(
             UserForgotPasswordEvent.EVENT_NAME,
             new UserForgotPasswordEvent(user, resetToken, callbackUrl, '1 hour'),
@@ -208,9 +205,6 @@ export class AuthService {
 
         return {
             message: 'If the email exists, a reset link has been sent',
-            // Remove this in production
-            resetToken,
-            expiresAt: expires,
         };
     }
 

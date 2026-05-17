@@ -262,14 +262,22 @@ describe('AuthService', () => {
             );
         });
 
-        it('issues a token, sets 24h expiry, emits UserCreatedEvent and returns the token', async () => {
+        it('issues a token, sets 24h expiry, emits UserCreatedEvent and does NOT leak the token in the response (C-02)', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
             const result = await service.sendVerificationEmail('u-1');
 
+            // C-02: response must not include the verification token or its expiry.
+            expect(result).toEqual({ message: 'Verification email sent' });
+            expect((result as any).verificationToken).toBeUndefined();
+            expect((result as any).expiresAt).toBeUndefined();
+
+            // The token still gets persisted and travels via the emitted event (→ email).
             const updateInput = userRepo.update.mock.calls[0][1];
-            expect(updateInput.emailVerificationToken).toBe(result.verificationToken);
+            const persistedToken = updateInput.emailVerificationToken as string;
+            expect(typeof persistedToken).toBe('string');
+            expect(persistedToken.length).toBeGreaterThan(0);
             expect(updateInput.emailVerificationExpires).toBeInstanceOf(Date);
             const expiry = updateInput.emailVerificationExpires as Date;
             const diffMs = expiry.getTime() - Date.now();
@@ -280,31 +288,34 @@ describe('AuthService', () => {
                 UserCreatedEvent.EVENT_NAME,
                 expect.any(UserCreatedEvent),
             );
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            expect(event.verificationToken).toBe(persistedToken);
         });
 
         it('appends ?token= when callbackUrl missing token=', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.sendVerificationEmail('u-1', 'https://x.test/verify');
+            await service.sendVerificationEmail('u-1', 'https://x.test/verify');
 
-            const event = (emitter.emit.mock.calls[0][1] as UserCreatedEvent).confirmationUrl;
-            expect(event).toBe(`https://x.test/verify?token=${result.verificationToken}`);
+            const persistedToken = userRepo.update.mock.calls[0][1].emailVerificationToken;
+            const confirmationUrl = (emitter.emit.mock.calls[0][1] as UserCreatedEvent)
+                .confirmationUrl;
+            expect(confirmationUrl).toBe(`https://x.test/verify?token=${persistedToken}`);
         });
 
         it('uses default callback URL when callbackUrl already has token=', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.sendVerificationEmail(
-                'u-1',
-                'https://x.test/verify?token=already',
-            );
+            await service.sendVerificationEmail('u-1', 'https://x.test/verify?token=already');
 
-            const event = (emitter.emit.mock.calls[0][1] as UserCreatedEvent).confirmationUrl;
+            const persistedToken = userRepo.update.mock.calls[0][1].emailVerificationToken;
+            const confirmationUrl = (emitter.emit.mock.calls[0][1] as UserCreatedEvent)
+                .confirmationUrl;
             // When token= already present, the service overrides with default URL
-            expect(event).toBe(
-                `https://app.test/api/auth/verify-email?token=${result.verificationToken}`,
+            expect(confirmationUrl).toBe(
+                `https://app.test/api/auth/verify-email?token=${persistedToken}`,
             );
         });
     });
@@ -368,7 +379,7 @@ describe('AuthService', () => {
             expect(userRepo.update).not.toHaveBeenCalled();
         });
 
-        it('issues reset token with 1h expiry and emits UserForgotPasswordEvent', async () => {
+        it('issues reset token with 1h expiry, emits UserForgotPasswordEvent, and does NOT leak the token in the response (C-01)', async () => {
             userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
             userRepo.update.mockResolvedValue({} as any);
 
@@ -377,8 +388,17 @@ describe('AuthService', () => {
                 resetPasswordCallbackUrl: 'https://x.test/reset',
             } as any);
 
+            // C-01: response must not include the reset token or expiry — only the generic message.
+            expect(result).toEqual({
+                message: 'If the email exists, a reset link has been sent',
+            });
+            expect((result as any).resetToken).toBeUndefined();
+            expect((result as any).expiresAt).toBeUndefined();
+
             const updateInput = userRepo.update.mock.calls[0][1];
-            expect(updateInput.passwordResetToken).toBe((result as any).resetToken);
+            const persistedToken = updateInput.passwordResetToken as string;
+            expect(typeof persistedToken).toBe('string');
+            expect(persistedToken.length).toBeGreaterThan(0);
             const expires = updateInput.passwordResetExpires as Date;
             expect(expires.getTime() - Date.now()).toBeGreaterThan(50 * 60 * 1000);
             expect(expires.getTime() - Date.now()).toBeLessThan(70 * 60 * 1000);
@@ -387,19 +407,32 @@ describe('AuthService', () => {
                 expect.any(UserForgotPasswordEvent),
             );
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
-            expect(event.resetUrl).toBe(`https://x.test/reset?token=${(result as any).resetToken}`);
+            expect(event.resetToken).toBe(persistedToken);
+            expect(event.resetUrl).toBe(`https://x.test/reset?token=${persistedToken}`);
         });
 
         it('uses default URL when callbackUrl missing', async () => {
             userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.forgotPassword({ email: 'a@b.co' } as any);
+            await service.forgotPassword({ email: 'a@b.co' } as any);
 
+            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
             expect(event.resetUrl).toBe(
-                `https://app.test/api/auth/reset-password?token=${(result as any).resetToken}`,
+                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
             );
+        });
+
+        it('returns the same generic body shape whether or not the email exists (H-03 mitigation)', async () => {
+            userRepo.findByEmail.mockResolvedValueOnce(null);
+            const r1 = await service.forgotPassword({ email: 'unknown@x.test' } as any);
+
+            userRepo.findByEmail.mockResolvedValueOnce({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+            const r2 = await service.forgotPassword({ email: 'known@x.test' } as any);
+
+            expect(r1).toEqual(r2);
         });
     });
 
