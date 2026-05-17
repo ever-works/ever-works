@@ -79,7 +79,7 @@ export class TemplateCustomizationService {
         }
 
         const baseConfig = this.resolveCustomizableBase(input.baseTemplateId);
-        await this.assertProviderAvailable(providerId);
+        await this.assertProviderAvailable(providerId, userId);
         const user = await this.userRepository.findById(userId);
         if (!user) {
             throw new NotFoundException({ status: 'error', message: 'User not found.' });
@@ -140,8 +140,8 @@ export class TemplateCustomizationService {
         return this.customizationRepository.listForTemplate(templateId, userId);
     }
 
-    listProviders(): CodeEditProviderInfo[] {
-        return this.codeEditFacade.listProviders();
+    listProviders(userId: string): Promise<CodeEditProviderInfo[]> {
+        return this.codeEditFacade.listProviders(userId);
     }
 
     /** Exposed for direct invocation by background tasks / tests. */
@@ -308,13 +308,13 @@ export class TemplateCustomizationService {
         };
     }
 
-    private async assertProviderAvailable(providerId: string): Promise<void> {
-        const available = this.codeEditFacade.listProviders();
+    private async assertProviderAvailable(providerId: string, userId: string): Promise<void> {
+        const available = await this.codeEditFacade.listProviders(userId);
         const match = available.find((p) => p.id === providerId);
-        if (!match || !match.enabled) {
+        if (!match) {
             throw new BadRequestException({
                 status: 'error',
-                message: `Code-edit provider "${providerId}" is not installed or not enabled.`,
+                message: `Code-edit provider "${providerId}" is not installed or not enabled for this account.`,
             });
         }
     }

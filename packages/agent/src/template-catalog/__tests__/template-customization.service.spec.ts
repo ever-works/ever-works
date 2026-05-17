@@ -108,10 +108,9 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
             push: jest.fn().mockResolvedValue(undefined),
         },
         codeEditFacade: {
-            listProviders: jest.fn().mockReturnValue([
-                { id: 'claude-code', name: 'Claude Code', enabled: true },
-                { id: 'codex', name: 'Codex', enabled: false },
-            ]),
+            listProviders: jest
+                .fn()
+                .mockResolvedValue([{ id: 'claude-code', name: 'Claude Code', enabled: true }]),
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 summary: 'Applied UI changes',
@@ -164,19 +163,19 @@ describe('TemplateCustomizationService.createAndStart', () => {
         ).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects when the selected provider is not installed/enabled', async () => {
+    it('rejects when the selected provider is not enabled for this user', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.listProviders.mockReturnValue([
-            { id: 'codex', name: 'Codex', enabled: false },
+        mocks.codeEditFacade.listProviders.mockResolvedValue([
+            { id: 'codex', name: 'Codex', enabled: true },
         ]);
         await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
             BadRequestException,
         );
     });
 
-    it('rejects when no code-edit providers are installed at all', async () => {
+    it('rejects when the user has no code-edit providers enabled', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.listProviders.mockReturnValue([]);
+        mocks.codeEditFacade.listProviders.mockResolvedValue([]);
         await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
             BadRequestException,
         );

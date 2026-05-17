@@ -39,16 +39,33 @@ export class CodeEditFacadeService {
         private readonly aiFacade: AiFacadeService,
     ) {}
 
-    listProviders(): CodeEditProviderInfo[] {
-        return this.registry.getByCapability(this.CAPABILITY).map((p) => ({
-            id: p.plugin.id,
-            name: p.manifest.name ?? p.plugin.id,
-            description: p.manifest.description,
-            icon: p.manifest.icon,
-            providerName: (p.plugin as ICodeEditPlugin).providerName,
-            enabled: p.state === 'loaded',
-            isDefault: p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) || false,
-        }));
+    async listProviders(userId: string): Promise<CodeEditProviderInfo[]> {
+        const candidates = this.registry
+            .getByCapability(this.CAPABILITY)
+            .filter((p) => p.state === 'loaded' && !p.manifest.supplementary);
+
+        const results = await Promise.all(
+            candidates.map(async (p): Promise<CodeEditProviderInfo | null> => {
+                const enabled = await this.registry.isPluginEnabledForScope(
+                    p.plugin.id,
+                    undefined,
+                    userId,
+                );
+                if (!enabled) return null;
+                return {
+                    id: p.plugin.id,
+                    name: p.manifest.name ?? p.plugin.id,
+                    description: p.manifest.description,
+                    icon: p.manifest.icon,
+                    providerName: (p.plugin as ICodeEditPlugin).providerName,
+                    enabled: true,
+                    isDefault:
+                        p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) || false,
+                };
+            }),
+        );
+
+        return results.filter((p): p is CodeEditProviderInfo => p !== null);
     }
 
     async resolveProvider(opts: CodeEditFacadeOptions): Promise<ICodeEditPlugin> {
@@ -62,24 +79,33 @@ export class CodeEditFacadeService {
                     `Provider ${opts.providerId} does not implement the code-edit capability`,
                 );
             }
+            const enabled = await this.registry.isPluginEnabledForScope(
+                opts.providerId,
+                undefined,
+                opts.userId,
+            );
+            if (!enabled) {
+                throw new Error(
+                    `Code-edit provider "${opts.providerId}" is not enabled for this user`,
+                );
+            }
             return registered.plugin;
         }
 
-        const loaded = this.registry
-            .getByCapability(this.CAPABILITY)
-            .filter((p) => p.state === 'loaded');
-        if (loaded.length === 0) {
+        const available = await this.listProviders(opts.userId);
+        const first = available[0];
+        if (!first) {
             throw new Error(
-                'No code-edit provider available — install claude-code, codex, gemini, or opencode',
+                'No code-edit provider available — install one from the plugin catalog',
             );
         }
-        const plugin = loaded[0].plugin;
-        if (!isCodeEditPlugin(plugin)) {
+        const registered = this.registry.get(first.id);
+        if (!registered || !isCodeEditPlugin(registered.plugin)) {
             throw new Error(
-                `Default plugin ${plugin.id} does not implement the code-edit capability`,
+                `Default plugin ${first.id} does not implement the code-edit capability`,
             );
         }
-        return plugin;
+        return registered.plugin;
     }
 
     async execute(

@@ -244,8 +244,9 @@ export class TemplateCatalogController {
         summary: 'List installed code-edit providers usable for template customization',
     })
     @ApiResponse({ status: 200, description: 'Providers' })
-    async listCustomizationProviders() {
-        return { status: 'success', providers: this.templateCustomizationService.listProviders() };
+    async listCustomizationProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.templateCustomizationService.listProviders(auth.userId);
+        return { status: 'success', providers };
     }
 
     @Post('templates/custom-from-base')
