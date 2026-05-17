@@ -4,8 +4,13 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Sparkles, Loader2 } from 'lucide-react';
-import type { TemplateCatalogItem, TemplateCustomization } from '@/lib/api/templates';
+import type {
+    CustomizationProvider,
+    TemplateCatalogItem,
+    TemplateCustomization,
+} from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import {
@@ -25,12 +30,18 @@ import {
 const POLL_INTERVAL_MS = 4000;
 const TERMINAL_STATUSES: TemplateCustomization['status'][] = ['succeeded', 'failed'];
 
+interface ForkTarget {
+    login: string;
+    label: string;
+    kind: 'personal' | 'organization';
+}
+
 interface CreateCustomTemplateDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    // Customizable built-in templates the user can fork+customize.
     customizableBases: TemplateCatalogItem[];
-    // Called when a customization succeeds so the parent can refresh its list.
+    providers: CustomizationProvider[];
+    forkTargets: ForkTarget[];
     onSucceeded?: () => void;
 }
 
@@ -38,10 +49,17 @@ export function CreateCustomTemplateDialog({
     open,
     onOpenChange,
     customizableBases,
+    providers,
+    forkTargets,
     onSucceeded,
 }: CreateCustomTemplateDialogProps) {
     const t = useTranslations('dashboard.templates.customizeDialog');
+    const enabledProviders = providers.filter((p) => p.enabled);
+
     const [baseTemplateId, setBaseTemplateId] = useState<string>(customizableBases[0]?.id ?? '');
+    const [providerId, setProviderId] = useState<string>(enabledProviders[0]?.id ?? '');
+    const [targetOwner, setTargetOwner] = useState<string>(forkTargets[0]?.login ?? '');
+    const [name, setName] = useState('');
     const [prompt, setPrompt] = useState('');
     const [submitting, startSubmitting] = useTransition();
     const [customization, setCustomization] = useState<TemplateCustomization | null>(null);
@@ -61,21 +79,17 @@ export function CreateCustomTemplateDialog({
             stopPolling();
             return;
         }
-
-        if (!customization || TERMINAL_STATUSES.includes(customization.status)) {
-            return;
-        }
+        if (!customization || TERMINAL_STATUSES.includes(customization.status)) return;
 
         pollTimer.current = setTimeout(async () => {
             const result = await getTemplateCustomization(customization.id);
-            if (result.success && result.customization) {
-                setCustomization(result.customization);
-                if (result.customization.status === 'succeeded') {
-                    toast.success(t('toast.success'));
-                    onSucceeded?.();
-                } else if (result.customization.status === 'failed') {
-                    toast.error(result.customization.errorMessage || t('toast.failed'));
-                }
+            if (!result.success || !result.customization) return;
+            setCustomization(result.customization);
+            if (result.customization.status === 'succeeded') {
+                toast.success(t('toast.success'));
+                onSucceeded?.();
+            } else if (result.customization.status === 'failed') {
+                toast.error(result.customization.errorMessage || t('toast.failed'));
             }
         }, POLL_INTERVAL_MS);
 
@@ -84,34 +98,35 @@ export function CreateCustomTemplateDialog({
 
     const reset = () => {
         stopPolling();
+        setName('');
         setPrompt('');
         setCustomization(null);
         setBaseTemplateId(customizableBases[0]?.id ?? '');
+        setProviderId(enabledProviders[0]?.id ?? '');
+        setTargetOwner(forkTargets[0]?.login ?? '');
     };
 
     const handleClose = (nextOpen: boolean) => {
-        if (!nextOpen) {
-            reset();
-        }
+        if (!nextOpen) reset();
         onOpenChange(nextOpen);
     };
 
     const handleSubmit = () => {
-        if (!baseTemplateId) {
-            toast.error(t('messages.baseRequired'));
-            return;
-        }
-        const trimmed = prompt.trim();
-        if (trimmed.length < 3) {
-            toast.error(t('messages.promptTooShort'));
-            return;
-        }
+        const trimmedName = name.trim();
+        const trimmedPrompt = prompt.trim();
+        if (!trimmedName) return toast.error(t('messages.nameRequired'));
+        if (trimmedPrompt.length < 3) return toast.error(t('messages.promptTooShort'));
+        if (!baseTemplateId) return toast.error(t('messages.baseRequired'));
+        if (!providerId) return toast.error(t('messages.providerRequired'));
 
         startSubmitting(() => {
             void (async () => {
                 const result = await customizeTemplateFromBase({
                     baseTemplateId,
-                    prompt: trimmed,
+                    name: trimmedName,
+                    prompt: trimmedPrompt,
+                    providerId,
+                    targetOwner: targetOwner || undefined,
                 });
                 if (!result.success || !result.customization) {
                     toast.error(result.error || t('toast.startFailed'));
@@ -126,6 +141,9 @@ export function CreateCustomTemplateDialog({
     const running = customization && !TERMINAL_STATUSES.includes(customization.status);
     const succeeded = customization?.status === 'succeeded';
     const failed = customization?.status === 'failed';
+    const disabled = submitting || !!running;
+    const noPrereqs =
+        customizableBases.length === 0 || enabledProviders.length === 0 || forkTargets.length === 0;
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -139,64 +157,91 @@ export function CreateCustomTemplateDialog({
                     <DialogDescription>{t('description')}</DialogDescription>
                 </DialogHeader>
 
-                {customizableBases.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
-                        {t('messages.noCustomizableBases')}
-                    </p>
+                {noPrereqs ? (
+                    <ul className="space-y-2 rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
+                        {customizableBases.length === 0 && (
+                            <li>• {t('messages.noCustomizableBases')}</li>
+                        )}
+                        {enabledProviders.length === 0 && <li>• {t('messages.noProviders')}</li>}
+                        {forkTargets.length === 0 && <li>• {t('messages.noTargets')}</li>}
+                    </ul>
                 ) : (
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-text dark:text-text-dark">
-                                {t('baseLabel')}
-                            </label>
+                        <Input
+                            label={t('nameLabel')}
+                            placeholder={t('namePlaceholder')}
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            disabled={disabled}
+                            helperText={t('nameHelp')}
+                        />
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field label={t('baseLabel')} hint={t('baseHelp')}>
+                                <Select
+                                    value={baseTemplateId}
+                                    onValueChange={setBaseTemplateId}
+                                    disabled={disabled}
+                                >
+                                    {customizableBases.map((base) => (
+                                        <option key={base.id} value={base.id}>
+                                            {base.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
+
+                            <Field label={t('providerLabel')} hint={t('providerHelp')}>
+                                <Select
+                                    value={providerId}
+                                    onValueChange={setProviderId}
+                                    disabled={disabled}
+                                >
+                                    {enabledProviders.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.providerName || p.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
+                        </div>
+
+                        <Field label={t('targetLabel')} hint={t('targetHelp')}>
                             <Select
-                                value={baseTemplateId}
-                                onValueChange={setBaseTemplateId}
-                                disabled={submitting || !!running}
+                                value={targetOwner}
+                                onValueChange={setTargetOwner}
+                                disabled={disabled || forkTargets.length === 0}
                             >
-                                {customizableBases.map((base) => (
-                                    <option key={base.id} value={base.id}>
-                                        {base.name}
+                                {forkTargets.map((target) => (
+                                    <option key={target.login} value={target.login}>
+                                        {target.kind === 'personal'
+                                            ? t('personalTarget', { login: target.login })
+                                            : t('organizationTarget', { login: target.login })}
                                     </option>
                                 ))}
                             </Select>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('baseHelp')}
-                            </p>
-                        </div>
+                        </Field>
 
                         <Textarea
                             label={t('promptLabel')}
                             placeholder={t('promptPlaceholder')}
                             rows={6}
                             value={prompt}
-                            onChange={(event) => setPrompt(event.target.value)}
-                            disabled={submitting || !!running}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            disabled={disabled}
                             helperText={t('promptHelp')}
                         />
 
                         {customization && (
-                            <div
-                                className={
-                                    'rounded-lg border px-4 py-3 text-sm ' +
-                                    (failed
-                                        ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                                        : succeeded
-                                          ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-300'
-                                          : 'border-border bg-surface text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark')
-                                }
-                            >
-                                <div className="flex items-center gap-2">
-                                    {running && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    <span className="font-medium">
-                                        {t(`status.${customization.status}`)}
-                                    </span>
-                                </div>
+                            <StatusBox failed={failed} succeeded={succeeded} running={!!running}>
+                                <span className="font-medium">
+                                    {t(`status.${customization.status}`)}
+                                </span>
                                 {failed && customization.errorMessage && (
                                     <p className="mt-2 text-xs">{customization.errorMessage}</p>
                                 )}
                                 {succeeded && <p className="mt-2 text-xs">{t('successHelp')}</p>}
-                            </div>
+                            </StatusBox>
                         )}
                     </div>
                 )}
@@ -209,19 +254,59 @@ export function CreateCustomTemplateDialog({
                     >
                         {succeeded ? t('done') : t('cancel')}
                     </Button>
-                    {!succeeded && (
-                        <Button
-                            onClick={handleSubmit}
-                            loading={submitting || !!running}
-                            disabled={
-                                customizableBases.length === 0 || !baseTemplateId || !!running
-                            }
-                        >
+                    {!succeeded && !noPrereqs && (
+                        <Button onClick={handleSubmit} loading={disabled} disabled={!!running}>
                             {customization ? t('retry') : t('submit')}
                         </Button>
                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function Field({
+    label,
+    hint,
+    children,
+}: {
+    label: string;
+    hint?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="space-y-2">
+            <label className="block text-sm font-medium text-text dark:text-text-dark">
+                {label}
+            </label>
+            {children}
+            {hint && <p className="text-xs text-text-muted dark:text-text-muted-dark">{hint}</p>}
+        </div>
+    );
+}
+
+function StatusBox({
+    failed,
+    succeeded,
+    running,
+    children,
+}: {
+    failed: boolean;
+    succeeded: boolean;
+    running: boolean;
+    children: React.ReactNode;
+}) {
+    const tone = failed
+        ? 'border-destructive/40 bg-destructive/10 text-destructive'
+        : succeeded
+          ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-300'
+          : 'border-border bg-surface text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark';
+    return (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${tone}`}>
+            <div className="flex items-center gap-2">
+                {running && <Loader2 className="h-4 w-4 animate-spin" />}
+                {children}
+            </div>
+        </div>
     );
 }

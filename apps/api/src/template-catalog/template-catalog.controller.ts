@@ -14,6 +14,7 @@ import {
     TemplateCatalogService,
     TemplateCustomizationService,
 } from '@ever-works/agent/template-catalog';
+import { CodeEditFacadeService } from '@ever-works/agent/facades';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { CurrentUser } from '@src/auth';
@@ -36,6 +37,7 @@ export class TemplateCatalogController {
     constructor(
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly templateCustomizationService: TemplateCustomizationService,
+        private readonly codeEditFacade: CodeEditFacadeService,
         private readonly activityLogService: ActivityLogService,
     ) {}
 
@@ -238,13 +240,19 @@ export class TemplateCatalogController {
         };
     }
 
-    @Post('templates/custom-from-base')
+    @Get('templates/customization-providers')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Create a custom template from a forkable base + agent UI customization',
-        description:
-            'Forks a customizable built-in template into the user’s GitHub account (or reuses an existing fork), runs an AI agent against it with the user’s UI prompt, commits and pushes the changes. Returns the customization row immediately; UI polls /templates/customizations/:id for completion.',
+        summary: 'List installed code-edit providers usable for template customization',
     })
+    @ApiResponse({ status: 200, description: 'Providers' })
+    async listCustomizationProviders() {
+        return { status: 'success', providers: this.codeEditFacade.listProviders() };
+    }
+
+    @Post('templates/custom-from-base')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Create a new custom template from a base + agent UI customization' })
     @ApiResponse({ status: 200, description: 'Customization scheduled' })
     async customizeTemplateFromBase(
         @CurrentUser() auth: AuthenticatedUser,
@@ -255,7 +263,7 @@ export class TemplateCatalogController {
         this.activityLogService
             .log({
                 userId: auth.userId,
-                actionType: ActivityActionType.TEMPLATE_FORKED,
+                actionType: ActivityActionType.TEMPLATE_ADDED,
                 action: 'template.customize_requested',
                 status: ActivityStatus.IN_PROGRESS,
                 summary: `Customize template ${result.template.name} from base ${body.baseTemplateId}`,
@@ -263,7 +271,7 @@ export class TemplateCatalogController {
                     templateId: result.template.id,
                     baseTemplateId: body.baseTemplateId,
                     customizationId: result.customization.id,
-                    forkCreated: result.created,
+                    providerId: body.providerId,
                 },
             })
             .catch(() => {});
@@ -279,16 +287,12 @@ export class TemplateCatalogController {
                 repositoryUrl: result.template.repositoryUrl,
             },
             customization: this.serializeCustomization(result.customization),
-            forkCreated: result.created,
         };
     }
 
     @Get('templates/customizations/:customizationId')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'Get template customization status',
-        description: 'Polls the status of a template customization run owned by the current user.',
-    })
+    @ApiOperation({ summary: 'Get template customization status' })
     @ApiResponse({ status: 200, description: 'Customization status' })
     async getCustomization(
         @CurrentUser() auth: AuthenticatedUser,
@@ -298,21 +302,13 @@ export class TemplateCatalogController {
             customizationId,
             auth.userId,
         );
-        if (!customization) {
-            return { status: 'error', message: 'Customization not found' };
-        }
-        return {
-            status: 'success',
-            customization: this.serializeCustomization(customization),
-        };
+        if (!customization) return { status: 'error', message: 'Customization not found' };
+        return { status: 'success', customization: this.serializeCustomization(customization) };
     }
 
     @Get('templates/:templateId/customizations')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'List template customizations',
-        description: 'Lists customization runs for a custom template owned by the current user.',
-    })
+    @ApiOperation({ summary: 'List customization runs for a custom template' })
     @ApiResponse({ status: 200, description: 'Customization list' })
     async listCustomizationsForTemplate(
         @CurrentUser() auth: AuthenticatedUser,

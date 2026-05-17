@@ -54,15 +54,15 @@ export class TemplateCustomizationRepository {
         return this.findById(id);
     }
 
-    async findById(id: string): Promise<TemplateCustomization | null> {
+    findById(id: string): Promise<TemplateCustomization | null> {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findByIdForUser(id: string, userId: string): Promise<TemplateCustomization | null> {
+    findByIdForUser(id: string, userId: string): Promise<TemplateCustomization | null> {
         return this.repository.findOne({ where: { id, userId } });
     }
 
-    async listForTemplate(
+    listForTemplate(
         templateId: string,
         userId: string,
         limit = 20,
@@ -71,21 +71,6 @@ export class TemplateCustomizationRepository {
             where: { templateId, userId },
             order: { createdAt: 'DESC' },
             take: limit,
-        });
-    }
-
-    async findLatestRunning(
-        templateId: string,
-        userId: string,
-    ): Promise<TemplateCustomization | null> {
-        return this.repository.findOne({
-            where: [
-                { templateId, userId, status: TemplateCustomizationStatus.PENDING },
-                { templateId, userId, status: TemplateCustomizationStatus.FORKING },
-                { templateId, userId, status: TemplateCustomizationStatus.CUSTOMIZING },
-                { templateId, userId, status: TemplateCustomizationStatus.PUSHING },
-            ],
-            order: { createdAt: 'DESC' },
         });
     }
 }

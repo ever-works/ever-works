@@ -2,6 +2,10 @@ import type {
 	IPlugin,
 	IPipelinePlugin,
 	IFormSchemaProvider,
+	ICodeEditPlugin,
+	CodeEditRequest,
+	CodeEditOptions,
+	CodeEditResult,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -21,9 +25,15 @@ import type {
 	FormFieldGroup,
 	ItemData,
 	ConnectionValidationResult,
-	FacadeOptions
+	FacadeOptions,
+	IAiFacade
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
+import {
+	buildSuccessPipelineResult,
+	substituteVariables,
+	buildDefaultCodeEditSystemPrompt
+} from '@ever-works/plugin';
+import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 
 import type { OpenCodeStepId } from './types.js';
 import { OPENCODE_STEP_IDS, DEFAULT_CLI_VERSION } from './types.js';
@@ -89,12 +99,13 @@ interface OpenCodeLogOptions {
  * Runs a single OpenCode session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
+export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ICodeEditPlugin {
 	readonly id = 'opencode';
 	readonly name = 'OpenCode Generator';
+	readonly providerName = 'OpenCode';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider', 'code-edit'] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
 
@@ -937,6 +948,117 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		this.state = state;
 		return result;
 	}
+
+	// ── Code-edit capability ──────────────────────────────────────────
+	// OpenCode proxies to a configured AI provider, so we resolve provider
+	// config + model up-front and prepare a session config (same as the
+	// pipeline path) before invoking the binary against an existing workspace.
+
+	async executeCodeEdit(request: CodeEditRequest, options?: CodeEditOptions): Promise<CodeEditResult> {
+		const startTime = Date.now();
+		const execContext = (options?.execContext ?? {}) as {
+			settings?: Record<string, unknown>;
+			aiFacade?: IAiFacade;
+			userId?: string;
+			workId?: string;
+		};
+		const settings = execContext.settings ?? {};
+		const aiFacade = execContext.aiFacade;
+		const userId = execContext.userId ?? 'code-edit';
+		const workId = execContext.workId;
+
+		if (!aiFacade) {
+			return failedCodeEditResult(startTime, 'OpenCode requires an AI facade (no aiFacade in execContext).');
+		}
+
+		const facadeOptions: FacadeOptions = { userId, workId };
+		const { providerConfig, modelName } = await this.resolveAiProvider(
+			{ aiFacade } as unknown as NonNullable<PipelineExecutionOptions['execContext']>,
+			facadeOptions
+		);
+		if (!providerConfig || !modelName) {
+			return failedCodeEditResult(
+				startTime,
+				providerConfig
+					? `AI provider "${providerConfig.providerId}" has no model configured.`
+					: 'Configure an AI provider (baseUrl + apiKey) before running OpenCode customizations.'
+			);
+		}
+
+		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
+		const binaryPath = await ensureBinary(version, this.context?.logger ?? console, options?.signal);
+
+		const sessionConfig = await prepareOpenCodeSessionConfig({
+			userId,
+			workId: workId ?? `code-edit-${Date.now()}`,
+			providerConfig,
+			model: request.model ?? modelName
+		});
+
+		try {
+			const systemPrompt = buildDefaultCodeEditSystemPrompt(request);
+			const combined = this.buildCombinedPrompt(systemPrompt, request.prompt);
+
+			const { promise, kill } = executeOpenCode({
+				binaryPath,
+				prompt: combined,
+				cwd: request.workspaceDir,
+				env: sessionConfig.env,
+				model: sessionConfig.model,
+				signal: options?.signal,
+				onStdoutLine: options?.onLogLine ? (line) => options.onLogLine!('stdout', line) : undefined,
+				onStderrLine: options?.onLogLine ? (line) => options.onLogLine!('stderr', line) : undefined
+			});
+			this.killProcess = kill;
+
+			const result = await promise;
+			this.killProcess = null;
+
+			if (result.killed || options?.signal?.aborted) {
+				return {
+					success: false,
+					summary: 'OpenCode code-edit cancelled',
+					filesChanged: [],
+					duration: Date.now() - startTime,
+					error: 'Cancelled'
+				};
+			}
+
+			const filesChanged = await computeWorkspaceFileChanges(request.workspaceDir);
+			const success = result.exitCode === 0 && filesChanged.length > 0;
+			const summary = success
+				? `OpenCode modified ${filesChanged.length} file(s) in ${Math.round((Date.now() - startTime) / 1000)}s`
+				: result.exitCode === 0
+					? 'OpenCode ran but produced no changes'
+					: `OpenCode exited with code ${result.exitCode}`;
+
+			return {
+				success,
+				summary,
+				filesChanged,
+				duration: Date.now() - startTime,
+				error: success ? undefined : `exit ${result.exitCode}`,
+				extra: { exitCode: result.exitCode }
+			};
+		} finally {
+			await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir).catch(() => {});
+		}
+	}
+
+	async cancelCodeEdit(): Promise<void> {
+		this.killProcess?.();
+		this.killProcess = null;
+	}
+}
+
+function failedCodeEditResult(startTime: number, error: string): CodeEditResult {
+	return {
+		success: false,
+		summary: error,
+		filesChanged: [],
+		duration: Date.now() - startTime,
+		error
+	};
 }
 
 export default OpenCodePlugin;

@@ -18,7 +18,7 @@ import {
     Star,
     Sparkles,
 } from 'lucide-react';
-import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
+import type { CustomizationProvider, TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -51,6 +51,7 @@ interface TemplatesCatalogProps {
     templates: TemplateCatalogItem[];
     defaultTemplateId: string | null;
     forkTargets: ForkTarget[];
+    customizationProviders: CustomizationProvider[];
 }
 
 interface ForkTarget {
@@ -281,6 +282,7 @@ export function TemplatesCatalog({
     templates: initialTemplates,
     defaultTemplateId,
     forkTargets,
+    customizationProviders,
 }: TemplatesCatalogProps) {
     const t = useTranslations('dashboard.templates');
     const [templates, setTemplates] = useState(initialTemplates);
@@ -936,6 +938,8 @@ export function TemplatesCatalog({
                 open={customizeDialogOpen}
                 onOpenChange={setCustomizeDialogOpen}
                 customizableBases={customizableBases}
+                providers={customizationProviders}
+                forkTargets={forkTargets}
                 onSucceeded={() => {
                     void (async () => {
                         const refreshed = await refreshTemplates({ kind });

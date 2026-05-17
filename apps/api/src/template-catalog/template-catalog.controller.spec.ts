@@ -2,6 +2,9 @@ jest.mock('@ever-works/agent/template-catalog', () => ({
     TemplateCatalogService: class TemplateCatalogService {},
     TemplateCustomizationService: class TemplateCustomizationService {},
 }));
+jest.mock('@ever-works/agent/facades', () => ({
+    CodeEditFacadeService: class CodeEditFacadeService {},
+}));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
 }));
@@ -35,6 +38,7 @@ describe('TemplateCatalogController', () => {
         getByIdForUser: jest.Mock;
         listForTemplate: jest.Mock;
     };
+    let codeEditFacade: { listProviders: jest.Mock };
     let activityLogService: { log: jest.Mock };
 
     beforeEach(() => {
@@ -48,6 +52,7 @@ describe('TemplateCatalogController', () => {
             getByIdForUser: jest.fn(),
             listForTemplate: jest.fn(),
         };
+        codeEditFacade = { listProviders: jest.fn().mockReturnValue([]) };
         activityLogService = {
             log: jest.fn().mockResolvedValue(undefined),
         };
@@ -55,6 +60,7 @@ describe('TemplateCatalogController', () => {
         controller = new TemplateCatalogController(
             templateCatalogService as any,
             templateCustomizationService as any,
+            codeEditFacade as any,
             activityLogService as any,
         );
     });

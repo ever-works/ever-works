@@ -42,9 +42,6 @@ export class TemplateCustomization {
     @JoinColumn({ name: 'userId' })
     user?: User;
 
-    // The built-in template this custom template was forked from (e.g. 'minimal').
-    // Drives which base prompt is loaded; kept on the row so the source of truth
-    // is the customization, not the (mutable) template metadata.
     @Column({ type: 'varchar', length: 120 })
     baseTemplateId: string;
 

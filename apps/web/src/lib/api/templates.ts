@@ -106,11 +106,21 @@ export type CustomizeTemplateFromBaseResponse = APIResponse<{
         repositoryUrl: string | null;
     };
     customization: TemplateCustomization;
-    forkCreated: boolean;
 }>;
 
 export type GetTemplateCustomizationResponse = APIResponse<{
     customization: TemplateCustomization;
+}>;
+
+export interface CustomizationProvider {
+    id: string;
+    name: string;
+    providerName?: string;
+    enabled: boolean;
+}
+
+export type ListCustomizationProvidersResponse = APIResponse<{
+    providers: CustomizationProvider[];
 }>;
 
 export const templatesAPI = {
@@ -194,9 +204,11 @@ export const templatesAPI = {
 
     customizeFromBase: async (data: {
         baseTemplateId: string;
+        name: string;
         prompt: string;
+        providerId: string;
         targetOwner?: string;
-        providerId?: string;
+        description?: string;
     }) => {
         return serverMutation<CustomizeTemplateFromBaseResponse>({
             endpoint: '/templates/custom-from-base',
@@ -209,6 +221,12 @@ export const templatesAPI = {
     getCustomization: async (customizationId: string) => {
         return serverFetch<GetTemplateCustomizationResponse>(
             `/templates/customizations/${customizationId}`,
+        );
+    },
+
+    listCustomizationProviders: async () => {
+        return serverFetch<ListCustomizationProvidersResponse>(
+            '/templates/customization-providers',
         );
     },
 };

@@ -216,9 +216,11 @@ export async function forkTemplate(input: {
 
 export async function customizeTemplateFromBase(input: {
     baseTemplateId: string;
+    name: string;
     prompt: string;
+    providerId: string;
     targetOwner?: string;
-    providerId?: string;
+    description?: string;
 }) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -229,15 +231,11 @@ export async function customizeTemplateFromBase(input: {
 
     try {
         const response = await templatesAPI.customizeFromBase(input);
-
-        // Don't revalidate yet — customization is in flight. The polling
-        // hook will revalidate once it completes.
         return {
             success: response.status === 'success',
             customizationId: response.customizationId ?? null,
             template: response.template ?? null,
             customization: response.customization ?? null,
-            forkCreated: response.forkCreated ?? false,
             error:
                 response.status === 'error'
                     ? getResponseMessage(response) || t('messages.customizeFailed')
@@ -250,8 +248,30 @@ export async function customizeTemplateFromBase(input: {
             customizationId: null,
             template: null,
             customization: null,
-            forkCreated: false,
             error: error instanceof Error ? error.message : t('messages.customizeFailed'),
+        };
+    }
+}
+
+export async function listCustomizationProviders() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await templatesAPI.listCustomizationProviders();
+        return {
+            success: response.status === 'success',
+            providers: response.providers ?? [],
+            error: response.status === 'error' ? getResponseMessage(response) : null,
+        };
+    } catch (error) {
+        console.error('List customization providers error:', error);
+        return {
+            success: false,
+            providers: [],
+            error: error instanceof Error ? error.message : 'unknown',
         };
     }
 }

@@ -139,36 +139,38 @@ export class RefreshTemplatesDto {
 }
 
 export class CustomizeTemplateFromBaseDto {
-    @ApiProperty({
-        description:
-            'Built-in template id to fork+customize. Must have customizable: true and a registered prompt.',
-    })
+    @ApiProperty({ description: 'Built-in base template id (e.g. "minimal").' })
     @IsString()
     baseTemplateId: string;
 
-    @ApiProperty({
-        description: 'Free-text description of the UI changes the agent should apply.',
-    })
+    @ApiProperty({ description: 'Display name for the new custom template.' })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(120)
+    name: string;
+
+    @ApiProperty({ description: 'UI customization prompt for the agent.' })
     @IsString()
     @MinLength(3)
     @MaxLength(4000)
     prompt: string;
 
+    @ApiProperty({ description: 'Code-edit plugin id (claude-code, codex, gemini, opencode).' })
+    @IsString()
+    @MinLength(1)
+    providerId: string;
+
     @ApiProperty({
         required: false,
-        description:
-            'GitHub login (personal or org) to fork into. Defaults to the user’s personal GitHub login.',
+        description: 'GitHub login (personal or org). Defaults to user.',
     })
     @IsOptional()
     @IsString()
     targetOwner?: string;
 
-    @ApiProperty({
-        required: false,
-        description:
-            'Explicit code-edit provider id (claude-code | codex | gemini | opencode). Defaults to the first loaded provider.',
-    })
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
-    providerId?: string;
+    @MaxLength(500)
+    description?: string;
 }

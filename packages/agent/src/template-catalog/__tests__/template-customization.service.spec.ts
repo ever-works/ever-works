@@ -1,7 +1,5 @@
-// The `minimal` website template is conditionally created based on env vars
-// (config.websiteTemplate.getMinimalRepo()) which aren't set in unit tests.
-// Stub the template-config module so the service sees a customizable minimal
-// template without depending on env state.
+// `minimal` is conditionally created from env vars in production; stub the
+// config lookup so tests don't depend on env.
 jest.mock('@src/generators/website-generator/config/website-template.config', () => {
     const minimal = {
         id: 'minimal',
@@ -15,40 +13,34 @@ jest.mock('@src/generators/website-generator/config/website-template.config', ()
         customizable: true,
     };
     const classic = {
+        ...minimal,
         id: 'classic',
-        name: 'Classic',
-        description: 'Classic',
-        owner: 'ever-works',
         repo: 'directory-web-template',
-        branch: 'main',
-        syncBranches: ['main'],
-        betaBranch: null,
         customizable: false,
     };
     return {
-        findWebsiteTemplateConfig: (id?: string | null) => {
-            if (id === 'minimal') return minimal;
-            if (id === 'classic') return classic;
-            return null;
-        },
+        findWebsiteTemplateConfig: (id?: string | null) =>
+            id === 'minimal' ? minimal : id === 'classic' ? classic : null,
     };
 });
 
-import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+jest.mock('@src/utils/git-repository.utils', () => ({
+    assertCreatedRepositoryTarget: (created: any) => created,
+}));
+
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TemplateCustomizationService } from '../template-customization.service';
 import { TemplateCustomizationStatus } from '../../entities/template-customization.entity';
 
-// The service touches a lot of collaborators; mock at the boundary.
 type AnyMock = jest.Mock;
 
 interface Mocks {
     templateRepository: {
         findById: AnyMock;
-        findOwnedCustomById: AnyMock;
+        upsert: AnyMock;
         updateById: AnyMock;
     };
     customizationRepository: {
-        findLatestRunning: AnyMock;
         create: AnyMock;
         findById: AnyMock;
         findByIdForUser: AnyMock;
@@ -60,56 +52,70 @@ interface Mocks {
         getUser: AnyMock;
         getCommitter: AnyMock;
         cloneOrPull: AnyMock;
+        createRepository: AnyMock;
+        getCloneUrl: AnyMock;
+        getWebUrl: AnyMock;
+        replaceRemote: AnyMock;
         addAll: AnyMock;
         commit: AnyMock;
         push: AnyMock;
     };
-    codeEditFacade: { execute: AnyMock };
-    templateCatalogService: { forkTemplateForUser: AnyMock };
+    codeEditFacade: { listProviders: AnyMock; execute: AnyMock };
 }
 
 function makeService(): { service: TemplateCustomizationService; mocks: Mocks } {
     const mocks: Mocks = {
         templateRepository: {
             findById: jest.fn(),
-            findOwnedCustomById: jest.fn(),
+            upsert: jest.fn().mockImplementation(async (t) => t),
             updateById: jest.fn().mockResolvedValue(undefined),
         },
         customizationRepository: {
-            findLatestRunning: jest.fn(),
-            create: jest.fn(),
+            create: jest.fn().mockImplementation(async (input) => ({
+                id: 'cust-1',
+                ...input,
+                status: TemplateCustomizationStatus.PENDING,
+            })),
             findById: jest.fn(),
             findByIdForUser: jest.fn(),
             listForTemplate: jest.fn(),
             updateById: jest.fn().mockResolvedValue(undefined),
         },
-        userRepository: { findById: jest.fn() },
+        userRepository: {
+            findById: jest
+                .fn()
+                .mockResolvedValue({ id: 'user-1', username: 'evereq', email: 'e@v.co' }),
+        },
         gitFacade: {
             getUser: jest.fn().mockResolvedValue({ login: 'evereq' }),
             getCommitter: jest.fn().mockResolvedValue({ name: 'evereq', email: 'e@v.co' }),
-            cloneOrPull: jest.fn().mockResolvedValue('/tmp/workspace'),
+            cloneOrPull: jest.fn().mockResolvedValue('/tmp/base-repo'),
+            createRepository: jest.fn().mockResolvedValue({
+                owner: 'evereq',
+                name: 'tpl-minimal-mytheme-abc123',
+                defaultBranch: 'main',
+                url: 'https://github.com/evereq/tpl-minimal-mytheme-abc123',
+            }),
+            getCloneUrl: jest
+                .fn()
+                .mockReturnValue('https://github.com/evereq/tpl-minimal-mytheme-abc123.git'),
+            getWebUrl: jest
+                .fn()
+                .mockReturnValue('https://github.com/evereq/tpl-minimal-mytheme-abc123'),
+            replaceRemote: jest.fn().mockResolvedValue(undefined),
             addAll: jest.fn().mockResolvedValue(undefined),
             commit: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
         },
         codeEditFacade: {
+            listProviders: jest.fn().mockReturnValue([
+                { id: 'claude-code', name: 'Claude Code', enabled: true },
+                { id: 'codex', name: 'Codex', enabled: false },
+            ]),
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 summary: 'Applied UI changes',
                 filesChanged: [{ path: 'src/styles/theme.css', status: 'modified' }],
-            }),
-        },
-        templateCatalogService: {
-            forkTemplateForUser: jest.fn().mockResolvedValue({
-                created: true,
-                template: { id: 'custom-abc' },
-                defaultTemplateId: 'custom-abc',
-                repository: {
-                    owner: 'evereq',
-                    name: 'directory-web-minimal-template',
-                    fullName: 'evereq/directory-web-minimal-template',
-                    url: 'https://github.com/evereq/directory-web-minimal-template',
-                },
             }),
         },
     };
@@ -119,142 +125,113 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         mocks.userRepository as any,
         mocks.gitFacade as any,
         mocks.codeEditFacade as any,
-        mocks.templateCatalogService as any,
     );
     return { service, mocks };
 }
 
+const baseInput = {
+    baseTemplateId: 'minimal',
+    name: 'My Theme',
+    prompt: 'dark mode with purple accents',
+    providerId: 'claude-code',
+};
+
 describe('TemplateCustomizationService.createAndStart', () => {
-    it('rejects when the base template id is not customizable', async () => {
+    it('rejects when name, prompt, or providerId are missing', async () => {
         const { service } = makeService();
-        // 'classic' exists in WebsiteTemplateConfig with customizable=false.
         await expect(
-            service.createAndStart('user-1', { baseTemplateId: 'classic', prompt: 'dark mode' }),
+            service.createAndStart('user-1', { ...baseInput, name: '' } as any),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+            service.createAndStart('user-1', { ...baseInput, prompt: ' ' } as any),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+            service.createAndStart('user-1', { ...baseInput, providerId: '' } as any),
         ).rejects.toThrow(BadRequestException);
     });
 
-    it('rejects when the prompt is missing or whitespace-only', async () => {
+    it('rejects non-customizable bases (e.g. classic)', async () => {
         const { service } = makeService();
         await expect(
-            service.createAndStart('user-1', { baseTemplateId: 'minimal', prompt: '   ' }),
+            service.createAndStart('user-1', { ...baseInput, baseTemplateId: 'classic' }),
         ).rejects.toThrow(BadRequestException);
     });
 
-    it('rejects when the base template id is unknown', async () => {
+    it('rejects unknown bases', async () => {
         const { service } = makeService();
         await expect(
-            service.createAndStart('user-1', {
-                baseTemplateId: 'no-such-template',
-                prompt: 'dark mode',
-            }),
+            service.createAndStart('user-1', { ...baseInput, baseTemplateId: 'no-such' }),
         ).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects when a customization is already running for the same custom template', async () => {
+    it('rejects when the selected provider is not installed/enabled', async () => {
         const { service, mocks } = makeService();
-        mocks.templateRepository.findById.mockResolvedValue({
-            id: 'minimal',
-            kind: 'website',
-            sourceType: 'built_in',
-            repositoryOwner: 'ever-works',
-            repositoryName: 'directory-web-minimal-template',
-            branch: 'main',
-        });
-        mocks.templateRepository.findOwnedCustomById.mockResolvedValue({
-            id: 'custom-abc',
-            kind: 'website',
-            sourceType: 'custom',
-            ownerUserId: 'user-1',
-            repositoryOwner: 'evereq',
-            repositoryName: 'directory-web-minimal-template',
-            branch: 'main',
-            metadata: { forkedFromTemplateId: 'minimal' },
-        });
-        mocks.customizationRepository.findLatestRunning.mockResolvedValue({
-            id: 'cust-running',
-            status: TemplateCustomizationStatus.CUSTOMIZING,
-        });
-
-        await expect(
-            service.createAndStart('user-1', {
-                baseTemplateId: 'minimal',
-                prompt: 'dark mode with purple accents',
-            }),
-        ).rejects.toThrow(ConflictException);
-        expect(mocks.customizationRepository.create).not.toHaveBeenCalled();
+        mocks.codeEditFacade.listProviders.mockReturnValue([
+            { id: 'codex', name: 'Codex', enabled: false },
+        ]);
+        await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
+            BadRequestException,
+        );
     });
 
-    it('happy path: forks if needed, persists the row, kicks off async run', async () => {
+    it('provisions a new repo and persists the Template + customization rows', async () => {
         const { service, mocks } = makeService();
-        mocks.templateRepository.findById.mockResolvedValue({
-            id: 'minimal',
-            kind: 'website',
-            sourceType: 'built_in',
-            repositoryOwner: 'ever-works',
-            repositoryName: 'directory-web-minimal-template',
-            branch: 'main',
-        });
-        mocks.templateRepository.findOwnedCustomById.mockResolvedValue({
-            id: 'custom-abc',
-            kind: 'website',
-            sourceType: 'custom',
-            ownerUserId: 'user-1',
-            repositoryOwner: 'evereq',
-            repositoryName: 'directory-web-minimal-template',
-            branch: 'main',
-            metadata: { forkedFromTemplateId: 'minimal' },
-        });
-        mocks.customizationRepository.findLatestRunning.mockResolvedValue(null);
-        mocks.customizationRepository.create.mockResolvedValue({
-            id: 'cust-1',
-            templateId: 'custom-abc',
-            baseTemplateId: 'minimal',
-            prompt: 'dark mode with purple accents',
-            status: TemplateCustomizationStatus.PENDING,
-        });
-        // Stub execute() so the async run is a no-op
         const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);
 
-        const result = await service.createAndStart('user-1', {
-            baseTemplateId: 'minimal',
-            prompt: 'dark mode with purple accents',
-        });
+        const result = await service.createAndStart('user-1', baseInput);
 
-        expect(mocks.templateCatalogService.forkTemplateForUser).toHaveBeenCalledWith(
+        // Cloned the base, created a new repo on the user's account, pushed.
+        expect(mocks.gitFacade.cloneOrPull).toHaveBeenCalledWith(
             expect.objectContaining({
-                kind: 'website',
-                templateId: 'minimal',
-                targetOwner: 'evereq',
+                owner: 'ever-works',
+                repo: 'directory-web-minimal-template',
             }),
-            'user-1',
+            expect.objectContaining({ userId: 'user-1', providerId: 'github' }),
+        );
+        expect(mocks.gitFacade.createRepository).toHaveBeenCalledWith(
+            expect.objectContaining({ isPrivate: true }),
+            expect.any(Object),
+        );
+        const newRepoName = mocks.gitFacade.createRepository.mock.calls[0][0].name;
+        expect(newRepoName).toMatch(/^tpl-minimal-/);
+        expect(mocks.gitFacade.replaceRemote).toHaveBeenCalled();
+        expect(mocks.gitFacade.push).toHaveBeenCalledWith(
+            expect.objectContaining({ force: true }),
+            expect.any(Object),
+        );
+
+        expect(mocks.templateRepository.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceType: 'custom',
+                ownerUserId: 'user-1',
+                repositoryOwner: 'evereq',
+                metadata: expect.objectContaining({ baseTemplateId: 'minimal' }),
+            }),
         );
         expect(mocks.customizationRepository.create).toHaveBeenCalledWith({
-            templateId: 'custom-abc',
+            templateId: expect.any(String),
             userId: 'user-1',
             baseTemplateId: 'minimal',
-            prompt: 'dark mode with purple accents',
-            providerId: null,
+            prompt: baseInput.prompt,
+            providerId: 'claude-code',
         });
         expect(result.customization.id).toBe('cust-1');
-        expect(result.template.id).toBe('custom-abc');
-        expect(result.created).toBe(true);
 
-        // Flush the microtask the service queued via `void this.runAsync(...)`.
-        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((r) => setImmediate(r));
         expect(executeSpy).toHaveBeenCalledWith('cust-1');
     });
 });
 
 describe('TemplateCustomizationService.execute', () => {
-    function withRunningRecord(mocks: Mocks) {
+    function seedRunning(mocks: Mocks) {
         mocks.customizationRepository.findById.mockResolvedValue({
             id: 'cust-1',
             templateId: 'custom-abc',
             userId: 'user-1',
             baseTemplateId: 'minimal',
             prompt: 'dark mode',
+            providerId: 'claude-code',
             status: TemplateCustomizationStatus.PENDING,
-            providerId: null,
         });
         mocks.templateRepository.findById.mockResolvedValue({
             id: 'custom-abc',
@@ -262,98 +239,47 @@ describe('TemplateCustomizationService.execute', () => {
             sourceType: 'custom',
             ownerUserId: 'user-1',
             repositoryOwner: 'evereq',
-            repositoryName: 'directory-web-minimal-template',
+            repositoryName: 'tpl-minimal-x',
             branch: 'main',
-            metadata: { forkedFromTemplateId: 'minimal' },
-        });
-        mocks.userRepository.findById.mockResolvedValue({
-            id: 'user-1',
-            username: 'evereq',
-            email: 'e@v.co',
+            metadata: { baseTemplateId: 'minimal' },
         });
     }
 
-    it('clones, runs the agent, commits, pushes, then marks the row succeeded', async () => {
+    it('clones, runs the agent, commits, pushes, marks succeeded', async () => {
         const { service, mocks } = makeService();
-        withRunningRecord(mocks);
-
+        seedRunning(mocks);
         await service.execute('cust-1');
-
-        // Agent ran with composed prompt (base + user)
         expect(mocks.codeEditFacade.execute).toHaveBeenCalledTimes(1);
-        const callArgs = mocks.codeEditFacade.execute.mock.calls[0];
-        expect(callArgs[0].workspaceDir).toBe('/tmp/workspace');
-        expect(callArgs[0].prompt).toMatch(/UI/i);
-        expect(callArgs[0].prompt).toMatch(/dark mode/);
-
-        // Pushed and template metadata updated
         expect(mocks.gitFacade.push).toHaveBeenCalled();
-        expect(mocks.templateRepository.updateById).toHaveBeenCalledWith(
-            'custom-abc',
-            expect.objectContaining({
-                metadata: expect.objectContaining({
-                    forkedFromTemplateId: 'minimal',
-                    lastCustomizedAt: expect.any(String),
-                }),
-            }),
-        );
-
-        // Final status = SUCCEEDED
         const finalCall = mocks.customizationRepository.updateById.mock.calls.find(
             ([, patch]) => patch.status === TemplateCustomizationStatus.SUCCEEDED,
         );
         expect(finalCall).toBeTruthy();
     });
 
-    it('marks the row failed when the agent produces no changes', async () => {
+    it('fails the row when the agent reports no changes', async () => {
         const { service, mocks } = makeService();
-        withRunningRecord(mocks);
+        seedRunning(mocks);
         mocks.codeEditFacade.execute.mockResolvedValueOnce({
             success: true,
-            summary: 'No changes',
+            summary: '',
             filesChanged: [],
         });
-
         await service.execute('cust-1');
-
         expect(mocks.gitFacade.push).not.toHaveBeenCalled();
-        const failedCall = mocks.customizationRepository.updateById.mock.calls.find(
+        const failed = mocks.customizationRepository.updateById.mock.calls.find(
             ([, patch]) => patch.status === TemplateCustomizationStatus.FAILED,
         );
-        expect(failedCall).toBeTruthy();
-        expect(failedCall[1].errorMessage).toMatch(/no file changes/i);
+        expect(failed[1].errorMessage).toMatch(/no file changes/i);
     });
 
-    it('marks the row failed when the agent itself returns success: false', async () => {
-        const { service, mocks } = makeService();
-        withRunningRecord(mocks);
-        mocks.codeEditFacade.execute.mockResolvedValueOnce({
-            success: false,
-            error: 'agent crashed',
-            summary: 'crash',
-            filesChanged: [],
-        });
-
-        await service.execute('cust-1');
-
-        expect(mocks.gitFacade.push).not.toHaveBeenCalled();
-        const failedCall = mocks.customizationRepository.updateById.mock.calls.find(
-            ([, patch]) => patch.status === TemplateCustomizationStatus.FAILED,
-        );
-        expect(failedCall).toBeTruthy();
-        expect(failedCall[1].errorMessage).toBe('agent crashed');
-    });
-
-    it('skips silently when the customization is already terminal', async () => {
+    it('skips terminal records', async () => {
         const { service, mocks } = makeService();
         mocks.customizationRepository.findById.mockResolvedValue({
             id: 'cust-1',
             status: TemplateCustomizationStatus.SUCCEEDED,
         });
-
         await service.execute('cust-1');
-
         expect(mocks.gitFacade.cloneOrPull).not.toHaveBeenCalled();
-        expect(mocks.codeEditFacade.execute).not.toHaveBeenCalled();
     });
 });

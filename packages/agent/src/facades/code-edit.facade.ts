@@ -9,14 +9,11 @@ import {
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { AiFacadeService } from './ai.facade';
 
 export interface CodeEditFacadeOptions {
     userId: string;
     workId?: string;
-    /**
-     * Optional explicit provider id. When omitted, the facade picks the first
-     * loaded plugin advertising the `code-edit` capability.
-     */
     providerId?: string;
 }
 
@@ -35,6 +32,7 @@ export class CodeEditFacadeService {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly pluginSettings: PluginSettingsService,
+        private readonly aiFacade: AiFacadeService,
     ) {}
 
     listProviders(): CodeEditProviderInfo[] {
@@ -60,15 +58,15 @@ export class CodeEditFacadeService {
             return registered.plugin;
         }
 
-        const candidates = this.registry
+        const loaded = this.registry
             .getByCapability(this.CAPABILITY)
             .filter((p) => p.state === 'loaded');
-        if (candidates.length === 0) {
+        if (loaded.length === 0) {
             throw new Error(
                 'No code-edit provider available — install claude-code, codex, gemini, or opencode',
             );
         }
-        const plugin = candidates[0].plugin;
+        const plugin = loaded[0].plugin;
         if (!isCodeEditPlugin(plugin)) {
             throw new Error(
                 `Default plugin ${plugin.id} does not implement the code-edit capability`,
@@ -93,9 +91,16 @@ export class CodeEditFacadeService {
             `Running code-edit via ${plugin.id} for user=${opts.userId} workspace=${request.workspaceDir}`,
         );
 
+        // aiFacade is forwarded so plugins that proxy to an AI provider (e.g.
+        // opencode) can resolve provider/model via the user's AI settings.
         return plugin.executeCodeEdit(request, {
             ...options,
-            execContext: { settings },
+            execContext: {
+                settings,
+                aiFacade: this.aiFacade,
+                userId: opts.userId,
+                workId: opts.workId,
+            },
         });
     }
 }

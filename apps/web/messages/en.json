@@ -3254,23 +3254,32 @@
                 "customizeFailed": "Failed to start template customization."
             },
             "customizeDialog": {
-                "title": "Customize a template with AI",
-                "description": "Pick a base template, describe the UI changes you want, and we'll fork it to your GitHub account and apply the changes for you. Functionality stays untouched — only the look and feel changes.",
+                "title": "Create a custom template with AI",
+                "description": "We duplicate a base template into a new repo in your GitHub account, then run your chosen AI agent against it to apply UI-only changes. Functionality stays untouched.",
+                "nameLabel": "Template name",
+                "namePlaceholder": "e.g. Dark Purple Theme",
+                "nameHelp": "Shown in your catalog and used to name the new GitHub repo.",
                 "baseLabel": "Base template",
-                "baseHelp": "Only templates that support AI UI customization show up here.",
+                "baseHelp": "Only bases marked AI-customizable are listed.",
+                "providerLabel": "Code-edit agent",
+                "providerHelp": "Pick an installed plugin (claude-code, codex, gemini, opencode).",
+                "targetLabel": "GitHub destination",
+                "targetHelp": "Where to create the new repo. Personal account or an org you belong to.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
                 "promptLabel": "Describe the UI you want",
                 "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
-                "promptHelp": "Be specific about styling. Don't ask for new features — those are out of scope for template customization.",
-                "submit": "Start customization",
+                "promptHelp": "Be specific about styling. New features are out of scope — UI only.",
+                "submit": "Create custom template",
                 "retry": "Retry",
                 "cancel": "Cancel",
                 "done": "Done",
                 "successHelp": "Your custom template is ready. It now appears in your catalog.",
                 "status": {
                     "pending": "Queued…",
-                    "forking": "Forking the base template…",
+                    "forking": "Provisioning the new repo…",
                     "customizing": "Agent is applying your changes…",
-                    "pushing": "Pushing changes to your fork…",
+                    "pushing": "Pushing changes…",
                     "succeeded": "Customization completed successfully.",
                     "failed": "Customization failed."
                 },
@@ -3281,9 +3290,13 @@
                     "startFailed": "Could not start the customization."
                 },
                 "messages": {
+                    "nameRequired": "Template name is required.",
                     "baseRequired": "Choose a base template.",
+                    "providerRequired": "Choose a code-edit agent.",
                     "promptTooShort": "Describe the changes in at least a few words.",
-                    "noCustomizableBases": "No customizable base templates are available yet."
+                    "noCustomizableBases": "No customizable base templates are available.",
+                    "noProviders": "No code-edit agent plugins are installed or enabled. Install claude-code, codex, gemini, or opencode.",
+                    "noTargets": "Connect a GitHub account to choose a destination."
                 }
             }
         },
