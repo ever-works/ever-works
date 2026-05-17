@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Plus, Trash2, AlertCircle, Download } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, Download, ChevronDown, Check } from 'lucide-react';
+import {
+    Combobox,
+    ComboboxButton,
+    ComboboxInput,
+    ComboboxOption,
+    ComboboxOptions,
+} from '@headlessui/react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
@@ -577,6 +584,7 @@ function PluginBudgetForm({
 }: PluginBudgetFormProps) {
     const tPlugin = useTranslations('dashboard.workDetail.settings.budgets.pluginCaps');
     const [pluginId, setPluginId] = useState('');
+    const [pluginQuery, setPluginQuery] = useState('');
     const [capInput, setCapInput] = useState('');
     const [allowOverage, setAllowOverage] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -586,6 +594,18 @@ function PluginBudgetForm({
         [availablePlugins, existingPluginIds],
     );
     const noPluginsAvailable = selectablePlugins.length === 0;
+    const selectedPlugin = useMemo(
+        () => selectablePlugins.find((p) => p.pluginId === pluginId) ?? null,
+        [selectablePlugins, pluginId],
+    );
+    const filteredPlugins = useMemo(() => {
+        const q = pluginQuery.trim().toLowerCase();
+        if (!q) return selectablePlugins;
+        return selectablePlugins.filter(
+            (p) =>
+                p.name.toLowerCase().includes(q) || p.pluginId.toLowerCase().includes(q),
+        );
+    }, [selectablePlugins, pluginQuery]);
 
     const handleAdd = () => {
         setError(null);
@@ -605,6 +625,7 @@ function PluginBudgetForm({
             allowOverage,
         });
         setPluginId('');
+        setPluginQuery('');
         setCapInput('');
         setAllowOverage(false);
     };
@@ -622,22 +643,101 @@ function PluginBudgetForm({
                 </p>
             ) : (
                 <div className="flex flex-wrap items-end gap-3">
-                    <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                        {tPlugin('pluginIdLabel')}
-                        <select
-                            value={pluginId}
-                            onChange={(e) => setPluginId(e.target.value)}
+                    <div className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
+                        <label className="mb-1">{tPlugin('pluginIdLabel')}</label>
+                        <Combobox
+                            value={selectedPlugin}
+                            onChange={(p: BudgetEligiblePlugin | null) => {
+                                setPluginId(p?.pluginId ?? '');
+                                setPluginQuery('');
+                            }}
                             disabled={disabled}
-                            className="mt-1 w-56 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
                         >
-                            <option value="">{tPlugin('pluginSelectPlaceholder')}</option>
-                            {selectablePlugins.map((p) => (
-                                <option key={p.pluginId} value={p.pluginId}>
-                                    {p.name} ({p.pluginId})
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                            <div className="relative w-56">
+                                <div
+                                    className={cn(
+                                        'flex min-h-9 items-center gap-2 rounded-md border px-2 py-1.5',
+                                        'border-input-border dark:border-border-dark',
+                                        'bg-input dark:bg-surface-secondary-dark',
+                                        'focus-within:border-primary dark:focus-within:border-primary-dark',
+                                        'focus-within:ring-2 focus-within:ring-primary/15',
+                                        disabled && 'opacity-60',
+                                    )}
+                                >
+                                    <ComboboxInput
+                                        className={cn(
+                                            'min-w-0 flex-1 bg-transparent text-sm outline-none',
+                                            'text-text dark:text-text-dark',
+                                            'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                        )}
+                                        displayValue={(p: BudgetEligiblePlugin | null) =>
+                                            p ? `${p.name} (${p.pluginId})` : ''
+                                        }
+                                        onChange={(e) => setPluginQuery(e.target.value)}
+                                        placeholder={tPlugin('pluginSelectPlaceholder')}
+                                    />
+                                    <ComboboxButton
+                                        className={cn(
+                                            'flex h-6 w-6 shrink-0 items-center justify-center rounded-sm',
+                                            'text-text-muted dark:text-text-muted-dark',
+                                            'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                        )}
+                                        aria-label={tPlugin('pluginSelectPlaceholder')}
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </ComboboxButton>
+                                </div>
+                                <ComboboxOptions
+                                    className={cn(
+                                        'absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-lg border shadow-lg',
+                                        'border-border dark:border-border-dark',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'max-h-60 p-1',
+                                        'empty:invisible',
+                                    )}
+                                >
+                                    <div className="max-h-58 overflow-y-auto">
+                                        {filteredPlugins.length === 0 ? (
+                                            <div className="px-3 py-2 text-sm text-text-muted dark:text-text-muted-dark">
+                                                {tPlugin('noMatchingPlugins')}
+                                            </div>
+                                        ) : (
+                                            filteredPlugins.map((p) => (
+                                                <ComboboxOption
+                                                    key={p.pluginId}
+                                                    value={p}
+                                                    className={({ focus }) =>
+                                                        cn(
+                                                            'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-2 text-sm',
+                                                            'text-text dark:text-text-dark',
+                                                            focus &&
+                                                                'bg-surface-hover dark:bg-surface-hover-dark',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ selected }) => (
+                                                        <>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="truncate font-medium">
+                                                                    {p.name}
+                                                                </div>
+                                                                <div className="truncate text-xs text-text-muted dark:text-text-muted-dark">
+                                                                    {p.pluginId}
+                                                                </div>
+                                                            </div>
+                                                            {selected && (
+                                                                <Check className="h-4 w-4 shrink-0 text-primary dark:text-primary-dark" />
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </ComboboxOption>
+                                            ))
+                                        )}
+                                    </div>
+                                </ComboboxOptions>
+                            </div>
+                        </Combobox>
+                    </div>
                     <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
                         {tPlugin('capLabel', { currency: currency.toUpperCase() })}
                         <input

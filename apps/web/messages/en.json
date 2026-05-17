@@ -2045,6 +2045,7 @@
                         "pluginSelectPlaceholder": "Select a plugin…",
                         "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
                         "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
                         "capLabel": "Monthly cap ({currency})",
                         "allowOverageLabel": "Allow overage",
                         "addButton": "Add cap",
