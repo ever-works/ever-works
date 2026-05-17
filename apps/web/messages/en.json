@@ -3153,6 +3153,7 @@
             "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
             "actions": {
                 "addTemplate": "Add custom template",
+                "customizeTemplate": "Create with AI",
                 "refreshTemplates": "Refresh templates"
             },
             "hero": {
@@ -3270,7 +3271,41 @@
                 "refreshSuccess": "Template catalog refreshed.",
                 "refreshFailed": "Failed to refresh templates.",
                 "defaultUpdated": "Default template updated.",
-                "defaultFailed": "Failed to update default template."
+                "defaultFailed": "Failed to update default template.",
+                "customizeFailed": "Failed to start template customization."
+            },
+            "customizeDialog": {
+                "title": "Customize a template with AI",
+                "description": "Pick a base template, describe the UI changes you want, and we'll fork it to your GitHub account and apply the changes for you. Functionality stays untouched — only the look and feel changes.",
+                "baseLabel": "Base template",
+                "baseHelp": "Only templates that support AI UI customization show up here.",
+                "promptLabel": "Describe the UI you want",
+                "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
+                "promptHelp": "Be specific about styling. Don't ask for new features — those are out of scope for template customization.",
+                "submit": "Start customization",
+                "retry": "Retry",
+                "cancel": "Cancel",
+                "done": "Done",
+                "successHelp": "Your custom template is ready. It now appears in your catalog.",
+                "status": {
+                    "pending": "Queued…",
+                    "forking": "Forking the base template…",
+                    "customizing": "Agent is applying your changes…",
+                    "pushing": "Pushing changes to your fork…",
+                    "succeeded": "Customization completed successfully.",
+                    "failed": "Customization failed."
+                },
+                "toast": {
+                    "started": "Customization started — this typically takes a few minutes.",
+                    "success": "Template customized successfully.",
+                    "failed": "Template customization failed.",
+                    "startFailed": "Could not start the customization."
+                },
+                "messages": {
+                    "baseRequired": "Choose a base template.",
+                    "promptTooShort": "Describe the changes in at least a few words.",
+                    "noCustomizableBases": "No customizable base templates are available yet."
+                }
             }
         },
         "templateSelector": {

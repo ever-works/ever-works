@@ -16,6 +16,7 @@ import {
     RefreshCw,
     Trash2,
     Star,
+    Sparkles,
 } from 'lucide-react';
 import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import {
     updateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
+import { CreateCustomTemplateDialog } from './CreateCustomTemplateDialog';
 
 type FilterMode = 'all' | 'built_in' | 'custom';
 
@@ -298,6 +300,15 @@ export function TemplatesCatalog({
     const [isForkingTemplate, startForkingTemplate] = useTransition();
     const [isArchivingTemplate, startArchivingTemplate] = useTransition();
     const [isRefreshingTemplates, startRefreshingTemplates] = useTransition();
+    const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+
+    const customizableBases = useMemo(
+        () =>
+            templates.filter(
+                (template) => template.sourceType === 'built_in' && template.customizable,
+            ),
+        [templates],
+    );
 
     const filteredTemplates = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -581,6 +592,16 @@ export function TemplatesCatalog({
                         >
                             <RefreshCw className="h-4 w-4" />
                         </Button>
+                        {customizableBases.length > 0 && (
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setCustomizeDialogOpen(true)}
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                {t('actions.customizeTemplate')}
+                            </Button>
+                        )}
                         <Button size="sm" onClick={() => setDialogOpen(true)}>
                             <Plus className="h-4 w-4" />
                             {t('actions.addTemplate')}
@@ -910,6 +931,21 @@ export function TemplatesCatalog({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CreateCustomTemplateDialog
+                open={customizeDialogOpen}
+                onOpenChange={setCustomizeDialogOpen}
+                customizableBases={customizableBases}
+                onSucceeded={() => {
+                    void (async () => {
+                        const refreshed = await refreshTemplates({ kind });
+                        if (refreshed.success) {
+                            setTemplates(refreshed.templates.sort(compareTemplates));
+                            setCurrentDefaultTemplateId(refreshed.defaultTemplateId);
+                        }
+                    })();
+                }}
+            />
 
             <Dialog
                 open={!!archiveDialogTemplate}

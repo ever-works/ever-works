@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 const TEMPLATE_KINDS = ['website', 'work'] as const;
 
@@ -136,4 +136,39 @@ export class RefreshTemplatesDto {
     @IsString()
     @IsIn(TEMPLATE_KINDS)
     kind: 'website' | 'work';
+}
+
+export class CustomizeTemplateFromBaseDto {
+    @ApiProperty({
+        description:
+            'Built-in template id to fork+customize. Must have customizable: true and a registered prompt.',
+    })
+    @IsString()
+    baseTemplateId: string;
+
+    @ApiProperty({
+        description: 'Free-text description of the UI changes the agent should apply.',
+    })
+    @IsString()
+    @MinLength(3)
+    @MaxLength(4000)
+    prompt: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'GitHub login (personal or org) to fork into. Defaults to the user’s personal GitHub login.',
+    })
+    @IsOptional()
+    @IsString()
+    targetOwner?: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Explicit code-edit provider id (claude-code | codex | gemini | opencode). Defaults to the first loaded provider.',
+    })
+    @IsOptional()
+    @IsString()
+    providerId?: string;
 }

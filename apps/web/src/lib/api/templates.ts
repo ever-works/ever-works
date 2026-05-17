@@ -24,6 +24,33 @@ export interface TemplateCatalogItem {
     isActive: boolean;
     isDefault: boolean;
     ownerUserId?: string | null;
+    customizable?: boolean;
+    baseTemplateId?: string | null;
+    lastCustomizedAt?: string | null;
+}
+
+export type TemplateCustomizationStatus =
+    | 'pending'
+    | 'forking'
+    | 'customizing'
+    | 'pushing'
+    | 'succeeded'
+    | 'failed';
+
+export interface TemplateCustomization {
+    id: string;
+    templateId: string;
+    baseTemplateId: string;
+    prompt: string;
+    status: TemplateCustomizationStatus;
+    branch: string | null;
+    commitSha: string | null;
+    providerId: string | null;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export type ListTemplatesResponse = APIResponse<{
@@ -67,6 +94,23 @@ export type RefreshTemplatesResponse = APIResponse<{
     kind: TemplateKind;
     defaultTemplateId: string | null;
     templates: TemplateCatalogItem[];
+}>;
+
+export type CustomizeTemplateFromBaseResponse = APIResponse<{
+    customizationId: string;
+    template: {
+        id: string;
+        name: string;
+        repositoryOwner: string;
+        repositoryName: string;
+        repositoryUrl: string | null;
+    };
+    customization: TemplateCustomization;
+    forkCreated: boolean;
+}>;
+
+export type GetTemplateCustomizationResponse = APIResponse<{
+    customization: TemplateCustomization;
 }>;
 
 export const templatesAPI = {
@@ -146,5 +190,25 @@ export const templatesAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    customizeFromBase: async (data: {
+        baseTemplateId: string;
+        prompt: string;
+        targetOwner?: string;
+        providerId?: string;
+    }) => {
+        return serverMutation<CustomizeTemplateFromBaseResponse>({
+            endpoint: '/templates/custom-from-base',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getCustomization: async (customizationId: string) => {
+        return serverFetch<GetTemplateCustomizationResponse>(
+            `/templates/customizations/${customizationId}`,
+        );
     },
 };

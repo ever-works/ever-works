@@ -10,7 +10,10 @@ import {
     Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
+import {
+    TemplateCatalogService,
+    TemplateCustomizationService,
+} from '@ever-works/agent/template-catalog';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { CurrentUser } from '@src/auth';
@@ -18,6 +21,7 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
     AddCustomTemplateDto,
     ArchiveCustomTemplateDto,
+    CustomizeTemplateFromBaseDto,
     ForkTemplateDto,
     ListTemplatesQueryDto,
     RefreshTemplatesDto,
@@ -31,6 +35,7 @@ import {
 export class TemplateCatalogController {
     constructor(
         private readonly templateCatalogService: TemplateCatalogService,
+        private readonly templateCustomizationService: TemplateCustomizationService,
         private readonly activityLogService: ActivityLogService,
     ) {}
 
@@ -230,6 +235,128 @@ export class TemplateCatalogController {
             status: 'success',
             kind: body.kind,
             ...result,
+        };
+    }
+
+    @Post('templates/custom-from-base')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Create a custom template from a forkable base + agent UI customization',
+        description:
+            'Forks a customizable built-in template into the user’s GitHub account (or reuses an existing fork), runs an AI agent against it with the user’s UI prompt, commits and pushes the changes. Returns the customization row immediately; UI polls /templates/customizations/:id for completion.',
+    })
+    @ApiResponse({ status: 200, description: 'Customization scheduled' })
+    async customizeTemplateFromBase(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CustomizeTemplateFromBaseDto,
+    ) {
+        const result = await this.templateCustomizationService.createAndStart(auth.userId, body);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_FORKED,
+                action: 'template.customize_requested',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Customize template ${result.template.name} from base ${body.baseTemplateId}`,
+                metadata: {
+                    templateId: result.template.id,
+                    baseTemplateId: body.baseTemplateId,
+                    customizationId: result.customization.id,
+                    forkCreated: result.created,
+                },
+            })
+            .catch(() => {});
+
+        return {
+            status: 'success',
+            customizationId: result.customization.id,
+            template: {
+                id: result.template.id,
+                name: result.template.name,
+                repositoryOwner: result.template.repositoryOwner,
+                repositoryName: result.template.repositoryName,
+                repositoryUrl: result.template.repositoryUrl,
+            },
+            customization: this.serializeCustomization(result.customization),
+            forkCreated: result.created,
+        };
+    }
+
+    @Get('templates/customizations/:customizationId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get template customization status',
+        description: 'Polls the status of a template customization run owned by the current user.',
+    })
+    @ApiResponse({ status: 200, description: 'Customization status' })
+    async getCustomization(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('customizationId') customizationId: string,
+    ) {
+        const customization = await this.templateCustomizationService.getByIdForUser(
+            customizationId,
+            auth.userId,
+        );
+        if (!customization) {
+            return { status: 'error', message: 'Customization not found' };
+        }
+        return {
+            status: 'success',
+            customization: this.serializeCustomization(customization),
+        };
+    }
+
+    @Get('templates/:templateId/customizations')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List template customizations',
+        description: 'Lists customization runs for a custom template owned by the current user.',
+    })
+    @ApiResponse({ status: 200, description: 'Customization list' })
+    async listCustomizationsForTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+    ) {
+        const customizations = await this.templateCustomizationService.listForTemplate(
+            templateId,
+            auth.userId,
+        );
+        return {
+            status: 'success',
+            customizations: customizations.map((c) => this.serializeCustomization(c)),
+        };
+    }
+
+    private serializeCustomization(c: {
+        id: string;
+        templateId: string;
+        baseTemplateId: string;
+        prompt: string;
+        status: string;
+        branch?: string | null;
+        commitSha?: string | null;
+        providerId?: string | null;
+        errorMessage?: string | null;
+        startedAt?: Date | null;
+        completedAt?: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }) {
+        return {
+            id: c.id,
+            templateId: c.templateId,
+            baseTemplateId: c.baseTemplateId,
+            prompt: c.prompt,
+            status: c.status,
+            branch: c.branch ?? null,
+            commitSha: c.commitSha ?? null,
+            providerId: c.providerId ?? null,
+            errorMessage: c.errorMessage ?? null,
+            startedAt: c.startedAt ? c.startedAt.toISOString() : null,
+            completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
         };
     }
 

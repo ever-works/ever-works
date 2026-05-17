@@ -11,6 +11,7 @@ import { UserTemplatePreferenceRepository } from '@src/database/repositories/use
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
 import {
+    findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     listWebsiteTemplates,
     type WebsiteTemplateConfig,
@@ -19,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
+import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
 
 export interface TemplateCatalogItem {
     id: string;
@@ -38,6 +40,16 @@ export interface TemplateCatalogItem {
     isActive: boolean;
     isDefault: boolean;
     ownerUserId?: string | null;
+    // Built-in: true when the WebsiteTemplateConfig marks it `customizable: true`
+    // AND a customization prompt is registered. Custom forks: true when their
+    // metadata.forkedFromTemplateId resolves to a customizable built-in.
+    customizable: boolean;
+    // For custom forks created via the agent flow, the built-in template id
+    // they were forked from. Lets the UI re-run a customization without
+    // making the user pick a base again.
+    baseTemplateId?: string | null;
+    // ISO timestamp of the last successful agent customization, if any.
+    lastCustomizedAt?: string | null;
 }
 
 export interface ForkTemplateResult {
@@ -103,25 +115,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
         return {
             defaultTemplateId,
-            templates: templates.map((template) => ({
-                id: template.id,
-                kind: template.kind,
-                sourceType: template.sourceType,
-                originType: this.getOriginType(template.sourceType, template.metadata),
-                name: template.name,
-                description: template.description,
-                framework: template.framework,
-                previewImageUrl: template.previewImageUrl,
-                repositoryUrl: template.repositoryUrl,
-                repositoryOwner: template.repositoryOwner,
-                repositoryName: template.repositoryName,
-                branch: template.branch,
-                syncBranches: template.syncBranches,
-                betaBranch: template.betaBranch,
-                isActive: template.isActive,
-                isDefault: template.id === defaultTemplateId,
-                ownerUserId: template.ownerUserId,
-            })),
+            templates: templates.map((template) => this.toCatalogItem(template, defaultTemplateId)),
         };
     }
 
@@ -725,6 +719,8 @@ export class TemplateCatalogService implements OnModuleInit {
         },
         defaultTemplateId: string | null,
     ): TemplateCatalogItem {
+        const baseTemplateId = this.resolveBaseTemplateId(template);
+        const lastCustomizedAtRaw = template.metadata?.lastCustomizedAt;
         return {
             id: template.id,
             kind: template.kind,
@@ -743,7 +739,38 @@ export class TemplateCatalogService implements OnModuleInit {
             isActive: template.isActive,
             isDefault: template.id === defaultTemplateId,
             ownerUserId: template.ownerUserId,
+            customizable: this.isCustomizable(template.sourceType, baseTemplateId, template.id),
+            baseTemplateId,
+            lastCustomizedAt: typeof lastCustomizedAtRaw === 'string' ? lastCustomizedAtRaw : null,
         };
+    }
+
+    private resolveBaseTemplateId(template: {
+        sourceType: TemplateSourceType;
+        id: string;
+        metadata?: Record<string, unknown>;
+    }): string | null {
+        if (template.sourceType === 'built_in') {
+            return template.id;
+        }
+        const forkedFrom = template.metadata?.forkedFromTemplateId;
+        return typeof forkedFrom === 'string' ? forkedFrom : null;
+    }
+
+    private isCustomizable(
+        sourceType: TemplateSourceType,
+        baseTemplateId: string | null,
+        templateId: string,
+    ): boolean {
+        const candidateId = baseTemplateId ?? (sourceType === 'built_in' ? templateId : null);
+        if (!candidateId) {
+            return false;
+        }
+        const config = findWebsiteTemplateConfig(candidateId);
+        if (!config?.customizable) {
+            return false;
+        }
+        return hasCustomizationPromptForBaseTemplate(candidateId);
     }
 
     private inferFramework(template: WebsiteTemplateConfig): string | null {

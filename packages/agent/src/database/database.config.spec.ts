@@ -30,6 +30,7 @@ jest.mock('../entities', () => ({
     GitHubAppUserLink: class GitHubAppUserLink {},
     OnboardingRequest: class OnboardingRequest {},
     Template: class Template {},
+    TemplateCustomization: class TemplateCustomization {},
     UserTemplatePreference: class UserTemplatePreference {},
     WebhookSubscription: class WebhookSubscription {},
     WorkProposal: class WorkProposal {},

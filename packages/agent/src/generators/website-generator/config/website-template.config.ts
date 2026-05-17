@@ -11,6 +11,11 @@ export interface WebsiteTemplateConfig {
     branch: string;
     syncBranches: string[];
     betaBranch?: string | null;
+    // Whether a fork of this template can be agent-customized (UI-only edits
+    // applied to a user's fork). Templates without a matching customization
+    // prompt cannot be customized regardless of this flag. See
+    // packages/agent/src/template-catalog/customization-prompts/.
+    customizable?: boolean;
 }
 
 const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
@@ -24,6 +29,8 @@ const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
     betaBranch: config.websiteTemplate.getBetaBranch(),
+    // Too large/complex to safely agent-customize end-to-end today.
+    customizable: false,
 };
 
 const createMinimalWebsiteTemplate = (): WebsiteTemplateConfig | null => {
@@ -41,6 +48,7 @@ const createMinimalWebsiteTemplate = (): WebsiteTemplateConfig | null => {
         branch: config.websiteTemplate.getMinimalBranch(),
         syncBranches: ['main', 'stage', 'develop'],
         betaBranch: config.websiteTemplate.getMinimalBetaBranch(),
+        customizable: true,
     };
 };
 

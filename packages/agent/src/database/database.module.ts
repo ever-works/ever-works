@@ -26,6 +26,7 @@ import { GitHubAppInstallationRepoRepository } from './repositories/github-app-i
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { TemplateRepository } from './repositories/template.repository';
+import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
 
@@ -69,6 +70,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
         TemplateRepository,
+        TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],
@@ -98,6 +100,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
         TemplateRepository,
+        TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],
