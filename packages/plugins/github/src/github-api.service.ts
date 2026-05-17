@@ -20,10 +20,7 @@ import type {
 	TransferRepoOptions,
 	TransferRepoResult
 } from '@ever-works/plugin/git';
-import {
-	GitHubVerifiedOrgService,
-	parseVerifiedOrgs
-} from './github-verified-org.service.js';
+import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
 
 function sanitizeDescription(description?: string): string {
 	if (!description) return '';
@@ -42,9 +39,7 @@ export class GitHubApiService {
 	 * (`new GitHubApiService()`) keep working; tests may inject a
 	 * custom instance.
 	 */
-	constructor(
-		private readonly verifiedOrgService: GitHubVerifiedOrgService = new GitHubVerifiedOrgService()
-	) {}
+	constructor(private readonly verifiedOrgService: GitHubVerifiedOrgService = new GitHubVerifiedOrgService()) {}
 
 	private createOctokit(token: string, baseUrl?: string): Octokit {
 		return new Octokit({

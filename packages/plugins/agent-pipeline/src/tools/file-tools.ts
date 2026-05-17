@@ -27,9 +27,7 @@ export function resolveSandboxPath(cwd: string, rawPath: string): string {
 	const resolved = nodePath.posix.resolve(cwd, rawPath);
 	const cwdNormalized = nodePath.posix.resolve(cwd) + nodePath.posix.sep;
 	if (resolved !== nodePath.posix.resolve(cwd) && !resolved.startsWith(cwdNormalized)) {
-		throw new Error(
-			`Invalid path "${rawPath}": resolves outside the workspace (${resolved} is not under ${cwd}).`
-		);
+		throw new Error(`Invalid path "${rawPath}": resolves outside the workspace (${resolved} is not under ${cwd}).`);
 	}
 	return resolved;
 }

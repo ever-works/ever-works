@@ -76,15 +76,16 @@ export class AuthService {
      * Returns the callbackUrl if its host is allowed, otherwise returns
      * undefined so the caller falls back to the platform default.
      */
-    private validateCallbackUrl(callbackUrl: string | undefined | null, kind: string): string | undefined {
+    private validateCallbackUrl(
+        callbackUrl: string | undefined | null,
+        kind: string,
+    ): string | undefined {
         if (!callbackUrl) return undefined;
         let parsed: URL;
         try {
             parsed = new URL(callbackUrl);
         } catch {
-            this.logger.warn(
-                `Rejected ${kind} callbackUrl: not a valid URL (${callbackUrl})`,
-            );
+            this.logger.warn(`Rejected ${kind} callbackUrl: not a valid URL (${callbackUrl})`);
             return undefined;
         }
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -325,7 +326,10 @@ export class AuthService {
         const user = await this.getUserByPasswordResetToken(token);
 
         // H-01: lookup by sha256(submitted). DB stores hashes only.
-        const consumed = await this.userRepository.clearPasswordResetToken(user.id, hashToken(token));
+        const consumed = await this.userRepository.clearPasswordResetToken(
+            user.id,
+            hashToken(token),
+        );
         if (!consumed) {
             throw new BadRequestException('Invalid reset token');
         }

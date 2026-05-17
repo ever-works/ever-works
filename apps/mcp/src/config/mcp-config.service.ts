@@ -35,7 +35,7 @@ export class McpConfigService {
 		if (this.authMode !== 'per-user-jwt' && !apiKey) {
 			throw new Error(
 				`EVER_WORKS_API_KEY is required for MCP auth mode "${this.authMode}". ` +
-					'Set EVER_WORKS_MCP_AUTH_MODE=per-user-jwt to opt out, or generate a key at Settings > API Keys in the Ever Works dashboard.',
+					'Set EVER_WORKS_MCP_AUTH_MODE=per-user-jwt to opt out, or generate a key at Settings > API Keys in the Ever Works dashboard.'
 			);
 		}
 		this.apiKey = apiKey;
@@ -63,11 +63,7 @@ export class McpConfigService {
 
 	/** True if a request that presents a per-user JWT should be allowed (with or without shared key). */
 	allowsJwt(): boolean {
-		return (
-			this.authMode === 'shared-key-jwt' ||
-			this.authMode === 'per-user-jwt' ||
-			this.authMode === 'hybrid'
-		);
+		return this.authMode === 'shared-key-jwt' || this.authMode === 'per-user-jwt' || this.authMode === 'hybrid';
 	}
 
 	/** True if a request must present a per-user JWT (i.e. the shared key alone is insufficient). */
@@ -82,6 +78,6 @@ function parseAuthMode(raw: string | undefined): McpAuthMode {
 		return v;
 	}
 	throw new Error(
-		`Invalid EVER_WORKS_MCP_AUTH_MODE: "${raw}". Expected one of: shared-key, shared-key-jwt, per-user-jwt, hybrid.`,
+		`Invalid EVER_WORKS_MCP_AUTH_MODE: "${raw}". Expected one of: shared-key, shared-key-jwt, per-user-jwt, hybrid.`
 	);
 }

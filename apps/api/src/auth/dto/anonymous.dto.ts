@@ -10,7 +10,8 @@ import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
  */
 export class CreateAnonymousDto {
     @ApiPropertyOptional({
-        description: 'Captcha token from the configured provider (Turnstile / hCaptcha / reCAPTCHA)',
+        description:
+            'Captcha token from the configured provider (Turnstile / hCaptcha / reCAPTCHA)',
     })
     @IsOptional()
     @IsString()

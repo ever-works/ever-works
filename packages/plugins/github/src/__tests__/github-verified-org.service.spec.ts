@@ -40,9 +40,9 @@ const { RequestError: FakeRequestError } = (await import('octokit')) as unknown 
 	RequestError: new (message: string, status: number) => Error & { status: number };
 };
 
-function makeOctokitMock(
-	checkMembershipForUser: ReturnType<typeof vi.fn>
-): { rest: { orgs: { checkMembershipForUser: ReturnType<typeof vi.fn> } } } {
+function makeOctokitMock(checkMembershipForUser: ReturnType<typeof vi.fn>): {
+	rest: { orgs: { checkMembershipForUser: ReturnType<typeof vi.fn> } };
+} {
 	return { rest: { orgs: { checkMembershipForUser } } };
 }
 
@@ -212,10 +212,7 @@ describe('GitHubVerifiedOrgService.isVerifiedMember', () => {
 	});
 
 	it('expires the cache after ttlMs', async () => {
-		const check = vi
-			.fn()
-			.mockResolvedValueOnce({ status: 204 })
-			.mockResolvedValueOnce({ status: 204 });
+		const check = vi.fn().mockResolvedValueOnce({ status: 204 }).mockResolvedValueOnce({ status: 204 });
 		let nowMs = 1_000_000;
 		const svc = new GitHubVerifiedOrgService({
 			ttlMs: 1000,

@@ -22,7 +22,8 @@ import { toast } from 'sonner';
  * dangerous slips through, swap this client copy for `isomorphic-dompurify`
  * when adding it as a dep.
  */
-const SVG_DANGEROUS_TAG_RE = /<\/?(?:script|iframe|object|embed|foreignObject|use\s+[^>]*xlink:href)[^>]*>/gi;
+const SVG_DANGEROUS_TAG_RE =
+    /<\/?(?:script|iframe|object|embed|foreignObject|use\s+[^>]*xlink:href)[^>]*>/gi;
 const SVG_DANGEROUS_ATTR_RE = /\s(?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 function sanitizeSvgClient(svg: string): string {

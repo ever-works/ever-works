@@ -45,7 +45,7 @@ export class PluginSecretEncService {
         if (process.env.NODE_ENV === 'production' && !this.tryGetKey()) {
             throw new Error(
                 'PLUGIN_SECRET_ENCRYPTION_KEY is required in production for at-rest encryption of plugin secret settings. ' +
-                    'Generate with: `node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"` and add to the deployment env.',
+                    "Generate with: `node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"` and add to the deployment env.",
             );
         }
     }

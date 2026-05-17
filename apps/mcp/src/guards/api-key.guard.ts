@@ -43,7 +43,7 @@ export class ApiKeyGuard implements CanActivate {
 		// 1. Validate per-user JWT presence.
 		if (this.config.requiresJwt() && !userJwtPresent) {
 			throw new UnauthorizedException(
-				`Per-user JWT required (x-ever-works-jwt header) for auth mode ${this.config.authMode}`,
+				`Per-user JWT required (x-ever-works-jwt header) for auth mode ${this.config.authMode}`
 			);
 		}
 
@@ -61,7 +61,9 @@ export class ApiKeyGuard implements CanActivate {
 					throw new UnauthorizedException('Invalid shared API key');
 				}
 			} else if (this.config.authMode === 'shared-key-jwt') {
-				throw new UnauthorizedException('Shared API key required (Authorization Bearer) for auth mode shared-key-jwt');
+				throw new UnauthorizedException(
+					'Shared API key required (Authorization Bearer) for auth mode shared-key-jwt'
+				);
 			}
 		} else if (this.config.authMode === 'per-user-jwt' && sharedKeyPresent) {
 			// In per-user-jwt mode, a shared key is not accepted — refuse to

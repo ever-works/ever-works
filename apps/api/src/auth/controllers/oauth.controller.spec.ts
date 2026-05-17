@@ -73,7 +73,8 @@ describe('OAuthController', () => {
             const result = await controller.getAuthUrl('github', res);
 
             expect(socialAuth.getAuthorizationUrl).toHaveBeenCalledTimes(1);
-            const [providerArg, redirectArg, stateArg] = socialAuth.getAuthorizationUrl.mock.calls[0];
+            const [providerArg, redirectArg, stateArg] =
+                socialAuth.getAuthorizationUrl.mock.calls[0];
             expect(providerArg).toBe('github');
             expect(redirectArg).toBeUndefined();
             // The state passed to the social-auth call must match the cookie value.
@@ -106,7 +107,9 @@ describe('OAuthController', () => {
             const { state, setCookie } = oauthState.mint({ secure: false });
             const cookieValue = setCookie.split(';')[0]; // "ew_oauth_state=<state>"
             const baseHeaders = { 'user-agent': 'Mozilla/5.0', cookie: cookieValue };
-            const headers = overrides.headers ? { ...baseHeaders, ...overrides.headers } : baseHeaders;
+            const headers = overrides.headers
+                ? { ...baseHeaders, ...overrides.headers }
+                : baseHeaders;
             return {
                 state,
                 req: makeRequest({ ...overrides, headers }),
@@ -200,9 +203,9 @@ describe('OAuthController', () => {
             const { state, req } = mintAndMakeReq();
             const res = makeRes();
 
-            await expect(
-                controller.authRedirect('github', 'bad', state, req, res),
-            ).rejects.toThrow('No access token returned');
+            await expect(controller.authRedirect('github', 'bad', state, req, res)).rejects.toThrow(
+                'No access token returned',
+            );
 
             expect(authProvider.issueSession).not.toHaveBeenCalled();
             expect(activityLog.log).not.toHaveBeenCalled();
@@ -214,9 +217,9 @@ describe('OAuthController', () => {
             const { state, req } = mintAndMakeReq();
             const res = makeRes();
 
-            await expect(
-                controller.authRedirect('github', 'c', state, req, res),
-            ).rejects.toThrow('session store down');
+            await expect(controller.authRedirect('github', 'c', state, req, res)).rejects.toThrow(
+                'session store down',
+            );
 
             expect(activityLog.log).not.toHaveBeenCalled();
         });

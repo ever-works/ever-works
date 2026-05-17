@@ -1,10 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { SOCIAL_AUTH_PROVIDERS, getSocialAuthProviderConfig } from './social-auth.providers';
-import {
-    GITHUB_FULL_SCOPES,
-    GITHUB_LOGIN_SCOPES,
-    GITHUB_SCOPES,
-} from './github-scopes.config';
+import { GITHUB_FULL_SCOPES, GITHUB_LOGIN_SCOPES, GITHUB_SCOPES } from './github-scopes.config';
 import { AuthProvider } from '../../config/constants';
 
 describe('social-auth.providers', () => {

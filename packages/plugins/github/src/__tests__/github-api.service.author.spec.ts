@@ -175,11 +175,7 @@ describe('GitHubApiService — PR author population', () => {
 		it('reuses the cached verified-org result for a batch of PRs from the same author', async () => {
 			process.env.COMMUNITY_PR_VERIFIED_ORGS = 'ever-works';
 			pullsListMock.mockResolvedValueOnce({
-				data: [
-					basePrPayload({ number: 1 }),
-					basePrPayload({ number: 2 }),
-					basePrPayload({ number: 3 })
-				]
+				data: [basePrPayload({ number: 1 }), basePrPayload({ number: 2 }), basePrPayload({ number: 3 })]
 			});
 
 			const check = vi.fn().mockResolvedValueOnce({ status: 204 });

@@ -39,7 +39,9 @@ describe('AuthController', () => {
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
     let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
     let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
-    let captchaVerifier: jest.Mocked<Pick<CaptchaVerifierService, 'isEnabled' | 'isRequired' | 'verify'>>;
+    let captchaVerifier: jest.Mocked<
+        Pick<CaptchaVerifierService, 'isEnabled' | 'isRequired' | 'verify'>
+    >;
     let funnel: { emit: jest.Mock };
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
@@ -491,10 +493,7 @@ describe('AuthController', () => {
             authService.verifyEmail.mockResolvedValue({ id: 'u1' } as any);
             authProvider.issueSession.mockResolvedValue({ access_token: 'tok' } as any);
 
-            const result = await controller.verifyEmail(
-                { token: 'verif-tok' } as any,
-                makeReq(),
-            );
+            const result = await controller.verifyEmail({ token: 'verif-tok' } as any, makeReq());
 
             expect(authService.verifyEmail).toHaveBeenCalledWith('verif-tok');
             expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
@@ -507,9 +506,9 @@ describe('AuthController', () => {
         it('does not issue a session when verifyEmail rejects', async () => {
             authService.verifyEmail.mockRejectedValue(new Error('Invalid or expired token'));
 
-            await expect(
-                controller.verifyEmail({ token: 'x' } as any, makeReq()),
-            ).rejects.toThrow('Invalid or expired token');
+            await expect(controller.verifyEmail({ token: 'x' } as any, makeReq())).rejects.toThrow(
+                'Invalid or expired token',
+            );
             expect(authProvider.issueSession).not.toHaveBeenCalled();
         });
     });

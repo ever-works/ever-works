@@ -299,9 +299,7 @@ describe('AuthService', () => {
             expect(typeof rawToken).toBe('string');
             // The persisted hash MUST be sha256(raw token) — verifies the
             // H-01 invariant on every call.
-            expect(persistedHash).toBe(
-                createHash('sha256').update(rawToken, 'utf8').digest('hex'),
-            );
+            expect(persistedHash).toBe(createHash('sha256').update(rawToken, 'utf8').digest('hex'));
         });
 
         it('appends ?token= when callbackUrl missing token=', async () => {
@@ -312,7 +310,9 @@ describe('AuthService', () => {
 
             const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
             // H-01: URL carries the raw token from the event; the DB has its hash.
-            expect(event.confirmationUrl).toBe(`https://x.test/verify?token=${event.confirmationToken}`);
+            expect(event.confirmationUrl).toBe(
+                `https://x.test/verify?token=${event.confirmationToken}`,
+            );
             expect(userRepo.update.mock.calls[0][1].emailVerificationToken).toBe(
                 createHash('sha256').update(event.confirmationToken, 'utf8').digest('hex'),
             );
@@ -430,9 +430,7 @@ describe('AuthService', () => {
             );
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
             const rawToken = event.resetToken;
-            expect(persistedHash).toBe(
-                createHash('sha256').update(rawToken, 'utf8').digest('hex'),
-            );
+            expect(persistedHash).toBe(createHash('sha256').update(rawToken, 'utf8').digest('hex'));
             expect(event.resetUrl).toBe(`https://x.test/reset?token=${rawToken}`);
         });
 

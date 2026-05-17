@@ -42,10 +42,7 @@ export function parseBcryptCost(hash: string): number | null {
     return cost;
 }
 
-export function passwordNeedsRehash(
-    hash: string,
-    targetCost: number = getBcryptCost(),
-): boolean {
+export function passwordNeedsRehash(hash: string, targetCost: number = getBcryptCost()): boolean {
     const current = parseBcryptCost(hash);
     if (current === null) return false;
     return current < targetCost;

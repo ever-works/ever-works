@@ -25,8 +25,8 @@ import { randomBytes, timingSafeEqual } from 'crypto';
 
 export const OAUTH_STATE_COOKIE = 'ew_oauth_state';
 const STATE_TTL_SECONDS = 10 * 60; // 10 minutes — long enough for the
-                                   //  user to OAuth + come back, short
-                                   //  enough that a leaked state expires.
+//  user to OAuth + come back, short
+//  enough that a leaked state expires.
 
 @Injectable()
 export class OAuthStateService {
@@ -68,7 +68,11 @@ export class OAuthStateService {
             `; SameSite=Lax` +
             (opts.secure ? '; Secure' : '');
 
-        if (!opts.stateQuery || typeof opts.stateQuery !== 'string' || opts.stateQuery.length === 0) {
+        if (
+            !opts.stateQuery ||
+            typeof opts.stateQuery !== 'string' ||
+            opts.stateQuery.length === 0
+        ) {
             return { valid: false, clearCookie, reason: 'missing state query' };
         }
         const cookieValue = parseStateCookie(opts.cookieHeader);

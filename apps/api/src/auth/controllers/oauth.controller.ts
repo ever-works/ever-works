@@ -1,4 +1,13 @@
-import { BadRequestException, Controller, Get, Inject, Param, Query, Req, Res } from '@nestjs/common';
+import {
+    BadRequestException,
+    Controller,
+    Get,
+    Inject,
+    Param,
+    Query,
+    Req,
+    Res,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 
@@ -36,7 +45,11 @@ export class OAuthController {
         summary: 'Get OAuth URL',
         description: 'Generate an OAuth authorization URL for a supported provider',
     })
-    @ApiQuery({ name: 'state', required: false, description: 'Optional state parameter (ignored — server mints its own per C-03)' })
+    @ApiQuery({
+        name: 'state',
+        required: false,
+        description: 'Optional state parameter (ignored — server mints its own per C-03)',
+    })
     @ApiResponse({ status: 200, description: 'Returns the OAuth URL' })
     async getAuthUrl(
         @Param('providerId') providerId: string,
@@ -81,9 +94,7 @@ export class OAuthController {
         // browser's `ew_oauth_state` cookie BEFORE we exchange the code.
         // Without this an attacker can complete a victim's OAuth flow.
         const rawCookieHeader = req.headers.cookie;
-        const cookieHeader = Array.isArray(rawCookieHeader)
-            ? rawCookieHeader[0]
-            : rawCookieHeader;
+        const cookieHeader = Array.isArray(rawCookieHeader) ? rawCookieHeader[0] : rawCookieHeader;
         const stateResult = this.oauthState.verify({
             cookieHeader,
             stateQuery: typeof state === 'string' ? state : undefined,

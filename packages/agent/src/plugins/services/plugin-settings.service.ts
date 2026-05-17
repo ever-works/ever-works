@@ -79,7 +79,9 @@ export class PluginSettingsService {
      * unchanged so the rest of the pipeline keeps working during the
      * gradual encrypt-on-next-write rollout.
      */
-    private decryptSecrets(record: Record<string, unknown> | null | undefined): Record<string, unknown> {
+    private decryptSecrets(
+        record: Record<string, unknown> | null | undefined,
+    ): Record<string, unknown> {
         if (!record) return {};
         if (!this.secretEnc) return { ...record };
         return this.secretEnc.decryptRecord(record);
@@ -90,7 +92,9 @@ export class PluginSettingsService {
      * persistence. Falls back to passthrough when the encryption service
      * isn't bound (tests, dev without PLUGIN_SECRET_ENCRYPTION_KEY).
      */
-    private encryptSecrets(record: Record<string, unknown> | null | undefined): Record<string, unknown> {
+    private encryptSecrets(
+        record: Record<string, unknown> | null | undefined,
+    ): Record<string, unknown> {
         if (!record) return {};
         if (!this.secretEnc) return { ...record };
         return this.secretEnc.encryptRecord(record);

@@ -137,10 +137,7 @@ export class AuthController {
     @ApiResponse({ status: 201, description: 'Anonymous session issued' })
     @ApiResponse({ status: 400, description: 'Captcha verification failed' })
     @ApiResponse({ status: 429, description: 'Rate limit exceeded for this IP' })
-    async anonymous(
-        @Request() req,
-        @Body() body?: CreateAnonymousDto,
-    ) {
+    async anonymous(@Request() req, @Body() body?: CreateAnonymousDto) {
         const ipAddress =
             (typeof req.ip === 'string' && req.ip) ||
             (typeof req.headers['x-forwarded-for'] === 'string'

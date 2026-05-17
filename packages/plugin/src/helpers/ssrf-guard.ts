@@ -114,8 +114,7 @@ export interface DnsLookupAddress {
  */
 export type DnsResolver = (hostname: string) => Promise<DnsLookupAddress[]>;
 
-const defaultDnsResolver: DnsResolver = (hostname) =>
-	dns.promises.lookup(hostname, { all: true });
+const defaultDnsResolver: DnsResolver = (hostname) => dns.promises.lookup(hostname, { all: true });
 
 /**
  * Error thrown when {@link safeFetchWithDnsPin} refuses to issue the
@@ -123,20 +122,9 @@ const defaultDnsResolver: DnsResolver = (hostname) =>
  * label without parsing a free-form message.
  */
 export class SsrfBlockedError extends Error {
-	readonly code:
-		| 'lexical_blocked'
-		| 'dns_lookup_failed'
-		| 'dns_no_results'
-		| 'dns_private_ip';
+	readonly code: 'lexical_blocked' | 'dns_lookup_failed' | 'dns_no_results' | 'dns_private_ip';
 
-	constructor(
-		code:
-			| 'lexical_blocked'
-			| 'dns_lookup_failed'
-			| 'dns_no_results'
-			| 'dns_private_ip',
-		message: string,
-	) {
+	constructor(code: 'lexical_blocked' | 'dns_lookup_failed' | 'dns_no_results' | 'dns_private_ip', message: string) {
 		super(message);
 		this.name = 'SsrfBlockedError';
 		this.code = code;
@@ -195,13 +183,10 @@ export interface SafeFetchOptions {
 export async function safeFetchWithDnsPin(
 	rawUrl: string,
 	init?: RequestInit,
-	options?: SafeFetchOptions,
+	options?: SafeFetchOptions
 ): Promise<Response> {
 	if (!isSafeWebhookUrl(rawUrl)) {
-		throw new SsrfBlockedError(
-			'lexical_blocked',
-			'URL rejected by lexical SSRF guard',
-		);
+		throw new SsrfBlockedError('lexical_blocked', 'URL rejected by lexical SSRF guard');
 	}
 
 	const url = new URL(rawUrl);
@@ -224,32 +209,20 @@ export async function safeFetchWithDnsPin(
 		addresses = await resolver(host);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		throw new SsrfBlockedError(
-			'dns_lookup_failed',
-			`DNS lookup failed for ${host}: ${message}`,
-		);
+		throw new SsrfBlockedError('dns_lookup_failed', `DNS lookup failed for ${host}: ${message}`);
 	}
 
 	if (!Array.isArray(addresses) || addresses.length === 0) {
-		throw new SsrfBlockedError(
-			'dns_no_results',
-			`DNS lookup returned no addresses for ${host}`,
-		);
+		throw new SsrfBlockedError('dns_no_results', `DNS lookup returned no addresses for ${host}`);
 	}
 
 	for (const entry of addresses) {
 		const ip = entry.address;
 		if (entry.family === 4 && isPrivateIPv4(ip)) {
-			throw new SsrfBlockedError(
-				'dns_private_ip',
-				`${host} resolved to private IPv4 ${ip}`,
-			);
+			throw new SsrfBlockedError('dns_private_ip', `${host} resolved to private IPv4 ${ip}`);
 		}
 		if (entry.family === 6 && isPrivateIPv6(ip)) {
-			throw new SsrfBlockedError(
-				'dns_private_ip',
-				`${host} resolved to private IPv6 ${ip}`,
-			);
+			throw new SsrfBlockedError('dns_private_ip', `${host} resolved to private IPv6 ${ip}`);
 		}
 	}
 

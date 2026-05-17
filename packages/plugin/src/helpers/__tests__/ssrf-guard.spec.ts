@@ -98,9 +98,7 @@ describe('safeFetchWithDnsPin', () => {
 		{ address: '93.184.216.34', family: 4 } satisfies DnsLookupAddress
 	];
 
-	const loopbackResolver: DnsResolver = async () => [
-		{ address: '127.0.0.1', family: 4 } satisfies DnsLookupAddress
-	];
+	const loopbackResolver: DnsResolver = async () => [{ address: '127.0.0.1', family: 4 } satisfies DnsLookupAddress];
 
 	const mixedResolver: DnsResolver = async () => [
 		{ address: '93.184.216.34', family: 4 } satisfies DnsLookupAddress,
@@ -206,14 +204,8 @@ describe('safeFetchWithDnsPin', () => {
 
 	it('skips DNS resolution for literal public IPs (lexical guard already accepted them)', async () => {
 		fetchSpy.mockResolvedValue(new Response('ok', { status: 200 }));
-		const resolver = vi.fn<DnsResolver>(async () => [
-			{ address: '8.8.8.8', family: 4 } satisfies DnsLookupAddress
-		]);
-		const res = await safeFetchWithDnsPin(
-			'https://8.8.8.8/health',
-			undefined,
-			{ dnsResolver: resolver }
-		);
+		const resolver = vi.fn<DnsResolver>(async () => [{ address: '8.8.8.8', family: 4 } satisfies DnsLookupAddress]);
+		const res = await safeFetchWithDnsPin('https://8.8.8.8/health', undefined, { dnsResolver: resolver });
 		expect(res.status).toBe(200);
 		expect(resolver).not.toHaveBeenCalled();
 	});

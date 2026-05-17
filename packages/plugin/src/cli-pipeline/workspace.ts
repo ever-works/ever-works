@@ -21,17 +21,20 @@ const ITEM_STRING_MAX = 16 * 1024;
 const ITEM_LONG_STRING_MAX = 64 * 1024;
 const ITEM_TAG_MAX = 64;
 
-const httpUrl = z.string().max(2048).refine(
-	(v) => {
-		try {
-			const u = new URL(v);
-			return u.protocol === 'http:' || u.protocol === 'https:';
-		} catch {
-			return false;
-		}
-	},
-	{ message: 'url must use http(s) scheme' }
-);
+const httpUrl = z
+	.string()
+	.max(2048)
+	.refine(
+		(v) => {
+			try {
+				const u = new URL(v);
+				return u.protocol === 'http:' || u.protocol === 'https:';
+			} catch {
+				return false;
+			}
+		},
+		{ message: 'url must use http(s) scheme' }
+	);
 
 const stringOrNullish = z.union([z.string().max(ITEM_STRING_MAX), z.null(), z.undefined()]);
 
@@ -44,7 +47,7 @@ const cliItemSchema = z
 		tags: z.array(z.string().max(ITEM_TAG_MAX)).max(256).optional(),
 		images: z.array(httpUrl).max(64).optional(),
 		image: stringOrNullish.optional(),
-		brand: stringOrNullish.optional(),
+		brand: stringOrNullish.optional()
 		// Free-form metadata — accept but cap.
 	})
 	.catchall(z.unknown())

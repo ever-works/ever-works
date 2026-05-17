@@ -53,7 +53,10 @@ export class AnthropicManagedAgentsClient {
 		// what the upstream SDK accepts at runtime.
 		const allowHostsRaw = process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS?.trim();
 		const allowHosts = allowHostsRaw
-			? allowHostsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+			? allowHostsRaw
+					.split(',')
+					.map((s) => s.trim())
+					.filter(Boolean)
 			: null;
 
 		// Use `any` because the SDK's `NetworkingConfig` type does not yet
@@ -61,9 +64,7 @@ export class AnthropicManagedAgentsClient {
 		// types update, narrow this.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const networking: any =
-			allowHosts && allowHosts.length > 0
-				? { type: 'allowlist', hosts: allowHosts }
-				: { type: 'unrestricted' };
+			allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' };
 
 		const environment = await this.client.beta.environments.create({
 			name: input.name,
