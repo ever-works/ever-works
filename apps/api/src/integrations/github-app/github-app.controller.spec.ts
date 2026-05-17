@@ -86,6 +86,14 @@ describe('GitHubAppController', () => {
     });
 
     describe('callback (GET /api/github-app/callback)', () => {
+        // H-04: callback binds the issued session to the requesting client's
+        // ip + user-agent. Tests pass a minimal `req` that mirrors the fields
+        // the controller reads.
+        const fakeReq = {
+            ip: '203.0.113.4',
+            headers: { 'user-agent': 'jest-test-runner' },
+        } as any;
+
         it('runs completeUserAuth → issueSession and merges installationId+redirectTo into the session payload', async () => {
             const { controller, onboardingService, authProvider } = createController();
             onboardingService.completeUserAuth.mockResolvedValue({
@@ -99,13 +107,16 @@ describe('GitHubAppController', () => {
                 user: { id: 'u1' },
             });
 
-            const result = await controller.callback({ code: 'c', state: 's' } as any);
+            const result = await controller.callback({ code: 'c', state: 's' } as any, fakeReq);
 
             expect(onboardingService.completeUserAuth).toHaveBeenCalledWith({
                 code: 'c',
                 state: 's',
             });
-            expect(authProvider.issueSession).toHaveBeenCalledWith('u1');
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
+                ipAddress: '203.0.113.4',
+                userAgent: 'jest-test-runner',
+            });
             expect(result).toEqual({
                 accessToken: 'tok',
                 refreshToken: 'rtok',
@@ -118,9 +129,9 @@ describe('GitHubAppController', () => {
         it('does not call issueSession when completeUserAuth fails', async () => {
             const { controller, onboardingService, authProvider } = createController();
             onboardingService.completeUserAuth.mockRejectedValue(new Error('auth failed'));
-            await expect(controller.callback({ code: 'c', state: 's' } as any)).rejects.toThrow(
-                'auth failed',
-            );
+            await expect(
+                controller.callback({ code: 'c', state: 's' } as any, fakeReq),
+            ).rejects.toThrow('auth failed');
             expect(authProvider.issueSession).not.toHaveBeenCalled();
         });
 
@@ -133,9 +144,50 @@ describe('GitHubAppController', () => {
             });
             authProvider.issueSession.mockResolvedValue({ accessToken: 'a' });
 
-            const result = await controller.callback({ code: 'c', state: 's' } as any);
+            const result = await controller.callback({ code: 'c', state: 's' } as any, fakeReq);
             expect(result.redirectTo).toBeUndefined();
             expect(result.installationId).toBe('inst-1');
+        });
+
+        // H-04: x-forwarded-for fallback when req.ip isn't set (proxy/LB).
+        it('falls back to x-forwarded-for first hop when req.ip is absent', async () => {
+            const { controller, onboardingService, authProvider } = createController();
+            onboardingService.completeUserAuth.mockResolvedValue({
+                user: { id: 'u1' },
+                installation: { installationId: 'inst-1' },
+            });
+            authProvider.issueSession.mockResolvedValue({ accessToken: 'a' });
+
+            await controller.callback({ code: 'c', state: 's' } as any, {
+                headers: {
+                    'x-forwarded-for': '198.51.100.7, 10.0.0.1',
+                    'user-agent': 'curl/8',
+                },
+            } as any);
+
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
+                ipAddress: '198.51.100.7',
+                userAgent: 'curl/8',
+            });
+        });
+
+        // H-04: when neither req.ip nor x-forwarded-for is usable, the
+        // controller must still issue the session but with nulls (defense
+        // in depth — issueSession itself decides what to do with nulls).
+        it('passes null ipAddress/userAgent when nothing usable is on the request', async () => {
+            const { controller, onboardingService, authProvider } = createController();
+            onboardingService.completeUserAuth.mockResolvedValue({
+                user: { id: 'u1' },
+                installation: { installationId: 'inst-1' },
+            });
+            authProvider.issueSession.mockResolvedValue({ accessToken: 'a' });
+
+            await controller.callback({ code: 'c', state: 's' } as any, { headers: {} } as any);
+
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
+                ipAddress: null,
+                userAgent: null,
+            });
         });
     });
 
