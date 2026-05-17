@@ -24,10 +24,15 @@ export function resolveSandboxPath(cwd: string, rawPath: string): string {
 			`Invalid path "${rawPath}": absolute paths are not allowed. Use a path relative to the workspace (e.g. "data/items/foo.json").`
 		);
 	}
-	const resolved = nodePath.posix.resolve(cwd, rawPath);
-	const cwdNormalized = nodePath.posix.resolve(cwd) + nodePath.posix.sep;
-	if (resolved !== nodePath.posix.resolve(cwd) && !resolved.startsWith(cwdNormalized)) {
-		throw new Error(`Invalid path "${rawPath}": resolves outside the workspace (${resolved} is not under ${cwd}).`);
+	const resolvedCwd = nodePath.posix.resolve(cwd);
+	const resolved = nodePath.posix.resolve(resolvedCwd, rawPath);
+	// Edge case: when cwd is `/`, `resolvedCwd + sep` becomes `//`, which
+	// nothing starts with. Use the raw separator boundary instead.
+	const cwdWithSep = resolvedCwd === '/' ? '/' : resolvedCwd + nodePath.posix.sep;
+	if (resolved !== resolvedCwd && !resolved.startsWith(cwdWithSep)) {
+		throw new Error(
+			`Invalid path "${rawPath}": resolves outside the workspace (${resolved} is not under ${resolvedCwd}).`
+		);
 	}
 	return resolved;
 }
