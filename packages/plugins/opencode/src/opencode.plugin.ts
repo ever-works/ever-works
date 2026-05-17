@@ -28,11 +28,7 @@ import type {
 	FacadeOptions,
 	IAiFacade
 } from '@ever-works/plugin';
-import {
-	buildSuccessPipelineResult,
-	substituteVariables,
-	buildDefaultCodeEditSystemPrompt
-} from '@ever-works/plugin';
+import { buildSuccessPipelineResult, substituteVariables, buildDefaultCodeEditSystemPrompt } from '@ever-works/plugin';
 import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 
 import type { OpenCodeStepId } from './types.js';
