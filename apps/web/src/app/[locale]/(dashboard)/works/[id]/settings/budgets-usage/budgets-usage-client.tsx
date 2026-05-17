@@ -354,7 +354,9 @@ function GlobalCapForm({
         existing && existing.monthlyCapCents > 0
             ? Math.min(150, Math.round((spendCents / existing.monthlyCapCents) * 100))
             : 0;
-    const isOver = percent >= 100;
+    // Derive isOver from raw cents — `percent` is rounded, so 99.6%
+    // would flip the bar red one tick before the cap is actually hit.
+    const isOver = existing != null && spendCents >= existing.monthlyCapCents;
 
     const handleSave = () => {
         setError(null);
@@ -614,6 +616,13 @@ function PluginBudgetForm({
             setError(tPlugin('errorPluginRequired'));
             return;
         }
+        // A non-empty pluginQuery means the user typed after the last
+        // selection event (Combobox onChange resets it to ''). Reject
+        // so a typed-but-not-picked query can't submit the prior pick.
+        if (pluginQuery) {
+            setError(tPlugin('errorPluginRequired'));
+            return;
+        }
         const cents = dollarsToCents(capInput);
         if (cents === null) {
             setError(tPlugin('errorPositive'));
@@ -678,11 +687,13 @@ function PluginBudgetForm({
                                             p ? `${p.name} (${p.pluginId})` : ''
                                         }
                                         onChange={(e) => {
-                                            // Typing invalidates the prior selection — otherwise
-                                            // a typed-but-not-picked query could submit the
-                                            // previously chosen plugin (Augment review #M1).
+                                            // Track the typed query, but don't clear pluginId
+                                            // here — flipping the Combobox value to null causes
+                                            // Headless UI to resync the input via displayValue
+                                            // and wipe the user's typed text. We invalidate a
+                                            // stale selection at submit time instead (handleAdd
+                                            // rejects when pluginQuery is non-empty).
                                             setPluginQuery(e.target.value);
-                                            if (pluginId) setPluginId('');
                                         }}
                                         placeholder={tPlugin('pluginSelectPlaceholder')}
                                     />

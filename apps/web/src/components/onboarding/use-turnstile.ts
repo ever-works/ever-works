@@ -81,8 +81,16 @@ export function useTurnstile(sitekey: string = TURNSTILE_SITEKEY) {
     useEffect(() => {
         if (!sitekey) return;
         if (typeof window === 'undefined') return;
-        // Already initialised — bail before doing any DOM work.
-        if (window.turnstile) return;
+        // Already initialised — make sure `ready` reflects that, then bail
+        // before any DOM work. Covers the narrow window where another mount
+        // loaded the script between our lazy-init read and this effect's
+        // commit, which would otherwise leave us stuck on ready=false.
+        // Defer via microtask to avoid triggering a synchronous cascading
+        // render inside the effect (react-hooks/set-state-in-effect).
+        if (window.turnstile) {
+            queueMicrotask(() => setReady(true));
+            return;
+        }
 
         const existing = document.querySelector(`script[src^="${TURNSTILE_SCRIPT_SRC}"]`);
         if (existing) {
