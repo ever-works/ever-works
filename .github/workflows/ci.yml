@@ -80,8 +80,20 @@ jobs:
 
       - name: Test Internal CLI
         working-directory: apps/internal-cli
+        # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
+        # in-memory sqlite here, not a real database). C-07 PR-B made
+        # `autoMigrate()` default-off everywhere except NODE_ENV=test — without
+        # this env, `synchronize` doesn't run and the eager NestJS bootstrap
+        # hits "no such table: subscription_plans". Equivalent to setting
+        # DATABASE_AUTOMIGRATE=true explicitly; NODE_ENV=test is the standard
+        # test-context signal already used by the unit-test suite.
+        env:
+          NODE_ENV: test
         run: pnpm test:cli
 
       - name: Test External CLI
         working-directory: apps/cli
+        # See note above on the Internal CLI step — same C-07 PR-B implication.
+        env:
+          NODE_ENV: test
         run: pnpm test:cli
