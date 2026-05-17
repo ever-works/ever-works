@@ -1,12 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { UserRepository } from '@ever-works/agent/database';
 import { AuthSession } from '@ever-works/agent/entities';
 import type { TokenResponse } from '../types/auth.types';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
+
+/**
+ * H-01 (sessions): mirror the helper used by `AuthProviderService`. We
+ * hash the raw bearer with sha256 at write time and only ever look up by
+ * the hash. Tokens carry 256 bits of entropy so an unsalted sha256 is
+ * collision-free for our purposes.
+ */
+function hashSessionToken(token: string): string {
+    return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 /**
  * EW-617 G2 — Anonymous (zero-friction) user creation.
@@ -72,17 +82,24 @@ export class AnonymousAuthService {
         // Mint a session token directly — Better Auth's signup flow requires
         // an email/password, so we bypass it for anon users and write the
         // session row by hand. Same shape the rest of the API consumes.
-        const session = await this.dataSource.getRepository(AuthSession).save({
+        //
+        // H-01 (sessions): the raw token is returned to the caller as
+        // `access_token`; the persisted row stores `null` in the legacy
+        // `token` column and `sha256(rawToken)` in `tokenHash`. Lookup on
+        // every authenticated request goes through `tokenHash` only.
+        const rawToken = randomBytes(32).toString('base64url');
+        await this.dataSource.getRepository(AuthSession).save({
             id: randomUUID(),
             userId: user.id,
-            token: randomBytes(32).toString('base64url'),
+            token: null,
+            tokenHash: hashSessionToken(rawToken),
             expiresAt,
             ipAddress: opts.ipAddress ?? null,
             userAgent: opts.userAgent ?? null,
         });
 
         return {
-            access_token: session.token,
+            access_token: rawToken,
             user: {
                 id: user.id,
                 email: null,

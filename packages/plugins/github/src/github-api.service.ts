@@ -6,6 +6,7 @@ import type {
 	GitBranch,
 	GitCommit,
 	GitPullRequest,
+	GitPullRequestAuthor,
 	GitPullRequestFile,
 	CreateRepoOptions,
 	UpdateRepoOptions,
@@ -19,6 +20,10 @@ import type {
 	TransferRepoOptions,
 	TransferRepoResult
 } from '@ever-works/plugin/git';
+import {
+	GitHubVerifiedOrgService,
+	parseVerifiedOrgs
+} from './github-verified-org.service.js';
 
 function sanitizeDescription(description?: string): string {
 	if (!description) return '';
@@ -29,11 +34,67 @@ function sanitizeDescription(description?: string): string {
 }
 
 export class GitHubApiService {
+	/**
+	 * Verified-org membership check for PR authors. C-11 in the
+	 * 2026-05-17 security audit — the community-PR pipeline uses
+	 * `GitPullRequest.author.orgVerified` to decide whether to
+	 * auto-apply a PR. Default constructed here so existing callers
+	 * (`new GitHubApiService()`) keep working; tests may inject a
+	 * custom instance.
+	 */
+	constructor(
+		private readonly verifiedOrgService: GitHubVerifiedOrgService = new GitHubVerifiedOrgService()
+	) {}
+
 	private createOctokit(token: string, baseUrl?: string): Octokit {
 		return new Octokit({
 			...(token ? { auth: token } : {}),
 			baseUrl: baseUrl || 'https://api.github.com'
 		});
+	}
+
+	/**
+	 * Build the `author` field for a `GitPullRequest` by inspecting
+	 * the GitHub API `user` payload + (when configured) calling out
+	 * to `GET /orgs/{org}/members/{username}` for each org in
+	 * `COMMUNITY_PR_VERIFIED_ORGS`. Returns `undefined` when the
+	 * upstream `user` is null (rare — ghost users).
+	 *
+	 * @param user GitHub user payload (`pr.user` from Octokit).
+	 * @param token The same token used to fetch the PR — reused for
+	 *   the membership lookup so the operator doesn't need a second
+	 *   credential.
+	 * @param baseUrl GitHub Enterprise base URL, if any.
+	 */
+	private async buildPrAuthor(
+		user: { login?: string | null; type?: string | null } | null | undefined,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequestAuthor | undefined> {
+		if (!user?.login) return undefined;
+
+		const verifiedOrgs = parseVerifiedOrgs(process.env.COMMUNITY_PR_VERIFIED_ORGS);
+		let orgVerified: boolean | undefined;
+		if (verifiedOrgs.length > 0) {
+			try {
+				orgVerified = await this.verifiedOrgService.isVerifiedMember({
+					username: user.login,
+					token,
+					baseUrl,
+					verifiedOrgs
+				});
+			} catch {
+				// Defensive: any unexpected exception means "couldn't verify".
+				orgVerified = false;
+			}
+		}
+
+		const author: GitPullRequestAuthor = {
+			username: user.login,
+			...(user.type ? { type: user.type } : {}),
+			...(orgVerified === undefined ? {} : { orgVerified })
+		};
+		return author;
 	}
 
 	async getUser(token: string, baseUrl?: string): Promise<GitUser> {
@@ -450,6 +511,7 @@ export class GitHubApiService {
 			draft: options.draft || false
 		});
 
+		const author = await this.buildPrAuthor(data.user, token, baseUrl);
 		return {
 			number: data.number,
 			title: data.title,
@@ -459,7 +521,8 @@ export class GitHubApiService {
 			url: data.html_url,
 			createdAt: data.created_at,
 			updatedAt: data.updated_at,
-			body: data.body ?? undefined
+			body: data.body ?? undefined,
+			...(author ? { author } : {})
 		};
 	}
 
@@ -479,6 +542,7 @@ export class GitHubApiService {
 				pull_number: prNumber
 			});
 
+			const author = await this.buildPrAuthor(data.user, token, baseUrl);
 			return {
 				number: data.number,
 				title: data.title,
@@ -488,7 +552,8 @@ export class GitHubApiService {
 				url: data.html_url,
 				createdAt: data.created_at,
 				updatedAt: data.updated_at,
-				body: data.body ?? undefined
+				body: data.body ?? undefined,
+				...(author ? { author } : {})
 			};
 		} catch (err) {
 			if (err instanceof RequestError && err.status === 404) {
@@ -541,17 +606,29 @@ export class GitHubApiService {
 			page: options?.page || 1
 		});
 
-		return data.map((pr) => ({
-			number: pr.number,
-			title: pr.title,
-			state: pr.merged_at ? 'merged' : (pr.state as 'open' | 'closed'),
-			head: pr.head.ref,
-			base: pr.base.ref,
-			url: pr.html_url,
-			createdAt: pr.created_at,
-			updatedAt: pr.updated_at,
-			body: pr.body ?? undefined
-		}));
+		// Map sequentially: the per-author verified-org call is cached, so
+		// a batch of PRs from the same author hits GitHub once. Different
+		// authors still trigger N lookups (bounded by per_page). The cap
+		// in the community-PR pipeline (max 10/PR per run) keeps total
+		// fan-out small enough to stay well under GitHub's 5000/hour
+		// authenticated rate limit.
+		const result: GitPullRequest[] = [];
+		for (const pr of data) {
+			const author = await this.buildPrAuthor(pr.user, token, baseUrl);
+			result.push({
+				number: pr.number,
+				title: pr.title,
+				state: pr.merged_at ? 'merged' : (pr.state as 'open' | 'closed'),
+				head: pr.head.ref,
+				base: pr.base.ref,
+				url: pr.html_url,
+				createdAt: pr.created_at,
+				updatedAt: pr.updated_at,
+				body: pr.body ?? undefined,
+				...(author ? { author } : {})
+			});
+		}
+		return result;
 	}
 
 	async getPullRequestFiles(
@@ -615,6 +692,7 @@ export class GitHubApiService {
 			state: 'closed'
 		});
 
+		const author = await this.buildPrAuthor(data.user, token, baseUrl);
 		return {
 			number: data.number,
 			title: data.title,
@@ -624,7 +702,8 @@ export class GitHubApiService {
 			url: data.html_url,
 			createdAt: data.created_at,
 			updatedAt: data.updated_at,
-			body: data.body ?? undefined
+			body: data.body ?? undefined,
+			...(author ? { author } : {})
 		};
 	}
 

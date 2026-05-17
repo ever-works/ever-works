@@ -410,12 +410,16 @@ describe('createAuthRuntimeInstance', () => {
     });
 
     describe('account.accountLinking', () => {
-        it('enables linking with the four documented trustedProviders', () => {
+        it('enables linking with the three trustedProviders (Facebook removed per M-01)', () => {
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
+            // M-01: Facebook is no longer trusted for auto-linking because the
+            // Facebook OAuth response hard-codes `emailVerified: false`. A user
+            // controlling a Facebook account with a forged/unverified email
+            // could otherwise auto-link to an existing local account.
             expect(getCapturedOptions().account.accountLinking).toEqual({
                 enabled: true,
-                trustedProviders: ['google', 'github', 'facebook', 'linkedin'],
+                trustedProviders: ['google', 'github', 'linkedin'],
             });
         });
     });
@@ -427,12 +431,19 @@ describe('createAuthRuntimeInstance', () => {
             const ep = getCapturedOptions().emailAndPassword;
             expect(ep.enabled).toBe(true);
             expect(ep.autoSignIn).toBe(true);
+            // H-07: email verification is required before a user can sign in.
+            expect(ep.requireEmailVerification).toBe(true);
             expect(ep.minPasswordLength).toBe(8);
             expect(typeof ep.password.hash).toBe('function');
             expect(typeof ep.password.verify).toBe('function');
         });
 
-        it('hashes via bcrypt with salt rounds = 10', async () => {
+        it('hashes via bcrypt at the configured cost (L-07: default 12)', async () => {
+            // L-07: cost is now read from BCRYPT_COST per call. Default 12.
+            // The `RUNTIME_ENV_KEYS` reset in beforeEach() deletes BCRYPT_COST
+            // implicitly via the test process boot, but we set it here for
+            // determinism in case another test leaked a value.
+            delete process.env.BCRYPT_COST;
             bcryptHash.mockResolvedValueOnce('hashed-result');
 
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
@@ -440,8 +451,21 @@ describe('createAuthRuntimeInstance', () => {
 
             const result = await hash('plain-text');
 
-            expect(bcryptHash).toHaveBeenCalledWith('plain-text', 10);
+            expect(bcryptHash).toHaveBeenCalledWith('plain-text', 12);
             expect(result).toBe('hashed-result');
+        });
+
+        it('hashes via bcrypt at BCRYPT_COST when set (L-07: env override)', async () => {
+            process.env.BCRYPT_COST = '14';
+            bcryptHash.mockResolvedValueOnce('hashed-14');
+
+            createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
+            const { hash } = getCapturedOptions().emailAndPassword.password;
+
+            await hash('plain-text');
+
+            expect(bcryptHash).toHaveBeenCalledWith('plain-text', 14);
+            delete process.env.BCRYPT_COST;
         });
 
         it('verifies via bcrypt.compare with `(password, hash)` positional order', async () => {
@@ -489,7 +513,8 @@ describe('createAuthRuntimeInstance', () => {
                     isActive: true,
                 },
             });
-            expect(bcryptHash).toHaveBeenCalledWith('uuid-fixture', 10);
+            // L-07: synthetic password is hashed at the configured cost (default 12).
+            expect(bcryptHash).toHaveBeenCalledWith('uuid-fixture', 12);
             expect(randomUUIDMock).toHaveBeenCalledTimes(1);
         });
 
@@ -524,8 +549,9 @@ describe('createAuthRuntimeInstance', () => {
 
             expect(a.data.password).toBe('h-A');
             expect(b.data.password).toBe('h-B');
-            expect(bcryptHash).toHaveBeenNthCalledWith(1, 'uuid-A', 10);
-            expect(bcryptHash).toHaveBeenNthCalledWith(2, 'uuid-B', 10);
+            // L-07: synthetic passwords are hashed at the configured cost (default 12).
+            expect(bcryptHash).toHaveBeenNthCalledWith(1, 'uuid-A', 12);
+            expect(bcryptHash).toHaveBeenNthCalledWith(2, 'uuid-B', 12);
         });
     });
 
@@ -643,6 +669,105 @@ describe('createAuthRuntimeInstance', () => {
 
             expect(bearerMock).toHaveBeenCalledWith();
         });
+    });
+
+    // L-07: helper-function tests. These are pure functions exported from
+    // the same module, so we exercise them directly without standing up a
+    // Better Auth runtime.
+    describe('L-07 — bcrypt cost helpers (getBcryptCost / parseBcryptCost / passwordNeedsRehash)', () => {
+        // Late `require` so the helpers see whatever the test sets on
+        // `process.env.BCRYPT_COST` at call time, NOT at module-load time.
+        // (`getBcryptCost` reads env on every call, so no module-cache
+        // dance is needed — late `require` is just symmetric with the
+        // other tests in this file.)
+        const helpers = (): {
+            getBcryptCost: () => number;
+            parseBcryptCost: (h: string) => number | null;
+            passwordNeedsRehash: (h: string, target?: number) => boolean;
+            DEFAULT_BCRYPT_COST: number;
+            MIN_BCRYPT_COST: number;
+        } => require('./auth-runtime.instance');
+
+        afterEach(() => {
+            delete process.env.BCRYPT_COST;
+        });
+
+        it('getBcryptCost defaults to 12 (DEFAULT_BCRYPT_COST)', () => {
+            const { getBcryptCost, DEFAULT_BCRYPT_COST } = helpers();
+            expect(getBcryptCost()).toBe(12);
+            expect(DEFAULT_BCRYPT_COST).toBe(12);
+        });
+
+        it('getBcryptCost reads BCRYPT_COST when set above the floor', () => {
+            process.env.BCRYPT_COST = '14';
+            const { getBcryptCost } = helpers();
+            expect(getBcryptCost()).toBe(14);
+        });
+
+        it('getBcryptCost floors at MIN_BCRYPT_COST=10 (cannot downgrade)', () => {
+            process.env.BCRYPT_COST = '4';
+            const { getBcryptCost, MIN_BCRYPT_COST } = helpers();
+            expect(getBcryptCost()).toBe(10);
+            expect(MIN_BCRYPT_COST).toBe(10);
+        });
+
+        it('parseBcryptCost reads the cost from a bcrypt-formatted hash', () => {
+            const { parseBcryptCost } = helpers();
+            expect(parseBcryptCost('$2b$10$' + 'a'.repeat(53))).toBe(10);
+            expect(parseBcryptCost('$2b$12$' + 'a'.repeat(53))).toBe(12);
+            expect(parseBcryptCost('$2a$11$' + 'a'.repeat(53))).toBe(11);
+            expect(parseBcryptCost('$2y$13$' + 'a'.repeat(53))).toBe(13);
+        });
+
+        it('parseBcryptCost returns null for non-bcrypt strings', () => {
+            const { parseBcryptCost } = helpers();
+            expect(parseBcryptCost('plaintext')).toBeNull();
+            expect(parseBcryptCost('$argon2id$...')).toBeNull();
+            expect(parseBcryptCost('')).toBeNull();
+        });
+
+        it('passwordNeedsRehash returns "needs rehash" for $2b$10$ at BCRYPT_COST=12', () => {
+            process.env.BCRYPT_COST = '12';
+            const { passwordNeedsRehash } = helpers();
+            expect(passwordNeedsRehash('$2b$10$' + 'a'.repeat(53))).toBe(true);
+        });
+
+        it('passwordNeedsRehash returns "OK" for $2b$12$ at BCRYPT_COST=12', () => {
+            process.env.BCRYPT_COST = '12';
+            const { passwordNeedsRehash } = helpers();
+            expect(passwordNeedsRehash('$2b$12$' + 'a'.repeat(53))).toBe(false);
+        });
+
+        it('passwordNeedsRehash never downgrades — $2b$14$ stays put at BCRYPT_COST=12', () => {
+            process.env.BCRYPT_COST = '12';
+            const { passwordNeedsRehash } = helpers();
+            expect(passwordNeedsRehash('$2b$14$' + 'a'.repeat(53))).toBe(false);
+        });
+
+        it('passwordNeedsRehash returns false for unparseable hashes (leaves them alone)', () => {
+            process.env.BCRYPT_COST = '12';
+            const { passwordNeedsRehash } = helpers();
+            expect(passwordNeedsRehash('not-a-bcrypt-hash')).toBe(false);
+        });
+
+        // Integration with the REAL bcrypt: build an actual hash at the
+        // configured cost and verify its prefix. We use `jest.requireActual`
+        // because the top-of-file `jest.mock('bcrypt')` shadows the module
+        // for the rest of this suite, and we want the real implementation
+        // here.
+        it('end-to-end: BCRYPT_COST=14 produces a hash with the $2b$14$ prefix', async () => {
+            const realBcrypt = jest.requireActual('bcrypt') as typeof import('bcrypt');
+
+            process.env.BCRYPT_COST = '14';
+            const { getBcryptCost, parseBcryptCost } = helpers();
+            const cost = getBcryptCost();
+            expect(cost).toBe(14);
+            // cost-14 takes ~1s on modern hardware — that's the trade-off the
+            // audit explicitly asked us to assert.
+            const hash = await realBcrypt.hash('pw', cost);
+            expect(parseBcryptCost(hash)).toBe(14);
+            expect(hash).toMatch(/^\$2[aby]\$14\$/);
+        }, 30_000);
     });
 
     describe('captured options shape (regression guard)', () => {

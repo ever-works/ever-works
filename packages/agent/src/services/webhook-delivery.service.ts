@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { isSafeWebhookUrl } from '../utils/ssrf-guard';
+import { isSafeWebhookUrl, safeFetchWithDnsPin, SsrfBlockedError } from '../utils/ssrf-guard';
 
 /**
  * DI token for the optional `WebhookHttpClient` override. Tests and the
@@ -67,7 +67,11 @@ export class FetchWebhookHttpClient implements WebhookHttpClient {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), args.timeoutMs);
         try {
-            const response = await fetch(args.url, {
+            // safeFetchWithDnsPin re-checks the lexical SSRF guard AND resolves
+            // DNS to refuse any private/loopback/link-local/metadata IP before
+            // the socket connect. See ssrf-guard.ts for the documented partial
+            // mitigation (no IP-pinned connection — see M-23 follow-up).
+            const response = await safeFetchWithDnsPin(args.url, {
                 method: 'POST',
                 body: args.body,
                 headers: args.headers,
@@ -156,6 +160,17 @@ export class WebhookDeliveryService {
             }
             return { ok, status: response.status, deliveryId: signed.deliveryId };
         } catch (err) {
+            // The default FetchWebhookHttpClient calls safeFetchWithDnsPin, which
+            // throws SsrfBlockedError if the hostname resolves to a private IP.
+            // Surface that as the same `ssrf_blocked` error code the lexical
+            // guard above uses so retry policies in Trigger.dev treat both
+            // cases identically (don't retry — the URL will never be safe).
+            if (err instanceof SsrfBlockedError) {
+                this.logger.warn(
+                    `webhook.ssrf_blocked url=${redactUrl(signed.url)} reason=${err.code} delivery=${signed.deliveryId}`,
+                );
+                return { ok: false, error: 'ssrf_blocked', deliveryId: signed.deliveryId };
+            }
             const message = err instanceof Error ? err.message : String(err);
             this.logger.warn(
                 `webhook.delivery_error url=${redactUrl(signed.url)} reason=${message} delivery=${signed.deliveryId}`,

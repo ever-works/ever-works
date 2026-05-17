@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { AuthProvider, config } from '../../config/constants';
-import { GITHUB_SCOPES } from './github-scopes.config';
+import { GITHUB_LOGIN_SCOPES } from './github-scopes.config';
 import type { SocialAuthProviderId } from '../types/social-auth.types';
 
 export interface SocialAuthProviderConfig {
@@ -21,7 +21,11 @@ export const SOCIAL_AUTH_PROVIDERS: Record<SocialAuthProviderId, SocialAuthProvi
         displayName: 'GitHub',
         authorizationUrl: 'https://github.com/login/oauth/authorize',
         tokenUrl: 'https://github.com/login/oauth/access_token',
-        scopes: [...GITHUB_SCOPES],
+        // Login flow requests ONLY identity scopes (read:user + user:email)
+        // — see M-02 / M-22. The full scope set (repo / workflow / hooks /
+        // project) is still requested by the GitHub plugin's capability
+        // OAuth flow when the user explicitly wires a work to GitHub.
+        scopes: [...GITHUB_LOGIN_SCOPES],
         callbackUrl: config.github.callbackUrl,
         clientId: config.github.clientId,
         clientSecret: config.github.clientSecret,

@@ -136,14 +136,35 @@ function makeService(
 }
 
 describe('CommunityPrProcessorService', () => {
+    // C-11: the production default is OFF — auto-apply is opt-in via
+    // COMMUNITY_PR_AUTO_APPLY=true. Most of these tests cover the
+    // post-gate flow (extraction, commit, push, history, comment); enable
+    // auto-apply globally and restore the previous value afterwards.
+    // The default-off behaviour is exercised explicitly in its own
+    // `describe('C-11 …')` block below.
+    const prevAutoApply = process.env.COMMUNITY_PR_AUTO_APPLY;
+    const prevVerifiedOrgs = process.env.COMMUNITY_PR_VERIFIED_ORGS;
+
     beforeEach(() => {
         dataRepoCreateMock.mockReset();
         jest.useFakeTimers();
         jest.setSystemTime(new Date('2026-05-08T12:00:00Z'));
+        process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+        delete process.env.COMMUNITY_PR_VERIFIED_ORGS;
     });
 
     afterEach(() => {
         jest.useRealTimers();
+        if (prevAutoApply === undefined) {
+            delete process.env.COMMUNITY_PR_AUTO_APPLY;
+        } else {
+            process.env.COMMUNITY_PR_AUTO_APPLY = prevAutoApply;
+        }
+        if (prevVerifiedOrgs === undefined) {
+            delete process.env.COMMUNITY_PR_VERIFIED_ORGS;
+        } else {
+            process.env.COMMUNITY_PR_VERIFIED_ORGS = prevVerifiedOrgs;
+        }
     });
 
     describe('processAllWorks', () => {
@@ -1790,6 +1811,227 @@ describe('CommunityPrProcessorService', () => {
             // Newest entry is retained, oldest is evicted.
             expect(recorded.processedPrNumbers).toContain(1001);
             expect(recorded.processedPrNumbers).not.toContain(1);
+        });
+    });
+
+    describe('C-11 — auto-apply default-off + verified-org author gate', () => {
+        // Audit ref: docs/specs/security/audits/2026-05-17-ever-works-platform-security-audit.md
+        // Implementation: packages/agent/src/community-pr/community-pr-processor.service.ts
+        //                 packages/plugins/github/src/github-verified-org.service.ts
+
+        it('default-off auto-apply: skips PR when COMMUNITY_PR_AUTO_APPLY is unset', async () => {
+            delete process.env.COMMUNITY_PR_AUTO_APPLY;
+
+            const pr = makePr();
+            const work = makeWork();
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn(),
+                cloneOrPull: jest.fn(),
+                add: jest.fn(),
+                commit: jest.fn(),
+                push: jest.fn(),
+                createPullRequestComment: jest.fn(),
+                closePullRequest: jest.fn(),
+            };
+            const aiFacade = { askJson: jest.fn() };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            const result = await service.processWork(work as any);
+
+            expect(result).toBe(0);
+            // Critically: getPullRequestFiles is never called — we
+            // short-circuit BEFORE talking to GitHub for diffs.
+            expect(gitFacade.getPullRequestFiles).not.toHaveBeenCalled();
+            // ... and we never invoke the AI extraction prompt.
+            expect(aiFacade.askJson).not.toHaveBeenCalled();
+        });
+
+        it('verified-org gate: skips PR when orgVerified is missing on author', async () => {
+            process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+            process.env.COMMUNITY_PR_VERIFIED_ORGS = 'ever-works,ever-co';
+
+            const pr = {
+                ...makePr(),
+                author: { username: 'random-contributor' }, // no orgVerified flag
+            };
+            const work = makeWork();
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn(),
+                cloneOrPull: jest.fn(),
+                add: jest.fn(),
+                commit: jest.fn(),
+                push: jest.fn(),
+                createPullRequestComment: jest.fn(),
+                closePullRequest: jest.fn(),
+            };
+            const aiFacade = { askJson: jest.fn() };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            const result = await service.processWork(work as any);
+
+            expect(result).toBe(0);
+            expect(gitFacade.getPullRequestFiles).not.toHaveBeenCalled();
+            expect(aiFacade.askJson).not.toHaveBeenCalled();
+        });
+
+        it('verified-org gate: skips PR when orgVerified is false', async () => {
+            process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+            process.env.COMMUNITY_PR_VERIFIED_ORGS = 'ever-works';
+
+            const pr = {
+                ...makePr(),
+                author: { username: 'stranger', orgVerified: false },
+            };
+            const work = makeWork();
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn(),
+                cloneOrPull: jest.fn(),
+                add: jest.fn(),
+                commit: jest.fn(),
+                push: jest.fn(),
+                createPullRequestComment: jest.fn(),
+                closePullRequest: jest.fn(),
+            };
+            const aiFacade = { askJson: jest.fn() };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            const result = await service.processWork(work as any);
+
+            expect(result).toBe(0);
+            expect(gitFacade.getPullRequestFiles).not.toHaveBeenCalled();
+            expect(aiFacade.askJson).not.toHaveBeenCalled();
+        });
+
+        it('verified-org gate: proceeds when orgVerified is true', async () => {
+            process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+            process.env.COMMUNITY_PR_VERIFIED_ORGS = 'ever-works';
+
+            const pr = {
+                ...makePr(),
+                author: { username: 'evermember', orgVerified: true },
+            };
+            const file = { filename: 'data/x.yml', status: 'added', patch: '+ added' };
+            const work = makeWork();
+            const dataRepo = makeDataRepoMock();
+            dataRepoCreateMock.mockResolvedValue(dataRepo);
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn().mockResolvedValue([file]),
+                cloneOrPull: jest.fn().mockResolvedValue('/tmp/repo'),
+                add: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                push: jest.fn().mockResolvedValue(undefined),
+                createPullRequestComment: jest.fn().mockResolvedValue(undefined),
+                closePullRequest: jest.fn().mockResolvedValue(undefined),
+            };
+            const aiFacade = {
+                askJson: jest.fn().mockResolvedValue({
+                    result: {
+                        items: [
+                            {
+                                name: 'Trusted Tool',
+                                description: 'A tool from a verified org member',
+                                source_url: 'https://trusted.test',
+                                category: 'AI',
+                                tags: ['a'],
+                            },
+                        ],
+                    },
+                }),
+            };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            const result = await service.processWork(work as any);
+
+            expect(result).toBe(1);
+            expect(gitFacade.getPullRequestFiles).toHaveBeenCalled();
+            expect(aiFacade.askJson).toHaveBeenCalled();
+        });
+
+        it('verified-org gate is disabled when COMMUNITY_PR_VERIFIED_ORGS is unset (back-compat)', async () => {
+            process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+            delete process.env.COMMUNITY_PR_VERIFIED_ORGS;
+
+            // No orgVerified on author — but the gate isn't configured,
+            // so the PR still proceeds (the operator opted out of the
+            // author check by not setting the env var).
+            const pr = {
+                ...makePr(),
+                author: { username: 'random-contributor' },
+            };
+            const file = { filename: 'data/x.yml', status: 'added', patch: '+ added' };
+            const work = makeWork();
+            const dataRepo = makeDataRepoMock();
+            dataRepoCreateMock.mockResolvedValue(dataRepo);
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn().mockResolvedValue([file]),
+                cloneOrPull: jest.fn().mockResolvedValue('/tmp/repo'),
+                add: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                push: jest.fn().mockResolvedValue(undefined),
+                createPullRequestComment: jest.fn().mockResolvedValue(undefined),
+                closePullRequest: jest.fn().mockResolvedValue(undefined),
+            };
+            const aiFacade = {
+                askJson: jest.fn().mockResolvedValue({
+                    result: {
+                        items: [
+                            {
+                                name: 'Anything',
+                                description: 'D',
+                                source_url: 'https://x.test',
+                                category: 'AI',
+                                tags: ['a'],
+                            },
+                        ],
+                    },
+                }),
+            };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            const result = await service.processWork(work as any);
+
+            expect(result).toBe(1);
+            expect(gitFacade.getPullRequestFiles).toHaveBeenCalled();
+        });
+
+        it('verified-org gate: marks the PR as handled with outcome=ignored when skipped', async () => {
+            process.env.COMMUNITY_PR_AUTO_APPLY = 'true';
+            process.env.COMMUNITY_PR_VERIFIED_ORGS = 'ever-works';
+
+            const pr = {
+                ...makePr({ number: 77 }),
+                author: { username: 'stranger', orgVerified: false },
+            };
+            const work = makeWork();
+            const workRepository = {
+                findWithCommunityPrEnabled: jest.fn(),
+                update: jest.fn().mockResolvedValue(undefined),
+                increment: jest.fn().mockResolvedValue(undefined),
+            };
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn(),
+                cloneOrPull: jest.fn(),
+                add: jest.fn(),
+                commit: jest.fn(),
+                push: jest.fn(),
+                createPullRequestComment: jest.fn(),
+                closePullRequest: jest.fn(),
+            };
+            const { service } = makeService({ gitFacade, workRepository });
+
+            await service.processWork(work as any);
+
+            const recorded = (workRepository.update as jest.Mock).mock.calls[0][1].communityPrState;
+            expect(recorded.processedPrs).toEqual([
+                { number: 77, updatedAt: pr.updatedAt, outcome: 'ignored' },
+            ]);
+            expect(recorded.processedPrNumbers).toContain(77);
         });
     });
 

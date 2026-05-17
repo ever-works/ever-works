@@ -88,6 +88,19 @@ export class User {
     @Column({ nullable: true })
     lastLoginIp: string;
 
+    // H-17 (rest): per-user login lockout. IP throttle (`@Throttle` on
+    // /auth/login) only protects against a single attacker IP; an attacker
+    // rotating IPs targeting one account walks past it. We count consecutive
+    // failed credential verifies in `failedLoginAttempts` and, once they
+    // cross `LOGIN_LOCKOUT_THRESHOLD`, set `lockedUntil = now +
+    // LOGIN_LOCKOUT_DURATION_MS`. Successful login resets both columns to
+    // 0 / null.
+    @Column({ type: 'int', default: 0 })
+    failedLoginAttempts: number;
+
+    @Column({ type: 'timestamp', nullable: true })
+    lockedUntil?: Date | null;
+
     // Password reset
     @Column({ nullable: true })
     passwordResetToken: string;

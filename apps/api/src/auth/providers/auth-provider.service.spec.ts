@@ -9,12 +9,24 @@ jest.mock('@ever-works/agent/entities', () => ({
 
 jest.mock('bcrypt', () => ({
     compare: jest.fn(),
+    // L-07 (rehash-on-login): `signInEmail` calls `bcrypt.hash(plaintext, cost)`
+    // on the rehash-on-login branch. Return a deterministic shape so we can
+    // assert on it.
+    hash: jest.fn(async (_plain: string, cost: number) => `$2b$${cost}$mockrehash`),
 }));
 
+import { createHash } from 'node:crypto';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthProviderService } from './auth-provider.service';
 import { AuthSyncService } from './auth-sync.service';
 import * as bcrypt from 'bcrypt';
+
+// H-01 (sessions): every persisted lookup is keyed on sha256(rawToken).
+// Spec assertions use this helper to convert the bearer-in-header into the
+// hash we expect to land in `findOne` / `delete` calls.
+function hashSessionToken(token: string): string {
+    return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 type SessionRepoMock = {
     findOne: jest.Mock;
@@ -84,8 +96,9 @@ describe('AuthProviderService', () => {
             const result = await service.authenticate(headers);
 
             expect(result).toBeNull();
+            // H-01 (sessions): lookups are now keyed on sha256(submittedBearer).
             expect(sessionRepository.findOne).toHaveBeenCalledWith({
-                where: { token: 'some-token' },
+                where: { tokenHash: hashSessionToken('some-token') },
             });
             expect(auth.api.getSession).not.toHaveBeenCalled();
         });
@@ -93,7 +106,8 @@ describe('AuthProviderService', () => {
         it('deletes an expired session row and returns null', async () => {
             const { service, sessionRepository, userRepository, auth } = createService();
             sessionRepository.findOne.mockResolvedValue({
-                token: 't',
+                token: null,
+                tokenHash: hashSessionToken('t'),
                 userId: 'u1',
                 expiresAt: new Date(Date.now() - 1000),
             });
@@ -101,7 +115,10 @@ describe('AuthProviderService', () => {
             const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
 
             expect(result).toBeNull();
-            expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 't' });
+            // H-01 (sessions): delete is also keyed on the hash, not the raw bearer.
+            expect(sessionRepository.delete).toHaveBeenCalledWith({
+                tokenHash: hashSessionToken('t'),
+            });
             expect(userRepository.findById).not.toHaveBeenCalled();
             expect(auth.api.getSession).not.toHaveBeenCalled();
         });
@@ -341,7 +358,11 @@ describe('AuthProviderService', () => {
 
             await service.authenticate(new Headers({ authorization: 'bearer t' }));
 
-            expect(sessionRepository.findOne).toHaveBeenCalledWith({ where: { token: 't' } });
+            // H-01 (sessions): lookup-by-hash. The plaintext "t" the spec sent
+            // is hashed before it hits the repo.
+            expect(sessionRepository.findOne).toHaveBeenCalledWith({
+                where: { tokenHash: hashSessionToken('t') },
+            });
         });
 
         it('rejects bearer with empty token (falls through to cookie path)', async () => {
@@ -563,11 +584,14 @@ describe('AuthProviderService', () => {
             expect(sessionRepository.create).toHaveBeenCalledTimes(1);
             const created = sessionRepository.create.mock.calls[0][0];
             expect(created.userId).toBe('u1');
-            expect(typeof created.token).toBe('string');
+            // H-01 (sessions): row is keyed on `tokenHash`; legacy column is null.
+            expect(created.token).toBeNull();
+            expect(typeof created.tokenHash).toBe('string');
             expect(typeof created.id).toBe('string');
             expect(created.expiresAt).toBeInstanceOf(Date);
             expect(sessionRepository.save).toHaveBeenCalled();
-            expect(result.access_token).toBe(created.token);
+            // `access_token` is the raw bearer; `tokenHash` is sha256(access_token).
+            expect(created.tokenHash).toBe(hashSessionToken(result.access_token));
         });
 
         it('writes back password + registrationProvider:"local" + isActive:true when getCredentialPasswordHash returns a hash', async () => {
@@ -629,8 +653,16 @@ describe('AuthProviderService', () => {
             const sevenDays = Date.now() + 7 * 24 * 60 * 60 * 1000;
             expect(Math.abs(created.expiresAt.getTime() - sevenDays)).toBeLessThan(60_000);
 
+            // H-01 (sessions): the persisted row has the legacy plaintext column
+            // nulled and `tokenHash = sha256(access_token)`. The raw bearer is
+            // only ever returned to the caller.
+            expect(created.token).toBeNull();
+            expect(typeof created.tokenHash).toBe('string');
+            expect(created.tokenHash).toBe(hashSessionToken(result.access_token));
+
             expect(sessionRepository.save).toHaveBeenCalledWith(created);
-            expect(result.access_token).toBe(created.token);
+            expect(typeof result.access_token).toBe('string');
+            expect(result.access_token.length).toBeGreaterThan(20);
             expect(result.user).toEqual({ id: 'u1', email: 'a@b.co', username: 'alice' });
         });
 
@@ -663,8 +695,10 @@ describe('AuthProviderService', () => {
             await service.issueSession('u1');
             await service.issueSession('u1');
 
-            const t1 = sessionRepository.create.mock.calls[0][0].token;
-            const t2 = sessionRepository.create.mock.calls[1][0].token;
+            // H-01 (sessions): assert freshness via the persisted hash since
+            // `token` is always null now.
+            const t1 = sessionRepository.create.mock.calls[0][0].tokenHash;
+            const t2 = sessionRepository.create.mock.calls[1][0].tokenHash;
             expect(t1).not.toBe(t2);
         });
     });
@@ -742,7 +776,10 @@ describe('AuthProviderService', () => {
             await expect(
                 service.changePassword('old', 'new', new Headers({ authorization: 'Bearer t' })),
             ).rejects.toThrow(new UnauthorizedException('Session expired'));
-            expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 't' });
+            // H-01 (sessions): delete keyed on the hash of the bearer.
+            expect(sessionRepository.delete).toHaveBeenCalledWith({
+                tokenHash: hashSessionToken('t'),
+            });
         });
 
         it('rejects when no auth context is present (no bearer + no cookie session)', async () => {
@@ -775,7 +812,10 @@ describe('AuthProviderService', () => {
 
             await service.signOut(new Headers({ authorization: 'Bearer t' }));
 
-            expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 't' });
+            // H-01 (sessions): delete keyed on the hash of the bearer.
+            expect(sessionRepository.delete).toHaveBeenCalledWith({
+                tokenHash: hashSessionToken('t'),
+            });
             expect(auth.api.signOut).not.toHaveBeenCalled();
         });
 
@@ -799,6 +839,243 @@ describe('AuthProviderService', () => {
             await service.signOutAll('u1');
 
             expect(sessionRepository.delete).toHaveBeenCalledWith({ userId: 'u1' });
+        });
+    });
+
+    // H-01 (sessions): the at-rest hashing behaviour gets its own block so a
+    // future refactor breaks one focused test rather than fifteen.
+    describe('H-01 (sessions) — at-rest token hashing', () => {
+        it('createSessionRecord persists tokenHash = sha256(access_token) and NULLs the legacy token column', async () => {
+            const { service, userRepository, sessionRepository } = createService();
+            userRepository.findById.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+            });
+
+            const result = await service.issueSession('u1');
+
+            const created = sessionRepository.create.mock.calls[0][0];
+            expect(created.token).toBeNull();
+            expect(created.tokenHash).toBe(hashSessionToken(result.access_token));
+        });
+
+        it('authenticate() looks up by tokenHash, not by token', async () => {
+            const { service, sessionRepository, userRepository } = createService();
+            sessionRepository.findOne.mockResolvedValue({
+                token: null,
+                tokenHash: hashSessionToken('raw-bearer'),
+                userId: 'u1',
+                expiresAt: new Date(Date.now() + 60_000),
+            });
+            userRepository.findById.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                emailVerified: true,
+                registrationProvider: 'local',
+                avatar: null,
+            });
+
+            await service.authenticate(new Headers({ authorization: 'Bearer raw-bearer' }));
+
+            // The where clause uses `tokenHash`, never `token`.
+            const [arg] = sessionRepository.findOne.mock.calls[0];
+            expect(arg).toEqual({ where: { tokenHash: hashSessionToken('raw-bearer') } });
+            expect(Object.keys(arg.where)).not.toContain('token');
+        });
+    });
+
+    // H-17 (rest) — per-user lockout. IP throttle is in the controller; this
+    // block covers the DB-backed counter / lockedUntil state machine.
+    describe('H-17 — per-user login lockout', () => {
+        const setupSignInEmailFailure = () => {
+            const ctx = createService();
+            ctx.userRepository.findByEmail.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                failedLoginAttempts: 0,
+                lockedUntil: null,
+                password: null,
+            });
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
+            return ctx;
+        };
+
+        afterEach(() => {
+            delete process.env.LOGIN_LOCKOUT_THRESHOLD;
+            delete process.env.LOGIN_LOCKOUT_DURATION_MS;
+        });
+
+        it('increments failedLoginAttempts on a failed signInEmail', async () => {
+            const { service, userRepository } = setupSignInEmailFailure();
+
+            await expect(service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
+                /Invalid credentials/,
+            );
+
+            expect(userRepository.update).toHaveBeenCalledWith('u1', { failedLoginAttempts: 1 });
+        });
+
+        it('sets lockedUntil on the 5th consecutive failed signInEmail (default threshold)', async () => {
+            // Same shape but the user is already at 4 failures.
+            const ctx = createService();
+            ctx.userRepository.findByEmail.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                failedLoginAttempts: 4,
+                lockedUntil: null,
+                password: null,
+            });
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
+
+            await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
+                /Invalid credentials/,
+            );
+
+            const [userId, partial] = ctx.userRepository.update.mock.calls[0];
+            expect(userId).toBe('u1');
+            expect(partial.failedLoginAttempts).toBe(5);
+            expect(partial.lockedUntil).toBeInstanceOf(Date);
+            // 15 min default, within 1s tolerance.
+            const expected = Date.now() + 15 * 60 * 1000;
+            expect(Math.abs(partial.lockedUntil.getTime() - expected)).toBeLessThan(1000);
+        });
+
+        it('clears failedLoginAttempts and lockedUntil on a successful signInEmail', async () => {
+            const { service, userRepository, auth, authSync } = createService();
+            userRepository.findByEmail.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                failedLoginAttempts: 3,
+                lockedUntil: null,
+                password: null,
+            });
+            userRepository.findById.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+            });
+            (authSync.getCredentialPasswordHash as jest.Mock).mockResolvedValue(null);
+            auth.api.signInEmail.mockResolvedValue({ token: 'tok', user: { id: 'u1' } });
+
+            await service.signInEmail('a@b.co', 'right', new Headers());
+
+            // Reset is one of the calls to update — pluck it out and assert shape.
+            const resetCall = userRepository.update.mock.calls.find(
+                ([, partial]: any[]) =>
+                    partial && partial.failedLoginAttempts === 0 && partial.lockedUntil === null,
+            );
+            expect(resetCall).toBeDefined();
+        });
+
+        it('rejects with a lockout message when lockedUntil is in the future, regardless of password validity', async () => {
+            const { service, userRepository, auth } = createService();
+            userRepository.findByEmail.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                failedLoginAttempts: 5,
+                lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+                password: null,
+            });
+            // Even though the credential check WOULD succeed, the lockout
+            // gates BEFORE we hand off to Better Auth.
+            auth.api.signInEmail.mockResolvedValue({ token: 'tok', user: { id: 'u1' } });
+
+            await expect(service.signInEmail('a@b.co', 'right', new Headers())).rejects.toThrow(
+                /Account temporarily locked/,
+            );
+            expect(auth.api.signInEmail).not.toHaveBeenCalled();
+        });
+
+        it('honours LOGIN_LOCKOUT_THRESHOLD env override', async () => {
+            process.env.LOGIN_LOCKOUT_THRESHOLD = '2';
+            const ctx = createService();
+            ctx.userRepository.findByEmail.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+                failedLoginAttempts: 1,
+                lockedUntil: null,
+                password: null,
+            });
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
+
+            await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
+                /Invalid credentials/,
+            );
+
+            // 2nd failure with threshold=2 should lock immediately.
+            const [, partial] = ctx.userRepository.update.mock.calls[0];
+            expect(partial.failedLoginAttempts).toBe(2);
+            expect(partial.lockedUntil).toBeInstanceOf(Date);
+        });
+    });
+
+    // L-07 (rehash-on-login). The rehash-detection helper lives in
+    // `auth-runtime.instance.ts`; covered by its own spec. Here we verify the
+    // signInEmail wire-up triggers the helper for low-cost hashes.
+    describe('L-07 — rehash-on-login wire-up in signInEmail', () => {
+        afterEach(() => {
+            delete process.env.BCRYPT_COST;
+        });
+
+        it('rehashes the password at BCRYPT_COST when the stored hash is below target', async () => {
+            process.env.BCRYPT_COST = '12';
+            const { service, userRepository, auth, authSync } = createService();
+            userRepository.findByEmail.mockResolvedValue(null);
+            userRepository.findById.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+            });
+            // Legacy bcrypt cost-10 hash — should trigger a rehash.
+            (authSync.getCredentialPasswordHash as jest.Mock).mockResolvedValue(
+                '$2b$10$' + 'a'.repeat(53),
+            );
+            auth.api.signInEmail.mockResolvedValue({ token: 'tok', user: { id: 'u1' } });
+
+            await service.signInEmail('a@b.co', 'plaintext-pw', new Headers());
+
+            // Wait one microtask tick for the fire-and-forget chain.
+            await new Promise((r) => setImmediate(r));
+
+            expect(bcrypt.hash).toHaveBeenCalledWith('plaintext-pw', 12);
+            expect(authSync.syncCredentialPassword).toHaveBeenCalledWith('u1', '$2b$12$mockrehash');
+        });
+
+        it('does NOT rehash when the stored hash is already at the target cost', async () => {
+            process.env.BCRYPT_COST = '12';
+            const { service, userRepository, auth, authSync } = createService();
+            userRepository.findByEmail.mockResolvedValue(null);
+            userRepository.findById.mockResolvedValue({
+                id: 'u1',
+                email: 'a@b.co',
+                username: 'alice',
+                isActive: true,
+            });
+            (authSync.getCredentialPasswordHash as jest.Mock).mockResolvedValue(
+                '$2b$12$' + 'a'.repeat(53),
+            );
+            auth.api.signInEmail.mockResolvedValue({ token: 'tok', user: { id: 'u1' } });
+
+            await service.signInEmail('a@b.co', 'plaintext-pw', new Headers());
+            await new Promise((r) => setImmediate(r));
+
+            expect(bcrypt.hash).not.toHaveBeenCalled();
         });
     });
 });

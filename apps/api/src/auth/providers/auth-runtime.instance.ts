@@ -7,6 +7,50 @@ import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
 import * as bcrypt from 'bcrypt';
 
+/**
+ * L-07: bcrypt cost factor. Modern guidance is 12+; we default to 12.
+ * Floor at 10 so an accidental misconfiguration can't downgrade the
+ * production fleet to last-decade defaults. Operators can raise this
+ * (e.g. 13/14) once they've measured the CPU budget on their hardware.
+ */
+export const MIN_BCRYPT_COST = 10;
+export const DEFAULT_BCRYPT_COST = 12;
+
+export function getBcryptCost(): number {
+    const raw = Number(process.env.BCRYPT_COST);
+    if (!Number.isFinite(raw)) return DEFAULT_BCRYPT_COST;
+    const cost = Math.floor(raw);
+    if (cost < MIN_BCRYPT_COST) return MIN_BCRYPT_COST;
+    return cost;
+}
+
+/**
+ * L-07 (rehash-on-login): extract the cost factor from a bcrypt hash so
+ * we can decide whether to re-hash transparently on next successful login.
+ * bcrypt hashes are `$<algo>$<cost>$<salt+hash>` with a fixed-width 2-digit
+ * cost. We tolerate every algo prefix bcrypt produces (`$2a$`, `$2b$`,
+ * `$2y$`) since they're all the same underlying construction; rehash is
+ * triggered purely by cost.
+ *
+ * Returns `null` when the hash isn't a recognisable bcrypt string (e.g.
+ * a legacy non-bcrypt hash) — `passwordNeedsRehash` treats that as
+ * "don't touch it" rather than panicking, since the verify() call already
+ * succeeded.
+ */
+export function parseBcryptCost(hash: string): number | null {
+    const m = /^\$2[aby]\$(\d{2})\$/.exec(hash);
+    if (!m) return null;
+    const cost = Number(m[1]);
+    if (!Number.isFinite(cost)) return null;
+    return cost;
+}
+
+export function passwordNeedsRehash(hash: string, targetCost: number = getBcryptCost()): boolean {
+    const current = parseBcryptCost(hash);
+    if (current === null) return false;
+    return current < targetCost;
+}
+
 function getInitializedDatabaseClient(dataSource: DataSource): any {
     const driver = dataSource.driver as any;
 
@@ -157,8 +201,13 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
             requireEmailVerification: true,
             minPasswordLength: 8,
             password: {
+                // L-07: cost is read on each call so operators can raise it
+                // via `BCRYPT_COST` without a redeploy of this file. New
+                // users / password resets immediately get hashes at the new
+                // cost; existing users migrate transparently via the
+                // rehash-on-login branch in `AuthProviderService.signInEmail`.
                 hash: async (password: string) => {
-                    return bcrypt.hash(password, 10);
+                    return bcrypt.hash(password, getBcryptCost());
                 },
                 verify: async ({ hash, password }: { hash: string; password: string }) => {
                     return bcrypt.compare(password, hash);
@@ -172,7 +221,8 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                         return {
                             data: {
                                 ...user,
-                                password: await bcrypt.hash(randomUUID(), 10),
+                                // L-07: same configured cost as `password.hash` above.
+                                password: await bcrypt.hash(randomUUID(), getBcryptCost()),
                                 registrationProvider: RegistrationProvider.LOCAL,
                                 isActive: true,
                             },

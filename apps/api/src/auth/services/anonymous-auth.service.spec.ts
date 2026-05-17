@@ -53,9 +53,10 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
         expect(insertedUser.username).toMatch(/^anon-[0-9a-f]{8}$/);
 
         const expiresAtMs = (insertedUser.anonymousExpiresAt as Date).getTime();
-        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-        expect(expiresAtMs).toBeGreaterThanOrEqual(before + sevenDaysMs - 1000);
-        expect(expiresAtMs).toBeLessThanOrEqual(after + sevenDaysMs + 1000);
+        // H-05: default anon TTL is 3 days (was 7d before the audit).
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        expect(expiresAtMs).toBeGreaterThanOrEqual(before + threeDaysMs - 1000);
+        expect(expiresAtMs).toBeLessThanOrEqual(after + threeDaysMs + 1000);
 
         expect(response.user.isAnonymous).toBe(true);
         expect(response.user.email).toBeNull();
@@ -64,7 +65,7 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
         );
     });
 
-    it('persists an AuthSession with a generated token bound to the user', async () => {
+    it('persists an AuthSession with a hashed token bound to the user', async () => {
         const { service, savedSessions } = buildService();
 
         const response = await service.createAnonymousUser({
@@ -75,8 +76,16 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
         expect(savedSessions).toHaveLength(1);
         const session = savedSessions[0];
         expect(session.userId).toBe(response.user.id);
-        expect(session.token).toBe(response.access_token);
-        expect(session.token.length).toBeGreaterThan(20); // base64url(32 bytes) >= 43 chars
+        // H-01 (sessions): legacy plaintext column is nulled; `tokenHash`
+        // stores sha256(access_token) so a DB leak doesn't surrender a
+        // live bearer. The raw `access_token` is the value returned to
+        // the caller.
+        expect(session.token).toBeNull();
+        expect(typeof session.tokenHash).toBe('string');
+        const { createHash } = require('node:crypto');
+        const expectedHash = createHash('sha256').update(response.access_token).digest('hex');
+        expect(session.tokenHash).toBe(expectedHash);
+        expect(response.access_token.length).toBeGreaterThan(20); // base64url(32 bytes) >= 43 chars
         expect(session.ipAddress).toBe('1.2.3.4');
         expect(session.userAgent).toBe('test-agent');
     });
@@ -95,7 +104,7 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
         expect(ttl).toBeLessThanOrEqual(after + oneDayMs + 1000);
     });
 
-    it('falls back to 7 days when ANONYMOUS_USER_TTL_DAYS is garbage', async () => {
+    it('falls back to the 3-day H-05 default when ANONYMOUS_USER_TTL_DAYS is garbage', async () => {
         process.env.ANONYMOUS_USER_TTL_DAYS = 'not-a-number';
         const { service, created } = buildService();
 
@@ -103,10 +112,10 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
         await service.createAnonymousUser();
         const after = Date.now();
 
-        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
         const ttl = (created[0].anonymousExpiresAt as Date).getTime();
-        expect(ttl).toBeGreaterThanOrEqual(before + sevenDaysMs - 1000);
-        expect(ttl).toBeLessThanOrEqual(after + sevenDaysMs + 1000);
+        expect(ttl).toBeGreaterThanOrEqual(before + threeDaysMs - 1000);
+        expect(ttl).toBeLessThanOrEqual(after + threeDaysMs + 1000);
     });
 
     it('mints unique usernames + tokens across consecutive calls', async () => {
