@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, type ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils/cn';
@@ -44,7 +44,7 @@ const markdownComponents = {
     table: ScrollableTable,
 };
 
-export const MarkdownPreview = memo(function MarkdownPreview({ content }: MarkdownPreviewProps) {
+export function MarkdownPreview({ content }: MarkdownPreviewProps) {
     return (
         <div className={previewClass}>
             <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
@@ -52,4 +52,4 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: Markdo
             </ReactMarkdown>
         </div>
     );
-});
+}

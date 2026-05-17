@@ -49,6 +49,7 @@ describe('BudgetsUsageClient', () => {
                 globalBudget: null,
             },
             initialBudgets: [],
+            availablePlugins: [],
             ...overrides,
         };
     }
