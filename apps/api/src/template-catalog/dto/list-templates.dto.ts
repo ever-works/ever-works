@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 const TEMPLATE_KINDS = ['website', 'work'] as const;
@@ -160,15 +160,12 @@ export class CustomizeTemplateFromBaseDto {
     @MinLength(1)
     providerId: string;
 
-    @ApiProperty({
-        required: false,
-        description: 'GitHub login (personal or org). Defaults to user.',
-    })
+    @ApiPropertyOptional({ description: 'GitHub login (personal or org). Defaults to user.' })
     @IsOptional()
     @IsString()
     targetOwner?: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
     @IsOptional()
     @IsString()
     @MaxLength(500)

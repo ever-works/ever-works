@@ -5,7 +5,7 @@ import { TemplateCustomizationRepository } from '@src/database/repositories/temp
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { GitFacadeService, type GitFacadeOptions } from '@src/facades/git.facade';
 import type { GitCommitter } from '@ever-works/plugin';
-import { CodeEditFacadeService } from '@src/facades/code-edit.facade';
+import { CodeEditFacadeService, type CodeEditProviderInfo } from '@src/facades/code-edit.facade';
 import {
     findWebsiteTemplateConfig,
     type WebsiteTemplateConfig,
@@ -17,6 +17,7 @@ import {
 import { Template } from '@src/entities/template.entity';
 import { assertCreatedRepositoryTarget } from '@src/utils/git-repository.utils';
 import { getCustomizationPromptForBaseTemplate } from './customization-prompts';
+import { inferFrameworkFromRepository } from './utils/framework-inference';
 
 const GIT_PROVIDER_ID = 'github';
 const REPO_NAME_MAX = 90;
@@ -103,7 +104,7 @@ export class TemplateCustomizationService {
             ownerUserId: userId,
             name,
             description: input.description?.trim() || baseConfig.description,
-            framework: this.inferFramework(baseConfig.repo),
+            framework: inferFrameworkFromRepository(baseConfig.repo),
             repositoryUrl: provisioned.repositoryUrl,
             repositoryOwner: provisioned.owner,
             repositoryName: provisioned.name,
@@ -137,6 +138,10 @@ export class TemplateCustomizationService {
 
     listForTemplate(templateId: string, userId: string): Promise<TemplateCustomization[]> {
         return this.customizationRepository.listForTemplate(templateId, userId);
+    }
+
+    listProviders(): CodeEditProviderInfo[] {
+        return this.codeEditFacade.listProviders();
     }
 
     /** Exposed for direct invocation by background tasks / tests. */
@@ -349,13 +354,6 @@ export class TemplateCustomizationService {
         const maxBody = REPO_NAME_MAX - prefix.length - 1 - suffix.length;
         const body = slug.slice(0, Math.max(1, maxBody));
         return `${prefix}${body}-${suffix}`;
-    }
-
-    private inferFramework(repo: string): string | null {
-        const normalized = repo.toLowerCase();
-        if (normalized.includes('astro')) return 'Astro';
-        if (normalized.includes('next')) return 'Next.js';
-        return null;
     }
 
     private async runAsync(id: string): Promise<void> {

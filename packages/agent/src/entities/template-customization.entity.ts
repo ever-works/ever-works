@@ -35,7 +35,7 @@ export class TemplateCustomization {
     @JoinColumn({ name: 'templateId' })
     template?: Template;
 
-    @Column({ type: 'varchar' })
+    @Column()
     userId: string;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE' })

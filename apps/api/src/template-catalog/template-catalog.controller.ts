@@ -14,7 +14,6 @@ import {
     TemplateCatalogService,
     TemplateCustomizationService,
 } from '@ever-works/agent/template-catalog';
-import { CodeEditFacadeService } from '@ever-works/agent/facades';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { CurrentUser } from '@src/auth';
@@ -37,7 +36,6 @@ export class TemplateCatalogController {
     constructor(
         private readonly templateCatalogService: TemplateCatalogService,
         private readonly templateCustomizationService: TemplateCustomizationService,
-        private readonly codeEditFacade: CodeEditFacadeService,
         private readonly activityLogService: ActivityLogService,
     ) {}
 
@@ -247,7 +245,7 @@ export class TemplateCatalogController {
     })
     @ApiResponse({ status: 200, description: 'Providers' })
     async listCustomizationProviders() {
-        return { status: 'success', providers: this.codeEditFacade.listProviders() };
+        return { status: 'success', providers: this.templateCustomizationService.listProviders() };
     }
 
     @Post('templates/custom-from-base')
@@ -264,7 +262,7 @@ export class TemplateCatalogController {
             .log({
                 userId: auth.userId,
                 actionType: ActivityActionType.TEMPLATE_ADDED,
-                action: 'template.customize_requested',
+                action: 'template.customized',
                 status: ActivityStatus.IN_PROGRESS,
                 summary: `Customize template ${result.template.name} from base ${body.baseTemplateId}`,
                 metadata: {

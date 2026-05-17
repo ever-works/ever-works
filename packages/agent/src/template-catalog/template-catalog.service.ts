@@ -21,6 +21,7 @@ import type { TemplateKind, TemplateSourceType } from '@src/entities/template.en
 import { config } from '@src/config';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
 import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
+import { inferFrameworkFromRepository } from './utils/framework-inference';
 
 export interface TemplateCatalogItem {
     id: string;
@@ -165,8 +166,7 @@ export class TemplateCatalogService implements OnModuleInit {
             ownerUserId: userId,
             name: input.name?.trim() || this.humanizeRepositoryName(repository.repo),
             description: input.description?.trim() || null,
-            framework:
-                input.framework?.trim() || this.inferFrameworkFromRepository(repository.repo),
+            framework: input.framework?.trim() || inferFrameworkFromRepository(repository.repo),
             previewImageUrl: input.previewImageUrl?.trim() || null,
             repositoryUrl: repository.canonicalUrl,
             repositoryOwner: repository.owner,
@@ -636,7 +636,7 @@ export class TemplateCatalogService implements OnModuleInit {
                         sourceType: 'built_in',
                         name: this.humanizeRepositoryName(repository.name),
                         description: repository.description || null,
-                        framework: this.inferFrameworkFromRepository(repository.name),
+                        framework: inferFrameworkFromRepository(repository.name),
                         repositoryUrl: repository.url,
                         repositoryOwner: repository.owner,
                         repositoryName: repository.name,
@@ -774,31 +774,7 @@ export class TemplateCatalogService implements OnModuleInit {
     }
 
     private inferFramework(template: WebsiteTemplateConfig): string | null {
-        const normalizedName = `${template.name} ${template.repo}`.toLowerCase();
-
-        if (normalizedName.includes('astro')) {
-            return 'Astro';
-        }
-
-        if (normalizedName.includes('next')) {
-            return 'Next.js';
-        }
-
-        return null;
-    }
-
-    private inferFrameworkFromRepository(repo: string): string | null {
-        const normalizedRepo = repo.toLowerCase();
-
-        if (normalizedRepo.includes('astro')) {
-            return 'Astro';
-        }
-
-        if (normalizedRepo.includes('next')) {
-            return 'Next.js';
-        }
-
-        return null;
+        return inferFrameworkFromRepository(`${template.name} ${template.repo}`);
     }
 
     private getOriginType(
