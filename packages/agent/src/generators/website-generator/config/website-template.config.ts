@@ -33,33 +33,23 @@ const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     customizable: false,
 };
 
-const createMinimalWebsiteTemplate = (): WebsiteTemplateConfig | null => {
-    const repo = config.websiteTemplate.getMinimalRepo();
-    if (!repo) {
-        return null;
-    }
-
-    return {
-        id: 'minimal',
-        name: 'Minimal',
-        description: 'A more minimalistic Ever Works work website template.',
-        owner: config.websiteTemplate.getMinimalOwner(),
-        repo,
-        branch: config.websiteTemplate.getMinimalBranch(),
-        syncBranches: ['main', 'stage', 'develop'],
-        betaBranch: config.websiteTemplate.getMinimalBetaBranch(),
-        customizable: true,
-    };
+const MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
+    id: 'minimal',
+    name: 'Minimal',
+    description: 'A more minimalistic Ever Works work website template.',
+    owner: config.websiteTemplate.getMinimalOwner(),
+    repo: config.websiteTemplate.getMinimalRepo(),
+    branch: config.websiteTemplate.getMinimalBranch(),
+    syncBranches: ['main', 'stage', 'develop'],
+    betaBranch: config.websiteTemplate.getMinimalBetaBranch(),
+    customizable: true,
 };
 
 export const DEFAULT_WEBSITE_TEMPLATE_ID: WebsiteTemplateId = 'classic';
 
 export const WEBSITE_TEMPLATES: WebsiteTemplateConfig[] = [
     CLASSIC_WEBSITE_TEMPLATE,
-    ...(() => {
-        const minimalTemplate = createMinimalWebsiteTemplate();
-        return minimalTemplate ? [minimalTemplate] : [];
-    })(),
+    MINIMAL_WEBSITE_TEMPLATE,
 ];
 
 export function listWebsiteTemplates(): WebsiteTemplateConfig[] {

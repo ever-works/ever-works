@@ -31,7 +31,7 @@ describe('Website templates registry', () => {
         });
     });
 
-    describe('minimal template (opt-in via env)', () => {
+    describe('minimal template (always registered, env-var overridable)', () => {
         const ENV_KEYS = [
             'WEBSITE_TEMPLATE_MINIMAL_REPO',
             'WEBSITE_TEMPLATE_MINIMAL_OWNER',
@@ -48,31 +48,13 @@ describe('Website templates registry', () => {
                 if (previous[k] === undefined) delete process.env[k];
                 else process.env[k] = previous[k];
             }
-            // Reset module cache so subsequent tests see the original env.
             jest.resetModules();
         });
 
-        it('does not appear in listWebsiteTemplates() unless WEBSITE_TEMPLATE_MINIMAL_REPO is set', () => {
-            // Default test-runner env should not have the minimal repo set.
-            // (work-lifecycle.service.spec.ts opts in by setting it; that
-            // does not affect this isolated module load.)
+        it('appears in listWebsiteTemplates() with the canonical ever-works repo by default', () => {
             jest.resetModules();
             delete process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
-            const reloaded =
-                require('../website-template.config') as typeof import('../website-template.config');
-
-            const minimal = reloaded.findWebsiteTemplateConfig('minimal');
-            expect(minimal).toBeNull();
-
-            const ids = reloaded.listWebsiteTemplates().map((t) => t.id);
-            expect(ids).not.toContain('minimal');
-        });
-
-        it('appears with the correct GitHub repo when env opts in', () => {
-            jest.resetModules();
-            // Published repo: https://github.com/ever-works/directory-web-minimal-template
-            process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-minimal-template';
-            process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER = 'ever-works';
+            delete process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER;
             const reloaded =
                 require('../website-template.config') as typeof import('../website-template.config');
 
@@ -81,6 +63,23 @@ describe('Website templates registry', () => {
             expect(minimal!.id).toBe('minimal');
             expect(minimal!.owner).toBe('ever-works');
             expect(minimal!.repo).toBe('directory-web-minimal-template');
+            expect(minimal!.customizable).toBe(true);
+
+            const ids = reloaded.listWebsiteTemplates().map((t) => t.id);
+            expect(ids).toContain('minimal');
+        });
+
+        it('honours env-var overrides when set', () => {
+            jest.resetModules();
+            process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'my-minimal-fork';
+            process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER = 'acme';
+            const reloaded =
+                require('../website-template.config') as typeof import('../website-template.config');
+
+            const minimal = reloaded.findWebsiteTemplateConfig('minimal');
+            expect(minimal).not.toBeNull();
+            expect(minimal!.owner).toBe('acme');
+            expect(minimal!.repo).toBe('my-minimal-fork');
         });
     });
 
