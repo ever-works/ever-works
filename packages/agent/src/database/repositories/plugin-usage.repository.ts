@@ -39,6 +39,7 @@ export class PluginUsageRepository {
         periodStart: Date,
         periodEnd: Date,
         pluginId?: string,
+        currency?: string,
     ): Promise<number> {
         const qb = this.repository
             .createQueryBuilder('e')
@@ -49,6 +50,14 @@ export class PluginUsageRepository {
 
         if (pluginId) {
             qb.andWhere('e.pluginId = :pluginId', { pluginId });
+        }
+
+        // EW-602 follow-up: budgets are denominated in a single currency
+        // (default usd). Summing across mixed-currency events would compare
+        // apples to oranges — filter to the budget's currency so the cap
+        // check stays honest if a plugin ever records non-usd usage.
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
         }
 
         const row = await qb.getRawOne<{ total: string }>();
