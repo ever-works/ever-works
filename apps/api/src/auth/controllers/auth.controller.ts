@@ -29,6 +29,7 @@ import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { CreateAnonymousDto } from '../dto/anonymous.dto';
 import { AuthSessionGuard } from '../guards/auth-session.guard';
 import { Public } from '../decorators/public.decorator';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
@@ -138,7 +139,7 @@ export class AuthController {
     @ApiResponse({ status: 429, description: 'Rate limit exceeded for this IP' })
     async anonymous(
         @Request() req,
-        @Body() body?: { captchaToken?: string; correlationId?: string },
+        @Body() body?: CreateAnonymousDto,
     ) {
         const ipAddress =
             (typeof req.ip === 'string' && req.ip) ||
@@ -265,7 +266,22 @@ export class AuthController {
         return claimed;
     }
 
+    // H-17 (partial): per-endpoint throttle on the credential-validation
+    // path. Defaults derived from the audit's "credential stuffing wide open
+    // under 50 req/sec/IP" finding — 10/min/IP is permissive enough for a real
+    // user fat-fingering their password but stops a brute-force loop dead.
+    // Overridable via env so an operator can tighten under attack:
+    //   LOGIN_THROTTLE_LIMIT  (default 10)
+    //   LOGIN_THROTTLE_TTL_MS (default 60_000)
+    // A per-user lockout (vs IP throttle) needs an additional DB-backed
+    // counter; that's deferred to a follow-up alongside H-17/H-18 Redis work.
     @Public()
+    @Throttle({
+        default: {
+            limit: Number(process.env.LOGIN_THROTTLE_LIMIT ?? 10),
+            ttl: Number(process.env.LOGIN_THROTTLE_TTL_MS ?? 60_000),
+        },
+    })
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User login', description: 'Authenticate with email and password' })
@@ -433,7 +449,12 @@ export class AuthController {
         return { message: 'Password reset successfully' };
     }
 
+    // M-20: tight throttle on token-validity oracles. The token space is large
+    // (256 bits of entropy), so brute-force is infeasible — but a leaked log
+    // line or DB peek combined with an unrestricted validity oracle would let
+    // an attacker confirm token guesses cheaply. 10/min/IP closes that side-channel.
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-email-token')
     @ApiOperation({
         summary: 'Validate email verification token',
@@ -447,6 +468,7 @@ export class AuthController {
     }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-reset-token')
     @ApiOperation({
         summary: 'Validate password reset token',

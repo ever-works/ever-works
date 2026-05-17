@@ -9,6 +9,27 @@ import type { ComparisonData } from '@/lib/api/work';
 import { ROUTES } from '@/lib/constants';
 import { formatComparisonDate } from '@/lib/utils/comparison';
 
+/**
+ * L-10: scheme allow-list for AI-generated `source.url` values. Without
+ * this, an LLM emitting `javascript:alert(1)` (deliberately or via
+ * prompt-injection) lands a working XSS in the rendered `<a href>`.
+ * `rel="noopener noreferrer"` and `target="_blank"` do not block this.
+ * Returns `undefined` for anything that isn't http/https; the JSX uses
+ * `?? '#'` so the resulting anchor is inert.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 interface ComparisonDetailClientProps {
     workId: string;
     comparison: ComparisonData;
@@ -360,14 +381,26 @@ export function ComparisonDetailClient({
                                         {source.title}
                                     </span>
                                     {' — '}
-                                    <a
-                                        href={source.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="break-all text-primary underline underline-offset-2 hover:text-primary-hover"
-                                    >
-                                        {source.url}
-                                    </a>
+                                    {(() => {
+                                        const safeHref = safeExternalUrl(source.url);
+                                        return safeHref ? (
+                                            <a
+                                                href={safeHref}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="break-all text-primary underline underline-offset-2 hover:text-primary-hover"
+                                            >
+                                                {source.url}
+                                            </a>
+                                        ) : (
+                                            <span
+                                                className="break-all text-text-secondary dark:text-text-secondary-dark line-through"
+                                                title="Unsafe URL scheme (blocked by L-10 allow-list)"
+                                            >
+                                                {source.url}
+                                            </span>
+                                        );
+                                    })()}
                                     {source.note && (
                                         <span className="ml-1 text-text-secondary dark:text-text-secondary-dark opacity-60">
                                             ({source.note})

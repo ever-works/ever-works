@@ -112,6 +112,13 @@ export function executeClaudeCode(options: ExecuteOptions): {
 
 		let stdout = '';
 		let stderr = '';
+		// M-25: cap the un-newlined tail used for line splitting. The total
+		// stdout/stderr buffers are already bounded by MAX_BUFFER_SIZE, but
+		// the *remainder* (everything since the last `\n`) was unbounded.
+		// A malicious model output stream with no newlines would balloon
+		// remainder memory indefinitely. On overflow, flush the accumulator
+		// as a synthetic line and warn.
+		const MAX_REMAINDER_BYTES = 1024 * 1024; // 1 MB
 		let stdoutRemainder = '';
 		let stderrRemainder = '';
 
@@ -133,6 +140,14 @@ export function executeClaudeCode(options: ExecuteOptions): {
 						options.onStdoutLine(line);
 					}
 				}
+				// M-25: flush oversize remainder.
+				if (stdoutRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStdoutLine(
+						`[claude-code: stdout line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStdoutLine(stdoutRemainder);
+					stdoutRemainder = '';
+				}
 			}
 		});
 
@@ -153,6 +168,13 @@ export function executeClaudeCode(options: ExecuteOptions): {
 					if (line.trim()) {
 						options.onStderrLine(line);
 					}
+				}
+				if (stderrRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStderrLine(
+						`[claude-code: stderr line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStderrLine(stderrRemainder);
+					stderrRemainder = '';
 				}
 			}
 		});

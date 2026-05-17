@@ -171,9 +171,31 @@ export class TriggerInternalController implements OnModuleInit {
         }
     }
 
+    // H-06: project an explicit allow-list of User fields. The previous
+    // implementation dropped `password` and spread the rest — meaning OAuth
+    // `accessToken`/`refreshToken` on `authAccounts` relations, password-reset
+    // tokens, and email-verification tokens all flowed to the Trigger.dev worker.
+    // The worker only needs identity + a handful of preference flags.
     private stripSensitiveUserData(user: User): WorkContextResponse['user'] {
-        const { password, ...rest } = user;
-        return JSON.parse(JSON.stringify(rest));
+        return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            // Preserve the original shape the worker is typed against —
+            // `JSON.parse(JSON.stringify(...))` here strips class metadata
+            // and any field that happens to be `undefined`.
+            ...JSON.parse(
+                JSON.stringify({
+                    avatar: user.avatar ?? null,
+                    emailVerified: user.emailVerified,
+                    isActive: user.isActive,
+                    registrationProvider: user.registrationProvider,
+                    isAnonymous: user.isAnonymous,
+                    committerName: user.committerName ?? null,
+                    committerEmail: user.committerEmail ?? null,
+                }),
+            ),
+        } as WorkContextResponse['user'];
     }
 
     private stripRelations(work: Work) {

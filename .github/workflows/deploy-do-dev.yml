@@ -7,6 +7,10 @@ on:
     types:
       - completed
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 jobs:
   deploy-dev:
     runs-on: ubuntu-latest

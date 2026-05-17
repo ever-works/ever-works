@@ -15,6 +15,10 @@ on:
     branches: [develop, stage, main]
   workflow_dispatch:
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

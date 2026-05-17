@@ -7,6 +7,10 @@ on:
     types:
       - completed
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 jobs:
   deploy-prod:
     runs-on: ubuntu-latest
@@ -34,14 +38,24 @@ jobs:
           DB_CA_CERT: '${{ secrets.DATABASE_CA_CERT }}'
 
       - name: Generate TLS Secrets
+        # M-13: pass secrets via `env:` and double-quote `"$VAR"` instead of
+        # interpolating `${{ secrets.X }}` directly into the shell. Inline
+        # interpolation expands client-side and a secret containing shell
+        # metacharacters (backticks, $(...), etc.) would break the step or
+        # — in pathological cases — leak via shell expansion.
         run: |
           rm -f ${HOME}/ingress.api.crt ${HOME}/ingress.api.key ${HOME}/ingress.webapp.crt ${HOME}/ingress.webapp.key
-          echo ${{ secrets.INGRESS_API_CERT }} | base64 --decode > ${HOME}/ingress.api.crt
-          echo ${{ secrets.INGRESS_API_CERT_KEY }} | base64 --decode > ${HOME}/ingress.api.key
-          echo ${{ secrets.INGRESS_WEBAPP_CERT }} | base64 --decode > ${HOME}/ingress.webapp.crt
-          echo ${{ secrets.INGRESS_WEBAPP_CERT_KEY }} | base64 --decode > ${HOME}/ingress.webapp.key
+          echo "$INGRESS_API_CERT" | base64 --decode > ${HOME}/ingress.api.crt
+          echo "$INGRESS_API_CERT_KEY" | base64 --decode > ${HOME}/ingress.api.key
+          echo "$INGRESS_WEBAPP_CERT" | base64 --decode > ${HOME}/ingress.webapp.crt
+          echo "$INGRESS_WEBAPP_CERT_KEY" | base64 --decode > ${HOME}/ingress.webapp.key
           kubectl create secret tls api.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.api.crt --key=${HOME}/ingress.api.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
           kubectl create secret tls app.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.webapp.crt --key=${HOME}/ingress.webapp.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
+        env:
+          INGRESS_API_CERT: ${{ secrets.INGRESS_API_CERT }}
+          INGRESS_API_CERT_KEY: ${{ secrets.INGRESS_API_CERT_KEY }}
+          INGRESS_WEBAPP_CERT: ${{ secrets.INGRESS_WEBAPP_CERT }}
+          INGRESS_WEBAPP_CERT_KEY: ${{ secrets.INGRESS_WEBAPP_CERT_KEY }}
 
       - name: Apply k8s manifests changes in DigitalOcean k8s cluster (if any)
         run: |

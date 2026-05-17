@@ -14,6 +14,28 @@ import { createCategory, updateCategory, deleteCategory } from '@/app/actions/da
 import { toast } from 'sonner';
 
 /**
+ * M-09: defense-in-depth render-time SVG hardening. The agent-side
+ * `sanitizeSvg` already strips script/event-handler/foreignObject on writes,
+ * but pre-seeded or imported categories (account import, restored backups,
+ * older code paths) can land unsanitized SVG in the DB and bypass that
+ * guarantee on read. Run a conservative regex pass here too — if anything
+ * dangerous slips through, swap this client copy for `isomorphic-dompurify`
+ * when adding it as a dep.
+ */
+const SVG_DANGEROUS_TAG_RE = /<\/?(?:script|iframe|object|embed|foreignObject|use\s+[^>]*xlink:href)[^>]*>/gi;
+const SVG_DANGEROUS_ATTR_RE = /\s(?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+
+function sanitizeSvgClient(svg: string): string {
+    if (typeof svg !== 'string') return '';
+    // Trim XML processing instructions / DOCTYPE that don't belong inline.
+    return svg
+        .replace(/<\?xml[^>]*\?>/gi, '')
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(SVG_DANGEROUS_TAG_RE, '')
+        .replace(SVG_DANGEROUS_ATTR_RE, '');
+}
+
+/**
  * Render the category's icon. Resolution order:
  *   1. `icon_svg` — server-sanitized inline SVG. Rendered with
  *      dangerouslySetInnerHTML so `stroke="currentColor"` themes
@@ -29,7 +51,7 @@ function CategoryIcon({ category }: { category: Category }) {
             <span
                 aria-hidden="true"
                 className="inline-flex w-6 h-6 items-center justify-center text-text-secondary dark:text-text-secondary-dark shrink-0 [&>svg]:w-full [&>svg]:h-full"
-                dangerouslySetInnerHTML={{ __html: category.icon_svg }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSvgClient(category.icon_svg) }}
             />
         );
     }

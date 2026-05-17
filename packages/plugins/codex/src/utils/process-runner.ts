@@ -82,6 +82,8 @@ export function executeCodex(options: ExecuteOptions): {
 
 		let stdout = '';
 		let stderr = '';
+		// M-25: cap the un-newlined remainder. See claude-code/process-runner.ts.
+		const MAX_REMAINDER_BYTES = 1024 * 1024;
 		let stdoutRemainder = '';
 		let stderrRemainder = '';
 
@@ -103,6 +105,13 @@ export function executeCodex(options: ExecuteOptions): {
 						options.onStdoutLine(line);
 					}
 				}
+				if (stdoutRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStdoutLine(
+						`[codex: stdout line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStdoutLine(stdoutRemainder);
+					stdoutRemainder = '';
+				}
 			}
 		});
 
@@ -123,6 +132,13 @@ export function executeCodex(options: ExecuteOptions): {
 					if (line.trim()) {
 						options.onStderrLine(line);
 					}
+				}
+				if (stderrRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStderrLine(
+						`[codex: stderr line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStderrLine(stderrRemainder);
+					stderrRemainder = '';
 				}
 			}
 		});
