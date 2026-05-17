@@ -9,7 +9,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import type { ClassToObject } from './types';
-import { TimestampColumn } from './_types';
+import { TimestampColumn, PortableDateColumn } from './_types';
 import { Work } from './work.entity';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
@@ -98,7 +98,12 @@ export class User {
     @Column({ type: 'int', default: 0 })
     failedLoginAttempts: number;
 
-    @Column({ type: 'timestamp', nullable: true })
+    // H-17: `type: 'timestamp'` is Postgres-only and breaks integration specs
+    // that boot the User entity under better-sqlite3 (work-proposal.entity.
+    // integration.spec). `PortableDateColumn` (`type: Date`) lets TypeORM pick
+    // the right column type per dialect — Postgres still gets `timestamp`,
+    // sqlite gets `datetime`.
+    @PortableDateColumn({ nullable: true })
     lockedUntil?: Date | null;
 
     // Password reset
