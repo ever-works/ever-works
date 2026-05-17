@@ -21,7 +21,9 @@ export class ApiClientService {
 		// REQUEST is the inbound HTTP request when MCP is running over the
 		// HTTP transport. For stdio transport the request is absent and we
 		// fall back to the shared key.
-		@Optional() @Inject(REQUEST) private readonly request: { __callerJwt?: string } | null = null
+		@Optional()
+		@Inject(REQUEST)
+		private readonly httpRequest: { __callerJwt?: string } | null = null
 	) {}
 
 	async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -34,7 +36,7 @@ export class ApiClientService {
 		// H-21: forward the per-user JWT if present, fall back to shared key.
 		// In `per-user-jwt` mode the shared key is null on the config, so
 		// we never send it even if a JWT is missing — the upstream will reject.
-		const callerJwt = this.request?.__callerJwt;
+		const callerJwt = this.httpRequest?.__callerJwt;
 		if (callerJwt) {
 			headers['Authorization'] = `Bearer ${callerJwt}`;
 		} else if (this.config.apiKey) {
