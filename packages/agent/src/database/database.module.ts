@@ -5,6 +5,7 @@ import { ApiKeyRepository } from './repositories/api-key.repository';
 import { WorkRepository } from './repositories/work.repository';
 import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
 import { WorkCustomDomainRepository } from './repositories/work-custom-domain.repository';
+import { WorkDeploymentRepository } from './repositories/work-deployment.repository';
 import { WorkMemberRepository } from './repositories/work-member.repository';
 import { WorkInvitationRepository } from './repositories/work-invitation.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
@@ -27,6 +28,7 @@ import { GitHubAppInstallationRepoRepository } from './repositories/github-app-i
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { TemplateRepository } from './repositories/template.repository';
+import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
 
@@ -50,6 +52,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         WorkRepository,
         WorkAdvancedPromptsRepository,
         WorkCustomDomainRepository,
+        WorkDeploymentRepository,
         WorkMemberRepository,
         WorkInvitationRepository,
         RefreshTokenRepository,
@@ -71,6 +74,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
         TemplateRepository,
+        TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],
@@ -80,6 +84,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         WorkRepository,
         WorkAdvancedPromptsRepository,
         WorkCustomDomainRepository,
+        WorkDeploymentRepository,
         WorkMemberRepository,
         WorkInvitationRepository,
         UserRepository,
@@ -101,6 +106,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
         TemplateRepository,
+        TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],

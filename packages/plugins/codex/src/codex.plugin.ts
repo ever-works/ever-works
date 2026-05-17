@@ -11,6 +11,10 @@ import type {
 	IFormSchemaProvider,
 	IPlugin,
 	IPipelinePlugin,
+	ICodeEditPlugin,
+	CodeEditRequest,
+	CodeEditOptions,
+	CodeEditResult,
 	JsonSchema,
 	DeviceAuthStatus,
 	PipelineExecutionOptions,
@@ -27,13 +31,16 @@ import type {
 } from '@ever-works/plugin';
 import {
 	buildSuccessPipelineResult,
+	buildDefaultCodeEditSystemPrompt,
 	normalizeItemTags,
 	PLUGIN_CAPABILITIES,
 	substituteVariables,
 	type ItemData
 } from '@ever-works/plugin';
+import { computeWorkspaceFileChanges } from '@ever-works/plugin/code-edit';
 import * as fs from 'fs';
-import * as path from 'path';
+// POSIX joins keep BASE_TEMP_DIR-derived paths stable across platforms.
+import * as path from 'path/posix';
 import * as https from 'https';
 
 import type { CodexStepId } from './types.js';
@@ -230,15 +237,19 @@ const RECOVERY_OUTPUT_SCHEMA = {
 	}
 } as const;
 
-export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, IDeviceAuthProvider {
+export class CodexPlugin
+	implements IPlugin, IPipelinePlugin, IFormSchemaProvider, IDeviceAuthProvider, ICodeEditPlugin
+{
 	readonly id = 'codex';
 	readonly name = 'Codex Generator';
+	readonly providerName = 'OpenAI Codex';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.PIPELINE,
 		PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
-		PLUGIN_CAPABILITIES.DEVICE_AUTH
+		PLUGIN_CAPABILITIES.DEVICE_AUTH,
+		PLUGIN_CAPABILITIES.CODE_EDIT
 	] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
@@ -1352,6 +1363,92 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		}
 
 		return result.errors;
+	}
+
+	// ─────────────────────────────────────────────────────────────────────
+	// Code-edit capability (ICodeEditPlugin)
+	// ─────────────────────────────────────────────────────────────────────
+
+	async executeCodeEdit(request: CodeEditRequest, options?: CodeEditOptions): Promise<CodeEditResult> {
+		const startTime = Date.now();
+		const settings =
+			((options?.execContext as { settings?: Record<string, unknown> })?.settings as Record<string, unknown>) ??
+			{};
+
+		const executionAuth = await resolveExecutionAuth(settings);
+		if (!executionAuth) {
+			return {
+				success: false,
+				summary: 'No Codex authentication available',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Configure an OpenAI API key or complete Codex device authentication first.'
+			};
+		}
+		if (executionAuth.mode !== 'api-key') {
+			return {
+				success: false,
+				summary: 'Codex device-auth mode is not yet supported for code-edit',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Use api-key mode for code-edit runs (device-auth follow-up tracked in EW-550).'
+			};
+		}
+
+		const cliVersion = (settings.version as string) || DEFAULT_CLI_VERSION;
+		this.codexCommandPath = await ensureBinary(cliVersion, this.context?.logger);
+
+		const model = request.model ?? (settings.model as string | undefined) ?? DEFAULT_MODEL;
+		const systemPrompt = buildDefaultCodeEditSystemPrompt(request);
+		const fullPrompt = `${systemPrompt}\n\n---\n\nUser request:\n${request.prompt}`;
+
+		const { promise, kill } = executeCodex({
+			command: this.codexCommandPath ?? 'codex',
+			cwd: request.workspaceDir,
+			env: executionAuth.env,
+			model,
+			bypassApprovalsAndSandbox: true,
+			prompt: fullPrompt,
+			signal: options?.signal,
+			onStdoutLine: options?.onLogLine ? (line) => options.onLogLine!('stdout', line) : undefined,
+			onStderrLine: options?.onLogLine ? (line) => options.onLogLine!('stderr', line) : undefined
+		});
+
+		this.killProcess = kill;
+		const result = await promise;
+		this.killProcess = null;
+
+		if (result.killed || options?.signal?.aborted) {
+			return {
+				success: false,
+				summary: 'Code edit cancelled',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Cancelled'
+			};
+		}
+
+		const filesChanged = await computeWorkspaceFileChanges(request.workspaceDir);
+		const success = result.exitCode === 0 && filesChanged.length > 0;
+		const summary = success
+			? `Codex modified ${filesChanged.length} file(s) in ${Math.round((Date.now() - startTime) / 1000)}s`
+			: result.exitCode === 0
+				? 'Codex ran but produced no changes'
+				: `Codex exited with code ${result.exitCode}`;
+
+		return {
+			success,
+			summary,
+			filesChanged,
+			duration: Date.now() - startTime,
+			error: success ? undefined : result.stderr || `Exit ${result.exitCode}`,
+			extra: { exitCode: result.exitCode }
+		};
+	}
+
+	async cancelCodeEdit(): Promise<void> {
+		this.killProcess?.();
+		this.killProcess = null;
 	}
 }
 

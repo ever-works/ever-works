@@ -15,7 +15,8 @@ export default defineConfig({
 		'src/git/index.ts',
 		'src/ai/index.ts',
 		'src/keywords/index.ts',
-		'src/cli-pipeline/index.ts'
+		'src/cli-pipeline/index.ts',
+		'src/code-edit/index.ts'
 	],
 	format: ['esm', 'cjs'],
 	dts: true,

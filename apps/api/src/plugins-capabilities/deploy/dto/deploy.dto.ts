@@ -8,6 +8,12 @@ export class DeployWorkDto {
     teamScope?: string;
 }
 
+export class RollbackDto {
+    @ApiProperty({ description: 'Deployment id to roll back to' })
+    @IsString()
+    deploymentId: string;
+}
+
 export class ValidateTokenDto {
     @ApiProperty({ description: 'Deployment provider ID' })
     @IsString()

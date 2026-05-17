@@ -509,11 +509,13 @@ describe('agent/config', () => {
         );
 
         describe('getMinimalRepo', () => {
-            it('returns undefined when env is unset (no default — gates the Minimal seed)', () => {
-                expect(config.websiteTemplate.getMinimalRepo()).toBeUndefined();
+            it('defaults to the canonical ever-works repo name when env is unset', () => {
+                expect(config.websiteTemplate.getMinimalRepo()).toBe(
+                    'directory-web-minimal-template',
+                );
             });
 
-            it('returns the env value verbatim', () => {
+            it('returns the env value verbatim when set', () => {
                 process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'minimal-template';
                 expect(config.websiteTemplate.getMinimalRepo()).toBe('minimal-template');
             });

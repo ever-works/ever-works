@@ -35,7 +35,9 @@ export function isOpenCodeStepId(value: string): value is OpenCodeStepId {
 /**
  * Base temporary work for all OpenCode operations
  */
-export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'opencode-generator');
+// Forward-slash form so downstream `path.posix.join` calls don't treat the
+// drive letter as relative on Windows. Node accepts `/` on Windows for FS ops.
+export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'opencode-generator').replace(/\\/g, '/');
 
 /**
  * GitHub repository for OpenCode CLI distribution

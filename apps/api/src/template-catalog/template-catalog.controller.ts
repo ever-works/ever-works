@@ -10,7 +10,10 @@ import {
     Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
+import {
+    TemplateCatalogService,
+    TemplateCustomizationService,
+} from '@ever-works/agent/template-catalog';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { CurrentUser } from '@src/auth';
@@ -18,6 +21,7 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
     AddCustomTemplateDto,
     ArchiveCustomTemplateDto,
+    CustomizeTemplateFromBaseDto,
     ForkTemplateDto,
     ListTemplatesQueryDto,
     RefreshTemplatesDto,
@@ -31,6 +35,7 @@ import {
 export class TemplateCatalogController {
     constructor(
         private readonly templateCatalogService: TemplateCatalogService,
+        private readonly templateCustomizationService: TemplateCustomizationService,
         private readonly activityLogService: ActivityLogService,
     ) {}
 
@@ -230,6 +235,122 @@ export class TemplateCatalogController {
             status: 'success',
             kind: body.kind,
             ...result,
+        };
+    }
+
+    @Get('templates/customization-providers')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List installed code-edit providers usable for template customization',
+    })
+    @ApiResponse({ status: 200, description: 'Providers' })
+    async listCustomizationProviders() {
+        return { status: 'success', providers: this.templateCustomizationService.listProviders() };
+    }
+
+    @Post('templates/custom-from-base')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Create a new custom template from a base + agent UI customization' })
+    @ApiResponse({ status: 200, description: 'Customization scheduled' })
+    async customizeTemplateFromBase(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CustomizeTemplateFromBaseDto,
+    ) {
+        const result = await this.templateCustomizationService.createAndStart(auth.userId, body);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_ADDED,
+                action: 'template.customized',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Customize template ${result.template.name} from base ${body.baseTemplateId}`,
+                metadata: {
+                    templateId: result.template.id,
+                    baseTemplateId: body.baseTemplateId,
+                    customizationId: result.customization.id,
+                    providerId: body.providerId,
+                },
+            })
+            .catch(() => {});
+
+        return {
+            status: 'success',
+            customizationId: result.customization.id,
+            template: {
+                id: result.template.id,
+                name: result.template.name,
+                repositoryOwner: result.template.repositoryOwner,
+                repositoryName: result.template.repositoryName,
+                repositoryUrl: result.template.repositoryUrl,
+            },
+            customization: this.serializeCustomization(result.customization),
+        };
+    }
+
+    @Get('templates/customizations/:customizationId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get template customization status' })
+    @ApiResponse({ status: 200, description: 'Customization status' })
+    async getCustomization(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('customizationId') customizationId: string,
+    ) {
+        const customization = await this.templateCustomizationService.getByIdForUser(
+            customizationId,
+            auth.userId,
+        );
+        if (!customization) return { status: 'error', message: 'Customization not found' };
+        return { status: 'success', customization: this.serializeCustomization(customization) };
+    }
+
+    @Get('templates/:templateId/customizations')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List customization runs for a custom template' })
+    @ApiResponse({ status: 200, description: 'Customization list' })
+    async listCustomizationsForTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+    ) {
+        const customizations = await this.templateCustomizationService.listForTemplate(
+            templateId,
+            auth.userId,
+        );
+        return {
+            status: 'success',
+            customizations: customizations.map((c) => this.serializeCustomization(c)),
+        };
+    }
+
+    private serializeCustomization(c: {
+        id: string;
+        templateId: string;
+        baseTemplateId: string;
+        prompt: string;
+        status: string;
+        branch?: string | null;
+        commitSha?: string | null;
+        providerId?: string | null;
+        errorMessage?: string | null;
+        startedAt?: Date | null;
+        completedAt?: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }) {
+        return {
+            id: c.id,
+            templateId: c.templateId,
+            baseTemplateId: c.baseTemplateId,
+            prompt: c.prompt,
+            status: c.status,
+            branch: c.branch ?? null,
+            commitSha: c.commitSha ?? null,
+            providerId: c.providerId ?? null,
+            errorMessage: c.errorMessage ?? null,
+            startedAt: c.startedAt ? c.startedAt.toISOString() : null,
+            completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
         };
     }
 

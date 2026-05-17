@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUrl } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 const TEMPLATE_KINDS = ['website', 'work'] as const;
 
@@ -136,4 +136,38 @@ export class RefreshTemplatesDto {
     @IsString()
     @IsIn(TEMPLATE_KINDS)
     kind: 'website' | 'work';
+}
+
+export class CustomizeTemplateFromBaseDto {
+    @ApiProperty({ description: 'Built-in base template id (e.g. "minimal").' })
+    @IsString()
+    baseTemplateId: string;
+
+    @ApiProperty({ description: 'Display name for the new custom template.' })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(120)
+    name: string;
+
+    @ApiProperty({ description: 'UI customization prompt for the agent.' })
+    @IsString()
+    @MinLength(3)
+    @MaxLength(4000)
+    prompt: string;
+
+    @ApiProperty({ description: 'Code-edit plugin id (claude-code, codex, gemini, opencode).' })
+    @IsString()
+    @MinLength(1)
+    providerId: string;
+
+    @ApiPropertyOptional({ description: 'GitHub login (personal or org). Defaults to user.' })
+    @IsOptional()
+    @IsString()
+    targetOwner?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    description?: string;
 }

@@ -204,7 +204,7 @@ export const config = {
             return process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER || 'ever-works';
         },
         getMinimalRepo() {
-            return process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_REPO || 'directory-web-minimal-template';
         },
         getMinimalBranch() {
             return process.env.WEBSITE_TEMPLATE_MINIMAL_BRANCH || 'main';

@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TemplatesPage() {
-    const [templatesData, gitUserResult, organizationsResult] = await Promise.all([
+    const [templatesData, gitUserResult, organizationsResult, providersResult] = await Promise.all([
         templatesAPI.list('website').catch(() => ({
             status: 'success' as const,
             kind: 'website' as const,
@@ -24,6 +24,10 @@ export default async function TemplatesPage() {
         gitProvidersAPI.getOrganizations('github').catch(() => ({
             success: false,
             organizations: [],
+        })),
+        templatesAPI.listCustomizationProviders().catch(() => ({
+            status: 'success' as const,
+            providers: [],
         })),
     ]);
 
@@ -51,6 +55,7 @@ export default async function TemplatesPage() {
                 templates={templatesData.templates}
                 defaultTemplateId={templatesData.defaultTemplateId}
                 forkTargets={forkTargets}
+                customizationProviders={providersResult.providers ?? []}
             />
         </div>
     );
