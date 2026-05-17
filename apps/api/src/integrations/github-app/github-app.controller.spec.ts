@@ -158,12 +158,15 @@ describe('GitHubAppController', () => {
             });
             authProvider.issueSession.mockResolvedValue({ accessToken: 'a' });
 
-            await controller.callback({ code: 'c', state: 's' } as any, {
-                headers: {
-                    'x-forwarded-for': '198.51.100.7, 10.0.0.1',
-                    'user-agent': 'curl/8',
-                },
-            } as any);
+            await controller.callback(
+                { code: 'c', state: 's' } as any,
+                {
+                    headers: {
+                        'x-forwarded-for': '198.51.100.7, 10.0.0.1',
+                        'user-agent': 'curl/8',
+                    },
+                } as any,
+            );
 
             expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
                 ipAddress: '198.51.100.7',
