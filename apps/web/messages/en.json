@@ -3361,7 +3361,7 @@
                 "baseLabel": "Base template",
                 "baseHelp": "Only bases marked AI-customizable are listed.",
                 "providerLabel": "Code-edit agent",
-                "providerHelp": "Pick an installed plugin (claude-code, codex, gemini, opencode).",
+                "providerHelp": "Pick one of your installed code-edit plugins. The default is preselected.",
                 "targetLabel": "GitHub destination",
                 "targetHelp": "Where to create the new repo. Personal account or an org you belong to.",
                 "personalTarget": "Personal account ({login})",
@@ -3394,8 +3394,9 @@
                     "providerRequired": "Choose a code-edit agent.",
                     "promptTooShort": "Describe the changes in at least a few words.",
                     "noCustomizableBases": "No customizable base templates are available.",
-                    "noProviders": "No code-edit agent plugins are installed or enabled. Install claude-code, codex, gemini, or opencode.",
-                    "noTargets": "Connect a GitHub account to choose a destination."
+                    "noProviders": "No code-edit agent plugins are installed or enabled. Install one from the plugin catalog (e.g. claude-code, codex, gemini, opencode).",
+                    "noTargets": "Connect a GitHub account to choose a destination.",
+                    "browsePlugins": "Browse plugin catalog"
                 }
             }
         },

@@ -6,6 +6,7 @@ import {
     type CodeEditRequest,
     type CodeEditOptions,
     type CodeEditResult,
+    type PluginIcon,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -20,8 +21,11 @@ export interface CodeEditFacadeOptions {
 export interface CodeEditProviderInfo {
     id: string;
     name: string;
+    description?: string;
+    icon?: PluginIcon;
     providerName?: string;
     enabled: boolean;
+    isDefault?: boolean;
 }
 
 @Injectable()
@@ -38,9 +42,12 @@ export class CodeEditFacadeService {
     listProviders(): CodeEditProviderInfo[] {
         return this.registry.getByCapability(this.CAPABILITY).map((p) => ({
             id: p.plugin.id,
-            name: p.plugin.name ?? p.plugin.id,
+            name: p.manifest.name ?? p.plugin.id,
+            description: p.manifest.description,
+            icon: p.manifest.icon,
             providerName: (p.plugin as ICodeEditPlugin).providerName,
             enabled: p.state === 'loaded',
+            isDefault: p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) || false,
         }));
     }
 

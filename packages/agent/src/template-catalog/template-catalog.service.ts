@@ -98,6 +98,28 @@ export class TemplateCatalogService implements OnModuleInit {
             builtInTemplates.map((template) => this.templateRepository.upsert(template)),
         );
 
+        // Deactivate any older built-in rows pointing at the same (owner, repo)
+        // but with a different id — e.g. a row previously seeded by org
+        // discovery under id="<repo-name>" that now duplicates a curated
+        // template. Without this, the catalog renders two cards for the same
+        // repo after a curated entry is added.
+        await Promise.all(
+            builtInTemplates.map(async (curated) => {
+                const matches = await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
+                    curated.kind,
+                    curated.repositoryOwner,
+                    curated.repositoryName,
+                );
+                await Promise.all(
+                    matches
+                        .filter((match) => match.id !== curated.id && match.isActive)
+                        .map((match) =>
+                            this.templateRepository.updateById(match.id, { isActive: false }),
+                        ),
+                );
+            }),
+        );
+
         this.logger.debug(`Ensured ${builtInTemplates.length} built-in templates are present`);
     }
 
@@ -600,8 +622,22 @@ export class TemplateCatalogService implements OnModuleInit {
                 this.isStandardTemplateRepository(repository.name),
             );
 
+            // Repos already represented by a curated WEBSITE_TEMPLATES entry —
+            // skip them in discovery so we don't re-create a `<repo-name>` row
+            // alongside the curated one and end up with duplicate catalog
+            // cards for the same GitHub repo.
+            const curatedRepoCoordinates = new Set(
+                listWebsiteTemplates().map(
+                    (template) => `${template.owner.toLowerCase()}/${template.repo.toLowerCase()}`,
+                ),
+            );
+
             await Promise.all(
                 standardTemplates.map(async (repository) => {
+                    const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
+                    if (curatedRepoCoordinates.has(coordinateKey)) {
+                        return;
+                    }
                     const discoveredId = repository.name.toLowerCase();
                     const canonicalTemplate =
                         await this.templateRepository.findBuiltInByRepositoryCoordinates(

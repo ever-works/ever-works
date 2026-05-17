@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, ExternalLink } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import type {
     CustomizationProvider,
     TemplateCatalogItem,
@@ -13,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
+import { Tooltip } from '@/components/ui/tooltip';
+import { ProviderChoiceButton } from '@/components/works/detail/plugins/ProviderChoiceButton';
 import {
     Dialog,
     DialogClose,
@@ -54,10 +58,17 @@ export function CreateCustomTemplateDialog({
     onSucceeded,
 }: CreateCustomTemplateDialogProps) {
     const t = useTranslations('dashboard.templates.customizeDialog');
-    const enabledProviders = providers.filter((p) => p.enabled);
+    const tGen = useTranslations('dashboard.workDetail.generator');
+    const enabledProviders = useMemo(() => providers.filter((p) => p.enabled), [providers]);
+    // Prefer the plugin that declares 'code-edit' in defaultForCapabilities;
+    // fall back to first enabled if none does.
+    const defaultProviderId = useMemo(
+        () => enabledProviders.find((p) => p.isDefault)?.id ?? enabledProviders[0]?.id ?? '',
+        [enabledProviders],
+    );
 
     const [baseTemplateId, setBaseTemplateId] = useState<string>(customizableBases[0]?.id ?? '');
-    const [providerId, setProviderId] = useState<string>(enabledProviders[0]?.id ?? '');
+    const [providerId, setProviderId] = useState<string>(defaultProviderId);
     const [targetOwner, setTargetOwner] = useState<string>(forkTargets[0]?.login ?? '');
     const [name, setName] = useState('');
     const [prompt, setPrompt] = useState('');
@@ -102,7 +113,7 @@ export function CreateCustomTemplateDialog({
         setPrompt('');
         setCustomization(null);
         setBaseTemplateId(customizableBases[0]?.id ?? '');
-        setProviderId(enabledProviders[0]?.id ?? '');
+        setProviderId(defaultProviderId);
         setTargetOwner(forkTargets[0]?.login ?? '');
     };
 
@@ -158,13 +169,26 @@ export function CreateCustomTemplateDialog({
                 </DialogHeader>
 
                 {noPrereqs ? (
-                    <ul className="space-y-2 rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
-                        {customizableBases.length === 0 && (
-                            <li>• {t('messages.noCustomizableBases')}</li>
+                    <div className="space-y-3 rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
+                        <ul className="space-y-2">
+                            {customizableBases.length === 0 && (
+                                <li>• {t('messages.noCustomizableBases')}</li>
+                            )}
+                            {enabledProviders.length === 0 && (
+                                <li>• {t('messages.noProviders')}</li>
+                            )}
+                            {forkTargets.length === 0 && <li>• {t('messages.noTargets')}</li>}
+                        </ul>
+                        {enabledProviders.length === 0 && (
+                            <Link
+                                href={ROUTES.DASHBOARD_PLUGINS}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                            >
+                                {t('messages.browsePlugins')}
+                                <ExternalLink className="h-3 w-3" />
+                            </Link>
                         )}
-                        {enabledProviders.length === 0 && <li>• {t('messages.noProviders')}</li>}
-                        {forkTargets.length === 0 && <li>• {t('messages.noTargets')}</li>}
-                    </ul>
+                    </div>
                 ) : (
                     <div className="space-y-4">
                         <Input
@@ -176,35 +200,51 @@ export function CreateCustomTemplateDialog({
                             helperText={t('nameHelp')}
                         />
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Field label={t('baseLabel')} hint={t('baseHelp')}>
-                                <Select
-                                    value={baseTemplateId}
-                                    onValueChange={setBaseTemplateId}
-                                    disabled={disabled}
-                                >
-                                    {customizableBases.map((base) => (
-                                        <option key={base.id} value={base.id}>
-                                            {base.name}
-                                        </option>
-                                    ))}
-                                </Select>
-                            </Field>
+                        <Field label={t('baseLabel')} hint={t('baseHelp')}>
+                            <Select
+                                value={baseTemplateId}
+                                onValueChange={setBaseTemplateId}
+                                disabled={disabled}
+                            >
+                                {customizableBases.map((base) => (
+                                    <option key={base.id} value={base.id}>
+                                        {base.name}
+                                    </option>
+                                ))}
+                            </Select>
+                        </Field>
 
-                            <Field label={t('providerLabel')} hint={t('providerHelp')}>
-                                <Select
-                                    value={providerId}
-                                    onValueChange={setProviderId}
-                                    disabled={disabled}
-                                >
-                                    {enabledProviders.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.providerName || p.name}
-                                        </option>
-                                    ))}
-                                </Select>
-                            </Field>
-                        </div>
+                        <Field label={t('providerLabel')} hint={t('providerHelp')}>
+                            <div className="flex flex-wrap gap-1.5">
+                                {providers.map((provider) => {
+                                    const isActive = providerId === provider.id;
+                                    const notConfigured = !provider.enabled;
+                                    const button = (
+                                        <ProviderChoiceButton
+                                            name={provider.providerName || provider.name}
+                                            icon={provider.icon}
+                                            isActive={isActive}
+                                            disabled={disabled}
+                                            notConfigured={notConfigured}
+                                            notConfiguredLabel={tGen('notConfigured')}
+                                            onSelect={() => {
+                                                if (!notConfigured) setProviderId(provider.id);
+                                            }}
+                                        />
+                                    );
+                                    return notConfigured ? (
+                                        <Tooltip
+                                            key={provider.id}
+                                            content={tGen('notConfiguredTooltip')}
+                                        >
+                                            {button}
+                                        </Tooltip>
+                                    ) : (
+                                        <span key={provider.id}>{button}</span>
+                                    );
+                                })}
+                            </div>
+                        </Field>
 
                         <Field label={t('targetLabel')} hint={t('targetHelp')}>
                             <Select

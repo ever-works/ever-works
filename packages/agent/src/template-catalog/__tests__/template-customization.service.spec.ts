@@ -174,6 +174,14 @@ describe('TemplateCustomizationService.createAndStart', () => {
         );
     });
 
+    it('rejects when no code-edit providers are installed at all', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.listProviders.mockReturnValue([]);
+        await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
+            BadRequestException,
+        );
+    });
+
     it('provisions a new repo and persists the Template + customization rows', async () => {
         const { service, mocks } = makeService();
         const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { PluginIcon } from '@ever-works/plugin';
 import { serverFetch, serverMutation } from './server-api';
 import { APIResponse } from './types';
 
@@ -115,8 +116,11 @@ export type GetTemplateCustomizationResponse = APIResponse<{
 export interface CustomizationProvider {
     id: string;
     name: string;
+    description?: string | null;
+    icon?: PluginIcon;
     providerName?: string;
     enabled: boolean;
+    isDefault?: boolean;
 }
 
 export type ListCustomizationProvidersResponse = APIResponse<{
