@@ -55,13 +55,12 @@ spec:
       labels:
         app: ever-works-api-dev
     spec:
-      # H-20: pod-level hardening. Dev is the canary — once this rolls
-      # cleanly here, the same block is copied to stage/prod manifests.
-      # `automountServiceAccountToken: false` is INTENTIONALLY omitted
-      # here because the API container uses `EVER_WORKS_K8S_*_KUBECONFIG`
-      # to deploy other Works; turning off the SA token doesn't break
-      # that path (the kubeconfig is the real credential) but it also
-      # doesn't help unless we add `runAsNonRoot`. Layered roll-out.
+      # H-20: pod-level hardening. The API container uses external
+      # kubeconfigs (`EVER_WORKS_K8S_*_KUBECONFIG`) to deploy other Works,
+      # so the in-cluster service-account token is unused and can be
+      # safely disabled. runAsNonRoot + dropped capabilities mirror the
+      # Docker image's `USER node` so a container compromise can't
+      # escalate to root or capability-protected operations.
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
