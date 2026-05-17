@@ -136,9 +136,12 @@ export class AuthProviderService extends AuthProvider {
         return this.issueSession(result.user.id);
     }
 
-    async issueSession(userId: string): Promise<TokenResponse> {
+    async issueSession(
+        userId: string,
+        clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+    ): Promise<TokenResponse> {
         const user = await this.assertActiveUser(userId);
-        const session = await this.createSessionRecord(user.id);
+        const session = await this.createSessionRecord(user.id, clientFingerprint);
 
         return {
             access_token: session.token,
@@ -297,7 +300,14 @@ export class AuthProviderService extends AuthProvider {
         await this.getSessionRepository().delete({ token });
     }
 
-    private async createSessionRecord(userId: string) {
+    // H-04: bind sessions to the requesting client at creation. Callers
+    // forward whatever fingerprint they can pull from the inbound request
+    // (typically req.ip + req.headers['user-agent']). The values are
+    // recorded for forensics; enforcement on use is a separate roadmap item.
+    private async createSessionRecord(
+        userId: string,
+        clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+    ) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -306,8 +316,8 @@ export class AuthProviderService extends AuthProvider {
             userId,
             token: randomBytes(24).toString('base64url'),
             expiresAt,
-            ipAddress: null,
-            userAgent: null,
+            ipAddress: clientFingerprint?.ipAddress ?? null,
+            userAgent: clientFingerprint?.userAgent ?? null,
         });
 
         return this.getSessionRepository().save(session);

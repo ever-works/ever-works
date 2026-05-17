@@ -31,11 +31,16 @@ export class AnonymousAuthService {
         private readonly authProvider: AuthProvider,
     ) {}
 
-    /** Default TTL (7 days) — tunable via env var. */
+    /**
+     * H-05: anonymous TTL is the window during which an attacker rotating
+     * IPv6 /64s can cheaply manufacture sessions. Default dropped from 7
+     * days to 3 days (still gives a real user a long weekend to claim);
+     * operators can override via `ANONYMOUS_USER_TTL_DAYS`.
+     */
     private getTtlMs(): number {
-        const days = Number(process.env.ANONYMOUS_USER_TTL_DAYS || '7');
+        const days = Number(process.env.ANONYMOUS_USER_TTL_DAYS || '3');
         if (!Number.isFinite(days) || days <= 0) {
-            return 7 * 24 * 60 * 60 * 1000;
+            return 3 * 24 * 60 * 60 * 1000;
         }
         return days * 24 * 60 * 60 * 1000;
     }

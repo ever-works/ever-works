@@ -19,6 +19,7 @@ afterAll(() => {
 
 import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 import { AuthService } from './auth.service';
 import type { UserRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
@@ -277,11 +278,12 @@ describe('AuthService', () => {
             expect((result as any).verificationToken).toBeUndefined();
             expect((result as any).expiresAt).toBeUndefined();
 
-            // The token still gets persisted and travels via the emitted event (→ email).
+            // H-01: persisted value is sha256(token); raw token only travels
+            // via the emitted event (→ email).
             const updateInput = userRepo.update.mock.calls[0][1];
-            const persistedToken = updateInput.emailVerificationToken as string;
-            expect(typeof persistedToken).toBe('string');
-            expect(persistedToken.length).toBeGreaterThan(0);
+            const persistedHash = updateInput.emailVerificationToken as string;
+            expect(typeof persistedHash).toBe('string');
+            expect(persistedHash).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
             expect(updateInput.emailVerificationExpires).toBeInstanceOf(Date);
             const expiry = updateInput.emailVerificationExpires as Date;
             const diffMs = expiry.getTime() - Date.now();
@@ -293,7 +295,13 @@ describe('AuthService', () => {
                 expect.any(UserCreatedEvent),
             );
             const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
-            expect(event.verificationToken).toBe(persistedToken);
+            const rawToken = event.verificationToken;
+            expect(typeof rawToken).toBe('string');
+            // The persisted hash MUST be sha256(raw token) — verifies the
+            // H-01 invariant on every call.
+            expect(persistedHash).toBe(
+                createHash('sha256').update(rawToken, 'utf8').digest('hex'),
+            );
         });
 
         it('appends ?token= when callbackUrl missing token=', async () => {
@@ -302,10 +310,12 @@ describe('AuthService', () => {
 
             await service.sendVerificationEmail('u-1', 'https://x.test/verify');
 
-            const persistedToken = userRepo.update.mock.calls[0][1].emailVerificationToken;
-            const confirmationUrl = (emitter.emit.mock.calls[0][1] as UserCreatedEvent)
-                .confirmationUrl;
-            expect(confirmationUrl).toBe(`https://x.test/verify?token=${persistedToken}`);
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            // H-01: URL carries the raw token from the event; the DB has its hash.
+            expect(event.confirmationUrl).toBe(`https://x.test/verify?token=${event.verificationToken}`);
+            expect(userRepo.update.mock.calls[0][1].emailVerificationToken).toBe(
+                createHash('sha256').update(event.verificationToken, 'utf8').digest('hex'),
+            );
         });
 
         it('uses default callback URL when callbackUrl already has token=', async () => {
@@ -314,12 +324,10 @@ describe('AuthService', () => {
 
             await service.sendVerificationEmail('u-1', 'https://x.test/verify?token=already');
 
-            const persistedToken = userRepo.update.mock.calls[0][1].emailVerificationToken;
-            const confirmationUrl = (emitter.emit.mock.calls[0][1] as UserCreatedEvent)
-                .confirmationUrl;
-            // When token= already present, the service overrides with default URL
-            expect(confirmationUrl).toBe(
-                `https://app.test/api/auth/verify-email?token=${persistedToken}`,
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            // When token= already present, the service overrides with default URL.
+            expect(event.confirmationUrl).toBe(
+                `https://app.test/api/auth/verify-email?token=${event.verificationToken}`,
             );
         });
     });
@@ -404,10 +412,12 @@ describe('AuthService', () => {
             expect((result as any).resetToken).toBeUndefined();
             expect((result as any).expiresAt).toBeUndefined();
 
+            // H-01: persisted value is sha256(token); raw token only travels
+            // via the emitted event (→ email).
             const updateInput = userRepo.update.mock.calls[0][1];
-            const persistedToken = updateInput.passwordResetToken as string;
-            expect(typeof persistedToken).toBe('string');
-            expect(persistedToken.length).toBeGreaterThan(0);
+            const persistedHash = updateInput.passwordResetToken as string;
+            expect(typeof persistedHash).toBe('string');
+            expect(persistedHash).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
             const expires = updateInput.passwordResetExpires as Date;
             expect(expires.getTime() - Date.now()).toBeGreaterThan(50 * 60 * 1000);
             expect(expires.getTime() - Date.now()).toBeLessThan(70 * 60 * 1000);
@@ -416,8 +426,11 @@ describe('AuthService', () => {
                 expect.any(UserForgotPasswordEvent),
             );
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
-            expect(event.resetToken).toBe(persistedToken);
-            expect(event.resetUrl).toBe(`https://x.test/reset?token=${persistedToken}`);
+            const rawToken = event.resetToken;
+            expect(persistedHash).toBe(
+                createHash('sha256').update(rawToken, 'utf8').digest('hex'),
+            );
+            expect(event.resetUrl).toBe(`https://x.test/reset?token=${rawToken}`);
         });
 
         it('uses default URL when callbackUrl missing', async () => {
@@ -426,10 +439,13 @@ describe('AuthService', () => {
 
             await service.forgotPassword({ email: 'a@b.co' } as any);
 
-            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
+            // H-01: URL carries the raw token (from event), DB has its hash.
             expect(event.resetUrl).toBe(
-                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
+            );
+            expect(userRepo.update.mock.calls[0][1].passwordResetToken).toBe(
+                createHash('sha256').update(event.resetToken, 'utf8').digest('hex'),
             );
         });
 
@@ -442,11 +458,10 @@ describe('AuthService', () => {
                 resetPasswordCallbackUrl: 'https://attacker.example/steal',
             } as any);
 
-            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
             // Attacker host was rejected → platform default URL used instead.
             expect(event.resetUrl).toBe(
-                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
             );
         });
 
@@ -459,10 +474,9 @@ describe('AuthService', () => {
                 resetPasswordCallbackUrl: 'javascript:alert(1)',
             } as any);
 
-            const persistedToken = userRepo.update.mock.calls[0][1].passwordResetToken;
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
             expect(event.resetUrl).toBe(
-                `https://app.test/api/auth/reset-password?token=${persistedToken}`,
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
             );
             expect(event.resetUrl.startsWith('javascript:')).toBe(false);
         });

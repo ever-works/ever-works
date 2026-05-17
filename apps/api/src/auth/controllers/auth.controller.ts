@@ -152,8 +152,16 @@ export class AuthController {
                 : null;
 
         // EW-617 G7: captcha gate. The verifier no-ops when CAPTCHA_PROVIDER
-        // is unset (dev/preview), so this is a hard requirement only on
-        // properly configured environments.
+        // is unset (dev/preview).
+        //
+        // H-05: in production, captcha is REQUIRED. If `CAPTCHA_PROVIDER` is
+        // unset in production, fail-closed rather than silently allowing
+        // unauthenticated row-creation traffic.
+        if (this.captchaVerifier.isRequired() && !this.captchaVerifier.isEnabled()) {
+            throw new BadRequestException(
+                'anonymous flow disabled: captcha is required in production but CAPTCHA_PROVIDER is not configured',
+            );
+        }
         if (this.captchaVerifier.isEnabled()) {
             const result = await this.captchaVerifier.verify({
                 token: body?.captchaToken,
@@ -418,9 +426,19 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'Email verified successfully and session issued' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-    async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto, @Request() req) {
         const user = await this.authService.verifyEmail(verifyEmailDto.token);
-        return this.authProvider.issueSession(user.id);
+        // H-04: bind the new session to the requesting client.
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+        return this.authProvider.issueSession(user.id, { ipAddress, userAgent });
     }
 
     @Public()

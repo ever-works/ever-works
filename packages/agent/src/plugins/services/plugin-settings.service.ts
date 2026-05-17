@@ -16,6 +16,7 @@ import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
+import { PluginSecretEncService } from './plugin-secret-enc.service';
 import {
     SettingsSchemaValidatorService,
     type SettingsScope as ValidatorSettingsScope,
@@ -66,7 +67,34 @@ export class PluginSettingsService {
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         private readonly settingsValidator?: SettingsSchemaValidatorService,
+        // C-08: optional so existing tests / call-sites that construct
+        // PluginSettingsService directly keep working. Module DI provides it.
+        @Optional()
+        private readonly secretEnc?: PluginSecretEncService,
     ) {}
+
+    /**
+     * C-08: decrypt a `secretSettings` JSON blob read from the DB. Values
+     * lacking the envelope prefix (legacy plaintext rows) pass through
+     * unchanged so the rest of the pipeline keeps working during the
+     * gradual encrypt-on-next-write rollout.
+     */
+    private decryptSecrets(record: Record<string, unknown> | null | undefined): Record<string, unknown> {
+        if (!record) return {};
+        if (!this.secretEnc) return { ...record };
+        return this.secretEnc.decryptRecord(record);
+    }
+
+    /**
+     * C-08: encrypt every value in a `secretSettings` JSON blob before
+     * persistence. Falls back to passthrough when the encryption service
+     * isn't bound (tests, dev without PLUGIN_SECRET_ENCRYPTION_KEY).
+     */
+    private encryptSecrets(record: Record<string, unknown> | null | undefined): Record<string, unknown> {
+        if (!record) return {};
+        if (!this.secretEnc) return { ...record };
+        return this.secretEnc.encryptRecord(record);
+    }
 
     /**
      * Get resolved settings for a plugin
@@ -97,7 +125,7 @@ export class PluginSettingsService {
         const adminEntity = await this.pluginRepository.findByPluginId(pluginId);
         const adminSettings = adminEntity?.settings || {};
         const adminSecrets = effectiveOptions?.includeSecrets
-            ? adminEntity?.secretSettings || {}
+            ? this.decryptSecrets(adminEntity?.secretSettings) // C-08
             : {};
 
         let userSettings: Record<string, unknown> = {};
@@ -108,7 +136,9 @@ export class PluginSettingsService {
                 pluginId,
             );
             userSettings = userEntity?.settings || {};
-            userSecrets = effectiveOptions?.includeSecrets ? userEntity?.secretSettings || {} : {};
+            userSecrets = effectiveOptions?.includeSecrets
+                ? this.decryptSecrets(userEntity?.secretSettings) // C-08
+                : {};
         }
 
         let workSettings: Record<string, unknown> = {};
@@ -121,7 +151,9 @@ export class PluginSettingsService {
                 pluginId,
             );
             workSettings = dirEntity?.settings || {};
-            workSecrets = effectiveOptions?.includeSecrets ? dirEntity?.secretSettings || {} : {};
+            workSecrets = effectiveOptions?.includeSecrets
+                ? this.decryptSecrets(dirEntity?.secretSettings) // C-08
+                : {};
         }
 
         // Resolve each setting
@@ -139,7 +171,9 @@ export class PluginSettingsService {
                 effectiveOptions,
             );
             workSettings = normalized.settings;
-            workSecrets = effectiveOptions?.includeSecrets ? normalized.secretSettings : {};
+            workSecrets = effectiveOptions?.includeSecrets
+                ? this.decryptSecrets(normalized.secretSettings) // C-08
+                : {};
         }
 
         for (const def of definitions) {
@@ -209,9 +243,12 @@ export class PluginSettingsService {
         options?: { secretKeys?: string[] },
     ): Promise<void> {
         const entity = await this.pluginRepository.findByPluginId(pluginId);
+        // C-08: validation/merge work in plaintext; persistence is always
+        // encrypted via encryptSecrets() below.
+        const existingSecretsPlain = this.decryptSecrets(entity?.secretSettings);
         const validationSettings = {
             ...(entity?.settings || {}),
-            ...(entity?.secretSettings || {}),
+            ...existingSecretsPlain,
             ...settings,
         };
         const { regularSettings, secretSettings, filteredSettings } =
@@ -227,7 +264,7 @@ export class PluginSettingsService {
             await this.pluginRepository.updateSettings(
                 pluginId,
                 { ...entity.settings, ...regularSettings },
-                { ...entity.secretSettings, ...secretSettings },
+                this.encryptSecrets({ ...existingSecretsPlain, ...secretSettings }),
             );
         }
 
@@ -251,9 +288,11 @@ export class PluginSettingsService {
         options?: { secretKeys?: string[] },
     ): Promise<void> {
         const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+        // C-08: validation/merge work in plaintext; persistence is encrypted.
+        const existingSecretsPlain = this.decryptSecrets(existing?.secretSettings);
         const validationSettings = {
             ...(existing?.settings || {}),
-            ...(existing?.secretSettings || {}),
+            ...existingSecretsPlain,
             ...settings,
         };
         const { regularSettings, secretSettings, filteredSettings } =
@@ -275,7 +314,7 @@ export class PluginSettingsService {
                 userId,
                 pluginId,
                 { ...existing.settings, ...regularSettings },
-                { ...existing.secretSettings, ...secretSettings },
+                this.encryptSecrets({ ...existingSecretsPlain, ...secretSettings }),
             );
         } else {
             await this.userPluginRepository.create({
@@ -283,7 +322,7 @@ export class PluginSettingsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 settings: regularSettings,
-                secretSettings,
+                secretSettings: this.encryptSecrets(secretSettings),
             });
         }
 
@@ -308,9 +347,11 @@ export class PluginSettingsService {
         options?: { secretKeys?: string[] },
     ): Promise<void> {
         const existing = await this.workPluginRepository.findByWorkAndPlugin(workId, pluginId);
+        // C-08: validation/merge work in plaintext; persistence is encrypted.
+        const existingSecretsPlain = this.decryptSecrets(existing?.secretSettings);
         const validationSettings = {
             ...(existing?.settings || {}),
-            ...(existing?.secretSettings || {}),
+            ...existingSecretsPlain,
             ...settings,
         };
         const { regularSettings, secretSettings, filteredSettings } =
@@ -332,7 +373,7 @@ export class PluginSettingsService {
                 workId,
                 pluginId,
                 { ...existing.settings, ...regularSettings },
-                { ...existing.secretSettings, ...secretSettings },
+                this.encryptSecrets({ ...existingSecretsPlain, ...secretSettings }),
             );
         } else {
             await this.workPluginRepository.create({
@@ -340,7 +381,7 @@ export class PluginSettingsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 settings: regularSettings,
-                secretSettings,
+                secretSettings: this.encryptSecrets(secretSettings),
             });
         }
 

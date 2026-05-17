@@ -7,7 +7,20 @@ import {
 } from '@nestjs/common';
 import { UserRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
+
+/**
+ * H-01: derive a deterministic hash of a token for at-rest storage.
+ * Verification/reset tokens travel out-of-band (via email) and need only
+ * collision-free comparison on read, so a plain sha256 is correct (no salt
+ * needed — the tokens themselves carry 256 bits of entropy).
+ *
+ * Operationally, this means: if the DB is leaked, the attacker gets hashes
+ * not raw tokens, and cannot use them to take over accounts.
+ */
+function hashToken(token: string): string {
+    return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 import { authConstants, AuthProvider, config } from '../../config/constants';
 import { User } from '@ever-works/agent/entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -175,8 +188,14 @@ export class AuthService {
         const expires = new Date();
         expires.setHours(expires.getHours() + 24); // 24 hour expiry
 
+        // H-01: persist sha256(token), email the raw token. The DB never
+        // sees the value the user clicks; the column itself reuses the
+        // existing `emailVerificationToken` name to avoid an entity migration
+        // (column is now interpreted as "hashed token"). All
+        // in-flight verification links issued before this deploy will fail
+        // — by operator decision, see audit Q-8.
         await this.userRepository.update(userId, {
-            emailVerificationToken: verificationToken,
+            emailVerificationToken: hashToken(verificationToken),
             emailVerificationExpires: expires,
         });
 
@@ -202,6 +221,8 @@ export class AuthService {
     }
 
     async verifyEmail(token: string) {
+        // H-01: lookup by sha256(submitted). DB stores hashes only.
+        token = hashToken(token);
         const user = await this.userRepository.findOne({
             where: { emailVerificationToken: token },
         });
@@ -252,8 +273,9 @@ export class AuthService {
         const expires = new Date();
         expires.setHours(expires.getHours() + 1); // 1 hour expiry
 
+        // H-01: persist sha256(token), email the raw token. See sendVerificationEmail above.
         await this.userRepository.update(user.id, {
-            passwordResetToken: resetToken,
+            passwordResetToken: hashToken(resetToken),
             passwordResetExpires: expires,
         });
 
@@ -282,8 +304,10 @@ export class AuthService {
     }
 
     async getUserByPasswordResetToken(token: string) {
+        // H-01: lookup by sha256(submitted). DB stores hashes only.
+        const tokenHash = hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { passwordResetToken: token },
+            where: { passwordResetToken: tokenHash },
         });
 
         if (!user) {
@@ -300,7 +324,8 @@ export class AuthService {
     async consumePasswordResetToken(token: string) {
         const user = await this.getUserByPasswordResetToken(token);
 
-        const consumed = await this.userRepository.clearPasswordResetToken(user.id, token);
+        // H-01: lookup by sha256(submitted). DB stores hashes only.
+        const consumed = await this.userRepository.clearPasswordResetToken(user.id, hashToken(token));
         if (!consumed) {
             throw new BadRequestException('Invalid reset token');
         }
@@ -373,8 +398,10 @@ export class AuthService {
     }
 
     async validateEmailVerificationToken(token: string) {
+        // H-01: lookup by sha256(submitted). DB stores hashes only.
+        const tokenHash = hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { emailVerificationToken: token },
+            where: { emailVerificationToken: tokenHash },
         });
 
         if (!user) {
@@ -394,8 +421,10 @@ export class AuthService {
     }
 
     async validatePasswordResetToken(token: string) {
+        // H-01: lookup by sha256(submitted). DB stores hashes only.
+        const tokenHash = hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { passwordResetToken: token },
+            where: { passwordResetToken: tokenHash },
         });
 
         if (!user) {

@@ -9,6 +9,68 @@ BUILD_OUTPUT = ['standalone', 'export'].includes(BUILD_OUTPUT as any) ? BUILD_OU
 
 const withNextIntl = createNextIntlPlugin();
 
+/**
+ * M-15 / M-16: baseline security headers for the Next.js web app.
+ *
+ * The CSP intentionally allows `'unsafe-inline'` for `script-src` because
+ * Next.js's runtime emits inline scripts (notably for hydration). Tightening
+ * to nonce-based CSP requires plumbing nonces through the request → response
+ * pipeline in middleware; queued for a follow-up. The current value still
+ * blocks unsanctioned third-party scripts and is materially stricter than
+ * "no CSP at all".
+ *
+ * `connect-src` allow-list is sized for the live integrations: the platform's
+ * own API, PostHog telemetry, Sentry ingest, and the Trigger.dev dashboard
+ * endpoints. Add hosts via `NEXT_PUBLIC_EXTRA_CONNECT_SRC` (comma-sep) for
+ * tenant-specific integrations without redeploying.
+ */
+const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
+const apiHost = (() => {
+    try {
+        return new URL(apiUrl).origin;
+    } catch {
+        return 'https://api.ever.works';
+    }
+})();
+const CSP = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' https:",
+    "font-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com",
+    `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com ${extraConnect.join(' ')}`.trim(),
+    "worker-src 'self' blob:",
+].join('; ');
+
+const securityHeaders = [
+    { key: 'X-Content-Type-Options', value: 'nosniff' },
+    { key: 'X-Frame-Options', value: 'DENY' },
+    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+    {
+        key: 'Permissions-Policy',
+        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    },
+    // HSTS: 6 months + subdomains. preload requires submission to
+    // https://hstspreload.org/ — leave that opt-in.
+    {
+        key: 'Strict-Transport-Security',
+        value: 'max-age=15552000; includeSubDomains',
+    },
+    {
+        key: 'Content-Security-Policy',
+        value: CSP,
+    },
+];
+
 const nextConfig: NextConfig = {
     output: BUILD_OUTPUT as NextConfig['output'],
     images: {
@@ -38,6 +100,16 @@ const nextConfig: NextConfig = {
                 pathname: '/**',
             },
         ],
+    },
+    async headers() {
+        return [
+            {
+                // Apply to every route except Next's internal API + static assets
+                // (those are served by the framework with its own headers).
+                source: '/:path*',
+                headers: securityHeaders,
+            },
+        ];
     },
 };
 
