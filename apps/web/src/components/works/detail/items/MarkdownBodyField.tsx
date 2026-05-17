@@ -10,14 +10,8 @@ import { cn } from '@/lib/utils/cn';
 
 // react-markdown is ~50KB gzipped with remark-gfm; only load it when a user
 // actually opens the preview pane. The chunk is shared with ChatMarkdown.
-// Wrap the named export in `{ default: ... }` because `MarkdownPreview` is a
-// `memo()`-returned `NamedExoticComponent<P>`, which next/dynamic's Loader
-// type does NOT accept under React 19's stricter `ReactNode`. The default-
-// export shape (`ComponentModule<P>`) bypasses the mismatch. Without this,
-// `next build`'s prod type check fails (tsc --noEmit alone is too lenient
-// to catch it, which is why CI passes).
 const MarkdownPreview = dynamic(
-    () => import('./MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })),
+    () => import('./MarkdownPreview').then((m) => m.MarkdownPreview),
     { ssr: false },
 );
 
