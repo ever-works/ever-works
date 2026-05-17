@@ -114,19 +114,19 @@ export class BudgetGuardService {
     ): Promise<void> {
         for (const threshold of evaluation.crossedThresholds) {
             try {
-                const alreadySent = await this.alertStateRepository.hasAlerted(
-                    evaluation.budget.id,
-                    threshold,
-                    periodStart,
-                );
-                if (alreadySent) continue;
-
-                await this.alertStateRepository.record(
+                // Single atomic write decides whether this caller owns the
+                // alert for this (budget, threshold, period). The previous
+                // version had a hasAlerted() pre-check that opened a race
+                // window between two concurrent capability calls; relying on
+                // the unique index closes it.
+                const { inserted } = await this.alertStateRepository.record(
                     evaluation.budget.workId,
                     evaluation.budget.id,
                     threshold,
                     periodStart,
                 );
+
+                if (!inserted) continue;
 
                 this.eventEmitter?.emit(
                     BudgetThresholdCrossedEvent.EVENT_NAME,
@@ -144,6 +144,8 @@ export class BudgetGuardService {
                     ),
                 );
             } catch (error) {
+                // Real failure (DB down, permission, etc.). Duplicates are
+                // handled inside record() and return `inserted: false`.
                 this.logger.warn(
                     `Failed to dispatch budget alert (budget=${evaluation.budget.id}, threshold=${threshold}): ${
                         error instanceof Error ? error.message : String(error)

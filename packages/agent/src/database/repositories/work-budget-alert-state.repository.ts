@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import {
     WorkBudgetAlertState,
     WorkBudgetAlertThreshold,
 } from '@src/entities/work-budget-alert-state.entity';
+
+export interface AlertRecordResult {
+    /** True when this call inserted a new row; false when a row already existed. */
+    readonly inserted: boolean;
+}
 
 @Injectable()
 export class WorkBudgetAlertStateRepository {
@@ -25,22 +30,28 @@ export class WorkBudgetAlertStateRepository {
     }
 
     /**
-     * Inserts an alert-state row. Idempotent — duplicates throw the
-     * unique-constraint error which the caller can swallow.
+     * Atomically inserts an alert-state row. The unique index on
+     * (budgetId, threshold, periodStart) is the dedupe authority — two
+     * concurrent callers race the insert, only one wins, and the loser
+     * gets `inserted: false`. Callers use that signal to decide whether
+     * to fire the user-facing alert exactly once per (budget, threshold,
+     * period).
      */
     async record(
         workId: string,
         budgetId: string,
         threshold: WorkBudgetAlertThreshold,
         periodStart: Date,
-    ): Promise<WorkBudgetAlertState> {
-        const created = this.repository.create({
-            workId,
-            budgetId,
-            threshold,
-            periodStart,
-        });
-        return this.repository.save(created);
+    ): Promise<AlertRecordResult> {
+        try {
+            await this.repository.insert({ workId, budgetId, threshold, periodStart });
+            return { inserted: true };
+        } catch (error) {
+            if (isUniqueConstraintViolation(error)) {
+                return { inserted: false };
+            }
+            throw error;
+        }
     }
 
     async listForBudget(budgetId: string): Promise<WorkBudgetAlertState[]> {
@@ -49,4 +60,16 @@ export class WorkBudgetAlertStateRepository {
             order: { periodStart: 'DESC', threshold: 'ASC' },
         });
     }
+}
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) return false;
+    const driverError = (error as QueryFailedError & { driverError?: { code?: string } })
+        .driverError;
+    const code = driverError?.code ?? '';
+    // 23505 = Postgres unique_violation; SQLITE_CONSTRAINT* covers
+    // better-sqlite3 in CI. Message fallback handles drivers that don't
+    // expose a code (e.g. some test doubles).
+    if (code === '23505' || code.startsWith('SQLITE_CONSTRAINT')) return true;
+    return /unique constraint/i.test(error.message ?? '');
 }

@@ -36,7 +36,7 @@ function makeBudget(overrides: Partial<WorkBudget> = {}): WorkBudget {
 function makeAlertStateRepo(overrides: Record<string, jest.Mock> = {}) {
     return {
         hasAlerted: jest.fn().mockResolvedValue(false),
-        record: jest.fn().mockResolvedValue(undefined),
+        record: jest.fn().mockResolvedValue({ inserted: true }),
         listForBudget: jest.fn().mockResolvedValue([]),
         ...overrides,
     };
@@ -138,21 +138,58 @@ describe('BudgetGuardService.checkBudget', () => {
 
     it('does NOT re-emit a threshold that was already alerted in the period (idempotent)', async () => {
         const global = makeBudget({ monthlyCapCents: 10_000, allowOverage: true });
-        const { guard, eventEmitter } = makeGuard({
+        // The repo's atomic insert is the dedupe authority: when a row
+        // already exists for this (budget, threshold, period) the insert
+        // returns `inserted: false` and no event should fire.
+        const { guard, eventEmitter, alertState } = makeGuard({
             global,
             currentSpendCents: 7_500, // 75%
             alertState: makeAlertStateRepo({
-                hasAlerted: jest
-                    .fn()
-                    .mockImplementation((_b, threshold: WorkBudgetAlertThreshold) =>
-                        Promise.resolve(threshold === WorkBudgetAlertThreshold.PERCENT_75),
-                    ),
+                record: jest.fn().mockResolvedValue({ inserted: false }),
             }),
         });
         await guard.checkBudget('work-1', 'user-1', PluginUsageCapability.AI, 'openai', {
             now: NOW,
         });
         expect(eventEmitter.emit).not.toHaveBeenCalled();
+        // Guard no longer pre-checks: the atomic insert is the single
+        // source of truth, so hasAlerted() must not be called.
+        expect(alertState.hasAlerted).not.toHaveBeenCalled();
+    });
+
+    it('only the winning concurrent caller emits when the repo reports a duplicate insert', async () => {
+        // Simulates two parallel capability calls racing the alert insert
+        // for the same (budget, threshold, period). The first wins
+        // (inserted: true), the second loses (inserted: false). The guard
+        // must emit exactly once across both.
+        const global = makeBudget({ monthlyCapCents: 10_000, allowOverage: true });
+        const record = jest
+            .fn()
+            .mockResolvedValueOnce({ inserted: true })
+            .mockResolvedValue({ inserted: false });
+        const eventEmitter = makeEventEmitter();
+        const alertState = makeAlertStateRepo({ record });
+
+        const callOnce = () => {
+            const { guard } = makeGuard({
+                global,
+                currentSpendCents: 7_500, // crosses 75%
+                alertState,
+                eventEmitter,
+            });
+            return guard.checkBudget('work-1', 'user-1', PluginUsageCapability.AI, 'openai', {
+                now: NOW,
+            });
+        };
+
+        await Promise.all([callOnce(), callOnce()]);
+
+        expect(record).toHaveBeenCalledTimes(2);
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+        expect(eventEmitter.emit).toHaveBeenCalledWith(
+            BudgetThresholdCrossedEvent.EVENT_NAME,
+            expect.objectContaining({ threshold: WorkBudgetAlertThreshold.PERCENT_75 }),
+        );
     });
 
     it('pre-flight: blocks when estimatedCostCents would push the next call over the cap', async () => {

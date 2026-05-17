@@ -438,7 +438,9 @@ function GlobalCapForm({
                         <div
                             className={cn(
                                 'h-full rounded-full transition-all',
-                                isOver ? 'bg-red-500' : 'bg-button-primary dark:bg-button-primary-dark',
+                                isOver
+                                    ? 'bg-red-500'
+                                    : 'bg-button-primary dark:bg-button-primary-dark',
                             )}
                             style={{ width: `${Math.min(100, percent)}%` }}
                         />
@@ -602,8 +604,7 @@ function PluginBudgetForm({
         const q = pluginQuery.trim().toLowerCase();
         if (!q) return selectablePlugins;
         return selectablePlugins.filter(
-            (p) =>
-                p.name.toLowerCase().includes(q) || p.pluginId.toLowerCase().includes(q),
+            (p) => p.name.toLowerCase().includes(q) || p.pluginId.toLowerCase().includes(q),
         );
     }, [selectablePlugins, pluginQuery]);
 
@@ -644,7 +645,9 @@ function PluginBudgetForm({
             ) : (
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                        <label className="mb-1">{tPlugin('pluginIdLabel')}</label>
+                        <label htmlFor="plugin-cap-combobox" className="mb-1">
+                            {tPlugin('pluginIdLabel')}
+                        </label>
                         <Combobox
                             value={selectedPlugin}
                             onChange={(p: BudgetEligiblePlugin | null) => {
@@ -665,6 +668,7 @@ function PluginBudgetForm({
                                     )}
                                 >
                                     <ComboboxInput
+                                        id="plugin-cap-combobox"
                                         className={cn(
                                             'min-w-0 flex-1 bg-transparent text-sm outline-none',
                                             'text-text dark:text-text-dark',
@@ -673,7 +677,13 @@ function PluginBudgetForm({
                                         displayValue={(p: BudgetEligiblePlugin | null) =>
                                             p ? `${p.name} (${p.pluginId})` : ''
                                         }
-                                        onChange={(e) => setPluginQuery(e.target.value)}
+                                        onChange={(e) => {
+                                            // Typing invalidates the prior selection — otherwise
+                                            // a typed-but-not-picked query could submit the
+                                            // previously chosen plugin (Augment review #M1).
+                                            setPluginQuery(e.target.value);
+                                            if (pluginId) setPluginId('');
+                                        }}
                                         placeholder={tPlugin('pluginSelectPlaceholder')}
                                     />
                                     <ComboboxButton
