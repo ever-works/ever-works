@@ -8,10 +8,16 @@ import { cn } from '@/lib/utils/cn';
 import { createBudget, updateBudget, deleteBudget } from '@/app/actions/dashboard/budgets';
 import type { UsageSummary, WorkBudget, PerPluginSpend } from '@/lib/api/types-only';
 
+export interface BudgetEligiblePlugin {
+    pluginId: string;
+    name: string;
+}
+
 interface BudgetsUsageClientProps {
     workId: string;
     initialSummary: UsageSummary | null;
     initialBudgets: WorkBudget[];
+    availablePlugins: BudgetEligiblePlugin[];
 }
 
 function formatCents(cents: number, currency: string): string {
@@ -34,6 +40,7 @@ export function BudgetsUsageClient({
     workId,
     initialSummary,
     initialBudgets,
+    availablePlugins,
 }: BudgetsUsageClientProps) {
     const t = useTranslations('dashboard.workDetail.settings.budgets');
     const tGlobal = useTranslations('dashboard.workDetail.settings.budgets.globalCap');
@@ -161,6 +168,7 @@ export function BudgetsUsageClient({
                         workId={workId}
                         currency={currency}
                         existing={globalBudget}
+                        spendCents={totalSpendCents}
                         disabled={isPending}
                         onCreate={(data) =>
                             runAction('createSuccess', 'createError', 'globalCap', () =>
@@ -236,6 +244,7 @@ export function BudgetsUsageClient({
                         workId={workId}
                         currency={currency}
                         existingPluginIds={new Set(pluginBudgets.map((b) => b.pluginId ?? ''))}
+                        availablePlugins={availablePlugins}
                         disabled={isPending}
                         onCreate={(data) =>
                             runAction('createSuccess', 'createError', 'pluginCaps', () =>
@@ -307,6 +316,7 @@ interface GlobalCapFormProps {
     workId: string;
     currency: string;
     existing: WorkBudget | null;
+    spendCents: number;
     disabled: boolean;
     onCreate: (data: { scope: 'global'; monthlyCapCents: number; allowOverage: boolean }) => void;
     onUpdate: (
@@ -320,6 +330,7 @@ function GlobalCapForm({
     workId: _workId,
     currency,
     existing,
+    spendCents,
     disabled,
     onCreate,
     onUpdate,
@@ -331,6 +342,12 @@ function GlobalCapForm({
     );
     const [allowOverage, setAllowOverage] = useState(existing?.allowOverage ?? false);
     const [error, setError] = useState<string | null>(null);
+
+    const percent =
+        existing && existing.monthlyCapCents > 0
+            ? Math.min(150, Math.round((spendCents / existing.monthlyCapCents) * 100))
+            : 0;
+    const isOver = percent >= 100;
 
     const handleSave = () => {
         setError(null);
@@ -381,7 +398,7 @@ function GlobalCapForm({
                     type="button"
                     onClick={handleSave}
                     disabled={disabled}
-                    className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                    className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-button-primary-foreground dark:text-button-primary-foreground-dark px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 >
                     {existing ? tGlobal('saveButton') : tGlobal('createButton')}
                 </button>
@@ -397,6 +414,30 @@ function GlobalCapForm({
                     </button>
                 )}
             </div>
+
+            {existing && (
+                <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-muted dark:text-text-muted-dark">
+                            {tGlobal('rowSpend', {
+                                spent: formatCents(spendCents, currency),
+                                cap: formatCents(existing.monthlyCapCents, currency),
+                                percent,
+                            })}
+                            {existing.allowOverage ? tGlobal('overageSuffix') : ''}
+                        </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-surface dark:bg-white/6 overflow-hidden">
+                        <div
+                            className={cn(
+                                'h-full rounded-full transition-all',
+                                isOver ? 'bg-red-500' : 'bg-button-primary dark:bg-button-primary-dark',
+                            )}
+                            style={{ width: `${Math.min(100, percent)}%` }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <p className="flex items-center gap-1 text-xs text-red-500">
@@ -489,7 +530,7 @@ function PluginBudgetRow({
                 type="button"
                 onClick={handleSave}
                 disabled={disabled}
-                className="rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                className="rounded-md bg-button-primary dark:bg-button-primary-dark text-button-primary-foreground dark:text-button-primary-foreground-dark px-3 py-1.5 text-sm font-medium disabled:opacity-60"
             >
                 {tPlugin('saveButton')}
             </button>
@@ -516,6 +557,7 @@ interface PluginBudgetFormProps {
     workId: string;
     currency: string;
     existingPluginIds: Set<string>;
+    availablePlugins: BudgetEligiblePlugin[];
     disabled: boolean;
     onCreate: (data: {
         scope: 'plugin';
@@ -529,6 +571,7 @@ function PluginBudgetForm({
     workId: _workId,
     currency,
     existingPluginIds,
+    availablePlugins,
     disabled,
     onCreate,
 }: PluginBudgetFormProps) {
@@ -538,15 +581,16 @@ function PluginBudgetForm({
     const [allowOverage, setAllowOverage] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const selectablePlugins = useMemo(
+        () => availablePlugins.filter((p) => !existingPluginIds.has(p.pluginId)),
+        [availablePlugins, existingPluginIds],
+    );
+    const noPluginsAvailable = selectablePlugins.length === 0;
+
     const handleAdd = () => {
         setError(null);
-        const trimmedPlugin = pluginId.trim();
-        if (!trimmedPlugin) {
+        if (!pluginId) {
             setError(tPlugin('errorPluginRequired'));
-            return;
-        }
-        if (existingPluginIds.has(trimmedPlugin)) {
-            setError(tPlugin('errorPluginDuplicate'));
             return;
         }
         const cents = dollarsToCents(capInput);
@@ -556,7 +600,7 @@ function PluginBudgetForm({
         }
         onCreate({
             scope: 'plugin',
-            pluginId: trimmedPlugin,
+            pluginId,
             monthlyCapCents: cents,
             allowOverage,
         });
@@ -570,49 +614,62 @@ function PluginBudgetForm({
             <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark uppercase tracking-wide">
                 {tPlugin('addHeading')}
             </p>
-            <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                    {tPlugin('pluginIdLabel')}
-                    <input
-                        type="text"
-                        value={pluginId}
-                        onChange={(e) => setPluginId(e.target.value)}
+            {noPluginsAvailable ? (
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                    {availablePlugins.length === 0
+                        ? tPlugin('noEligiblePlugins')
+                        : tPlugin('allPluginsCapped')}
+                </p>
+            ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                    <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
+                        {tPlugin('pluginIdLabel')}
+                        <select
+                            value={pluginId}
+                            onChange={(e) => setPluginId(e.target.value)}
+                            disabled={disabled}
+                            className="mt-1 w-56 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
+                        >
+                            <option value="">{tPlugin('pluginSelectPlaceholder')}</option>
+                            {selectablePlugins.map((p) => (
+                                <option key={p.pluginId} value={p.pluginId}>
+                                    {p.name} ({p.pluginId})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
+                        {tPlugin('capLabel', { currency: currency.toUpperCase() })}
+                        <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={capInput}
+                            onChange={(e) => setCapInput(e.target.value)}
+                            disabled={disabled}
+                            placeholder="20.00"
+                            className="mt-1 w-32 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
+                        />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark mb-1.5">
+                        <input
+                            type="checkbox"
+                            checked={allowOverage}
+                            onChange={(e) => setAllowOverage(e.target.checked)}
+                            disabled={disabled}
+                        />
+                        {tPlugin('allowOverageLabel')}
+                    </label>
+                    <button
+                        type="button"
+                        onClick={handleAdd}
                         disabled={disabled}
-                        placeholder={tPlugin('pluginIdPlaceholder')}
-                        className="mt-1 w-44 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
-                    />
-                </label>
-                <label className="flex flex-col text-xs text-text-muted dark:text-text-muted-dark">
-                    {tPlugin('capLabel', { currency: currency.toUpperCase() })}
-                    <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={capInput}
-                        onChange={(e) => setCapInput(e.target.value)}
-                        disabled={disabled}
-                        placeholder="20.00"
-                        className="mt-1 w-32 rounded-md border border-input-border dark:border-border-dark bg-input dark:bg-surface-secondary-dark px-2 py-1.5 text-sm text-text dark:text-text-dark"
-                    />
-                </label>
-                <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark mb-1.5">
-                    <input
-                        type="checkbox"
-                        checked={allowOverage}
-                        onChange={(e) => setAllowOverage(e.target.checked)}
-                        disabled={disabled}
-                    />
-                    {tPlugin('allowOverageLabel')}
-                </label>
-                <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={disabled}
-                    className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
-                >
-                    <Plus className="w-4 h-4" /> {tPlugin('addButton')}
-                </button>
-            </div>
+                        className="ml-auto inline-flex items-center gap-1 rounded-md bg-button-primary dark:bg-button-primary-dark text-button-primary-foreground dark:text-button-primary-foreground-dark px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                    >
+                        <Plus className="w-4 h-4" /> {tPlugin('addButton')}
+                    </button>
+                </div>
+            )}
             {error && (
                 <p className="flex items-center gap-1 text-xs text-red-500">
                     <AlertCircle className="w-3.5 h-3.5" /> {error}
