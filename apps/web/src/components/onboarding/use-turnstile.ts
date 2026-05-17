@@ -69,21 +69,23 @@ declare global {
 export function useTurnstile(sitekey: string = TURNSTILE_SITEKEY) {
     const widgetIdRef = useRef<string | null>(null);
     const pendingResolveRef = useRef<((token: string) => void) | null>(null);
-    const [ready, setReady] = useState(false);
+    // Lazy init covers the "script already loaded by an earlier mount and
+    // window.turnstile is up" case without needing a synchronous setState
+    // inside the effect below (which trips the react-compiler rule).
+    const [ready, setReady] = useState(
+        () => typeof window !== 'undefined' && Boolean(window.turnstile),
+    );
 
     // Lazy-load the Turnstile script once. The Cloudflare API auto-detects
     // duplicate loads, but we still guard against multiple <script> tags.
     useEffect(() => {
         if (!sitekey) return;
         if (typeof window === 'undefined') return;
+        // Already initialised — bail before doing any DOM work.
+        if (window.turnstile) return;
 
         const existing = document.querySelector(`script[src^="${TURNSTILE_SCRIPT_SRC}"]`);
         if (existing) {
-            // Already loaded by another mount — just check if API is up.
-            if (window.turnstile) {
-                setReady(true);
-                return;
-            }
             existing.addEventListener('load', () => setReady(true), { once: true });
             return;
         }

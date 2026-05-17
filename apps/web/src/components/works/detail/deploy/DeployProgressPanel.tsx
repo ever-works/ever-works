@@ -124,12 +124,11 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
     }, [shouldPoll, workId]);
 
     // Elapsed time ticker — independent of the poll cadence so the
-    // counter visibly moves every second.
+    // counter visibly moves every second. The "no startedAt" case is
+    // derived at render time below (elapsed = null), so this effect
+    // doesn't need a synchronous setState reset branch.
     useEffect(() => {
-        if (!status?.deploymentStartedAt) {
-            setElapsedSeconds(null);
-            return;
-        }
+        if (!status?.deploymentStartedAt) return;
         const startedAt = new Date(status.deploymentStartedAt).getTime();
         const tick = () => {
             setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
@@ -138,6 +137,8 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
         const interval = setInterval(tick, 1000);
         return () => clearInterval(interval);
     }, [status?.deploymentStartedAt]);
+
+    const displayedElapsedSeconds = status?.deploymentStartedAt ? elapsedSeconds : null;
 
     if (!isDeploying && !status) return null;
     if (!status) {
@@ -197,9 +198,9 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
                         >
                             {stateKey}
                         </span>
-                        {elapsedSeconds !== null && isInFlight && (
+                        {displayedElapsedSeconds !== null && isInFlight && (
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {formatElapsed(elapsedSeconds)}
+                                {formatElapsed(displayedElapsedSeconds)}
                             </span>
                         )}
                     </div>

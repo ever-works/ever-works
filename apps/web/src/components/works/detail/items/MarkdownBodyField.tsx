@@ -10,10 +10,9 @@ import { cn } from '@/lib/utils/cn';
 
 // react-markdown is ~50KB gzipped with remark-gfm; only load it when a user
 // actually opens the preview pane. The chunk is shared with ChatMarkdown.
-const MarkdownPreview = dynamic(
-    () => import('./MarkdownPreview').then((m) => m.MarkdownPreview),
-    { ssr: false },
-);
+const MarkdownPreview = dynamic(() => import('./MarkdownPreview').then((m) => m.MarkdownPreview), {
+    ssr: false,
+});
 
 interface MarkdownBodyFieldProps {
     value: string;
