@@ -11,6 +11,7 @@ import {
     HttpStatus,
     Logger,
     BadRequestException,
+    ForbiddenException,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -226,6 +227,17 @@ export class AuthController {
             return { message: 'unauthorized' };
         }
 
+        // L-05: explicit anonymous-only guard at the controller layer. The
+        // downstream `claimAccountService.claim` does check `user.isAnonymous`,
+        // but pinning the rule at the controller surface keeps the contract
+        // visible in the OpenAPI doc and protects against a future refactor
+        // that loses the service-side check.
+        if (req.user?.isAnonymous !== true) {
+            throw new ForbiddenException(
+                'claim is only valid for anonymous (zero-friction) accounts',
+            );
+        }
+
         const claimed = await this.claimAccountService.claim({
             userId,
             email: claimDto.email,
@@ -343,7 +355,23 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
     async logoutAll(@Request() req) {
+        const userAgent = req.headers['user-agent'];
+        const ipAddress = req.ip || req.headers['x-forwarded-for'];
         await this.authProvider.signOutAll(req.user.userId);
+        // L-03: forensic audit-log entry for a fleet-wide sign-out. Useful
+        // when investigating "all my sessions were killed" support tickets
+        // or correlating the event with a suspicious login from a new IP.
+        this.activityLogService
+            .log({
+                userId: req.user.userId,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.logout_all',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed out from all devices',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
         return { message: 'Logged out from all devices successfully' };
     }
 

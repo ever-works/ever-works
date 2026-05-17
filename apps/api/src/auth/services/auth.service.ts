@@ -390,8 +390,27 @@ export class AuthService {
         // Allow explicitly setting committer fields to null (to clear them)
         if (updateData.committerName !== undefined)
             updateFields.committerName = updateData.committerName || null;
-        if (updateData.committerEmail !== undefined)
+        if (updateData.committerEmail !== undefined) {
+            // L-04: prevent intra-platform attribution spoofing. A user
+            // can't claim another user's verified primary email as their
+            // git-commit author. Self-email is fine (it's the default
+            // already). Setting an unrelated email (e.g. work@somewhere) is
+            // still allowed — git's author/committer fields are not
+            // verified by git itself, only this cross-tenant guard.
+            const claimedEmail = updateData.committerEmail?.toLowerCase().trim() ?? '';
+            if (claimedEmail && claimedEmail !== (user.email ?? '').toLowerCase()) {
+                const collision = await this.userRepository.findByEmail(claimedEmail);
+                if (collision && collision.id !== userId) {
+                    this.logger.warn(
+                        `auth.profile.committerEmail.collision user=${userId} attemptedEmail=${claimedEmail} collisionUserId=${collision.id}`,
+                    );
+                    throw new BadRequestException(
+                        'committerEmail conflicts with another user. Use your own email or leave blank to fall back to your account email.',
+                    );
+                }
+            }
             updateFields.committerEmail = updateData.committerEmail || null;
+        }
         if (typeof updateData.emailBudgetAlerts === 'boolean')
             updateFields.emailBudgetAlerts = updateData.emailBudgetAlerts;
 

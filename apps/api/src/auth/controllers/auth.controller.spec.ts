@@ -115,7 +115,9 @@ describe('AuthController', () => {
             claimAccount.claim.mockResolvedValue(claimed);
 
             const req = {
-                user: { userId: 'u-anon-1' },
+                // L-05: claim endpoint requires isAnonymous=true on the
+                // AuthenticatedUser envelope.
+                user: { userId: 'u-anon-1', isAnonymous: true },
                 ip: '1.2.3.4',
                 headers: { 'user-agent': 'jest-agent' },
             };
@@ -153,7 +155,7 @@ describe('AuthController', () => {
             });
 
             await (controller as any).claimAccount(
-                { user: { userId: 'u-1' }, headers: {} },
+                { user: { userId: 'u-1', isAnonymous: true }, headers: {} },
                 {
                     email: 'a@b.com',
                     password: 'MySecure123!',
@@ -166,6 +168,16 @@ describe('AuthController', () => {
                     emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
                 }),
             );
+        });
+
+        it('rejects with 403 when the bearer-user is NOT anonymous (L-05)', async () => {
+            await expect(
+                (controller as any).claimAccount(
+                    { user: { userId: 'u-real', isAnonymous: false }, headers: {} },
+                    { email: 'a@b.com', password: 'MySecure123!' },
+                ),
+            ).rejects.toThrow(/anonymous/);
+            expect(claimAccount.claim).not.toHaveBeenCalled();
         });
     });
 
@@ -391,13 +403,26 @@ describe('AuthController', () => {
     });
 
     describe('logoutAll (POST /api/auth/logout-all)', () => {
-        it('forwards req.user.userId to provider.signOutAll', async () => {
-            const req: any = { user: { userId: 'u1' } };
+        it('forwards req.user.userId to provider.signOutAll and audit-logs the action (L-03)', async () => {
+            const req: any = {
+                user: { userId: 'u1' },
+                ip: '1.2.3.4',
+                headers: { 'user-agent': 'jest-agent' },
+            };
 
             const result = await controller.logoutAll(req);
 
             expect(authProvider.signOutAll).toHaveBeenCalledWith('u1');
             expect(result).toEqual({ message: 'Logged out from all devices successfully' });
+            // L-03: forensic audit-log entry.
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    action: 'user.logout_all',
+                    ipAddress: '1.2.3.4',
+                    userAgent: 'jest-agent',
+                }),
+            );
         });
     });
 
