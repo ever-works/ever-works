@@ -59,7 +59,6 @@ for (const providerId of PROVIDERS) {
             const res = await request.get(`${API_BASE}/api/oauth/${providerId}/url`);
             if (await isProviderUnconfigured(res)) {
                 test.skip(true, `${providerId} OAuth client id/secret not configured; skipping`);
-                return;
             }
             expect(res.status(), `status was ${res.status()}`).toBe(200);
 
@@ -87,7 +86,6 @@ for (const providerId of PROVIDERS) {
             const b = await request.get(`${API_BASE}/api/oauth/${providerId}/url`);
             if ((await isProviderUnconfigured(a)) || (await isProviderUnconfigured(b))) {
                 test.skip(true, `${providerId} OAuth client id/secret not configured; skipping`);
-                return;
             }
             expect(a.status(), `first call status was ${a.status()}`).toBe(200);
             expect(b.status(), `second call status was ${b.status()}`).toBe(200);

@@ -111,15 +111,75 @@ export const ENTITIES = [
     UserSyncConfig,
 ];
 
+/**
+ * Resolve TypeORM migration globs for the runtime path. TypeORM accepts
+ * an array of globs and silently ignores any that don't match files, so
+ * listing the candidate layouts is safe and idempotent.
+ *
+ * **Only `.js` patterns**, intentionally. TypeORM 0.3.x's
+ * `DirectoryExportedClassesLoader` loads matched files via
+ * `Promise.all(import(file))`. On Node ≥ 22, requiring `.ts` files (even
+ * after Nest+SWC transpilation) goes through the ESM loader and
+ * `Promise.all`-importing several at once trips Node's internal
+ * "Unexpected module status 0" assertion (a known race between
+ * `require()` and dynamic `import()` on the same module). Compiled JS
+ * doesn't hit this path. The manual `pnpm typeorm migration:generate /
+ * migration:run` commands keep their own `'.ts'` glob in
+ * `apps/api/typeorm.config.ts` and run under `ts-node`, which loads
+ * synchronously and is unaffected.
+ *
+ * Paths are absolute and use forward slashes (TypeORM's underlying glob
+ * engine — `globby` / `fast-glob` — handles forward-slash absolute paths
+ * correctly on Windows too).
+ *
+ *   - Docker / prod:        `/app/dist/migrations/*.js` (cwd = /app)
+ *   - Local API workspace:  `apps/api/dist/migrations/*.js` (from repo root)
+ *   - From apps/api cwd:    `dist/migrations/*.js`
+ *
+ * For local dev: run `pnpm build --filter ever-works-api` (or `pnpm dev`
+ * which builds before watching) to populate `apps/api/dist/migrations/`,
+ * then the API will pick up pending migrations on next boot. Authoring
+ * a new migration still goes through `pnpm typeorm migration:generate`
+ * (which produces `.ts` next to the existing ones) — the build step
+ * compiles it to `.js` automatically.
+ */
+function resolveMigrationGlobs(): string[] {
+    const cwd = process.cwd().replace(/\\/g, '/');
+    return [`${cwd}/dist/migrations/*.js`, `${cwd}/apps/api/dist/migrations/*.js`];
+}
+
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const environment = config.getEnvironment() || 'development';
     const appType = config.getAppType() || 'api';
     let dbType = config.database.getType();
 
+    // `migrationsRun` is gated on:
+    //   - API app type only — CLI uses synchronize for its local SQLite
+    //     (`DatabaseInitService` does that), so it has no use for the
+    //     migrations table.
+    //   - `!autoMigrate()` — when synchronize is ON (test / E2E), TypeORM's
+    //     `DataSource.initialize()` runs `migrationsRun` BEFORE
+    //     `synchronize`, so any ALTER-style migration would fail against
+    //     the still-empty schema. Synchronize bootstraps the full schema
+    //     from entities and the migrations table catches up implicitly;
+    //     migrations are only needed in environments with real persisted
+    //     data (prod/stage).
+    const migrationsRun =
+        appType === 'api' && config.database.runMigrations() && !config.database.autoMigrate();
+
     const baseConfig: any = {
         entities: ENTITIES,
         synchronize: config.database.autoMigrate(),
         logging: config.database.loggingEnabled(),
+        migrations: resolveMigrationGlobs(),
+        migrationsRun,
+        migrationsTableName: 'migrations',
+        // `'all'` = all pending migrations in ONE shared transaction. If
+        // migration N fails, migrations 1..N-1 are rolled back too and the
+        // whole batch is retried on the next boot. Use `'each'` if you ever
+        // need partial-progress semantics; we want atomic-batch behaviour so
+        // a half-applied schema can't escape between pod restarts.
+        migrationsTransactionMode: 'all' as const,
     };
 
     if (config.database.sslMode()) {

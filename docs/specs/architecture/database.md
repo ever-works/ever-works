@@ -195,26 +195,94 @@ Per Constitution Principle V, the platform is **forward-only**:
 ### 6.3 Synchronize disabled in production
 
 ```ts
-// database.config.ts (production branch)
-synchronize: false,
-migrationsRun: true,        // run migrations on startup
-migrations: ['dist/migrations/*.js'],
+// database.config.ts (every branch — postgres, sqlite, URL-style)
+synchronize: false,                  // never auto-derive schema (DANGEROUS)
+migrationsRun: true,                 // run pending migrations on startup
+migrations: [                        // resolved relative to process.cwd()
+  '${cwd}/dist/migrations/*.js',     // Docker / prod
+  '${cwd}/apps/api/dist/migrations/*.js',
+],
+migrationsTableName: 'migrations',
+migrationsTransactionMode: 'all',    // all pending migrations in ONE shared transaction (atomic batch)
 ```
 
-`synchronize: true` is **only** allowed in `NODE_ENV=test` for fast
-e2e suite startup. Production catches a misconfigured `synchronize`
-at boot via `DatabaseInitService`.
+**`.js` only, intentionally.** TypeORM 0.3.x's
+`DirectoryExportedClassesLoader` loads matched files via
+`Promise.all(import(file))`. On Node ≥ 22, importing several `.ts`
+files concurrently trips Node's "Unexpected module status 0" internal
+assertion (a known race between `require()` and dynamic `import()` on
+the same module). The runtime config sticks to compiled `.js` only;
+the CLI path in `apps/api/typeorm.config.ts` still globs `.ts` and
+runs under `ts-node` (synchronous loader, no race). For local dev,
+`pnpm build --filter ever-works-api` populates
+`apps/api/dist/migrations/` so the API picks up pending migrations
+on next boot.
 
-### 6.4 Generate + run
+`synchronize: true` is **only** allowed in `NODE_ENV=test` for fast
+e2e suite startup (`DATABASE_AUTOMIGRATE=true` is the explicit opt-in
+flag).
+
+Two distinct env flags control two distinct things — do not conflate
+them. The 2026-05-17 audit batch (C-07) historically did, which
+silently left prod with no migration runner for several deploys:
+
+- **`DATABASE_AUTOMIGRATE`** → TypeORM `synchronize` (auto-derive
+  schema from entities). Default `false` outside test. **Must stay
+  off in prod** — that was the point of C-07.
+- **`RUN_MIGRATIONS`** → TypeORM `migrationsRun` (apply pending
+  migrations from the `migrations` array). Default `true` outside
+  test. **Stays on in prod** so every API pod boot self-heals.
+
+**Mutual exclusion (TypeORM order trap).** When `synchronize: true`
+is on, the runtime config forces `migrationsRun: false` regardless of
+`RUN_MIGRATIONS`. The reason: `DataSource.initialize()` runs migrations
+**before** synchronize, so any ALTER-style migration would hit an
+empty schema and fail. Synchronize bootstraps the full schema from
+entities; migrations are only meaningful in environments with real
+persisted data (prod / stage). This mutual exclusion is what makes
+the E2E suite work (`DATABASE_AUTOMIGRATE=true` for fast empty-DB
+bootstrap, migrations skipped automatically).
+
+### 6.4 Schema-change workflow (the rule for AI agents and humans)
+
+Every TypeORM entity / schema change MUST ship with a migration in
+the **same PR**. The flow:
+
+1. Edit the entity under `packages/agent/src/entities/` (add column,
+   change type, add index, …).
+2. From `apps/api/`, generate the migration from the entity diff:
+    ```bash
+    pnpm typeorm migration:generate -d typeorm.config.ts \
+        src/migrations/<DescriptiveName>
+    ```
+    This produces `apps/api/src/migrations/<unix-millis>-<Name>.ts`.
+3. **Review the generated SQL** — TypeORM's diff is best-effort and
+   sometimes proposes destructive changes (DROP / ALTER TYPE). For
+   destructive changes, follow the two-phase pattern in §6.2.
+4. Include the migration file in the PR alongside the entity change.
+   CI's `pnpm test` exercises the migration against a fresh test DB
+   (catches syntax + ordering bugs).
+5. On merge to `develop` → `stage` → `main`, every new API pod boot
+   self-applies the migration via `migrationsRun: true`. No manual
+   `kubectl exec`, no operator step.
+
+**Never** push an entity change without its migration. The next
+deploy will silently 500 on any query that touches the missing
+column. (This is exactly how the 2026-05-18 OAuth login outage
+happened — H-17 added two columns, the audit batch correctly
+generated the migration but the runner had been disabled by C-07's
+flag misnaming.)
+
+### 6.5 Generate + run
 
 ```bash
 # Generate a new migration from current entity diffs (run from apps/api/)
 pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<name>
 
-# Apply pending migrations
+# Apply pending migrations explicitly (rare — API does this on boot)
 pnpm typeorm migration:run -d typeorm.config.ts
 
-# Revert the most recent migration (dev / staging only)
+# Revert the most recent migration (DESTRUCTIVE — coordinate with operator)
 pnpm typeorm migration:revert -d typeorm.config.ts
 ```
 

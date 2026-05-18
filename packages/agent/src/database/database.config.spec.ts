@@ -60,6 +60,7 @@ jest.mock('@src/config', () => {
         getHost: jest.fn(() => undefined as string | undefined),
         getPort: jest.fn(() => undefined as string | undefined),
         autoMigrate: jest.fn(() => true),
+        runMigrations: jest.fn(() => true),
         loggingEnabled: jest.fn(() => false),
         sslMode: jest.fn(() => false),
         databaseCaCert: jest.fn(() => undefined as string | undefined),
@@ -108,6 +109,7 @@ const cfgMock = config as unknown as {
         getHost: jest.Mock;
         getPort: jest.Mock;
         autoMigrate: jest.Mock;
+        runMigrations: jest.Mock;
         loggingEnabled: jest.Mock;
         sslMode: jest.Mock;
         databaseCaCert: jest.Mock;
@@ -130,6 +132,7 @@ function resetMocks() {
     cfgMock.database.getHost.mockReturnValue(undefined);
     cfgMock.database.getPort.mockReturnValue(undefined);
     cfgMock.database.autoMigrate.mockReturnValue(true);
+    cfgMock.database.runMigrations.mockReturnValue(true);
     cfgMock.database.loggingEnabled.mockReturnValue(false);
     cfgMock.database.sslMode.mockReturnValue(false);
     cfgMock.database.databaseCaCert.mockReturnValue(undefined);
@@ -294,6 +297,94 @@ describe('database.config', () => {
             cfgMock.getEnvironment.mockReturnValue('test');
             const result = (databaseConfig as any)();
             expect(result.logging).toBe(true);
+        });
+
+        // TypeORM migrations contract — distinct from `synchronize`. The
+        // runtime config must always carry a migrations glob + table name,
+        // and `migrationsRun` must reflect `runMigrations()` for API apps.
+        describe('migrations wiring (runMigrations + migrations array)', () => {
+            it('always exposes a non-empty `migrations` glob array + table name', () => {
+                const result = (databaseConfig as any)();
+                expect(Array.isArray(result.migrations)).toBe(true);
+                expect(result.migrations.length).toBeGreaterThan(0);
+                expect(result.migrationsTableName).toBe('migrations');
+                expect(result.migrationsTransactionMode).toBe('all');
+                // Every glob is absolute (TypeORM does not normalize cwd-relative globs).
+                for (const glob of result.migrations as string[]) {
+                    expect(glob).toMatch(/^([A-Za-z]:)?\//);
+                }
+            });
+
+            it('migrationsRun=true when runMigrations()=true and appType=api and autoMigrate()=false (prod-shape)', () => {
+                cfgMock.getAppType.mockReturnValue('api');
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
+                const result = (databaseConfig as any)();
+                expect(result.migrationsRun).toBe(true);
+            });
+
+            it('migrationsRun=false when runMigrations()=false (kill switch wins)', () => {
+                cfgMock.getAppType.mockReturnValue('api');
+                cfgMock.database.runMigrations.mockReturnValue(false);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
+                const result = (databaseConfig as any)();
+                expect(result.migrationsRun).toBe(false);
+            });
+
+            it('migrationsRun=false for CLI even when runMigrations()=true (CLI uses synchronize)', () => {
+                cfgMock.getAppType.mockReturnValue('cli');
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
+                const result = (databaseConfig as any)();
+                expect(result.migrationsRun).toBe(false);
+            });
+
+            it('migrationsRun=false when synchronize is ON (mutual exclusion — TypeORM order trap)', () => {
+                // TypeORM `DataSource.initialize()` runs migrationsRun BEFORE
+                // synchronize. With synchronize=true the schema is built from
+                // entities, so any ALTER-style migration would fail against
+                // an empty DB first. The test/E2E env needs synchronize-only.
+                cfgMock.getAppType.mockReturnValue('api');
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(true);
+                const result = (databaseConfig as any)();
+                expect(result.synchronize).toBe(true);
+                expect(result.migrationsRun).toBe(false);
+            });
+
+            it('migrations + migrationsRun flow through every dbType branch (postgres)', () => {
+                cfgMock.database.getType.mockReturnValue('postgres');
+                cfgMock.database.getHost.mockReturnValue('db.example.com');
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false); // prod-shape
+                const result = (databaseConfig as any)();
+                expect(result.type).toBe('postgres');
+                expect(result.migrationsRun).toBe(true);
+                expect(Array.isArray(result.migrations)).toBe(true);
+            });
+
+            it('migrations + migrationsRun flow through DATABASE_URL branch', () => {
+                cfgMock.database.getType.mockReturnValue('postgres');
+                cfgMock.database.getUrl.mockReturnValue('postgres://u:p@h:5432/d');
+                parseMock.mockReturnValue({ database: 'd' } as any);
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false); // prod-shape
+                const result = (databaseConfig as any)();
+                expect(result.url).toBe('postgres://u:p@h:5432/d');
+                expect(result.migrationsRun).toBe(true);
+                expect(Array.isArray(result.migrations)).toBe(true);
+            });
+
+            it('migrations array is always present in SQLite branch (E2E shape: synchronize on, migrationsRun off)', () => {
+                cfgMock.database.getType.mockReturnValue('better-sqlite3');
+                cfgMock.getEnvironment.mockReturnValue('test');
+                // autoMigrate=true by default in resetMocks, simulating E2E.
+                const result = (databaseConfig as any)();
+                expect(result.type).toBe('better-sqlite3');
+                expect(result.synchronize).toBe(true);
+                expect(result.migrationsRun).toBe(false); // gated off by autoMigrate
+                expect(Array.isArray(result.migrations)).toBe(true);
+            });
         });
     });
 
