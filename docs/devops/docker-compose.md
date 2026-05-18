@@ -9,13 +9,13 @@ sidebar_position: 9
 
 Ever Works ships five layered Compose files at the repository root, so you can pick the right stack for what you're doing:
 
-| File                         | Purpose                                                                 | Use when                                                          |
-| ---------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `docker-compose.demo.yml`    | Minimal SQLite showcase, pre-built images. No infra deps.               | First-time evaluator, "clone and run" to kick the tires.          |
-| `docker-compose.infra.yml`   | PostgreSQL + Redis only. No application services.                       | Running the platform apps locally with `pnpm dev` against real deps. |
-| `docker-compose.yml`         | Full platform from pre-built GHCR images + bundled Postgres/Redis.      | Production-shaped self-host, no local Docker build.               |
-| `docker-compose.build.yml`   | Same as above, but builds api/web/mcp/docs from source.                 | Hacking on the apps, or building your own registry images.        |
-| `docker-compose.trigger.yml` | Optional self-hosted Trigger.dev (profile-gated, off by default).       | Local Trigger.dev webapp for background jobs.                     |
+| File                         | Purpose                                                            | Use when                                                             |
+| ---------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `docker-compose.demo.yml`    | Minimal SQLite showcase, pre-built images. No infra deps.          | First-time evaluator, "clone and run" to kick the tires.             |
+| `docker-compose.infra.yml`   | PostgreSQL + Redis only. No application services.                  | Running the platform apps locally with `pnpm dev` against real deps. |
+| `docker-compose.yml`         | Full platform from pre-built GHCR images + bundled Postgres/Redis. | Production-shaped self-host, no local Docker build.                  |
+| `docker-compose.build.yml`   | Same as above, but builds api/web/mcp/docs from source.            | Hacking on the apps, or building your own registry images.           |
+| `docker-compose.trigger.yml` | Optional self-hosted Trigger.dev (profile-gated, off by default).  | Local Trigger.dev webapp for background jobs.                        |
 
 The infra file is `include:`d by both `docker-compose.yml` and `docker-compose.build.yml`, so Postgres and Redis come up automatically with either flavour.
 
@@ -88,19 +88,19 @@ For a full production self-host (workers on separate machines, ClickHouse, objec
 
 ### `ever-works-api`
 
-NestJS REST API. Listens on `3100`. Reads `.env.compose` for all backing-service config — the compose file only hardcodes the container's *role* (`APP_TYPE=api`, `PORT=3100`), so every DB / Redis / Trigger.dev knob below can be overridden by editing `.env.compose` (or shelling out an env var before `docker compose up`) without touching the compose YAML.
+NestJS REST API. Listens on `3100`. Reads `.env.compose` for all backing-service config — the compose file only hardcodes the container's _role_ (`APP_TYPE=api`, `PORT=3100`), so every DB / Redis / Trigger.dev knob below can be overridden by editing `.env.compose` (or shelling out an env var before `docker compose up`) without touching the compose YAML.
 
-| Env var               | Default in `.env.compose`            | Notes                                                                    |
-| --------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
-| `DATABASE_TYPE`       | `postgres`                           | Demo path overrides to `sqlite` via `.env.demo.compose`.                 |
-| `DATABASE_HOST`       | `ever-works-db`                      | Compose service name. Point at a managed Postgres FQDN to swap.          |
-| `DATABASE_PORT`       | `5432`                               |                                                                          |
-| `DATABASE_USERNAME`   | `postgres`                           |                                                                          |
-| `DATABASE_PASSWORD`   | `ever_works_password`                | **Replace before any non-local use.**                                    |
-| `DATABASE_NAME`       | `ever_works`                         |                                                                          |
-| `THROTTLER_REDIS_URL` | `redis://ever-works-redis:6379`      | Used by the distributed rate limiter (`apps/api`).                       |
-| `REDIS_URL`           | `redis://ever-works-redis:6379`      | Used by BullMQ queues in `@ever-works/agent`.                            |
-| `RUN_MIGRATIONS`      | `true`                               | Set to `false` if you run migrations out-of-band.                        |
+| Env var               | Default in `.env.compose`       | Notes                                                           |
+| --------------------- | ------------------------------- | --------------------------------------------------------------- |
+| `DATABASE_TYPE`       | `postgres`                      | Demo path overrides to `sqlite` via `.env.demo.compose`.        |
+| `DATABASE_HOST`       | `ever-works-db`                 | Compose service name. Point at a managed Postgres FQDN to swap. |
+| `DATABASE_PORT`       | `5432`                          |                                                                 |
+| `DATABASE_USERNAME`   | `postgres`                      |                                                                 |
+| `DATABASE_PASSWORD`   | `ever_works_password`           | **Replace before any non-local use.**                           |
+| `DATABASE_NAME`       | `ever_works`                    |                                                                 |
+| `THROTTLER_REDIS_URL` | `redis://ever-works-redis:6379` | Used by the distributed rate limiter (`apps/api`).              |
+| `REDIS_URL`           | `redis://ever-works-redis:6379` | Used by BullMQ queues in `@ever-works/agent`.                   |
+| `RUN_MIGRATIONS`      | `true`                          | Set to `false` if you run migrations out-of-band.               |
 
 ### `ever-works-web`
 
@@ -156,22 +156,22 @@ When the `trigger` profile is active, three more containers join `ever-works-net
 
 ## Volumes
 
-| Volume                    | Mount                                      | File                          |
-| ------------------------- | ------------------------------------------ | ----------------------------- |
-| `postgres_data`           | `/var/lib/postgresql/data/`                | infra                         |
-| `redis_data`              | `/data`                                    | infra                         |
-| `api_data`                | `/app/apps/api/data` (SQLite)              | demo                          |
-| `trigger_postgres_data`   | `/var/lib/postgresql/data/`                | trigger (profile)             |
-| `trigger_redis_data`      | `/data`                                    | trigger (profile)             |
+| Volume                  | Mount                         | File              |
+| ----------------------- | ----------------------------- | ----------------- |
+| `postgres_data`         | `/var/lib/postgresql/data/`   | infra             |
+| `redis_data`            | `/data`                       | infra             |
+| `api_data`              | `/app/apps/api/data` (SQLite) | demo              |
+| `trigger_postgres_data` | `/var/lib/postgresql/data/`   | trigger (profile) |
+| `trigger_redis_data`    | `/data`                       | trigger (profile) |
 
 Named volumes survive `docker compose down`. Wipe them with `docker compose down -v`.
 
 ## Environment files
 
-| File                  | Paired compose file                                   | Defaults to              |
-| --------------------- | ----------------------------------------------------- | ------------------------ |
-| `.env.compose`        | `docker-compose.yml`, `docker-compose.build.yml`      | Postgres + Redis         |
-| `.env.demo.compose`   | `docker-compose.demo.yml`                             | SQLite, no Redis         |
+| File                | Paired compose file                              | Defaults to      |
+| ------------------- | ------------------------------------------------ | ---------------- |
+| `.env.compose`      | `docker-compose.yml`, `docker-compose.build.yml` | Postgres + Redis |
+| `.env.demo.compose` | `docker-compose.demo.yml`                        | SQLite, no Redis |
 
 Both files are committed with placeholder secrets — replace them before any non-local use. Compose loads variables with this priority (highest first):
 
@@ -226,11 +226,11 @@ docker compose down -v
 
 ## Troubleshooting
 
-| Symptom                                       | Likely cause                                                | Fix                                                                                        |
-| --------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Web shows "Unable to connect to API"          | API still starting up                                       | `docker compose logs -f ever-works-api`. Healthcheck on `ever-works-db` may still be amber. |
-| API exits with `ECONNREFUSED 127.0.0.1:6379`  | Stale `REDIS_URL` pointing at localhost                     | Confirm `REDIS_URL=redis://ever-works-redis:6379` in the running container's env.          |
-| Port already in use                           | Another local service on 3000/3100/5432/6379                | Remap the host side: `'3001:3000'` in the compose file, or stop the conflicting process.   |
-| `pg_isready` healthcheck never goes green     | Custom `DATABASE_USERNAME` not matched in healthcheck cmd   | The healthcheck uses `$POSTGRES_USER`/`$POSTGRES_DB` — both come from the env, so make sure your overrides are consistent. |
-| Trigger.dev webapp 500s on first login        | Placeholder `TRIGGER_ENCRYPTION_KEY` still 32 ASCII chars   | Regenerate: `openssl rand -hex 32` and bounce the webapp container.                        |
-| `RUN_MIGRATIONS=true` with SQLite fails       | Migration script targets Postgres/MySQL                     | Set `RUN_MIGRATIONS=false` in `.env.demo.compose` (already the default there).             |
+| Symptom                                      | Likely cause                                              | Fix                                                                                                                        |
+| -------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Web shows "Unable to connect to API"         | API still starting up                                     | `docker compose logs -f ever-works-api`. Healthcheck on `ever-works-db` may still be amber.                                |
+| API exits with `ECONNREFUSED 127.0.0.1:6379` | Stale `REDIS_URL` pointing at localhost                   | Confirm `REDIS_URL=redis://ever-works-redis:6379` in the running container's env.                                          |
+| Port already in use                          | Another local service on 3000/3100/5432/6379              | Remap the host side: `'3001:3000'` in the compose file, or stop the conflicting process.                                   |
+| `pg_isready` healthcheck never goes green    | Custom `DATABASE_USERNAME` not matched in healthcheck cmd | The healthcheck uses `$POSTGRES_USER`/`$POSTGRES_DB` — both come from the env, so make sure your overrides are consistent. |
+| Trigger.dev webapp 500s on first login       | Placeholder `TRIGGER_ENCRYPTION_KEY` still 32 ASCII chars | Regenerate: `openssl rand -hex 32` and bounce the webapp container.                                                        |
+| `RUN_MIGRATIONS=true` with SQLite fails      | Migration script targets Postgres/MySQL                   | Set `RUN_MIGRATIONS=false` in `.env.demo.compose` (already the default there).                                             |
