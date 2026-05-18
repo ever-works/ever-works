@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Sparkles, Loader2, ExternalLink } from 'lucide-react';
@@ -29,12 +29,21 @@ import {
 } from '@/components/ui/dialog';
 import {
     customizeTemplateFromBase,
-    getTemplateCustomization,
     iterateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 
-const POLL_INTERVAL_MS = 4000;
 const TERMINAL_STATUSES: TemplateCustomization['status'][] = ['succeeded', 'failed'];
+
+export interface CustomizationStartedArgs {
+    customization: TemplateCustomization;
+    template?: {
+        id: string;
+        name: string;
+        repositoryOwner: string;
+        repositoryName: string;
+        repositoryUrl: string | null;
+    };
+}
 
 interface ForkTarget {
     login: string;
@@ -51,10 +60,9 @@ interface CreateCustomTemplateDialogProps {
     providers: CustomizationProvider[];
     aiProviders: CustomizationAiProvider[];
     forkTargets: ForkTarget[];
-    onSucceeded?: () => void;
     mode?: CustomizeDialogMode;
     targetTemplate?: TemplateCatalogItem | null;
-    initialCustomization?: TemplateCustomization | TemplateCustomizationSummary | null;
+    onCustomizationStarted?: (args: CustomizationStartedArgs) => void;
 }
 
 export function CreateCustomTemplateDialog({
@@ -64,10 +72,9 @@ export function CreateCustomTemplateDialog({
     providers,
     aiProviders,
     forkTargets,
-    onSucceeded,
     mode = 'new',
     targetTemplate = null,
-    initialCustomization = null,
+    onCustomizationStarted,
 }: CreateCustomTemplateDialogProps) {
     const t = useTranslations('dashboard.templates.customizeDialog');
     const enabledProviders = useMemo(() => providers.filter((p) => p.enabled), [providers]);
@@ -88,59 +95,34 @@ export function CreateCustomTemplateDialog({
     const [name, setName] = useState('');
     const [prompt, setPrompt] = useState('');
     const [submitting, startSubmitting] = useTransition();
-    const [customization, setCustomization] = useState<
-        TemplateCustomization | TemplateCustomizationSummary | null
-    >(initialCustomization);
-    const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Local customization snapshot covers the gap between submit success
+    // and the parent picking up the new latestCustomization. After that,
+    // the page-level poller is the source of truth via `targetTemplate`.
+    const [pendingCustomization, setPendingCustomization] = useState<TemplateCustomization | null>(
+        null,
+    );
 
-    const stopPolling = useCallback(() => {
-        if (pollTimer.current) {
-            clearTimeout(pollTimer.current);
-            pollTimer.current = null;
-        }
-    }, []);
-
-    useEffect(() => () => stopPolling(), [stopPolling]);
-
-    // Sync the polled customization when the dialog opens with a fresh
-    // `initialCustomization` (e.g. user clicked another card while the
-    // dialog was still mounted).
-    useEffect(() => {
-        if (open) setCustomization(initialCustomization);
-    }, [open, initialCustomization]);
+    const customization: TemplateCustomization | TemplateCustomizationSummary | null =
+        targetTemplate?.latestCustomization ?? pendingCustomization;
 
     useEffect(() => {
-        if (!open) {
-            stopPolling();
-            return;
+        if (
+            pendingCustomization &&
+            targetTemplate?.latestCustomization?.id === pendingCustomization.id
+        ) {
+            setPendingCustomization(null);
         }
-        if (!customization || TERMINAL_STATUSES.includes(customization.status)) return;
-
-        pollTimer.current = setTimeout(async () => {
-            const result = await getTemplateCustomization(customization.id);
-            if (!result.success || !result.customization) return;
-            setCustomization(result.customization);
-            if (result.customization.status === 'succeeded') {
-                toast.success(t('toast.success'));
-                onSucceeded?.();
-            } else if (result.customization.status === 'failed') {
-                toast.error(result.customization.errorMessage || t('toast.failed'));
-            }
-        }, POLL_INTERVAL_MS);
-
-        return () => stopPolling();
-    }, [open, customization, stopPolling, t, onSucceeded]);
+    }, [pendingCustomization, targetTemplate?.latestCustomization?.id]);
 
     const reset = useCallback(() => {
-        stopPolling();
         setName('');
         setPrompt('');
-        setCustomization(null);
+        setPendingCustomization(null);
         setBaseTemplateId(customizableBases[0]?.id ?? '');
         setProviderId(defaultProviderId);
         setAiProviderId(defaultAiProviderId);
         setTargetOwner(forkTargets[0]?.login ?? '');
-    }, [stopPolling, customizableBases, defaultProviderId, defaultAiProviderId, forkTargets]);
+    }, [customizableBases, defaultProviderId, defaultAiProviderId, forkTargets]);
 
     const handleClose = (nextOpen: boolean) => {
         if (!nextOpen) reset();
@@ -175,7 +157,8 @@ export function CreateCustomTemplateDialog({
                         toast.error(result.error || t('toast.startFailed'));
                         return;
                     }
-                    setCustomization(result.customization);
+                    setPendingCustomization(result.customization);
+                    onCustomizationStarted?.({ customization: result.customization });
                     toast.message(t('toast.started'));
                 })();
             });
@@ -200,7 +183,11 @@ export function CreateCustomTemplateDialog({
                     toast.error(result.error || t('toast.startFailed'));
                     return;
                 }
-                setCustomization(result.customization);
+                setPendingCustomization(result.customization);
+                onCustomizationStarted?.({
+                    customization: result.customization,
+                    template: result.template ?? undefined,
+                });
                 toast.message(t('toast.started'));
             })();
         });
