@@ -56,6 +56,9 @@ export interface TemplateCatalogItem {
     baseTemplateId?: string | null;
     // ISO timestamp of the last successful agent customization, if any.
     lastCustomizedAt?: string | null;
+    // Prompt of the last successful agent customization, if any. Lets the
+    // UI pre-fill the "Customize again" textarea without an extra fetch.
+    lastCustomizationPrompt?: string | null;
     // Latest customization run for this template (most recent by createdAt),
     // surfaced so the UI can render a status chip without an extra fetch.
     latestCustomization?: TemplateCustomizationSummary | null;
@@ -785,6 +788,7 @@ export class TemplateCatalogService implements OnModuleInit {
     ): TemplateCatalogItem {
         const baseTemplateId = this.resolveBaseTemplateId(template);
         const lastCustomizedAtRaw = template.metadata?.lastCustomizedAt;
+        const lastCustomizationPromptRaw = template.metadata?.lastCustomizationPrompt;
         return {
             id: template.id,
             kind: template.kind,
@@ -806,6 +810,8 @@ export class TemplateCatalogService implements OnModuleInit {
             customizable: this.isCustomizable(template.sourceType, baseTemplateId, template.id),
             baseTemplateId,
             lastCustomizedAt: typeof lastCustomizedAtRaw === 'string' ? lastCustomizedAtRaw : null,
+            lastCustomizationPrompt:
+                typeof lastCustomizationPromptRaw === 'string' ? lastCustomizationPromptRaw : null,
             latestCustomization: latestCustomization
                 ? this.toCustomizationSummary(latestCustomization)
                 : null,

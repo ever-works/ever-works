@@ -120,15 +120,26 @@ export function CreateCustomTemplateDialog({
 
     // Seed the prompt with the prior run on iterate-mode open. Only fires
     // on the false→true transition so polling updates don't overwrite
-    // whatever the user is typing mid-session.
+    // whatever the user is typing mid-session. Prefer the most-recent
+    // run's prompt; fall back to the last-known-good prompt persisted on
+    // template.metadata so prefill works even when the customization
+    // summary doesn't carry it.
     const prevOpenRef = useRef(false);
     useEffect(() => {
         if (open && !prevOpenRef.current && mode === 'iterate') {
-            const seed = targetTemplate?.latestCustomization?.prompt ?? '';
+            const seed =
+                targetTemplate?.latestCustomization?.prompt ||
+                targetTemplate?.lastCustomizationPrompt ||
+                '';
             if (seed) setPrompt(seed);
         }
         prevOpenRef.current = open;
-    }, [open, mode, targetTemplate?.latestCustomization?.prompt]);
+    }, [
+        open,
+        mode,
+        targetTemplate?.latestCustomization?.prompt,
+        targetTemplate?.lastCustomizationPrompt,
+    ]);
 
     const reset = useCallback(() => {
         setName('');

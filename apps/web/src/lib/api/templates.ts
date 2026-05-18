@@ -28,6 +28,7 @@ export interface TemplateCatalogItem {
     customizable?: boolean;
     baseTemplateId?: string | null;
     lastCustomizedAt?: string | null;
+    lastCustomizationPrompt?: string | null;
     latestCustomization?: TemplateCustomizationSummary | null;
 }
 
