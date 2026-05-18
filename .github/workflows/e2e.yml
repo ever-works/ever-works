@@ -119,7 +119,13 @@ jobs:
           # API
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
-          AUTH_SECRET: ever-works-e2e-ci-secret
+          # H-14 (PR #816) raised the floor on COOKIE_SECRET / AUTH_SECRET
+          # to 32 characters of high-entropy material and removed the silent
+          # short-secret padding. The previous 24-char value broke cookie
+          # encryption in the web's `setAuthCookies` → registration succeeded
+          # but no session cookie was set → every subsequent request 401'd.
+          # Padded to 51 chars (CI-only, obviously fake — do not reuse).
+          AUTH_SECRET: ever-works-e2e-ci-secret-padding-to-meet-32min-fake
           NODE_ENV: development
           # C-07 PR-B: `autoMigrate()` now defaults to OFF everywhere except
           # `NODE_ENV=test`. E2E boots a real dev-mode API with in-memory
