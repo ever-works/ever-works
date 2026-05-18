@@ -101,6 +101,10 @@ export function CreateCustomTemplateDialog({
     const [pendingCustomization, setPendingCustomization] = useState<TemplateCustomization | null>(
         null,
     );
+    // Id of the run this dialog instance kicked off. Lets us distinguish
+    // "you just submitted and it finished" (show Done, hide submit) from
+    // "this template has a prior succeeded run" (keep submit available).
+    const [sessionRunId, setSessionRunId] = useState<string | null>(null);
 
     const customization: TemplateCustomization | TemplateCustomizationSummary | null =
         targetTemplate?.latestCustomization ?? pendingCustomization;
@@ -130,6 +134,7 @@ export function CreateCustomTemplateDialog({
         setName('');
         setPrompt('');
         setPendingCustomization(null);
+        setSessionRunId(null);
         setBaseTemplateId(customizableBases[0]?.id ?? '');
         setProviderId(defaultProviderId);
         setAiProviderId(defaultAiProviderId);
@@ -170,6 +175,7 @@ export function CreateCustomTemplateDialog({
                         return;
                     }
                     setPendingCustomization(result.customization);
+                    setSessionRunId(result.customization.id);
                     onCustomizationStarted?.({ customization: result.customization });
                     toast.message(t('toast.started'));
                 })();
@@ -196,6 +202,7 @@ export function CreateCustomTemplateDialog({
                     return;
                 }
                 setPendingCustomization(result.customization);
+                setSessionRunId(result.customization.id);
                 onCustomizationStarted?.({
                     customization: result.customization,
                     template: result.template ?? undefined,
@@ -208,6 +215,8 @@ export function CreateCustomTemplateDialog({
     const running = customization && !TERMINAL_STATUSES.includes(customization.status);
     const succeeded = customization?.status === 'succeeded';
     const failed = customization?.status === 'failed';
+    const isSessionRun = !!customization && customization.id === sessionRunId;
+    const sessionRunSucceeded = isSessionRun && succeeded;
     const disabled = submitting || !!running;
     const missingAiProvider = requiresAiProvider && enabledAiProviders.length === 0;
     const noPrereqs =
@@ -389,7 +398,7 @@ export function CreateCustomTemplateDialog({
                             helperText={t('promptHelp')}
                         />
 
-                        {customization && (
+                        {customization && (isSessionRun || !!running || failed) && (
                             <StatusBox failed={failed} succeeded={succeeded} running={!!running}>
                                 <span className="font-medium">
                                     {t(`status.${customization.status}`)}
@@ -397,7 +406,9 @@ export function CreateCustomTemplateDialog({
                                 {failed && customization.errorMessage && (
                                     <p className="mt-2 text-xs">{customization.errorMessage}</p>
                                 )}
-                                {succeeded && <p className="mt-2 text-xs">{t('successHelp')}</p>}
+                                {sessionRunSucceeded && (
+                                    <p className="mt-2 text-xs">{t('successHelp')}</p>
+                                )}
                             </StatusBox>
                         )}
                     </div>
@@ -409,14 +420,14 @@ export function CreateCustomTemplateDialog({
                         onClick={() => handleClose(false)}
                         disabled={submitting}
                     >
-                        {succeeded ? t('done') : t('cancel')}
+                        {sessionRunSucceeded ? t('done') : t('cancel')}
                     </Button>
-                    {mode !== 'status' && !succeeded && !noPrereqs && (
+                    {mode !== 'status' && !sessionRunSucceeded && !noPrereqs && (
                         <Button onClick={handleSubmit} loading={disabled} disabled={!!running}>
-                            {customization
-                                ? t('retry')
-                                : mode === 'iterate'
-                                  ? t('submitIterate')
+                            {mode === 'iterate'
+                                ? t('submitIterate')
+                                : failed
+                                  ? t('retry')
                                   : t('submit')}
                         </Button>
                     )}
