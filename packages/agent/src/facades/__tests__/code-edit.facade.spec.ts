@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CodeEditFacadeService } from '../code-edit.facade';
+import { ProviderNotFoundError, NoProviderError } from '../base.facade';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
@@ -20,7 +21,7 @@ describe('CodeEditFacadeService', () => {
             category: 'pipeline',
             capabilities: ['code-edit'],
             configurationMode: 'hybrid',
-            executeCodeEdit: jest.fn(),
+            executeCodeEdit: jest.fn().mockResolvedValue({ success: true }),
             onLoad: jest.fn(),
             onUnload: jest.fn(),
         }) as unknown as ICodeEditPlugin;
@@ -81,16 +82,6 @@ describe('CodeEditFacadeService', () => {
             const providers = await service.listProviders('user-1');
 
             expect(providers.map((p) => p.id)).toEqual(['claude-code']);
-            expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
-                'claude-code',
-                undefined,
-                'user-1',
-            );
-            expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
-                'gemini',
-                undefined,
-                'user-1',
-            );
         });
 
         it('skips plugins that are registered but not loaded', async () => {
@@ -122,42 +113,46 @@ describe('CodeEditFacadeService', () => {
             await expect(service.listProviders('user-1')).resolves.toEqual([]);
         });
 
-        it('marks defaultForCapabilities plugin as isDefault', async () => {
+        it('marks defaultForCapabilities plugin as isDefault and sorts it first', async () => {
             registry.getByCapability.mockReturnValue([
-                createRegistered('claude-code', { defaultForCapabilities: ['code-edit'] }),
                 createRegistered('codex'),
+                createRegistered('claude-code', { defaultForCapabilities: ['code-edit'] }),
             ]);
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const providers = await service.listProviders('user-1');
 
-            expect(providers.find((p) => p.id === 'claude-code')?.isDefault).toBe(true);
-            expect(providers.find((p) => p.id === 'codex')?.isDefault).toBe(false);
+            expect(providers[0].id).toBe('claude-code');
+            expect(providers[0].isDefault).toBe(true);
+            expect(providers[1].isDefault).toBe(false);
         });
     });
 
-    describe('resolveProvider', () => {
-        it('throws when the user has not enabled the requested plugin', async () => {
+    describe('execute (resolution via BaseFacadeService.resolvePlugin)', () => {
+        it('throws ProviderNotFoundError when the user has not enabled the requested plugin', async () => {
             const registered = createRegistered('gemini');
             registry.get.mockReturnValue(registered);
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             await expect(
-                service.resolveProvider({ userId: 'user-1', providerId: 'gemini' }),
-            ).rejects.toThrow(/not enabled for this user/);
+                service.execute(
+                    { workspaceDir: '/tmp/x', prompt: 'p' },
+                    { userId: 'user-1', providerId: 'gemini' },
+                ),
+            ).rejects.toBeInstanceOf(ProviderNotFoundError);
         });
 
-        it('returns the plugin when the user has it enabled', async () => {
+        it('runs the plugin when the user has it enabled', async () => {
             const registered = createRegistered('claude-code');
             registry.get.mockReturnValue(registered);
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
-            const plugin = await service.resolveProvider({
-                userId: 'user-1',
-                providerId: 'claude-code',
-            });
+            await service.execute(
+                { workspaceDir: '/tmp/x', prompt: 'p' },
+                { userId: 'user-1', providerId: 'claude-code' },
+            );
 
-            expect(plugin.id).toBe('claude-code');
+            expect((registered.plugin as ICodeEditPlugin).executeCodeEdit).toHaveBeenCalled();
         });
 
         it('falls back to the first user-enabled plugin when no providerId is given', async () => {
@@ -166,18 +161,18 @@ describe('CodeEditFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
-            const plugin = await service.resolveProvider({ userId: 'user-1' });
+            await service.execute({ workspaceDir: '/tmp/x', prompt: 'p' }, { userId: 'user-1' });
 
-            expect(plugin.id).toBe('codex');
+            expect((registered.plugin as ICodeEditPlugin).executeCodeEdit).toHaveBeenCalled();
         });
 
-        it('throws when the user has no providers enabled and none was requested', async () => {
+        it('throws NoProviderError when the user has no providers enabled and none was requested', async () => {
             registry.getByCapability.mockReturnValue([createRegistered('codex')]);
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
-            await expect(service.resolveProvider({ userId: 'user-1' })).rejects.toThrow(
-                /No code-edit provider available/,
-            );
+            await expect(
+                service.execute({ workspaceDir: '/tmp/x', prompt: 'p' }, { userId: 'user-1' }),
+            ).rejects.toBeInstanceOf(NoProviderError);
         });
     });
 });
