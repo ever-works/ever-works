@@ -17,6 +17,9 @@ export interface CodeEditFacadeOptions {
     userId: string;
     workId?: string;
     providerId?: string;
+    // Forwarded to plugins that proxy to an AI provider (e.g. opencode). Plugins
+    // that bring their own model (claude-code, codex, gemini) ignore this.
+    aiProviderId?: string;
 }
 
 export interface CodeEditProviderInfo {
@@ -26,7 +29,8 @@ export interface CodeEditProviderInfo {
     icon?: PluginIcon;
     providerName?: string;
     enabled: boolean;
-    isDefault?: boolean;
+    isDefault: boolean;
+    selectableProviderCategories: readonly string[];
 }
 
 @Injectable()
@@ -48,6 +52,14 @@ export class CodeEditFacadeService extends BaseFacadeService {
         userId: string,
         workId?: string,
     ): Promise<boolean> {
+        return (await this.getProviderForUser(providerId, userId, workId)) !== null;
+    }
+
+    async getProviderForUser(
+        providerId: string,
+        userId: string,
+        workId?: string,
+    ): Promise<CodeEditProviderInfo | null> {
         const registered = this.registry.get(providerId);
         if (
             !registered ||
@@ -55,24 +67,25 @@ export class CodeEditFacadeService extends BaseFacadeService {
             !registered.manifest.capabilities.includes(this.CAPABILITY) ||
             registered.manifest.supplementary
         ) {
-            return false;
+            return null;
         }
-        return this.registry.isPluginEnabledForScope(providerId, workId, userId);
+        const enabled = await this.registry.isPluginEnabledForScope(providerId, workId, userId);
+        if (!enabled) return null;
+        return {
+            id: registered.plugin.id,
+            name: registered.manifest.name ?? registered.plugin.id,
+            description: registered.manifest.description,
+            icon: registered.manifest.icon,
+            providerName: this.getProviderName(registered.plugin),
+            enabled: true,
+            isDefault:
+                registered.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ?? false,
+            selectableProviderCategories: registered.manifest.selectableProviderCategories ?? [],
+        };
     }
 
-    async listProviders(userId: string, workId?: string): Promise<CodeEditProviderInfo[]> {
-        const enabled = await this.getEnabledPlugins(workId as string, userId);
-        return enabled
-            .filter((p) => !p.manifest.supplementary)
-            .map((p) => ({
-                id: p.plugin.id,
-                name: p.manifest.name ?? p.plugin.id,
-                description: p.manifest.description,
-                icon: p.manifest.icon,
-                providerName: (p.plugin as ICodeEditPlugin).providerName,
-                enabled: true,
-                isDefault: p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) || false,
-            }));
+    listProviders(userId: string, workId?: string): Promise<CodeEditProviderInfo[]> {
+        return this.getAvailableProvidersForUser(userId, workId);
     }
 
     async execute(
@@ -105,6 +118,7 @@ export class CodeEditFacadeService extends BaseFacadeService {
                 aiFacade: this.aiFacade,
                 userId: opts.userId,
                 workId: opts.workId,
+                aiProviderId: opts.aiProviderId,
             },
         });
     }

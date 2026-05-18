@@ -63,8 +63,10 @@ interface Mocks {
     codeEditFacade: {
         listProviders: AnyMock;
         isProviderAvailable: AnyMock;
+        getProviderForUser: AnyMock;
         execute: AnyMock;
     };
+    aiFacade: { getAvailableProvidersForUser: AnyMock };
 }
 
 function makeService(): { service: TemplateCustomizationService; mocks: Mocks } {
@@ -112,15 +114,31 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
             push: jest.fn().mockResolvedValue(undefined),
         },
         codeEditFacade: {
-            listProviders: jest
-                .fn()
-                .mockResolvedValue([{ id: 'claude-code', name: 'Claude Code', enabled: true }]),
+            listProviders: jest.fn().mockResolvedValue([
+                {
+                    id: 'claude-code',
+                    name: 'Claude Code',
+                    enabled: true,
+                    isDefault: true,
+                    selectableProviderCategories: [],
+                },
+            ]),
             isProviderAvailable: jest.fn().mockResolvedValue(true),
+            getProviderForUser: jest.fn().mockResolvedValue({
+                id: 'claude-code',
+                name: 'Claude Code',
+                enabled: true,
+                isDefault: true,
+                selectableProviderCategories: [],
+            }),
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 summary: 'Applied UI changes',
                 filesChanged: [{ path: 'src/styles/theme.css', status: 'modified' }],
             }),
+        },
+        aiFacade: {
+            getAvailableProvidersForUser: jest.fn().mockResolvedValue([]),
         },
     };
     const service = new TemplateCustomizationService(
@@ -129,6 +147,7 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         mocks.userRepository as any,
         mocks.gitFacade as any,
         mocks.codeEditFacade as any,
+        mocks.aiFacade as any,
     );
     return { service, mocks };
 }
@@ -170,11 +189,11 @@ describe('TemplateCustomizationService.createAndStart', () => {
 
     it('rejects when the selected provider is not enabled for this user', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.isProviderAvailable.mockResolvedValue(false);
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue(null);
         await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
             BadRequestException,
         );
-        expect(mocks.codeEditFacade.isProviderAvailable).toHaveBeenCalledWith(
+        expect(mocks.codeEditFacade.getProviderForUser).toHaveBeenCalledWith(
             'claude-code',
             'user-1',
         );
@@ -182,9 +201,69 @@ describe('TemplateCustomizationService.createAndStart', () => {
 
     it('rejects when the user has no code-edit providers enabled', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.isProviderAvailable.mockResolvedValue(false);
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue(null);
         await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
             BadRequestException,
+        );
+    });
+
+    it('rejects when the chosen code-edit plugin requires ai-provider but none was supplied', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        await expect(
+            service.createAndStart('user-1', { ...baseInput, providerId: 'opencode' }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects when the supplied ai-provider is not enabled for this user', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        mocks.aiFacade.getAvailableProvidersForUser.mockResolvedValue([
+            { id: 'openai', name: 'OpenAI', enabled: true },
+        ]);
+        await expect(
+            service.createAndStart('user-1', {
+                ...baseInput,
+                providerId: 'opencode',
+                aiProviderId: 'anthropic',
+            }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('persists ai-provider id when the chosen code-edit plugin requires it', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        mocks.aiFacade.getAvailableProvidersForUser.mockResolvedValue([
+            { id: 'openai', name: 'OpenAI', enabled: true },
+        ]);
+        jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        await service.createAndStart('user-1', {
+            ...baseInput,
+            providerId: 'opencode',
+            aiProviderId: 'openai',
+        });
+
+        expect(mocks.customizationRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({ providerId: 'opencode', aiProviderId: 'openai' }),
         );
     });
 
@@ -228,6 +307,7 @@ describe('TemplateCustomizationService.createAndStart', () => {
             baseTemplateId: 'minimal',
             prompt: baseInput.prompt,
             providerId: 'claude-code',
+            aiProviderId: null,
         });
         expect(result.customization.id).toBe('cust-1');
 

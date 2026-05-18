@@ -957,6 +957,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			aiFacade?: IAiFacade;
 			userId?: string;
 			workId?: string;
+			aiProviderId?: string;
 		};
 		const settings = execContext.settings ?? {};
 		const aiFacade = execContext.aiFacade;
@@ -967,7 +968,11 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			return failedCodeEditResult(startTime, 'OpenCode requires an AI facade (no aiFacade in execContext).');
 		}
 
-		const facadeOptions: FacadeOptions = { userId, workId };
+		const facadeOptions: FacadeOptions = {
+			userId,
+			workId,
+			providerOverride: execContext.aiProviderId
+		};
 		const { providerConfig, modelName } = await this.resolveAiProvider(
 			{ aiFacade } as unknown as NonNullable<PipelineExecutionOptions['execContext']>,
 			facadeOptions

@@ -5,7 +5,7 @@ import {
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
-import type { IPlugin, FacadeOptions } from '@ever-works/plugin';
+import type { IPlugin, FacadeOptions, PluginIcon } from '@ever-works/plugin';
 
 // Common error classes for all facades
 export class FacadeError extends Error {
@@ -37,6 +37,17 @@ export class ProviderNotFoundError extends FacadeError {
 export interface DefaultProviderInfo {
     id: string;
     name: string;
+}
+
+export interface UserProviderInfo {
+    id: string;
+    name: string;
+    description?: string;
+    icon?: PluginIcon;
+    providerName?: string;
+    enabled: boolean;
+    isDefault: boolean;
+    selectableProviderCategories: readonly string[];
 }
 
 /**
@@ -77,6 +88,29 @@ export abstract class BaseFacadeService {
             name: this.getProviderName(p.plugin),
             enabled: p.state === 'loaded',
         }));
+    }
+
+    // User-scoped listing for picker UIs (Code-edit dialog, AI provider picker,
+    // etc.). Mirrors the filter sequence used by the generator form-schema
+    // service: by-capability + loaded + not supplementary + enabled-for-user,
+    // with defaultForCapabilities sorted first.
+    async getAvailableProvidersForUser(
+        userId: string,
+        workId?: string,
+    ): Promise<UserProviderInfo[]> {
+        const enabled = await this.getEnabledPlugins(workId as string, userId);
+        return enabled
+            .filter((p) => !p.manifest.supplementary)
+            .map((p) => ({
+                id: p.plugin.id,
+                name: p.manifest.name ?? p.plugin.id,
+                description: p.manifest.description,
+                icon: p.manifest.icon,
+                providerName: this.getProviderName(p.plugin),
+                enabled: true,
+                isDefault: p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ?? false,
+                selectableProviderCategories: p.manifest.selectableProviderCategories ?? [],
+            }));
     }
 
     async getDefaultProvider(

@@ -219,6 +219,7 @@ export async function customizeTemplateFromBase(input: {
     name: string;
     prompt: string;
     providerId: string;
+    aiProviderId?: string;
     targetOwner?: string;
     description?: string;
 }) {
@@ -268,6 +269,29 @@ export async function listCustomizationProviders() {
         };
     } catch (error) {
         console.error('List customization providers error:', error);
+        return {
+            success: false,
+            providers: [],
+            error: error instanceof Error ? error.message : 'unknown',
+        };
+    }
+}
+
+export async function listCustomizationAiProviders() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await templatesAPI.listCustomizationAiProviders();
+        return {
+            success: response.status === 'success',
+            providers: response.providers ?? [],
+            error: response.status === 'error' ? getResponseMessage(response) : null,
+        };
+    } catch (error) {
+        console.error('List customization AI providers error:', error);
         return {
             success: false,
             providers: [],

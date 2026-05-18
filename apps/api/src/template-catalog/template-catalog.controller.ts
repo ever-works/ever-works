@@ -249,6 +249,18 @@ export class TemplateCatalogController {
         return { status: 'success', providers };
     }
 
+    @Get('templates/customization-ai-providers')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary:
+            'List installed AI providers, used when a chosen code-edit plugin declares ai-provider in selectableProviderCategories',
+    })
+    @ApiResponse({ status: 200, description: 'AI providers' })
+    async listCustomizationAiProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.templateCustomizationService.listAiProviders(auth.userId);
+        return { status: 'success', providers };
+    }
+
     @Post('templates/custom-from-base')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Create a new custom template from a base + agent UI customization' })
@@ -271,6 +283,7 @@ export class TemplateCatalogController {
                     baseTemplateId: body.baseTemplateId,
                     customizationId: result.customization.id,
                     providerId: body.providerId,
+                    aiProviderId: body.aiProviderId,
                 },
             })
             .catch(() => {});

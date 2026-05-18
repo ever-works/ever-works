@@ -7,6 +7,7 @@ import { Sparkles, Loader2, ExternalLink } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type {
+    CustomizationAiProvider,
     CustomizationProvider,
     TemplateCatalogItem,
     TemplateCustomization,
@@ -45,6 +46,7 @@ interface CreateCustomTemplateDialogProps {
     onOpenChange: (open: boolean) => void;
     customizableBases: TemplateCatalogItem[];
     providers: CustomizationProvider[];
+    aiProviders: CustomizationAiProvider[];
     forkTargets: ForkTarget[];
     onSucceeded?: () => void;
 }
@@ -54,21 +56,28 @@ export function CreateCustomTemplateDialog({
     onOpenChange,
     customizableBases,
     providers,
+    aiProviders,
     forkTargets,
     onSucceeded,
 }: CreateCustomTemplateDialogProps) {
     const t = useTranslations('dashboard.templates.customizeDialog');
     const tGen = useTranslations('dashboard.workDetail.generator');
     const enabledProviders = useMemo(() => providers.filter((p) => p.enabled), [providers]);
+    const enabledAiProviders = useMemo(() => aiProviders.filter((p) => p.enabled), [aiProviders]);
     // Prefer the plugin that declares 'code-edit' in defaultForCapabilities;
     // fall back to first enabled if none does.
     const defaultProviderId = useMemo(
         () => enabledProviders.find((p) => p.isDefault)?.id ?? enabledProviders[0]?.id ?? '',
         [enabledProviders],
     );
+    const defaultAiProviderId = useMemo(
+        () => enabledAiProviders.find((p) => p.isDefault)?.id ?? enabledAiProviders[0]?.id ?? '',
+        [enabledAiProviders],
+    );
 
     const [baseTemplateId, setBaseTemplateId] = useState<string>(customizableBases[0]?.id ?? '');
     const [providerId, setProviderId] = useState<string>(defaultProviderId);
+    const [aiProviderId, setAiProviderId] = useState<string>(defaultAiProviderId);
     const [targetOwner, setTargetOwner] = useState<string>(forkTargets[0]?.login ?? '');
     const [name, setName] = useState('');
     const [prompt, setPrompt] = useState('');
@@ -114,6 +123,7 @@ export function CreateCustomTemplateDialog({
         setCustomization(null);
         setBaseTemplateId(customizableBases[0]?.id ?? '');
         setProviderId(defaultProviderId);
+        setAiProviderId(defaultAiProviderId);
         setTargetOwner(forkTargets[0]?.login ?? '');
     };
 
@@ -122,6 +132,13 @@ export function CreateCustomTemplateDialog({
         onOpenChange(nextOpen);
     };
 
+    const selectedProvider = useMemo(
+        () => providers.find((p) => p.id === providerId) ?? null,
+        [providers, providerId],
+    );
+    const requiresAiProvider =
+        selectedProvider?.selectableProviderCategories?.includes('ai-provider') ?? false;
+
     const handleSubmit = () => {
         const trimmedName = name.trim();
         const trimmedPrompt = prompt.trim();
@@ -129,6 +146,9 @@ export function CreateCustomTemplateDialog({
         if (trimmedPrompt.length < 3) return toast.error(t('messages.promptTooShort'));
         if (!baseTemplateId) return toast.error(t('messages.baseRequired'));
         if (!providerId) return toast.error(t('messages.providerRequired'));
+        if (requiresAiProvider && !aiProviderId) {
+            return toast.error(t('messages.aiProviderRequired'));
+        }
 
         startSubmitting(() => {
             void (async () => {
@@ -137,6 +157,7 @@ export function CreateCustomTemplateDialog({
                     name: trimmedName,
                     prompt: trimmedPrompt,
                     providerId,
+                    aiProviderId: requiresAiProvider ? aiProviderId : undefined,
                     targetOwner: targetOwner || undefined,
                 });
                 if (!result.success || !result.customization) {
@@ -153,8 +174,12 @@ export function CreateCustomTemplateDialog({
     const succeeded = customization?.status === 'succeeded';
     const failed = customization?.status === 'failed';
     const disabled = submitting || !!running;
+    const missingAiProvider = requiresAiProvider && enabledAiProviders.length === 0;
     const noPrereqs =
-        customizableBases.length === 0 || enabledProviders.length === 0 || forkTargets.length === 0;
+        customizableBases.length === 0 ||
+        enabledProviders.length === 0 ||
+        forkTargets.length === 0 ||
+        missingAiProvider;
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -177,9 +202,17 @@ export function CreateCustomTemplateDialog({
                             {enabledProviders.length === 0 && (
                                 <li>• {t('messages.noProviders')}</li>
                             )}
+                            {missingAiProvider && (
+                                <li>
+                                    •{' '}
+                                    {t('messages.noAiProviders', {
+                                        plugin: selectedProvider?.name ?? '',
+                                    })}
+                                </li>
+                            )}
                             {forkTargets.length === 0 && <li>• {t('messages.noTargets')}</li>}
                         </ul>
-                        {enabledProviders.length === 0 && (
+                        {(enabledProviders.length === 0 || missingAiProvider) && (
                             <Link
                                 href={ROUTES.DASHBOARD_PLUGINS}
                                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
@@ -245,6 +278,28 @@ export function CreateCustomTemplateDialog({
                                 })}
                             </div>
                         </Field>
+
+                        {requiresAiProvider && (
+                            <Field
+                                label={t('aiProviderLabel')}
+                                hint={t('aiProviderHelp', {
+                                    plugin: selectedProvider?.name ?? '',
+                                })}
+                            >
+                                <div className="flex flex-wrap gap-1.5">
+                                    {enabledAiProviders.map((provider) => (
+                                        <ProviderChoiceButton
+                                            key={provider.id}
+                                            name={provider.providerName || provider.name}
+                                            icon={provider.icon}
+                                            isActive={aiProviderId === provider.id}
+                                            disabled={disabled}
+                                            onSelect={() => setAiProviderId(provider.id)}
+                                        />
+                                    ))}
+                                </div>
+                            </Field>
+                        )}
 
                         <Field label={t('targetLabel')} hint={t('targetHelp')}>
                             <Select

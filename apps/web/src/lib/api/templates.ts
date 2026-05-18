@@ -121,10 +121,27 @@ export interface CustomizationProvider {
     providerName?: string;
     enabled: boolean;
     isDefault?: boolean;
+    // Mirrors the plugin manifest declaration. The dialog renders a conditional
+    // AI provider picker when this includes 'ai-provider' (e.g. opencode).
+    selectableProviderCategories?: readonly string[];
 }
 
 export type ListCustomizationProvidersResponse = APIResponse<{
     providers: CustomizationProvider[];
+}>;
+
+export interface CustomizationAiProvider {
+    id: string;
+    name: string;
+    description?: string | null;
+    icon?: PluginIcon;
+    providerName?: string;
+    enabled: boolean;
+    isDefault?: boolean;
+}
+
+export type ListCustomizationAiProvidersResponse = APIResponse<{
+    providers: CustomizationAiProvider[];
 }>;
 
 export const templatesAPI = {
@@ -211,6 +228,7 @@ export const templatesAPI = {
         name: string;
         prompt: string;
         providerId: string;
+        aiProviderId?: string;
         targetOwner?: string;
         description?: string;
     }) => {
@@ -231,6 +249,12 @@ export const templatesAPI = {
     listCustomizationProviders: async () => {
         return serverFetch<ListCustomizationProvidersResponse>(
             '/templates/customization-providers',
+        );
+    },
+
+    listCustomizationAiProviders: async () => {
+        return serverFetch<ListCustomizationAiProvidersResponse>(
+            '/templates/customization-ai-providers',
         );
     },
 };

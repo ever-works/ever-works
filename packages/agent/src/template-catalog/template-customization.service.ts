@@ -6,6 +6,7 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 import { GitFacadeService, type GitFacadeOptions } from '@src/facades/git.facade';
 import type { GitCommitter } from '@ever-works/plugin';
 import { CodeEditFacadeService, type CodeEditProviderInfo } from '@src/facades/code-edit.facade';
+import { AiFacadeService } from '@src/facades/ai.facade';
 import {
     findWebsiteTemplateConfig,
     type WebsiteTemplateConfig,
@@ -28,6 +29,7 @@ export interface CreateAndStartCustomizationInput {
     name: string;
     prompt: string;
     providerId: string;
+    aiProviderId?: string;
     targetOwner?: string;
     description?: string;
 }
@@ -52,6 +54,7 @@ export class TemplateCustomizationService {
         private readonly userRepository: UserRepository,
         private readonly gitFacade: GitFacadeService,
         private readonly codeEditFacade: CodeEditFacadeService,
+        private readonly aiFacade: AiFacadeService,
     ) {}
 
     async createAndStart(
@@ -79,7 +82,12 @@ export class TemplateCustomizationService {
         }
 
         const baseConfig = this.resolveCustomizableBase(input.baseTemplateId);
-        await this.assertProviderAvailable(providerId, userId);
+        const codeEditProvider = await this.assertProviderAvailable(providerId, userId);
+        const aiProviderId = await this.resolveAiProviderRequirement(
+            codeEditProvider,
+            input.aiProviderId?.trim(),
+            userId,
+        );
         const user = await this.userRepository.findById(userId);
         if (!user) {
             throw new NotFoundException({ status: 'error', message: 'User not found.' });
@@ -125,6 +133,7 @@ export class TemplateCustomizationService {
             baseTemplateId: baseConfig.id,
             prompt,
             providerId,
+            aiProviderId,
         });
 
         void this.runAsync(customization.id);
@@ -142,6 +151,10 @@ export class TemplateCustomizationService {
 
     listProviders(userId: string): Promise<CodeEditProviderInfo[]> {
         return this.codeEditFacade.listProviders(userId);
+    }
+
+    listAiProviders(userId: string) {
+        return this.aiFacade.getAvailableProvidersForUser(userId);
     }
 
     /** Exposed for direct invocation by background tasks / tests. */
@@ -188,7 +201,11 @@ export class TemplateCustomizationService {
 
             const edit = await this.codeEditFacade.execute(
                 { workspaceDir, prompt: composedPrompt },
-                { userId: record.userId, providerId: record.providerId ?? undefined },
+                {
+                    userId: record.userId,
+                    providerId: record.providerId ?? undefined,
+                    aiProviderId: record.aiProviderId ?? undefined,
+                },
                 { onLogLine: (s, line) => this.logger.debug(`[tpl-customize:${s}] ${line}`) },
             );
 
@@ -308,14 +325,42 @@ export class TemplateCustomizationService {
         };
     }
 
-    private async assertProviderAvailable(providerId: string, userId: string): Promise<void> {
-        const available = await this.codeEditFacade.isProviderAvailable(providerId, userId);
-        if (!available) {
+    private async assertProviderAvailable(
+        providerId: string,
+        userId: string,
+    ): Promise<CodeEditProviderInfo> {
+        const match = await this.codeEditFacade.getProviderForUser(providerId, userId);
+        if (!match) {
             throw new BadRequestException({
                 status: 'error',
                 message: `Code-edit provider "${providerId}" is not installed or not enabled for this account.`,
             });
         }
+        return match;
+    }
+
+    private async resolveAiProviderRequirement(
+        codeEditProvider: CodeEditProviderInfo,
+        candidateAiProviderId: string | undefined,
+        userId: string,
+    ): Promise<string | null> {
+        if (!codeEditProvider.selectableProviderCategories.includes('ai-provider')) {
+            return null;
+        }
+        if (!candidateAiProviderId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `${codeEditProvider.name} requires you to pick an AI provider.`,
+            });
+        }
+        const available = await this.aiFacade.getAvailableProvidersForUser(userId);
+        if (!available.some((p) => p.id === candidateAiProviderId)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `AI provider "${candidateAiProviderId}" is not installed or not enabled for this account.`,
+            });
+        }
+        return candidateAiProviderId;
     }
 
     private resolveCustomizableBase(id: string): WebsiteTemplateConfig {

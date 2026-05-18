@@ -11,6 +11,7 @@ export type CreateTemplateCustomizationInput = Pick<
     'templateId' | 'userId' | 'baseTemplateId' | 'prompt'
 > & {
     providerId?: string | null;
+    aiProviderId?: string | null;
     status?: TemplateCustomizationStatus;
 };
 
@@ -41,6 +42,7 @@ export class TemplateCustomizationRepository {
             baseTemplateId: input.baseTemplateId,
             prompt: input.prompt,
             providerId: input.providerId ?? null,
+            aiProviderId: input.aiProviderId ?? null,
             status: input.status ?? TemplateCustomizationStatus.PENDING,
         });
         return this.repository.save(entity);

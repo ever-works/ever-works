@@ -160,6 +160,14 @@ export class CustomizeTemplateFromBaseDto {
     @MinLength(1)
     providerId: string;
 
+    @ApiPropertyOptional({
+        description:
+            'AI provider plugin id, required when the chosen code-edit plugin declares "ai-provider" in selectableProviderCategories (e.g. opencode).',
+    })
+    @IsOptional()
+    @IsString()
+    aiProviderId?: string;
+
     @ApiPropertyOptional({ description: 'GitHub login (personal or org). Defaults to user.' })
     @IsOptional()
     @IsString()
