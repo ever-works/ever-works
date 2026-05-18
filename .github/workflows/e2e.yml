@@ -108,6 +108,12 @@ jobs:
           DATABASE_IN_MEMORY: 'true'
           AUTH_SECRET: ever-works-e2e-ci-secret
           NODE_ENV: development
+          # C-07 PR-B: `autoMigrate()` now defaults to OFF everywhere except
+          # `NODE_ENV=test`. E2E boots a real dev-mode API with in-memory
+          # sqlite, so the tables must be created via TypeORM `synchronize`
+          # before Playwright fires. Set this explicitly instead of flipping
+          # NODE_ENV (which would change other dev-vs-test branches).
+          DATABASE_AUTOMIGRATE: 'true'
           # Web
           API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
