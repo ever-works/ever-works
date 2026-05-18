@@ -71,6 +71,16 @@ export interface UserProfile {
 
 export interface OAuthUrlResponse {
     url: string;
+    /**
+     * Server-minted CSRF state nonce. Callers MUST mirror this into their
+     * own host-scoped `oauth_state` cookie and verify it on the OAuth
+     * callback. The OAuth provider's `redirect_uri` points at the web
+     * (`${WEB_URL}/api/oauth/:p/callback`), so the api.ever.works cookie
+     * the API also sets is never carried on the callback request in the
+     * normal user flow — the web's mirrored cookie is what closes the
+     * CSRF loop. See `docs/specs/security/THREAT-MODEL.md` (C-03).
+     */
+    state: string;
 }
 
 export interface TokenValidationResponse {
@@ -146,11 +156,13 @@ export const authAPI = {
     },
 
     // OAuth URLs
-    getOAuthAuthUrl: async (providerId: OAuthProvider, state?: string) => {
-        const params = new URLSearchParams();
-        if (state) params.append('state', state);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url${query}`);
+    //
+    // The API server mints the CSRF state nonce and returns it alongside the
+    // OAuth URL. Callers MUST set their own `oauth_state` cookie to that
+    // returned value and check it on the OAuth callback. Do NOT supply a
+    // client-side state — the API ignores it.
+    getOAuthAuthUrl: async (providerId: OAuthProvider) => {
+        return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url`);
     },
 
     connectOAuthCallback: async (providerId: OAuthProvider, code: string) => {

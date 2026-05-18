@@ -65,8 +65,12 @@ describe('OAuthController', () => {
     }
 
     describe('getAuthUrl (GET /api/oauth/:providerId/url)', () => {
-        // C-03: server now mints state; client-supplied state is ignored.
-        it('mints a server-side state nonce, sets the cookie, and embeds the nonce in the OAuth URL', async () => {
+        // C-03: server mints state and returns it so the web tier can mirror
+        // it into its own host-scoped cookie. The OAuth provider's redirect_uri
+        // points at the web app, not this API, so api.ever.works's own cookie
+        // is never sent on the callback in the normal user flow — the value
+        // returned here is what carries the CSRF check end-to-end.
+        it('mints state, sets the api-side cookie, embeds it in the OAuth URL, and returns it', async () => {
             socialAuth.getAuthorizationUrl.mockReturnValue('https://github.com/login/oauth/...');
             const res = makeRes();
 
@@ -77,7 +81,8 @@ describe('OAuthController', () => {
                 socialAuth.getAuthorizationUrl.mock.calls[0];
             expect(providerArg).toBe('github');
             expect(redirectArg).toBeUndefined();
-            // The state passed to the social-auth call must match the cookie value.
+            // The state passed to the social-auth call must match the cookie value
+            // and the value returned in the response body.
             expect(typeof stateArg).toBe('string');
             expect((stateArg as string).length).toBeGreaterThan(20);
             // Cookie header is set.
@@ -85,7 +90,37 @@ describe('OAuthController', () => {
             expect(setCookie).toBeDefined();
             expect(String(setCookie)).toContain(`ew_oauth_state=${stateArg}`);
             expect(String(setCookie)).toContain('HttpOnly');
-            expect(result).toEqual({ url: 'https://github.com/login/oauth/...' });
+            // Response body exposes the state so the web tier can mirror it.
+            expect(result).toEqual({ url: 'https://github.com/login/oauth/...', state: stateArg });
+        });
+
+        it('returns a fresh state on each call (no reuse across sessions)', async () => {
+            socialAuth.getAuthorizationUrl.mockReturnValue('https://provider/auth');
+            const a = await controller.getAuthUrl('github', makeRes());
+            const b = await controller.getAuthUrl('github', makeRes());
+            expect(a.state).not.toEqual(b.state);
+        });
+
+        it('round-trip: state returned by getAuthUrl is the one that authRedirect accepts', async () => {
+            socialAuth.getAuthorizationUrl.mockReturnValue('https://provider/auth');
+            socialAuth.authenticate.mockResolvedValue({ id: 'u1' } as any);
+            socialAuth.getProviderDisplayName.mockReturnValue('GitHub');
+            authProvider.issueSession.mockResolvedValue({ access_token: 't' } as any);
+
+            // Step 1: mint via getAuthUrl, capture state + the Set-Cookie value.
+            const mintRes = makeRes();
+            const { state } = await controller.getAuthUrl('github', mintRes);
+            const setCookie = String(mintRes._headers['set-cookie']);
+            const cookieHeader = setCookie.split(';')[0]; // "ew_oauth_state=<state>"
+
+            // Step 2: replay state on the callback with the cookie attached.
+            const req = makeRequest({ headers: { 'user-agent': 'UA', cookie: cookieHeader } });
+            const cbRes = makeRes();
+            const result = await controller.authRedirect('github', 'code', state, req, cbRes);
+
+            expect(result).toEqual({ access_token: 't' });
+            // Single-use: cookie cleared after a successful callback.
+            expect(String(cbRes._headers['set-cookie'])).toContain('Max-Age=0');
         });
 
         it('propagates service errors (e.g. unknown provider)', async () => {
