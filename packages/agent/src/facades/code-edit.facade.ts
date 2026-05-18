@@ -43,6 +43,23 @@ export class CodeEditFacadeService extends BaseFacadeService {
         super(registry, pluginSettings, workPluginRepository);
     }
 
+    async isProviderAvailable(
+        providerId: string,
+        userId: string,
+        workId?: string,
+    ): Promise<boolean> {
+        const registered = this.registry.get(providerId);
+        if (
+            !registered ||
+            registered.state !== 'loaded' ||
+            !registered.manifest.capabilities.includes(this.CAPABILITY) ||
+            registered.manifest.supplementary
+        ) {
+            return false;
+        }
+        return this.registry.isPluginEnabledForScope(providerId, workId, userId);
+    }
+
     async listProviders(userId: string, workId?: string): Promise<CodeEditProviderInfo[]> {
         const enabled = await this.getEnabledPlugins(workId as string, userId);
         return enabled

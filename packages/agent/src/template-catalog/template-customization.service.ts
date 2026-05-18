@@ -309,9 +309,8 @@ export class TemplateCustomizationService {
     }
 
     private async assertProviderAvailable(providerId: string, userId: string): Promise<void> {
-        const available = await this.codeEditFacade.listProviders(userId);
-        const match = available.find((p) => p.id === providerId);
-        if (!match) {
+        const available = await this.codeEditFacade.isProviderAvailable(providerId, userId);
+        if (!available) {
             throw new BadRequestException({
                 status: 'error',
                 message: `Code-edit provider "${providerId}" is not installed or not enabled for this account.`,

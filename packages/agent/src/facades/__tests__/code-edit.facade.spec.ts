@@ -71,6 +71,51 @@ describe('CodeEditFacadeService', () => {
         registry = module.get(PluginRegistryService);
     });
 
+    describe('isProviderAvailable', () => {
+        it('returns false when the plugin id is unknown', async () => {
+            registry.get.mockReturnValue(undefined);
+            await expect(service.isProviderAvailable('nope', 'user-1')).resolves.toBe(false);
+            expect(registry.isPluginEnabledForScope).not.toHaveBeenCalled();
+        });
+
+        it('returns false when the plugin is registered but not loaded', async () => {
+            registry.get.mockReturnValue(createRegistered('codex', {}, 'error'));
+            await expect(service.isProviderAvailable('codex', 'user-1')).resolves.toBe(false);
+            expect(registry.isPluginEnabledForScope).not.toHaveBeenCalled();
+        });
+
+        it('returns false when the plugin does not declare the code-edit capability', async () => {
+            registry.get.mockReturnValue(createRegistered('helper', { capabilities: ['search'] }));
+            await expect(service.isProviderAvailable('helper', 'user-1')).resolves.toBe(false);
+            expect(registry.isPluginEnabledForScope).not.toHaveBeenCalled();
+        });
+
+        it('returns false for supplementary plugins even when the user has them enabled', async () => {
+            registry.get.mockReturnValue(createRegistered('helper', { supplementary: true }));
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
+            await expect(service.isProviderAvailable('helper', 'user-1')).resolves.toBe(false);
+            expect(registry.isPluginEnabledForScope).not.toHaveBeenCalled();
+        });
+
+        it('returns false when the user has the plugin disabled', async () => {
+            registry.get.mockReturnValue(createRegistered('claude-code'));
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
+            await expect(service.isProviderAvailable('claude-code', 'user-1')).resolves.toBe(false);
+        });
+
+        it('returns true when loaded, code-edit-capable, not supplementary, and user-enabled', async () => {
+            registry.get.mockReturnValue(createRegistered('claude-code'));
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
+            await expect(service.isProviderAvailable('claude-code', 'user-1')).resolves.toBe(true);
+            expect(registry.isPluginEnabledForScope).toHaveBeenCalledTimes(1);
+            expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
+                'claude-code',
+                undefined,
+                'user-1',
+            );
+        });
+    });
+
     describe('listProviders', () => {
         it('returns only plugins the user has enabled', async () => {
             registry.getByCapability.mockReturnValue([
