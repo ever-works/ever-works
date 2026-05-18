@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { ProviderChoiceButton } from '@/components/works/detail/plugins/ProviderChoiceButton';
-import { ChatProviderSelector } from '@/components/ai/ChatProviderSelector';
 import {
     Dialog,
     DialogClose,
@@ -232,35 +231,35 @@ export function CreateCustomTemplateDialog({
                             helperText={t('nameHelp')}
                         />
 
-                        <Field label={t('baseLabel')} hint={t('baseHelp')}>
-                            <Select
-                                value={baseTemplateId}
-                                onValueChange={setBaseTemplateId}
-                                disabled={disabled}
-                            >
-                                {customizableBases.map((base) => (
-                                    <option key={base.id} value={base.id}>
-                                        {base.name}
-                                    </option>
-                                ))}
-                            </Select>
-                        </Field>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field label={t('baseLabel')} hint={t('baseHelp')}>
+                                <Select
+                                    value={baseTemplateId}
+                                    onValueChange={setBaseTemplateId}
+                                    disabled={disabled}
+                                >
+                                    {customizableBases.map((base) => (
+                                        <option key={base.id} value={base.id}>
+                                            {base.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
 
-                        <Field label={t('providerLabel')} hint={t('providerHelp')}>
-                            <ChatProviderSelector
-                                providers={providers.map((p) => ({
-                                    id: p.id,
-                                    name: p.providerName || p.name,
-                                    description: p.description ?? undefined,
-                                    configured: p.enabled,
-                                    isDefault: p.isDefault,
-                                    icon: p.icon,
-                                }))}
-                                selectedProvider={providerId}
-                                isStreaming={disabled}
-                                onSelect={setProviderId}
-                            />
-                        </Field>
+                            <Field label={t('providerLabel')} hint={t('providerHelp')}>
+                                <Select
+                                    value={providerId}
+                                    onValueChange={setProviderId}
+                                    disabled={disabled}
+                                >
+                                    {providers.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.providerName || p.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
+                        </div>
 
                         {requiresAiProvider && (
                             <Field
