@@ -492,6 +492,31 @@ describe('AuthService', () => {
 
             expect(r1).toEqual(r2);
         });
+
+        it('H-03 + L-07: timing-equalization bcrypt uses getBcryptCost() (not legacy authConstants)', async () => {
+            // Regression for AI-review feedback on PR #818: the no-user
+            // branch must hash at the same cost as the user-exists branch
+            // (which uses getBcryptCost(), default 12). If randomHashedPassword
+            // still used authConstants.bcryptSaltRounds (10), the no-user
+            // branch would finish ~4x faster and leak the existence of the
+            // account via timing.
+            //
+            // Import dynamically inside the test to avoid module-load races
+            // with the env var.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { getBcryptCost } = require('../providers/bcrypt-cost');
+            const expectedCost = getBcryptCost();
+
+            userRepo.findByEmail.mockResolvedValue(null);
+            const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
+            bcryptSpy.mockClear();
+
+            await service.forgotPassword({ email: 'no@one.test' } as any);
+
+            expect(bcryptSpy).toHaveBeenCalledTimes(1);
+            const usedCost = bcryptSpy.mock.calls[0][1];
+            expect(usedCost).toBe(expectedCost);
+        });
     });
 
     describe('getUserByPasswordResetToken', () => {

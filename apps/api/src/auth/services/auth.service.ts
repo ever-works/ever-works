@@ -21,7 +21,8 @@ import { createHash, randomBytes } from 'crypto';
 function hashToken(token: string): string {
     return createHash('sha256').update(token, 'utf8').digest('hex');
 }
-import { authConstants, AuthProvider, config } from '../../config/constants';
+import { AuthProvider, config } from '../../config/constants';
+import { getBcryptCost } from '../providers/bcrypt-cost';
 import { User } from '@ever-works/agent/entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '../../events';
@@ -264,8 +265,10 @@ export class AuthService {
             // user-exists branch so an attacker can't distinguish via timing.
             // The user-exists branch does a DB UPDATE that writes ~64 bytes
             // of indexed columns + emits an event; doing a throwaway bcrypt
-            // here is a closer cost match than just returning immediately
-            // (bcrypt cost 10 ≈ ~50ms, similar to a single DB row update).
+            // here is a closer cost match than just returning immediately.
+            // The bcrypt cost is pulled from `getBcryptCost()` so the no-user
+            // branch matches whatever cost the user-exists branch uses for
+            // password verification (see randomHashedPassword below).
             await this.randomHashedPassword().catch(() => undefined);
             return { message: 'If the email exists, a reset link has been sent' };
         }
@@ -484,8 +487,14 @@ export class AuthService {
     }
 
     private async randomHashedPassword() {
+        // L-07 + H-03: bcrypt cost must match the canonical cost used by the
+        // user-exists branch (`getBcryptCost()`, default 12). The legacy
+        // `authConstants.bcryptSaltRounds` defaulted to 10, which made the
+        // no-user branch finish ~4x faster and partially undermined H-03
+        // timing equalization on forgot-password. See bcrypt-cost.ts for the
+        // BCRYPT_COST env override.
         const randomPassword = randomBytes(16).toString('hex');
-        const hashedPassword = await bcrypt.hash(randomPassword, authConstants.bcryptSaltRounds);
+        const hashedPassword = await bcrypt.hash(randomPassword, getBcryptCost());
         return hashedPassword;
     }
 

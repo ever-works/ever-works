@@ -87,6 +87,14 @@ describe('ApiKeyGuard (H-08 constant-time + H-21 dual mode)', () => {
 			const ctx = buildContext({ authorization: 'Bearer secret-key' });
 			expect(guard.canActivate(ctx)).toBe(true);
 		});
+
+		it('rejects a JWT-only request (no Authorization header) — the shared key is part of the contract in shared-key mode', () => {
+			const guard = buildGuard();
+			const ctx = buildContext({ 'x-ever-works-jwt': 'user-jwt-abc' });
+			expect(() => guard.canActivate(ctx)).toThrow(
+				/Shared API key required \(Authorization Bearer\) for auth mode shared-key/
+			);
+		});
 	});
 
 	describe('H-21 — per-user-jwt mode', () => {

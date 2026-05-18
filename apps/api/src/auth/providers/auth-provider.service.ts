@@ -450,12 +450,25 @@ export class AuthProviderService extends AuthProvider {
 
     private async recordFailedLogin(user: User): Promise<void> {
         const threshold = getLockoutThreshold();
-        const nextCount = (user.failedLoginAttempts ?? 0) + 1;
-        const update: Partial<User> = { failedLoginAttempts: nextCount };
+        // H-17 follow-up: a read-modify-write on `failedLoginAttempts` lets
+        // two concurrent failed logins for the same email both observe the
+        // same `N`, both write `N+1`, and silently drop one increment —
+        // giving an attacker an extra try past the lockout threshold. Use
+        // the repository's atomic increment so the COUNT side compiles
+        // down to a single `UPDATE … SET col = col + 1 …`. The post-increment
+        // `lockedUntil` set is still a write-after-increment; that's fine —
+        // only the count needed to be race-free, and a slight overshoot of
+        // `lockedUntil` updates is benign (worst case: the lock window is
+        // re-extended twice in quick succession, which only hurts the
+        // attacker).
+        await this.userRepository.increment(user.id, 'failedLoginAttempts', 1);
+        const refreshed = await this.userRepository.findById(user.id);
+        const nextCount = refreshed?.failedLoginAttempts ?? (user.failedLoginAttempts ?? 0) + 1;
         if (nextCount >= threshold) {
-            update.lockedUntil = new Date(Date.now() + getLockoutDurationMs());
+            await this.userRepository.update(user.id, {
+                lockedUntil: new Date(Date.now() + getLockoutDurationMs()),
+            });
         }
-        await this.userRepository.update(user.id, update);
     }
 
     private async resetLockoutState(userId: string): Promise<void> {

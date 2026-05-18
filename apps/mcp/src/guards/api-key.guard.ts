@@ -49,6 +49,11 @@ export class ApiKeyGuard implements CanActivate {
 
 		// 2. Validate shared-key presence.
 		const sharedKeyAllowed = this.config.allowsSharedKeyOnly() || this.config.authMode === 'shared-key-jwt';
+		// Modes where the shared key is REQUIRED (not merely accepted). In
+		// `shared-key` and `shared-key-jwt` the shared key is part of the
+		// contract — a JWT-only request must NOT satisfy the check. In
+		// `hybrid`, either credential is acceptable.
+		const sharedKeyRequired = this.config.authMode === 'shared-key' || this.config.authMode === 'shared-key-jwt';
 		if (sharedKeyAllowed && this.config.apiKey) {
 			// Either shared-key alone is OK (shared-key/hybrid) or it's
 			// required alongside JWT (shared-key-jwt). In both cases, when
@@ -60,9 +65,12 @@ export class ApiKeyGuard implements CanActivate {
 				if (!sharedKeyMatches(sharedKeyHeader!, this.config.apiKey)) {
 					throw new UnauthorizedException('Invalid shared API key');
 				}
-			} else if (this.config.authMode === 'shared-key-jwt') {
+			} else if (sharedKeyRequired) {
+				// Modes that require the shared key must reject JWT-only
+				// requests — accepting a JWT alone would silently downgrade
+				// `shared-key` mode's contract.
 				throw new UnauthorizedException(
-					'Shared API key required (Authorization Bearer) for auth mode shared-key-jwt'
+					`Shared API key required (Authorization Bearer) for auth mode ${this.config.authMode}`
 				);
 			}
 		} else if (this.config.authMode === 'per-user-jwt' && sharedKeyPresent) {
