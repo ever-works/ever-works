@@ -962,7 +962,9 @@ Only include image URLs that are absolute URLs (starting with http).`;
     async runScheduledUpdate(schedule: WorkSchedule): Promise<ItemsGeneratorResponseDto | void> {
         let user: User | null = null;
         try {
-            user = (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
+            user =
+                (schedule.user as User) ||
+                (await this.userRepository.findByIdForScheduledRun(schedule.userId));
 
             if (!user) {
                 throw new NotFoundException('User not found for scheduled update');

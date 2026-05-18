@@ -643,15 +643,19 @@ describe('WorkRepository', () => {
         it('queries works whose progressedAt is older than the given cutoff AND finishedAt IS NULL (so completed runs are excluded even if last progress was stale)', async () => {
             const olderThan = new Date('2026-05-01T00:00:00Z');
             const rows = [{ id: 'w1' } as Work];
-            repository.find.mockResolvedValueOnce(rows);
+            const { chain, fns } = buildChain<Work[]>('getMany', rows);
+            repository.createQueryBuilder.mockReturnValueOnce(
+                chain as unknown as SelectQueryBuilder<Work>,
+            );
 
             await expect(service.getUnfinishedGenerations(olderThan)).resolves.toBe(rows);
 
-            expect(repository.find).toHaveBeenCalledWith({
-                where: {
-                    generationProgressedAt: LessThan(olderThan),
-                    generationFinishedAt: IsNull(),
-                },
+            expect(repository.find).not.toHaveBeenCalled();
+            expect(repository.createQueryBuilder).toHaveBeenCalledWith('work');
+            expect(fns.select).toHaveBeenCalledWith(['work.id', 'work.generateStatus']);
+            expect(fns.where).toHaveBeenCalledWith({
+                generationProgressedAt: LessThan(olderThan),
+                generationFinishedAt: IsNull(),
             });
         });
     });
@@ -1010,6 +1014,13 @@ describe('WorkRepository', () => {
             await expect(service.findForDetailCacheWarmup(50, 100)).resolves.toBe(rows);
 
             expect(fns.leftJoinAndSelect).toHaveBeenCalledWith('work.user', 'user');
+            expect(fns.select).toHaveBeenCalledWith([
+                'work.id',
+                'work.generateStatus',
+                'work.itemsCount',
+                'work.updatedAt',
+                'user.id',
+            ]);
             expect(fns.where).toHaveBeenCalledWith('COALESCE(work.itemsCount, 0) > 0');
             expect(fns.orderBy).toHaveBeenCalledWith('work.updatedAt', 'DESC');
             expect(fns.addOrderBy).toHaveBeenCalledWith('work.id', 'ASC');

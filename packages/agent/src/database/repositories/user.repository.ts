@@ -39,6 +39,38 @@ export class UserRepository {
         });
     }
 
+    async findByIdForScheduledRun(id: string): Promise<User | null> {
+        return this.repository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.defaultPlan', 'defaultPlan')
+            .select([
+                'user.id',
+                'user.username',
+                'user.email',
+                'user.registrationProvider',
+                'user.isAnonymous',
+                'user.avatar',
+                'user.emailVerified',
+                'user.isActive',
+                'user.committerName',
+                'user.committerEmail',
+                'user.defaultPlanId',
+                'defaultPlan.id',
+                'defaultPlan.code',
+                'defaultPlan.displayName',
+                'defaultPlan.maxWorks',
+                'defaultPlan.allowedCadences',
+                'defaultPlan.monthlyPrice',
+                'defaultPlan.overagePricePerRun',
+                'defaultPlan.currency',
+                'defaultPlan.active',
+                'defaultPlan.createdAt',
+                'defaultPlan.updatedAt',
+            ])
+            .where({ id })
+            .getOne();
+    }
+
     async update(id: string, userData: Partial<User>): Promise<User> {
         await this.repository.update(id, userData);
         return await this.findById(id);

@@ -453,12 +453,14 @@ export class WorkRepository {
     }
 
     async getUnfinishedGenerations(olderThan: Date): Promise<Work[]> {
-        const stalledWorks = await this.repository.find({
-            where: {
+        const stalledWorks = await this.repository
+            .createQueryBuilder('work')
+            .select(['work.id', 'work.generateStatus'])
+            .where({
                 generationProgressedAt: LessThan(olderThan),
                 generationFinishedAt: IsNull(),
-            },
-        });
+            })
+            .getMany();
 
         return stalledWorks;
     }
@@ -703,6 +705,13 @@ export class WorkRepository {
         return this.repository
             .createQueryBuilder('work')
             .leftJoinAndSelect('work.user', 'user')
+            .select([
+                'work.id',
+                'work.generateStatus',
+                'work.itemsCount',
+                'work.updatedAt',
+                'user.id',
+            ])
             .where('COALESCE(work.itemsCount, 0) > 0')
             .orderBy('work.updatedAt', 'DESC')
             .addOrderBy('work.id', 'ASC')

@@ -9,20 +9,32 @@ describe('WorkScheduleRepository', () => {
         createQueryBuilder: jest.Mock;
     };
     let queryBuilder: {
+        leftJoinAndSelect: jest.Mock;
+        select: jest.Mock;
         update: jest.Mock;
         set: jest.Mock;
         where: jest.Mock;
         andWhere: jest.Mock;
+        orderBy: jest.Mock;
+        take: jest.Mock;
+        getMany: jest.Mock;
+        getOne: jest.Mock;
         execute: jest.Mock;
     };
     let scheduleRepository: WorkScheduleRepository;
 
     beforeEach(() => {
         queryBuilder = {
+            leftJoinAndSelect: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            getMany: jest.fn(),
+            getOne: jest.fn(),
             execute: jest.fn(),
         };
 
@@ -61,12 +73,10 @@ describe('WorkScheduleRepository', () => {
             }),
         );
         expect(setPayload.lastRunAt).toBe(setPayload.updatedAt);
-        expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 'schedule-1' });
-        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(1, 'status = :status', {
+        expect(queryBuilder.where).toHaveBeenCalledWith({
+            id: 'schedule-1',
             status: WorkScheduleStatus.ACTIVE,
-        });
-        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt = :nextRunAt', {
-            nextRunAt: nextRunAt.getTime(),
+            nextRunAt,
         });
         expect(result).toBe(nextRunAt);
     });
@@ -100,5 +110,54 @@ describe('WorkScheduleRepository', () => {
             },
             ['workId'],
         );
+    });
+
+    it('findDue selects the dispatch fields through a query builder without loading schedule.user', async () => {
+        const rows = [{ id: 'schedule-1' }] as WorkSchedule[];
+        queryBuilder.getMany.mockResolvedValue(rows);
+
+        await expect(scheduleRepository.findDue(25)).resolves.toBe(rows);
+
+        expect(repository.createQueryBuilder).toHaveBeenCalledWith('schedule');
+        expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('schedule.work', 'work');
+        expect(queryBuilder.select).toHaveBeenCalledWith(
+            expect.arrayContaining([
+                'schedule.id',
+                'schedule.workId',
+                'schedule.userId',
+                'work.id',
+                'work.name',
+                'work.slug',
+                'work.sourceRepository',
+            ]),
+        );
+        expect(queryBuilder.where).toHaveBeenCalledWith({
+            status: WorkScheduleStatus.ACTIVE,
+            nextRunAt: expect.any(Object),
+        });
+        expect(queryBuilder.orderBy).toHaveBeenCalledWith('schedule.nextRunAt', 'ASC');
+        expect(queryBuilder.take).toHaveBeenCalledWith(25);
+    });
+
+    it('findByIdForDispatch selects schedule and work fields without loading schedule.user', async () => {
+        const row = { id: 'schedule-1' } as WorkSchedule;
+        queryBuilder.getOne.mockResolvedValue(row);
+
+        await expect(scheduleRepository.findByIdForDispatch('schedule-1')).resolves.toBe(row);
+
+        expect(repository.createQueryBuilder).toHaveBeenCalledWith('schedule');
+        expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('schedule.work', 'work');
+        expect(queryBuilder.select).toHaveBeenCalledWith(
+            expect.arrayContaining([
+                'schedule.id',
+                'schedule.workId',
+                'schedule.userId',
+                'work.id',
+                'work.name',
+                'work.slug',
+                'work.sourceRepository',
+            ]),
+        );
+        expect(queryBuilder.where).toHaveBeenCalledWith({ id: 'schedule-1' });
     });
 });
