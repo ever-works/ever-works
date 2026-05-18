@@ -3,7 +3,6 @@
 import { oauthAPI, gitProvidersAPI } from '@/lib/api';
 import { setOAuthStateCookie } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
-import { generateHexToken } from '@/lib/utils/random';
 
 export async function checkGitProviderConnection(providerId: string) {
     try {
@@ -51,9 +50,6 @@ export async function connectOAuthProvider(
             return { success: false, error: 'Provider ID is required' };
         }
 
-        const state = generateHexToken(16);
-        await setOAuthStateCookie(state);
-
         const params = new URLSearchParams();
         if (returnPath) {
             params.append('returnPath', returnPath);
@@ -63,7 +59,12 @@ export async function connectOAuthProvider(
         const callbackPath = routeWithParams(ROUTES.API_OAUTH_PLUGINS_CALLBACK, { providerId });
         const callbackUrl = withAppUrl(callbackPath) + (queryString ? `?${queryString}` : '');
 
-        const response = await oauthAPI.getConnectUrl(providerId, callbackUrl, state, forceConsent);
+        // C-03 parity with /api/oauth/:p/url: let the API mint the CSRF state
+        // nonce, then mirror it into the host-scoped `oauth_state` cookie so
+        // `handleOAuthCallback` (plugins route) validates the same value the
+        // OAuth provider echoes back.
+        const response = await oauthAPI.getConnectUrl(providerId, callbackUrl, forceConsent);
+        await setOAuthStateCookie(response.state);
 
         return { success: true, url: response.url, state: response.state };
     } catch (error) {
@@ -104,9 +105,6 @@ export async function connectReadPackagesOAuthProvider(
             return { success: false, error: 'Provider ID is required' };
         }
 
-        const state = generateHexToken(16);
-        await setOAuthStateCookie(state);
-
         const params = new URLSearchParams();
         if (returnPath) {
             params.append('returnPath', returnPath);
@@ -118,12 +116,14 @@ export async function connectReadPackagesOAuthProvider(
         });
         const callbackUrl = withAppUrl(callbackPath) + (queryString ? `?${queryString}` : '');
 
+        // C-03 parity: API mints the state nonce; web mirrors it into the
+        // host-scoped cookie before redirecting to the OAuth provider.
         const response = await oauthAPI.getReadPackagesConnectUrl(
             providerId,
             callbackUrl,
-            state,
             forceConsent,
         );
+        await setOAuthStateCookie(response.state);
 
         return { success: true, url: response.url, state: response.state };
     } catch (error) {

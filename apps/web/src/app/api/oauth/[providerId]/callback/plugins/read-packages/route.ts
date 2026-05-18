@@ -43,8 +43,11 @@ export async function GET(
         });
     }
 
+    // C-03: unconditional state check. Mirror of the main plugins callback —
+    // require state to be present AND match the cookie, so an attacker can't
+    // bypass CSRF by stripping the `?state=` param from the OAuth redirect.
     const storedState = await getOAuthStateCookie();
-    if (state && state !== storedState) {
+    if (!state || state !== storedState) {
         await removeOAuthStateCookie();
         return redirect({
             locale,
@@ -60,7 +63,7 @@ export async function GET(
 
     let href: string;
     try {
-        await oauthAPI.readPackagesCallback(providerId, code, state || undefined);
+        await oauthAPI.readPackagesCallback(providerId, code, state);
         href = appendQueryParams(targetPath, {
             oauth_connected: 'true',
             oauth_provider: providerId,
