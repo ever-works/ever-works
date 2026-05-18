@@ -135,4 +135,59 @@ describe('file-tools', () => {
 			spy.mockRestore();
 		});
 	});
+
+	// H-23 — reject paths that try to escape the workspace cwd.
+	describe('H-23 — path-escape rejection', () => {
+		it('rejects an absolute POSIX path passed by the model', async () => {
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+
+			const result = await (tool as any).execute({
+				path: '/etc/passwd',
+				content: 'attacker-payload'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/absolute paths are not allowed/);
+			expect(sandbox.writeFiles).not.toHaveBeenCalled();
+		});
+
+		it('rejects an absolute Windows path passed by the model', async () => {
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+
+			const result = await (tool as any).execute({
+				path: 'C:\\Windows\\System32\\drivers\\etc\\hosts',
+				content: 'attacker-payload'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/absolute paths are not allowed/);
+			expect(sandbox.writeFiles).not.toHaveBeenCalled();
+		});
+
+		it('rejects a relative path that traverses out of cwd', async () => {
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+
+			const result = await (tool as any).execute({
+				path: '../../etc/passwd',
+				content: 'attacker-payload'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/resolves outside the workspace/);
+			expect(sandbox.writeFiles).not.toHaveBeenCalled();
+		});
+
+		it('rejects empty path', async () => {
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+
+			const result = await (tool as any).execute({ path: '', content: 'x' });
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/non-empty string/);
+		});
+	});
 });

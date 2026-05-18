@@ -1,5 +1,5 @@
 import * as http from 'http';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { WEB_URL } from '../../utils/constants';
@@ -353,26 +353,62 @@ export async function startOAuthServer(port: number): Promise<string> {
 }
 
 // Helper function to open URL in browser
+// L-08: use `spawn` with argv arrays instead of `exec` + a manually
+// escaped string. The previous form `"${escapedUrl}"` only escaped the
+// `"` character and trusted every other shell metacharacter to be
+// inert; safe in today's narrow callsite (the URL is platform-generated
+// with a small fixed port), but the spawn-argv pattern removes the
+// shell-injection class entirely.
 export async function openBrowser(url: string): Promise<void> {
     const platform = process.platform;
-    let command: string;
-    const escapedUrl = url.replace(/"/g, '\\"');
 
-    if (platform === 'darwin') {
-        command = `open "${escapedUrl}"`;
-    } else if (platform === 'win32') {
-        // Pass empty title argument to avoid spawning a new console window instead of the browser
-        command = `start "" "${escapedUrl}"`;
-    } else {
-        command = `xdg-open "${escapedUrl}"`;
-    }
-
+    // Refuse anything that isn't a well-formed http(s) URL to keep the
+    // attack surface minimal. The CLI's localhost-OAuth callback URLs are
+    // always shaped like `http://127.0.0.1:<port>/...`.
     try {
-        await execAsync(command);
-    } catch (error) {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            throw new Error(`Refusing to open non-http(s) URL: ${parsed.protocol}`);
+        }
+    } catch (err) {
         console.log(chalk.yellow('\n⚠ Could not open browser automatically.'));
         console.log(chalk.cyan(`Please open this URL manually: ${url}`));
+        return;
     }
+
+    let cmd: string;
+    let args: string[];
+    if (platform === 'darwin') {
+        cmd = 'open';
+        args = [url];
+    } else if (platform === 'win32') {
+        // `cmd /c start "" <url>` — the empty quoted title prevents
+        // cmd.exe from treating the URL as the new window title.
+        cmd = 'cmd';
+        args = ['/c', 'start', '', url];
+    } else {
+        cmd = 'xdg-open';
+        args = [url];
+    }
+
+    await new Promise<void>((resolve) => {
+        try {
+            const child = spawn(cmd, args, { stdio: 'ignore', detached: true, shell: false });
+            child.on('error', () => {
+                console.log(chalk.yellow('\n⚠ Could not open browser automatically.'));
+                console.log(chalk.cyan(`Please open this URL manually: ${url}`));
+                resolve();
+            });
+            child.on('spawn', () => {
+                child.unref();
+                resolve();
+            });
+        } catch {
+            console.log(chalk.yellow('\n⚠ Could not open browser automatically.'));
+            console.log(chalk.cyan(`Please open this URL manually: ${url}`));
+            resolve();
+        }
+    });
 }
 
 // Build OAuth authorization URL

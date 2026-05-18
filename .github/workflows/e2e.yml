@@ -15,6 +15,10 @@ on:
     branches: [develop, stage, main]
   workflow_dispatch:
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
         with:
           version: 10.13.1
 

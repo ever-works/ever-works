@@ -10,10 +10,16 @@ function getPassword(): string {
         );
     }
 
-    // Iron session requires at least 32 characters
+    // H-14: previously we silently padded with a literal constant
+    // ('everworks-cookie-salt-v1'), so a sub-32-char secret produced a key
+    // dominated by a known string. Fail closed instead and force operators
+    // to provide proper entropy.
     if (secret.length < 32) {
-        // Pad the secret to meet minimum requirements
-        return secret.padEnd(32, 'everworks-cookie-salt-v1');
+        throw new Error(
+            'COOKIE_SECRET / AUTH_SECRET must be at least 32 characters of high-entropy material ' +
+                '(e.g. `openssl rand -base64 48`). The previous behavior of padding short secrets with ' +
+                'a fixed string has been removed because it produced a predictable encryption key.',
+        );
     }
 
     return secret;

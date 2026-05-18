@@ -1,11 +1,48 @@
 'use server';
 
+import { z } from 'zod';
 import { accountTransferAPI } from '@/lib/api/account-transfer';
 import type { AccountExportPayload, ConflictResolution } from '@/lib/api/account-transfer.types';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { serverFetch } from '@/lib/api/server-api';
+
+/**
+ * M-08: defense-in-depth shape validation for Server Action args. The API
+ * tier has its own DTO check, but a malformed shape at this boundary
+ * (oversized payload, wrong type) should fail fast in the web tier rather
+ * than be proxied verbatim and trigger an opaque 400/500 from the API.
+ *
+ * The schemas are deliberately permissive on the deep shape (the export
+ * payload is large and varied) but enforce length / count caps that bound
+ * memory + RPC body size before the upstream call.
+ */
+const accountExportPayloadSchema = z
+    .object({
+        // Top-level fields the API tier requires
+        version: z.union([z.string().max(64), z.number()]).optional(),
+        user: z.unknown().optional(),
+    })
+    .catchall(z.unknown());
+
+const conflictResolutionSchema = z.unknown(); // ConflictResolution shape is server-owned; cap by array length below.
+
+const repoFullNameSchema = z
+    .string()
+    .min(3)
+    .max(140)
+    // M-04 mirror: owner/repo, GitHub-legal chars only.
+    .regex(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/);
+
+const configureSyncSchema = z.object({
+    repoFullName: repoFullNameSchema.optional(),
+    createNew: z.boolean().optional(),
+});
+
+function returnBadRequest(message: string) {
+    return { success: false as const, data: null, error: message };
+}
 
 function ensureAuth() {
     return getAuthFromCookie().then((user) => {
@@ -32,6 +69,10 @@ export async function exportAccountData(includeSecrets: boolean) {
 
 export async function previewImport(payload: AccountExportPayload) {
     await ensureAuth();
+    const parsed = accountExportPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+        return returnBadRequest('Invalid import payload shape');
+    }
     try {
         const data = await accountTransferAPI.previewImport(payload);
         return { success: true as const, data, error: null };
@@ -49,6 +90,14 @@ export async function applyImport(
     resolutions: ConflictResolution[],
 ) {
     await ensureAuth();
+    const parsedPayload = accountExportPayloadSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+        return returnBadRequest('Invalid import payload shape');
+    }
+    const parsedResolutions = z.array(conflictResolutionSchema).max(10_000).safeParse(resolutions);
+    if (!parsedResolutions.success) {
+        return returnBadRequest('Invalid resolutions array (too large or wrong shape)');
+    }
     try {
         const data = await accountTransferAPI.applyImport(payload, resolutions);
         return { success: true as const, data, error: null };
@@ -77,6 +126,10 @@ export async function getSyncStatus() {
 
 export async function configureSyncRepo(config: { repoFullName?: string; createNew?: boolean }) {
     await ensureAuth();
+    const parsed = configureSyncSchema.safeParse(config);
+    if (!parsed.success) {
+        return returnBadRequest('Invalid sync config (bad repoFullName format)');
+    }
     try {
         const data = await accountTransferAPI.configureSyncRepo(config);
         return { success: true as const, data, error: null };

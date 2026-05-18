@@ -17,6 +17,7 @@ import axios, { type AxiosError } from 'axios';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly id = 'local-content-extractor';
@@ -82,6 +83,19 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const startTime = Date.now();
 		const { url, settings } = options;
+
+		// H-09 / C-13: refuse to fetch URLs pointing at private, loopback,
+		// link-local, or cloud-metadata IPs. This is the default content
+		// provider, invoked for every item's `source_url` — including URLs the
+		// community-PR LLM is free to choose — so the SSRF surface is large.
+		if (!isSafeWebhookUrl(url)) {
+			return {
+				success: false,
+				url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${url})`,
+				duration: Date.now() - startTime
+			} as ContentExtractionResult;
+		}
 
 		const timeout = (settings?.timeout as number) || 15000;
 		const minContentLength = (settings?.minContentLength as number) || 200;

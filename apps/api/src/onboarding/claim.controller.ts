@@ -43,10 +43,14 @@ export class ClaimController {
         private readonly gitFacade: GitFacadeService,
     ) {}
 
+    // M-18: per-IP throttle on the public claim-preview path. Previously 30/min
+    // — tightened to 10/min so brute-forcing a leaked-but-truncated token
+    // becomes infeasible. Genuine UX (a maintainer landing on a claim URL,
+    // reloading once or twice) fits inside 10/min easily.
     @Public()
     @Get('preview')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Preview a claim invitation without consuming it',
         description:

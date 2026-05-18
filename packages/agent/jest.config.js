@@ -27,6 +27,11 @@ module.exports = {
         '^@src/(.*)$': '<rootDir>/$1',
         // Map workspace packages to their source TypeScript files for testing
         '^@ever-works/plugin$': '<rootDir>/../../plugin/src/index.ts',
+        // Specific subpath: `@ever-works/plugin/helpers/ssrf-guard` is a single
+        // file (not a folder with index), separated from `helpers/index.ts` so
+        // its `node:net`/`node:dns` imports stay out of the client bundle.
+        // Map BEFORE the catch-all `helpers` rule below so the regex order matters.
+        '^@ever-works/plugin/helpers/ssrf-guard$': '<rootDir>/../../plugin/src/helpers/ssrf-guard.ts',
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../contracts/src/$1/index.ts',

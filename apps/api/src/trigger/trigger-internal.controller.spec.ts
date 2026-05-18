@@ -191,6 +191,44 @@ describe('TriggerInternalController', () => {
             expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
         });
 
+        // C-05 / L-09: `ensureSecret` performs constant-time comparison with a
+        // length-padded buffer so equal-length AND unequal-length submissions
+        // both reach `timingSafeEqual`. A naive `length-only` short-circuit
+        // would leak the secret length to an attacker; this test asserts that
+        // a same-length-but-wrong secret is still rejected. The constant-time
+        // property itself is not observable in JS — but rejecting a same-length
+        // mismatch confirms the byte-comparison path is wired correctly and
+        // that we are NOT accidentally accepting a wrong secret just because
+        // the lengths happened to match.
+        it('rejects same-length wrong secret in constant time (no early length-leak)', async () => {
+            // VALID_SECRET = 'super-secret-token' is 18 chars. Build a
+            // same-length wrong secret so we exercise the equal-length branch
+            // of the timingSafeEqual comparison.
+            const wrongSameLength = 'aaaaaaaaaaaaaaaaaa';
+            expect(wrongSameLength).toHaveLength(VALID_SECRET.length);
+            expect(wrongSameLength).not.toBe(VALID_SECRET);
+
+            await expect(
+                controller.getWorkContext(wrongSameLength, 'work-1', 'user-1'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                controller.getWorkContext(wrongSameLength, 'work-1', 'user-1'),
+            ).rejects.toThrow('Invalid trigger secret');
+
+            // And the same property holds on the RPC entrypoint.
+            await expect(
+                controller.callRemote(wrongSameLength, {
+                    name: 'PluginRepository',
+                    method: 'echo',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+
+            // Critically: NO downstream side-effects should run on a wrong
+            // secret, regardless of length.
+            expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
+        });
+
         it('throws ForbiddenException when no internal secret is configured', async () => {
             getInternalSecretMock.mockReturnValue(undefined);
 
@@ -248,6 +286,11 @@ describe('TriggerInternalController', () => {
                 expect(d.toISOString()).toBe(fixedDate.toISOString());
                 return d;
             });
+            // C-05: the per-service allow-list is built in onModuleInit by
+            // walking the instance's prototype chain. We added `withDate` to
+            // the stub instance AFTER the beforeEach-built controller, so we
+            // need a fresh controller instance for the allow-list to include it.
+            controller = buildController();
 
             const out = await controller.callRemote(VALID_SECRET, {
                 name: 'PluginRepository',
@@ -269,7 +312,12 @@ describe('TriggerInternalController', () => {
             ).rejects.toThrow('Unknown remote target: NotARealTarget');
         });
 
-        it('throws BadRequestException for unknown method on a known target', async () => {
+        // C-05: unknown methods are now rejected by the per-service allow-list
+        // (built at onModuleInit from the instance's own prototype chain) BEFORE
+        // we reach the `typeof fn !== 'function'` check. The allow-list error
+        // names the service so an operator can see which target rejected the
+        // call.
+        it('throws BadRequestException for unknown method on a known target (allow-list)', async () => {
             await expect(
                 controller.callRemote(
                     VALID_SECRET,
@@ -281,7 +329,7 @@ describe('TriggerInternalController', () => {
                     VALID_SECRET,
                     buildBody({ name: 'PluginRepository', method: 'doesNotExist' }),
                 ),
-            ).rejects.toThrow('Unknown method: doesNotExist');
+            ).rejects.toThrow('Method not in allow-list for PluginRepository: doesNotExist');
         });
 
         it('throws ForbiddenException with wrong secret (and never invokes the remote)', async () => {
@@ -308,13 +356,15 @@ describe('TriggerInternalController', () => {
             ];
 
             for (const target of expectedTargets) {
+                // C-05: each target's allow-list is built independently so the
+                // service name is interpolated into the rejection.
                 await expect(
                     controller.callRemote(VALID_SECRET, {
                         name: target,
                         method: 'doesNotExist',
                         args: superjson.serialize([]) as any,
                     }),
-                ).rejects.toThrow('Unknown method: doesNotExist');
+                ).rejects.toThrow(`Method not in allow-list for ${target}: doesNotExist`);
             }
         });
 

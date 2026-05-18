@@ -45,13 +45,32 @@ export class AnthropicManagedAgentsClient {
 	}
 
 	async createEnvironment(input: { name: string }): Promise<{ id: string }> {
+		// H-25: pin egress to an allow-list when CLAUDE_MANAGED_AGENT_EGRESS_HOSTS
+		// is set. Default stays `unrestricted` to preserve the current
+		// behavior (the env is opt-in until operators verify the agent
+		// tooling works with the constrained list). Comma-separated hosts;
+		// supports plain hostnames or `*.example.com` wildcards depending on
+		// what the upstream SDK accepts at runtime.
+		const allowHostsRaw = process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS?.trim();
+		const allowHosts = allowHostsRaw
+			? allowHostsRaw
+					.split(',')
+					.map((s) => s.trim())
+					.filter(Boolean)
+			: null;
+
+		// Use `any` because the SDK's `NetworkingConfig` type does not yet
+		// expose the allow-list shape in our pinned version. Once the SDK
+		// types update, narrow this.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const networking: any =
+			allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' };
+
 		const environment = await this.client.beta.environments.create({
 			name: input.name,
 			config: {
 				type: 'cloud',
-				networking: {
-					type: 'unrestricted'
-				}
+				networking
 			}
 		});
 

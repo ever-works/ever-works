@@ -7,6 +7,19 @@ import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
 import * as bcrypt from 'bcrypt';
 
+// L-07 bcrypt helpers re-exported from `./bcrypt-cost` so callers that
+// don't want to load the ESM-only `better-auth/plugins` module (e.g.
+// `auth-provider.service.spec.ts` with its mocked Better Auth) can import
+// directly from `./bcrypt-cost`.
+export {
+    MIN_BCRYPT_COST,
+    DEFAULT_BCRYPT_COST,
+    getBcryptCost,
+    parseBcryptCost,
+    passwordNeedsRehash,
+} from './bcrypt-cost';
+import { getBcryptCost } from './bcrypt-cost';
+
 function getInitializedDatabaseClient(dataSource: DataSource): any {
     const driver = dataSource.driver as any;
 
@@ -135,16 +148,35 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
         account: {
             accountLinking: {
                 enabled: true,
-                trustedProviders: ['google', 'github', 'facebook', 'linkedin'],
+                // M-01: Facebook is removed from trustedProviders. Facebook
+                // hard-codes `emailVerified: false` for its profile responses
+                // (see social-auth.service.ts), so a Facebook account with a
+                // forged/unverified email could otherwise auto-link to a
+                // pre-existing local account with the same email. LinkedIn
+                // and Google verify emails server-side; GitHub OAuth's
+                // primary email is verified server-side via the GitHub API.
+                trustedProviders: ['google', 'github', 'linkedin'],
             },
         },
         emailAndPassword: {
             enabled: true,
+            // H-07: require email verification before the user can sign in.
+            // Combined with C-02 (no verification token in HTTP response),
+            // this closes the loop where an attacker registers with a victim's
+            // email and immediately gains an authenticated session. Existing
+            // unverified users will be prompted to verify on next login
+            // (the platform currently has very few users, all internal).
             autoSignIn: true,
+            requireEmailVerification: true,
             minPasswordLength: 8,
             password: {
+                // L-07: cost is read on each call so operators can raise it
+                // via `BCRYPT_COST` without a redeploy of this file. New
+                // users / password resets immediately get hashes at the new
+                // cost; existing users migrate transparently via the
+                // rehash-on-login branch in `AuthProviderService.signInEmail`.
                 hash: async (password: string) => {
-                    return bcrypt.hash(password, 10);
+                    return bcrypt.hash(password, getBcryptCost());
                 },
                 verify: async ({ hash, password }: { hash: string; password: string }) => {
                     return bcrypt.compare(password, hash);
@@ -158,7 +190,8 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                         return {
                             data: {
                                 ...user,
-                                password: await bcrypt.hash(randomUUID(), 10),
+                                // L-07: same configured cost as `password.hash` above.
+                                password: await bcrypt.hash(randomUUID(), getBcryptCost()),
                                 registrationProvider: RegistrationProvider.LOCAL,
                                 isActive: true,
                             },

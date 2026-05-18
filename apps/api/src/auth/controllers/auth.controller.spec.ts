@@ -39,7 +39,9 @@ describe('AuthController', () => {
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
     let anonymousAuth: jest.Mocked<Pick<AnonymousAuthService, 'createAnonymousUser'>>;
     let claimAccount: jest.Mocked<Pick<ClaimAccountService, 'claim'>>;
-    let captchaVerifier: jest.Mocked<Pick<CaptchaVerifierService, 'isEnabled' | 'verify'>>;
+    let captchaVerifier: jest.Mocked<
+        Pick<CaptchaVerifierService, 'isEnabled' | 'isRequired' | 'verify'>
+    >;
     let funnel: { emit: jest.Mock };
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
     let authProvider: jest.Mocked<
@@ -71,9 +73,12 @@ describe('AuthController', () => {
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
         anonymousAuth = { createAnonymousUser: jest.fn() } as any;
         claimAccount = { claim: jest.fn() } as any;
-        // Default: captcha disabled (no-op) so existing tests pass through.
+        // Default: captcha disabled + not-required (dev/test mode) so the
+        // existing tests pass through. H-05 added isRequired() — defaults to
+        // false here; production tests can override.
         captchaVerifier = {
             isEnabled: jest.fn().mockReturnValue(false),
+            isRequired: jest.fn().mockReturnValue(false),
             verify: jest.fn().mockResolvedValue({ success: true, skipped: true }),
         } as any;
         funnel = { emit: jest.fn() };
@@ -110,7 +115,9 @@ describe('AuthController', () => {
             claimAccount.claim.mockResolvedValue(claimed);
 
             const req = {
-                user: { userId: 'u-anon-1' },
+                // L-05: claim endpoint requires isAnonymous=true on the
+                // AuthenticatedUser envelope.
+                user: { userId: 'u-anon-1', isAnonymous: true },
                 ip: '1.2.3.4',
                 headers: { 'user-agent': 'jest-agent' },
             };
@@ -148,7 +155,7 @@ describe('AuthController', () => {
             });
 
             await (controller as any).claimAccount(
-                { user: { userId: 'u-1' }, headers: {} },
+                { user: { userId: 'u-1', isAnonymous: true }, headers: {} },
                 {
                     email: 'a@b.com',
                     password: 'MySecure123!',
@@ -161,6 +168,16 @@ describe('AuthController', () => {
                     emailVerificationCallbackUrl: 'https://app.ever.works/welcome',
                 }),
             );
+        });
+
+        it('rejects with 403 when the bearer-user is NOT anonymous (L-05)', async () => {
+            await expect(
+                (controller as any).claimAccount(
+                    { user: { userId: 'u-real', isAnonymous: false }, headers: {} },
+                    { email: 'a@b.com', password: 'MySecure123!' },
+                ),
+            ).rejects.toThrow(/anonymous/);
+            expect(claimAccount.claim).not.toHaveBeenCalled();
         });
     });
 
@@ -216,6 +233,55 @@ describe('AuthController', () => {
                 ipAddress: '8.8.8.8',
                 userAgent: null,
             });
+        });
+
+        // H-05: in production, the anonymous-flow controller must fail-closed
+        // when captcha is required by config (`NODE_ENV=production`) but is
+        // not actually wired up (`CAPTCHA_PROVIDER` unset). The existing
+        // tests in this file rely on the default mock where
+        // `isRequired() === false`, which only exercises the dev/preview
+        // branch. This test flips `isRequired` to true and asserts that:
+        //   (a) the controller throws BadRequestException (400)
+        //   (b) the anonymous-user-creation downstream is NEVER invoked
+        //   (c) the error message names captcha so an operator can find it
+        // See `auth.controller.ts` and `captcha-verifier.service.ts` for
+        // the H-05 implementation comments.
+        it('returns 400 when captcha is required (production) but CAPTCHA_PROVIDER is not configured', async () => {
+            captchaVerifier.isRequired.mockReturnValue(true);
+            captchaVerifier.isEnabled.mockReturnValue(false);
+
+            const req = { ip: '1.2.3.4', headers: { 'user-agent': 'jest-agent' } };
+
+            await expect((controller as any).anonymous(req)).rejects.toMatchObject({
+                status: 400,
+            });
+            await expect((controller as any).anonymous(req)).rejects.toThrow(/captcha/i);
+            expect(anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+            expect(captchaVerifier.verify).not.toHaveBeenCalled();
+        });
+
+        // H-05 part 2: when captcha IS enabled in production and a token is
+        // missing/invalid, the verify path fails and the controller returns
+        // 400 — again without ever creating an anonymous user row.
+        it('returns 400 when captcha is enabled and the token is missing/invalid', async () => {
+            captchaVerifier.isRequired.mockReturnValue(true);
+            captchaVerifier.isEnabled.mockReturnValue(true);
+            captchaVerifier.verify.mockResolvedValue({
+                success: false,
+                skipped: false,
+                errorCodes: ['missing-input-response'],
+            });
+
+            const req = { ip: '1.2.3.4', headers: { 'user-agent': 'jest-agent' } };
+
+            await expect((controller as any).anonymous(req)).rejects.toMatchObject({
+                status: 400,
+            });
+            await expect((controller as any).anonymous(req)).rejects.toThrow(/captcha/i);
+            // verify() was called (we reached the captcha path) but no
+            // anonymous user was ever created.
+            expect(captchaVerifier.verify).toHaveBeenCalled();
+            expect(anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
         });
     });
 
@@ -386,13 +452,26 @@ describe('AuthController', () => {
     });
 
     describe('logoutAll (POST /api/auth/logout-all)', () => {
-        it('forwards req.user.userId to provider.signOutAll', async () => {
-            const req: any = { user: { userId: 'u1' } };
+        it('forwards req.user.userId to provider.signOutAll and audit-logs the action (L-03)', async () => {
+            const req: any = {
+                user: { userId: 'u1' },
+                ip: '1.2.3.4',
+                headers: { 'user-agent': 'jest-agent' },
+            };
 
             const result = await controller.logoutAll(req);
 
             expect(authProvider.signOutAll).toHaveBeenCalledWith('u1');
             expect(result).toEqual({ message: 'Logged out from all devices successfully' });
+            // L-03: forensic audit-log entry.
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    action: 'user.logout_all',
+                    ipAddress: '1.2.3.4',
+                    userAgent: 'jest-agent',
+                }),
+            );
         });
     });
 
@@ -476,21 +555,32 @@ describe('AuthController', () => {
     });
 
     describe('verifyEmail (POST /api/auth/verify-email)', () => {
-        it('verifies token, then issues a session for the resolved user', async () => {
+        // H-04: verifyEmail now binds the new session to the requesting client.
+        function makeReq() {
+            return {
+                ip: '203.0.113.5',
+                headers: { 'user-agent': 'Mozilla/5.0' },
+            } as any;
+        }
+
+        it('verifies token, then issues a session bound to the requesting client', async () => {
             authService.verifyEmail.mockResolvedValue({ id: 'u1' } as any);
             authProvider.issueSession.mockResolvedValue({ access_token: 'tok' } as any);
 
-            const result = await controller.verifyEmail({ token: 'verif-tok' } as any);
+            const result = await controller.verifyEmail({ token: 'verif-tok' } as any, makeReq());
 
             expect(authService.verifyEmail).toHaveBeenCalledWith('verif-tok');
-            expect(authProvider.issueSession).toHaveBeenCalledWith('u1');
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
+                ipAddress: '203.0.113.5',
+                userAgent: 'Mozilla/5.0',
+            });
             expect(result).toEqual({ access_token: 'tok' });
         });
 
         it('does not issue a session when verifyEmail rejects', async () => {
             authService.verifyEmail.mockRejectedValue(new Error('Invalid or expired token'));
 
-            await expect(controller.verifyEmail({ token: 'x' } as any)).rejects.toThrow(
+            await expect(controller.verifyEmail({ token: 'x' } as any, makeReq())).rejects.toThrow(
                 'Invalid or expired token',
             );
             expect(authProvider.issueSession).not.toHaveBeenCalled();

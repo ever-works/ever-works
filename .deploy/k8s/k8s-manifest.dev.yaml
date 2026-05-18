@@ -55,10 +55,30 @@ spec:
       labels:
         app: ever-works-api-dev
     spec:
+      # H-20: pod-level hardening. The API container uses external
+      # kubeconfigs (`EVER_WORKS_K8S_*_KUBECONFIG`) to deploy other Works,
+      # so the in-cluster service-account token is unused and can be
+      # safely disabled. runAsNonRoot + dropped capabilities mirror the
+      # Docker image's `USER node` so a container compromise can't
+      # escalate to root or capability-protected operations.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: ever-works-api-dev
           image: registry.digitalocean.com/ever/ever-works-api-dev:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: WEB_URL
               value: https://appdev.ever.works
@@ -156,6 +176,33 @@ spec:
               value: "$DATABASE_SSL_MODE"
             - name: DATABASE_CA_CERT
               value: "$DATABASE_CA_CERT"
+            # C-07: schema migrations are run via the migration step in
+            # `.deploy/docker/api/entrypoint.sh`. Keep TypeORM `synchronize`
+            # off here too — drift between dev/stage/prod when an ad-hoc
+            # entity change auto-applies in dev but not stage/prod has bitten
+            # us before.
+            - name: DATABASE_AUTOMIGRATE
+              value: "false"
+
+            # 2026-05-17 audit env (PR ever-works#816)
+            - name: PLUGIN_SECRET_ENCRYPTION_KEY
+              value: "$PLUGIN_SECRET_ENCRYPTION_KEY"
+            - name: COMMUNITY_PR_VERIFIED_ORGS
+              value: "$COMMUNITY_PR_VERIFIED_ORGS"
+            - name: AGENT_BASH_AUDIT_LOG
+              value: "$AGENT_BASH_AUDIT_LOG"
+            # C-04: host allow-list for user-supplied callback URLs.
+            # WEB_URL's host is always allowed by default — list extras here.
+            - name: ALLOWED_CALLBACK_HOSTS
+              value: "$ALLOWED_CALLBACK_HOSTS"
+            # H-17: per-user login lockout knobs (5 fails / 15 min by default).
+            - name: LOGIN_LOCKOUT_THRESHOLD
+              value: "$LOGIN_LOCKOUT_THRESHOLD"
+            - name: LOGIN_LOCKOUT_DURATION_MS
+              value: "$LOGIN_LOCKOUT_DURATION_MS"
+            # M-19: HTTP body parser limit (default 1mb).
+            - name: BODY_LIMIT
+              value: "$BODY_LIMIT"
 
             # Mail
             - name: MAILER_PROVIDER

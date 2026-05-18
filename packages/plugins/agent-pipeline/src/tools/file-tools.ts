@@ -4,6 +4,39 @@ import { z } from 'zod';
 import { syncTaxonomyFromFile } from '../utils/taxonomy-sync.js';
 import type { WrappedSandbox } from '../types.js';
 
+/**
+ * H-23: resolve an LLM-supplied path relative to the agent's workspace cwd
+ * and refuse anything that escapes it. `nodePath.posix.resolve(cwd, path)`
+ * silently honours absolute paths in the model's output — e.g. a model
+ * emitting `path: "/etc/passwd"` would write outside the sandbox. The wrapping
+ * `ReadWriteFs({ root: workspacePath })` in `modification-worker.ts` catches
+ * the read/write attempt, but the tool description itself encourages absolute
+ * paths in earlier model traces; enforce the boundary at the tool layer too
+ * so any future sandbox helper that doesn't enforce `root` still rejects
+ * escape attempts.
+ */
+export function resolveSandboxPath(cwd: string, rawPath: string): string {
+	if (typeof rawPath !== 'string' || rawPath.length === 0) {
+		throw new Error('Invalid path: must be a non-empty string');
+	}
+	if (nodePath.posix.isAbsolute(rawPath) || nodePath.win32.isAbsolute(rawPath)) {
+		throw new Error(
+			`Invalid path "${rawPath}": absolute paths are not allowed. Use a path relative to the workspace (e.g. "data/items/foo.json").`
+		);
+	}
+	const resolvedCwd = nodePath.posix.resolve(cwd);
+	const resolved = nodePath.posix.resolve(resolvedCwd, rawPath);
+	// Edge case: when cwd is `/`, `resolvedCwd + sep` becomes `//`, which
+	// nothing starts with. Use the raw separator boundary instead.
+	const cwdWithSep = resolvedCwd === '/' ? '/' : resolvedCwd + nodePath.posix.sep;
+	if (resolved !== resolvedCwd && !resolved.startsWith(cwdWithSep)) {
+		throw new Error(
+			`Invalid path "${rawPath}": resolves outside the workspace (${resolved} is not under ${resolvedCwd}).`
+		);
+	}
+	return resolved;
+}
+
 export interface CreateFileToolOptions {
 	/** Called after a file is successfully created. Receives the resolved path and content. */
 	onCreated?: (path: string, content: string) => Promise<void>;
@@ -26,7 +59,12 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 			content: z.string().describe('Content to write to the file')
 		}),
 		execute: async ({ path, content }) => {
-			const resolvedPath = nodePath.posix.resolve(cwd, path);
+			let resolvedPath: string;
+			try {
+				resolvedPath = resolveSandboxPath(cwd, path);
+			} catch (err) {
+				return { success: false, error: err instanceof Error ? err.message : String(err) };
+			}
 			try {
 				await sandbox.readFile(resolvedPath);
 				return {
@@ -74,7 +112,12 @@ export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 			content: z.string().describe('New content for the file')
 		}),
 		execute: async ({ path, content }) => {
-			const resolvedPath = nodePath.posix.resolve(cwd, path);
+			let resolvedPath: string;
+			try {
+				resolvedPath = resolveSandboxPath(cwd, path);
+			} catch (err) {
+				return { success: false, error: err instanceof Error ? err.message : String(err) };
+			}
 			try {
 				await sandbox.readFile(resolvedPath);
 			} catch {

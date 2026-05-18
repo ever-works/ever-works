@@ -31,4 +31,11 @@ export { DomainType } from '@ever-works/contracts';
 export type { FormFieldDefinition, FormFieldGroup, FormSchema, FormFieldType } from '@ever-works/contracts';
 
 // Shared provider constants
-export { GITHUB_SCOPES, type GitHubScope } from './github.scopes.js';
+export {
+	GITHUB_SCOPES,
+	GITHUB_LOGIN_SCOPES,
+	GITHUB_FULL_SCOPES,
+	type GitHubScope,
+	type GitHubLoginScope,
+	type GitHubFullScope
+} from './github.scopes.js';

@@ -7,6 +7,10 @@ on:
     types:
       - completed
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 jobs:
   deploy-stage:
     runs-on: ubuntu-latest
@@ -20,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
@@ -127,6 +131,18 @@ jobs:
           EVER_WORKS_CUSTOMERS_GITHUB_ORG: ever-works-cloud
           EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
           EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
+
+          # 2026-05-17 security audit env knobs (PR ever-works#816).
+          PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
+          COMMUNITY_PR_VERIFIED_ORGS: ever-works
+          AGENT_BASH_AUDIT_LOG: 'true'
+          # C-04 host allow-list. Empty = WEB_URL's host only.
+          ALLOWED_CALLBACK_HOSTS: ''
+          # H-17 lockout knobs. Empty = built-in defaults (5 fails / 15 min).
+          LOGIN_LOCKOUT_THRESHOLD: ''
+          LOGIN_LOCKOUT_DURATION_MS: ''
+          # M-19 body limit — empty = default 1mb.
+          BODY_LIMIT: ''
 
           # EW-616 — kubeconfigs for platform-managed clusterSource values.
           EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}

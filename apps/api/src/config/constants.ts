@@ -15,7 +15,21 @@ export enum AuthProvider {
 export const config = {
     debug: () => process.env.HTTP_DEBUG === 'true',
 
-    webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
+    // L-02: WEB_URL must be set in production. Falling back to
+    // `http://localhost:3000` in prod silently breaks every email link,
+    // every OAuth callback URL builder, every CORS allow-list. Surface
+    // the misconfiguration at boot instead of in a customer-facing flow.
+    webAppUrl: () => {
+        const value = process.env.WEB_URL;
+        if (value) return value;
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error(
+                'WEB_URL environment variable is required in production. ' +
+                    'Set it to the public origin of the web app, e.g. https://app.ever.works.',
+            );
+        }
+        return 'http://localhost:3000';
+    },
 
     auth: {
         secret: () => {

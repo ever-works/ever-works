@@ -5,9 +5,26 @@ import { encrypt, decrypt } from './crypto';
 
 export const AUTH_COOKIE_NAME = 'everworks_auth_token';
 
+// M-21: in preview / staging deploys that serve over HTTPS but happen to
+// run with NODE_ENV !== 'production', the previous `secure: NODE_ENV ===
+// 'production'` flag would let the cookie travel over HTTP. Anchor on the
+// public URL scheme instead so any HTTPS deploy gets the secure flag.
+// `WEB_URL` is already required at boot for the API; mirror that here.
+function isPublicUrlHttps(): boolean {
+    const url = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL;
+    if (url) {
+        try {
+            return new URL(url).protocol === 'https:';
+        } catch {
+            // fall through
+        }
+    }
+    return process.env.NODE_ENV === 'production';
+}
+
 const cookieOptions: Partial<ResponseCookie> = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isPublicUrlHttps(),
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: '/',

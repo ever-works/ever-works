@@ -11,6 +11,7 @@ import {
     HttpStatus,
     Logger,
     BadRequestException,
+    ForbiddenException,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -29,6 +30,7 @@ import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { CreateAnonymousDto } from '../dto/anonymous.dto';
 import { AuthSessionGuard } from '../guards/auth-session.guard';
 import { Public } from '../decorators/public.decorator';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
@@ -136,10 +138,7 @@ export class AuthController {
     @ApiResponse({ status: 201, description: 'Anonymous session issued' })
     @ApiResponse({ status: 400, description: 'Captcha verification failed' })
     @ApiResponse({ status: 429, description: 'Rate limit exceeded for this IP' })
-    async anonymous(
-        @Request() req,
-        @Body() body?: { captchaToken?: string; correlationId?: string },
-    ) {
+    async anonymous(@Request() req, @Body() body?: CreateAnonymousDto) {
         const ipAddress =
             (typeof req.ip === 'string' && req.ip) ||
             (typeof req.headers['x-forwarded-for'] === 'string'
@@ -151,8 +150,16 @@ export class AuthController {
                 : null;
 
         // EW-617 G7: captcha gate. The verifier no-ops when CAPTCHA_PROVIDER
-        // is unset (dev/preview), so this is a hard requirement only on
-        // properly configured environments.
+        // is unset (dev/preview).
+        //
+        // H-05: in production, captcha is REQUIRED. If `CAPTCHA_PROVIDER` is
+        // unset in production, fail-closed rather than silently allowing
+        // unauthenticated row-creation traffic.
+        if (this.captchaVerifier.isRequired() && !this.captchaVerifier.isEnabled()) {
+            throw new BadRequestException(
+                'anonymous flow disabled: captcha is required in production but CAPTCHA_PROVIDER is not configured',
+            );
+        }
         if (this.captchaVerifier.isEnabled()) {
             const result = await this.captchaVerifier.verify({
                 token: body?.captchaToken,
@@ -220,6 +227,17 @@ export class AuthController {
             return { message: 'unauthorized' };
         }
 
+        // L-05: explicit anonymous-only guard at the controller layer. The
+        // downstream `claimAccountService.claim` does check `user.isAnonymous`,
+        // but pinning the rule at the controller surface keeps the contract
+        // visible in the OpenAPI doc and protects against a future refactor
+        // that loses the service-side check.
+        if (req.user?.isAnonymous !== true) {
+            throw new ForbiddenException(
+                'claim is only valid for anonymous (zero-friction) accounts',
+            );
+        }
+
         const claimed = await this.claimAccountService.claim({
             userId,
             email: claimDto.email,
@@ -265,7 +283,22 @@ export class AuthController {
         return claimed;
     }
 
+    // H-17 (partial): per-endpoint throttle on the credential-validation
+    // path. Defaults derived from the audit's "credential stuffing wide open
+    // under 50 req/sec/IP" finding — 10/min/IP is permissive enough for a real
+    // user fat-fingering their password but stops a brute-force loop dead.
+    // Overridable via env so an operator can tighten under attack:
+    //   LOGIN_THROTTLE_LIMIT  (default 10)
+    //   LOGIN_THROTTLE_TTL_MS (default 60_000)
+    // A per-user lockout (vs IP throttle) needs an additional DB-backed
+    // counter; that's deferred to a follow-up alongside H-17/H-18 Redis work.
     @Public()
+    @Throttle({
+        default: {
+            limit: Number(process.env.LOGIN_THROTTLE_LIMIT ?? 10),
+            ttl: Number(process.env.LOGIN_THROTTLE_TTL_MS ?? 60_000),
+        },
+    })
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User login', description: 'Authenticate with email and password' })
@@ -322,7 +355,23 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
     async logoutAll(@Request() req) {
+        const userAgent = req.headers['user-agent'];
+        const ipAddress = req.ip || req.headers['x-forwarded-for'];
         await this.authProvider.signOutAll(req.user.userId);
+        // L-03: forensic audit-log entry for a fleet-wide sign-out. Useful
+        // when investigating "all my sessions were killed" support tickets
+        // or correlating the event with a suspicious login from a new IP.
+        this.activityLogService
+            .log({
+                userId: req.user.userId,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.logout_all',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed out from all devices',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
         return { message: 'Logged out from all devices successfully' };
     }
 
@@ -402,9 +451,19 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'Email verified successfully and session issued' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-    async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto, @Request() req) {
         const user = await this.authService.verifyEmail(verifyEmailDto.token);
-        return this.authProvider.issueSession(user.id);
+        // H-04: bind the new session to the requesting client.
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+        return this.authProvider.issueSession(user.id, { ipAddress, userAgent });
     }
 
     @Public()
@@ -433,7 +492,12 @@ export class AuthController {
         return { message: 'Password reset successfully' };
     }
 
+    // M-20: tight throttle on token-validity oracles. The token space is large
+    // (256 bits of entropy), so brute-force is infeasible — but a leaked log
+    // line or DB peek combined with an unrestricted validity oracle would let
+    // an attacker confirm token guesses cheaply. 10/min/IP closes that side-channel.
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-email-token')
     @ApiOperation({
         summary: 'Validate email verification token',
@@ -447,6 +511,7 @@ export class AuthController {
     }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-reset-token')
     @ApiOperation({
         summary: 'Validate password reset token',

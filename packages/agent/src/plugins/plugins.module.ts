@@ -20,6 +20,7 @@ import { PluginVersionCheckerService } from './services/plugin-version-checker.s
 import { PluginClassValidatorService } from './services/plugin-class-validator.service';
 import { PluginLifecycleManagerService } from './services/plugin-lifecycle-manager.service';
 import { PluginSettingsService } from './services/plugin-settings.service';
+import { PluginSecretEncService } from './services/plugin-secret-enc.service';
 import { SettingsSchemaValidatorService } from './services/settings-schema-validator.service';
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
@@ -60,6 +61,7 @@ const PROVIDERS = [
     PluginLoaderService,
     // Lifecycle and settings
     PluginLifecycleManagerService,
+    PluginSecretEncService, // C-08: must register before PluginSettingsService (optional injection)
     PluginSettingsService,
     // Context and capabilities
     PluginContextFactoryService,
@@ -80,6 +82,7 @@ const EXPORTS = [
     PluginRegistryService,
     PluginLoaderService,
     PluginLifecycleManagerService,
+    PluginSecretEncService, // C-08
     PluginSettingsService,
     PluginContextFactoryService,
     CustomCapabilityRegistryService,

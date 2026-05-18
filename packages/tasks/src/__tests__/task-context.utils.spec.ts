@@ -23,6 +23,14 @@ class FakeOrchestrator {
     name = 'fake-orchestrator';
 }
 
+// H-22: createTaskContext now requires UUID-shaped workId / userId in the
+// payload. Use deterministic UUIDs in the spec so we test BOTH the happy
+// path AND can add an "invalid UUID rejected" case below.
+const TEST_WORK_ID = '11111111-2222-4333-8444-555555555555';
+const TEST_USER_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const TEST_WORK_ID_2 = '66666666-7777-4888-8999-aaaaaaaaaaaa';
+const TEST_USER_ID_2 = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
 describe('createTaskContext', () => {
     let hydrator: { initialize: ReturnType<typeof vi.fn> };
     let apiClient: { fetchWorkContext: ReturnType<typeof vi.fn> };
@@ -55,7 +63,7 @@ describe('createTaskContext', () => {
 
         await createTaskContext(
             appContext as any,
-            { workId: 'w1', userId: 'u1' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -70,11 +78,11 @@ describe('createTaskContext', () => {
 
         await createTaskContext(
             appContext as any,
-            { workId: 'work-42', userId: 'user-99' },
+            { workId: TEST_WORK_ID_2, userId: TEST_USER_ID_2 },
             FakeOrchestrator,
         );
 
-        expect(apiClient.fetchWorkContext).toHaveBeenCalledWith('work-42', 'user-99');
+        expect(apiClient.fetchWorkContext).toHaveBeenCalledWith(TEST_WORK_ID_2, TEST_USER_ID_2);
     });
 
     it('hydrates plain objects into Work/User class instances via class-transformer', async () => {
@@ -85,7 +93,7 @@ describe('createTaskContext', () => {
 
         const ctx = await createTaskContext(
             appContext as any,
-            { workId: 'w1', userId: 'u1' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -105,7 +113,7 @@ describe('createTaskContext', () => {
 
         const ctx = await createTaskContext(
             appContext as any,
-            { workId: 'w1', userId: 'u1' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -137,7 +145,7 @@ describe('createTaskContext', () => {
 
         const ctx = await createTaskContext(
             appContext as any,
-            { workId: 'w', userId: 'u' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -155,7 +163,7 @@ describe('createTaskContext', () => {
 
         const ctx = await createTaskContext(
             appContext as any,
-            { workId: 'w', userId: 'u' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -170,7 +178,7 @@ describe('createTaskContext', () => {
 
         const ctx = await createTaskContext(
             appContext as any,
-            { workId: 'w', userId: 'u' },
+            { workId: TEST_WORK_ID, userId: TEST_USER_ID },
             FakeOrchestrator,
         );
 
@@ -181,7 +189,11 @@ describe('createTaskContext', () => {
         hydrator.initialize.mockRejectedValueOnce(new Error('plugin-load-failed'));
 
         await expect(
-            createTaskContext(appContext as any, { workId: 'w', userId: 'u' }, FakeOrchestrator),
+            createTaskContext(
+                appContext as any,
+                { workId: TEST_WORK_ID, userId: TEST_USER_ID },
+                FakeOrchestrator,
+            ),
         ).rejects.toThrow('plugin-load-failed');
 
         expect(apiClient.fetchWorkContext).not.toHaveBeenCalled();
@@ -191,7 +203,11 @@ describe('createTaskContext', () => {
         apiClient.fetchWorkContext.mockRejectedValueOnce(new Error('api-down'));
 
         await expect(
-            createTaskContext(appContext as any, { workId: 'w', userId: 'u' }, FakeOrchestrator),
+            createTaskContext(
+                appContext as any,
+                { workId: TEST_WORK_ID, userId: TEST_USER_ID },
+                FakeOrchestrator,
+            ),
         ).rejects.toThrow('api-down');
 
         // appContext.get was called for hydrator + api-client + … but NOT for the orchestrator
@@ -199,5 +215,30 @@ describe('createTaskContext', () => {
         expect(tokens).toContain(TriggerPluginHydratorService);
         expect(tokens).toContain(TriggerInternalApiClient);
         expect(tokens).not.toContain(FakeOrchestrator);
+    });
+
+    // H-22: payload-boundary UUID validation.
+    it('rejects non-UUID workId before hitting the hydrator (H-22)', async () => {
+        await expect(
+            createTaskContext(
+                appContext as any,
+                { workId: 'not-a-uuid', userId: TEST_USER_ID },
+                FakeOrchestrator,
+            ),
+        ).rejects.toThrow(/Invalid payload.workId/);
+        expect(hydrator.initialize).not.toHaveBeenCalled();
+        expect(apiClient.fetchWorkContext).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-UUID userId before hitting the hydrator (H-22)', async () => {
+        await expect(
+            createTaskContext(
+                appContext as any,
+                { workId: TEST_WORK_ID, userId: 'not-a-uuid' },
+                FakeOrchestrator,
+            ),
+        ).rejects.toThrow(/Invalid payload.userId/);
+        expect(hydrator.initialize).not.toHaveBeenCalled();
+        expect(apiClient.fetchWorkContext).not.toHaveBeenCalled();
     });
 });

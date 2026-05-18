@@ -4,9 +4,67 @@ import * as fs from 'fs/promises';
 // Windows just fine for filesystem ops). Tests assert on POSIX paths.
 import * as path from 'path/posix';
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import type { Brand, Category, ItemData, Tag } from '../common/index.js';
 import type { ReferenceEntry } from '../pipeline/references.js';
 import { jsonrepair, normalizeItemTags, slugify, validateRequiredItemFields } from '../pipeline/workspace-utils.js';
+
+/**
+ * M-26: validation schema for items produced by CLI agents
+ * (claude-code, codex, gemini, opencode). Before this, only the four
+ * required fields were checked; the rest of the item flowed through
+ * unbounded — letting a prompt-injected model insert oversized payloads,
+ * unicode tricks, or attacker-chosen URLs into fields the platform later
+ * renders. Schema is intentionally permissive on shape (most fields are
+ * optional and free-form, by design of the CLI plugin contract) but
+ * enforces length caps and URL schemes everywhere a string could become
+ * an `href` / image src.
+ */
+const ITEM_STRING_MAX = 16 * 1024;
+const ITEM_LONG_STRING_MAX = 64 * 1024;
+const ITEM_TAG_MAX = 64;
+
+const httpUrl = z
+	.string()
+	.max(2048)
+	.refine(
+		(v) => {
+			try {
+				const u = new URL(v);
+				return u.protocol === 'http:' || u.protocol === 'https:';
+			} catch {
+				return false;
+			}
+		},
+		{ message: 'url must use http(s) scheme' }
+	);
+
+const stringOrNullish = z.union([z.string().max(ITEM_STRING_MAX), z.null(), z.undefined()]);
+
+const cliItemSchema = z
+	.object({
+		name: z.string().min(1).max(ITEM_STRING_MAX),
+		description: z.string().min(1).max(ITEM_LONG_STRING_MAX),
+		source_url: httpUrl,
+		category: z.union([z.string().max(ITEM_STRING_MAX), z.array(z.string().max(ITEM_STRING_MAX)).max(64)]),
+		tags: z.array(z.string().max(ITEM_TAG_MAX)).max(256).optional(),
+		images: z.array(httpUrl).max(64).optional(),
+		image: stringOrNullish.optional(),
+		brand: stringOrNullish.optional()
+		// Free-form metadata — accept but cap.
+	})
+	.catchall(z.unknown())
+	.transform((item) => {
+		// Cap any unknown top-level string fields silently to avoid letting
+		// 100 MB strings through via `metadata: { huge: "..." }`. This is a
+		// last-resort cap; explicit fields above already constrain expected paths.
+		for (const [k, v] of Object.entries(item)) {
+			if (typeof v === 'string' && v.length > ITEM_LONG_STRING_MAX) {
+				(item as Record<string, unknown>)[k] = v.slice(0, ITEM_LONG_STRING_MAX);
+			}
+		}
+		return item;
+	});
 
 export { collectMetadataFromItems, slugify, unslugify } from '../pipeline/workspace-utils.js';
 
@@ -175,8 +233,26 @@ export async function readGeneratedItems(
 					return null;
 				}
 
-				normalizeItemTags(data);
-				return data as unknown as ItemData;
+				// M-26: full-shape validation. `validateRequiredItemFields`
+				// only checks presence of the four required fields; the Zod
+				// schema additionally enforces field types, URL schemes
+				// (no `javascript:`), and length caps so a malicious CLI
+				// model output can't sneak oversized fields or unsafe URLs
+				// into the rendered site.
+				const parsed = cliItemSchema.safeParse(data);
+				if (!parsed.success) {
+					logger?.warn(
+						`Skipping ${fileName}: failed CLI item schema (M-26): ${parsed.error.issues
+							.slice(0, 3)
+							.map((e) => `${e.path.join('.') || '<root>'}: ${e.message}`)
+							.join('; ')}`
+					);
+					return null;
+				}
+				const validated = parsed.data as Record<string, unknown>;
+
+				normalizeItemTags(validated);
+				return validated as unknown as ItemData;
 			} catch (err) {
 				logger?.warn(`Skipping ${fileName}: ${err instanceof Error ? err.message : 'invalid JSON'}`);
 				return null;
@@ -187,9 +263,35 @@ export async function readGeneratedItems(
 	return results.filter((item: ItemData | null): item is ItemData => item !== null);
 }
 
-export async function cleanupWorkspace(workspacePath: string): Promise<void> {
+/**
+ * L-32: defensive guard against catastrophic `fs.rm({ recursive: true, force: true })`
+ * if a caller ever passes an empty string, `/`, or a path that isn't actually under
+ * the configured temp dir. `createWorkspace` is the only safe producer, but a future
+ * caller could pass a tampered string from a payload — refusing anything that
+ * resolves to a short / non-temp path is much cheaper than the worst case.
+ *
+ * Pass `baseTempDir` when you can; when you can't, we still refuse `/`, `''`,
+ * the root drive on Windows, and any path with fewer than 5 segments.
+ */
+export async function cleanupWorkspace(workspacePath: string, baseTempDir?: string): Promise<void> {
 	try {
-		await fs.rm(workspacePath, { recursive: true, force: true });
+		if (typeof workspacePath !== 'string' || workspacePath.trim().length === 0) {
+			return;
+		}
+		const resolved = path.resolve(workspacePath);
+		// Refuse root / near-root paths regardless of OS.
+		if (resolved === '/' || /^[A-Za-z]:[\\/]?$/.test(resolved)) {
+			return;
+		}
+		// If a baseTempDir is supplied, the workspace MUST be inside it.
+		if (baseTempDir) {
+			const baseResolved = path.resolve(baseTempDir);
+			const relative = path.relative(baseResolved, resolved);
+			if (relative.startsWith('..') || path.isAbsolute(relative) || relative === '') {
+				return;
+			}
+		}
+		await fs.rm(resolved, { recursive: true, force: true });
 	} catch {
 		// Cleanup failures are non-fatal.
 	}

@@ -8,6 +8,10 @@ jest.mock('@ever-works/agent/entities', () => ({
 const ORIGINAL_ENV = { ...process.env };
 beforeAll(() => {
     process.env.WEB_URL = 'https://app.test';
+    // C-04: callback-host allow-list — tests below use https://x.test/...
+    // as a custom callbackUrl, so that host must be in the allow-list.
+    // The platform's own host (app.test) is implicitly allowed.
+    process.env.ALLOWED_CALLBACK_HOSTS = 'x.test';
 });
 afterAll(() => {
     process.env = ORIGINAL_ENV;
@@ -15,6 +19,7 @@ afterAll(() => {
 
 import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 import { AuthService } from './auth.service';
 import type { UserRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
@@ -262,14 +267,23 @@ describe('AuthService', () => {
             );
         });
 
-        it('issues a token, sets 24h expiry, emits UserCreatedEvent and returns the token', async () => {
+        it('issues a token, sets 24h expiry, emits UserCreatedEvent and does NOT leak the token in the response (C-02)', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
             const result = await service.sendVerificationEmail('u-1');
 
+            // C-02: response must not include the verification token or its expiry.
+            expect(result).toEqual({ message: 'Verification email sent' });
+            expect((result as any).verificationToken).toBeUndefined();
+            expect((result as any).expiresAt).toBeUndefined();
+
+            // H-01: persisted value is sha256(token); raw token only travels
+            // via the emitted event (→ email).
             const updateInput = userRepo.update.mock.calls[0][1];
-            expect(updateInput.emailVerificationToken).toBe(result.verificationToken);
+            const persistedHash = updateInput.emailVerificationToken as string;
+            expect(typeof persistedHash).toBe('string');
+            expect(persistedHash).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
             expect(updateInput.emailVerificationExpires).toBeInstanceOf(Date);
             const expiry = updateInput.emailVerificationExpires as Date;
             const diffMs = expiry.getTime() - Date.now();
@@ -280,31 +294,40 @@ describe('AuthService', () => {
                 UserCreatedEvent.EVENT_NAME,
                 expect.any(UserCreatedEvent),
             );
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            const rawToken = event.confirmationToken;
+            expect(typeof rawToken).toBe('string');
+            // The persisted hash MUST be sha256(raw token) — verifies the
+            // H-01 invariant on every call.
+            expect(persistedHash).toBe(createHash('sha256').update(rawToken, 'utf8').digest('hex'));
         });
 
         it('appends ?token= when callbackUrl missing token=', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.sendVerificationEmail('u-1', 'https://x.test/verify');
+            await service.sendVerificationEmail('u-1', 'https://x.test/verify');
 
-            const event = (emitter.emit.mock.calls[0][1] as UserCreatedEvent).confirmationUrl;
-            expect(event).toBe(`https://x.test/verify?token=${result.verificationToken}`);
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            // H-01: URL carries the raw token from the event; the DB has its hash.
+            expect(event.confirmationUrl).toBe(
+                `https://x.test/verify?token=${event.confirmationToken}`,
+            );
+            expect(userRepo.update.mock.calls[0][1].emailVerificationToken).toBe(
+                createHash('sha256').update(event.confirmationToken, 'utf8').digest('hex'),
+            );
         });
 
         it('uses default callback URL when callbackUrl already has token=', async () => {
             userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.sendVerificationEmail(
-                'u-1',
-                'https://x.test/verify?token=already',
-            );
+            await service.sendVerificationEmail('u-1', 'https://x.test/verify?token=already');
 
-            const event = (emitter.emit.mock.calls[0][1] as UserCreatedEvent).confirmationUrl;
-            // When token= already present, the service overrides with default URL
-            expect(event).toBe(
-                `https://app.test/api/auth/verify-email?token=${result.verificationToken}`,
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            // When token= already present, the service overrides with default URL.
+            expect(event.confirmationUrl).toBe(
+                `https://app.test/api/auth/verify-email?token=${event.confirmationToken}`,
             );
         });
     });
@@ -360,15 +383,23 @@ describe('AuthService', () => {
     describe('forgotPassword', () => {
         it('returns generic message and skips emit when email unknown', async () => {
             userRepo.findByEmail.mockResolvedValue(null);
+            // H-03: timing-leveling does a throwaway bcrypt hash on the
+            // no-user branch. Mock it so the test runs fast. mockClear() is
+            // important because other tests in the file may have set up the
+            // same spy first and we want to assert exactly THIS call.
+            const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
+            bcryptSpy.mockClear();
 
             const result = await service.forgotPassword({ email: 'no@one.test' } as any);
 
             expect(result).toEqual({ message: 'If the email exists, a reset link has been sent' });
             expect(emitter.emit).not.toHaveBeenCalled();
             expect(userRepo.update).not.toHaveBeenCalled();
+            // H-03 verification: the dummy hash was called even though no user matched.
+            expect(bcryptSpy).toHaveBeenCalledTimes(1);
         });
 
-        it('issues reset token with 1h expiry and emits UserForgotPasswordEvent', async () => {
+        it('issues reset token with 1h expiry, emits UserForgotPasswordEvent, and does NOT leak the token in the response (C-01)', async () => {
             userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
             userRepo.update.mockResolvedValue({} as any);
 
@@ -377,8 +408,19 @@ describe('AuthService', () => {
                 resetPasswordCallbackUrl: 'https://x.test/reset',
             } as any);
 
+            // C-01: response must not include the reset token or expiry — only the generic message.
+            expect(result).toEqual({
+                message: 'If the email exists, a reset link has been sent',
+            });
+            expect((result as any).resetToken).toBeUndefined();
+            expect((result as any).expiresAt).toBeUndefined();
+
+            // H-01: persisted value is sha256(token); raw token only travels
+            // via the emitted event (→ email).
             const updateInput = userRepo.update.mock.calls[0][1];
-            expect(updateInput.passwordResetToken).toBe((result as any).resetToken);
+            const persistedHash = updateInput.passwordResetToken as string;
+            expect(typeof persistedHash).toBe('string');
+            expect(persistedHash).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
             const expires = updateInput.passwordResetExpires as Date;
             expect(expires.getTime() - Date.now()).toBeGreaterThan(50 * 60 * 1000);
             expect(expires.getTime() - Date.now()).toBeLessThan(70 * 60 * 1000);
@@ -387,19 +429,68 @@ describe('AuthService', () => {
                 expect.any(UserForgotPasswordEvent),
             );
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
-            expect(event.resetUrl).toBe(`https://x.test/reset?token=${(result as any).resetToken}`);
+            const rawToken = event.resetToken;
+            expect(persistedHash).toBe(createHash('sha256').update(rawToken, 'utf8').digest('hex'));
+            expect(event.resetUrl).toBe(`https://x.test/reset?token=${rawToken}`);
         });
 
         it('uses default URL when callbackUrl missing', async () => {
             userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
             userRepo.update.mockResolvedValue({} as any);
 
-            const result = await service.forgotPassword({ email: 'a@b.co' } as any);
+            await service.forgotPassword({ email: 'a@b.co' } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
+            // H-01: URL carries the raw token (from event), DB has its hash.
+            expect(event.resetUrl).toBe(
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
+            );
+            expect(userRepo.update.mock.calls[0][1].passwordResetToken).toBe(
+                createHash('sha256').update(event.resetToken, 'utf8').digest('hex'),
+            );
+        });
+
+        it('rejects callbackUrl outside ALLOWED_CALLBACK_HOSTS and falls back to platform default (C-04)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.forgotPassword({
+                email: 'a@b.co',
+                resetPasswordCallbackUrl: 'https://attacker.example/steal',
+            } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
+            // Attacker host was rejected → platform default URL used instead.
+            expect(event.resetUrl).toBe(
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
+            );
+        });
+
+        it('rejects javascript: scheme callbackUrl (C-04)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.forgotPassword({
+                email: 'a@b.co',
+                resetPasswordCallbackUrl: 'javascript:alert(1)',
+            } as any);
 
             const event = emitter.emit.mock.calls[0][1] as UserForgotPasswordEvent;
             expect(event.resetUrl).toBe(
-                `https://app.test/api/auth/reset-password?token=${(result as any).resetToken}`,
+                `https://app.test/api/auth/reset-password?token=${event.resetToken}`,
             );
+            expect(event.resetUrl.startsWith('javascript:')).toBe(false);
+        });
+
+        it('returns the same generic body shape whether or not the email exists (H-03 mitigation)', async () => {
+            userRepo.findByEmail.mockResolvedValueOnce(null);
+            const r1 = await service.forgotPassword({ email: 'unknown@x.test' } as any);
+
+            userRepo.findByEmail.mockResolvedValueOnce({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+            const r2 = await service.forgotPassword({ email: 'known@x.test' } as any);
+
+            expect(r1).toEqual(r2);
         });
     });
 
@@ -449,14 +540,16 @@ describe('AuthService', () => {
             );
         });
 
-        it('returns the user when consumed', async () => {
+        it('returns the user when consumed; clear keyed on sha256(token) per H-01', async () => {
             const user = { id: 'u', passwordResetExpires: new Date(Date.now() + 1000) };
             userRepo.findOne.mockResolvedValue(user as any);
             userRepo.clearPasswordResetToken.mockResolvedValue(true);
 
             const result = await service.consumePasswordResetToken('t');
 
-            expect(userRepo.clearPasswordResetToken).toHaveBeenCalledWith('u', 't');
+            // H-01: DB stores sha256(token); clear is keyed on the hash.
+            const expectedHash = createHash('sha256').update('t', 'utf8').digest('hex');
+            expect(userRepo.clearPasswordResetToken).toHaveBeenCalledWith('u', expectedHash);
             expect(result).toBe(user);
         });
     });
