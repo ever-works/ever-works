@@ -1,0 +1,101 @@
+# Optional self-hosted Trigger.dev stack for Ever Works platform.
+#
+# Layered on top of docker-compose.yml (or docker-compose.build.yml) to
+# provide a local Trigger.dev webapp for running the platform's background
+# jobs (packages/tasks). All services are gated behind the `trigger`
+# Compose profile, so they only start when the profile is explicitly
+# selected:
+#
+#   docker compose \
+#     -f docker-compose.yml -f docker-compose.trigger.yml \
+#     --profile trigger up -d
+#
+# Note: Trigger.dev Cloud (https://trigger.dev) is the recommended path
+# for most users — point TRIGGER_API_URL at it in .env.compose and skip
+# this file entirely. Self-hosting v4 is a heavier setup; for a full
+# production deployment follow the official Trigger.dev guide:
+# https://trigger.dev/docs/self-hosting/docker
+#
+# This file ships an intentionally minimal webapp + bundled Postgres on
+# isolated ports/network suffixes so it doesn't collide with the
+# platform's own Postgres (port 5432 → 5433 here, Redis 6379 → 6389).
+
+services:
+    ever-works-trigger-db:
+        image: postgres:16-alpine
+        container_name: ever-works-trigger-db
+        restart: unless-stopped
+        profiles: ['trigger']
+        environment:
+            POSTGRES_DB: trigger
+            POSTGRES_USER: ${TRIGGER_DB_USER:-trigger}
+            POSTGRES_PASSWORD: ${TRIGGER_DB_PASS:-trigger_password}
+        command: ['postgres', '-c', 'wal_level=logical']
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} || exit 1',
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        volumes:
+            - trigger_postgres_data:/var/lib/postgresql/data/
+        ports:
+            - '${TRIGGER_DB_PUBLISH_PORT:-5433}:5432'
+        networks:
+            - ever-works-network
+
+    ever-works-trigger-redis:
+        image: redis:7-alpine
+        container_name: ever-works-trigger-redis
+        restart: unless-stopped
+        profiles: ['trigger']
+        command: ['redis-server', '--appendonly', 'yes']
+        healthcheck:
+            test: ['CMD-SHELL', 'redis-cli -h localhost ping | grep -q PONG']
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        volumes:
+            - trigger_redis_data:/data
+        ports:
+            - '${TRIGGER_REDIS_PUBLISH_PORT:-6389}:6379'
+        networks:
+            - ever-works-network
+
+    ever-works-trigger-webapp:
+        # Trigger.dev v4 webapp — pin TRIGGER_IMAGE_TAG in .env.compose to a
+        # specific v4 release (e.g. `v4.4.6`) for reproducible deploys.
+        image: ghcr.io/triggerdotdev/trigger.dev:${TRIGGER_IMAGE_TAG:-v4}
+        container_name: ever-works-trigger-webapp
+        restart: unless-stopped
+        profiles: ['trigger']
+        depends_on:
+            ever-works-trigger-db:
+                condition: service_healthy
+            ever-works-trigger-redis:
+                condition: service_healthy
+        environment:
+            LOGIN_ORIGIN: ${TRIGGER_LOGIN_ORIGIN:-http://localhost:3040}
+            APP_ORIGIN: ${TRIGGER_APP_ORIGIN:-http://localhost:3040}
+            DATABASE_URL: postgresql://${TRIGGER_DB_USER:-trigger}:${TRIGGER_DB_PASS:-trigger_password}@ever-works-trigger-db:5432/trigger
+            DIRECT_URL: postgresql://${TRIGGER_DB_USER:-trigger}:${TRIGGER_DB_PASS:-trigger_password}@ever-works-trigger-db:5432/trigger
+            REDIS_HOST: ever-works-trigger-redis
+            REDIS_PORT: 6379
+            REDIS_TLS_DISABLED: 'true'
+            SESSION_SECRET: ${TRIGGER_SESSION_SECRET:-change-me-session-secret}
+            MAGIC_LINK_SECRET: ${TRIGGER_MAGIC_LINK_SECRET:-change-me-magic-link-secret}
+            ENCRYPTION_KEY: ${TRIGGER_ENCRYPTION_KEY:-change-me-encryption-key-32-bytes}
+            MANAGED_WORKER_SECRET: ${TRIGGER_MANAGED_WORKER_SECRET:-change-me-worker-secret}
+            WHITELISTED_EMAILS: ${TRIGGER_WHITELISTED_EMAILS:-}
+            NODE_ENV: production
+        ports:
+            - '${TRIGGER_WEBAPP_PUBLISH_PORT:-3040}:3000'
+        networks:
+            - ever-works-network
+
+volumes:
+    trigger_postgres_data: {}
+    trigger_redis_data: {}

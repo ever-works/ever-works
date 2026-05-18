@@ -1,0 +1,94 @@
+# Main compose for Ever Works platform — uses pre-built images from GHCR.
+#
+# Brings up the full platform (api, web, mcp, docs) plus the shared infra
+# (PostgreSQL, Redis) from docker-compose.infra.yml. The application
+# containers pull `ghcr.io/ever-works/*:latest` so this is the fast path —
+# no local Docker build, just `docker compose up`.
+#
+# Quick start:
+#
+#   cp .env.compose .env                             # optional — edit as needed
+#   docker compose up -d
+#   open http://localhost:3000                       # web dashboard
+#
+# Want to build the images locally instead of pulling from GHCR? Use
+# docker-compose.build.yml — same services, but with `build:` blocks.
+#
+# Want self-hosted Trigger.dev for background jobs? Layer in
+# docker-compose.trigger.yml (profile-gated, off by default):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.trigger.yml \
+#       --profile trigger up -d
+
+include:
+    - ./docker-compose.infra.yml
+
+services:
+    ever-works-api:
+        image: ghcr.io/ever-works/ever-works-api:latest
+        container_name: ever-works-api
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            # Database — point the API at the bundled Postgres
+            DATABASE_TYPE: postgres
+            DATABASE_HOST: ever-works-db
+            DATABASE_PORT: 5432
+            DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+            DATABASE_PASSWORD: ${DATABASE_PASSWORD:-ever_works_password}
+            DATABASE_NAME: ${DATABASE_NAME:-ever_works}
+            RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+            # Distributed throttler + BullMQ — bundled Redis
+            THROTTLER_REDIS_URL: redis://ever-works-redis:6379
+            REDIS_URL: redis://ever-works-redis:6379
+            # API surface
+            APP_TYPE: api
+            PORT: 3100
+            WEB_URL: ${WEB_URL:-http://localhost:3000}
+        depends_on:
+            ever-works-db:
+                condition: service_healthy
+            ever-works-redis:
+                condition: service_healthy
+        ports:
+            - '3100:3100'
+        networks:
+            - ever-works-network
+
+    ever-works-web:
+        image: ghcr.io/ever-works/ever-works-web:latest
+        container_name: ever-works-web
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            API_URL: http://ever-works-api:3100
+            NEXT_PUBLIC_WEB_URL: ${WEB_URL:-http://localhost:3000}
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3000:3000'
+        networks:
+            - ever-works-network
+
+    ever-works-mcp:
+        image: ghcr.io/ever-works/ever-works-mcp:latest
+        container_name: ever-works-mcp
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            EVER_WORKS_API_URL: http://ever-works-api:3100
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3200:3200'
+        networks:
+            - ever-works-network
+
+    ever-works-docs:
+        image: ghcr.io/ever-works/ever-works-docs:latest
+        container_name: ever-works-docs
+        restart: unless-stopped
+        ports:
+            - '3300:80'
+        networks:
+            - ever-works-network

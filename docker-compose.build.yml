@@ -1,0 +1,99 @@
+# Local-build compose for Ever Works platform.
+#
+# Same shape as docker-compose.yml, but every application service is built
+# from source via the Dockerfiles under .deploy/docker/. Use this when:
+#   - You're hacking on api / web / mcp / docs and want your changes baked
+#     into a container.
+#   - You're cutting a release image you intend to push to your own
+#     registry (override the `image:` tag).
+#   - GHCR is unavailable and you want a fully air-gapped build.
+#
+# Quick start:
+#
+#   docker compose -f docker-compose.build.yml up --build -d
+#
+# Note: turbo prune walks the monorepo, so the build context is the repo
+# root for every service. First build takes a few minutes; subsequent
+# builds reuse Docker's layer cache.
+
+include:
+    - ./docker-compose.infra.yml
+
+services:
+    ever-works-api:
+        image: ever-works-api:local
+        container_name: ever-works-api
+        build:
+            context: .
+            dockerfile: .deploy/docker/api/Dockerfile
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            DATABASE_TYPE: postgres
+            DATABASE_HOST: ever-works-db
+            DATABASE_PORT: 5432
+            DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+            DATABASE_PASSWORD: ${DATABASE_PASSWORD:-ever_works_password}
+            DATABASE_NAME: ${DATABASE_NAME:-ever_works}
+            RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+            THROTTLER_REDIS_URL: redis://ever-works-redis:6379
+            REDIS_URL: redis://ever-works-redis:6379
+            APP_TYPE: api
+            PORT: 3100
+            WEB_URL: ${WEB_URL:-http://localhost:3000}
+        depends_on:
+            ever-works-db:
+                condition: service_healthy
+            ever-works-redis:
+                condition: service_healthy
+        ports:
+            - '3100:3100'
+        networks:
+            - ever-works-network
+
+    ever-works-web:
+        image: ever-works-web:local
+        container_name: ever-works-web
+        build:
+            context: .
+            dockerfile: .deploy/docker/web/Dockerfile
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            API_URL: http://ever-works-api:3100
+            NEXT_PUBLIC_WEB_URL: ${WEB_URL:-http://localhost:3000}
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3000:3000'
+        networks:
+            - ever-works-network
+
+    ever-works-mcp:
+        image: ever-works-mcp:local
+        container_name: ever-works-mcp
+        build:
+            context: .
+            dockerfile: .deploy/docker/mcp/Dockerfile
+        restart: unless-stopped
+        env_file: .env.compose
+        environment:
+            EVER_WORKS_API_URL: http://ever-works-api:3100
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3200:3200'
+        networks:
+            - ever-works-network
+
+    ever-works-docs:
+        image: ever-works-docs:local
+        container_name: ever-works-docs
+        build:
+            context: .
+            dockerfile: .deploy/docker/docs/Dockerfile
+        restart: unless-stopped
+        ports:
+            - '3300:80'
+        networks:
+            - ever-works-network

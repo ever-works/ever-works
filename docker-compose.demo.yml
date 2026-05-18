@@ -1,0 +1,76 @@
+# Demo compose for Ever Works platform.
+#
+# Minimal, zero-dependency showcase. Brings up api + web + mcp + docs from
+# pre-built GHCR images using SQLite in a named volume — no Postgres, no
+# Redis, no Trigger.dev. The goal is "clone, `docker compose up`, see it
+# work" for first-time evaluators.
+#
+# Quick start:
+#
+#   docker compose -f docker-compose.demo.yml --env-file .env.demo.compose up -d
+#   open http://localhost:3000
+#
+# For anything past evaluation, use docker-compose.yml (Postgres + Redis,
+# production-shaped) or docker-compose.build.yml (build from source).
+
+services:
+    ever-works-api:
+        image: ghcr.io/ever-works/ever-works-api:latest
+        container_name: ever-works-api
+        restart: unless-stopped
+        env_file: .env.demo.compose
+        environment:
+            DATABASE_TYPE: sqlite
+            DATABASE_PATH: /app/apps/api/data/database.db
+            APP_TYPE: api
+            PORT: 3100
+        volumes:
+            - api_data:/app/apps/api/data
+        ports:
+            - '3100:3100'
+        networks:
+            - ever-works-network
+
+    ever-works-web:
+        image: ghcr.io/ever-works/ever-works-web:latest
+        container_name: ever-works-web
+        restart: unless-stopped
+        env_file: .env.demo.compose
+        environment:
+            API_URL: http://ever-works-api:3100
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3000:3000'
+        networks:
+            - ever-works-network
+
+    ever-works-mcp:
+        image: ghcr.io/ever-works/ever-works-mcp:latest
+        container_name: ever-works-mcp
+        restart: unless-stopped
+        env_file: .env.demo.compose
+        environment:
+            EVER_WORKS_API_URL: http://ever-works-api:3100
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3200:3200'
+        networks:
+            - ever-works-network
+
+    ever-works-docs:
+        image: ghcr.io/ever-works/ever-works-docs:latest
+        container_name: ever-works-docs
+        restart: unless-stopped
+        ports:
+            - '3300:80'
+        networks:
+            - ever-works-network
+
+volumes:
+    api_data: {}
+
+networks:
+    ever-works-network:
+        driver: bridge
