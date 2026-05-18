@@ -165,9 +165,28 @@ export const authAPI = {
         return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url`);
     },
 
-    connectOAuthCallback: async (providerId: OAuthProvider, code: string) => {
-        const params = new URLSearchParams({ code });
-        return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`);
+    /**
+     * Exchange an OAuth callback `code` for an authenticated session.
+     *
+     * Forwards the validated `state` along two channels so the API's C-03
+     * state check (`OAuthController.authRedirect`) succeeds even though the
+     * request is server-to-server and doesn't carry the browser's
+     * `ew_oauth_state` cookie:
+     *
+     *   - `?state=<state>` query parameter
+     *   - `Cookie: ew_oauth_state=<state>` request header
+     *
+     * The caller (web `handleOAuthCallback`) has already verified that this
+     * `state` equals the value the API minted on `/api/oauth/:p/url` and
+     * mirrored into the host-scoped `oauth_state` cookie on the web origin,
+     * so forwarding both is equivalent to the browser-direct path the API
+     * was originally written for.
+     */
+    connectOAuthCallback: async (providerId: OAuthProvider, code: string, state: string) => {
+        const params = new URLSearchParams({ code, state });
+        return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`, {
+            headers: { cookie: `ew_oauth_state=${state}` },
+        });
     },
 
     // Email Verification

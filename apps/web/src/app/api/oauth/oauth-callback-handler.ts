@@ -27,8 +27,13 @@ export async function handleOAuthCallback(request: NextRequest, providerId: stri
         });
     }
 
+    // C-03: require state to be present AND match the cookie. The previous
+    // `if (state !== storedState)` shape already rejected empty state (since
+    // `null !== "ABC"`), but spell it out so a future refactor can't soften
+    // it to a conditional `if (state && …)` like the plugin callbacks used
+    // to have.
     const storedState = await getOAuthStateCookie();
-    if (state !== storedState) {
+    if (!state || state !== storedState) {
         await removeOAuthStateCookie();
         return redirect({
             locale,
@@ -38,13 +43,18 @@ export async function handleOAuthCallback(request: NextRequest, providerId: stri
 
     await removeOAuthStateCookie();
 
-    return loginOauth(request, providerId as OAuthProvider, code, locale);
+    // Forward the validated state to the API exchange call so its own C-03
+    // check (`OAuthController.authRedirect`) succeeds — the API expects
+    // `?state=` query + matching `ew_oauth_state` cookie, and the web's
+    // server-to-server fetch synthesizes both from the same validated value.
+    return loginOauth(request, providerId as OAuthProvider, code, state, locale);
 }
 
 async function loginOauth(
     request: NextRequest,
     provider: OAuthProvider,
     code: string,
+    state: string,
     locale: string,
 ) {
     let href: string = ROUTES.DASHBOARD;
@@ -54,7 +64,7 @@ async function loginOauth(
         if (!Object.values(OAuthProvider).includes(provider)) {
             href = ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider';
         } else {
-            authResponse = await authAPI.connectOAuthCallback(provider, code);
+            authResponse = await authAPI.connectOAuthCallback(provider, code, state);
         }
 
         if (authResponse) {

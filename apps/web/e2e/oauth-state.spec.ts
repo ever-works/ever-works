@@ -23,16 +23,42 @@ import { API_BASE } from './helpers/api';
 
 const PROVIDERS = ['github', 'google'] as const;
 
+/**
+ * Treat the response as "credentials not provisioned in this environment"
+ * ONLY when it is a 400 carrying a known "client id/secret not configured"
+ * or "Unsupported OAuth provider" message. Anything else — non-deterministic
+ * 5xx, network errors, any 400 that doesn't match these signals — is treated
+ * as a real failure so the suite catches regressions in the URL endpoint
+ * itself (the exact contract this file exists to defend).
+ */
+async function isProviderUnconfigured(
+    res: import('@playwright/test').APIResponse,
+): Promise<boolean> {
+    if (res.status() !== 400) return false;
+    let body: unknown;
+    try {
+        body = await res.json();
+    } catch {
+        return false;
+    }
+    const message =
+        typeof body === 'object' && body !== null && 'message' in body
+            ? String((body as { message: unknown }).message ?? '')
+            : '';
+    return (
+        /client (id|secret) is not configured/i.test(message) ||
+        /unsupported oauth provider/i.test(message)
+    );
+}
+
 for (const providerId of PROVIDERS) {
     test.describe(`OAuth ${providerId} URL contract (C-03 state round-trip)`, () => {
         test(`GET /api/oauth/${providerId}/url returns url + state and the URL embeds the same state`, async ({
             request,
         }) => {
             const res = await request.get(`${API_BASE}/api/oauth/${providerId}/url`);
-            // 200 only if credentials are configured for the provider on the
-            // test API. Skip cleanly otherwise so this suite stays portable.
-            if (res.status() === 400 || res.status() === 500) {
-                test.skip(true, `${providerId} OAuth not configured on this API; skipping`);
+            if (await isProviderUnconfigured(res)) {
+                test.skip(true, `${providerId} OAuth client id/secret not configured; skipping`);
                 return;
             }
             expect(res.status(), `status was ${res.status()}`).toBe(200);
@@ -59,10 +85,12 @@ for (const providerId of PROVIDERS) {
         }) => {
             const a = await request.get(`${API_BASE}/api/oauth/${providerId}/url`);
             const b = await request.get(`${API_BASE}/api/oauth/${providerId}/url`);
-            if (a.status() !== 200 || b.status() !== 200) {
-                test.skip(true, `${providerId} OAuth not configured on this API; skipping`);
+            if ((await isProviderUnconfigured(a)) || (await isProviderUnconfigured(b))) {
+                test.skip(true, `${providerId} OAuth client id/secret not configured; skipping`);
                 return;
             }
+            expect(a.status(), `first call status was ${a.status()}`).toBe(200);
+            expect(b.status(), `second call status was ${b.status()}`).toBe(200);
             const ja = await a.json();
             const jb = await b.json();
             expect(ja.state).not.toEqual(jb.state);
