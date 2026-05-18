@@ -361,6 +361,13 @@ export class AuthProviderService extends AuthProvider {
             iat: Math.floor(Date.now() / 1000),
             iss: 'auth-runtime',
             aud: 'ever-works-users',
+            // EW-617 G3: propagate isAnonymous so `/api/auth/claim`'s
+            // controller-level anonymous-only guard can read it from
+            // `req.user`. Better Auth's session.user does carry the column
+            // through the TypeORM adapter even though it's not declared on
+            // the trimmed AuthRuntimeUser shape.
+            isAnonymous:
+                (user as AuthRuntimeUser & { isAnonymous?: boolean }).isAnonymous === true,
         };
     }
 
@@ -376,6 +383,11 @@ export class AuthProviderService extends AuthProvider {
             iat: Math.floor(Date.now() / 1000),
             iss: 'auth-runtime',
             aud: 'ever-works-users',
+            // EW-617 G3: propagate isAnonymous from the DB row. This is the
+            // bearer-token code path (POST /api/auth/anonymous returns an
+            // opaque token; the zero-friction-flow e2e test then bearer-auths
+            // POST /api/auth/claim, which throws 403 unless req.user.isAnonymous === true).
+            isAnonymous: user.isAnonymous === true,
         };
     }
 

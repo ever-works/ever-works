@@ -240,6 +240,56 @@ describe('AuthProviderService', () => {
                 service.authenticate(new Headers({ authorization: 'Bearer t' })),
             ).rejects.toThrow(new UnauthorizedException('User not found'));
         });
+
+        // EW-617 G3: zero-friction-flow e2e calls POST /api/auth/claim via the
+        // bearer token returned by POST /api/auth/anonymous. The claim controller
+        // throws Forbidden unless `req.user.isAnonymous === true`, so the field
+        // must round-trip from the DB row through mapAuthenticatedUserFromUser.
+        it('propagates isAnonymous=true from the User row', async () => {
+            const { service, sessionRepository, userRepository } = createService();
+            sessionRepository.findOne.mockResolvedValue({
+                token: 't',
+                userId: 'u-anon',
+                expiresAt: new Date(Date.now() + 1000),
+            });
+            userRepository.findById.mockResolvedValue({
+                id: 'u-anon',
+                email: null,
+                username: 'anon-abc',
+                registrationProvider: 'anonymous',
+                emailVerified: false,
+                isActive: true,
+                avatar: null,
+                isAnonymous: true,
+            });
+
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
+
+            expect(result?.isAnonymous).toBe(true);
+        });
+
+        it('returns isAnonymous=false for a regular User row', async () => {
+            const { service, sessionRepository, userRepository } = createService();
+            sessionRepository.findOne.mockResolvedValue({
+                token: 't',
+                userId: 'u-real',
+                expiresAt: new Date(Date.now() + 1000),
+            });
+            userRepository.findById.mockResolvedValue({
+                id: 'u-real',
+                email: 'a@b.co',
+                username: 'alice',
+                registrationProvider: 'local',
+                emailVerified: true,
+                isActive: true,
+                avatar: null,
+                isAnonymous: false,
+            });
+
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
+
+            expect(result?.isAnonymous).toBe(false);
+        });
     });
 
     describe('authenticate — Better Auth cookie path', () => {
