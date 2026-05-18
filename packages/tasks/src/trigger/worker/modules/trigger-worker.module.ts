@@ -18,6 +18,7 @@ import {
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
+import { CategoryIconService } from '@ever-works/agent/services';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -79,6 +80,10 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
                 createRemoteProxy(apiClient, 'UserRepository'),
             inject: [TriggerInternalApiClient],
         },
+        // DataGeneratorService consumes CategoryIconService for icon enrichment (EW-357).
+        // CACHE_MANAGER is provided globally via TriggerRemoteCacheModule; AiFacadeService
+        // comes from TriggerFacadesModule — both deps reachable in worker scope.
+        CategoryIconService,
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,
