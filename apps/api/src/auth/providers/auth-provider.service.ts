@@ -363,11 +363,10 @@ export class AuthProviderService extends AuthProvider {
             aud: 'ever-works-users',
             // EW-617 G3: propagate isAnonymous so `/api/auth/claim`'s
             // controller-level anonymous-only guard can read it from
-            // `req.user`. Better Auth's session.user does carry the column
-            // through the TypeORM adapter even though it's not declared on
-            // the trimmed AuthRuntimeUser shape.
-            isAnonymous:
-                (user as AuthRuntimeUser & { isAnonymous?: boolean }).isAnonymous === true,
+            // `req.user`. Better Auth's session.user carries the column
+            // through the TypeORM adapter even though it's not declared
+            // on the trimmed AuthRuntimeUser shape.
+            isAnonymous: (user as { isAnonymous?: boolean }).isAnonymous === true,
         };
     }
 
