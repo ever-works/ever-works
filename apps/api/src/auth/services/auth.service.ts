@@ -425,6 +425,15 @@ export class AuthService {
 
     async validateEmailVerificationToken(token: string) {
         // H-01: lookup by sha256(submitted). DB stores hashes only.
+        // Guard non-string/empty input so a missing `?token=` query param
+        // returns 200 + `valid: false` instead of 500ing inside
+        // `createHash().update(undefined)`. The E2E `api-public-contract`
+        // suite hits these endpoints without a token to verify the public
+        // contract; without the guard, NestJS surfaces the TypeError as a
+        // 500 and the spec fails (`expect(res.status()).toBeLessThan(500)`).
+        if (typeof token !== 'string' || token.length === 0) {
+            return { valid: false, message: 'Invalid verification token' };
+        }
         const tokenHash = hashToken(token);
         const user = await this.userRepository.findOne({
             where: { emailVerificationToken: tokenHash },
@@ -448,6 +457,11 @@ export class AuthService {
 
     async validatePasswordResetToken(token: string) {
         // H-01: lookup by sha256(submitted). DB stores hashes only.
+        // Guard non-string/empty input — see validateEmailVerificationToken
+        // for the rationale.
+        if (typeof token !== 'string' || token.length === 0) {
+            return { valid: false, message: 'Invalid reset token' };
+        }
         const tokenHash = hashToken(token);
         const user = await this.userRepository.findOne({
             where: { passwordResetToken: tokenHash },
