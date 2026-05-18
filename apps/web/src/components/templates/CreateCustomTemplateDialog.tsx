@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
-import { Tooltip } from '@/components/ui/tooltip';
 import { ProviderChoiceButton } from '@/components/works/detail/plugins/ProviderChoiceButton';
+import { ChatProviderSelector } from '@/components/ai/ChatProviderSelector';
 import {
     Dialog,
     DialogClose,
@@ -61,7 +61,6 @@ export function CreateCustomTemplateDialog({
     onSucceeded,
 }: CreateCustomTemplateDialogProps) {
     const t = useTranslations('dashboard.templates.customizeDialog');
-    const tGen = useTranslations('dashboard.workDetail.generator');
     const enabledProviders = useMemo(() => providers.filter((p) => p.enabled), [providers]);
     const enabledAiProviders = useMemo(() => aiProviders.filter((p) => p.enabled), [aiProviders]);
     // Prefer the plugin that declares 'code-edit' in defaultForCapabilities;
@@ -248,35 +247,19 @@ export function CreateCustomTemplateDialog({
                         </Field>
 
                         <Field label={t('providerLabel')} hint={t('providerHelp')}>
-                            <div className="flex flex-wrap gap-1.5">
-                                {providers.map((provider) => {
-                                    const isActive = providerId === provider.id;
-                                    const notConfigured = !provider.enabled;
-                                    const button = (
-                                        <ProviderChoiceButton
-                                            name={provider.providerName || provider.name}
-                                            icon={provider.icon}
-                                            isActive={isActive}
-                                            disabled={disabled}
-                                            notConfigured={notConfigured}
-                                            notConfiguredLabel={tGen('notConfigured')}
-                                            onSelect={() => {
-                                                if (!notConfigured) setProviderId(provider.id);
-                                            }}
-                                        />
-                                    );
-                                    return notConfigured ? (
-                                        <Tooltip
-                                            key={provider.id}
-                                            content={tGen('notConfiguredTooltip')}
-                                        >
-                                            {button}
-                                        </Tooltip>
-                                    ) : (
-                                        <span key={provider.id}>{button}</span>
-                                    );
-                                })}
-                            </div>
+                            <ChatProviderSelector
+                                providers={providers.map((p) => ({
+                                    id: p.id,
+                                    name: p.providerName || p.name,
+                                    description: p.description ?? undefined,
+                                    configured: p.enabled,
+                                    isDefault: p.isDefault,
+                                    icon: p.icon,
+                                }))}
+                                selectedProvider={providerId}
+                                isStreaming={disabled}
+                                onSelect={setProviderId}
+                            />
                         </Field>
 
                         {requiresAiProvider && (
