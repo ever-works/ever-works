@@ -111,15 +111,48 @@ export const ENTITIES = [
     UserSyncConfig,
 ];
 
+/**
+ * Resolve TypeORM migration globs that work in both dev (TS source) and
+ * Docker / k8s (compiled JS). TypeORM accepts an array of globs and
+ * silently ignores any that don't match files, so listing all known
+ * layouts is safe and idempotent.
+ *
+ * Paths are absolute and use forward slashes (TypeORM's glob loader is
+ * cross-platform but a few internals trip on backslashes on Windows).
+ *
+ *   - Docker / prod:        `/app/dist/migrations/*.js` (cwd = /app)
+ *   - Local API workspace:  `apps/api/dist/migrations/*.js` (from repo root)
+ *   - Local API workspace:  `apps/api/src/migrations/*.ts` (ts-node / SWC)
+ *   - From apps/api cwd:    `src/migrations/*.ts` and `dist/migrations/*.js`
+ */
+function resolveMigrationGlobs(): string[] {
+    const cwd = process.cwd().replace(/\\/g, '/');
+    return [
+        `${cwd}/dist/migrations/*.js`,
+        `${cwd}/src/migrations/*.ts`,
+        `${cwd}/apps/api/dist/migrations/*.js`,
+        `${cwd}/apps/api/src/migrations/*.ts`,
+    ];
+}
+
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const environment = config.getEnvironment() || 'development';
     const appType = config.getAppType() || 'api';
     let dbType = config.database.getType();
 
+    // `migrationsRun` is gated on the API app type — CLI uses synchronize
+    // for its local SQLite (`DatabaseInitService` does that), so it has no
+    // use for the migrations table.
+    const migrationsRun = appType === 'api' && config.database.runMigrations();
+
     const baseConfig: any = {
         entities: ENTITIES,
         synchronize: config.database.autoMigrate(),
         logging: config.database.loggingEnabled(),
+        migrations: resolveMigrationGlobs(),
+        migrationsRun,
+        migrationsTableName: 'migrations',
+        migrationsTransactionMode: 'all' as const,
     };
 
     if (config.database.sslMode()) {
