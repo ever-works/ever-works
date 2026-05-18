@@ -296,11 +296,7 @@ export async function cleanupWorkspace(workspacePath: string, baseTempDir?: stri
 		// touch the filesystem.
 		const nativeResolved = nativePath.resolve(workspacePath);
 		const winResolved = nativePath.win32.resolve(workspacePath);
-		if (
-			resolved === '/' ||
-			nativeResolved === '/' ||
-			/^[A-Za-z]:[\\/]?$/.test(winResolved)
-		) {
+		if (resolved === '/' || nativeResolved === '/' || /^[A-Za-z]:[\\/]?$/.test(winResolved)) {
 			return;
 		}
 		// If a baseTempDir is supplied, the workspace MUST be inside it.
