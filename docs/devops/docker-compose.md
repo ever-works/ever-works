@@ -88,15 +88,19 @@ For a full production self-host (workers on separate machines, ClickHouse, objec
 
 ### `ever-works-api`
 
-NestJS REST API. Listens on `3100`. Reads `.env.compose`, plus inline overrides for `DATABASE_*` and `*_REDIS_URL` that point at the bundled services.
+NestJS REST API. Listens on `3100`. Reads `.env.compose` for all backing-service config — the compose file only hardcodes the container's *role* (`APP_TYPE=api`, `PORT=3100`), so every DB / Redis / Trigger.dev knob below can be overridden by editing `.env.compose` (or shelling out an env var before `docker compose up`) without touching the compose YAML.
 
-| Container env       | Default                              | Notes                                              |
-| ------------------- | ------------------------------------ | -------------------------------------------------- |
-| `DATABASE_TYPE`     | `postgres`                           | `sqlite` only in the demo compose.                 |
-| `DATABASE_HOST`     | `ever-works-db`                      | Compose service name.                              |
-| `THROTTLER_REDIS_URL` | `redis://ever-works-redis:6379`    | Used by the distributed rate limiter (`apps/api`). |
-| `REDIS_URL`         | `redis://ever-works-redis:6379`      | Used by BullMQ queues in `@ever-works/agent`.      |
-| `RUN_MIGRATIONS`    | `true`                               | Set to `false` if you run migrations out-of-band.  |
+| Env var               | Default in `.env.compose`            | Notes                                                                    |
+| --------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
+| `DATABASE_TYPE`       | `postgres`                           | Demo path overrides to `sqlite` via `.env.demo.compose`.                 |
+| `DATABASE_HOST`       | `ever-works-db`                      | Compose service name. Point at a managed Postgres FQDN to swap.          |
+| `DATABASE_PORT`       | `5432`                               |                                                                          |
+| `DATABASE_USERNAME`   | `postgres`                           |                                                                          |
+| `DATABASE_PASSWORD`   | `ever_works_password`                | **Replace before any non-local use.**                                    |
+| `DATABASE_NAME`       | `ever_works`                         |                                                                          |
+| `THROTTLER_REDIS_URL` | `redis://ever-works-redis:6379`      | Used by the distributed rate limiter (`apps/api`).                       |
+| `REDIS_URL`           | `redis://ever-works-redis:6379`      | Used by BullMQ queues in `@ever-works/agent`.                            |
+| `RUN_MIGRATIONS`      | `true`                               | Set to `false` if you run migrations out-of-band.                        |
 
 ### `ever-works-web`
 
@@ -171,10 +175,13 @@ Named volumes survive `docker compose down`. Wipe them with `docker compose down
 
 Both files are committed with placeholder secrets — replace them before any non-local use. Compose loads variables with this priority (highest first):
 
-1. Inline `environment:` block in the compose file.
-2. Variables passed via `--env-file`.
-3. `.env` next to the compose file (if present).
-4. Defaults in the application code.
+1. Inline `environment:` block in the compose file (kept deliberately minimal — only the values that genuinely define container role, like `APP_TYPE` / `PORT`, so they can't be accidentally overridden).
+2. Shell-exported env vars (e.g. `DATABASE_HOST=managed.db.example.com docker compose up`).
+3. The `env_file:` specified in the service (`.env.compose` or `.env.demo.compose` here).
+4. `.env` next to the compose file (if present).
+5. Defaults in the application code.
+
+The practical effect: every backing-service knob (`DATABASE_*`, `REDIS_URL`, `THROTTLER_REDIS_URL`, `RUN_MIGRATIONS`, `WEB_URL`, all `TRIGGER_*`, ...) lives in `.env.compose` and can be repointed at managed Postgres / managed Redis / Trigger.dev Cloud by editing that file alone — no compose-YAML changes required.
 
 ## Production checklist
 

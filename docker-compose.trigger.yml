@@ -1,24 +1,53 @@
-# Optional self-hosted Trigger.dev stack for Ever Works platform.
+# Optional self-hosted Trigger.dev v4 *webapp only* for Ever Works.
 #
-# Layered on top of docker-compose.yml (or docker-compose.build.yml) to
-# provide a local Trigger.dev webapp for running the platform's background
-# jobs (packages/tasks). All services are gated behind the `trigger`
-# Compose profile, so they only start when the profile is explicitly
-# selected:
+# Layered on top of docker-compose.yml (or docker-compose.build.yml) and
+# gated behind the `trigger` Compose profile:
 #
 #   docker compose \
 #     -f docker-compose.yml -f docker-compose.trigger.yml \
 #     --profile trigger up -d
 #
-# Note: Trigger.dev Cloud (https://trigger.dev) is the recommended path
-# for most users — point TRIGGER_API_URL at it in .env.compose and skip
-# this file entirely. Self-hosting v4 is a heavier setup; for a full
-# production deployment follow the official Trigger.dev guide:
-# https://trigger.dev/docs/self-hosting/docker
+# ===================== READ THIS BEFORE USING =====================
 #
-# This file ships an intentionally minimal webapp + bundled Postgres on
-# isolated ports/network suffixes so it doesn't collide with the
-# platform's own Postgres (port 5432 → 5433 here, Redis 6379 → 6389).
+# THIS FILE ALONE DOES NOT EXECUTE BACKGROUND JOBS. A full Trigger.dev v4
+# self-host needs more than the webapp:
+#
+#   - webapp (this file)
+#   - supervisor (orchestrates task runners)
+#   - workers / runner containers (the actual job executors)
+#   - docker socket proxy (so the supervisor can launch containers safely)
+#   - object storage (for large payloads — minio works)
+#   - optionally clickhouse (for production event history)
+#
+# Without the supervisor + a runner, the webapp will accept job submissions
+# from `packages/tasks` and queue them, but nothing will ever pick them up
+# off the queue. They will sit indefinitely. This is fine if all you want
+# is to:
+#
+#   - browse the Trigger.dev management UI locally,
+#   - verify that the platform can reach a Trigger.dev API and obtain a
+#     secret key,
+#   - exercise the connection / auth path without paying for Cloud during
+#     development.
+#
+# If you need jobs to actually run, you have two options:
+#
+#   1. (Strongly recommended for most operators.) Use Trigger.dev Cloud.
+#      Sign up at https://trigger.dev, mint a project token, and set
+#      TRIGGER_SECRET_KEY in .env.compose. Skip this file entirely.
+#
+#   2. Follow the upstream production self-host template at
+#      https://trigger.dev/docs/self-hosting/docker which includes the
+#      supervisor + runner + storage stack. That template is intentionally
+#      not vendored here — keeping it in sync upstream is non-trivial and
+#      out of scope for the platform repo.
+#
+# ===================== Networking notes =====================
+#
+# This file ships the webapp + a dedicated Postgres + a dedicated Redis on
+# ports offset from the platform's own services (Postgres 5432 → 5433,
+# Redis 6379 → 6389) so they can coexist on the same Docker network
+# without conflict.
 
 services:
     ever-works-trigger-db:

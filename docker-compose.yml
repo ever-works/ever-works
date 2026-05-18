@@ -29,22 +29,15 @@ services:
         container_name: ever-works-api
         restart: unless-stopped
         env_file: .env.compose
+        # `environment:` is intentionally minimal — only the container-role
+        # values that should not be overridable (this image is always
+        # `APP_TYPE=api` listening on `PORT=3100`). Everything else
+        # (DATABASE_*, REDIS_URL, THROTTLER_REDIS_URL, RUN_MIGRATIONS,
+        # WEB_URL, ...) is read from .env.compose, so operators can repoint
+        # at managed Postgres / Redis without editing this file.
         environment:
-            # Database — point the API at the bundled Postgres
-            DATABASE_TYPE: postgres
-            DATABASE_HOST: ever-works-db
-            DATABASE_PORT: 5432
-            DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
-            DATABASE_PASSWORD: ${DATABASE_PASSWORD:-ever_works_password}
-            DATABASE_NAME: ${DATABASE_NAME:-ever_works}
-            RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
-            # Distributed throttler + BullMQ — bundled Redis
-            THROTTLER_REDIS_URL: redis://ever-works-redis:6379
-            REDIS_URL: redis://ever-works-redis:6379
-            # API surface
             APP_TYPE: api
             PORT: 3100
-            WEB_URL: ${WEB_URL:-http://localhost:3000}
         depends_on:
             ever-works-db:
                 condition: service_healthy
