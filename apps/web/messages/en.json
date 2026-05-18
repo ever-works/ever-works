@@ -3237,6 +3237,7 @@
             "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
             "actions": {
                 "addTemplate": "Add custom template",
+                "customizeTemplate": "Create with AI",
                 "refreshTemplates": "Refresh templates"
             },
             "hero": {
@@ -3354,7 +3355,55 @@
                 "refreshSuccess": "Template catalog refreshed.",
                 "refreshFailed": "Failed to refresh templates.",
                 "defaultUpdated": "Default template updated.",
-                "defaultFailed": "Failed to update default template."
+                "defaultFailed": "Failed to update default template.",
+                "customizeFailed": "Failed to start template customization."
+            },
+            "customizeDialog": {
+                "title": "Create a custom template with AI",
+                "description": "We duplicate a base template into a new repo in your GitHub account, then run your chosen AI agent against it to apply UI-only changes. Functionality stays untouched.",
+                "nameLabel": "Template name",
+                "namePlaceholder": "e.g. Dark Purple Theme",
+                "nameHelp": "Shown in your catalog and used to name the new GitHub repo.",
+                "baseLabel": "Base template",
+                "baseHelp": "Only bases marked AI-customizable are listed.",
+                "providerLabel": "Code-edit agent",
+                "providerHelp": "Pick one of your installed code-edit plugins. The default is preselected.",
+                "targetLabel": "GitHub destination",
+                "targetHelp": "Where to create the new repo. Personal account or an org you belong to.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
+                "promptLabel": "Describe the UI you want",
+                "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
+                "promptHelp": "Be specific about styling. New features are out of scope — UI only.",
+                "submit": "Create custom template",
+                "retry": "Retry",
+                "cancel": "Cancel",
+                "done": "Done",
+                "successHelp": "Your custom template is ready. It now appears in your catalog.",
+                "status": {
+                    "pending": "Queued…",
+                    "forking": "Provisioning the new repo…",
+                    "customizing": "Agent is applying your changes…",
+                    "pushing": "Pushing changes…",
+                    "succeeded": "Customization completed successfully.",
+                    "failed": "Customization failed."
+                },
+                "toast": {
+                    "started": "Customization started — this typically takes a few minutes.",
+                    "success": "Template customized successfully.",
+                    "failed": "Template customization failed.",
+                    "startFailed": "Could not start the customization."
+                },
+                "messages": {
+                    "nameRequired": "Template name is required.",
+                    "baseRequired": "Choose a base template.",
+                    "providerRequired": "Choose a code-edit agent.",
+                    "promptTooShort": "Describe the changes in at least a few words.",
+                    "noCustomizableBases": "No customizable base templates are available.",
+                    "noProviders": "No code-edit agent plugins are installed or enabled. Install one from the plugin catalog (e.g. claude-code, codex, gemini, opencode).",
+                    "noTargets": "Connect a GitHub account to choose a destination.",
+                    "browsePlugins": "Browse plugin catalog"
+                }
             }
         },
         "templateSelector": {

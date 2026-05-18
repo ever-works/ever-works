@@ -9,9 +9,10 @@ module.exports = {
             {
                 diagnostics: {
                     // 151002: ts-jest specific warning
+                    // 2305: workspace package declarations may lag source exports (handled by moduleNameMapper)
                     // 2307: cross-package @src path alias not resolved by TS (handled by moduleNameMapper)
                     // 2589: deep type instantiation in zodToJsonSchema chain reachable via @ever-works/agent
-                    ignoreCodes: [151002, 2307, 2589],
+                    ignoreCodes: [151002, 2305, 2307, 2589],
                 },
             },
         ],

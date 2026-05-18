@@ -8,6 +8,7 @@ import { User } from '../../entities/user.entity';
 import { Work } from '../../entities/work.entity';
 import { WorkAdvancedPrompts } from '../../entities/work-advanced-prompts.entity';
 import { WorkCustomDomain } from '../../entities/work-custom-domain.entity';
+import { WorkDeployment } from '../../entities/work-deployment.entity';
 import { WorkMember } from '../../entities/work-member.entity';
 import { WorkInvitation } from '../../entities/work-invitation.entity';
 import { WorkGenerationHistory } from '../../entities/work-generation-history.entity';
@@ -29,6 +30,7 @@ describe('WorkProposal entity', () => {
                 Work,
                 WorkAdvancedPrompts,
                 WorkCustomDomain,
+                WorkDeployment,
                 WorkMember,
                 WorkInvitation,
                 WorkGenerationHistory,

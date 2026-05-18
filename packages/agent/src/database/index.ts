@@ -3,6 +3,7 @@ export * from './database.config';
 export * from './database.module';
 export * from './repositories/api-key.repository';
 export * from './repositories/work.repository';
+export * from './repositories/work-deployment.repository';
 export * from './repositories/work-member.repository';
 export * from './repositories/user.repository';
 export * from './repositories/refresh-token.repository';

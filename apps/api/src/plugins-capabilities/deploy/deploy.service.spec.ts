@@ -1,5 +1,13 @@
 jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
-jest.mock('@ever-works/agent/entities', () => ({ Work: class {}, User: class {} }));
+jest.mock('@ever-works/agent/entities', () => ({
+    Work: class {},
+    User: class {},
+    DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
+    DeploymentTriggerSource: {
+        MANUAL: 'manual',
+        SCHEDULED: 'scheduled',
+    },
+}));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/services', () => ({
     PlatformSyncSecretService: class {},
@@ -86,7 +94,14 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             getAccessToken: jest.fn().mockResolvedValue('gh-token'),
         };
 
-        const workRepository = { findById: jest.fn().mockResolvedValue(work) };
+        const workRepository = {
+            findById: jest.fn().mockResolvedValue(work),
+            update: jest.fn().mockResolvedValue(undefined),
+        };
+        const deploymentRepository = {
+            create: jest.fn().mockResolvedValue({ id: 'deployment-1' }),
+            markTerminal: jest.fn().mockResolvedValue(undefined),
+        };
 
         // Single shared GitHub plugin stub returned by every
         // pluginRegistry.get('github') call. Capturing its call history is
@@ -141,6 +156,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             deployFacade as any,
             gitFacade as any,
             workRepository as any,
+            deploymentRepository as any,
             pluginRegistry as any,
             websiteUpdateService as any,
             websiteTemplateResolver as any,
@@ -155,6 +171,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             work,
             deployFacade,
             gitFacade,
+            deploymentRepository,
             pluginRegistry,
             githubPlugin,
             eventEmitter,
@@ -212,6 +229,19 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         const { dispatches } = captureCalls(githubPlugin);
         const workflows = dispatches.map((d: any) => d.workflow);
         expect(workflows[0]).toBe('deploy_vercel.yaml');
+    });
+
+    it('passes rollback commit sha to workflow dispatch inputs', async () => {
+        const { service, githubPlugin } = buildService({
+            plugin: { id: 'legacy' },
+        });
+
+        await service.deploy('work-1', 'user-1', { commitSha: 'abc123' });
+
+        const { dispatches } = captureCalls(githubPlugin);
+        expect(dispatches[0].inputs).toEqual(
+            expect.objectContaining({ environment: 'production', commit_sha: 'abc123' }),
+        );
     });
 
     it('pushes plugin.getDeploymentSecrets() entries as GitHub Actions secrets', async () => {
@@ -482,7 +512,10 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             });
             deployFacade.getOtherPluginSettings.mockRejectedValueOnce(new Error('boom'));
 
-            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+                deploymentId: 'deployment-1',
+            });
 
             // Deploy still ran — the standard k8s secrets were pushed.
             const { secrets } = captureCalls(githubPlugin);
@@ -548,7 +581,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         const emitted = eventEmitter.emit.mock.calls.find(
             (c: any[]) => c[0] === 'deployment.dispatched',
         );
-        expect(result).toBe(false);
+        expect(result).toMatchObject({ dispatched: false, deploymentId: 'deployment-1' });
         expect(emitted).toBeUndefined();
     });
 
@@ -570,7 +603,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         // Deploy still went through (workflow dispatched).
         const { dispatches } = captureCalls(githubPlugin);
         expect(dispatches.length).toBeGreaterThan(0);
-        expect(result).toBe(true);
+        expect(result).toMatchObject({ dispatched: true, deploymentId: 'deployment-1' });
         expect(errorSpy).toHaveBeenCalledWith(
             expect.stringContaining('Failed to push plugin-specific secrets for k8s'),
         );
@@ -841,7 +874,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 token: 'vercel-deploy-token',
             });
 
-            await expect(service.deploy('work-1', 'user-1', {})).resolves.toBe(true);
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
 
             const { secrets } = captureCalls(githubPlugin);
             expect(secrets.find((s: any) => s.key === 'VERCEL_TOKEN')?.value).toBe(

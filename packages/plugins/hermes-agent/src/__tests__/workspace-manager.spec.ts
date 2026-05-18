@@ -109,7 +109,7 @@ describe('workspace manager', () => {
 		expect(result.items).toEqual([]);
 		expect(result.errors).toContain('Item 0 is missing required fields: source_url, category');
 		expect(result.errors).toContain('Item 0 has invalid tags: expected an array of strings');
-		expect(result.resultFilePath).toContain('_meta/hermes-result.json');
+		expect(result.resultFilePath).toContain(path.join('_meta', 'hermes-result.json'));
 	});
 
 	it('returns a friendly error when malformed JSON cannot be repaired', async () => {

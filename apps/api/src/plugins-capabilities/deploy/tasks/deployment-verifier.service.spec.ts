@@ -1,5 +1,11 @@
-jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
-jest.mock('@ever-works/agent/entities', () => ({ Work: class {} }));
+jest.mock('@ever-works/agent/database', () => ({
+    WorkRepository: class {},
+    WorkDeploymentRepository: class {},
+}));
+jest.mock('@ever-works/agent/entities', () => ({
+    Work: class {},
+    DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
+}));
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/facades', () => ({ DeployFacadeService: class {} }));
 jest.mock('@ever-works/agent/events', () => {
@@ -16,7 +22,7 @@ jest.mock('@ever-works/agent/events', () => {
 
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { DeployFacadeService } from '@ever-works/agent/facades';
-import type { WorkRepository } from '@ever-works/agent/database';
+import type { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
 import type { PluginRegistryService } from '@ever-works/agent/plugins';
 import { DeploymentCompletedEvent, DeploymentFailedEvent } from '@ever-works/agent/events';
 import { DeploymentVerifierService } from './deployment-verifier.service';
@@ -49,6 +55,9 @@ describe('DeploymentVerifierService', () => {
     });
 
     let repository: jest.Mocked<Pick<WorkRepository, 'update'>>;
+    let deploymentRepository: jest.Mocked<
+        Pick<WorkDeploymentRepository, 'findById' | 'update' | 'markTerminal'>
+    >;
     let deployFacade: jest.Mocked<Pick<DeployFacadeService, 'lookupExistingDeployment'>>;
     let pluginRegistry: jest.Mocked<Pick<PluginRegistryService, 'get'>>;
     let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
@@ -58,11 +67,17 @@ describe('DeploymentVerifierService', () => {
 
     beforeEach(() => {
         repository = { update: jest.fn().mockResolvedValue(undefined) } as any;
+        deploymentRepository = {
+            findById: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue(undefined),
+            markTerminal: jest.fn().mockResolvedValue(undefined),
+        } as any;
         deployFacade = { lookupExistingDeployment: jest.fn() } as any;
         pluginRegistry = { get: jest.fn() } as any;
         eventEmitter = { emit: jest.fn() } as any;
         service = new DeploymentVerifierService(
             repository as unknown as WorkRepository,
+            deploymentRepository as unknown as WorkDeploymentRepository,
             deployFacade as unknown as DeployFacadeService,
             pluginRegistry as unknown as PluginRegistryService,
             eventEmitter as unknown as EventEmitter2,

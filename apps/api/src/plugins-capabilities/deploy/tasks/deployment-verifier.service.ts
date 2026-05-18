@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeployFacadeService } from '@ever-works/agent/facades';
-import { WorkRepository } from '@ever-works/agent/database';
+import { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
-import { Work } from '@ever-works/agent/entities';
+import { Work, DeploymentEnvironment } from '@ever-works/agent/entities';
 import { DeploymentCompletedEvent, DeploymentFailedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 
@@ -17,6 +17,10 @@ type DeploymentReadyState =
     | 'READY'
     | 'CANCELED'
     | 'TIMEOUT';
+type DeploymentTerminalState = 'READY' | 'ERROR' | 'CANCELED' | 'TIMEOUT';
+
+const isTerminalState = (state: DeploymentReadyState): state is DeploymentTerminalState =>
+    state === 'READY' || state === 'ERROR' || state === 'CANCELED' || state === 'TIMEOUT';
 
 /**
  * DeploymentVerifierService monitors deployment progress and updates work status.
@@ -30,20 +34,25 @@ export class DeploymentVerifierService {
 
     constructor(
         private readonly repository: WorkRepository,
+        private readonly deploymentRepository: WorkDeploymentRepository,
         private readonly deployFacade: DeployFacadeService,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
     /**
-     * Start verification for a work deployment
+     * Start verification for a work deployment.
+     *
+     * `deploymentId` references the WorkDeployment history row. When provided,
+     * verification updates that row alongside Work.deploymentState (the latter
+     * only when environment=production, preserving the EW-610 UI contract).
      */
-    async startVerification(work: Work, userId: string, teamScope?: string) {
+    async startVerification(work: Work, userId: string, teamScope?: string, deploymentId?: string) {
         this.logger.log(`Starting verification for work ${work.id}`);
 
         this.cancelVerification(work.id);
 
-        this.queue.set(work.id, await this.verifyDeployment(work, userId, teamScope));
+        this.queue.set(work.id, await this.verifyDeployment(work, userId, teamScope, deploymentId));
     }
 
     private cancelVerification(workId: string) {
@@ -55,10 +64,17 @@ export class DeploymentVerifierService {
         work: Work,
         userId: string,
         teamScope?: string,
+        deploymentId?: string,
     ): Promise<CancelVerification> {
         const FETCH_LIMIT = 18; // 3 minutes (POLL_INTERVAL * FETCH_LIMIT)
         const POLL_INTERVAL = 10 * 1000; // 10 seconds
         const TIMEOUT = 13 * 60 * 1000; // 13 minutes
+
+        const deployment = deploymentId
+            ? await this.deploymentRepository.findById(deploymentId)
+            : null;
+        const isProduction =
+            !deployment || deployment.environment === DeploymentEnvironment.PRODUCTION;
 
         const startedAt = Date.now();
         const intervalId = { value: null as NodeJS.Timeout | null };
@@ -73,16 +89,17 @@ export class DeploymentVerifierService {
         // `READY`).
         let terminated = false;
 
-        // Record start time and update status
-        this.repository.update(work.id, {
-            deploymentStartedAt: new Date(startedAt),
-            deploymentState: 'INITIALIZING',
-        });
+        if (isProduction) {
+            this.repository.update(work.id, {
+                deploymentStartedAt: new Date(startedAt),
+                deploymentState: 'INITIALIZING',
+            });
+        }
 
         let fetchTries = 0;
         let inVerification = false;
 
-        const cleanup = (state?: DeploymentReadyState, error?: string) => {
+        const cleanup = (state?: DeploymentTerminalState, error?: string) => {
             if (terminated) {
                 this.logger.debug(
                     `Skipping duplicate cleanup for work ${work.id} (already terminal)`,
@@ -102,9 +119,21 @@ export class DeploymentVerifierService {
             this.queue.delete(work.id);
 
             if (state) {
-                this.repository.update(work.id, {
-                    deploymentState: state,
-                });
+                if (isProduction) {
+                    this.repository.update(work.id, { deploymentState: state });
+                }
+                if (deploymentId) {
+                    this.deploymentRepository
+                        .markTerminal(deploymentId, state, {
+                            website: lastWebsiteUrl,
+                            lastError: error,
+                        })
+                        .catch((err) =>
+                            this.logger.warn(
+                                `Failed to mark deployment ${deploymentId} terminal: ${err?.message}`,
+                            ),
+                        );
+                }
                 this.emitTerminalEvent(work, userId, state, lastWebsiteUrl, error);
             }
         };
@@ -135,27 +164,33 @@ export class DeploymentVerifierService {
                     return;
                 }
 
-                // Update website URL if found
                 if (result.website) {
                     lastWebsiteUrl = result.website;
-                    await this.repository.update(work.id, {
-                        website: result.website,
-                    });
+                    if (isProduction) {
+                        await this.repository.update(work.id, { website: result.website });
+                    }
+                    if (deploymentId) {
+                        await this.deploymentRepository.update(deploymentId, {
+                            website: result.website,
+                        });
+                    }
                 }
 
-                // Check deployment state
                 const state = result.deploymentState as DeploymentReadyState | undefined;
 
                 this.logger.log(`Deployment for work ${work.id} is ${state || 'UNKNOWN'}`);
 
-                if (state && ['READY', 'ERROR', 'CANCELED'].includes(state)) {
+                if (state && isTerminalState(state)) {
                     cleanup(state);
                 } else if (Date.now() - startedAt > TIMEOUT) {
                     cleanup('TIMEOUT');
                 } else if (state) {
-                    await this.repository.update(work.id, {
-                        deploymentState: state,
-                    });
+                    if (isProduction) {
+                        await this.repository.update(work.id, { deploymentState: state });
+                    }
+                    if (deploymentId) {
+                        await this.deploymentRepository.update(deploymentId, { state });
+                    }
                 }
             } catch (error) {
                 this.logger.error(`Failed to get deployment for work ${work.id}:`, error);

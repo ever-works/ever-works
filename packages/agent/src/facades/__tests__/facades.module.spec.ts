@@ -8,13 +8,14 @@ import { DataSourceFacadeService } from '../data-source.facade';
 import { GitFacadeService } from '../git.facade';
 import { OAuthFacadeService } from '../oauth.facade';
 import { DeployFacadeService } from '../deploy.facade';
+import { CodeEditFacadeService } from '../code-edit.facade';
 import { PromptFacadeService } from '../prompt.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
  * `@ever-works/agent/facades` barrel surface. Both are wire-format-stable:
  * `apps/api/src/plugins-capabilities/*` and the agent pipeline steps import
- * the same nine facade classes by name. A silent removal/rename here would
+ * the same facade classes by name. A silent removal/rename here would
  * change which provider Nest hands consumers, so each binding is pinned
  * individually rather than only via a "count" assertion.
  */
@@ -29,6 +30,7 @@ describe('FacadesModule + barrel re-exports', () => {
         GitFacadeService,
         OAuthFacadeService,
         DeployFacadeService,
+        CodeEditFacadeService,
         PromptFacadeService,
     ] as const;
 
@@ -45,7 +47,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(importNames).toContain('DatabaseModule');
         });
 
-        it('declares all nine facade classes as providers (one entry per facade, no extras)', () => {
+        it('declares all ten facade classes as providers (one entry per facade, no extras)', () => {
             const providers = getMeta('providers');
             for (const cls of FACADE_CLASSES) {
                 expect(providers).toContain(cls);
@@ -57,7 +59,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(providers).toHaveLength(FACADE_CLASSES.length);
         });
 
-        it('exports all nine facade classes (one-to-one with providers)', () => {
+        it('exports all ten facade classes (one-to-one with providers)', () => {
             const exports = getMeta('exports');
             for (const cls of FACADE_CLASSES) {
                 expect(exports).toContain(cls);
@@ -81,7 +83,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.FacadesModule).toBe(FacadesModule);
         });
 
-        it('re-exports each of the nine facade service classes verbatim', () => {
+        it('re-exports each of the ten facade service classes verbatim', () => {
             expect(facadesBarrel.AiFacadeService).toBe(AiFacadeService);
             expect(facadesBarrel.SearchFacadeService).toBe(SearchFacadeService);
             expect(facadesBarrel.ScreenshotFacadeService).toBe(ScreenshotFacadeService);
@@ -90,6 +92,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.GitFacadeService).toBe(GitFacadeService);
             expect(facadesBarrel.OAuthFacadeService).toBe(OAuthFacadeService);
             expect(facadesBarrel.DeployFacadeService).toBe(DeployFacadeService);
+            expect(facadesBarrel.CodeEditFacadeService).toBe(CodeEditFacadeService);
             expect(facadesBarrel.PromptFacadeService).toBe(PromptFacadeService);
         });
 
@@ -143,6 +146,7 @@ describe('FacadesModule + barrel re-exports', () => {
                     'AiFacadeError',
                     'AiFacadeService',
                     'BaseFacadeService',
+                    'CodeEditFacadeService',
                     'ContentExtractorFacadeError',
                     'ContentExtractorFacadeService',
                     'ContentExtractorProviderNotFoundError',

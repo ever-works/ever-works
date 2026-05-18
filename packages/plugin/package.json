@@ -88,6 +88,11 @@
 			"types": "./dist/cli-pipeline/index.d.ts",
 			"import": "./dist/cli-pipeline/index.js",
 			"require": "./dist/cli-pipeline/index.cjs"
+		},
+		"./code-edit": {
+			"types": "./dist/code-edit/index.d.ts",
+			"import": "./dist/code-edit/index.js",
+			"require": "./dist/code-edit/index.cjs"
 		}
 	},
 	"files": [

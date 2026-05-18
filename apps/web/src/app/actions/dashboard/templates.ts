@@ -214,6 +214,91 @@ export async function forkTemplate(input: {
     }
 }
 
+export async function customizeTemplateFromBase(input: {
+    baseTemplateId: string;
+    name: string;
+    prompt: string;
+    providerId: string;
+    targetOwner?: string;
+    description?: string;
+}) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.customizeFromBase(input);
+        return {
+            success: response.status === 'success',
+            customizationId: response.customizationId ?? null,
+            template: response.template ?? null,
+            customization: response.customization ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.customizeFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Customize template error:', error);
+        return {
+            success: false,
+            customizationId: null,
+            template: null,
+            customization: null,
+            error: error instanceof Error ? error.message : t('messages.customizeFailed'),
+        };
+    }
+}
+
+export async function listCustomizationProviders() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await templatesAPI.listCustomizationProviders();
+        return {
+            success: response.status === 'success',
+            providers: response.providers ?? [],
+            error: response.status === 'error' ? getResponseMessage(response) : null,
+        };
+    } catch (error) {
+        console.error('List customization providers error:', error);
+        return {
+            success: false,
+            providers: [],
+            error: error instanceof Error ? error.message : 'unknown',
+        };
+    }
+}
+
+export async function getTemplateCustomization(customizationId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await templatesAPI.getCustomization(customizationId);
+        return {
+            success: response.status === 'success',
+            customization: response.customization ?? null,
+            error: response.status === 'error' ? getResponseMessage(response) : null,
+        };
+    } catch (error) {
+        console.error('Get template customization error:', error);
+        return {
+            success: false,
+            customization: null,
+            error: error instanceof Error ? error.message : 'unknown',
+        };
+    }
+}
+
 export async function refreshTemplates(input: { kind: 'website' | 'work' }) {
     const user = await getAuthFromCookie();
     if (!user) {

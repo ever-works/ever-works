@@ -2,13 +2,7 @@
 
 import { z } from 'zod';
 import { accountTransferAPI } from '@/lib/api/account-transfer';
-import type {
-    AccountExportPayload,
-    ConflictResolution,
-    ImportPreview,
-    ImportResult,
-    SyncStatus,
-} from '@/lib/api/account-transfer.types';
+import type { AccountExportPayload, ConflictResolution } from '@/lib/api/account-transfer.types';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
