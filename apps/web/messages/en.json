@@ -2347,7 +2347,7 @@
                     "saveFailed": "Failed to save committer settings"
                 },
                 "activitySync": {
-                    "title": "Activity Feed sync (EW-120)",
+                    "title": "Activity Feed sync",
                     "subtitle": "Choose how the platform learns about user-facing events from this directory's deployed site (signups, item submissions, reports).",
                     "defaultBadge": "default",
                     "modeLegend": "Activity Feed sync transport",
