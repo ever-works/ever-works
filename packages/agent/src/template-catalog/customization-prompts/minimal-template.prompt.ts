@@ -13,14 +13,15 @@ Apply the user's UI request to this repository. Treat the request as a styling b
 
 \`\`\`
 apps/
-  sample-basic/        ← default minimal site; treat as the canonical target unless the user names a niche
-  sample-events/       ← events vertical
-  sample-jobs/         ← jobs vertical
-  sample-real-estate/  ← real-estate vertical
-  sample-git/          ← git-tools vertical
-  ...                  ← other niche samples; same internal layout as sample-basic
-  docs/                ← Docusaurus docs site — do NOT modify
-  web-e2e/             ← Playwright tests — do NOT modify
+  web/                 ← PRIMARY canonical app. Default target for every request.
+  sample-basic/        ← niche sample (generic directory)
+  sample-events/       ← niche sample (events vertical)
+  sample-jobs/         ← niche sample (jobs vertical)
+  sample-real-estate/  ← niche sample (real-estate vertical)
+  sample-git/          ← niche sample (git-tools vertical)
+  ...                  ← other niche samples; same internal layout as apps/web
+  docs/                ← Docusaurus docs site — DO NOT modify
+  web-e2e/             ← Playwright tests — DO NOT modify
 
   apps/<app>/src/
     styles/global.css      ← Tailwind v4 \`@theme\` tokens (--color-brand-*) + headless component styling via [data-component=...] / [data-part=...] selectors. PRIMARY styling lever.
@@ -43,7 +44,10 @@ packages/
 1. **Theme tokens** — change \`apps/<app>/src/styles/global.css\` inside the \`@theme { ... }\` block. The \`--color-brand-*\` ramp is the canonical brand palette; replace its 11 stops to re-skin the whole site.
 2. **Component styling** — components from \`@ever-works/ui\` emit \`data-component\` / \`data-part\` attributes. Restyle them by editing the matching \`[data-component="..."] [data-part="..."]\` rules in the same \`global.css\`. Do NOT edit the source under \`packages/ui/\`.
 3. **Layout chrome** — adjust classes / structure in \`apps/<app>/src/layouts/BaseLayout.astro\` and the local Astro pages under \`apps/<app>/src/pages/\`.
-4. **Per-app vs. all apps** — if the request names a niche ("make the events theme purple"), restrict edits to \`apps/sample-<niche>/\`. Otherwise default to \`apps/sample-basic/\` and apply the SAME change to every other \`apps/sample-*/global.css\` so all samples stay visually consistent.
+4. **Target app — pick exactly one.**
+   - Default: \`apps/web/\`. Edit only files inside \`apps/web/\`.
+   - If the user explicitly names a niche ("make the events theme purple", "for the jobs site …"), use the matching \`apps/sample-<niche>/\` instead.
+   - Do NOT fan changes out across multiple \`apps/sample-*/\` directories. One run = one app. The niche samples are independent variants the user opts into by name.
 
 # Rules
 
