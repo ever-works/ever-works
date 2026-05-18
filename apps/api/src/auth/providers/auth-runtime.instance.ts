@@ -166,8 +166,12 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
             // email and immediately gains an authenticated session. Existing
             // unverified users will be prompted to verify on next login
             // (the platform currently has very few users, all internal).
+            // Env-overridable for E2E + local-dev: `REQUIRE_EMAIL_VERIFICATION=false`
+            // turns off the check so test flows can register + login in one go.
+            // Default stays `true` so production deploys can't accidentally
+            // disable the check by omission.
             autoSignIn: true,
-            requireEmailVerification: true,
+            requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION !== 'false',
             minPasswordLength: 8,
             password: {
                 // L-07: cost is read on each call so operators can raise it
