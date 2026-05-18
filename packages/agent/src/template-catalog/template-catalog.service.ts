@@ -47,12 +47,12 @@ export interface TemplateCatalogItem {
     isDefault: boolean;
     ownerUserId?: string | null;
     // Built-in: true when the WebsiteTemplateConfig marks it `customizable: true`
-    // AND a customization prompt is registered. Custom forks: true when their
-    // metadata.forkedFromTemplateId resolves to a customizable built-in.
+    // AND a customization prompt is registered. Custom templates: true when
+    // their metadata links them to a customizable built-in via
+    // `forkedFromTemplateId` (fork flow) or `baseTemplateId` (AI flow).
     customizable: boolean;
-    // For custom forks created via the agent flow, the built-in template id
-    // they were forked from. Lets the UI re-run a customization without
-    // making the user pick a base again.
+    // The built-in template id this custom template descends from. Lets the
+    // UI re-run a customization without making the user pick a base again.
     baseTemplateId?: string | null;
     // ISO timestamp of the last successful agent customization, if any.
     lastCustomizedAt?: string | null;
@@ -831,8 +831,13 @@ export class TemplateCatalogService implements OnModuleInit {
         if (template.sourceType === 'built_in') {
             return template.id;
         }
+        // Forked-from-base templates use `forkedFromTemplateId`; templates
+        // created via the AI customization flow use `baseTemplateId`. Both
+        // mark the template as customizable.
         const forkedFrom = template.metadata?.forkedFromTemplateId;
-        return typeof forkedFrom === 'string' ? forkedFrom : null;
+        if (typeof forkedFrom === 'string') return forkedFrom;
+        const baseTemplateId = template.metadata?.baseTemplateId;
+        return typeof baseTemplateId === 'string' ? baseTemplateId : null;
     }
 
     private isCustomizable(
