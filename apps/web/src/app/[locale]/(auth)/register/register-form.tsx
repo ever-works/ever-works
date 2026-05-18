@@ -45,11 +45,7 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
         }
 
         startTransition(async () => {
-            const response = await registerAction(
-                formData.name,
-                formData.email,
-                formData.password,
-            );
+            const response = await registerAction(formData.name, formData.email, formData.password);
 
             if (response && !response.success) {
                 setError(response.error || t('errors.generic'));
