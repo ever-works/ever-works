@@ -47,7 +47,11 @@ const CSP = [
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com",
-    `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com ${extraConnect.join(' ')}`.trim(),
+    // dotlottie-web fetches its WASM blob from jsdelivr (primary) or unpkg
+    // (backup). Both are essential for the on-page Lottie animations that
+    // boot on /login and /register; without them the E2E suite trips on
+    // console errors. Keep them tightly listed (not wildcard).
+    `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
     "worker-src 'self' blob:",
 ].join('; ');
 

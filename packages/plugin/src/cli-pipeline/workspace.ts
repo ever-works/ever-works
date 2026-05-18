@@ -288,13 +288,19 @@ export async function cleanupWorkspace(workspacePath: string, baseTempDir?: stri
 		}
 		const resolved = path.resolve(workspacePath);
 		// Refuse root / near-root paths regardless of OS. The Windows
-		// drive-letter check runs against `nativePath.resolve(...)` because
-		// `path.posix.resolve` never produces a `C:\` shape — it would treat
-		// the input as a relative POSIX path and silently emit
-		// `/cwd/C:\`, which the Windows regex never matches. The native
-		// resolve is the only one that yields the canonical Windows root.
+		// drive-letter check runs against `path.win32.resolve(...)` so the
+		// guard fires on every platform (`path.posix.resolve` and the
+		// platform-default `nativePath.resolve` on Linux both turn `C:\`
+		// into `/cwd/C:\` which the Windows regex never matches). Using
+		// `path.win32.resolve` is purely a string operation — it does not
+		// touch the filesystem.
 		const nativeResolved = nativePath.resolve(workspacePath);
-		if (resolved === '/' || nativeResolved === '/' || /^[A-Za-z]:[\\/]?$/.test(nativeResolved)) {
+		const winResolved = nativePath.win32.resolve(workspacePath);
+		if (
+			resolved === '/' ||
+			nativeResolved === '/' ||
+			/^[A-Za-z]:[\\/]?$/.test(winResolved)
+		) {
 			return;
 		}
 		// If a baseTempDir is supplied, the workspace MUST be inside it.
