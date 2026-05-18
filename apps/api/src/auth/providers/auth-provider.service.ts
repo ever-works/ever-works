@@ -383,17 +383,39 @@ export class AuthProviderService extends AuthProvider {
         return this.dataSource.getRepository(AuthSession);
     }
 
-    // H-01 (sessions): lookup is now keyed on sha256(submitted token). Raw
+    // H-01 (sessions): primary lookup is sha256(submitted token). Raw
     // bearer is hashed by the caller (`getBearerToken` → `hashSessionToken`)
     // before it touches the DB.
+    //
+    // Fallback path: Better Auth's signInEmail / signUpEmail / OAuth flows
+    // create sessions through Better Auth's own adapter, which writes the
+    // raw token to the legacy `token` column WITHOUT populating `tokenHash`.
+    // Those sessions wouldn't match the tokenHash lookup, so every
+    // bearer-authenticated request from a freshly-issued session would 401.
+    // When tokenHash lookup misses, fall back to plain-token lookup, then
+    // migrate the row in place: write `tokenHash = sha256(token)` and null
+    // out the plaintext `token` column. Over time every session converges
+    // to the H-01 invariant (hash-only) on first use.
     private async findSessionRecord(token: string) {
-        return this.getSessionRepository().findOne({
-            where: { tokenHash: hashSessionToken(token) },
-        });
+        const tokenHash = hashSessionToken(token);
+        let session = await this.getSessionRepository().findOne({ where: { tokenHash } });
+        if (session) return session;
+
+        session = await this.getSessionRepository().findOne({ where: { token } });
+        if (session) {
+            await this.getSessionRepository().update(session.id, { token: null, tokenHash });
+            session.token = null;
+            session.tokenHash = tokenHash;
+        }
+        return session;
     }
 
     private async deleteSessionRecord(token: string) {
-        await this.getSessionRepository().delete({ tokenHash: hashSessionToken(token) });
+        const tokenHash = hashSessionToken(token);
+        // Same dual-path as `findSessionRecord` — sessions created via Better
+        // Auth's adapter live under the plaintext column until first use.
+        await this.getSessionRepository().delete({ tokenHash });
+        await this.getSessionRepository().delete({ token });
     }
 
     // H-04 + H-01 (sessions): bind sessions to the requesting client at
