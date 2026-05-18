@@ -416,10 +416,11 @@ export function TemplatesCatalog({
 
     // Always resolve the target from current templates state so the dialog
     // sees status updates pushed by the page-level poller below.
-    const customizeTargetTemplate = useMemo(
-        () => (customizeTargetId ? (templates.find((t) => t.id === customizeTargetId) ?? null) : null),
-        [customizeTargetId, templates],
-    );
+    const customizeTargetTemplate = useMemo(() => {
+        return customizeTargetId
+            ? (templates.find((t) => t.id === customizeTargetId) ?? null)
+            : null;
+    }, [customizeTargetId, templates]);
 
     const openCustomizeNew = () => {
         setCustomizeMode('new');
@@ -446,9 +447,7 @@ export function TemplatesCatalog({
                 .filter(
                     (t) =>
                         t.latestCustomization &&
-                        !TERMINAL_CUSTOMIZATION_STATUSES.includes(
-                            t.latestCustomization.status,
-                        ),
+                        !TERMINAL_CUSTOMIZATION_STATUSES.includes(t.latestCustomization.status),
                 )
                 .map((t) => t.latestCustomization!.id)
                 .sort()
@@ -466,9 +465,7 @@ export function TemplatesCatalog({
         let cancelled = false;
 
         const tick = async () => {
-            const results = await Promise.allSettled(
-                ids.map((id) => getTemplateCustomization(id)),
-            );
+            const results = await Promise.allSettled(ids.map((id) => getTemplateCustomization(id)));
             if (cancelled) return;
 
             const updates = new Map<string, TemplateCustomizationSummary>();
