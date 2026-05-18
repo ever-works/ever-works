@@ -200,13 +200,23 @@ synchronize: false,                  // never auto-derive schema (DANGEROUS)
 migrationsRun: true,                 // run pending migrations on startup
 migrations: [                        // resolved relative to process.cwd()
   '${cwd}/dist/migrations/*.js',     // Docker / prod
-  '${cwd}/src/migrations/*.ts',      // pnpm dev:api inside apps/api
   '${cwd}/apps/api/dist/migrations/*.js',
-  '${cwd}/apps/api/src/migrations/*.ts',
 ],
 migrationsTableName: 'migrations',
 migrationsTransactionMode: 'all',    // all pending migrations in ONE shared transaction (atomic batch)
 ```
+
+**`.js` only, intentionally.** TypeORM 0.3.x's
+`DirectoryExportedClassesLoader` loads matched files via
+`Promise.all(import(file))`. On Node ≥ 22, importing several `.ts`
+files concurrently trips Node's "Unexpected module status 0" internal
+assertion (a known race between `require()` and dynamic `import()` on
+the same module). The runtime config sticks to compiled `.js` only;
+the CLI path in `apps/api/typeorm.config.ts` still globs `.ts` and
+runs under `ts-node` (synchronous loader, no race). For local dev,
+`pnpm build --filter ever-works-api` populates
+`apps/api/dist/migrations/` so the API picks up pending migrations
+on next boot.
 
 `synchronize: true` is **only** allowed in `NODE_ENV=test` for fast
 e2e suite startup (`DATABASE_AUTOMIGRATE=true` is the explicit opt-in
