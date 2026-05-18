@@ -9,6 +9,7 @@ import { initSentry, initPostHog } from '@ever-works/monitoring';
 import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
+import { assertProductionCorsConfig } from './cors-validation';
 
 async function bootstrap() {
     // Load environment variables from .env file
@@ -68,16 +69,7 @@ async function bootstrap() {
     // localhost-only allow-list while still serving `credentials: true`, which
     // is both useless to real callers and a foot-gun for any future change
     // that drops the credentials flag.
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean);
-    if (process.env.NODE_ENV === 'production' && (!allowedOrigins || allowedOrigins.length === 0)) {
-        throw new Error(
-            'ALLOWED_ORIGINS must be configured in production. ' +
-                'Set it to a comma-separated list of origins permitted to call the API with credentials, e.g. ' +
-                '"https://app.ever.works,https://demo.ever.works".',
-        );
-    }
+    const allowedOrigins = assertProductionCorsConfig(process.env);
     app.enableCors({
         origin:
             allowedOrigins && allowedOrigins.length > 0

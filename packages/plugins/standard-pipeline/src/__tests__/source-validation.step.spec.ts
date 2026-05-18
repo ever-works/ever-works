@@ -263,4 +263,32 @@ describe('SourceValidationStep', () => {
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 		});
 	});
+
+	describe('SSRF guard', () => {
+		it.each([
+			['http://127.0.0.1/foo', 'loopback'],
+			['http://169.254.169.254/latest/meta-data/', 'AWS/GCP/Azure IMDS link-local'],
+			['http://10.0.0.1/', 'RFC1918 private']
+		])(
+			'rejects SSRF-blocked URLs (%s — %s) without making an HTTP request to the blocked host',
+			async (blockedUrl) => {
+				const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+				global.fetch = fetchSpy;
+				// No fallback URLs from search — so the item with an SSRF-blocked
+				// source_url has no rescue path and should be filtered out.
+				mockExecContext.searchFacade.search = vi.fn().mockResolvedValue([]);
+				mockContext.finalItems = [createMockItem('Blocked Item', blockedUrl)];
+
+				const result = await step.run(mockContext, mockExecContext);
+
+				// Step is expected to return undefined (filter out) for blocked
+				// hosts — not throw — per the source-validation contract.
+				expect(result.finalItems).toEqual([]);
+				// Crucially, no fetch went anywhere near the blocked host.
+				for (const call of fetchSpy.mock.calls) {
+					expect(call[0]).not.toBe(blockedUrl);
+				}
+			}
+		);
+	});
 });

@@ -191,6 +191,19 @@ describe('LocalContentExtractorPlugin', () => {
 			expect(config.timeout).toBe(5000);
 			expect(config.headers['User-Agent']).toBe('CustomAgent/1.0');
 		});
+
+		it.each([
+			['http://127.0.0.1/foo', 'loopback'],
+			['http://169.254.169.254/latest/meta-data/', 'AWS/GCP/Azure IMDS link-local'],
+			['http://10.0.0.1/', 'RFC1918 private']
+		])('rejects SSRF-blocked URLs (%s — %s) without making an HTTP request', async (blockedUrl) => {
+			const r = await plugin.extract(opts({ url: blockedUrl }));
+			expect(r.success).toBe(false);
+			expect(r.url).toBe(blockedUrl);
+			expect(r.error).toMatch(/SSRF guard blocked/);
+			expect(r.error).toContain(blockedUrl);
+			expect(axiosGetMock).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('extractBatch', () => {

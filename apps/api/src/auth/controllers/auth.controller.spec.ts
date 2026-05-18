@@ -234,6 +234,55 @@ describe('AuthController', () => {
                 userAgent: null,
             });
         });
+
+        // H-05: in production, the anonymous-flow controller must fail-closed
+        // when captcha is required by config (`NODE_ENV=production`) but is
+        // not actually wired up (`CAPTCHA_PROVIDER` unset). The existing
+        // tests in this file rely on the default mock where
+        // `isRequired() === false`, which only exercises the dev/preview
+        // branch. This test flips `isRequired` to true and asserts that:
+        //   (a) the controller throws BadRequestException (400)
+        //   (b) the anonymous-user-creation downstream is NEVER invoked
+        //   (c) the error message names captcha so an operator can find it
+        // See `auth.controller.ts` and `captcha-verifier.service.ts` for
+        // the H-05 implementation comments.
+        it('returns 400 when captcha is required (production) but CAPTCHA_PROVIDER is not configured', async () => {
+            captchaVerifier.isRequired.mockReturnValue(true);
+            captchaVerifier.isEnabled.mockReturnValue(false);
+
+            const req = { ip: '1.2.3.4', headers: { 'user-agent': 'jest-agent' } };
+
+            await expect((controller as any).anonymous(req)).rejects.toMatchObject({
+                status: 400,
+            });
+            await expect((controller as any).anonymous(req)).rejects.toThrow(/captcha/i);
+            expect(anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+            expect(captchaVerifier.verify).not.toHaveBeenCalled();
+        });
+
+        // H-05 part 2: when captcha IS enabled in production and a token is
+        // missing/invalid, the verify path fails and the controller returns
+        // 400 — again without ever creating an anonymous user row.
+        it('returns 400 when captcha is enabled and the token is missing/invalid', async () => {
+            captchaVerifier.isRequired.mockReturnValue(true);
+            captchaVerifier.isEnabled.mockReturnValue(true);
+            captchaVerifier.verify.mockResolvedValue({
+                success: false,
+                skipped: false,
+                errorCodes: ['missing-input-response'],
+            });
+
+            const req = { ip: '1.2.3.4', headers: { 'user-agent': 'jest-agent' } };
+
+            await expect((controller as any).anonymous(req)).rejects.toMatchObject({
+                status: 400,
+            });
+            await expect((controller as any).anonymous(req)).rejects.toThrow(/captcha/i);
+            // verify() was called (we reached the captcha path) but no
+            // anonymous user was ever created.
+            expect(captchaVerifier.verify).toHaveBeenCalled();
+            expect(anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+        });
     });
 
     describe('getConfiguredProviders (GET /api/auth/providers)', () => {

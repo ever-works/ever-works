@@ -185,6 +185,44 @@ describe('TriggerInternalController', () => {
             expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
         });
 
+        // C-05 / L-09: `ensureSecret` performs constant-time comparison with a
+        // length-padded buffer so equal-length AND unequal-length submissions
+        // both reach `timingSafeEqual`. A naive `length-only` short-circuit
+        // would leak the secret length to an attacker; this test asserts that
+        // a same-length-but-wrong secret is still rejected. The constant-time
+        // property itself is not observable in JS — but rejecting a same-length
+        // mismatch confirms the byte-comparison path is wired correctly and
+        // that we are NOT accidentally accepting a wrong secret just because
+        // the lengths happened to match.
+        it('rejects same-length wrong secret in constant time (no early length-leak)', async () => {
+            // VALID_SECRET = 'super-secret-token' is 18 chars. Build a
+            // same-length wrong secret so we exercise the equal-length branch
+            // of the timingSafeEqual comparison.
+            const wrongSameLength = 'aaaaaaaaaaaaaaaaaa';
+            expect(wrongSameLength).toHaveLength(VALID_SECRET.length);
+            expect(wrongSameLength).not.toBe(VALID_SECRET);
+
+            await expect(
+                controller.getWorkContext(wrongSameLength, 'work-1', 'user-1'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                controller.getWorkContext(wrongSameLength, 'work-1', 'user-1'),
+            ).rejects.toThrow('Invalid trigger secret');
+
+            // And the same property holds on the RPC entrypoint.
+            await expect(
+                controller.callRemote(wrongSameLength, {
+                    name: 'PluginRepository',
+                    method: 'echo',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+
+            // Critically: NO downstream side-effects should run on a wrong
+            // secret, regardless of length.
+            expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
+        });
+
         it('throws ForbiddenException when no internal secret is configured', async () => {
             getInternalSecretMock.mockReturnValue(undefined);
 

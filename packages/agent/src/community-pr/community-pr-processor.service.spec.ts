@@ -2035,6 +2035,101 @@ describe('CommunityPrProcessorService', () => {
         });
     });
 
+    describe('C-11 — extractedItemSchema URL-scheme guard', () => {
+        // Audit ref: docs/specs/security/audits/2026-05-17-ever-works-platform-security-audit.md
+        // The schema in `community-pr-processor.service.ts` constrains
+        // `source_url` to http(s) only. A naive `z.string()` would happily
+        // accept `javascript:alert(1)`, `data:text/html,...`, or `file://...`
+        // — any of which would land in the data repo's markdown body as a
+        // clickable link. We capture the schema passed to `aiFacade.askJson`
+        // and exercise it directly with `safeParse` so the assertion targets
+        // the schema's parse semantics, not any downstream business logic.
+        async function captureExtractedItemSchema(): Promise<{
+            schema: import('zod').ZodSchema<unknown>;
+        }> {
+            const pr = makePr();
+            const file = { filename: 'data/x.yml', status: 'added', patch: '+ added' };
+            const work = makeWork();
+            const dataRepo = makeDataRepoMock();
+            dataRepoCreateMock.mockResolvedValue(dataRepo);
+            const gitFacade = {
+                listPullRequests: jest.fn().mockResolvedValue([pr]),
+                getPullRequestFiles: jest.fn().mockResolvedValue([file]),
+                cloneOrPull: jest.fn().mockResolvedValue('/tmp/repo'),
+                add: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                push: jest.fn().mockResolvedValue(undefined),
+                createPullRequestComment: jest.fn().mockResolvedValue(undefined),
+                closePullRequest: jest.fn().mockResolvedValue(undefined),
+            };
+            // Return an empty items array so the processor short-circuits
+            // after schema validation — we only care about capturing the
+            // schema arg here.
+            const aiFacade = {
+                askJson: jest.fn().mockResolvedValue({ result: { items: [] } }),
+            };
+            const { service } = makeService({ gitFacade, aiFacade });
+
+            await service.processWork(work as any);
+
+            expect(aiFacade.askJson).toHaveBeenCalledTimes(1);
+            const schema = (aiFacade.askJson as jest.Mock).mock.calls[0][1];
+            expect(schema).toBeDefined();
+            // Zod schemas expose `safeParse`. This guards against a future
+            // refactor that drops the schema argument or swaps in something
+            // that isn't a Zod schema.
+            expect(typeof (schema as { safeParse?: unknown }).safeParse).toBe('function');
+            return { schema };
+        }
+
+        const baseItem = {
+            name: 'A tool',
+            description: 'A useful tool',
+            category: 'AI',
+            tags: ['a'],
+        };
+
+        it('rejects javascript:, data:, and file: URL schemes in source_url', async () => {
+            const { schema } = await captureExtractedItemSchema();
+
+            // Each of these would slip past `z.string()` but must be rejected
+            // by the http(s)-only `.refine()` in `extractedItemSchema`.
+            const dangerousUrls = [
+                'javascript:alert(1)',
+                // eslint-disable-next-line no-script-url
+                'JavaScript:alert(1)', // case-insensitive — the URL parser lower-cases protocol
+                'data:text/html,<script>alert(1)</script>',
+                'file:///etc/passwd',
+            ];
+
+            for (const url of dangerousUrls) {
+                const parsed = (schema as import('zod').ZodSchema<unknown>).safeParse({
+                    items: [{ ...baseItem, source_url: url }],
+                });
+                expect(parsed.success).toBe(false);
+                if (!parsed.success) {
+                    // The rejection must come from the schema (the http(s)
+                    // refinement) — assert the exact message wired in
+                    // `community-pr-processor.service.ts`, not a generic
+                    // "unsafe URL" wrapper added elsewhere.
+                    const messages = parsed.error.issues.map((i) => i.message);
+                    expect(messages).toContain('source_url must be http(s)');
+                }
+            }
+        });
+
+        it('accepts http: and https: URLs (positive control for the URL-scheme guard)', async () => {
+            const { schema } = await captureExtractedItemSchema();
+
+            for (const url of ['http://example.com', 'https://example.com/path?q=1']) {
+                const parsed = (schema as import('zod').ZodSchema<unknown>).safeParse({
+                    items: [{ ...baseItem, source_url: url }],
+                });
+                expect(parsed.success).toBe(true);
+            }
+        });
+    });
+
     describe('Constants', () => {
         // Sanity test confirming the documented constants do not silently change.
         // We assert via observable side-effects.
