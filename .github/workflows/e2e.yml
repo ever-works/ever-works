@@ -100,6 +100,19 @@ jobs:
           echo "Web ready."
 
           echo "::group::Running Playwright e2e suite"
+          # Trap to dump API + Web stdout on Playwright failure — without this
+          # we can only see the test-runner's view (e.g. `Expected: 200,
+          # Received: 401`) and not why the API was rejecting. The dev-server
+          # stdout is the authoritative source for NestJS exceptions and
+          # Better Auth's request-flow logging.
+          trap '{
+            echo "::group::API log (last 200 lines)"
+            tail -n 200 /tmp/api.log || true
+            echo "::endgroup::"
+            echo "::group::Web log (last 200 lines)"
+            tail -n 200 /tmp/web.log || true
+            echo "::endgroup::"
+          }' EXIT
           pnpm exec playwright test
           echo "::endgroup::"
         env:
