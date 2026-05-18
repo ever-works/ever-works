@@ -17,11 +17,17 @@ import {
     Trash2,
     Star,
     Sparkles,
+    Loader2,
+    AlertCircle,
+    CheckCircle2,
+    Wand2,
 } from 'lucide-react';
 import type {
     CustomizationAiProvider,
     CustomizationProvider,
     TemplateCatalogItem,
+    TemplateCustomizationStatus,
+    TemplateCustomizationSummary,
     TemplateKind,
 } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
@@ -47,7 +53,9 @@ import {
     updateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
-import { CreateCustomTemplateDialog } from './CreateCustomTemplateDialog';
+import { CreateCustomTemplateDialog, type CustomizeDialogMode } from './CreateCustomTemplateDialog';
+
+const TERMINAL_CUSTOMIZATION_STATUSES: TemplateCustomizationStatus[] = ['succeeded', 'failed'];
 
 type FilterMode = 'all' | 'built_in' | 'custom';
 
@@ -112,6 +120,49 @@ function getTemplatePreviewUrl(template: TemplateCatalogItem): string | null {
     return `https://opengraph.githubassets.com/${cacheKey}/${owner}/${repository}`;
 }
 
+function CustomizationStatusChip({
+    summary,
+    onClick,
+}: {
+    summary: TemplateCustomizationSummary;
+    onClick?: () => void;
+}) {
+    const t = useTranslations('dashboard.templates');
+    const isTerminal = TERMINAL_CUSTOMIZATION_STATUSES.includes(summary.status);
+    const succeeded = summary.status === 'succeeded';
+    const failed = summary.status === 'failed';
+    const tone = failed
+        ? 'bg-destructive/15 text-destructive border border-destructive/30'
+        : succeeded
+          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30';
+    const Icon = failed ? AlertCircle : succeeded ? CheckCircle2 : Loader2;
+
+    const chip = (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-sm',
+                tone,
+            )}
+        >
+            <Icon className={cn('w-2.5 h-2.5', !isTerminal && 'animate-spin')} />
+            {t(`card.status.${summary.status}`)}
+        </span>
+    );
+
+    if (isTerminal || !onClick) return chip;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex"
+            title={t('card.viewStatus')}
+        >
+            {chip}
+        </button>
+    );
+}
+
 function TemplateCard({
     template,
     isDefault,
@@ -119,6 +170,8 @@ function TemplateCard({
     onFork,
     onEdit,
     onArchive,
+    onCustomizeAgain,
+    onViewStatus,
     loading,
     forkLoading,
     archiveLoading,
@@ -129,6 +182,8 @@ function TemplateCard({
     onFork: (template: TemplateCatalogItem) => void;
     onEdit: (template: TemplateCatalogItem) => void;
     onArchive: (template: TemplateCatalogItem) => void;
+    onCustomizeAgain: (template: TemplateCatalogItem) => void;
+    onViewStatus: (template: TemplateCatalogItem) => void;
     loading: boolean;
     forkLoading: boolean;
     archiveLoading: boolean;
@@ -171,6 +226,14 @@ function TemplateCard({
                         <Star className="w-2.5 h-2.5 fill-current" />
                         {t('card.default')}
                     </span>
+                )}
+                {template.latestCustomization && (
+                    <div className="absolute top-2 left-2">
+                        <CustomizationStatusChip
+                            summary={template.latestCustomization}
+                            onClick={() => onViewStatus(template)}
+                        />
+                    </div>
                 )}
             </div>
 
@@ -243,6 +306,18 @@ function TemplateCard({
                             </Button>
                         ) : (
                             <>
+                                {template.customizable && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={loading || archiveLoading}
+                                        onClick={() => onCustomizeAgain(template)}
+                                        title={t('card.customizeAgain')}
+                                        className="text-xs"
+                                    >
+                                        <Wand2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -310,6 +385,33 @@ export function TemplatesCatalog({
     const [isArchivingTemplate, startArchivingTemplate] = useTransition();
     const [isRefreshingTemplates, startRefreshingTemplates] = useTransition();
     const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+    const [customizeMode, setCustomizeMode] = useState<CustomizeDialogMode>('new');
+    const [customizeTargetTemplate, setCustomizeTargetTemplate] =
+        useState<TemplateCatalogItem | null>(null);
+    const [customizeInitialCustomization, setCustomizeInitialCustomization] =
+        useState<TemplateCustomizationSummary | null>(null);
+
+    const openCustomizeNew = () => {
+        setCustomizeMode('new');
+        setCustomizeTargetTemplate(null);
+        setCustomizeInitialCustomization(null);
+        setCustomizeDialogOpen(true);
+    };
+
+    const openCustomizeIterate = (template: TemplateCatalogItem) => {
+        setCustomizeMode('iterate');
+        setCustomizeTargetTemplate(template);
+        setCustomizeInitialCustomization(null);
+        setCustomizeDialogOpen(true);
+    };
+
+    const openCustomizeStatus = (template: TemplateCatalogItem) => {
+        if (!template.latestCustomization) return;
+        setCustomizeMode('status');
+        setCustomizeTargetTemplate(template);
+        setCustomizeInitialCustomization(template.latestCustomization);
+        setCustomizeDialogOpen(true);
+    };
 
     const customizableBases = useMemo(
         () =>
@@ -602,11 +704,7 @@ export function TemplatesCatalog({
                             <RefreshCw className="h-4 w-4" />
                         </Button>
                         {customizableBases.length > 0 && (
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => setCustomizeDialogOpen(true)}
-                            >
+                            <Button size="sm" variant="secondary" onClick={openCustomizeNew}>
                                 <Sparkles className="h-4 w-4" />
                                 {t('actions.customizeTemplate')}
                             </Button>
@@ -705,6 +803,8 @@ export function TemplatesCatalog({
                             onArchive={(selectedTemplate) =>
                                 setArchiveDialogTemplate(selectedTemplate)
                             }
+                            onCustomizeAgain={openCustomizeIterate}
+                            onViewStatus={openCustomizeStatus}
                             loading={isSavingDefault}
                             forkLoading={
                                 isForkingTemplate && forkDialogTemplate?.id === template.id
@@ -948,6 +1048,9 @@ export function TemplatesCatalog({
                 providers={customizationProviders}
                 aiProviders={customizationAiProviders}
                 forkTargets={forkTargets}
+                mode={customizeMode}
+                targetTemplate={customizeTargetTemplate}
+                initialCustomization={customizeInitialCustomization}
                 onSucceeded={() => {
                     void (async () => {
                         const refreshed = await refreshTemplates({ kind });

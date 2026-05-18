@@ -3274,6 +3274,8 @@
                 "fork": "Fork",
                 "edit": "Edit",
                 "archive": "Archive",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
                 "catalogOnly": "Catalog item",
                 "openRepository": "Open repository",
                 "previewAlt": "{name} preview",
@@ -3281,7 +3283,15 @@
                 "branch": "Branch: {branch}",
                 "syncBranches": "{count} sync branches",
                 "betaBranch": "Beta: {branch}",
-                "noDescription": "No description yet."
+                "noDescription": "No description yet.",
+                "status": {
+                    "pending": "Queued",
+                    "forking": "Forking",
+                    "customizing": "Customizing",
+                    "pushing": "Pushing",
+                    "succeeded": "Customized",
+                    "failed": "Last run failed"
+                }
             },
             "dialog": {
                 "title": "Add custom template",
@@ -3360,7 +3370,13 @@
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
+                "titleIterate": "Customize {name} again",
+                "titleStatus": "Customization status — {name}",
                 "description": "We duplicate a base template into a new repo in your GitHub account, then run your chosen AI agent against it to apply UI-only changes. Functionality stays untouched.",
+                "descriptionIterate": "Run another round of agent edits on the same repository. A new commit is pushed each time.",
+                "descriptionStatus": "Live status of the latest customization run for this template.",
+                "templateLabel": "Template",
+                "templateIterateHelp": "Re-running on this existing custom template's repository.",
                 "nameLabel": "Template name",
                 "namePlaceholder": "e.g. Dark Purple Theme",
                 "nameHelp": "Shown in your catalog and used to name the new GitHub repo.",
@@ -3376,8 +3392,10 @@
                 "organizationTarget": "Organization ({login})",
                 "promptLabel": "Describe the UI you want",
                 "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
+                "promptIteratePlaceholder": "Example: increase the sidebar contrast and switch the headline font to Inter.",
                 "promptHelp": "Be specific about styling. New features are out of scope — UI only.",
                 "submit": "Create custom template",
+                "submitIterate": "Run customization",
                 "retry": "Retry",
                 "cancel": "Cancel",
                 "done": "Done",
@@ -3406,7 +3424,8 @@
                     "noProviders": "No code-edit agent plugins are installed or enabled. Install one from the plugin catalog (e.g. claude-code, codex, gemini, opencode).",
                     "noAiProviders": "{plugin} requires an AI provider, but none are installed or enabled. Install one (e.g. openai, anthropic, google) from the plugin catalog.",
                     "noTargets": "Connect a GitHub account to choose a destination.",
-                    "browsePlugins": "Browse plugin catalog"
+                    "browsePlugins": "Browse plugin catalog",
+                    "noRuns": "No customization runs yet for this template."
                 }
             }
         },

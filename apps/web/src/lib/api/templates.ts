@@ -28,6 +28,17 @@ export interface TemplateCatalogItem {
     customizable?: boolean;
     baseTemplateId?: string | null;
     lastCustomizedAt?: string | null;
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export type TemplateCustomizationStatus =
@@ -110,6 +121,11 @@ export type CustomizeTemplateFromBaseResponse = APIResponse<{
 }>;
 
 export type GetTemplateCustomizationResponse = APIResponse<{
+    customization: TemplateCustomization;
+}>;
+
+export type IterateCustomTemplateResponse = APIResponse<{
+    customizationId: string;
     customization: TemplateCustomization;
 }>;
 
@@ -234,6 +250,18 @@ export const templatesAPI = {
     }) => {
         return serverMutation<CustomizeTemplateFromBaseResponse>({
             endpoint: '/templates/custom-from-base',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    iterateCustom: async (
+        templateId: string,
+        data: { prompt: string; providerId: string; aiProviderId?: string },
+    ) => {
+        return serverMutation<IterateCustomTemplateResponse>({
+            endpoint: `/templates/custom/${templateId}/customize`,
             data,
             method: 'POST',
             wrapInData: false,

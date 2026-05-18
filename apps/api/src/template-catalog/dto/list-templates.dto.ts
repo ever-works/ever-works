@@ -179,3 +179,24 @@ export class CustomizeTemplateFromBaseDto {
     @MaxLength(500)
     description?: string;
 }
+
+export class IterateCustomTemplateDto {
+    @ApiProperty({ description: 'New customization prompt for the agent.' })
+    @IsString()
+    @MinLength(3)
+    @MaxLength(4000)
+    prompt: string;
+
+    @ApiProperty({ description: 'Code-edit plugin id (claude-code, codex, gemini, opencode).' })
+    @IsString()
+    @MinLength(1)
+    providerId: string;
+
+    @ApiPropertyOptional({
+        description:
+            'AI provider plugin id, required when the chosen code-edit plugin declares "ai-provider" in selectableProviderCategories.',
+    })
+    @IsOptional()
+    @IsString()
+    aiProviderId?: string;
+}

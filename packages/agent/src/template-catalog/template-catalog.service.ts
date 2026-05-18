@@ -7,9 +7,14 @@ import {
     OnModuleInit,
 } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
+import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
+import {
+    TemplateCustomization,
+    TemplateCustomizationStatus,
+} from '@src/entities/template-customization.entity';
 import {
     findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
@@ -51,6 +56,19 @@ export interface TemplateCatalogItem {
     baseTemplateId?: string | null;
     // ISO timestamp of the last successful agent customization, if any.
     lastCustomizedAt?: string | null;
+    // Latest customization run for this template (most recent by createdAt),
+    // surfaced so the UI can render a status chip without an extra fetch.
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface ForkTemplateResult {
@@ -72,6 +90,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
     constructor(
         private readonly templateRepository: TemplateRepository,
+        private readonly customizationRepository: TemplateCustomizationRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
         private readonly workRepository: WorkRepository,
         private readonly gitFacade: GitFacadeService,
@@ -136,9 +155,16 @@ export class TemplateCatalogService implements OnModuleInit {
             this.getDefaultTemplateIdForUser(kind, userId),
         ]);
 
+        const latestByTemplate = await this.customizationRepository.findLatestForTemplates(
+            templates.map((t) => t.id),
+            userId,
+        );
+
         return {
             defaultTemplateId,
-            templates: templates.map((template) => this.toCatalogItem(template, defaultTemplateId)),
+            templates: templates.map((template) =>
+                this.toCatalogItem(template, defaultTemplateId, latestByTemplate.get(template.id)),
+            ),
         };
     }
 
@@ -754,6 +780,7 @@ export class TemplateCatalogService implements OnModuleInit {
             ownerUserId?: string | null;
         },
         defaultTemplateId: string | null,
+        latestCustomization?: TemplateCustomization,
     ): TemplateCatalogItem {
         const baseTemplateId = this.resolveBaseTemplateId(template);
         const lastCustomizedAtRaw = template.metadata?.lastCustomizedAt;
@@ -778,6 +805,21 @@ export class TemplateCatalogService implements OnModuleInit {
             customizable: this.isCustomizable(template.sourceType, baseTemplateId, template.id),
             baseTemplateId,
             lastCustomizedAt: typeof lastCustomizedAtRaw === 'string' ? lastCustomizedAtRaw : null,
+            latestCustomization: latestCustomization
+                ? this.toCustomizationSummary(latestCustomization)
+                : null,
+        };
+    }
+
+    private toCustomizationSummary(c: TemplateCustomization): TemplateCustomizationSummary {
+        return {
+            id: c.id,
+            status: c.status,
+            errorMessage: c.errorMessage ?? null,
+            startedAt: c.startedAt ? c.startedAt.toISOString() : null,
+            completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
         };
     }
 

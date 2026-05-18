@@ -254,6 +254,40 @@ export async function customizeTemplateFromBase(input: {
     }
 }
 
+export async function iterateCustomTemplate(
+    templateId: string,
+    input: { prompt: string; providerId: string; aiProviderId?: string },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.iterateCustom(templateId, input);
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+        return {
+            success: response.status === 'success',
+            customizationId: response.customizationId ?? null,
+            customization: response.customization ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.customizeFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Iterate custom template error:', error);
+        return {
+            success: false,
+            customizationId: null,
+            customization: null,
+            error: error instanceof Error ? error.message : t('messages.customizeFailed'),
+        };
+    }
+}
+
 export async function listCustomizationProviders() {
     const user = await getAuthFromCookie();
     if (!user) {

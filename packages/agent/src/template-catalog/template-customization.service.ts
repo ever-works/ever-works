@@ -50,6 +50,12 @@ export interface CreateAndStartCustomizationResult {
     template: Template;
 }
 
+export interface IterateCustomizationInput {
+    prompt: string;
+    providerId: string;
+    aiProviderId?: string;
+}
+
 /**
  * Provision a brand-new repo for each customization (clone base → push to new
  * repo → run agent → push). NOT a GitHub fork — fork API is 1-per-account,
@@ -145,6 +151,65 @@ export class TemplateCustomizationService {
             templateId: template.id,
             userId,
             baseTemplateId: baseConfig.id,
+            prompt,
+            providerId,
+            aiProviderId,
+        });
+
+        await this.start(customization.id);
+
+        return { customization, template };
+    }
+
+    async runOnExistingTemplate(
+        userId: string,
+        templateId: string,
+        input: IterateCustomizationInput,
+    ): Promise<CreateAndStartCustomizationResult> {
+        const prompt = input.prompt?.trim();
+        const providerId = input.providerId?.trim();
+
+        if (!prompt) {
+            throw new BadRequestException({ status: 'error', message: 'Prompt is required.' });
+        }
+        if (!providerId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Select an installed code-edit provider before continuing.',
+            });
+        }
+
+        const template = await this.templateRepository.findById(templateId);
+        if (!template || template.ownerUserId !== userId || template.sourceType !== 'custom') {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found.',
+            });
+        }
+
+        const baseTemplateId =
+            typeof template.metadata?.baseTemplateId === 'string'
+                ? template.metadata.baseTemplateId
+                : null;
+        if (!baseTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Template is not linked to a customizable base.',
+            });
+        }
+        this.resolveCustomizableBase(baseTemplateId);
+
+        const codeEditProvider = await this.assertProviderAvailable(providerId, userId);
+        const aiProviderId = await this.resolveAiProviderRequirement(
+            codeEditProvider,
+            input.aiProviderId?.trim(),
+            userId,
+        );
+
+        const customization = await this.customizationRepository.create({
+            templateId: template.id,
+            userId,
+            baseTemplateId,
             prompt,
             providerId,
             aiProviderId,
