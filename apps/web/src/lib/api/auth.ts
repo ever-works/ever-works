@@ -71,6 +71,16 @@ export interface UserProfile {
 
 export interface OAuthUrlResponse {
     url: string;
+    /**
+     * Server-minted CSRF state nonce. Callers MUST mirror this into their
+     * own host-scoped `oauth_state` cookie and verify it on the OAuth
+     * callback. The OAuth provider's `redirect_uri` points at the web
+     * (`${WEB_URL}/api/oauth/:p/callback`), so the api.ever.works cookie
+     * the API also sets is never carried on the callback request in the
+     * normal user flow — the web's mirrored cookie is what closes the
+     * CSRF loop. See `docs/specs/security/THREAT-MODEL.md` (C-03).
+     */
+    state: string;
 }
 
 export interface TokenValidationResponse {
@@ -146,16 +156,37 @@ export const authAPI = {
     },
 
     // OAuth URLs
-    getOAuthAuthUrl: async (providerId: OAuthProvider, state?: string) => {
-        const params = new URLSearchParams();
-        if (state) params.append('state', state);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url${query}`);
+    //
+    // The API server mints the CSRF state nonce and returns it alongside the
+    // OAuth URL. Callers MUST set their own `oauth_state` cookie to that
+    // returned value and check it on the OAuth callback. Do NOT supply a
+    // client-side state — the API ignores it.
+    getOAuthAuthUrl: async (providerId: OAuthProvider) => {
+        return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url`);
     },
 
-    connectOAuthCallback: async (providerId: OAuthProvider, code: string) => {
-        const params = new URLSearchParams({ code });
-        return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`);
+    /**
+     * Exchange an OAuth callback `code` for an authenticated session.
+     *
+     * Forwards the validated `state` along two channels so the API's C-03
+     * state check (`OAuthController.authRedirect`) succeeds even though the
+     * request is server-to-server and doesn't carry the browser's
+     * `ew_oauth_state` cookie:
+     *
+     *   - `?state=<state>` query parameter
+     *   - `Cookie: ew_oauth_state=<state>` request header
+     *
+     * The caller (web `handleOAuthCallback`) has already verified that this
+     * `state` equals the value the API minted on `/api/oauth/:p/url` and
+     * mirrored into the host-scoped `oauth_state` cookie on the web origin,
+     * so forwarding both is equivalent to the browser-direct path the API
+     * was originally written for.
+     */
+    connectOAuthCallback: async (providerId: OAuthProvider, code: string, state: string) => {
+        const params = new URLSearchParams({ code, state });
+        return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`, {
+            headers: { cookie: `ew_oauth_state=${state}` },
+        });
     },
 
     // Email Verification

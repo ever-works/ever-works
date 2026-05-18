@@ -89,6 +89,30 @@ These are known risks the audit flagged that the platform team has accepted for 
 - **No platform-wide kill-switch.** If a prompt-injection or runaway is in progress, ops can stop individual pipelines but there's no `IS_AGENT_KILL_SWITCH_ON` that halts all autonomous activity instantly. Queued.
 - **Fake `iat` / `iss` / `aud` on `AuthenticatedUser`.** Marked `@deprecated`; removal is a follow-up after consumers migrate. Low risk because the values are server-internal and don't sign anything.
 
+### 5.1. OAuth `state` cookie — dual-host round-trip (C-03)
+
+The OAuth login flow crosses two origins:
+
+- `app.ever.works` — Next.js web app where the user clicks "Sign in with X".
+- `api.ever.works` — NestJS API that issues the OAuth URL and exchanges the code.
+
+The OAuth provider's `redirect_uri` is configured as `${WEB_URL}/api/oauth/:p/callback` — it lands the callback on the **web** host, so the `api.ever.works`-scoped `ew_oauth_state` cookie is **not carried** on the user-flow callback request.
+
+The hardening therefore validates state in two complementary layers, both bound to the **same server-minted value**:
+
+1. `GET /api/oauth/:p/url` mints a 32-byte base64url nonce, sets it as `ew_oauth_state` (HttpOnly, Path=`/api/oauth`, SameSite=Lax, Secure in prod) on the API host, **and returns the value in the response body**.
+2. The web's `connectProvider` server action mirrors that returned value into `oauth_state` on `app.ever.works` (HttpOnly, Path=`/`, SameSite=Lax, Secure when `WEB_URL` is HTTPS).
+3. On callback to `app.ever.works/api/oauth/:p/callback`, `handleOAuthCallback` `timingSafeEqual`-compares `oauth_state` cookie ↔ URL `state` query.
+4. Anything hitting `api.ever.works/api/oauth/:p/callback` directly (CLI, future tooling, provider misconfigured to the API host) is validated against `ew_oauth_state` by the same constant-time check.
+
+Properties:
+
+- **Single source of truth.** Both cookies hold the same value the API minted; there is no client-mintable input to the state.
+- **Single-use.** Each callback clears its cookie regardless of outcome.
+- **Cross-origin safe.** SameSite=Lax permits the OAuth provider's top-level GET redirect to attach the cookie on the way back; cross-site script can't read either cookie because both are HttpOnly.
+
+A regression where the API substituted its own nonce without surfacing it to the web caused every Google/GitHub sign-in to fail the web check; the contract above pins both layers so a future-self can't reintroduce the same skew. Specs: API `GET /api/oauth/:p/url` returns `{ url, state }`; both the URL query and the response body carry the same `state`.
+
 ## 6. Plugin trust posture (formal statement)
 
 > The hosted SaaS at `apps.ever.works` will not load any plugin that
@@ -131,7 +155,7 @@ Concretely:
 | Task-payload path components are validated UUIDs         | H-22                      | ✅ Batch 2                                                 |
 | Agentic file tools can't escape the workspace            | H-23                      | ✅ Batch 2                                                 |
 | Plugin readme HTML is sanitized                          | H-12                      | ✅ Batch 2                                                 |
-| OAuth state validated against signed cookie              | C-03                      | 🚧 Batch 3                                                 |
+| OAuth state validated against signed cookie              | C-03                      | ✅ Batch 3 + EW-OAUTH-STATE-FIX (dual-host round-trip)     |
 | Trigger remote-call surface is allow-listed              | C-05 RPC half             | 🚧 Batch 3                                                 |
 | Plugin secret settings are encrypted at rest             | C-08                      | 🚧 Batch 3                                                 |
 | Community-PR auto-apply gated by Verified-org membership | C-11                      | 🚧 Batch 3                                                 |

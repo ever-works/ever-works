@@ -30,8 +30,12 @@ export async function GET(
         });
     }
 
+    // C-03: unconditional state check. The previous `if (state && …)` shape
+    // skipped validation when the OAuth provider's redirect was missing
+    // `?state=` — letting an attacker bypass CSRF by simply stripping the
+    // query param. Require state to be present AND match the cookie.
     const storedState = await getOAuthStateCookie();
-    if (state && state !== storedState) {
+    if (!state || state !== storedState) {
         await removeOAuthStateCookie();
         return redirect({
             locale,
@@ -48,7 +52,7 @@ export async function GET(
     // next-intl's redirect() throws a NEXT_REDIRECT control flow exception internally.
     let href: string;
     try {
-        await oauthAPI.connectCallback(providerId, code, state || undefined);
+        await oauthAPI.connectCallback(providerId, code, state);
         href = appendQueryParams(targetPath, {
             oauth_connected: 'true',
             oauth_provider: providerId,

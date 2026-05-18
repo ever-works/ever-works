@@ -8,7 +8,7 @@ import {
     Req,
     Res,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 
 // Minimal duck-typed shapes — the platform deliberately doesn't depend on
@@ -45,21 +45,27 @@ export class OAuthController {
         summary: 'Get OAuth URL',
         description: 'Generate an OAuth authorization URL for a supported provider',
     })
-    @ApiQuery({
-        name: 'state',
-        required: false,
-        description: 'Optional state parameter (ignored — server mints its own per C-03)',
+    @ApiResponse({
+        status: 200,
+        description:
+            'Returns `{ url, state }`. The OAuth provider redirect_uri points at the ' +
+            "web app, NOT this API, so the `ew_oauth_state` cookie set here isn't sent " +
+            'on the callback in the normal user flow. The web tier mirrors `state` into ' +
+            'its own host-scoped cookie and validates it on the callback. Both layers ' +
+            'agree on the same server-minted value.',
     })
-    @ApiResponse({ status: 200, description: 'Returns the OAuth URL' })
     async getAuthUrl(
         @Param('providerId') providerId: string,
         @Res({ passthrough: true }) res: OAuthResponse,
     ) {
-        // C-03: mint a server-side state nonce + set it as an HttpOnly
-        // cookie. The previous design accepted a client-supplied `state` and
-        // never validated it on callback; that's CSRF (account takeover via
-        // forced-login). We ignore any client-supplied state and use the
-        // server-minted one.
+        // C-03: mint a server-side state nonce. Set it as an HttpOnly cookie
+        // on this origin AND return it in the body so the web tier can mirror
+        // it into its own `oauth_state` cookie on its origin. The OAuth
+        // provider's `redirect_uri` points at the web app
+        // (`${WEB_URL}/api/oauth/:p/callback`), so the cookie set here is
+        // never sent on the callback in the normal user flow — the web's
+        // cookie carries the CSRF check, and both layers verify against the
+        // identical server-minted value.
         const { state, setCookie } = this.oauthState.mint({
             secure: process.env.NODE_ENV === 'production',
         });
@@ -73,7 +79,7 @@ export class OAuthController {
             res.setHeader('Set-Cookie', setCookie);
         }
         const url = this.socialAuthService.getAuthorizationUrl(providerId, undefined, state);
-        return { url };
+        return { url, state };
     }
 
     @Public()
