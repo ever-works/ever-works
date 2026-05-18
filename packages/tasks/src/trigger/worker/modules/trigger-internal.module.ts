@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
-import { WorkScheduleDispatcherService, WorkScheduleService } from '@ever-works/agent/services';
+import {
+    DeployReadyPollerService,
+    WorkScheduleDispatcherService,
+    WorkScheduleService,
+} from '@ever-works/agent/services';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -34,12 +38,19 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'DataSyncDispatcherService'),
             inject: [TriggerInternalApiClient],
         },
+        {
+            provide: DeployReadyPollerService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'DeployReadyPollerService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
         WorkScheduleDispatcherService,
         WorkScheduleService,
         DATA_SYNC_DISPATCHER_SERVICE,
+        DeployReadyPollerService,
     ],
 })
 export class TriggerInternalModule {}

@@ -98,8 +98,9 @@ describe('TriggerInternalController', () => {
             templateCustomizationRepository,
             userTemplatePreferenceRepository,
             userRepository,
-            undefined,
-            undefined,
+            undefined, // dataSyncDispatcher
+            undefined, // deployReadyPoller
+            undefined, // workProposalsApiService
         );
         c.onModuleInit();
         return c;

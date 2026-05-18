@@ -31,6 +31,7 @@ import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { WorkContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
+    DeployReadyPollerService,
     WorkOwnershipService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
@@ -69,6 +70,8 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly userRepository: UserRepository,
         // EW-628 G7 — dispatcher fanned out from the data-repo-sync cron.
         private readonly dataSyncDispatcher: DataSyncDispatcherService,
+        // EW-617 G8 — exposed for the deploy-ready-poller cron task.
+        private readonly deployReadyPoller: DeployReadyPollerService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -92,6 +95,8 @@ export class TriggerInternalController implements OnModuleInit {
             WorkScheduleService: this.workScheduleService,
             // EW-628 G7 — exposed for the data-repo-sync dispatcher cron.
             DataSyncDispatcherService: this.dataSyncDispatcher,
+            // EW-617 G8 — exposed for the deploy-ready-poller cron task.
+            DeployReadyPollerService: this.deployReadyPoller,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
