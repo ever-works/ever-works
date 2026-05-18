@@ -67,6 +67,7 @@ interface Mocks {
         execute: AnyMock;
     };
     aiFacade: { getAvailableProvidersForUser: AnyMock };
+    dispatcher: { dispatchTemplateCustomization: AnyMock };
 }
 
 function makeService(): { service: TemplateCustomizationService; mocks: Mocks } {
@@ -140,6 +141,9 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         aiFacade: {
             getAvailableProvidersForUser: jest.fn().mockResolvedValue([]),
         },
+        dispatcher: {
+            dispatchTemplateCustomization: jest.fn().mockResolvedValue(null),
+        },
     };
     const service = new TemplateCustomizationService(
         mocks.templateRepository as any,
@@ -148,6 +152,7 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         mocks.gitFacade as any,
         mocks.codeEditFacade as any,
         mocks.aiFacade as any,
+        mocks.dispatcher as any,
     );
     return { service, mocks };
 }
@@ -240,6 +245,39 @@ describe('TemplateCustomizationService.createAndStart', () => {
                 aiProviderId: 'anthropic',
             }),
         ).rejects.toThrow(BadRequestException);
+    });
+
+    it('dispatches to Trigger.dev when a dispatcher is bound and stores the run id', async () => {
+        const { service, mocks } = makeService();
+        mocks.dispatcher.dispatchTemplateCustomization.mockResolvedValue('run-tpl-1');
+        const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        const result = await service.createAndStart('user-1', baseInput);
+
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+        });
+        expect(mocks.customizationRepository.updateById).toHaveBeenCalledWith(
+            result.customization.id,
+            { triggerRunId: 'run-tpl-1' },
+        );
+        await new Promise((r) => setImmediate(r));
+        expect(executeSpy).not.toHaveBeenCalled();
+    });
+
+    it('falls back to in-process execution when the dispatcher returns null', async () => {
+        const { service, mocks } = makeService();
+        mocks.dispatcher.dispatchTemplateCustomization.mockResolvedValue(null);
+        const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        const result = await service.createAndStart('user-1', baseInput);
+
+        await new Promise((r) => setImmediate(r));
+        expect(executeSpy).toHaveBeenCalledWith(result.customization.id);
+        expect(mocks.customizationRepository.updateById).not.toHaveBeenCalledWith(
+            result.customization.id,
+            expect.objectContaining({ triggerRunId: expect.anything() }),
+        );
     });
 
     it('persists ai-provider id when the chosen code-edit plugin requires it', async () => {

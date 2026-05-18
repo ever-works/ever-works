@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import {
     TemplateRepository,
+    TemplateCustomizationRepository,
+    UserRepository,
     UserTemplatePreferenceRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
@@ -15,6 +17,7 @@ import {
 } from '@ever-works/agent/generators';
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
+import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -64,6 +67,18 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
                 createRemoteProxy(apiClient, 'UserTemplatePreferenceRepository'),
             inject: [TriggerInternalApiClient],
         },
+        {
+            provide: TemplateCustomizationRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TemplateCustomizationRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: UserRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'UserRepository'),
+            inject: [TriggerInternalApiClient],
+        },
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,
@@ -75,7 +90,13 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         ImportExecutorService,
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
+        TemplateCustomizationService,
     ],
-    exports: [TriggerGenerationOrchestrator, TriggerImportOrchestrator, TriggerInternalModule],
+    exports: [
+        TriggerGenerationOrchestrator,
+        TriggerImportOrchestrator,
+        TemplateCustomizationService,
+        TriggerInternalModule,
+    ],
 })
 export class TriggerWorkerModule {}

@@ -23,6 +23,7 @@ export type UpdateTemplateCustomizationPatch = Partial<
         | 'commitSha'
         | 'errorMessage'
         | 'providerId'
+        | 'triggerRunId'
         | 'startedAt'
         | 'completedAt'
     >

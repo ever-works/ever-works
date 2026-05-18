@@ -21,7 +21,9 @@ import {
     WorkRepository,
     AuthAccountRepository,
     TemplateRepository,
+    TemplateCustomizationRepository,
     UserTemplatePreferenceRepository,
+    UserRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
@@ -62,7 +64,9 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly workPluginRepository: WorkPluginRepository,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly templateRepository: TemplateRepository,
+        private readonly templateCustomizationRepository: TemplateCustomizationRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
+        private readonly userRepository: UserRepository,
         // EW-628 G7 — dispatcher fanned out from the data-repo-sync cron.
         private readonly dataSyncDispatcher: DataSyncDispatcherService,
         @Optional()
@@ -80,7 +84,9 @@ export class TriggerInternalController implements OnModuleInit {
             NotificationService: this.notificationService,
             WorkRepository: this.workRepository,
             TemplateRepository: this.templateRepository,
+            TemplateCustomizationRepository: this.templateCustomizationRepository,
             UserTemplatePreferenceRepository: this.userTemplatePreferenceRepository,
+            UserRepository: this.userRepository,
             CacheManager: this.cacheManager,
             WorkScheduleDispatcherService: this.scheduleDispatcher,
             WorkScheduleService: this.workScheduleService,

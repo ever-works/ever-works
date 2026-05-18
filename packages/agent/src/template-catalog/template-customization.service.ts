@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
@@ -7,6 +14,10 @@ import { GitFacadeService, type GitFacadeOptions } from '@src/facades/git.facade
 import type { GitCommitter } from '@ever-works/plugin';
 import { CodeEditFacadeService, type CodeEditProviderInfo } from '@src/facades/code-edit.facade';
 import { AiFacadeService } from '@src/facades/ai.facade';
+import {
+    TEMPLATE_CUSTOMIZATION_DISPATCHER,
+    type TemplateCustomizationDispatcher,
+} from '@src/tasks';
 import {
     findWebsiteTemplateConfig,
     type WebsiteTemplateConfig,
@@ -55,6 +66,9 @@ export class TemplateCustomizationService {
         private readonly gitFacade: GitFacadeService,
         private readonly codeEditFacade: CodeEditFacadeService,
         private readonly aiFacade: AiFacadeService,
+        @Optional()
+        @Inject(TEMPLATE_CUSTOMIZATION_DISPATCHER)
+        private readonly dispatcher?: TemplateCustomizationDispatcher,
     ) {}
 
     async createAndStart(
@@ -136,9 +150,29 @@ export class TemplateCustomizationService {
             aiProviderId,
         });
 
-        void this.runAsync(customization.id);
+        await this.start(customization.id);
 
         return { customization, template };
+    }
+
+    private async start(customizationId: string): Promise<void> {
+        const dispatchedId = this.dispatcher
+            ? await this.dispatcher.dispatchTemplateCustomization({ customizationId })
+            : null;
+
+        if (dispatchedId) {
+            await this.customizationRepository.updateById(customizationId, {
+                triggerRunId: dispatchedId,
+            });
+            return;
+        }
+
+        if (this.dispatcher) {
+            this.logger.warn(
+                `Trigger dispatch failed, falling back to in-process customization for ${customizationId}`,
+            );
+        }
+        void this.runAsync(customizationId);
     }
 
     getByIdForUser(id: string, userId: string): Promise<TemplateCustomization | null> {

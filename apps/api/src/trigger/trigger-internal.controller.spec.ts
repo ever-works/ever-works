@@ -75,7 +75,9 @@ describe('TriggerInternalController', () => {
     let workPluginRepository: any;
     let authAccountRepository: any;
     let templateRepository: any;
+    let templateCustomizationRepository: any;
     let userTemplatePreferenceRepository: any;
+    let userRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -93,7 +95,10 @@ describe('TriggerInternalController', () => {
             workPluginRepository,
             authAccountRepository,
             templateRepository,
+            templateCustomizationRepository,
             userTemplatePreferenceRepository,
+            userRepository,
+            undefined,
             undefined,
         );
         c.onModuleInit();

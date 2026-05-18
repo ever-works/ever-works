@@ -57,6 +57,9 @@ export class TemplateCustomization {
     @Column({ type: 'varchar', length: 80, nullable: true })
     aiProviderId?: string | null;
 
+    @Column({ type: 'varchar', length: 80, nullable: true })
+    triggerRunId?: string | null;
+
     @Column({ type: 'varchar', length: 255, nullable: true })
     branch?: string | null;
 
