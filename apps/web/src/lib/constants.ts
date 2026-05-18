@@ -101,8 +101,8 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
-    // Profile
-    DASHBOARD_PROFILE: '/profile',
+    // Profile (alias of settings — `/profile` redirects to `/settings`)
+    DASHBOARD_PROFILE: '/settings',
     DASHBOARD_ANALYTICS: '/analytics',
     DASHBOARD_NOTIFICATIONS: '/notifications',
 
