@@ -44,19 +44,12 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
             return;
         }
 
-        startTransition(() => {
-            void (async () => {
-                const response = await registerAction(
-                    formData.name,
-                    formData.email,
-                    formData.password,
-                );
+        startTransition(async () => {
+            const response = await registerAction(formData.name, formData.email, formData.password);
 
-                if (!response.success) {
-                    setError(response.error || t('errors.generic'));
-                    return;
-                }
-            })();
+            if (response && !response.success) {
+                setError(response.error || t('errors.generic'));
+            }
         });
     };
 
