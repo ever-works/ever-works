@@ -114,6 +114,12 @@ jobs:
           # before Playwright fires. Set this explicitly instead of flipping
           # NODE_ENV (which would change other dev-vs-test branches).
           DATABASE_AUTOMIGRATE: 'true'
+          # H-07: Better Auth now requires email verification before sign-in.
+          # The E2E suite registers users via API and immediately logs in;
+          # without disabling the check here, every login returns 403
+          # EMAIL_NOT_VERIFIED. Production still enforces the check (default
+          # `true`); `false` is opt-in for test contexts only.
+          REQUIRE_EMAIL_VERIFICATION: 'false'
           # Web
           API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
