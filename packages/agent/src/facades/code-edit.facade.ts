@@ -11,7 +11,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { AiFacadeService } from './ai.facade';
-import { BaseFacadeService } from './base.facade';
+import { BaseFacadeService, ProviderNotFoundError } from './base.facade';
 
 export interface CodeEditFacadeOptions {
     userId: string;
@@ -68,6 +68,9 @@ export class CodeEditFacadeService extends BaseFacadeService {
             opts.userId,
             opts.workId,
         );
+        if (this.registry.get(plugin.id)?.manifest.supplementary) {
+            throw new ProviderNotFoundError(plugin.id, this.CAPABILITY);
+        }
         const settings = await this.pluginSettings.getSettings(plugin.id, {
             userId: opts.userId,
             workId: opts.workId,

@@ -174,5 +174,18 @@ describe('CodeEditFacadeService', () => {
                 service.execute({ workspaceDir: '/tmp/x', prompt: 'p' }, { userId: 'user-1' }),
             ).rejects.toBeInstanceOf(NoProviderError);
         });
+
+        it('rejects supplementary plugins even if a caller posts their id directly', async () => {
+            const registered = createRegistered('helper', { supplementary: true });
+            registry.get.mockReturnValue(registered);
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
+
+            await expect(
+                service.execute(
+                    { workspaceDir: '/tmp/x', prompt: 'p' },
+                    { userId: 'user-1', providerId: 'helper' },
+                ),
+            ).rejects.toBeInstanceOf(ProviderNotFoundError);
+        });
     });
 });
