@@ -205,7 +205,7 @@ migrations: [                        // resolved relative to process.cwd()
   '${cwd}/apps/api/src/migrations/*.ts',
 ],
 migrationsTableName: 'migrations',
-migrationsTransactionMode: 'all',    // one tx per migration
+migrationsTransactionMode: 'all',    // all pending migrations in ONE shared transaction (atomic batch)
 ```
 
 `synchronize: true` is **only** allowed in `NODE_ENV=test` for fast

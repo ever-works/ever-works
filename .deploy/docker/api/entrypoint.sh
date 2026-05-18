@@ -20,9 +20,11 @@ echo "==> Starting Ever Works API..."
 #      via `maxUnavailable: 0`.
 #
 # If you ever need to run migrations WITHOUT starting the API (e.g. for a
-# one-shot k8s Job in a more cautious rollout), use the TypeORM CLI:
-#   node /app/dist/migrations-cli.js  # NOT YET WIRED — placeholder
-# or shell into a pod and run `pnpm typeorm migration:run` via apps/api.
+# one-shot k8s Job in a more cautious rollout), shell into a checkout of
+# the repo and run `pnpm typeorm migration:run -d typeorm.config.ts` from
+# `apps/api/`. There is intentionally NO pre-baked migration-only CLI in
+# the production image — keeping the same code path (TypeORM via the API)
+# for every environment avoids drift.
 
 echo "==> Starting API server (migrations run in-process via TypeORM migrationsRun)..."
 exec node /app/dist/main
