@@ -357,6 +357,15 @@ export class AuthProviderService extends AuthProvider {
             provider: user.registrationProvider || 'local',
             emailVerified: user.emailVerified,
             isActive: user.isActive !== false,
+            // L-05: propagate `isAnonymous` so controller-level guards
+            // (e.g. claim-account is anonymous-only) can see it on `req.user`.
+            // Without this, the post-bearer-auth user object lacks
+            // `isAnonymous` and the L-05 check rejects legitimate anon-claim
+            // attempts with 403 — surfaced by zero-friction E2E run
+            // 26039862248. Better Auth's session.user shape may not include
+            // the custom column, hence the defensive cast + `=== true`.
+            isAnonymous:
+                (user as AuthRuntimeUser & { isAnonymous?: boolean }).isAnonymous === true,
             avatar: user.image || null,
             iat: Math.floor(Date.now() / 1000),
             iss: 'auth-runtime',
@@ -372,6 +381,8 @@ export class AuthProviderService extends AuthProvider {
             provider: user.registrationProvider || 'local',
             emailVerified: user.emailVerified,
             isActive: user.isActive !== false,
+            // L-05: propagate `isAnonymous` — see `mapAuthenticatedUser`.
+            isAnonymous: user.isAnonymous === true,
             avatar: user.avatar || null,
             iat: Math.floor(Date.now() / 1000),
             iss: 'auth-runtime',
