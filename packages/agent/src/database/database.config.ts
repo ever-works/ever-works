@@ -153,10 +153,19 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const appType = config.getAppType() || 'api';
     let dbType = config.database.getType();
 
-    // `migrationsRun` is gated on the API app type — CLI uses synchronize
-    // for its local SQLite (`DatabaseInitService` does that), so it has no
-    // use for the migrations table.
-    const migrationsRun = appType === 'api' && config.database.runMigrations();
+    // `migrationsRun` is gated on:
+    //   - API app type only — CLI uses synchronize for its local SQLite
+    //     (`DatabaseInitService` does that), so it has no use for the
+    //     migrations table.
+    //   - `!autoMigrate()` — when synchronize is ON (test / E2E), TypeORM's
+    //     `DataSource.initialize()` runs `migrationsRun` BEFORE
+    //     `synchronize`, so any ALTER-style migration would fail against
+    //     the still-empty schema. Synchronize bootstraps the full schema
+    //     from entities and the migrations table catches up implicitly;
+    //     migrations are only needed in environments with real persisted
+    //     data (prod/stage).
+    const migrationsRun =
+        appType === 'api' && config.database.runMigrations() && !config.database.autoMigrate();
 
     const baseConfig: any = {
         entities: ENTITIES,

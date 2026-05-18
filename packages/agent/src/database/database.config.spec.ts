@@ -315,9 +315,10 @@ describe('database.config', () => {
                 }
             });
 
-            it('migrationsRun=true when runMigrations()=true and appType=api', () => {
+            it('migrationsRun=true when runMigrations()=true and appType=api and autoMigrate()=false (prod-shape)', () => {
                 cfgMock.getAppType.mockReturnValue('api');
                 cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
                 const result = (databaseConfig as any)();
                 expect(result.migrationsRun).toBe(true);
             });
@@ -325,6 +326,7 @@ describe('database.config', () => {
             it('migrationsRun=false when runMigrations()=false (kill switch wins)', () => {
                 cfgMock.getAppType.mockReturnValue('api');
                 cfgMock.database.runMigrations.mockReturnValue(false);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
                 const result = (databaseConfig as any)();
                 expect(result.migrationsRun).toBe(false);
             });
@@ -332,7 +334,21 @@ describe('database.config', () => {
             it('migrationsRun=false for CLI even when runMigrations()=true (CLI uses synchronize)', () => {
                 cfgMock.getAppType.mockReturnValue('cli');
                 cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false);
                 const result = (databaseConfig as any)();
+                expect(result.migrationsRun).toBe(false);
+            });
+
+            it('migrationsRun=false when synchronize is ON (mutual exclusion — TypeORM order trap)', () => {
+                // TypeORM `DataSource.initialize()` runs migrationsRun BEFORE
+                // synchronize. With synchronize=true the schema is built from
+                // entities, so any ALTER-style migration would fail against
+                // an empty DB first. The test/E2E env needs synchronize-only.
+                cfgMock.getAppType.mockReturnValue('api');
+                cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(true);
+                const result = (databaseConfig as any)();
+                expect(result.synchronize).toBe(true);
                 expect(result.migrationsRun).toBe(false);
             });
 
@@ -340,6 +356,7 @@ describe('database.config', () => {
                 cfgMock.database.getType.mockReturnValue('postgres');
                 cfgMock.database.getHost.mockReturnValue('db.example.com');
                 cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false); // prod-shape
                 const result = (databaseConfig as any)();
                 expect(result.type).toBe('postgres');
                 expect(result.migrationsRun).toBe(true);
@@ -351,19 +368,21 @@ describe('database.config', () => {
                 cfgMock.database.getUrl.mockReturnValue('postgres://u:p@h:5432/d');
                 parseMock.mockReturnValue({ database: 'd' } as any);
                 cfgMock.database.runMigrations.mockReturnValue(true);
+                cfgMock.database.autoMigrate.mockReturnValue(false); // prod-shape
                 const result = (databaseConfig as any)();
                 expect(result.url).toBe('postgres://u:p@h:5432/d');
                 expect(result.migrationsRun).toBe(true);
                 expect(Array.isArray(result.migrations)).toBe(true);
             });
 
-            it('migrations + migrationsRun flow through SQLite branch', () => {
+            it('migrations array is always present in SQLite branch (E2E shape: synchronize on, migrationsRun off)', () => {
                 cfgMock.database.getType.mockReturnValue('better-sqlite3');
                 cfgMock.getEnvironment.mockReturnValue('test');
+                // autoMigrate=true by default in resetMocks, simulating E2E.
                 const result = (databaseConfig as any)();
                 expect(result.type).toBe('better-sqlite3');
-                // appType=api in resetMocks; runMigrations=true; migrationsRun=true.
-                expect(result.migrationsRun).toBe(true);
+                expect(result.synchronize).toBe(true);
+                expect(result.migrationsRun).toBe(false); // gated off by autoMigrate
                 expect(Array.isArray(result.migrations)).toBe(true);
             });
         });

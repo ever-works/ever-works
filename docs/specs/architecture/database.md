@@ -233,6 +233,16 @@ silently left prod with no migration runner for several deploys:
   migrations from the `migrations` array). Default `true` outside
   test. **Stays on in prod** so every API pod boot self-heals.
 
+**Mutual exclusion (TypeORM order trap).** When `synchronize: true`
+is on, the runtime config forces `migrationsRun: false` regardless of
+`RUN_MIGRATIONS`. The reason: `DataSource.initialize()` runs migrations
+**before** synchronize, so any ALTER-style migration would hit an
+empty schema and fail. Synchronize bootstraps the full schema from
+entities; migrations are only meaningful in environments with real
+persisted data (prod / stage). This mutual exclusion is what makes
+the E2E suite work (`DATABASE_AUTOMIGRATE=true` for fast empty-DB
+bootstrap, migrations skipped automatically).
+
 ### 6.4 Schema-change workflow (the rule for AI agents and humans)
 
 Every TypeORM entity / schema change MUST ship with a migration in
