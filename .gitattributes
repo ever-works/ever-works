@@ -1,0 +1,37 @@
+# Force LF line endings on files that must run as scripts inside Linux
+# containers regardless of host OS. Without this, a Windows checkout
+# converts the files to CRLF on disk and `COPY` bakes those CRLF endings
+# into the image — Linux then tries to run `#!/bin/sh\r` as the
+# interpreter and reports "exec: no such file or directory".
+#
+# Catches:
+#   - Container entrypoints (e.g. .deploy/docker/api/entrypoint.sh)
+#   - Any *.sh dropped into an image via Dockerfile COPY
+#   - Dockerfiles themselves (no shebang, but `\r` in RUN lines breaks busybox)
+#
+# `text=auto` keeps source files using each developer's local convention
+# for normal text files (Windows devs still get CRLF for *.ts etc.); the
+# patterns below are the surgical exceptions.
+
+* text=auto
+
+# Shell scripts MUST be LF — they're run inside Linux containers / on
+# Linux/macOS hosts and the shebang line breaks with CRLF.
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# Dockerfiles — RUN commands evaluated by `/bin/sh` inside the build
+# container choke on \r the same way shebangs do.
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+
+# YAML used by Docker Compose and Kubernetes is parsed by Go YAML
+# libraries that accept either, but keeping it LF avoids needless diff
+# noise when someone on Linux re-saves a file edited on Windows.
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+# PowerShell scripts stay CRLF — that's the Windows native convention
+# and Windows PowerShell tolerates either, but PS 5.1 occasionally
+# gets confused by LF-only here-strings.
+*.ps1       text eol=crlf

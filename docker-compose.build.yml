@@ -1,0 +1,105 @@
+# Local-build compose for Ever Works platform.
+#
+# Same shape as docker-compose.yml, but every application service is built
+# from source via the Dockerfiles under .deploy/docker/. Use this when:
+#   - You're hacking on api / web / mcp / docs and want your changes baked
+#     into a container.
+#   - You're cutting a release image you intend to push to your own
+#     registry (override the `image:` tag).
+#   - GHCR is unavailable and you want a fully air-gapped build.
+#
+# Quick start:
+#
+#   docker compose -f docker-compose.build.yml up --build -d
+#
+# Note: turbo prune walks the monorepo, so the build context is the repo
+# root for every service. First build takes a few minutes; subsequent
+# builds reuse Docker's layer cache.
+
+include:
+    - ./docker-compose.infra.yml
+
+services:
+    ever-works-api:
+        image: ever-works-api:local
+        container_name: ever-works-api
+        build:
+            context: .
+            dockerfile: .deploy/docker/api/Dockerfile
+        restart: unless-stopped
+        env_file: .env.compose
+        # `environment:` is intentionally minimal — only the container-role
+        # values that should not be overridable. Everything else (DATABASE_*,
+        # REDIS_URL, THROTTLER_REDIS_URL, RUN_MIGRATIONS, WEB_URL, ...) is
+        # read from .env.compose, so operators can repoint at managed
+        # Postgres / Redis without editing this file.
+        environment:
+            APP_TYPE: api
+            PORT: 3100
+        depends_on:
+            ever-works-db:
+                condition: service_healthy
+            ever-works-redis:
+                condition: service_healthy
+        ports:
+            - '3100:3100'
+        networks:
+            - ever-works-network
+
+    ever-works-web:
+        image: ever-works-web:local
+        container_name: ever-works-web
+        build:
+            context: .
+            dockerfile: .deploy/docker/web/Dockerfile
+        restart: unless-stopped
+        env_file: .env.compose
+        # PORT is a container-role value: web listens on 3000, API on 3100,
+        # MCP on 3200. Pin it inline so the env_file's API-targeted `PORT`
+        # value (3100) doesn't bleed into the other services.
+        environment:
+            PORT: 3000
+            API_URL: http://ever-works-api:3100
+            NEXT_PUBLIC_WEB_URL: ${WEB_URL:-http://localhost:3000}
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3000:3000'
+        networks:
+            - ever-works-network
+
+    # MCP server is profile-gated because it refuses to start without
+    # `EVER_WORKS_API_KEY` — that key has to be minted via the web
+    # dashboard first. Bring it up explicitly once the platform is
+    # running and you have a key:
+    #   docker compose -f docker-compose.build.yml --profile mcp up -d ever-works-mcp
+    ever-works-mcp:
+        image: ever-works-mcp:local
+        container_name: ever-works-mcp
+        build:
+            context: .
+            dockerfile: .deploy/docker/mcp/Dockerfile
+        restart: unless-stopped
+        profiles: ['mcp']
+        env_file: .env.compose
+        environment:
+            PORT: 3200
+            EVER_WORKS_API_URL: http://ever-works-api:3100
+        depends_on:
+            - ever-works-api
+        ports:
+            - '3200:3200'
+        networks:
+            - ever-works-network
+
+    ever-works-docs:
+        image: ever-works-docs:local
+        container_name: ever-works-docs
+        build:
+            context: .
+            dockerfile: .deploy/docker/docs/Dockerfile
+        restart: unless-stopped
+        ports:
+            - '3300:80'
+        networks:
+            - ever-works-network
