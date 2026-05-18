@@ -364,8 +364,7 @@ export class AuthProviderService extends AuthProvider {
             // attempts with 403 — surfaced by zero-friction E2E run
             // 26039862248. Better Auth's session.user shape may not include
             // the custom column, hence the defensive cast + `=== true`.
-            isAnonymous:
-                (user as AuthRuntimeUser & { isAnonymous?: boolean }).isAnonymous === true,
+            isAnonymous: (user as AuthRuntimeUser & { isAnonymous?: boolean }).isAnonymous === true,
             avatar: user.image || null,
             iat: Math.floor(Date.now() / 1000),
             iss: 'auth-runtime',
