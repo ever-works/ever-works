@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Sparkles, Loader2, ExternalLink } from 'lucide-react';
@@ -113,6 +113,18 @@ export function CreateCustomTemplateDialog({
             setPendingCustomization(null);
         }
     }, [pendingCustomization, targetTemplate?.latestCustomization?.id]);
+
+    // Seed the prompt with the prior run on iterate-mode open. Only fires
+    // on the false→true transition so polling updates don't overwrite
+    // whatever the user is typing mid-session.
+    const prevOpenRef = useRef(false);
+    useEffect(() => {
+        if (open && !prevOpenRef.current && mode === 'iterate') {
+            const seed = targetTemplate?.latestCustomization?.prompt ?? '';
+            if (seed) setPrompt(seed);
+        }
+        prevOpenRef.current = open;
+    }, [open, mode, targetTemplate?.latestCustomization?.prompt]);
 
     const reset = useCallback(() => {
         setName('');

@@ -64,6 +64,7 @@ export interface TemplateCatalogItem {
 export interface TemplateCustomizationSummary {
     id: string;
     status: TemplateCustomizationStatus;
+    prompt: string;
     errorMessage: string | null;
     startedAt: string | null;
     completedAt: string | null;
@@ -815,6 +816,7 @@ export class TemplateCatalogService implements OnModuleInit {
         return {
             id: c.id,
             status: c.status,
+            prompt: c.prompt,
             errorMessage: c.errorMessage ?? null,
             startedAt: c.startedAt ? c.startedAt.toISOString() : null,
             completedAt: c.completedAt ? c.completedAt.toISOString() : null,

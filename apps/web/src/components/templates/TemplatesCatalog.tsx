@@ -66,6 +66,7 @@ const CUSTOMIZATION_POLL_INTERVAL_MS = 5_000;
 function toCustomizationSummary(c: {
     id: string;
     status: TemplateCustomizationStatus;
+    prompt: string;
     errorMessage?: string | null;
     startedAt?: string | null;
     completedAt?: string | null;
@@ -75,6 +76,7 @@ function toCustomizationSummary(c: {
     return {
         id: c.id,
         status: c.status,
+        prompt: c.prompt,
         errorMessage: c.errorMessage ?? null,
         startedAt: c.startedAt ?? null,
         completedAt: c.completedAt ?? null,

@@ -34,6 +34,7 @@ export interface TemplateCatalogItem {
 export interface TemplateCustomizationSummary {
     id: string;
     status: TemplateCustomizationStatus;
+    prompt: string;
     errorMessage: string | null;
     startedAt: string | null;
     completedAt: string | null;
