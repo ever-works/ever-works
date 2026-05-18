@@ -49,7 +49,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV APP_TYPE=api
 ENV PORT=3100
-ENV RUN_MIGRATIONS=false
+# RUN_MIGRATIONS gates whether the API self-applies pending TypeORM
+# migrations on startup. Default `true` so deployments self-heal after a
+# schema change — set to `false` only for diagnostic / debug pods that
+# should not touch the schema.
+ENV RUN_MIGRATIONS=true
 
 COPY --from=installer --chown=node:node /app/deploy/dist ./dist
 COPY --from=installer --chown=node:node /app/deploy/node_modules ./node_modules

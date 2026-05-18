@@ -256,6 +256,56 @@ describe('agent/config', () => {
             });
         });
 
+        // `runMigrations` controls actual migration execution (TypeORM
+        // `migrationsRun`). It is INTENTIONALLY a different flag from
+        // `autoMigrate` (which controls the dangerous `synchronize`) — these
+        // two flags must not be conflated in either env or code.
+        describe('runMigrations (default-on everywhere except NODE_ENV=test)', () => {
+            it('defaults to true when RUN_MIGRATIONS is unset and NODE_ENV is unset', () => {
+                expect(config.database.runMigrations()).toBe(true);
+            });
+
+            it("returns false when NODE_ENV='test' and RUN_MIGRATIONS is unset", () => {
+                process.env.NODE_ENV = 'test';
+                expect(config.database.runMigrations()).toBe(false);
+            });
+
+            it("returns true when RUN_MIGRATIONS='true' (explicit opt-in)", () => {
+                process.env.RUN_MIGRATIONS = 'true';
+                expect(config.database.runMigrations()).toBe(true);
+            });
+
+            it("returns false when RUN_MIGRATIONS='false' (explicit opt-out)", () => {
+                process.env.RUN_MIGRATIONS = 'false';
+                expect(config.database.runMigrations()).toBe(false);
+            });
+
+            it("returns true when NODE_ENV='test' but RUN_MIGRATIONS='true' (explicit override beats test env)", () => {
+                process.env.NODE_ENV = 'test';
+                process.env.RUN_MIGRATIONS = 'true';
+                expect(config.database.runMigrations()).toBe(true);
+            });
+
+            it("returns false when NODE_ENV='production' but RUN_MIGRATIONS='false' (kill switch wins)", () => {
+                process.env.NODE_ENV = 'production';
+                process.env.RUN_MIGRATIONS = 'false';
+                expect(config.database.runMigrations()).toBe(false);
+            });
+
+            it("treats non-'true'/'false' values as unset (falls through to NODE_ENV default)", () => {
+                process.env.NODE_ENV = 'production';
+                for (const value of ['1', '0', 'yes', 'TRUE']) {
+                    process.env.RUN_MIGRATIONS = value;
+                    expect(config.database.runMigrations()).toBe(true);
+                }
+                process.env.NODE_ENV = 'test';
+                for (const value of ['1', '0', 'yes', 'TRUE']) {
+                    process.env.RUN_MIGRATIONS = value;
+                    expect(config.database.runMigrations()).toBe(false);
+                }
+            });
+        });
+
         describe('loggingEnabled / sslMode / getInMemory (strict "true" gates)', () => {
             it.each([
                 ['DATABASE_LOGGING', 'loggingEnabled'],

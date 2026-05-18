@@ -48,8 +48,23 @@ pnpm type-check         # TypeScript check all packages
 pnpm format             # Prettier format all files
 
 # Database migrations (from apps/api/)
-pnpm typeorm migration:generate -d typeorm.config.ts
+#
+# Schema is owned by TypeORM migrations under `apps/api/src/migrations/`.
+# The API self-applies pending migrations on every startup via TypeORM's
+# `migrationsRun: true` (gated by RUN_MIGRATIONS env, default `true`
+# outside NODE_ENV=test) — `pnpm dev:api`, Docker, and k8s share the
+# same self-healing path. Manual commands below are only needed when
+# AUTHORING a new migration; nothing has to be run manually on deploy.
+#
+# RULE: every TypeORM entity / schema change MUST ship with a migration
+# in the SAME PR. See `docs/specs/architecture/database-migrations.md`.
+#
+# Generate a migration from current entity diff vs current DB schema:
+pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<NameOfMigration>
+# Run pending migrations explicitly (rare — API does this on boot):
 pnpm typeorm migration:run -d typeorm.config.ts
+# Revert the most recent migration (DESTRUCTIVE — coordinate with operator):
+pnpm typeorm migration:revert -d typeorm.config.ts
 
 # Trigger.dev deployment
 pnpm deploy:trigger
