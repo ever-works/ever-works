@@ -62,9 +62,33 @@ export const config = {
             // forgets to set the flag still doesn't run TypeORM `synchronize`
             // against production. Opt back in by setting
             // DATABASE_AUTOMIGRATE=true explicitly.
+            //
+            // IMPORTANT: this controls TypeORM `synchronize` — auto-derive
+            // schema from entities, DANGEROUS in prod. It is NOT the same
+            // as "run pending migrations on startup"; that's
+            // `runMigrations()` below. The two flags serve two different
+            // purposes and must not be conflated.
             if (process.env.DATABASE_AUTOMIGRATE === 'true') return true;
             if (process.env.DATABASE_AUTOMIGRATE === 'false') return false;
             return process.env.NODE_ENV === 'test';
+        },
+        runMigrations() {
+            // Whether to run pending TypeORM migrations on API startup.
+            // Default `true` everywhere except `NODE_ENV=test` (the test
+            // suite owns its own schema bootstrap via `synchronize`).
+            //
+            // This is the SAFE auto-apply path — TypeORM consults the
+            // `migrations` table and applies anything new in order, one
+            // transaction per migration. Idempotent across replicas (the
+            // adapter takes a row-level lock on the table). Distinct from
+            // `autoMigrate()` (which controls the dangerous `synchronize`
+            // flag); these two flags should never be conflated.
+            //
+            // Opt out with RUN_MIGRATIONS=false (e.g. one-off debugging
+            // pods that should not touch schema).
+            if (process.env.RUN_MIGRATIONS === 'true') return true;
+            if (process.env.RUN_MIGRATIONS === 'false') return false;
+            return process.env.NODE_ENV !== 'test';
         },
         loggingEnabled() {
             return process.env.DATABASE_LOGGING === 'true';

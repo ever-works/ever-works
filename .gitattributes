@@ -1,22 +1,27 @@
-# Force LF line endings on files that must run as scripts inside Linux
-# containers regardless of host OS. Without this, a Windows checkout
-# converts the files to CRLF on disk and `COPY` bakes those CRLF endings
-# into the image — Linux then tries to run `#!/bin/sh\r` as the
-# interpreter and reports "exec: no such file or directory".
+# Force LF line endings on files where CRLF causes real defects:
 #
-# Catches:
-#   - Container entrypoints (e.g. .deploy/docker/api/entrypoint.sh)
-#   - Any *.sh dropped into an image via Dockerfile COPY
-#   - Dockerfiles themselves (no shebang, but `\r` in RUN lines breaks busybox)
+#   1. Files baked into a Linux container via Dockerfile COPY —
+#      shell-script shebangs like `#!/bin/sh\r` make the kernel
+#      report "exec: no such file or directory", and `\r` in
+#      Dockerfile RUN lines breaks busybox.
 #
-# `text=auto` keeps source files using each developer's local convention
-# for normal text files (Windows devs still get CRLF for *.ts etc.); the
-# patterns below are the surgical exceptions.
+#   2. Files checked by Prettier `pnpm format:check` — Prettier 3
+#      defaults to `endOfLine: lf`, so any CRLF on a Windows
+#      working tree shows as a false-positive formatting failure.
+#      `git ls-files --eol` shows these are stored LF in the index
+#      already; the problem is purely Windows working-tree
+#      conversion via `core.autocrlf=true`. CI is Linux + LF, so
+#      this is a Windows-only paper cut — a fresh clone reports
+#      thousands of files as "needing reformatting" when nothing
+#      is actually wrong with them.
+#
+# `text=auto` keeps the default of "git decides per-file using its
+# heuristics"; the explicit patterns below are surgical overrides.
 
 * text=auto
 
-# Shell scripts MUST be LF — they're run inside Linux containers / on
-# Linux/macOS hosts and the shebang line breaks with CRLF.
+# Shell scripts MUST be LF — they're run inside Linux containers /
+# on Linux/macOS hosts and the shebang line breaks with CRLF.
 *.sh        text eol=lf
 *.bash      text eol=lf
 
@@ -26,12 +31,27 @@ Dockerfile  text eol=lf
 *.dockerfile text eol=lf
 
 # YAML used by Docker Compose and Kubernetes is parsed by Go YAML
-# libraries that accept either, but keeping it LF avoids needless diff
-# noise when someone on Linux re-saves a file edited on Windows.
+# libraries that accept either, but keeping it LF avoids needless
+# diff noise when someone on Linux re-saves a file edited on Windows.
 *.yml       text eol=lf
 *.yaml      text eol=lf
 
-# PowerShell scripts stay CRLF — that's the Windows native convention
-# and Windows PowerShell tolerates either, but PS 5.1 occasionally
-# gets confused by LF-only here-strings.
+# Files in the `pnpm format:check` glob — Prettier 3 defaults to
+# `endOfLine: lf` and rejects CRLF.  Without these rules, Windows
+# devs running `pnpm format:check` locally hit thousands of false-
+# positive "needs reformatting" warnings purely from autocrlf
+# conversion (3360 files on the develop tip as of 2026-05-18,
+# breakdown: 1966 .ts, 905 .md, 320 .tsx, 161 .json, 7 .css, 1 other).
+# CI is Linux + LF and passes, so the local results mislead.  Force
+# LF in the working tree on every OS to make local match CI.
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.css       text eol=lf
+
+# PowerShell scripts stay CRLF — that's the Windows native
+# convention and Windows PowerShell tolerates either, but PS 5.1
+# occasionally gets confused by LF-only here-strings.
 *.ps1       text eol=crlf

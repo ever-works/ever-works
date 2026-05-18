@@ -36,7 +36,13 @@ services:
         container_name: ever-works-web
         restart: unless-stopped
         env_file: .env.demo.compose
+        # PORT is a container-role value: web listens on 3000, API on 3100,
+        # MCP on 3200. Pin it inline so the env_file's API-targeted `PORT`
+        # value (3100) doesn't bleed into the web container — otherwise
+        # the Next standalone server binds to 3100 inside the container
+        # while `ports: 3000:3000` publishes 3000, breaking the demo URL.
         environment:
+            PORT: 3000
             API_URL: http://ever-works-api:3100
         depends_on:
             - ever-works-api
