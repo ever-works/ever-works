@@ -9,7 +9,6 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
-import { generateHexToken } from '@/lib/utils/random';
 import { OAuthProvider } from '@/lib/api/enums';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
@@ -163,10 +162,16 @@ export async function logout() {
 
 export async function connectProvider(providerId: OAuthProvider) {
     try {
-        const state = generateHexToken(16);
+        // C-03: the API server mints the OAuth `state` nonce and returns it.
+        // We mirror it into a host-scoped `oauth_state` cookie on this
+        // origin so `handleOAuthCallback` can validate the value the OAuth
+        // provider echoes back on the callback. The OAuth provider's
+        // `redirect_uri` points at the web app, so the API-side cookie
+        // (set on a different origin) is not sent on the callback in the
+        // normal user flow — this mirror is what closes the CSRF loop.
+        const { url, state } = await authAPI.getOAuthAuthUrl(providerId);
         await setOAuthStateCookie(state);
 
-        const { url } = await authAPI.getOAuthAuthUrl(providerId, state);
         return {
             success: true,
             url,

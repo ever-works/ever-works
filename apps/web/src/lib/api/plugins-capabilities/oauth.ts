@@ -30,15 +30,16 @@ export const oauthAPI = {
         return serverFetch<OAuthConnectionInfo>(`/oauth/${providerId}/connection`);
     },
 
-    getConnectUrl: async (
-        providerId: string,
-        callbackUrl?: string,
-        state?: string,
-        forceConsent?: boolean,
-    ) => {
+    /**
+     * Get the OAuth authorization URL for a plugin/git-provider connection.
+     * The API mints the CSRF `state` nonce server-side and returns it in
+     * the response. Callers MUST mirror that state into their own
+     * host-scoped `oauth_state` cookie and validate it on the OAuth
+     * callback. See C-03 in `docs/specs/security/THREAT-MODEL.md`.
+     */
+    getConnectUrl: async (providerId: string, callbackUrl?: string, forceConsent?: boolean) => {
         const params = new URLSearchParams();
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
-        if (state) params.append('state', state);
         if (forceConsent) params.append('forceConsent', 'true');
         const query = params.toString() ? `?${params.toString()}` : '';
 
@@ -59,17 +60,16 @@ export const oauthAPI = {
     /**
      * Get OAuth authorization URL for the GitHub read-packages flow. The
      * resulting token is stored in plugin settings under `readPackagesPat`
-     * instead of replacing the main OAuth connection.
+     * instead of replacing the main OAuth connection. Same C-03 contract
+     * as {@link getConnectUrl} — state is server-minted and returned.
      */
     getReadPackagesConnectUrl: async (
         providerId: string,
         callbackUrl?: string,
-        state?: string,
         forceConsent?: boolean,
     ) => {
         const params = new URLSearchParams();
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
-        if (state) params.append('state', state);
         if (forceConsent) params.append('forceConsent', 'true');
         const query = params.toString() ? `?${params.toString()}` : '';
         return serverFetch<{

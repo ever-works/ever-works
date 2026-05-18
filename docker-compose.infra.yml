@@ -1,0 +1,66 @@
+# Infrastructure-only compose for Ever Works platform.
+#
+# Brings up the shared backing services the platform's API and packages
+# depend on (PostgreSQL, Redis). This file is included by docker-compose.yml
+# and docker-compose.build.yml — running it directly is also useful when you
+# want to run the platform apps locally with `pnpm dev` but keep the deps in
+# containers:
+#
+#   docker compose -f docker-compose.infra.yml up -d
+#
+# To use the matching env file:
+#
+#   docker compose --env-file .env.compose -f docker-compose.infra.yml up -d
+#
+# Networks and volumes declared here are reused by the parent compose files
+# via `include:`.
+
+services:
+    ever-works-db:
+        image: postgres:17-alpine
+        container_name: ever-works-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DATABASE_NAME:-ever_works}
+            POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+            POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-ever_works_password}
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} || exit 1',
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+        ports:
+            - '${DATABASE_PORT:-5432}:5432'
+        networks:
+            - ever-works-network
+
+    ever-works-redis:
+        image: redis:7-alpine
+        container_name: ever-works-redis
+        restart: unless-stopped
+        command: ['redis-server', '--appendonly', 'yes']
+        healthcheck:
+            test: ['CMD-SHELL', 'redis-cli -h localhost ping | grep -q PONG']
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        volumes:
+            - redis_data:/data
+        ports:
+            - '${REDIS_PORT:-6379}:6379'
+        networks:
+            - ever-works-network
+
+volumes:
+    postgres_data: {}
+    redis_data: {}
+
+networks:
+    ever-works-network:
+        driver: bridge
