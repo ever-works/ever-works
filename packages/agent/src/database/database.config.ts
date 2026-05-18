@@ -112,34 +112,40 @@ export const ENTITIES = [
 ];
 
 /**
- * Resolve TypeORM migration globs that work in both dev (TS source) and
- * Docker / k8s (compiled JS). TypeORM accepts an array of globs and
- * silently ignores any that don't match files, so listing all known
- * layouts is safe and idempotent.
+ * Resolve TypeORM migration globs for the runtime path. TypeORM accepts
+ * an array of globs and silently ignores any that don't match files, so
+ * listing the candidate layouts is safe and idempotent.
  *
- * Paths are absolute and use forward slashes (TypeORM's glob loader is
- * cross-platform but a few internals trip on backslashes on Windows).
+ * **Only `.js` patterns**, intentionally. TypeORM 0.3.x's
+ * `DirectoryExportedClassesLoader` loads matched files via
+ * `Promise.all(import(file))`. On Node ≥ 22, requiring `.ts` files (even
+ * after Nest+SWC transpilation) goes through the ESM loader and
+ * `Promise.all`-importing several at once trips Node's internal
+ * "Unexpected module status 0" assertion (a known race between
+ * `require()` and dynamic `import()` on the same module). Compiled JS
+ * doesn't hit this path. The manual `pnpm typeorm migration:generate /
+ * migration:run` commands keep their own `'.ts'` glob in
+ * `apps/api/typeorm.config.ts` and run under `ts-node`, which loads
+ * synchronously and is unaffected.
+ *
+ * Paths are absolute and use forward slashes (TypeORM's underlying glob
+ * engine — `globby` / `fast-glob` — handles forward-slash absolute paths
+ * correctly on Windows too).
  *
  *   - Docker / prod:        `/app/dist/migrations/*.js` (cwd = /app)
  *   - Local API workspace:  `apps/api/dist/migrations/*.js` (from repo root)
- *   - Local API workspace:  `apps/api/src/migrations/*.ts` (ts-node / SWC)
- *   - From apps/api cwd:    `src/migrations/*.ts` and `dist/migrations/*.js`
+ *   - From apps/api cwd:    `dist/migrations/*.js`
  *
- * Windows note: `process.cwd()` returns `C:\…` on Windows; the `.replace`
- * below normalises to forward slashes. TypeORM's underlying glob engine
- * (`globby` / `fast-glob`) treats forward-slash absolute paths on Windows
- * correctly, so `C:/Users/…/migrations/*.ts` resolves. If a Windows dev
- * ever sees zero migrations loaded despite running `pnpm dev:api`, check
- * `databaseConfig().migrations` and confirm the cwd path.
+ * For local dev: run `pnpm build --filter ever-works-api` (or `pnpm dev`
+ * which builds before watching) to populate `apps/api/dist/migrations/`,
+ * then the API will pick up pending migrations on next boot. Authoring
+ * a new migration still goes through `pnpm typeorm migration:generate`
+ * (which produces `.ts` next to the existing ones) — the build step
+ * compiles it to `.js` automatically.
  */
 function resolveMigrationGlobs(): string[] {
     const cwd = process.cwd().replace(/\\/g, '/');
-    return [
-        `${cwd}/dist/migrations/*.js`,
-        `${cwd}/src/migrations/*.ts`,
-        `${cwd}/apps/api/dist/migrations/*.js`,
-        `${cwd}/apps/api/src/migrations/*.ts`,
-    ];
+    return [`${cwd}/dist/migrations/*.js`, `${cwd}/apps/api/dist/migrations/*.js`];
 }
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
