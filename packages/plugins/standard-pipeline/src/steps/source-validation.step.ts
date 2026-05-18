@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
@@ -187,6 +188,14 @@ export class SourceValidationStep extends BasePipelineStep {
 			try {
 				new URL(urlToValidate);
 			} catch {
+				return undefined;
+			}
+
+			// H-11: refuse to probe URLs pointing at private, loopback,
+			// link-local, or cloud-metadata IPs. Returning a boolean from this
+			// step still let an attacker map internal ports / ping IMDS via
+			// the timing of the fetch — close the side-channel entirely.
+			if (!isSafeWebhookUrl(urlToValidate)) {
 				return undefined;
 			}
 

@@ -15,6 +15,10 @@ on:
       - '.github/workflows/deploy-vercel-docs-prod.yml'
   workflow_dispatch:
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-vercel-docs-prod
   cancel-in-progress: false

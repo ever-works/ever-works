@@ -31,6 +31,7 @@ import { WorkGenerationHistory } from './work-generation-history.entity';
 import { TimestampColumn } from './_types';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkCustomDomain } from './work-custom-domain.entity';
+import { WorkDeployment } from './work-deployment.entity';
 import { WorkMember } from './work-member.entity';
 
 @Entity({ name: 'works' })
@@ -113,6 +114,9 @@ export class Work {
 
     @OneToMany(() => WorkCustomDomain, (customDomain) => customDomain.work)
     customDomains?: ClassToObject<WorkCustomDomain>[];
+
+    @OneToMany(() => WorkDeployment, (deployment) => deployment.work)
+    deployments?: ClassToObject<WorkDeployment>[];
 
     @Column({ type: 'boolean', default: false })
     scheduledUpdatesEnabled: boolean;
@@ -251,7 +255,7 @@ export class Work {
     @TimestampColumn({ nullable: true })
     sourceValidationLastRunAt?: Date | null;
 
-    // Activity Feed Sync (EW-120) — per-Work transport for surfacing
+    // Activity Feed sync — per-Work transport for surfacing
     // website-side events (signups, item submissions, reports) in the
     // platform Activity Feed tab. See ADR-004.
     //

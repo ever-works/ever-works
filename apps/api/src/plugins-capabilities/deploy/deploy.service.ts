@@ -11,9 +11,14 @@ import {
     GitFacadeService,
     PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
 } from '@ever-works/agent/facades';
-import { WorkRepository } from '@ever-works/agent/database';
+import { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
-import { Work, User } from '@ever-works/agent/entities';
+import {
+    Work,
+    User,
+    DeploymentEnvironment,
+    DeploymentTriggerSource,
+} from '@ever-works/agent/entities';
 import { PlatformSyncSecretService, ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
@@ -63,6 +68,22 @@ interface RepoContext {
     publicKey: { key_id: string; key: string };
 }
 
+export interface DeployOptions {
+    teamScope?: string;
+    correlationId?: string;
+    environment?: DeploymentEnvironment;
+    branch?: string;
+    prNumber?: number;
+    commitSha?: string;
+    codeUpdateId?: string;
+    triggerSource?: DeploymentTriggerSource;
+}
+
+export interface DeployResult {
+    dispatched: boolean;
+    deploymentId: string;
+}
+
 /**
  * DeployService handles deployment operations using the plugin system.
  *
@@ -80,6 +101,7 @@ export class DeployService {
         private readonly deployFacade: DeployFacadeService,
         private readonly gitFacade: GitFacadeService,
         private readonly workRepository: WorkRepository,
+        private readonly deploymentRepository: WorkDeploymentRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
@@ -90,13 +112,39 @@ export class DeployService {
     ) {}
 
     /**
-     * Deploy a work using its configured deployment provider
+     * Optional fields that target a preview or scheduled deploy. When all are
+     * omitted, this behaves exactly like the original production-only call.
+     */
+    static buildEnvironmentOptions(opts: DeployOptions): {
+        environment: DeploymentEnvironment;
+        branch?: string;
+        prNumber?: number;
+        commitSha?: string;
+        codeUpdateId?: string;
+        triggerSource: DeploymentTriggerSource;
+    } {
+        return {
+            environment: opts.environment ?? DeploymentEnvironment.PRODUCTION,
+            branch: opts.branch,
+            prNumber: opts.prNumber,
+            commitSha: opts.commitSha,
+            codeUpdateId: opts.codeUpdateId,
+            triggerSource: opts.triggerSource ?? DeploymentTriggerSource.MANUAL,
+        };
+    }
+
+    /**
+     * Deploy a work using its configured deployment provider.
+     *
+     * Returns the dispatched flag plus the deployment-history row id so the
+     * caller can start verification keyed by environment.
      */
     async deploy(
         workId: string,
         userId: string,
-        options: { teamScope?: string; correlationId?: string },
-    ): Promise<boolean> {
+        options: DeployOptions = {},
+    ): Promise<DeployResult> {
+        const env = DeployService.buildEnvironmentOptions(options);
         const { plugin, token, work, settings } =
             await this.deployFacade.getPluginAndTokenAndSettings({
                 userId,
@@ -151,6 +199,22 @@ export class DeployService {
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
+        const targetBranch = env.branch ?? template.branch;
+
+        const deployment = await this.deploymentRepository.create({
+            workId: work.id,
+            environment: env.environment,
+            provider: plugin.id,
+            branch: targetBranch,
+            prNumber: env.prNumber,
+            commitSha: env.commitSha,
+            codeUpdateId: env.codeUpdateId,
+            triggerSource: env.triggerSource,
+            triggeredByUserId: userId,
+            state: 'INITIALIZING',
+        });
+
         // EW-617 G8 — funnel step 6: deploy started. Emit just before the
         // dispatch so the timestamp lines up with the workflow kick-off,
         // not the secret-pushing prep. Gated on correlationId so non-funnel
@@ -178,12 +242,33 @@ export class DeployService {
             });
         }
 
-        const dispatched = await this.dispatchWithRetry(work, user, gitToken, plugin);
+        const dispatched = await this.dispatchWithRetry(
+            work,
+            user,
+            gitToken,
+            plugin,
+            env.environment,
+            targetBranch,
+            env.prNumber,
+            env.commitSha,
+        );
 
-        // Fire-and-forget event so the activity-log listener (and any
-        // future subscribers — Sentry breadcrumbs, metrics, etc.) can
-        // record the dispatch without DeployService taking a hard
-        // dependency on ActivityLogService.
+        if (!dispatched) {
+            await this.deploymentRepository.markTerminal(deployment.id, 'ERROR', {
+                lastError: 'Workflow dispatch failed',
+            });
+        }
+
+        // Production deploys also update the legacy Work.deploymentState/website
+        // fields so EW-610's DeployProgressPanel and existing consumers keep
+        // working without changes.
+        if (dispatched && env.environment === DeploymentEnvironment.PRODUCTION) {
+            await this.workRepository.update(work.id, {
+                deploymentStartedAt: new Date(),
+                deploymentState: 'INITIALIZING',
+            });
+        }
+
         if (dispatched) {
             this.eventEmitter.emit(
                 DeploymentDispatchedEvent.EVENT_NAME,
@@ -196,7 +281,7 @@ export class DeployService {
             );
         }
 
-        return dispatched;
+        return { dispatched, deploymentId: deployment.id };
     }
 
     /**
@@ -278,17 +363,17 @@ export class DeployService {
                 };
             }
 
-            const success = await this.deploy(workId, userId, { teamScope });
+            const { dispatched } = await this.deploy(workId, userId, { teamScope });
 
             return {
                 workId,
                 slug: work.slug,
-                status: success ? 'pending' : 'error',
-                message: success ? 'Deployment started' : 'Failed to initiate deployment',
+                status: dispatched ? 'pending' : 'error',
+                message: dispatched ? 'Deployment started' : 'Failed to initiate deployment',
                 owner: work.getRepoOwner('website'),
                 repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             };
-        } catch (error) {
+        } catch (error: any) {
             return {
                 workId,
                 slug: 'unknown',
@@ -334,7 +419,7 @@ export class DeployService {
 
         try {
             return resolveKubeconfigForClusterSource(clusterSource, realUserToken);
-        } catch (error) {
+        } catch (error: any) {
             // The only failure path here is a missing platform-managed
             // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
             // `EVER_WORKS_K8S_GAUZY_KUBECONFIG`). The user picked a
@@ -417,7 +502,7 @@ export class DeployService {
         const provider = work.deployProvider || 'ever-works';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(
                 `Failed to set DEPLOY_PROVIDER variable for ${ctx.owner}/${ctx.repo}: ${error.message}`,
             );
@@ -455,7 +540,7 @@ export class DeployService {
                         this.setSecret(ctx, 'PLATFORM_API_URL', platformApiUrl),
                         this.setSecret(ctx, 'PLATFORM_API_SECRET_TOKEN', platformApiSecret),
                     ]);
-                } catch (error) {
+                } catch (error: any) {
                     this.logger.error(
                         `Failed to push PLATFORM_API_* secrets for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
                             error instanceof Error ? error.message : String(error)
@@ -473,7 +558,7 @@ export class DeployService {
                     work.id,
                 );
                 await this.setSecret(ctx, 'PLATFORM_SYNC_SECRET', platformSyncSecret);
-            } catch (error) {
+            } catch (error: any) {
                 this.logger.error(
                     `Failed to push PLATFORM_SYNC_SECRET for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
                         error instanceof Error ? error.message : String(error)
@@ -499,7 +584,7 @@ export class DeployService {
                         `Pushed ${entries.length} plugin-specific secrets for ${plugin.id} to ${ctx.owner}/${ctx.repo}`,
                     );
                 }
-            } catch (error) {
+            } catch (error: any) {
                 this.logger.error(
                     `Failed to push plugin-specific secrets for ${plugin.id} on ${ctx.owner}/${ctx.repo}: ${
                         error instanceof Error ? error.message : String(error)
@@ -609,7 +694,7 @@ export class DeployService {
             this.logger.log(
                 `Pushed GHCR pull credentials to ${ctx.owner}/${ctx.repo} for k8s deploy: ${written.join(', ')}`,
             );
-        } catch (error) {
+        } catch (error: any) {
             // Don't block the deploy on this — the workflow has a safe
             // fallback. Just log so operators can debug if pulls fail.
             this.logger.warn(
@@ -693,30 +778,39 @@ export class DeployService {
         user: User,
         gitToken: string,
         plugin?: IDeploymentPlugin,
+        environment: DeploymentEnvironment = DeploymentEnvironment.PRODUCTION,
+        branchOverride?: string,
+        prNumber?: number,
+        commitSha?: string,
     ): Promise<boolean> {
-        // Resolve workflow files from the plugin (capability-driven). Plugins
-        // without `getWorkflowFilenames` use the default fallback list. This
-        // replaces the hardcoded `['deploy_vercel.yaml', 'deploy_prod.yaml']`
-        // that pre-dated the optional contract method.
         const workflowFilesToTry = plugin?.getWorkflowFilenames
             ? plugin.getWorkflowFilenames()
             : [...DEFAULT_WORKFLOW_FILES];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();
         const template = await this.websiteTemplateResolver.resolveForWork(work);
+        const dispatchBranch = branchOverride ?? template.branch;
+
+        const inputs: Record<string, string> = { environment };
+        if (prNumber !== undefined) {
+            inputs.pr_number = String(prNumber);
+        }
+        if (commitSha) {
+            inputs.commit_sha = commitSha;
+        }
 
         const tryDispatch = async (): Promise<boolean> => {
             for (const workflowFile of workflowFilesToTry) {
                 try {
                     this.logger.log(
-                        `Attempting to dispatch workflow "${workflowFile}" for ${owner}/${repo}`,
+                        `Attempting to dispatch workflow "${workflowFile}" for ${owner}/${repo} on ${dispatchBranch} (${environment})`,
                     );
 
                     await this.dispatchWorkflow(
                         {
                             workflow: workflowFile,
-                            inputs: { environment: 'production' },
-                            branch: template.branch,
+                            inputs,
+                            branch: dispatchBranch,
                             owner,
                             repo,
                         },
@@ -727,7 +821,7 @@ export class DeployService {
                         `Successfully dispatched workflow "${workflowFile}" for ${owner}/${repo}`,
                     );
                     return true;
-                } catch (error) {
+                } catch (error: any) {
                     this.logger.warn(
                         `Failed to dispatch workflow "${workflowFile}" for ${owner}/${repo}: ${error.message}`,
                     );
@@ -756,7 +850,7 @@ export class DeployService {
 
             this.logger.warn(`Workflow dispatch still failed after updating ${owner}/${repo}`);
             return false;
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Failed to update repository for ${owner}/${repo}: ${error.message}`);
             return false;
         }
@@ -811,7 +905,7 @@ export class DeployService {
             );
 
             this.logger.log(`Created trigger commit for ${websiteOwner}/${websiteRepo}`);
-        } catch (error) {
+        } catch (error: any) {
             this.logger.warn(
                 `Failed to create trigger commit for ${websiteOwner}/${websiteRepo}: ${error.message}`,
             );

@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DeployWorkDto {
@@ -6,6 +6,14 @@ export class DeployWorkDto {
     @IsString()
     @IsOptional()
     teamScope?: string;
+}
+
+export class RollbackDto {
+    @ApiProperty({ description: 'Deployment id to roll back to' })
+    @IsString()
+    @IsNotEmpty()
+    @IsUUID()
+    deploymentId: string;
 }
 
 export class ValidateTokenDto {

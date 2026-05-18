@@ -236,6 +236,36 @@ describe('WorkRepository', () => {
         });
     });
 
+    describe('findByDeploymentStates', () => {
+        it('returns [] without touching the repository when states is empty', async () => {
+            await expect(service.findByDeploymentStates([])).resolves.toEqual([]);
+            expect(repository.find).not.toHaveBeenCalled();
+            expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+        });
+
+        it('selects only deployment poller fields and avoids eager user loading', async () => {
+            const rows = [{ id: 'w1', slug: 'site' }] as Work[];
+            const { chain, fns } = buildChain('getMany', rows);
+            repository.createQueryBuilder.mockReturnValueOnce(chain as SelectQueryBuilder<Work>);
+
+            await expect(service.findByDeploymentStates(['pending'], 50)).resolves.toBe(rows);
+
+            expect(repository.find).not.toHaveBeenCalled();
+            expect(repository.createQueryBuilder).toHaveBeenCalledWith('work');
+            expect(fns.select).toHaveBeenCalledWith([
+                'work.id',
+                'work.slug',
+                'work.deploymentState',
+                'work.deploymentStartedAt',
+                'work.lastDeployCorrelationId',
+            ]);
+            expect(fns.where).toHaveBeenCalledWith({ deploymentState: In(['pending']) });
+            expect(fns.orderBy).toHaveBeenCalledWith('work.id', 'ASC');
+            expect(fns.take).toHaveBeenCalledWith(50);
+            expect(fns.getMany).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('findAll', () => {
         it('with no options: only order + relations (NO where, no take, no skip)', async () => {
             repository.find.mockResolvedValueOnce([] as Work[]);

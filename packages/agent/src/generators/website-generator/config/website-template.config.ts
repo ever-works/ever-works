@@ -11,6 +11,11 @@ export interface WebsiteTemplateConfig {
     branch: string;
     syncBranches: string[];
     betaBranch?: string | null;
+    // Whether a fork of this template can be agent-customized (UI-only edits
+    // applied to a user's fork). Templates without a matching customization
+    // prompt cannot be customized regardless of this flag. See
+    // packages/agent/src/template-catalog/customization-prompts/.
+    customizable?: boolean;
 }
 
 const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
@@ -24,34 +29,27 @@ const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
     betaBranch: config.websiteTemplate.getBetaBranch(),
+    // Too large/complex to safely agent-customize end-to-end today.
+    customizable: false,
 };
 
-const createMinimalWebsiteTemplate = (): WebsiteTemplateConfig | null => {
-    const repo = config.websiteTemplate.getMinimalRepo();
-    if (!repo) {
-        return null;
-    }
-
-    return {
-        id: 'minimal',
-        name: 'Minimal',
-        description: 'A more minimalistic Ever Works work website template.',
-        owner: config.websiteTemplate.getMinimalOwner(),
-        repo,
-        branch: config.websiteTemplate.getMinimalBranch(),
-        syncBranches: ['main', 'stage', 'develop'],
-        betaBranch: config.websiteTemplate.getMinimalBetaBranch(),
-    };
+const MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
+    id: 'minimal',
+    name: 'Minimal',
+    description: 'A more minimalistic Ever Works work website template.',
+    owner: config.websiteTemplate.getMinimalOwner(),
+    repo: config.websiteTemplate.getMinimalRepo(),
+    branch: config.websiteTemplate.getMinimalBranch(),
+    syncBranches: ['main', 'stage', 'develop'],
+    betaBranch: config.websiteTemplate.getMinimalBetaBranch(),
+    customizable: true,
 };
 
 export const DEFAULT_WEBSITE_TEMPLATE_ID: WebsiteTemplateId = 'classic';
 
 export const WEBSITE_TEMPLATES: WebsiteTemplateConfig[] = [
     CLASSIC_WEBSITE_TEMPLATE,
-    ...(() => {
-        const minimalTemplate = createMinimalWebsiteTemplate();
-        return minimalTemplate ? [minimalTemplate] : [];
-    })(),
+    MINIMAL_WEBSITE_TEMPLATE,
 ];
 
 export function listWebsiteTemplates(): WebsiteTemplateConfig[] {

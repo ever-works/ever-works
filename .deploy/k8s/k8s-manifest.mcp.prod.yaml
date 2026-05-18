@@ -32,10 +32,29 @@ spec:
       labels:
         app: ever-works-mcp
     spec:
+      # H-20: pod-level hardening. Same shape as the API manifest — pod
+      # runs as non-root with seccomp/RuntimeDefault, container drops all
+      # caps and disables privilege escalation. `readOnlyRootFilesystem`
+      # stays false (the image writes to a few paths; flipping it on is
+      # a follow-up that needs an emptyDir volume).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: ever-works-mcp
           image: registry.digitalocean.com/ever/ever-works-mcp:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: EVER_WORKS_API_URL
               value: "http://ever-works-api:3100"

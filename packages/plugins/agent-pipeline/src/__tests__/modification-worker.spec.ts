@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { processModification } from '../worker/modification-worker';
 import type { ModificationWorkerContext } from '../worker/modification-worker';
 import type { PluginLogger } from '@ever-works/plugin';
@@ -34,6 +34,9 @@ vi.mock('tokenx', () => ({
 	estimateTokenCount: vi.fn(() => 100)
 }));
 
+// `bash-tool` is mocked per-test below (some tests need a fresh
+// `bash.execute` mock so they can inspect the wrapped call). Default
+// implementation returns identity-shaped tools.
 vi.mock('bash-tool', () => ({
 	createBashTool: vi.fn().mockResolvedValue({
 		tools: {
@@ -49,9 +52,11 @@ vi.mock('just-bash', () => ({
 }));
 
 import { streamText } from 'ai';
+import { createBashTool } from 'bash-tool';
 import { TokenUsageAccumulator } from '../types';
 
 const mockStreamText = vi.mocked(streamText);
+const mockCreateBashTool = vi.mocked(createBashTool);
 
 function createMockStreamResult(overrides?: {
 	onStream?: () => Promise<void>;
@@ -168,5 +173,107 @@ describe('processModification', () => {
 		expect(breakdown.workers.inputTokens).toBe(300);
 		expect(breakdown.workers.outputTokens).toBe(150);
 		expect(breakdown.workers.totalTokens).toBe(450);
+	});
+
+	// ---- H-24: AGENT_BASH_AUDIT_LOG wiring -----------------------------------
+	// When AGENT_BASH_AUDIT_LOG=true, processModification wraps
+	// `bashTools.bash.execute` with a logger.log audit line. These tests
+	// pin that wiring so a refactor cannot silently drop it.
+	describe('AGENT_BASH_AUDIT_LOG wiring (H-24)', () => {
+		const originalEnvValue = process.env.AGENT_BASH_AUDIT_LOG;
+
+		afterEach(() => {
+			if (originalEnvValue === undefined) {
+				delete process.env.AGENT_BASH_AUDIT_LOG;
+			} else {
+				process.env.AGENT_BASH_AUDIT_LOG = originalEnvValue;
+			}
+		});
+
+		it('wraps bash.execute and logs a [bash-audit] line when env=true', async () => {
+			process.env.AGENT_BASH_AUDIT_LOG = 'true';
+
+			const originalExecute = vi.fn().mockResolvedValue('inner-result');
+			const bashTool = { execute: originalExecute };
+			mockCreateBashTool.mockResolvedValueOnce({
+				tools: {
+					bash: bashTool,
+					readFile: { execute: vi.fn() }
+				}
+			} as never);
+
+			mockStreamText.mockReturnValue(createMockStreamResult({ totalUsage: { totalTokens: 0 } }));
+
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger;
+			const ctx = createMockContext({ logger, workspacePath: '/tmp/audited-ws' });
+
+			await processModification('do something', ctx);
+
+			// The wrapper must have replaced the original execute fn.
+			expect(bashTool.execute).not.toBe(originalExecute);
+
+			// Invoking the wrapped execute emits a structured audit log
+			// line containing the command and the workspace, and still
+			// delegates to the original.
+			const result = await bashTool.execute({ command: 'ls -la /tmp' });
+			expect(result).toBe('inner-result');
+			expect(originalExecute).toHaveBeenCalledWith({ command: 'ls -la /tmp' });
+
+			const logCalls = (logger.log as ReturnType<typeof vi.fn>).mock.calls.map((args) => String(args[0] ?? ''));
+			const auditLine = logCalls.find((line) => line.includes('[bash-audit]'));
+			expect(auditLine).toBeDefined();
+			expect(auditLine!).toContain('workspace=/tmp/audited-ws');
+			expect(auditLine!).toContain('ls -la /tmp');
+		});
+
+		it('does NOT wrap bash.execute when env is unset', async () => {
+			delete process.env.AGENT_BASH_AUDIT_LOG;
+
+			const originalExecute = vi.fn().mockResolvedValue('inner-result');
+			const bashTool = { execute: originalExecute };
+			mockCreateBashTool.mockResolvedValueOnce({
+				tools: {
+					bash: bashTool,
+					readFile: { execute: vi.fn() }
+				}
+			} as never);
+
+			mockStreamText.mockReturnValue(createMockStreamResult({ totalUsage: { totalTokens: 0 } }));
+
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger;
+			const ctx = createMockContext({ logger });
+
+			await processModification('do something', ctx);
+
+			// The execute function must be the same reference — no wrapping.
+			expect(bashTool.execute).toBe(originalExecute);
+
+			// Invoking it should not produce any [bash-audit] log line.
+			await bashTool.execute({ command: 'ls' });
+			const logCalls = (logger.log as ReturnType<typeof vi.fn>).mock.calls.map((args) => String(args[0] ?? ''));
+			expect(logCalls.some((line) => line.includes('[bash-audit]'))).toBe(false);
+		});
+
+		it('does NOT wrap bash.execute when env=false (only literal "true" enables it)', async () => {
+			process.env.AGENT_BASH_AUDIT_LOG = 'false';
+
+			const originalExecute = vi.fn().mockResolvedValue('inner-result');
+			const bashTool = { execute: originalExecute };
+			mockCreateBashTool.mockResolvedValueOnce({
+				tools: {
+					bash: bashTool,
+					readFile: { execute: vi.fn() }
+				}
+			} as never);
+
+			mockStreamText.mockReturnValue(createMockStreamResult({ totalUsage: { totalTokens: 0 } }));
+
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger;
+			const ctx = createMockContext({ logger });
+
+			await processModification('do something', ctx);
+
+			expect(bashTool.execute).toBe(originalExecute);
+		});
 	});
 });

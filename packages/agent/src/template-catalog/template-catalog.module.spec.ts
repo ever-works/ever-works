@@ -7,16 +7,21 @@ jest.mock('../facades/facades.module', () => ({
 
 import { TemplateCatalogModule } from './template-catalog.module';
 import { TemplateCatalogService } from './template-catalog.service';
+import { TemplateCustomizationService } from './template-customization.service';
 
 describe('TemplateCatalogModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, TemplateCatalogModule) ?? [];
 
-    it('declares TemplateCatalogService as a provider', () => {
-        expect(meta('providers')).toContain(TemplateCatalogService);
+    it('declares TemplateCatalogService + TemplateCustomizationService as providers', () => {
+        const providers = meta('providers');
+        expect(providers).toContain(TemplateCatalogService);
+        expect(providers).toContain(TemplateCustomizationService);
     });
 
-    it('exports TemplateCatalogService for downstream modules', () => {
-        expect(meta('exports')).toContain(TemplateCatalogService);
+    it('exports both services for downstream modules', () => {
+        const exports = meta('exports');
+        expect(exports).toContain(TemplateCatalogService);
+        expect(exports).toContain(TemplateCustomizationService);
     });
 
     it('imports DatabaseModule + FacadesModule by name', () => {
@@ -34,8 +39,11 @@ describe('template-catalog barrel', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const barrel = require('./index');
 
-    it('re-exports TemplateCatalogService and TemplateCatalogModule', () => {
+    it('re-exports services + module + prompt helpers', () => {
         expect(barrel.TemplateCatalogService).toBe(TemplateCatalogService);
         expect(barrel.TemplateCatalogModule).toBe(TemplateCatalogModule);
+        expect(barrel.TemplateCustomizationService).toBe(TemplateCustomizationService);
+        expect(typeof barrel.getCustomizationPromptForBaseTemplate).toBe('function');
+        expect(typeof barrel.hasCustomizationPromptForBaseTemplate).toBe('function');
     });
 });

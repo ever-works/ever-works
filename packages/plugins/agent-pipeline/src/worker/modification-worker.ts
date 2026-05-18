@@ -50,6 +50,34 @@ export async function processModification(
 		const bashInstance = new Bash({ fs });
 		const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
+		// H-24: audit-log every bash invocation when AGENT_BASH_AUDIT_LOG is
+		// set. This is JS-implemented bash (just-bash), so there's no OS
+		// shell escape risk — but a prompt-injected model can still write
+		// attacker-chosen content to files in the workspace, and the audit
+		// log lets us reconstruct what happened after the fact. Logger
+		// stream is intentional: we want the log line in the existing
+		// structured logging so it ends up in CloudWatch / Loki / Sentry
+		// breadcrumbs alongside every other agent action.
+		const auditEnabled = process.env.AGENT_BASH_AUDIT_LOG === 'true';
+		if (auditEnabled && bashTools.bash && typeof bashTools.bash === 'object') {
+			const original = (bashTools.bash as { execute?: (...a: unknown[]) => unknown }).execute;
+			if (typeof original === 'function') {
+				(bashTools.bash as { execute: (...a: unknown[]) => unknown }).execute = (...args: unknown[]) => {
+					try {
+						const arg0 = args[0];
+						const summary =
+							arg0 && typeof arg0 === 'object'
+								? JSON.stringify(arg0).slice(0, 4096)
+								: String(arg0).slice(0, 4096);
+						logger?.log(`[bash-audit] workspace=${workspacePath} args=${summary}`);
+					} catch {
+						/* never let audit logging break the call */
+					}
+					return (original as (...a: unknown[]) => unknown).apply(bashTools.bash, args);
+				};
+			}
+		}
+
 		const sandbox = {
 			readFile: (p: string) => fs.readFile(p),
 			writeFiles: (files: Array<{ path: string; content: string }>) => {

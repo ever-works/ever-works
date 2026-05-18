@@ -237,6 +237,26 @@ describe('BudgetService', () => {
                 expect.any(Date),
                 expect.any(Date),
                 'openai',
+                'usd',
+            );
+        });
+
+        it('scopes the spend aggregate to the budget currency', async () => {
+            // EW-602 follow-up: cap is denominated in one currency, so the
+            // spend aggregate must filter to that currency too — otherwise
+            // a non-usd event would inflate the usd total.
+            const budget = makeBudget({ currency: 'eur', monthlyCapCents: 10_000 });
+            const usage = makeUsageRepo({
+                getTotalSpendCents: jest.fn().mockResolvedValue(0),
+            });
+            const service = new BudgetService(makeBudgetRepo() as any, usage as any);
+            await service.evaluateBudget(budget, now);
+            expect(usage.getTotalSpendCents).toHaveBeenCalledWith(
+                'work-1',
+                expect.any(Date),
+                expect.any(Date),
+                undefined,
+                'eur',
             );
         });
     });

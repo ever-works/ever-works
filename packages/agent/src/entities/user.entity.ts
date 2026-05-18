@@ -9,7 +9,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import type { ClassToObject } from './types';
-import { TimestampColumn } from './_types';
+import { TimestampColumn, PortableDateColumn } from './_types';
 import { Work } from './work.entity';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
@@ -87,6 +87,24 @@ export class User {
 
     @Column({ nullable: true })
     lastLoginIp: string;
+
+    // H-17 (rest): per-user login lockout. IP throttle (`@Throttle` on
+    // /auth/login) only protects against a single attacker IP; an attacker
+    // rotating IPs targeting one account walks past it. We count consecutive
+    // failed credential verifies in `failedLoginAttempts` and, once they
+    // cross `LOGIN_LOCKOUT_THRESHOLD`, set `lockedUntil = now +
+    // LOGIN_LOCKOUT_DURATION_MS`. Successful login resets both columns to
+    // 0 / null.
+    @Column({ type: 'int', default: 0 })
+    failedLoginAttempts: number;
+
+    // H-17: `type: 'timestamp'` is Postgres-only and breaks integration specs
+    // that boot the User entity under better-sqlite3 (work-proposal.entity.
+    // integration.spec). `PortableDateColumn` (`type: Date`) lets TypeORM pick
+    // the right column type per dialect — Postgres still gets `timestamp`,
+    // sqlite gets `datetime`.
+    @PortableDateColumn({ nullable: true })
+    lockedUntil?: Date | null;
 
     // Password reset
     @Column({ nullable: true })

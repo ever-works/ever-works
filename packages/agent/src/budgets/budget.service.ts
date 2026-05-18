@@ -70,10 +70,17 @@ export class BudgetService {
         workId: string,
         pluginId?: string,
         now: Date = new Date(),
+        currency?: string,
     ): Promise<number> {
         const periodStart = this.getCurrentPeriodStart(now);
         const periodEnd = this.getNextPeriodStart(now);
-        return this.usageRepository.getTotalSpendCents(workId, periodStart, periodEnd, pluginId);
+        return this.usageRepository.getTotalSpendCents(
+            workId,
+            periodStart,
+            periodEnd,
+            pluginId,
+            currency,
+        );
     }
 
     async evaluateBudget(budget: WorkBudget, now: Date = new Date()): Promise<BudgetEvaluation> {
@@ -81,6 +88,7 @@ export class BudgetService {
             budget.workId,
             budget.pluginId ?? undefined,
             now,
+            budget.currency,
         );
 
         const capCents = budget.monthlyCapCents;

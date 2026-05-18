@@ -1,4 +1,5 @@
 import 'server-only';
+import type { PluginIcon } from '@ever-works/plugin';
 import { serverFetch, serverMutation } from './server-api';
 import { APIResponse } from './types';
 
@@ -24,6 +25,46 @@ export interface TemplateCatalogItem {
     isActive: boolean;
     isDefault: boolean;
     ownerUserId?: string | null;
+    customizable?: boolean;
+    baseTemplateId?: string | null;
+    lastCustomizedAt?: string | null;
+    lastCustomizationPrompt?: string | null;
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    prompt: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type TemplateCustomizationStatus =
+    | 'pending'
+    | 'forking'
+    | 'customizing'
+    | 'pushing'
+    | 'succeeded'
+    | 'failed';
+
+export interface TemplateCustomization {
+    id: string;
+    templateId: string;
+    baseTemplateId: string;
+    prompt: string;
+    status: TemplateCustomizationStatus;
+    branch: string | null;
+    commitSha: string | null;
+    providerId: string | null;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export type ListTemplatesResponse = APIResponse<{
@@ -67,6 +108,58 @@ export type RefreshTemplatesResponse = APIResponse<{
     kind: TemplateKind;
     defaultTemplateId: string | null;
     templates: TemplateCatalogItem[];
+}>;
+
+export type CustomizeTemplateFromBaseResponse = APIResponse<{
+    customizationId: string;
+    template: {
+        id: string;
+        name: string;
+        repositoryOwner: string;
+        repositoryName: string;
+        repositoryUrl: string | null;
+    };
+    customization: TemplateCustomization;
+}>;
+
+export type GetTemplateCustomizationResponse = APIResponse<{
+    customization: TemplateCustomization;
+}>;
+
+export type IterateCustomTemplateResponse = APIResponse<{
+    customizationId: string;
+    customization: TemplateCustomization;
+}>;
+
+export interface CustomizationProvider {
+    id: string;
+    name: string;
+    description?: string | null;
+    icon?: PluginIcon;
+    providerName?: string;
+    enabled: boolean;
+    isDefault?: boolean;
+    // Mirrors the plugin manifest declaration. The dialog renders a conditional
+    // AI provider picker when this includes 'ai-provider' (e.g. opencode).
+    selectableProviderCategories?: readonly string[];
+}
+
+export type ListCustomizationProvidersResponse = APIResponse<{
+    providers: CustomizationProvider[];
+}>;
+
+export interface CustomizationAiProvider {
+    id: string;
+    name: string;
+    description?: string | null;
+    icon?: PluginIcon;
+    providerName?: string;
+    enabled: boolean;
+    isDefault?: boolean;
+}
+
+export type ListCustomizationAiProvidersResponse = APIResponse<{
+    providers: CustomizationAiProvider[];
 }>;
 
 export const templatesAPI = {
@@ -146,5 +239,52 @@ export const templatesAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    customizeFromBase: async (data: {
+        baseTemplateId: string;
+        name: string;
+        prompt: string;
+        providerId: string;
+        aiProviderId?: string;
+        targetOwner?: string;
+        description?: string;
+    }) => {
+        return serverMutation<CustomizeTemplateFromBaseResponse>({
+            endpoint: '/templates/custom-from-base',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    iterateCustom: async (
+        templateId: string,
+        data: { prompt: string; providerId: string; aiProviderId?: string },
+    ) => {
+        return serverMutation<IterateCustomTemplateResponse>({
+            endpoint: `/templates/custom/${templateId}/customize`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getCustomization: async (customizationId: string) => {
+        return serverFetch<GetTemplateCustomizationResponse>(
+            `/templates/customizations/${customizationId}`,
+        );
+    },
+
+    listCustomizationProviders: async () => {
+        return serverFetch<ListCustomizationProvidersResponse>(
+            '/templates/customization-providers',
+        );
+    },
+
+    listCustomizationAiProviders: async () => {
+        return serverFetch<ListCustomizationAiProvidersResponse>(
+            '/templates/customization-ai-providers',
+        );
     },
 };

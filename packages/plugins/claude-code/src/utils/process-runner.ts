@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { MAX_BUFFER_SIZE, KILL_TIMEOUT_MS } from '../types.js';
+import { buildSubprocessEnv } from './subprocess-env.js';
 
 export interface ExecuteOptions {
 	/** Path to the Claude Code binary */
@@ -90,12 +91,18 @@ export function executeClaudeCode(options: ExecuteOptions): {
 			args.push('--model', options.model);
 		}
 
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
+		// C-10: build the subprocess env from an explicit allow-list instead of
+		// spreading `process.env`. The CLI runs with --dangerously-skip-permissions
+		// and is fed user prompts + scraped web content + community-PR text — any
+		// prompt-injection in those inputs can drive the model to `printenv` and
+		// exfiltrate every host secret. Mirror the codex / gemini / opencode
+		// pattern: only PATH/HOME/TMPDIR, proxy/CA vars, and ANTHROPIC_*/
+		// CLAUDE_CODE_* keys are forwarded.
+		const env: Record<string, string> = buildSubprocessEnv({
 			...options.env,
 			DISABLE_AUTOUPDATER: '1',
 			DISABLE_TELEMETRY: '1'
-		};
+		});
 
 		childProcess = spawn(options.binaryPath, args, {
 			cwd: options.cwd,
@@ -105,6 +112,13 @@ export function executeClaudeCode(options: ExecuteOptions): {
 
 		let stdout = '';
 		let stderr = '';
+		// M-25: cap the un-newlined tail used for line splitting. The total
+		// stdout/stderr buffers are already bounded by MAX_BUFFER_SIZE, but
+		// the *remainder* (everything since the last `\n`) was unbounded.
+		// A malicious model output stream with no newlines would balloon
+		// remainder memory indefinitely. On overflow, flush the accumulator
+		// as a synthetic line and warn.
+		const MAX_REMAINDER_BYTES = 1024 * 1024; // 1 MB
 		let stdoutRemainder = '';
 		let stderrRemainder = '';
 
@@ -126,6 +140,14 @@ export function executeClaudeCode(options: ExecuteOptions): {
 						options.onStdoutLine(line);
 					}
 				}
+				// M-25: flush oversize remainder.
+				if (stdoutRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStdoutLine(
+						`[claude-code: stdout line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStdoutLine(stdoutRemainder);
+					stdoutRemainder = '';
+				}
 			}
 		});
 
@@ -146,6 +168,13 @@ export function executeClaudeCode(options: ExecuteOptions): {
 					if (line.trim()) {
 						options.onStderrLine(line);
 					}
+				}
+				if (stderrRemainder.length > MAX_REMAINDER_BYTES) {
+					options.onStderrLine(
+						`[claude-code: stderr line exceeded ${MAX_REMAINDER_BYTES} bytes without a newline; flushed]`
+					);
+					options.onStderrLine(stderrRemainder);
+					stderrRemainder = '';
 				}
 			}
 		});

@@ -305,10 +305,19 @@ export class WorkRepository {
         if (states.length === 0) {
             return [];
         }
-        return this.repository.find({
-            where: { deploymentState: In(states) },
-            take,
-        });
+        return this.repository
+            .createQueryBuilder('work')
+            .select([
+                'work.id',
+                'work.slug',
+                'work.deploymentState',
+                'work.deploymentStartedAt',
+                'work.lastDeployCorrelationId',
+            ])
+            .where({ deploymentState: In(states) })
+            .orderBy('work.id', 'ASC')
+            .take(take)
+            .getMany();
     }
 
     /**

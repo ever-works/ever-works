@@ -2023,6 +2023,8 @@
                         "createButton": "Create global cap",
                         "saveButton": "Save",
                         "removeButton": "Remove",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
                         "errorPositive": "Enter a positive cap value (e.g. 50.00).",
                         "createSuccess": "Create global budget succeeded",
                         "createError": "Create global budget failed",
@@ -2038,8 +2040,12 @@
                         "rowSpend": "Spent {spent} of {cap} ({percent}%)",
                         "overageSuffix": " · overage allowed",
                         "addHeading": "Add plugin cap",
-                        "pluginIdLabel": "Plugin id",
+                        "pluginIdLabel": "Plugin",
                         "pluginIdPlaceholder": "e.g. openai",
+                        "pluginSelectPlaceholder": "Select a plugin…",
+                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
+                        "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
                         "capLabel": "Monthly cap ({currency})",
                         "allowOverageLabel": "Allow overage",
                         "addButton": "Add cap",
@@ -2341,7 +2347,7 @@
                     "saveFailed": "Failed to save committer settings"
                 },
                 "activitySync": {
-                    "title": "Activity Feed sync (EW-120)",
+                    "title": "Activity Feed sync",
                     "subtitle": "Choose how the platform learns about user-facing events from this directory's deployed site (signups, item submissions, reports).",
                     "defaultBadge": "default",
                     "modeLegend": "Activity Feed sync transport",
@@ -3231,6 +3237,7 @@
             "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
             "actions": {
                 "addTemplate": "Add custom template",
+                "customizeTemplate": "Create with AI",
                 "refreshTemplates": "Refresh templates"
             },
             "hero": {
@@ -3267,6 +3274,8 @@
                 "fork": "Fork",
                 "edit": "Edit",
                 "archive": "Archive",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
                 "catalogOnly": "Catalog item",
                 "openRepository": "Open repository",
                 "previewAlt": "{name} preview",
@@ -3274,7 +3283,15 @@
                 "branch": "Branch: {branch}",
                 "syncBranches": "{count} sync branches",
                 "betaBranch": "Beta: {branch}",
-                "noDescription": "No description yet."
+                "noDescription": "No description yet.",
+                "status": {
+                    "pending": "Queued",
+                    "forking": "Forking",
+                    "customizing": "Customizing",
+                    "pushing": "Pushing",
+                    "succeeded": "Customized",
+                    "failed": "Last run failed"
+                }
             },
             "dialog": {
                 "title": "Add custom template",
@@ -3348,7 +3365,70 @@
                 "refreshSuccess": "Template catalog refreshed.",
                 "refreshFailed": "Failed to refresh templates.",
                 "defaultUpdated": "Default template updated.",
-                "defaultFailed": "Failed to update default template."
+                "defaultFailed": "Failed to update default template.",
+                "customizeFailed": "Failed to start template customization.",
+                "customizationSucceeded": "Template customization completed.",
+                "customizationFailed": "Template customization failed."
+            },
+            "customizeDialog": {
+                "title": "Create a custom template with AI",
+                "titleIterate": "Customize {name} again",
+                "titleStatus": "Customization status — {name}",
+                "description": "We duplicate a base template into a new repo in your GitHub account, then run your chosen AI agent against it to apply UI-only changes. Functionality stays untouched.",
+                "descriptionIterate": "Run another round of agent edits on the same repository. A new commit is pushed each time.",
+                "descriptionStatus": "Live status of the latest customization run for this template.",
+                "templateLabel": "Template",
+                "templateIterateHelp": "Re-running on this existing custom template's repository.",
+                "nameLabel": "Template name",
+                "namePlaceholder": "e.g. Dark Purple Theme",
+                "nameHelp": "Shown in your catalog and used to name the new GitHub repo.",
+                "baseLabel": "Base template",
+                "baseHelp": "Only bases marked AI-customizable are listed.",
+                "providerLabel": "Code-edit agent",
+                "providerHelp": "Pick one of your installed code-edit plugins. The default is preselected.",
+                "aiProviderLabel": "AI provider",
+                "aiProviderHelp": "{plugin} runs against an external LLM — pick which one to use.",
+                "targetLabel": "GitHub destination",
+                "targetHelp": "Where to create the new repo. Personal account or an org you belong to.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
+                "promptLabel": "Describe the UI you want",
+                "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
+                "promptIteratePlaceholder": "Example: increase the sidebar contrast and switch the headline font to Inter.",
+                "promptHelp": "Be specific about styling. New features are out of scope — UI only.",
+                "submit": "Create custom template",
+                "submitIterate": "Run customization",
+                "retry": "Retry",
+                "cancel": "Cancel",
+                "done": "Done",
+                "successHelp": "Your custom template is ready. It now appears in your catalog.",
+                "status": {
+                    "pending": "Queued…",
+                    "forking": "Provisioning the new repo…",
+                    "customizing": "Agent is applying your changes…",
+                    "pushing": "Pushing changes…",
+                    "succeeded": "Customization completed successfully.",
+                    "failed": "Customization failed."
+                },
+                "toast": {
+                    "started": "Customization started — this typically takes a few minutes.",
+                    "success": "Template customized successfully.",
+                    "failed": "Template customization failed.",
+                    "startFailed": "Could not start the customization."
+                },
+                "messages": {
+                    "nameRequired": "Template name is required.",
+                    "baseRequired": "Choose a base template.",
+                    "providerRequired": "Choose a code-edit agent.",
+                    "aiProviderRequired": "Choose an AI provider for the selected agent.",
+                    "promptTooShort": "Describe the changes in at least a few words.",
+                    "noCustomizableBases": "No customizable base templates are available.",
+                    "noProviders": "No code-edit agent plugins are installed or enabled. Install one from the plugin catalog (e.g. claude-code, codex, gemini, opencode).",
+                    "noAiProviders": "{plugin} requires an AI provider, but none are installed or enabled. Install one (e.g. openai, anthropic, google) from the plugin catalog.",
+                    "noTargets": "Connect a GitHub account to choose a destination.",
+                    "browsePlugins": "Browse plugin catalog",
+                    "noRuns": "No customization runs yet for this template."
+                }
             }
         },
         "templateSelector": {

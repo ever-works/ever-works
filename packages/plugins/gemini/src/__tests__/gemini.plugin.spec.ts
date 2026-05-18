@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { GeminiPlugin } from '../gemini.plugin';
+import { BASE_TEMP_DIR } from '../types';
 import type { PluginContext, PluginSettings } from '@ever-works/plugin';
 import type { TaxonomyWatcherOptions } from '../utils/taxonomy-watcher';
 
@@ -241,11 +242,13 @@ describe('GeminiPlugin', () => {
 			expect(vi.mocked(executeGemini)).toHaveBeenCalledWith(
 				expect.objectContaining({
 					env: expect.objectContaining({
-						GEMINI_CONFIG_DIR: '/tmp/gemini-generator/config/user1',
-						HOME: '/tmp/gemini-generator/config/user1',
-						XDG_CONFIG_HOME: '/tmp/gemini-generator/config/user1/.config',
-						XDG_DATA_HOME: '/tmp/gemini-generator/config/user1/.local/share',
-						XDG_CACHE_HOME: '/tmp/gemini-generator/config/user1/.cache',
+						// BASE_TEMP_DIR is os.tmpdir()-derived; anchor live so this
+						// passes on Linux (`/tmp/...`) and Windows (`C:/.../Temp/...`).
+						GEMINI_CONFIG_DIR: `${BASE_TEMP_DIR}/config/user1`,
+						HOME: `${BASE_TEMP_DIR}/config/user1`,
+						XDG_CONFIG_HOME: `${BASE_TEMP_DIR}/config/user1/.config`,
+						XDG_DATA_HOME: `${BASE_TEMP_DIR}/config/user1/.local/share`,
+						XDG_CACHE_HOME: `${BASE_TEMP_DIR}/config/user1/.cache`,
 						GEMINI_API_KEY: 'test-key'
 					})
 				})

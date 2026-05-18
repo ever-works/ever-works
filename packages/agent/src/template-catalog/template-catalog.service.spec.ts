@@ -3,6 +3,7 @@ import { TemplateCatalogService } from './template-catalog.service';
 
 describe('TemplateCatalogService', () => {
     let templateRepository: any;
+    let customizationRepository: any;
     let userTemplatePreferenceRepository: any;
     let workRepository: any;
     let gitFacade: any;
@@ -16,10 +17,14 @@ describe('TemplateCatalogService', () => {
             findOwnedCustomByRepositoryUrl: jest.fn(),
             findOwnedCustomByRepositoryCoordinates: jest.fn(),
             findBuiltInByRepositoryCoordinates: jest.fn(),
+            findAllBuiltInByRepositoryCoordinates: jest.fn().mockResolvedValue([]),
             hasRecentDiscoveredBuiltInTemplates: jest.fn(),
             findById: jest.fn(),
             upsert: jest.fn(),
             updateById: jest.fn(),
+        };
+        customizationRepository = {
+            findLatestForTemplates: jest.fn().mockResolvedValue(new Map()),
         };
         userTemplatePreferenceRepository = {
             findByUserAndKind: jest.fn(),
@@ -43,6 +48,7 @@ describe('TemplateCatalogService', () => {
 
         service = new TemplateCatalogService(
             templateRepository,
+            customizationRepository,
             userTemplatePreferenceRepository,
             workRepository,
             gitFacade,
@@ -318,12 +324,12 @@ describe('TemplateCatalogService', () => {
             description: `Repository ${index}`,
         }));
         firstPageRepositories[0] = {
-            name: 'directory-web-template',
+            name: 'astro-blog-template',
             owner: 'ever-works',
-            url: 'https://github.com/ever-works/directory-web-template',
-            fullName: 'ever-works/directory-web-template',
+            url: 'https://github.com/ever-works/astro-blog-template',
+            fullName: 'ever-works/astro-blog-template',
             defaultBranch: 'main',
-            description: 'Classic template',
+            description: 'Astro blog template',
         };
         firstPageRepositories[1] = {
             name: 'docs',
@@ -337,33 +343,33 @@ describe('TemplateCatalogService', () => {
             .mockResolvedValueOnce(firstPageRepositories)
             .mockResolvedValueOnce([]);
         templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue({
-            id: 'classic',
+            id: 'astro-blog',
             kind: 'website',
             sourceType: 'built_in',
             repositoryOwner: 'ever-works',
-            repositoryName: 'directory-web-template',
+            repositoryName: 'astro-blog-template',
             isActive: true,
         });
         templateRepository.findById.mockResolvedValue({
-            id: 'directory-web-template',
+            id: 'astro-blog-template',
             kind: 'website',
             sourceType: 'built_in',
             repositoryOwner: 'ever-works',
-            repositoryName: 'directory-web-template',
+            repositoryName: 'astro-blog-template',
             isActive: true,
         });
         templateRepository.findVisibleByKind.mockResolvedValue([
             {
-                id: 'classic',
+                id: 'astro-blog',
                 kind: 'website',
                 sourceType: 'built_in',
-                name: 'Classic',
-                description: 'Classic template',
+                name: 'Astro Blog',
+                description: 'Astro blog template',
                 framework: null,
                 previewImageUrl: null,
-                repositoryUrl: 'https://github.com/ever-works/directory-web-template',
+                repositoryUrl: 'https://github.com/ever-works/astro-blog-template',
                 repositoryOwner: 'ever-works',
-                repositoryName: 'directory-web-template',
+                repositoryName: 'astro-blog-template',
                 branch: 'main',
                 syncBranches: ['main'],
                 betaBranch: null,
@@ -390,18 +396,104 @@ describe('TemplateCatalogService', () => {
         );
         expect(templateRepository.upsert).toHaveBeenCalledWith(
             expect.objectContaining({
-                id: 'classic',
+                id: 'astro-blog',
                 sourceType: 'built_in',
-                repositoryName: 'directory-web-template',
+                repositoryName: 'astro-blog-template',
             }),
         );
-        expect(templateRepository.updateById).toHaveBeenCalledWith('directory-web-template', {
+        expect(templateRepository.updateById).toHaveBeenCalledWith('astro-blog-template', {
             isActive: false,
         });
         expect(result.templates[0]).toEqual(
             expect.objectContaining({
-                id: 'classic',
+                id: 'astro-blog',
                 originType: 'standard',
+            }),
+        );
+    });
+
+    it('seedBuiltInTemplates deactivates orphan built-in rows pointing at the same repo', async () => {
+        templateRepository.upsert.mockResolvedValue(undefined);
+        templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
+            async (_kind: string, owner: string, repo: string) => {
+                if (owner === 'ever-works' && repo === 'directory-web-minimal-template') {
+                    return [
+                        {
+                            id: 'minimal',
+                            kind: 'website',
+                            sourceType: 'built_in',
+                            repositoryOwner: owner,
+                            repositoryName: repo,
+                            isActive: true,
+                        },
+                        {
+                            id: 'directory-web-minimal-template',
+                            kind: 'website',
+                            sourceType: 'built_in',
+                            repositoryOwner: owner,
+                            repositoryName: repo,
+                            isActive: true,
+                        },
+                    ];
+                }
+                return [
+                    {
+                        id: 'classic',
+                        kind: 'website',
+                        sourceType: 'built_in',
+                        repositoryOwner: owner,
+                        repositoryName: repo,
+                        isActive: true,
+                    },
+                ];
+            },
+        );
+
+        await service.seedBuiltInTemplates();
+
+        expect(templateRepository.updateById).toHaveBeenCalledWith(
+            'directory-web-minimal-template',
+            { isActive: false },
+        );
+        expect(templateRepository.updateById).not.toHaveBeenCalledWith(
+            'minimal',
+            expect.anything(),
+        );
+        expect(templateRepository.updateById).not.toHaveBeenCalledWith(
+            'classic',
+            expect.anything(),
+        );
+    });
+
+    it('skips discovered repos already covered by a curated built-in template', async () => {
+        templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
+        gitFacade.getAccessToken.mockResolvedValue(null);
+        gitFacade.listPublicRepositories
+            .mockResolvedValueOnce([
+                {
+                    name: 'directory-web-minimal-template',
+                    owner: 'ever-works',
+                    url: 'https://github.com/ever-works/directory-web-minimal-template',
+                    fullName: 'ever-works/directory-web-minimal-template',
+                    defaultBranch: 'develop',
+                    description: 'Minimal template',
+                },
+            ])
+            .mockResolvedValueOnce([]);
+        templateRepository.findVisibleByKind.mockResolvedValue([]);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+
+        await service.refreshTemplatesForUser('website', 'user-1');
+
+        expect(templateRepository.findBuiltInByRepositoryCoordinates).not.toHaveBeenCalledWith(
+            'website',
+            'ever-works',
+            'directory-web-minimal-template',
+        );
+        expect(templateRepository.upsert).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                repositoryOwner: 'ever-works',
+                repositoryName: 'directory-web-minimal-template',
             }),
         );
     });

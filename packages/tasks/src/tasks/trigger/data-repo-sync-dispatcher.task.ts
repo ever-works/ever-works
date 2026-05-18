@@ -50,7 +50,16 @@ export const dataRepoSyncDispatcherTask = schedules.task({
     run: async () => {
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('DataRepoSyncDispatcher'));
-        const logger = appContext.get('NestFactoryStaticLogger', { strict: false }) ?? console;
+        // `appContext.get('NestFactoryStaticLogger', { strict: false })` still
+        // throws under Nest 11 when the provider isn't registered, so the
+        // `?? console` fallback never fires. Guard explicitly.
+        let logger: { log?: (m: string) => void } = console;
+        try {
+            const fromCtx = appContext.get('NestFactoryStaticLogger', { strict: false });
+            if (fromCtx) logger = fromCtx as typeof logger;
+        } catch {
+            // Fall back to console — already the default.
+        }
 
         try {
             const dispatcher = appContext.get<DataSyncDispatcher>(DATA_SYNC_DISPATCHER_SERVICE);

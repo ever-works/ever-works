@@ -60,10 +60,30 @@ spec:
       labels:
         app: ever-works-api
     spec:
+      # H-20: pod-level hardening. The API container uses external
+      # kubeconfigs (`EVER_WORKS_K8S_*_KUBECONFIG`) to deploy other Works,
+      # so the in-cluster service-account token is unused and can be
+      # safely disabled. runAsNonRoot + dropped capabilities mirror the
+      # Docker image's `USER node` so a container compromise can't
+      # escalate to root or capability-protected operations.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: ever-works-api
           image: registry.digitalocean.com/ever/ever-works-api:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: WEB_URL
               value: https://app.ever.works
@@ -161,6 +181,33 @@ spec:
               value: "$DATABASE_SSL_MODE"
             - name: DATABASE_CA_CERT
               value: "$DATABASE_CA_CERT"
+            # C-07: schema migrations are run via the migration step in
+            # `.deploy/docker/api/entrypoint.sh`. TypeORM `synchronize` must
+            # NOT run in production — it can silently drop columns / re-create
+            # tables on the live DB, contradicting the project's own
+            # constitution (.specify/memory/constitution.md). Force it off.
+            - name: DATABASE_AUTOMIGRATE
+              value: "false"
+
+            # 2026-05-17 audit env (PR ever-works#816 — see THREAT-MODEL.md)
+            - name: PLUGIN_SECRET_ENCRYPTION_KEY
+              value: "$PLUGIN_SECRET_ENCRYPTION_KEY"
+            - name: COMMUNITY_PR_VERIFIED_ORGS
+              value: "$COMMUNITY_PR_VERIFIED_ORGS"
+            - name: AGENT_BASH_AUDIT_LOG
+              value: "$AGENT_BASH_AUDIT_LOG"
+            # C-04: host allow-list for user-supplied callback URLs.
+            # WEB_URL's host is always allowed by default — list extras here.
+            - name: ALLOWED_CALLBACK_HOSTS
+              value: "$ALLOWED_CALLBACK_HOSTS"
+            # H-17: per-user login lockout knobs (5 fails / 15 min by default).
+            - name: LOGIN_LOCKOUT_THRESHOLD
+              value: "$LOGIN_LOCKOUT_THRESHOLD"
+            - name: LOGIN_LOCKOUT_DURATION_MS
+              value: "$LOGIN_LOCKOUT_DURATION_MS"
+            # M-19: HTTP body parser limit (default 1mb).
+            - name: BODY_LIMIT
+              value: "$BODY_LIMIT"
 
             # Mail
             - name: MAILER_PROVIDER
@@ -296,10 +343,29 @@ spec:
       labels:
         app: ever-works-web
     spec:
+      # H-20: pod-level hardening. Same shape as the API deployment —
+      # non-root with seccomp/RuntimeDefault, container drops all caps
+      # and disables privilege escalation. `readOnlyRootFilesystem` stays
+      # false (Next.js writes to `.next/cache` etc; flipping it on is a
+      # follow-up that needs an emptyDir volume).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: ever-works-web
           image: registry.digitalocean.com/ever/ever-works-web:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"

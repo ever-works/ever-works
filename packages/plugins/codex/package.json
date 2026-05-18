@@ -55,7 +55,8 @@
 			"capabilities": [
 				"pipeline",
 				"form-schema-provider",
-				"device-auth"
+				"device-auth",
+				"code-edit"
 			],
 			"description": "Full pipeline plugin that delegates the entire generation to Codex",
 			"author": {

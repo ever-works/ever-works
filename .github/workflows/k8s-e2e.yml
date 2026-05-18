@@ -25,6 +25,10 @@ on:
       - '.github/workflows/k8s-e2e.yml'
   workflow_dispatch:
 
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -55,7 +59,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
         with:
           version: 10.13.1
 
@@ -76,7 +80,7 @@ jobs:
         run: pnpm --filter '@ever-works/k8s-plugin...' build
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc  # v1
         with:
           cluster_name: ever-works-e2e
           node_image: ${{ matrix.kubernetes.image }}

@@ -23,6 +23,7 @@ export type {
 	GitUser,
 	GitOrganization,
 	GitPullRequest,
+	GitPullRequestAuthor,
 	GitRepositoryPermissions,
 	GitRepositoryWithPermissions,
 	ListRepositoriesOptions,

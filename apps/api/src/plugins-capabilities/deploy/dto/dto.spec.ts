@@ -3,7 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { BatchDeployDto, BatchDeployItemDto } from './batch-deploy.dto';
-import { DeployWorkDto, GetTeamsDto, ValidateTokenDto } from './deploy.dto';
+import { DeployWorkDto, GetTeamsDto, RollbackDto, ValidateTokenDto } from './deploy.dto';
 
 const constraintsFor = (
     errs: { property: string; constraints?: Record<string, string> }[],
@@ -61,6 +61,39 @@ describe('plugins-capabilities/deploy DTO validation', () => {
             // responsible for surfacing "Provider 'X' is not available" downstream.
             const dto = plainToInstance(ValidateTokenDto, { providerId: '' });
             expect(await validate(dto)).toHaveLength(0);
+        });
+    });
+
+    describe('RollbackDto', () => {
+        it('accepts a valid UUID deploymentId', async () => {
+            const dto = plainToInstance(RollbackDto, {
+                deploymentId: '123e4567-e89b-12d3-a456-426614174000',
+            });
+            expect(await validate(dto)).toHaveLength(0);
+        });
+
+        it('rejects empty-string deploymentId via @IsNotEmpty', async () => {
+            // Without @IsNotEmpty, an empty string would fall through to findById('')
+            // and surface as a generic 404 from the service layer.
+            const dto = plainToInstance(RollbackDto, { deploymentId: '' });
+            const errs = await validate(dto);
+            expect(constraintsFor(errs, 'deploymentId').isNotEmpty).toBeDefined();
+        });
+
+        it('rejects non-UUID deploymentId via @IsUUID', async () => {
+            // Without @IsUUID, garbage strings reach the DB layer and produce a
+            // confusing 404 rather than a 400 validation error.
+            const dto = plainToInstance(RollbackDto, { deploymentId: 'not-a-uuid' });
+            const errs = await validate(dto);
+            expect(constraintsFor(errs, 'deploymentId').isUuid).toBeDefined();
+        });
+
+        it('rejects non-string deploymentId via @IsString', async () => {
+            const dto = plainToInstance(RollbackDto, {
+                deploymentId: 42 as unknown as string,
+            });
+            const errs = await validate(dto);
+            expect(constraintsFor(errs, 'deploymentId').isString).toBeDefined();
         });
     });
 

@@ -40,12 +40,22 @@ export class GitHubAppController {
 
     @Public()
     @Get('callback')
-    async callback(@Query() query: GitHubAppCallbackQueryDto) {
+    async callback(@Query() query: GitHubAppCallbackQueryDto, @Request() req) {
         const result = await this.gitHubAppOnboardingService.completeUserAuth({
             code: query.code,
             state: query.state,
         });
-        const auth = await this.authProvider.issueSession(result.user.id);
+        // H-04: bind the GitHub-App-issued session to the requesting client.
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+        const auth = await this.authProvider.issueSession(result.user.id, { ipAddress, userAgent });
 
         return {
             ...auth,

@@ -54,7 +54,7 @@ describe('SocialAuthService', () => {
     });
 
     describe('getAuthorizationUrl', () => {
-        it('builds GitHub URL with default callback, scopes (space-separated), and no state', () => {
+        it('builds GitHub URL with default callback, narrow login scopes (space-separated), and no state', () => {
             const url = service.getAuthorizationUrl(AuthProvider.GITHUB);
             const parsed = new URL(url);
 
@@ -68,9 +68,14 @@ describe('SocialAuthService', () => {
             expect(parsed.searchParams.get('response_type')).toBe('code');
             expect(parsed.searchParams.get('state')).toBeNull();
             const scope = parsed.searchParams.get('scope') || '';
-            expect(scope.split(' ')).toEqual(
-                expect.arrayContaining(['user:email', 'read:user', 'repo']),
-            );
+            const scopes = scope.split(' ');
+            // M-02 / M-22: login flow grants identity only — no repo / workflow / hook scopes.
+            expect(scopes).toEqual(expect.arrayContaining(['user:email', 'read:user']));
+            expect(scopes).not.toContain('repo');
+            expect(scopes).not.toContain('delete_repo');
+            expect(scopes).not.toContain('workflow');
+            expect(scopes).not.toContain('write:repo_hook');
+            expect(scopes).not.toContain('project');
             expect(parsed.searchParams.get('access_type')).toBeNull();
             expect(parsed.searchParams.get('prompt')).toBeNull();
         });

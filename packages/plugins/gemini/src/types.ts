@@ -35,7 +35,9 @@ export function isGeminiStepId(value: string): value is GeminiStepId {
 /**
  * Base temporary work for all Gemini operations
  */
-export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'gemini-generator');
+// Forward-slash form so downstream `path.posix.join` calls don't treat the
+// drive letter as relative on Windows. Node accepts `/` on Windows for FS ops.
+export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'gemini-generator').replace(/\\/g, '/');
 
 /**
  * NPM package used to install Gemini CLI
