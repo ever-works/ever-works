@@ -10,26 +10,31 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TemplatesPage() {
-    const [templatesData, gitUserResult, organizationsResult, providersResult] = await Promise.all([
-        templatesAPI.list('website').catch(() => ({
-            status: 'success' as const,
-            kind: 'website' as const,
-            defaultTemplateId: null,
-            templates: [],
-        })),
-        gitProvidersAPI.getUser('github').catch(() => ({
-            success: false,
-            user: null,
-        })),
-        gitProvidersAPI.getOrganizations('github').catch(() => ({
-            success: false,
-            organizations: [],
-        })),
-        templatesAPI.listCustomizationProviders().catch(() => ({
-            status: 'success' as const,
-            providers: [],
-        })),
-    ]);
+    const [templatesData, gitUserResult, organizationsResult, providersResult, aiProvidersResult] =
+        await Promise.all([
+            templatesAPI.list('website').catch(() => ({
+                status: 'success' as const,
+                kind: 'website' as const,
+                defaultTemplateId: null,
+                templates: [],
+            })),
+            gitProvidersAPI.getUser('github').catch(() => ({
+                success: false,
+                user: null,
+            })),
+            gitProvidersAPI.getOrganizations('github').catch(() => ({
+                success: false,
+                organizations: [],
+            })),
+            templatesAPI.listCustomizationProviders().catch(() => ({
+                status: 'success' as const,
+                providers: [],
+            })),
+            templatesAPI.listCustomizationAiProviders().catch(() => ({
+                status: 'success' as const,
+                providers: [],
+            })),
+        ]);
 
     const forkTargets = [
         ...(gitUserResult.success && gitUserResult.user
@@ -56,6 +61,7 @@ export default async function TemplatesPage() {
                 defaultTemplateId={templatesData.defaultTemplateId}
                 forkTargets={forkTargets}
                 customizationProviders={providersResult.providers ?? []}
+                customizationAiProviders={aiProvidersResult.providers ?? []}
             />
         </div>
     );

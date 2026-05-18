@@ -35,6 +35,7 @@ describe('TemplateCatalogController', () => {
         getByIdForUser: jest.Mock;
         listForTemplate: jest.Mock;
         listProviders: jest.Mock;
+        listAiProviders: jest.Mock;
     };
     let activityLogService: { log: jest.Mock };
 
@@ -48,7 +49,8 @@ describe('TemplateCatalogController', () => {
             createAndStart: jest.fn(),
             getByIdForUser: jest.fn(),
             listForTemplate: jest.fn(),
-            listProviders: jest.fn().mockReturnValue([]),
+            listProviders: jest.fn().mockResolvedValue([]),
+            listAiProviders: jest.fn().mockResolvedValue([]),
         };
         activityLogService = {
             log: jest.fn().mockResolvedValue(undefined),
@@ -141,6 +143,38 @@ describe('TemplateCatalogController', () => {
             kind: 'website',
             defaultTemplateId: 'classic',
             templates: [{ id: 'classic', name: 'Classic' }],
+        });
+    });
+
+    it('scopes customization providers to the current user', async () => {
+        templateCustomizationService.listProviders.mockResolvedValue([
+            { id: 'claude-code', name: 'Claude Code', enabled: true },
+        ]);
+
+        const result = await controller.listCustomizationProviders({
+            userId: 'user-1',
+        } as any);
+
+        expect(templateCustomizationService.listProviders).toHaveBeenCalledWith('user-1');
+        expect(result).toEqual({
+            status: 'success',
+            providers: [{ id: 'claude-code', name: 'Claude Code', enabled: true }],
+        });
+    });
+
+    it('scopes customization AI providers to the current user', async () => {
+        templateCustomizationService.listAiProviders.mockResolvedValue([
+            { id: 'openai', name: 'OpenAI', enabled: true },
+        ]);
+
+        const result = await controller.listCustomizationAiProviders({
+            userId: 'user-1',
+        } as any);
+
+        expect(templateCustomizationService.listAiProviders).toHaveBeenCalledWith('user-1');
+        expect(result).toEqual({
+            status: 'success',
+            providers: [{ id: 'openai', name: 'OpenAI', enabled: true }],
         });
     });
 });

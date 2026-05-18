@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
     TemplateCustomization,
     TemplateCustomizationStatus,
@@ -11,6 +11,7 @@ export type CreateTemplateCustomizationInput = Pick<
     'templateId' | 'userId' | 'baseTemplateId' | 'prompt'
 > & {
     providerId?: string | null;
+    aiProviderId?: string | null;
     status?: TemplateCustomizationStatus;
 };
 
@@ -22,6 +23,7 @@ export type UpdateTemplateCustomizationPatch = Partial<
         | 'commitSha'
         | 'errorMessage'
         | 'providerId'
+        | 'triggerRunId'
         | 'startedAt'
         | 'completedAt'
     >
@@ -41,6 +43,7 @@ export class TemplateCustomizationRepository {
             baseTemplateId: input.baseTemplateId,
             prompt: input.prompt,
             providerId: input.providerId ?? null,
+            aiProviderId: input.aiProviderId ?? null,
             status: input.status ?? TemplateCustomizationStatus.PENDING,
         });
         return this.repository.save(entity);
@@ -72,5 +75,22 @@ export class TemplateCustomizationRepository {
             order: { createdAt: 'DESC' },
             take: limit,
         });
+    }
+
+    async findLatestForTemplates(
+        templateIds: readonly string[],
+        userId: string,
+    ): Promise<Map<string, TemplateCustomization>> {
+        const result = new Map<string, TemplateCustomization>();
+        if (templateIds.length === 0) return result;
+
+        const rows = await this.repository.find({
+            where: { templateId: In(templateIds as string[]), userId },
+            order: { createdAt: 'DESC' },
+        });
+        for (const row of rows) {
+            if (!result.has(row.templateId)) result.set(row.templateId, row);
+        }
+        return result;
     }
 }

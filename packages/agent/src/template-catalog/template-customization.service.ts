@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
@@ -6,6 +13,11 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 import { GitFacadeService, type GitFacadeOptions } from '@src/facades/git.facade';
 import type { GitCommitter } from '@ever-works/plugin';
 import { CodeEditFacadeService, type CodeEditProviderInfo } from '@src/facades/code-edit.facade';
+import { AiFacadeService } from '@src/facades/ai.facade';
+import {
+    TEMPLATE_CUSTOMIZATION_DISPATCHER,
+    type TemplateCustomizationDispatcher,
+} from '@src/tasks';
 import {
     findWebsiteTemplateConfig,
     type WebsiteTemplateConfig,
@@ -28,6 +40,7 @@ export interface CreateAndStartCustomizationInput {
     name: string;
     prompt: string;
     providerId: string;
+    aiProviderId?: string;
     targetOwner?: string;
     description?: string;
 }
@@ -35,6 +48,12 @@ export interface CreateAndStartCustomizationInput {
 export interface CreateAndStartCustomizationResult {
     customization: TemplateCustomization;
     template: Template;
+}
+
+export interface IterateCustomizationInput {
+    prompt: string;
+    providerId: string;
+    aiProviderId?: string;
 }
 
 /**
@@ -52,6 +71,10 @@ export class TemplateCustomizationService {
         private readonly userRepository: UserRepository,
         private readonly gitFacade: GitFacadeService,
         private readonly codeEditFacade: CodeEditFacadeService,
+        private readonly aiFacade: AiFacadeService,
+        @Optional()
+        @Inject(TEMPLATE_CUSTOMIZATION_DISPATCHER)
+        private readonly dispatcher?: TemplateCustomizationDispatcher,
     ) {}
 
     async createAndStart(
@@ -79,7 +102,12 @@ export class TemplateCustomizationService {
         }
 
         const baseConfig = this.resolveCustomizableBase(input.baseTemplateId);
-        await this.assertProviderAvailable(providerId);
+        const codeEditProvider = await this.assertProviderAvailable(providerId, userId);
+        const aiProviderId = await this.resolveAiProviderRequirement(
+            codeEditProvider,
+            input.aiProviderId?.trim(),
+            userId,
+        );
         const user = await this.userRepository.findById(userId);
         if (!user) {
             throw new NotFoundException({ status: 'error', message: 'User not found.' });
@@ -125,11 +153,91 @@ export class TemplateCustomizationService {
             baseTemplateId: baseConfig.id,
             prompt,
             providerId,
+            aiProviderId,
         });
 
-        void this.runAsync(customization.id);
+        await this.start(customization.id);
 
         return { customization, template };
+    }
+
+    async runOnExistingTemplate(
+        userId: string,
+        templateId: string,
+        input: IterateCustomizationInput,
+    ): Promise<CreateAndStartCustomizationResult> {
+        const prompt = input.prompt?.trim();
+        const providerId = input.providerId?.trim();
+
+        if (!prompt) {
+            throw new BadRequestException({ status: 'error', message: 'Prompt is required.' });
+        }
+        if (!providerId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Select an installed code-edit provider before continuing.',
+            });
+        }
+
+        const template = await this.templateRepository.findById(templateId);
+        if (!template || template.ownerUserId !== userId || template.sourceType !== 'custom') {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found.',
+            });
+        }
+
+        const baseTemplateId =
+            typeof template.metadata?.baseTemplateId === 'string'
+                ? template.metadata.baseTemplateId
+                : null;
+        if (!baseTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Template is not linked to a customizable base.',
+            });
+        }
+        this.resolveCustomizableBase(baseTemplateId);
+
+        const codeEditProvider = await this.assertProviderAvailable(providerId, userId);
+        const aiProviderId = await this.resolveAiProviderRequirement(
+            codeEditProvider,
+            input.aiProviderId?.trim(),
+            userId,
+        );
+
+        const customization = await this.customizationRepository.create({
+            templateId: template.id,
+            userId,
+            baseTemplateId,
+            prompt,
+            providerId,
+            aiProviderId,
+        });
+
+        await this.start(customization.id);
+
+        return { customization, template };
+    }
+
+    private async start(customizationId: string): Promise<void> {
+        const dispatchedId = this.dispatcher
+            ? await this.dispatcher.dispatchTemplateCustomization({ customizationId })
+            : null;
+
+        if (dispatchedId) {
+            await this.customizationRepository.updateById(customizationId, {
+                triggerRunId: dispatchedId,
+            });
+            return;
+        }
+
+        if (this.dispatcher) {
+            this.logger.warn(
+                `Trigger dispatch failed, falling back to in-process customization for ${customizationId}`,
+            );
+        }
+        void this.runAsync(customizationId);
     }
 
     getByIdForUser(id: string, userId: string): Promise<TemplateCustomization | null> {
@@ -140,8 +248,12 @@ export class TemplateCustomizationService {
         return this.customizationRepository.listForTemplate(templateId, userId);
     }
 
-    listProviders(): CodeEditProviderInfo[] {
-        return this.codeEditFacade.listProviders();
+    listProviders(userId: string): Promise<CodeEditProviderInfo[]> {
+        return this.codeEditFacade.listProviders(userId);
+    }
+
+    listAiProviders(userId: string) {
+        return this.aiFacade.getAvailableProvidersForUser(userId);
     }
 
     /** Exposed for direct invocation by background tasks / tests. */
@@ -188,7 +300,11 @@ export class TemplateCustomizationService {
 
             const edit = await this.codeEditFacade.execute(
                 { workspaceDir, prompt: composedPrompt },
-                { userId: record.userId, providerId: record.providerId ?? undefined },
+                {
+                    userId: record.userId,
+                    providerId: record.providerId ?? undefined,
+                    aiProviderId: record.aiProviderId ?? undefined,
+                },
                 { onLogLine: (s, line) => this.logger.debug(`[tpl-customize:${s}] ${line}`) },
             );
 
@@ -308,15 +424,42 @@ export class TemplateCustomizationService {
         };
     }
 
-    private async assertProviderAvailable(providerId: string): Promise<void> {
-        const available = this.codeEditFacade.listProviders();
-        const match = available.find((p) => p.id === providerId);
-        if (!match || !match.enabled) {
+    private async assertProviderAvailable(
+        providerId: string,
+        userId: string,
+    ): Promise<CodeEditProviderInfo> {
+        const match = await this.codeEditFacade.getProviderForUser(providerId, userId);
+        if (!match) {
             throw new BadRequestException({
                 status: 'error',
-                message: `Code-edit provider "${providerId}" is not installed or not enabled.`,
+                message: `Code-edit provider "${providerId}" is not installed or not enabled for this account.`,
             });
         }
+        return match;
+    }
+
+    private async resolveAiProviderRequirement(
+        codeEditProvider: CodeEditProviderInfo,
+        candidateAiProviderId: string | undefined,
+        userId: string,
+    ): Promise<string | null> {
+        if (!codeEditProvider.selectableProviderCategories.includes('ai-provider')) {
+            return null;
+        }
+        if (!candidateAiProviderId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `${codeEditProvider.name} requires you to pick an AI provider.`,
+            });
+        }
+        const available = await this.aiFacade.getAvailableProvidersForUser(userId);
+        if (!available.some((p) => p.id === candidateAiProviderId)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `AI provider "${candidateAiProviderId}" is not installed or not enabled for this account.`,
+            });
+        }
+        return candidateAiProviderId;
     }
 
     private resolveCustomizableBase(id: string): WebsiteTemplateConfig {

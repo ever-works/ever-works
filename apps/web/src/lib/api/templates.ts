@@ -28,6 +28,19 @@ export interface TemplateCatalogItem {
     customizable?: boolean;
     baseTemplateId?: string | null;
     lastCustomizedAt?: string | null;
+    lastCustomizationPrompt?: string | null;
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    prompt: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export type TemplateCustomizationStatus =
@@ -113,7 +126,29 @@ export type GetTemplateCustomizationResponse = APIResponse<{
     customization: TemplateCustomization;
 }>;
 
+export type IterateCustomTemplateResponse = APIResponse<{
+    customizationId: string;
+    customization: TemplateCustomization;
+}>;
+
 export interface CustomizationProvider {
+    id: string;
+    name: string;
+    description?: string | null;
+    icon?: PluginIcon;
+    providerName?: string;
+    enabled: boolean;
+    isDefault?: boolean;
+    // Mirrors the plugin manifest declaration. The dialog renders a conditional
+    // AI provider picker when this includes 'ai-provider' (e.g. opencode).
+    selectableProviderCategories?: readonly string[];
+}
+
+export type ListCustomizationProvidersResponse = APIResponse<{
+    providers: CustomizationProvider[];
+}>;
+
+export interface CustomizationAiProvider {
     id: string;
     name: string;
     description?: string | null;
@@ -123,8 +158,8 @@ export interface CustomizationProvider {
     isDefault?: boolean;
 }
 
-export type ListCustomizationProvidersResponse = APIResponse<{
-    providers: CustomizationProvider[];
+export type ListCustomizationAiProvidersResponse = APIResponse<{
+    providers: CustomizationAiProvider[];
 }>;
 
 export const templatesAPI = {
@@ -211,11 +246,24 @@ export const templatesAPI = {
         name: string;
         prompt: string;
         providerId: string;
+        aiProviderId?: string;
         targetOwner?: string;
         description?: string;
     }) => {
         return serverMutation<CustomizeTemplateFromBaseResponse>({
             endpoint: '/templates/custom-from-base',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    iterateCustom: async (
+        templateId: string,
+        data: { prompt: string; providerId: string; aiProviderId?: string },
+    ) => {
+        return serverMutation<IterateCustomTemplateResponse>({
+            endpoint: `/templates/custom/${templateId}/customize`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -231,6 +279,12 @@ export const templatesAPI = {
     listCustomizationProviders: async () => {
         return serverFetch<ListCustomizationProvidersResponse>(
             '/templates/customization-providers',
+        );
+    },
+
+    listCustomizationAiProviders: async () => {
+        return serverFetch<ListCustomizationAiProvidersResponse>(
+            '/templates/customization-ai-providers',
         );
     },
 };

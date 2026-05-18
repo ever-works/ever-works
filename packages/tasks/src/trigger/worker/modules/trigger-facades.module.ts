@@ -7,6 +7,7 @@ import {
     DataSourceFacadeService,
     GitFacadeService,
     PromptFacadeService,
+    CodeEditFacadeService,
 } from '@ever-works/agent/facades';
 import {
     AuthAccountRepository,
@@ -25,6 +26,7 @@ const FACADES = [
     DataSourceFacadeService,
     GitFacadeService,
     PromptFacadeService,
+    CodeEditFacadeService,
 ];
 
 /**

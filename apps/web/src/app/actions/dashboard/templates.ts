@@ -219,6 +219,7 @@ export async function customizeTemplateFromBase(input: {
     name: string;
     prompt: string;
     providerId: string;
+    aiProviderId?: string;
     targetOwner?: string;
     description?: string;
 }) {
@@ -253,6 +254,40 @@ export async function customizeTemplateFromBase(input: {
     }
 }
 
+export async function iterateCustomTemplate(
+    templateId: string,
+    input: { prompt: string; providerId: string; aiProviderId?: string },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.iterateCustom(templateId, input);
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+        return {
+            success: response.status === 'success',
+            customizationId: response.customizationId ?? null,
+            customization: response.customization ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.customizeFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Iterate custom template error:', error);
+        return {
+            success: false,
+            customizationId: null,
+            customization: null,
+            error: error instanceof Error ? error.message : t('messages.customizeFailed'),
+        };
+    }
+}
+
 export async function listCustomizationProviders() {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -268,6 +303,29 @@ export async function listCustomizationProviders() {
         };
     } catch (error) {
         console.error('List customization providers error:', error);
+        return {
+            success: false,
+            providers: [],
+            error: error instanceof Error ? error.message : 'unknown',
+        };
+    }
+}
+
+export async function listCustomizationAiProviders() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await templatesAPI.listCustomizationAiProviders();
+        return {
+            success: response.status === 'success',
+            providers: response.providers ?? [],
+            error: response.status === 'error' ? getResponseMessage(response) : null,
+        };
+    } catch (error) {
+        console.error('List customization AI providers error:', error);
         return {
             success: false,
             providers: [],

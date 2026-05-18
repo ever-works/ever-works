@@ -23,6 +23,7 @@ import {
     ArchiveCustomTemplateDto,
     CustomizeTemplateFromBaseDto,
     ForkTemplateDto,
+    IterateCustomTemplateDto,
     ListTemplatesQueryDto,
     RefreshTemplatesDto,
     SetDefaultTemplateDto,
@@ -244,8 +245,21 @@ export class TemplateCatalogController {
         summary: 'List installed code-edit providers usable for template customization',
     })
     @ApiResponse({ status: 200, description: 'Providers' })
-    async listCustomizationProviders() {
-        return { status: 'success', providers: this.templateCustomizationService.listProviders() };
+    async listCustomizationProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.templateCustomizationService.listProviders(auth.userId);
+        return { status: 'success', providers };
+    }
+
+    @Get('templates/customization-ai-providers')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary:
+            'List installed AI providers, used when a chosen code-edit plugin declares ai-provider in selectableProviderCategories',
+    })
+    @ApiResponse({ status: 200, description: 'AI providers' })
+    async listCustomizationAiProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.templateCustomizationService.listAiProviders(auth.userId);
+        return { status: 'success', providers };
     }
 
     @Post('templates/custom-from-base')
@@ -270,6 +284,7 @@ export class TemplateCatalogController {
                     baseTemplateId: body.baseTemplateId,
                     customizationId: result.customization.id,
                     providerId: body.providerId,
+                    aiProviderId: body.aiProviderId,
                 },
             })
             .catch(() => {});
@@ -284,6 +299,48 @@ export class TemplateCatalogController {
                 repositoryName: result.template.repositoryName,
                 repositoryUrl: result.template.repositoryUrl,
             },
+            customization: this.serializeCustomization(result.customization),
+        };
+    }
+
+    @Post('templates/custom/:templateId/customize')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Re-run agent customization on an existing custom template',
+        description:
+            'Submits a new customization run with a fresh prompt against the same custom template (same repo).',
+    })
+    @ApiResponse({ status: 200, description: 'Customization scheduled' })
+    async iterateCustomTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+        @Body() body: IterateCustomTemplateDto,
+    ) {
+        const result = await this.templateCustomizationService.runOnExistingTemplate(
+            auth.userId,
+            templateId,
+            body,
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_ADDED,
+                action: 'template.customized',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Re-customize template ${result.template.name}`,
+                metadata: {
+                    templateId: result.template.id,
+                    customizationId: result.customization.id,
+                    providerId: body.providerId,
+                    aiProviderId: body.aiProviderId,
+                },
+            })
+            .catch(() => {});
+
+        return {
+            status: 'success',
+            customizationId: result.customization.id,
             customization: this.serializeCustomization(result.customization),
         };
     }

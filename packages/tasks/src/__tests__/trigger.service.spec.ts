@@ -5,6 +5,7 @@ const {
     runsCancelMock,
     workGenTriggerMock,
     workImportTriggerMock,
+    templateCustomizationTriggerMock,
     triggerConfig,
     subscriptionsConfig,
 } = vi.hoisted(() => {
@@ -13,6 +14,7 @@ const {
         runsCancelMock: vi.fn(),
         workGenTriggerMock: vi.fn(),
         workImportTriggerMock: vi.fn(),
+        templateCustomizationTriggerMock: vi.fn(),
         triggerConfig: {
             shouldUseTrigger: vi.fn(),
             getSecretKey: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('@ever-works/agent/config', () => ({
 vi.mock('@ever-works/agent/tasks', () => ({
     WORK_GENERATION_DISPATCHER: Symbol('WORK_GENERATION_DISPATCHER'),
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
+    TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
 }));
 
 vi.mock('../tasks/trigger/work-generation.task', () => ({
@@ -50,6 +53,9 @@ vi.mock('../tasks/trigger/work-generation.task', () => ({
 }));
 vi.mock('../tasks/trigger/work-import.task', () => ({
     workImportTask: { trigger: workImportTriggerMock },
+}));
+vi.mock('../tasks/trigger/template-customization.task', () => ({
+    templateCustomizationTask: { trigger: templateCustomizationTriggerMock },
 }));
 
 import { TriggerService } from '../trigger/trigger.service';
@@ -231,6 +237,36 @@ describe('TriggerService', () => {
                 sourceType: 'github',
             } as any);
 
+            expect(out).toBeNull();
+        });
+    });
+
+    describe('dispatchTemplateCustomization', () => {
+        it('returns null when trigger is disabled', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            const out = await service.dispatchTemplateCustomization({ customizationId: 'c1' });
+            expect(out).toBeNull();
+            expect(templateCustomizationTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('returns the run id and tags the customization id', async () => {
+            templateCustomizationTriggerMock.mockResolvedValue({ id: 'run-tpl-1' });
+
+            const out = await service.dispatchTemplateCustomization({ customizationId: 'c1' });
+
+            expect(out).toBe('run-tpl-1');
+            expect(templateCustomizationTriggerMock).toHaveBeenCalledWith(
+                { customizationId: 'c1' },
+                expect.objectContaining({
+                    tags: ['template-customization', 'c1'],
+                    machine: 'small-1x',
+                }),
+            );
+        });
+
+        it('returns null when the SDK throws', async () => {
+            templateCustomizationTriggerMock.mockRejectedValue(new Error('boom'));
+            const out = await service.dispatchTemplateCustomization({ customizationId: 'c1' });
             expect(out).toBeNull();
         });
     });

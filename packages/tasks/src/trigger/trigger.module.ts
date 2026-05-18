@@ -1,6 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { TriggerService } from './trigger.service';
-import { WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER } from '@ever-works/agent/tasks';
+import {
+    WORK_GENERATION_DISPATCHER,
+    WORK_IMPORT_DISPATCHER,
+    TEMPLATE_CUSTOMIZATION_DISPATCHER,
+} from '@ever-works/agent/tasks';
 
 @Global()
 @Module({
@@ -14,7 +18,16 @@ import { WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER } from '@ever-works/
             provide: WORK_IMPORT_DISPATCHER,
             useExisting: TriggerService,
         },
+        {
+            provide: TEMPLATE_CUSTOMIZATION_DISPATCHER,
+            useExisting: TriggerService,
+        },
     ],
-    exports: [TriggerService, WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER],
+    exports: [
+        TriggerService,
+        WORK_GENERATION_DISPATCHER,
+        WORK_IMPORT_DISPATCHER,
+        TEMPLATE_CUSTOMIZATION_DISPATCHER,
+    ],
 })
 export class TriggerModule {}

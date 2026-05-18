@@ -60,7 +60,14 @@ interface Mocks {
         commit: AnyMock;
         push: AnyMock;
     };
-    codeEditFacade: { listProviders: AnyMock; execute: AnyMock };
+    codeEditFacade: {
+        listProviders: AnyMock;
+        isProviderAvailable: AnyMock;
+        getProviderForUser: AnyMock;
+        execute: AnyMock;
+    };
+    aiFacade: { getAvailableProvidersForUser: AnyMock };
+    dispatcher: { dispatchTemplateCustomization: AnyMock };
 }
 
 function makeService(): { service: TemplateCustomizationService; mocks: Mocks } {
@@ -108,15 +115,34 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
             push: jest.fn().mockResolvedValue(undefined),
         },
         codeEditFacade: {
-            listProviders: jest.fn().mockReturnValue([
-                { id: 'claude-code', name: 'Claude Code', enabled: true },
-                { id: 'codex', name: 'Codex', enabled: false },
+            listProviders: jest.fn().mockResolvedValue([
+                {
+                    id: 'claude-code',
+                    name: 'Claude Code',
+                    enabled: true,
+                    isDefault: true,
+                    selectableProviderCategories: [],
+                },
             ]),
+            isProviderAvailable: jest.fn().mockResolvedValue(true),
+            getProviderForUser: jest.fn().mockResolvedValue({
+                id: 'claude-code',
+                name: 'Claude Code',
+                enabled: true,
+                isDefault: true,
+                selectableProviderCategories: [],
+            }),
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 summary: 'Applied UI changes',
                 filesChanged: [{ path: 'src/styles/theme.css', status: 'modified' }],
             }),
+        },
+        aiFacade: {
+            getAvailableProvidersForUser: jest.fn().mockResolvedValue([]),
+        },
+        dispatcher: {
+            dispatchTemplateCustomization: jest.fn().mockResolvedValue(null),
         },
     };
     const service = new TemplateCustomizationService(
@@ -125,6 +151,8 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         mocks.userRepository as any,
         mocks.gitFacade as any,
         mocks.codeEditFacade as any,
+        mocks.aiFacade as any,
+        mocks.dispatcher as any,
     );
     return { service, mocks };
 }
@@ -164,21 +192,116 @@ describe('TemplateCustomizationService.createAndStart', () => {
         ).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects when the selected provider is not installed/enabled', async () => {
+    it('rejects when the selected provider is not enabled for this user', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.listProviders.mockReturnValue([
-            { id: 'codex', name: 'Codex', enabled: false },
-        ]);
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue(null);
+        await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
+            BadRequestException,
+        );
+        expect(mocks.codeEditFacade.getProviderForUser).toHaveBeenCalledWith(
+            'claude-code',
+            'user-1',
+        );
+    });
+
+    it('rejects when the user has no code-edit providers enabled', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue(null);
         await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
             BadRequestException,
         );
     });
 
-    it('rejects when no code-edit providers are installed at all', async () => {
+    it('rejects when the chosen code-edit plugin requires ai-provider but none was supplied', async () => {
         const { service, mocks } = makeService();
-        mocks.codeEditFacade.listProviders.mockReturnValue([]);
-        await expect(service.createAndStart('user-1', baseInput)).rejects.toThrow(
-            BadRequestException,
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        await expect(
+            service.createAndStart('user-1', { ...baseInput, providerId: 'opencode' }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects when the supplied ai-provider is not enabled for this user', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        mocks.aiFacade.getAvailableProvidersForUser.mockResolvedValue([
+            { id: 'openai', name: 'OpenAI', enabled: true },
+        ]);
+        await expect(
+            service.createAndStart('user-1', {
+                ...baseInput,
+                providerId: 'opencode',
+                aiProviderId: 'anthropic',
+            }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('dispatches to Trigger.dev when a dispatcher is bound and stores the run id', async () => {
+        const { service, mocks } = makeService();
+        mocks.dispatcher.dispatchTemplateCustomization.mockResolvedValue('run-tpl-1');
+        const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        const result = await service.createAndStart('user-1', baseInput);
+
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+        });
+        expect(mocks.customizationRepository.updateById).toHaveBeenCalledWith(
+            result.customization.id,
+            { triggerRunId: 'run-tpl-1' },
+        );
+        await new Promise((r) => setImmediate(r));
+        expect(executeSpy).not.toHaveBeenCalled();
+    });
+
+    it('falls back to in-process execution when the dispatcher returns null', async () => {
+        const { service, mocks } = makeService();
+        mocks.dispatcher.dispatchTemplateCustomization.mockResolvedValue(null);
+        const executeSpy = jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        const result = await service.createAndStart('user-1', baseInput);
+
+        await new Promise((r) => setImmediate(r));
+        expect(executeSpy).toHaveBeenCalledWith(result.customization.id);
+        expect(mocks.customizationRepository.updateById).not.toHaveBeenCalledWith(
+            result.customization.id,
+            expect.objectContaining({ triggerRunId: expect.anything() }),
+        );
+    });
+
+    it('persists ai-provider id when the chosen code-edit plugin requires it', async () => {
+        const { service, mocks } = makeService();
+        mocks.codeEditFacade.getProviderForUser.mockResolvedValue({
+            id: 'opencode',
+            name: 'OpenCode',
+            enabled: true,
+            isDefault: false,
+            selectableProviderCategories: ['ai-provider'],
+        });
+        mocks.aiFacade.getAvailableProvidersForUser.mockResolvedValue([
+            { id: 'openai', name: 'OpenAI', enabled: true },
+        ]);
+        jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        await service.createAndStart('user-1', {
+            ...baseInput,
+            providerId: 'opencode',
+            aiProviderId: 'openai',
+        });
+
+        expect(mocks.customizationRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({ providerId: 'opencode', aiProviderId: 'openai' }),
         );
     });
 
@@ -222,6 +345,7 @@ describe('TemplateCustomizationService.createAndStart', () => {
             baseTemplateId: 'minimal',
             prompt: baseInput.prompt,
             providerId: 'claude-code',
+            aiProviderId: null,
         });
         expect(result.customization.id).toBe('cust-1');
 

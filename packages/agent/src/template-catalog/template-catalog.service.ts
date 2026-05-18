@@ -7,9 +7,14 @@ import {
     OnModuleInit,
 } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
+import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
+import {
+    TemplateCustomization,
+    TemplateCustomizationStatus,
+} from '@src/entities/template-customization.entity';
 import {
     findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
@@ -42,15 +47,32 @@ export interface TemplateCatalogItem {
     isDefault: boolean;
     ownerUserId?: string | null;
     // Built-in: true when the WebsiteTemplateConfig marks it `customizable: true`
-    // AND a customization prompt is registered. Custom forks: true when their
-    // metadata.forkedFromTemplateId resolves to a customizable built-in.
+    // AND a customization prompt is registered. Custom templates: true when
+    // their metadata links them to a customizable built-in via
+    // `forkedFromTemplateId` (fork flow) or `baseTemplateId` (AI flow).
     customizable: boolean;
-    // For custom forks created via the agent flow, the built-in template id
-    // they were forked from. Lets the UI re-run a customization without
-    // making the user pick a base again.
+    // The built-in template id this custom template descends from. Lets the
+    // UI re-run a customization without making the user pick a base again.
     baseTemplateId?: string | null;
     // ISO timestamp of the last successful agent customization, if any.
     lastCustomizedAt?: string | null;
+    // Prompt of the last successful agent customization, if any. Lets the
+    // UI pre-fill the "Customize again" textarea without an extra fetch.
+    lastCustomizationPrompt?: string | null;
+    // Latest customization run for this template (most recent by createdAt),
+    // surfaced so the UI can render a status chip without an extra fetch.
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    prompt: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface ForkTemplateResult {
@@ -72,6 +94,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
     constructor(
         private readonly templateRepository: TemplateRepository,
+        private readonly customizationRepository: TemplateCustomizationRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
         private readonly workRepository: WorkRepository,
         private readonly gitFacade: GitFacadeService,
@@ -136,9 +159,16 @@ export class TemplateCatalogService implements OnModuleInit {
             this.getDefaultTemplateIdForUser(kind, userId),
         ]);
 
+        const latestByTemplate = await this.customizationRepository.findLatestForTemplates(
+            templates.map((t) => t.id),
+            userId,
+        );
+
         return {
             defaultTemplateId,
-            templates: templates.map((template) => this.toCatalogItem(template, defaultTemplateId)),
+            templates: templates.map((template) =>
+                this.toCatalogItem(template, defaultTemplateId, latestByTemplate.get(template.id)),
+            ),
         };
     }
 
@@ -754,9 +784,11 @@ export class TemplateCatalogService implements OnModuleInit {
             ownerUserId?: string | null;
         },
         defaultTemplateId: string | null,
+        latestCustomization?: TemplateCustomization,
     ): TemplateCatalogItem {
         const baseTemplateId = this.resolveBaseTemplateId(template);
         const lastCustomizedAtRaw = template.metadata?.lastCustomizedAt;
+        const lastCustomizationPromptRaw = template.metadata?.lastCustomizationPrompt;
         return {
             id: template.id,
             kind: template.kind,
@@ -778,6 +810,24 @@ export class TemplateCatalogService implements OnModuleInit {
             customizable: this.isCustomizable(template.sourceType, baseTemplateId, template.id),
             baseTemplateId,
             lastCustomizedAt: typeof lastCustomizedAtRaw === 'string' ? lastCustomizedAtRaw : null,
+            lastCustomizationPrompt:
+                typeof lastCustomizationPromptRaw === 'string' ? lastCustomizationPromptRaw : null,
+            latestCustomization: latestCustomization
+                ? this.toCustomizationSummary(latestCustomization)
+                : null,
+        };
+    }
+
+    private toCustomizationSummary(c: TemplateCustomization): TemplateCustomizationSummary {
+        return {
+            id: c.id,
+            status: c.status,
+            prompt: c.prompt,
+            errorMessage: c.errorMessage ?? null,
+            startedAt: c.startedAt ? c.startedAt.toISOString() : null,
+            completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
         };
     }
 
@@ -789,8 +839,13 @@ export class TemplateCatalogService implements OnModuleInit {
         if (template.sourceType === 'built_in') {
             return template.id;
         }
+        // Forked-from-base templates use `forkedFromTemplateId`; templates
+        // created via the AI customization flow use `baseTemplateId`. Both
+        // mark the template as customizable.
         const forkedFrom = template.metadata?.forkedFromTemplateId;
-        return typeof forkedFrom === 'string' ? forkedFrom : null;
+        if (typeof forkedFrom === 'string') return forkedFrom;
+        const baseTemplateId = template.metadata?.baseTemplateId;
+        return typeof baseTemplateId === 'string' ? baseTemplateId : null;
     }
 
     private isCustomizable(

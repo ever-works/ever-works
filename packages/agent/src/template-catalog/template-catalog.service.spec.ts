@@ -3,6 +3,7 @@ import { TemplateCatalogService } from './template-catalog.service';
 
 describe('TemplateCatalogService', () => {
     let templateRepository: any;
+    let customizationRepository: any;
     let userTemplatePreferenceRepository: any;
     let workRepository: any;
     let gitFacade: any;
@@ -21,6 +22,9 @@ describe('TemplateCatalogService', () => {
             findById: jest.fn(),
             upsert: jest.fn(),
             updateById: jest.fn(),
+        };
+        customizationRepository = {
+            findLatestForTemplates: jest.fn().mockResolvedValue(new Map()),
         };
         userTemplatePreferenceRepository = {
             findByUserAndKind: jest.fn(),
@@ -44,6 +48,7 @@ describe('TemplateCatalogService', () => {
 
         service = new TemplateCatalogService(
             templateRepository,
+            customizationRepository,
             userTemplatePreferenceRepository,
             workRepository,
             gitFacade,
