@@ -3,6 +3,14 @@ import * as fs from 'fs/promises';
 // strings are stable across platforms (Node accepts forward slashes on
 // Windows just fine for filesystem ops). Tests assert on POSIX paths.
 import * as path from 'path/posix';
+// `nativePath` (the OS-native variant) is used ONLY for the safety check in
+// `cleanupWorkspace`: a Windows root like `C:\` must be refused even when
+// every path the module *constructs* is POSIX-shaped. The plugins that wrap
+// this module (claude-code, codex, gemini, opencode, hermes-agent, agent-pipeline)
+// run on developers' Windows machines as well as macOS/Linux/WSL, and a
+// caller may legitimately pass a native absolute path through to
+// `cleanupWorkspace`.
+import nativePath from 'path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Brand, Category, ItemData, Tag } from '../common/index.js';
@@ -279,8 +287,14 @@ export async function cleanupWorkspace(workspacePath: string, baseTempDir?: stri
 			return;
 		}
 		const resolved = path.resolve(workspacePath);
-		// Refuse root / near-root paths regardless of OS.
-		if (resolved === '/' || /^[A-Za-z]:[\\/]?$/.test(resolved)) {
+		// Refuse root / near-root paths regardless of OS. The Windows
+		// drive-letter check runs against `nativePath.resolve(...)` because
+		// `path.posix.resolve` never produces a `C:\` shape — it would treat
+		// the input as a relative POSIX path and silently emit
+		// `/cwd/C:\`, which the Windows regex never matches. The native
+		// resolve is the only one that yields the canonical Windows root.
+		const nativeResolved = nativePath.resolve(workspacePath);
+		if (resolved === '/' || nativeResolved === '/' || /^[A-Za-z]:[\\/]?$/.test(nativeResolved)) {
 			return;
 		}
 		// If a baseTempDir is supplied, the workspace MUST be inside it.

@@ -81,13 +81,27 @@ export class OAuthStateService {
         }
         const a = Buffer.from(cookieValue, 'utf8');
         const b = Buffer.from(opts.stateQuery, 'utf8');
+        // Always pad BOTH buffers to the same width (max of the two lengths)
+        // and run a single timingSafeEqual. The previous shape compared the
+        // attacker-controlled cookie against a zero-filled buffer when the
+        // lengths differed — a small information leak: an attacker who chose
+        // an all-zero cookie could detect the length-mismatch path via the
+        // tiny timing delta between "compared against zeros" and "compared
+        // against the real expected value". Padding both buffers to a
+        // common width derived from BOTH inputs removes that asymmetry.
+        const width = Math.max(a.length, b.length);
+        const aPadded = Buffer.alloc(width);
+        const bPadded = Buffer.alloc(width);
+        a.copy(aPadded);
+        b.copy(bPadded);
+        const bytesEqual = timingSafeEqual(aPadded, bPadded);
         if (a.length !== b.length) {
-            // Length-pad the compare to keep timing uniform.
-            const c = Buffer.alloc(a.length);
-            timingSafeEqual(a, c);
+            // Length mismatch always means rejection, regardless of whether
+            // the padded-prefix bytes happen to be equal. We still ran the
+            // comparison above so the timing matches the equal-length branch.
             return { valid: false, clearCookie, reason: 'state length mismatch' };
         }
-        if (!timingSafeEqual(a, b)) {
+        if (!bytesEqual) {
             return { valid: false, clearCookie, reason: 'state value mismatch' };
         }
         return { valid: true, clearCookie };

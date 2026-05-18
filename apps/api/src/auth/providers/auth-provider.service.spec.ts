@@ -50,6 +50,11 @@ function createService(opts?: { apiSession?: any; apiSessionError?: Error }) {
         findById: jest.fn(),
         findByEmail: jest.fn(),
         update: jest.fn().mockResolvedValue(undefined),
+        // H-17 follow-up: `recordFailedLogin` atomically increments the
+        // counter on the DB side. Default the mock to a no-op so tests that
+        // don't care about counts keep working; the lockout block below
+        // installs a stateful fake when it does care.
+        increment: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     const authSync: jest.Mocked<
@@ -891,17 +896,37 @@ describe('AuthProviderService', () => {
     // H-17 (rest) — per-user lockout. IP throttle is in the controller; this
     // block covers the DB-backed counter / lockedUntil state machine.
     describe('H-17 — per-user login lockout', () => {
-        const setupSignInEmailFailure = () => {
-            const ctx = createService();
-            ctx.userRepository.findByEmail.mockResolvedValue({
+        // H-17 follow-up: install a stateful fake on `increment` + `findById`
+        // so tests can observe the atomic counter rather than a destructive
+        // read-modify-write `update`. `failedLoginAttempts` is the source of
+        // truth here.
+        const installCounterFake = (
+            ctx: ReturnType<typeof createService>,
+            initialCount: number,
+            extraRowFields: Partial<{ lockedUntil: Date | null }> = {},
+        ) => {
+            const row: any = {
                 id: 'u1',
                 email: 'a@b.co',
                 username: 'alice',
                 isActive: true,
-                failedLoginAttempts: 0,
-                lockedUntil: null,
+                failedLoginAttempts: initialCount,
+                lockedUntil: extraRowFields.lockedUntil ?? null,
                 password: null,
-            });
+            };
+            ctx.userRepository.findByEmail.mockResolvedValue(row);
+            ctx.userRepository.findById.mockImplementation(async () => ({ ...row }));
+            ctx.userRepository.increment.mockImplementation(
+                async (_id: string, column: string, by: number) => {
+                    row[column] = (row[column] ?? 0) + by;
+                },
+            );
+            return row;
+        };
+
+        const setupSignInEmailFailure = () => {
+            const ctx = createService();
+            installCounterFake(ctx, 0);
             ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
             return ctx;
         };
@@ -911,37 +936,45 @@ describe('AuthProviderService', () => {
             delete process.env.LOGIN_LOCKOUT_DURATION_MS;
         });
 
-        it('increments failedLoginAttempts on a failed signInEmail', async () => {
+        it('atomically increments failedLoginAttempts on a failed signInEmail', async () => {
             const { service, userRepository } = setupSignInEmailFailure();
 
             await expect(service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
                 /Invalid credentials/,
             );
 
-            expect(userRepository.update).toHaveBeenCalledWith('u1', { failedLoginAttempts: 1 });
+            // The COUNT side must compile to an atomic UPDATE … SET col = col + 1
+            // (TypeORM's `repository.increment` proxy). A read-modify-write
+            // `update({ failedLoginAttempts: snapshot + 1 })` loses one
+            // increment under concurrent calls and lets an attacker get a
+            // free try past the threshold.
+            expect(userRepository.increment).toHaveBeenCalledWith('u1', 'failedLoginAttempts', 1);
         });
 
         it('sets lockedUntil on the 5th consecutive failed signInEmail (default threshold)', async () => {
             // Same shape but the user is already at 4 failures.
             const ctx = createService();
-            ctx.userRepository.findByEmail.mockResolvedValue({
-                id: 'u1',
-                email: 'a@b.co',
-                username: 'alice',
-                isActive: true,
-                failedLoginAttempts: 4,
-                lockedUntil: null,
-                password: null,
-            });
+            installCounterFake(ctx, 4);
             ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
 
             await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
                 /Invalid credentials/,
             );
 
-            const [userId, partial] = ctx.userRepository.update.mock.calls[0];
+            // The counter side is now an atomic increment.
+            expect(ctx.userRepository.increment).toHaveBeenCalledWith(
+                'u1',
+                'failedLoginAttempts',
+                1,
+            );
+            // The lockedUntil side is still a normal `update` write, but
+            // only because the post-increment count crossed the threshold.
+            const lockCall = ctx.userRepository.update.mock.calls.find(
+                ([, partial]: any[]) => partial && partial.lockedUntil instanceof Date,
+            );
+            expect(lockCall).toBeDefined();
+            const [userId, partial] = lockCall!;
             expect(userId).toBe('u1');
-            expect(partial.failedLoginAttempts).toBe(5);
             expect(partial.lockedUntil).toBeInstanceOf(Date);
             // 15 min default, within 1s tolerance.
             const expected = Date.now() + 15 * 60 * 1000;
@@ -1002,15 +1035,7 @@ describe('AuthProviderService', () => {
         it('honours LOGIN_LOCKOUT_THRESHOLD env override', async () => {
             process.env.LOGIN_LOCKOUT_THRESHOLD = '2';
             const ctx = createService();
-            ctx.userRepository.findByEmail.mockResolvedValue({
-                id: 'u1',
-                email: 'a@b.co',
-                username: 'alice',
-                isActive: true,
-                failedLoginAttempts: 1,
-                lockedUntil: null,
-                password: null,
-            });
+            installCounterFake(ctx, 1);
             ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
 
             await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
@@ -1018,9 +1043,42 @@ describe('AuthProviderService', () => {
             );
 
             // 2nd failure with threshold=2 should lock immediately.
-            const [, partial] = ctx.userRepository.update.mock.calls[0];
-            expect(partial.failedLoginAttempts).toBe(2);
-            expect(partial.lockedUntil).toBeInstanceOf(Date);
+            expect(ctx.userRepository.increment).toHaveBeenCalledWith(
+                'u1',
+                'failedLoginAttempts',
+                1,
+            );
+            const lockCall = ctx.userRepository.update.mock.calls.find(
+                ([, partial]: any[]) => partial && partial.lockedUntil instanceof Date,
+            );
+            expect(lockCall).toBeDefined();
+            expect(lockCall![1].lockedUntil).toBeInstanceOf(Date);
+        });
+
+        it('two concurrent failed logins for the same user produce a final count of N+2 (no lost increment)', async () => {
+            // Regression test for the read-modify-write race: a naive
+            // implementation would read `failedLoginAttempts = 0` twice,
+            // both write `1`, and the second increment would be lost.
+            // With an atomic `increment(id, col, 1)`, the final count must
+            // be 2.
+            const ctx = createService();
+            installCounterFake(ctx, 0);
+            ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
+
+            const [r1, r2] = await Promise.allSettled([
+                ctx.service.signInEmail('a@b.co', 'wrong', new Headers()),
+                ctx.service.signInEmail('a@b.co', 'wrong', new Headers()),
+            ]);
+            expect(r1.status).toBe('rejected');
+            expect(r2.status).toBe('rejected');
+
+            // The fake's mutable row is the source of truth — after both
+            // racing increments resolve, the column must be exactly 2.
+            expect(ctx.userRepository.increment).toHaveBeenCalledTimes(2);
+            // findById returns a snapshot of `row`; calling it now after
+            // both increments resolved gives the final count.
+            const final = await ctx.userRepository.findById('u1');
+            expect(final.failedLoginAttempts).toBe(2);
         });
     });
 

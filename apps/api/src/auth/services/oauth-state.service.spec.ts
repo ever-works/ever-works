@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { OAuthStateService, OAUTH_STATE_COOKIE } from './oauth-state.service';
 
 describe('OAuthStateService (C-03)', () => {
@@ -106,6 +107,92 @@ describe('OAuthStateService (C-03)', () => {
             const result = service.verify({
                 cookieHeader: cookieValue,
                 stateQuery: 'short',
+                secure: false,
+            });
+            expect(result.valid).toBe(false);
+            expect(result.reason).toMatch(/length mismatch/);
+        });
+
+        // AI-review feedback (PR #818): the previous length-mismatch branch
+        // compared the attacker-controlled cookie against a zero-filled
+        // buffer of the cookie's length, giving the attacker a tiny timing
+        // oracle for "is my cookie all-zero bytes?". The current branch
+        // pads BOTH buffers to a common width and runs a single
+        // timingSafeEqual, so the byte pattern of the inputs no longer
+        // affects which buffer is "absent".
+        it('length-mismatch path always rejects, regardless of which side is longer', () => {
+            const { setCookie, state } = service.mint({ secure: false });
+            const cookieValue = setCookie.split(';')[0];
+
+            // Cookie longer than state query.
+            const r1 = service.verify({
+                cookieHeader: cookieValue,
+                stateQuery: 'short',
+                secure: false,
+            });
+            expect(r1.valid).toBe(false);
+            expect(r1.reason).toMatch(/length mismatch/);
+
+            // State query longer than cookie. Construct a short cookie value.
+            const shortCookieHeader = `${OAUTH_STATE_COOKIE}=ab`;
+            const r2 = service.verify({
+                cookieHeader: shortCookieHeader,
+                stateQuery: state, // 43 chars
+                secure: false,
+            });
+            expect(r2.valid).toBe(false);
+            expect(r2.reason).toMatch(/length mismatch/);
+        });
+
+        it('length-mismatch branch performs a single timingSafeEqual on equal-width padded buffers (no all-zero oracle)', () => {
+            // The fix: regardless of input lengths, exactly one call to
+            // timingSafeEqual happens, and it's on two buffers of the same
+            // (max) length — derived from BOTH sides, not just the cookie.
+            // This means an attacker choosing an all-zero cookie can't
+            // distinguish their compare from a compare against the real
+            // expected value.
+            const spy = jest.spyOn(crypto, 'timingSafeEqual');
+            try {
+                const { setCookie } = service.mint({ secure: false });
+                const cookieValue = setCookie.split(';')[0];
+
+                // Wrong-length attacker state.
+                const result = service.verify({
+                    cookieHeader: cookieValue,
+                    stateQuery: 'a'.repeat(10),
+                    secure: false,
+                });
+                expect(result.valid).toBe(false);
+                expect(result.reason).toMatch(/length mismatch/);
+
+                // Exactly one comparison happens (no second "real" compare).
+                expect(spy).toHaveBeenCalledTimes(1);
+                const [aArg, bArg] = spy.mock.calls[0] as [Buffer, Buffer];
+                // Both args have the same length (the new shape) so
+                // timingSafeEqual doesn't throw.
+                expect(aArg.byteLength).toBe(bArg.byteLength);
+                // And the width is max(cookieLen, queryLen) — i.e. derived
+                // from BOTH sides, not just one. With a 43-char base64url
+                // cookie and a 10-char query, width should be 43.
+                expect(aArg.byteLength).toBe(43);
+            } finally {
+                spy.mockRestore();
+            }
+        });
+
+        it('attacker-supplied all-zero-byte cookie of length-mismatch is rejected (no timing oracle)', () => {
+            // Regression: a cookie containing only NUL bytes used to be
+            // compared against a zero-buffer of the same length on the
+            // mismatch branch, which made that comparison return true and
+            // gave a tiny timing delta vs a non-zero-cookie compare.
+            //
+            // We assert the rejection still happens and that the result is
+            // not "valid" — exact same observable behavior across both
+            // inputs from the caller's POV.
+            const zeroCookie = `${OAUTH_STATE_COOKIE}=${'\0'.repeat(8)}`;
+            const result = service.verify({
+                cookieHeader: zeroCookie,
+                stateQuery: 'x'.repeat(43), // different length
                 secure: false,
             });
             expect(result.valid).toBe(false);

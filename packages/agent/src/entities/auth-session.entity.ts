@@ -10,7 +10,11 @@ import { PortableDateColumn } from './_types';
  * for replaying a session — rather than live bearers.
  */
 @Entity({ name: 'session' })
-@Index(['token'], { unique: true })
+// Legacy `token` column kept for migration window; `tokenHash` is the live
+// index (see 1779300000000-HashAuthSessionTokensH01 and the drop in
+// 1779500000000-DropLegacyAuthSessionTokenIndexH01). Do NOT re-add a unique
+// index on `token` — new writes set it to NULL and on engines that treat
+// NULLs as equal under uniqueness (SQLite) it would block concurrent inserts.
 @Index(['tokenHash'], { unique: true })
 @Index(['userId'])
 export class AuthSession {
@@ -21,7 +25,9 @@ export class AuthSession {
     userId: string;
 
     // H-01 (sessions): legacy plaintext column. Kept for migration safety —
-    // new writes set it to NULL. Lookup paths use `tokenHash` only.
+    // new writes set it to NULL. Lookup paths use `tokenHash` only. The
+    // unique index that used to live on this column was dropped in
+    // 1779500000000-DropLegacyAuthSessionTokenIndexH01.
     @Column({ type: 'varchar', nullable: true })
     token: string | null;
 

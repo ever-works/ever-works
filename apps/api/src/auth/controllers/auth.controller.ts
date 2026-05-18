@@ -287,11 +287,15 @@ export class AuthController {
     // path. Defaults derived from the audit's "credential stuffing wide open
     // under 50 req/sec/IP" finding — 10/min/IP is permissive enough for a real
     // user fat-fingering their password but stops a brute-force loop dead.
-    // Overridable via env so an operator can tighten under attack:
+    // Overridable via env vars:
     //   LOGIN_THROTTLE_LIMIT  (default 10)
     //   LOGIN_THROTTLE_TTL_MS (default 60_000)
-    // A per-user lockout (vs IP throttle) needs an additional DB-backed
-    // counter; that's deferred to a follow-up alongside H-17/H-18 Redis work.
+    // NOTE: these env vars are read once at module load (class-decoration
+    // time), NOT per-request — changes require an API restart to take effect.
+    // Env tightening is meant for the next deploy, not live attack tuning;
+    // for live tuning we'd need a runtime-configurable throttler (deferred
+    // alongside the H-17/H-18 Redis work). A per-user lockout (vs IP
+    // throttle) needs an additional DB-backed counter; that's also deferred.
     @Public()
     @Throttle({
         default: {
