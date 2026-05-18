@@ -7,6 +7,13 @@ on:
     branches: [main, develop, stage]
   workflow_dispatch:
 
+# M-12: explicit minimum default permissions for every job. Individual jobs
+# can elevate to `write` only on the scope they need. Without this, any
+# compromised third-party action runs with whatever the repo default grants
+# (typically `contents: write`).
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -26,7 +33,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
         with:
           version: 10.13.1
 
@@ -38,6 +45,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # H-15: fail the build if any production transitive dep has a HIGH or
+      # CRITICAL vulnerability. The existing `pnpm.overrides` block proves
+      # maintainers already patch high/critical drift; this just makes it
+      # CI-enforced so a new transitive doesn't slip through unnoticed.
+      # Moderate findings stay as Dependabot work (re-evaluate the threshold
+      # if the backlog becomes too noisy).
+      - name: Audit production dependencies (high+)
+        run: pnpm audit --prod --audit-level=high
 
       - name: Check formatting
         run: pnpm format:check
@@ -64,8 +80,20 @@ jobs:
 
       - name: Test Internal CLI
         working-directory: apps/internal-cli
+        # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
+        # in-memory sqlite here, not a real database). C-07 PR-B made
+        # `autoMigrate()` default-off everywhere except NODE_ENV=test — without
+        # this env, `synchronize` doesn't run and the eager NestJS bootstrap
+        # hits "no such table: subscription_plans". Equivalent to setting
+        # DATABASE_AUTOMIGRATE=true explicitly; NODE_ENV=test is the standard
+        # test-context signal already used by the unit-test suite.
+        env:
+          NODE_ENV: test
         run: pnpm test:cli
 
       - name: Test External CLI
         working-directory: apps/cli
+        # See note above on the Internal CLI step — same C-07 PR-B implication.
+        env:
+          NODE_ENV: test
         run: pnpm test:cli

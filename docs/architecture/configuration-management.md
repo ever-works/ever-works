@@ -56,8 +56,22 @@ async function bootstrap() {
 The API application defines its constants in `apps/api/src/config/constants.ts`:
 
 ```typescript
+export const config = {
+	auth: {
+		// Fail-closed at boot: AUTH_SECRET must be set. Never fall back to a
+		// hardcoded default — a fixed fallback turns "missing env var in
+		// production" into "predictable encryption/signing key in production".
+		secret: () => {
+			const secret = process.env.AUTH_SECRET;
+			if (!secret) {
+				throw new Error('AUTH_SECRET environment variable is required');
+			}
+			return secret;
+		}
+	}
+};
+
 export const jwtConstants = {
-	secret: () => process.env.JWT_SECRET || 'aesh4Dai_secret_key_here',
 	accessTokenExpiration: (): any => {
 		const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
 		return expiration === 'never' ? undefined : expiration || '7d';

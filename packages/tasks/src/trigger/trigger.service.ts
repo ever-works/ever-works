@@ -6,12 +6,17 @@ import {
     WorkGenerationDispatcher,
     WorkImportPayload,
     WorkImportDispatcher,
+    TemplateCustomizationPayload,
+    TemplateCustomizationDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
+import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
 
 @Injectable()
-export class TriggerService implements WorkGenerationDispatcher, WorkImportDispatcher {
+export class TriggerService
+    implements WorkGenerationDispatcher, WorkImportDispatcher, TemplateCustomizationDispatcher
+{
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 
@@ -101,6 +106,26 @@ export class TriggerService implements WorkGenerationDispatcher, WorkImportDispa
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch work-import task', error as Error);
+            return null;
+        }
+    }
+
+    async dispatchTemplateCustomization(
+        payload: TemplateCustomizationPayload,
+    ): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await templateCustomizationTask.trigger(payload, {
+                tags: ['template-customization', payload.customizationId],
+                machine: this.machine() as any,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch template-customization task', error as Error);
             return null;
         }
     }

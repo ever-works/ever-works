@@ -19,16 +19,84 @@ const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
 const COMMUNITY_PR_LOCK_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * C-11: cap items added per community PR. Default 10 — generous for a
+ * legitimate "add 3 new awesome-list entries" PR, but stops a malicious
+ * PR from flooding the data repo with attacker-chosen items in one go.
+ * Tunable via `COMMUNITY_PR_MAX_ITEMS_PER_PR` env.
+ */
+function getMaxItemsPerPr(): number {
+    const v = Number(process.env.COMMUNITY_PR_MAX_ITEMS_PER_PR ?? 10);
+    return Number.isFinite(v) && v > 0 ? v : 10;
+}
+
+/**
+ * C-11: default-off auto-apply. Until the GitHub Verified-org author
+ * check ships (requires extending GitPullRequest with author info from
+ * the git-provider plugin), community-PR auto-extraction is off by
+ * default. Operators can opt in globally with `COMMUNITY_PR_AUTO_APPLY=true`,
+ * or per-Work via the Work's own settings (not wired here yet — operator
+ * roadmap item).
+ */
+function isAutoApplyEnabled(): boolean {
+    return process.env.COMMUNITY_PR_AUTO_APPLY === 'true';
+}
+
+/**
+ * C-11 — Verified-org author allow-list. When
+ * `COMMUNITY_PR_VERIFIED_ORGS` is set (comma-separated org logins,
+ * e.g. `ever-works,ever-co`), only PRs whose author is a verified
+ * member of one of those orgs get auto-applied. PRs from anyone else
+ * are short-circuited with `outcome: 'ignored'`. The
+ * `pr.author.orgVerified` flag is populated by the git-provider
+ * plugin (currently the github plugin in
+ * `packages/plugins/github/src/github-verified-org.service.ts`).
+ *
+ * When the env var is unset, the verified-org check is disabled and
+ * any author may auto-apply — useful for self-hosted operators who
+ * accept that risk in exchange for friction-free contributions.
+ */
+function parseVerifiedOrgs(): string[] {
+    const raw = process.env.COMMUNITY_PR_VERIFIED_ORGS;
+    if (!raw) return [];
+    const set = new Set<string>();
+    for (const part of raw.split(',')) {
+        const v = part.trim().toLowerCase();
+        if (v) set.add(v);
+    }
+    return [...set];
+}
+
+/**
+ * C-11 — strict item shape. The previous schema allowed `source_url:
+ * z.string()` which trivially admits `javascript:...`. Now requires
+ * http/https + length caps + tag count caps.
+ */
 const extractedItemSchema = z.object({
-    items: z.array(
-        z.object({
-            name: z.string(),
-            description: z.string(),
-            source_url: z.string(),
-            category: z.string(),
-            tags: z.array(z.string()),
-        }),
-    ),
+    items: z
+        .array(
+            z.object({
+                name: z.string().min(1).max(256),
+                description: z.string().min(1).max(8_000),
+                source_url: z
+                    .string()
+                    .max(2048)
+                    .refine(
+                        (v) => {
+                            try {
+                                const u = new URL(v);
+                                return u.protocol === 'http:' || u.protocol === 'https:';
+                            } catch {
+                                return false;
+                            }
+                        },
+                        { message: 'source_url must be http(s)' },
+                    ),
+                category: z.string().min(1).max(128),
+                tags: z.array(z.string().min(1).max(64)).max(32),
+            }),
+        )
+        .max(256), // sanity ceiling — the per-PR cap below is the real limit
 });
 
 export interface CommunityPrProcessingResult {
@@ -254,6 +322,37 @@ export class CommunityPrProcessorService {
         autoClose: boolean,
         triggeredBy: CommunityPrTriggerSource,
     ): Promise<CommunityPrSinglePrResult> {
+        // C-11: default-off auto-apply. AI extraction from community PRs
+        // is disabled unless the operator explicitly enables it. The PR
+        // is left untouched (still visible in GitHub) so a maintainer
+        // can review it manually. See the 2026-05-17 security audit
+        // (`docs/specs/security/audits/2026-05-17-ever-works-platform-security-audit.md`)
+        // — finding C-11.
+        if (!isAutoApplyEnabled()) {
+            this.logger.debug(
+                `Community PR auto-apply is disabled (set COMMUNITY_PR_AUTO_APPLY=true to enable). Skipping PR #${pr.number} for work ${work.id}.`,
+            );
+            return { outcome: 'ignored', itemsAdded: 0 };
+        }
+
+        // C-11: Verified-org author allow-list. When
+        // `COMMUNITY_PR_VERIFIED_ORGS` is set, the git-provider plugin
+        // must have populated `pr.author.orgVerified === true` for the
+        // PR to be applied. The github plugin (see
+        // `packages/plugins/github/src/github-verified-org.service.ts`)
+        // performs the membership lookup via
+        // `GET /orgs/{org}/members/{username}` with a short-TTL
+        // per-process cache. Anything else (missing author, missing
+        // flag, false, or undefined) is treated as untrusted and the
+        // PR is left for a maintainer to review.
+        const verifiedOrgs = parseVerifiedOrgs();
+        if (verifiedOrgs.length > 0 && pr.author?.orgVerified !== true) {
+            this.logger.warn(
+                `Community PR #${pr.number} for work ${work.id} skipped — author "${pr.author?.username ?? '<unknown>'}" is not a verified member of any configured org (${verifiedOrgs.join(', ')}). See C-11 in docs/specs/security/audits/2026-05-17-ever-works-platform-security-audit.md.`,
+            );
+            return { outcome: 'ignored', itemsAdded: 0 };
+        }
+
         const owner = work.getRepoOwner();
         const mainRepo = work.getMainRepo();
         const dataRepo = work.getDataRepo();
@@ -311,11 +410,22 @@ export class CommunityPrProcessorService {
             return { outcome: 'ignored', itemsAdded: 0 };
         }
 
+        // C-11: cap items per PR. The Zod schema enforces a hard ceiling
+        // of 256; here we enforce the operator-tuned cap (default 10) so
+        // a single malicious PR can't flood the data repo.
+        const maxItems = getMaxItemsPerPr();
+        const itemsToConsider = extractedItems.items.slice(0, maxItems);
+        if (extractedItems.items.length > maxItems) {
+            this.logger.warn(
+                `Community PR #${pr.number} for work ${work.id} extracted ${extractedItems.items.length} items; capped at ${maxItems}.`,
+            );
+        }
+
         // Write items to data repo
         const addedEntries: WorkHistoryChangeEntry[] = [];
         const seenSlugs = new Set<string>();
 
-        for (const item of extractedItems.items) {
+        for (const item of itemsToConsider) {
             const slug = slugifyText(item.name);
             if (!slug || seenSlugs.has(slug) || (await data.itemExists(slug))) {
                 this.logger.warn(

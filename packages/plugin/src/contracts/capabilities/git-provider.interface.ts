@@ -140,6 +140,25 @@ export interface GitOrganization {
 	readonly avatarUrl?: string;
 }
 
+/**
+ * Author info attached to a PR by the git-provider plugin.
+ *
+ * `orgVerified` is `true` iff the plugin has confirmed (via a provider API
+ * call) that the author is a member of one of the operator-configured
+ * "verified" organisations. The community-PR pipeline treats
+ * `orgVerified !== true` as untrusted — see C-11 in the
+ * 2026-05-17 security audit.
+ *
+ * Field is optional so existing provider implementations don't have to
+ * populate it; consumers that need the verified-org check should treat
+ * a missing `author` (or missing `orgVerified`) as "untrusted".
+ */
+export interface GitPullRequestAuthor {
+	readonly username: string;
+	readonly type?: 'User' | 'Bot' | 'Organization' | string;
+	readonly orgVerified?: boolean;
+}
+
 export interface GitPullRequest {
 	readonly number: number;
 	readonly title: string;
@@ -150,6 +169,7 @@ export interface GitPullRequest {
 	readonly createdAt: string;
 	readonly updatedAt: string;
 	readonly body?: string;
+	readonly author?: GitPullRequestAuthor;
 }
 
 export interface GitRepositoryPermissions {

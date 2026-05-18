@@ -275,4 +275,60 @@ describe('PdfExtractorPlugin', () => {
 			expect(results).toHaveLength(2);
 		});
 	});
+
+	describe('SSRF guard', () => {
+		beforeEach(async () => {
+			await plugin.onLoad(mockContext);
+		});
+
+		it.each([
+			['http://127.0.0.1/foo.pdf', 'loopback'],
+			['http://169.254.169.254/latest/meta-data/', 'AWS/GCP/Azure IMDS link-local'],
+			['http://10.0.0.1/', 'RFC1918 private']
+		])('rejects SSRF-blocked URLs (%s — %s) without making an HTTP request', async (blockedUrl) => {
+			const result = await plugin.extract({ url: blockedUrl });
+
+			expect(result.success).toBe(false);
+			expect(result.url).toBe(blockedUrl);
+			expect(result.error).toMatch(/SSRF guard blocked/);
+			expect(result.error).toContain(blockedUrl);
+			expect(axios.get).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('PDF_EXTRACTOR_MAX_BYTES cap', () => {
+		beforeEach(async () => {
+			await plugin.onLoad(mockContext);
+		});
+
+		it('passes maxContentLength and maxBodyLength to axios.get to cap the payload size', async () => {
+			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 1, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 1, text: ['A'.repeat(500)] });
+			mockGetMeta.mockResolvedValue({ info: {} });
+
+			await plugin.extract({ url: 'https://example.com/doc.pdf' });
+
+			expect(axios.get).toHaveBeenCalledTimes(1);
+			const [, config] = vi.mocked(axios.get).mock.calls[0];
+			// Default cap is 50 MB unless PDF_EXTRACTOR_MAX_BYTES env override raised it.
+			expect(config?.maxContentLength).toBeGreaterThan(0);
+			expect(config?.maxBodyLength).toBeGreaterThan(0);
+			expect(config?.maxContentLength).toBe(config?.maxBodyLength);
+		});
+
+		it('rejects oversized payloads (axios maxContentLength fired)', async () => {
+			// Simulate the axios rejection that fires when a response's
+			// content-length exceeds the configured maxContentLength.
+			const overflowErr = Object.assign(new Error('maxContentLength size of 52428800 exceeded'), {
+				code: 'ERR_BAD_RESPONSE'
+			});
+			vi.mocked(axios.get).mockRejectedValue(overflowErr);
+
+			const result = await plugin.extract({ url: 'https://example.com/huge.pdf' });
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/maxContentLength/);
+		});
+	});
 });

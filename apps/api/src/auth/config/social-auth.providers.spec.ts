@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { SOCIAL_AUTH_PROVIDERS, getSocialAuthProviderConfig } from './social-auth.providers';
-import { GITHUB_SCOPES } from './github-scopes.config';
+import { GITHUB_FULL_SCOPES, GITHUB_LOGIN_SCOPES, GITHUB_SCOPES } from './github-scopes.config';
 import { AuthProvider } from '../../config/constants';
 
 describe('social-auth.providers', () => {
@@ -66,14 +66,42 @@ describe('social-auth.providers', () => {
             expect(provider.tokenUrl).toBe('https://github.com/login/oauth/access_token');
         });
 
-        it('mirrors the shared GITHUB_SCOPES list (preserves order)', () => {
-            expect(provider.scopes).toEqual([...GITHUB_SCOPES]);
+        it('uses the narrow GITHUB_LOGIN_SCOPES for login (NOT the full scope set) — M-02 / M-22', () => {
+            // The login flow requests identity scopes only. The full
+            // repo/workflow/hook scope set is granted later via the GitHub
+            // plugin's capability OAuth flow, not at sign-in.
+            expect(provider.scopes).toEqual([...GITHUB_LOGIN_SCOPES]);
         });
 
-        it('owns its own copy of scopes (mutating SOCIAL_AUTH_PROVIDERS does not leak into GITHUB_SCOPES)', () => {
-            // The registry spreads the readonly tuple via [...GITHUB_SCOPES], so the
-            // registry's array MUST NOT be the same reference as GITHUB_SCOPES.
-            expect(provider.scopes).not.toBe(GITHUB_SCOPES);
+        it('does NOT request repo/workflow/hook write scopes at login', () => {
+            // Principle of least privilege. The login redirect must not embed
+            // any admin-class scope — if a future change re-broadens it, this
+            // assertion breaks loudly.
+            expect(provider.scopes).not.toContain('repo');
+            expect(provider.scopes).not.toContain('delete_repo');
+            expect(provider.scopes).not.toContain('workflow');
+            expect(provider.scopes).not.toContain('write:repo_hook');
+            expect(provider.scopes).not.toContain('project');
+        });
+
+        it('still includes the identity scopes needed by SocialAuthService', () => {
+            // resolveGitHubAccountEmail() falls back to /user/emails (needs
+            // user:email) after /user (needs read:user).
+            expect(provider.scopes).toContain('read:user');
+            expect(provider.scopes).toContain('user:email');
+        });
+
+        it('keeps GITHUB_SCOPES as a backward-compatible alias for the full set', () => {
+            // The GitHub plugin's capability OAuth flow still reads GITHUB_SCOPES
+            // as its default-scope fallback, so the alias must point at the
+            // broad list.
+            expect([...GITHUB_SCOPES]).toEqual([...GITHUB_FULL_SCOPES]);
+        });
+
+        it('owns its own copy of scopes (mutating SOCIAL_AUTH_PROVIDERS does not leak into GITHUB_LOGIN_SCOPES)', () => {
+            // The registry spreads the readonly tuple via [...GITHUB_LOGIN_SCOPES],
+            // so the registry's array MUST NOT be the same reference.
+            expect(provider.scopes).not.toBe(GITHUB_LOGIN_SCOPES);
         });
 
         it('omits scopeSeparator (defaults to space at the call site)', () => {

@@ -102,8 +102,10 @@ function isMetaPath(filePath: string): boolean {
 }
 
 function resolveMetaDir(filePath: string): string {
-	const lastSlash = filePath.lastIndexOf('/');
-	const dir = lastSlash >= 0 ? filePath.slice(0, lastSlash) : '.';
+	// Handle both POSIX (`/`) and Windows (`\`) separators — fs.watch on
+	// Windows surfaces paths with backslashes.
+	const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+	const dir = lastSep >= 0 ? filePath.slice(0, lastSep) : '.';
 	return `${dir}/_meta`;
 }
 

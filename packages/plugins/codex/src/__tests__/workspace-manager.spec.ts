@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import * as path from 'path';
+// Source uses path/posix; tests must match so platform-specific separators
+// don't drift assertions on Windows.
+import * as path from 'path/posix';
 
 import { afterEach, describe, expect, it } from 'vitest';
 

@@ -45,9 +45,9 @@ export class ResetPasswordDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(8)
-    @Matches(/^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$/, {
+    @Matches(/^(?=.*[a-z])(?=.*[\d\W_]).{8,}$/, {
         message:
-            'Password must contain at least 1 lowercase letter and 1 number or special character',
+            'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
     })
     newPassword: string;
 }

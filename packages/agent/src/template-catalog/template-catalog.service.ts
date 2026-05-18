@@ -7,10 +7,16 @@ import {
     OnModuleInit,
 } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
+import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
 import {
+    TemplateCustomization,
+    TemplateCustomizationStatus,
+} from '@src/entities/template-customization.entity';
+import {
+    findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     listWebsiteTemplates,
     type WebsiteTemplateConfig,
@@ -19,6 +25,8 @@ import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
+import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
+import { inferFrameworkFromRepository } from './utils/framework-inference';
 
 export interface TemplateCatalogItem {
     id: string;
@@ -38,6 +46,33 @@ export interface TemplateCatalogItem {
     isActive: boolean;
     isDefault: boolean;
     ownerUserId?: string | null;
+    // Built-in: true when the WebsiteTemplateConfig marks it `customizable: true`
+    // AND a customization prompt is registered. Custom templates: true when
+    // their metadata links them to a customizable built-in via
+    // `forkedFromTemplateId` (fork flow) or `baseTemplateId` (AI flow).
+    customizable: boolean;
+    // The built-in template id this custom template descends from. Lets the
+    // UI re-run a customization without making the user pick a base again.
+    baseTemplateId?: string | null;
+    // ISO timestamp of the last successful agent customization, if any.
+    lastCustomizedAt?: string | null;
+    // Prompt of the last successful agent customization, if any. Lets the
+    // UI pre-fill the "Customize again" textarea without an extra fetch.
+    lastCustomizationPrompt?: string | null;
+    // Latest customization run for this template (most recent by createdAt),
+    // surfaced so the UI can render a status chip without an extra fetch.
+    latestCustomization?: TemplateCustomizationSummary | null;
+}
+
+export interface TemplateCustomizationSummary {
+    id: string;
+    status: TemplateCustomizationStatus;
+    prompt: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface ForkTemplateResult {
@@ -59,6 +94,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
     constructor(
         private readonly templateRepository: TemplateRepository,
+        private readonly customizationRepository: TemplateCustomizationRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
         private readonly workRepository: WorkRepository,
         private readonly gitFacade: GitFacadeService,
@@ -85,6 +121,28 @@ export class TemplateCatalogService implements OnModuleInit {
             builtInTemplates.map((template) => this.templateRepository.upsert(template)),
         );
 
+        // Deactivate any older built-in rows pointing at the same (owner, repo)
+        // but with a different id — e.g. a row previously seeded by org
+        // discovery under id="<repo-name>" that now duplicates a curated
+        // template. Without this, the catalog renders two cards for the same
+        // repo after a curated entry is added.
+        await Promise.all(
+            builtInTemplates.map(async (curated) => {
+                const matches = await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
+                    curated.kind,
+                    curated.repositoryOwner,
+                    curated.repositoryName,
+                );
+                await Promise.all(
+                    matches
+                        .filter((match) => match.id !== curated.id && match.isActive)
+                        .map((match) =>
+                            this.templateRepository.updateById(match.id, { isActive: false }),
+                        ),
+                );
+            }),
+        );
+
         this.logger.debug(`Ensured ${builtInTemplates.length} built-in templates are present`);
     }
 
@@ -101,27 +159,16 @@ export class TemplateCatalogService implements OnModuleInit {
             this.getDefaultTemplateIdForUser(kind, userId),
         ]);
 
+        const latestByTemplate = await this.customizationRepository.findLatestForTemplates(
+            templates.map((t) => t.id),
+            userId,
+        );
+
         return {
             defaultTemplateId,
-            templates: templates.map((template) => ({
-                id: template.id,
-                kind: template.kind,
-                sourceType: template.sourceType,
-                originType: this.getOriginType(template.sourceType, template.metadata),
-                name: template.name,
-                description: template.description,
-                framework: template.framework,
-                previewImageUrl: template.previewImageUrl,
-                repositoryUrl: template.repositoryUrl,
-                repositoryOwner: template.repositoryOwner,
-                repositoryName: template.repositoryName,
-                branch: template.branch,
-                syncBranches: template.syncBranches,
-                betaBranch: template.betaBranch,
-                isActive: template.isActive,
-                isDefault: template.id === defaultTemplateId,
-                ownerUserId: template.ownerUserId,
-            })),
+            templates: templates.map((template) =>
+                this.toCatalogItem(template, defaultTemplateId, latestByTemplate.get(template.id)),
+            ),
         };
     }
 
@@ -171,8 +218,7 @@ export class TemplateCatalogService implements OnModuleInit {
             ownerUserId: userId,
             name: input.name?.trim() || this.humanizeRepositoryName(repository.repo),
             description: input.description?.trim() || null,
-            framework:
-                input.framework?.trim() || this.inferFrameworkFromRepository(repository.repo),
+            framework: input.framework?.trim() || inferFrameworkFromRepository(repository.repo),
             previewImageUrl: input.previewImageUrl?.trim() || null,
             repositoryUrl: repository.canonicalUrl,
             repositoryOwner: repository.owner,
@@ -606,8 +652,22 @@ export class TemplateCatalogService implements OnModuleInit {
                 this.isStandardTemplateRepository(repository.name),
             );
 
+            // Repos already represented by a curated WEBSITE_TEMPLATES entry —
+            // skip them in discovery so we don't re-create a `<repo-name>` row
+            // alongside the curated one and end up with duplicate catalog
+            // cards for the same GitHub repo.
+            const curatedRepoCoordinates = new Set(
+                listWebsiteTemplates().map(
+                    (template) => `${template.owner.toLowerCase()}/${template.repo.toLowerCase()}`,
+                ),
+            );
+
             await Promise.all(
                 standardTemplates.map(async (repository) => {
+                    const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
+                    if (curatedRepoCoordinates.has(coordinateKey)) {
+                        return;
+                    }
                     const discoveredId = repository.name.toLowerCase();
                     const canonicalTemplate =
                         await this.templateRepository.findBuiltInByRepositoryCoordinates(
@@ -642,7 +702,7 @@ export class TemplateCatalogService implements OnModuleInit {
                         sourceType: 'built_in',
                         name: this.humanizeRepositoryName(repository.name),
                         description: repository.description || null,
-                        framework: this.inferFrameworkFromRepository(repository.name),
+                        framework: inferFrameworkFromRepository(repository.name),
                         repositoryUrl: repository.url,
                         repositoryOwner: repository.owner,
                         repositoryName: repository.name,
@@ -724,7 +784,11 @@ export class TemplateCatalogService implements OnModuleInit {
             ownerUserId?: string | null;
         },
         defaultTemplateId: string | null,
+        latestCustomization?: TemplateCustomization,
     ): TemplateCatalogItem {
+        const baseTemplateId = this.resolveBaseTemplateId(template);
+        const lastCustomizedAtRaw = template.metadata?.lastCustomizedAt;
+        const lastCustomizationPromptRaw = template.metadata?.lastCustomizationPrompt;
         return {
             id: template.id,
             kind: template.kind,
@@ -743,35 +807,65 @@ export class TemplateCatalogService implements OnModuleInit {
             isActive: template.isActive,
             isDefault: template.id === defaultTemplateId,
             ownerUserId: template.ownerUserId,
+            customizable: this.isCustomizable(template.sourceType, baseTemplateId, template.id),
+            baseTemplateId,
+            lastCustomizedAt: typeof lastCustomizedAtRaw === 'string' ? lastCustomizedAtRaw : null,
+            lastCustomizationPrompt:
+                typeof lastCustomizationPromptRaw === 'string' ? lastCustomizationPromptRaw : null,
+            latestCustomization: latestCustomization
+                ? this.toCustomizationSummary(latestCustomization)
+                : null,
         };
     }
 
-    private inferFramework(template: WebsiteTemplateConfig): string | null {
-        const normalizedName = `${template.name} ${template.repo}`.toLowerCase();
-
-        if (normalizedName.includes('astro')) {
-            return 'Astro';
-        }
-
-        if (normalizedName.includes('next')) {
-            return 'Next.js';
-        }
-
-        return null;
+    private toCustomizationSummary(c: TemplateCustomization): TemplateCustomizationSummary {
+        return {
+            id: c.id,
+            status: c.status,
+            prompt: c.prompt,
+            errorMessage: c.errorMessage ?? null,
+            startedAt: c.startedAt ? c.startedAt.toISOString() : null,
+            completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
+        };
     }
 
-    private inferFrameworkFromRepository(repo: string): string | null {
-        const normalizedRepo = repo.toLowerCase();
-
-        if (normalizedRepo.includes('astro')) {
-            return 'Astro';
+    private resolveBaseTemplateId(template: {
+        sourceType: TemplateSourceType;
+        id: string;
+        metadata?: Record<string, unknown>;
+    }): string | null {
+        if (template.sourceType === 'built_in') {
+            return template.id;
         }
+        // Forked-from-base templates use `forkedFromTemplateId`; templates
+        // created via the AI customization flow use `baseTemplateId`. Both
+        // mark the template as customizable.
+        const forkedFrom = template.metadata?.forkedFromTemplateId;
+        if (typeof forkedFrom === 'string') return forkedFrom;
+        const baseTemplateId = template.metadata?.baseTemplateId;
+        return typeof baseTemplateId === 'string' ? baseTemplateId : null;
+    }
 
-        if (normalizedRepo.includes('next')) {
-            return 'Next.js';
+    private isCustomizable(
+        sourceType: TemplateSourceType,
+        baseTemplateId: string | null,
+        templateId: string,
+    ): boolean {
+        const candidateId = baseTemplateId ?? (sourceType === 'built_in' ? templateId : null);
+        if (!candidateId) {
+            return false;
         }
+        const config = findWebsiteTemplateConfig(candidateId);
+        if (!config?.customizable) {
+            return false;
+        }
+        return hasCustomizationPromptForBaseTemplate(candidateId);
+    }
 
-        return null;
+    private inferFramework(template: WebsiteTemplateConfig): string | null {
+        return inferFrameworkFromRepository(`${template.name} ${template.repo}`);
     }
 
     private getOriginType(

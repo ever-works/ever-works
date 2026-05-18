@@ -75,6 +75,18 @@ export class CaptchaVerifierService {
         return Boolean(c.provider && c.secret && c.verifyUrl);
     }
 
+    /**
+     * H-05: in production, captcha is REQUIRED. If `CAPTCHA_PROVIDER` is
+     * unset in production, this returns true so the caller can fail-closed
+     * — better to surface a 503 than to silently let the anon-flow be
+     * abused. In dev/preview the absence of a captcha is a deliberate
+     * convenience; controllers should also gate on `isEnabled()` in those
+     * environments so the absence isn't fatal.
+     */
+    isRequired(): boolean {
+        return process.env.NODE_ENV === 'production';
+    }
+
     async verify(input: CaptchaVerifyInput): Promise<CaptchaVerifyResult> {
         if (!this.isEnabled()) {
             // No captcha configured — let traffic through. The

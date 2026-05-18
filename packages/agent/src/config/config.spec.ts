@@ -217,26 +217,42 @@ describe('agent/config', () => {
             expect((config.database as any)[getter]()).toBeUndefined();
         });
 
-        describe('autoMigrate (default-on; only flipped by literal "false")', () => {
-            it('returns true when DATABASE_AUTOMIGRATE is unset', () => {
-                expect(config.database.autoMigrate()).toBe(true);
+        // C-07 PR-B: the safer default is now OFF everywhere except the unit-test
+        // env. Explicit "true" opts back in; anything else (including the empty
+        // string) leaves the flag off. The k8s manifests already pin
+        // DATABASE_AUTOMIGRATE=false (PR-A) — this is the belt+suspenders so a
+        // forgotten env var doesn't run TypeORM `synchronize` against prod.
+        describe('autoMigrate (default-off everywhere except NODE_ENV=test)', () => {
+            it('returns false when DATABASE_AUTOMIGRATE is unset and NODE_ENV is unset', () => {
+                expect(config.database.autoMigrate()).toBe(false);
             });
 
-            it("returns true when DATABASE_AUTOMIGRATE='true'", () => {
+            it("returns true when DATABASE_AUTOMIGRATE='true' (explicit opt-in)", () => {
                 process.env.DATABASE_AUTOMIGRATE = 'true';
                 expect(config.database.autoMigrate()).toBe(true);
             });
 
-            it("returns false ONLY for the literal string 'false'", () => {
+            it("returns false when DATABASE_AUTOMIGRATE='false'", () => {
                 process.env.DATABASE_AUTOMIGRATE = 'false';
                 expect(config.database.autoMigrate()).toBe(false);
             });
 
-            it("returns true for non-'false' values like '0', 'no', 'FALSE'", () => {
+            it("returns false for non-'true' values like '0', 'no', 'FALSE'", () => {
                 for (const value of ['0', 'no', 'FALSE', 'False']) {
                     process.env.DATABASE_AUTOMIGRATE = value;
-                    expect(config.database.autoMigrate()).toBe(true);
+                    expect(config.database.autoMigrate()).toBe(false);
                 }
+            });
+
+            it("returns true when NODE_ENV='test' and DATABASE_AUTOMIGRATE is unset", () => {
+                process.env.NODE_ENV = 'test';
+                expect(config.database.autoMigrate()).toBe(true);
+            });
+
+            it("returns false when NODE_ENV='test' but DATABASE_AUTOMIGRATE='false' (explicit override beats test env)", () => {
+                process.env.NODE_ENV = 'test';
+                process.env.DATABASE_AUTOMIGRATE = 'false';
+                expect(config.database.autoMigrate()).toBe(false);
             });
         });
 
@@ -509,11 +525,13 @@ describe('agent/config', () => {
         );
 
         describe('getMinimalRepo', () => {
-            it('returns undefined when env is unset (no default — gates the Minimal seed)', () => {
-                expect(config.websiteTemplate.getMinimalRepo()).toBeUndefined();
+            it('defaults to the canonical ever-works repo name when env is unset', () => {
+                expect(config.websiteTemplate.getMinimalRepo()).toBe(
+                    'directory-web-minimal-template',
+                );
             });
 
-            it('returns the env value verbatim', () => {
+            it('returns the env value verbatim when set', () => {
                 process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'minimal-template';
                 expect(config.websiteTemplate.getMinimalRepo()).toBe('minimal-template');
             });

@@ -8,6 +8,7 @@ import {
 	cleanupWorkspace,
 	ensureOnboardingConfig
 } from '../utils/workspace-manager';
+import { BASE_TEMP_DIR } from '../types';
 import type { ItemData, Category } from '@ever-works/plugin';
 
 vi.mock('fs/promises');
@@ -18,16 +19,22 @@ describe('workspace-manager', () => {
 	});
 
 	describe('createWorkspace', () => {
+		// BASE_TEMP_DIR derives from `os.tmpdir()`, so it differs by platform
+		// (`/tmp/gemini-generator` on Linux, `C:/.../Temp/gemini-generator` on
+		// Windows). Anchor the assertions against the live value rather than
+		// a Linux-only literal.
+		const workspaceRoot = `${BASE_TEMP_DIR}/user1/dir1`;
+
 		it('should create a per-run workspace and create _meta work', async () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
-			vi.mocked(fs.mkdtemp).mockResolvedValue('/tmp/gemini-generator/user1/dir1/run-123');
+			vi.mocked(fs.mkdtemp).mockResolvedValue(`${workspaceRoot}/run-123`);
 
 			const result = await createWorkspace('user1', 'dir1');
 
-			expect(fs.mkdir).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1', { recursive: true });
-			expect(fs.mkdtemp).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1/run-');
+			expect(fs.mkdir).toHaveBeenCalledWith(workspaceRoot, { recursive: true });
+			expect(fs.mkdtemp).toHaveBeenCalledWith(`${workspaceRoot}/run-`);
 			expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('_meta'), { recursive: true });
-			expect(result).toBe('/tmp/gemini-generator/user1/dir1/run-123');
+			expect(result).toBe(`${workspaceRoot}/run-123`);
 		});
 	});
 

@@ -306,6 +306,7 @@ describe('agent/tasks submodule', () => {
             const runtimeKeys = Object.keys(tasksBarrel).sort();
             expect(runtimeKeys).toEqual(
                 [
+                    'TEMPLATE_CUSTOMIZATION_DISPATCHER',
                     'WORK_GENERATION_DISPATCHER',
                     'WORK_GENERATION_MODE',
                     'WORK_IMPORT_DISPATCHER',

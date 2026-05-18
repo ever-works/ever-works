@@ -98,6 +98,24 @@ export class TemplateRepository {
         });
     }
 
+    async findAllBuiltInByRepositoryCoordinates(
+        kind: TemplateKind,
+        repositoryOwner: string,
+        repositoryName: string,
+    ): Promise<Template[]> {
+        return this.repository.find({
+            where: {
+                kind,
+                sourceType: 'built_in',
+                repositoryOwner,
+                repositoryName,
+            },
+            order: {
+                id: 'ASC',
+            },
+        });
+    }
+
     async hasRecentDiscoveredBuiltInTemplates(
         kind: TemplateKind,
         catalogOwner: string,

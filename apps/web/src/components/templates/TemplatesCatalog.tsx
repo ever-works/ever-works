@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
@@ -16,8 +16,20 @@ import {
     RefreshCw,
     Trash2,
     Star,
+    Sparkles,
+    Loader2,
+    AlertCircle,
+    CheckCircle2,
+    Wand2,
 } from 'lucide-react';
-import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
+import type {
+    CustomizationAiProvider,
+    CustomizationProvider,
+    TemplateCatalogItem,
+    TemplateCustomizationStatus,
+    TemplateCustomizationSummary,
+    TemplateKind,
+} from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -36,11 +48,42 @@ import {
     addCustomTemplate,
     archiveCustomTemplate,
     forkTemplate,
+    getTemplateCustomization,
     refreshTemplates,
     setDefaultTemplate,
     updateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
+import {
+    CreateCustomTemplateDialog,
+    type CustomizationStartedArgs,
+    type CustomizeDialogMode,
+} from './CreateCustomTemplateDialog';
+
+const TERMINAL_CUSTOMIZATION_STATUSES: TemplateCustomizationStatus[] = ['succeeded', 'failed'];
+const CUSTOMIZATION_POLL_INTERVAL_MS = 5_000;
+
+function toCustomizationSummary(c: {
+    id: string;
+    status: TemplateCustomizationStatus;
+    prompt: string;
+    errorMessage?: string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}): TemplateCustomizationSummary {
+    return {
+        id: c.id,
+        status: c.status,
+        prompt: c.prompt,
+        errorMessage: c.errorMessage ?? null,
+        startedAt: c.startedAt ?? null,
+        completedAt: c.completedAt ?? null,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+    };
+}
 
 type FilterMode = 'all' | 'built_in' | 'custom';
 
@@ -49,6 +92,8 @@ interface TemplatesCatalogProps {
     templates: TemplateCatalogItem[];
     defaultTemplateId: string | null;
     forkTargets: ForkTarget[];
+    customizationProviders: CustomizationProvider[];
+    customizationAiProviders: CustomizationAiProvider[];
 }
 
 interface ForkTarget {
@@ -103,6 +148,49 @@ function getTemplatePreviewUrl(template: TemplateCatalogItem): string | null {
     return `https://opengraph.githubassets.com/${cacheKey}/${owner}/${repository}`;
 }
 
+function CustomizationStatusChip({
+    summary,
+    onClick,
+}: {
+    summary: TemplateCustomizationSummary;
+    onClick?: () => void;
+}) {
+    const t = useTranslations('dashboard.templates');
+    const isTerminal = TERMINAL_CUSTOMIZATION_STATUSES.includes(summary.status);
+    const succeeded = summary.status === 'succeeded';
+    const failed = summary.status === 'failed';
+    const tone = failed
+        ? 'bg-destructive/15 text-destructive border border-destructive/30'
+        : succeeded
+          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30';
+    const Icon = failed ? AlertCircle : succeeded ? CheckCircle2 : Loader2;
+
+    const chip = (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-sm',
+                tone,
+            )}
+        >
+            <Icon className={cn('w-2.5 h-2.5', !isTerminal && 'animate-spin')} />
+            {t(`card.status.${summary.status}`)}
+        </span>
+    );
+
+    if (isTerminal || !onClick) return chip;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex"
+            title={t('card.viewStatus')}
+        >
+            {chip}
+        </button>
+    );
+}
+
 function TemplateCard({
     template,
     isDefault,
@@ -110,6 +198,8 @@ function TemplateCard({
     onFork,
     onEdit,
     onArchive,
+    onCustomizeAgain,
+    onViewStatus,
     loading,
     forkLoading,
     archiveLoading,
@@ -120,6 +210,8 @@ function TemplateCard({
     onFork: (template: TemplateCatalogItem) => void;
     onEdit: (template: TemplateCatalogItem) => void;
     onArchive: (template: TemplateCatalogItem) => void;
+    onCustomizeAgain: (template: TemplateCatalogItem) => void;
+    onViewStatus: (template: TemplateCatalogItem) => void;
     loading: boolean;
     forkLoading: boolean;
     archiveLoading: boolean;
@@ -162,6 +254,14 @@ function TemplateCard({
                         <Star className="w-2.5 h-2.5 fill-current" />
                         {t('card.default')}
                     </span>
+                )}
+                {template.latestCustomization && (
+                    <div className="absolute top-2 left-2">
+                        <CustomizationStatusChip
+                            summary={template.latestCustomization}
+                            onClick={() => onViewStatus(template)}
+                        />
+                    </div>
                 )}
             </div>
 
@@ -234,6 +334,18 @@ function TemplateCard({
                             </Button>
                         ) : (
                             <>
+                                {template.customizable && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={loading || archiveLoading}
+                                        onClick={() => onCustomizeAgain(template)}
+                                        title={t('card.customizeAgain')}
+                                        className="text-xs"
+                                    >
+                                        <Wand2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -279,6 +391,8 @@ export function TemplatesCatalog({
     templates: initialTemplates,
     defaultTemplateId,
     forkTargets,
+    customizationProviders,
+    customizationAiProviders,
 }: TemplatesCatalogProps) {
     const t = useTranslations('dashboard.templates');
     const [templates, setTemplates] = useState(initialTemplates);
@@ -298,6 +412,164 @@ export function TemplatesCatalog({
     const [isForkingTemplate, startForkingTemplate] = useTransition();
     const [isArchivingTemplate, startArchivingTemplate] = useTransition();
     const [isRefreshingTemplates, startRefreshingTemplates] = useTransition();
+    const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+    const [customizeMode, setCustomizeMode] = useState<CustomizeDialogMode>('new');
+    const [customizeTargetId, setCustomizeTargetId] = useState<string | null>(null);
+
+    // Always resolve the target from current templates state so the dialog
+    // sees status updates pushed by the page-level poller below.
+    const customizeTargetTemplate = useMemo(() => {
+        return customizeTargetId
+            ? (templates.find((t) => t.id === customizeTargetId) ?? null)
+            : null;
+    }, [customizeTargetId, templates]);
+
+    const openCustomizeNew = () => {
+        setCustomizeMode('new');
+        setCustomizeTargetId(null);
+        setCustomizeDialogOpen(true);
+    };
+
+    const openCustomizeIterate = (template: TemplateCatalogItem) => {
+        setCustomizeMode('iterate');
+        setCustomizeTargetId(template.id);
+        setCustomizeDialogOpen(true);
+    };
+
+    const openCustomizeStatus = (template: TemplateCatalogItem) => {
+        if (!template.latestCustomization) return;
+        setCustomizeMode('status');
+        setCustomizeTargetId(template.id);
+        setCustomizeDialogOpen(true);
+    };
+
+    const inFlightIdsKey = useMemo(
+        () =>
+            templates
+                .filter(
+                    (t) =>
+                        t.latestCustomization &&
+                        !TERMINAL_CUSTOMIZATION_STATUSES.includes(t.latestCustomization.status),
+                )
+                .map((t) => t.latestCustomization!.id)
+                .sort()
+                .join(','),
+        [templates],
+    );
+
+    // One shared interval polls every in-flight customization. Mirrors the
+    // WorkLayoutClient pattern (apps/web/src/components/works/detail/WorkLayoutClient.tsx).
+    const previousStatusesRef = useRef<Record<string, TemplateCustomizationStatus>>({});
+
+    useEffect(() => {
+        if (!inFlightIdsKey) return;
+        const ids = inFlightIdsKey.split(',');
+        let cancelled = false;
+
+        const tick = async () => {
+            const results = await Promise.allSettled(ids.map((id) => getTemplateCustomization(id)));
+            if (cancelled) return;
+
+            const updates = new Map<string, TemplateCustomizationSummary>();
+            const transitions: TemplateCustomizationSummary[] = [];
+            const prev = previousStatusesRef.current;
+
+            for (const r of results) {
+                if (r.status !== 'fulfilled') continue;
+                const c = r.value.customization;
+                if (!r.value.success || !c) continue;
+                const summary = toCustomizationSummary(c);
+                updates.set(summary.id, summary);
+                if (
+                    prev[summary.id] &&
+                    prev[summary.id] !== summary.status &&
+                    TERMINAL_CUSTOMIZATION_STATUSES.includes(summary.status)
+                ) {
+                    transitions.push(summary);
+                }
+                previousStatusesRef.current[summary.id] = summary.status;
+            }
+
+            if (updates.size > 0) {
+                setTemplates((current) =>
+                    current.map((tpl) => {
+                        if (!tpl.latestCustomization) return tpl;
+                        const next = updates.get(tpl.latestCustomization.id);
+                        return next ? { ...tpl, latestCustomization: next } : tpl;
+                    }),
+                );
+            }
+
+            for (const transition of transitions) {
+                if (transition.status === 'succeeded') {
+                    toast.success(t('messages.customizationSucceeded'));
+                } else if (transition.status === 'failed') {
+                    toast.error(transition.errorMessage || t('messages.customizationFailed'));
+                }
+            }
+
+            if (transitions.length > 0) {
+                // Pick up the new `lastCustomizedAt` and any template fields
+                // refreshed by the agent run.
+                const refreshed = await refreshTemplates({ kind });
+                if (!cancelled && refreshed.success) {
+                    setTemplates(refreshed.templates.sort(compareTemplates));
+                    setCurrentDefaultTemplateId(refreshed.defaultTemplateId);
+                }
+            }
+        };
+
+        void tick();
+        const interval = window.setInterval(tick, CUSTOMIZATION_POLL_INTERVAL_MS);
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [inFlightIdsKey, kind, t]);
+
+    const handleCustomizationStarted = ({ customization, template }: CustomizationStartedArgs) => {
+        const summary = toCustomizationSummary(customization);
+
+        if (template) {
+            // New customization → new template. Refresh once to pull the
+            // fully-shaped TemplateCatalogItem; then the polling effect
+            // takes over.
+            setCustomizeTargetId(template.id);
+            void (async () => {
+                const refreshed = await refreshTemplates({ kind });
+                if (refreshed.success) {
+                    setTemplates(
+                        refreshed.templates
+                            .map((tpl) =>
+                                tpl.id === template.id
+                                    ? { ...tpl, latestCustomization: summary }
+                                    : tpl,
+                            )
+                            .sort(compareTemplates),
+                    );
+                    setCurrentDefaultTemplateId(refreshed.defaultTemplateId);
+                }
+            })();
+            return;
+        }
+
+        // Iterate against an existing template → update in place.
+        setTemplates((current) =>
+            current.map((tpl) =>
+                tpl.id === customization.templateId
+                    ? { ...tpl, latestCustomization: summary }
+                    : tpl,
+            ),
+        );
+    };
+
+    const customizableBases = useMemo(
+        () =>
+            templates.filter(
+                (template) => template.sourceType === 'built_in' && template.customizable,
+            ),
+        [templates],
+    );
 
     const filteredTemplates = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -581,6 +853,12 @@ export function TemplatesCatalog({
                         >
                             <RefreshCw className="h-4 w-4" />
                         </Button>
+                        {customizableBases.length > 0 && (
+                            <Button size="sm" variant="secondary" onClick={openCustomizeNew}>
+                                <Sparkles className="h-4 w-4" />
+                                {t('actions.customizeTemplate')}
+                            </Button>
+                        )}
                         <Button size="sm" onClick={() => setDialogOpen(true)}>
                             <Plus className="h-4 w-4" />
                             {t('actions.addTemplate')}
@@ -675,6 +953,8 @@ export function TemplatesCatalog({
                             onArchive={(selectedTemplate) =>
                                 setArchiveDialogTemplate(selectedTemplate)
                             }
+                            onCustomizeAgain={openCustomizeIterate}
+                            onViewStatus={openCustomizeStatus}
                             loading={isSavingDefault}
                             forkLoading={
                                 isForkingTemplate && forkDialogTemplate?.id === template.id
@@ -910,6 +1190,18 @@ export function TemplatesCatalog({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CreateCustomTemplateDialog
+                open={customizeDialogOpen}
+                onOpenChange={setCustomizeDialogOpen}
+                customizableBases={customizableBases}
+                providers={customizationProviders}
+                aiProviders={customizationAiProviders}
+                forkTargets={forkTargets}
+                mode={customizeMode}
+                targetTemplate={customizeTargetTemplate}
+                onCustomizationStarted={handleCustomizationStarted}
+            />
 
             <Dialog
                 open={!!archiveDialogTemplate}

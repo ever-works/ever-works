@@ -100,10 +100,48 @@ export class GitHubSyncService {
             repoOwner = parts[0];
             repoName = parts[1];
 
-            // Verify it exists and is private
+            // M-04: validate owner/repo character set against GitHub's
+            // server-side rule (`^[A-Za-z0-9._-]+$`) before any network call.
+            // The split-by-`/` above leaves the strings unchecked, so an
+            // attacker passing `repoFullName: "evil.com/x#?frag"` would have
+            // those characters reach the git facade's URL builder.
+            const repoCoordPattern = /^[A-Za-z0-9._-]+$/;
+            if (!repoCoordPattern.test(repoOwner) || !repoCoordPattern.test(repoName)) {
+                throw new Error(
+                    'Invalid repository name. Owner and repo may only contain letters, digits, dot, underscore, and hyphen.',
+                );
+            }
+
+            // M-04 (ownership check): the OAuth-linked GitHub identity's
+            // login must match the supplied owner — covers the personal-repo
+            // case. Without this an attacker could point the sync at any
+            // private repo whose existence they know; the subsequent push
+            // would fail at GitHub's auth layer, but the configure-step
+            // would still bind the platform's record to a foreign repo.
+            //
+            // Org-owned repos: the GitUser interface doesn't currently
+            // expose the user's org list, so we fall back to "if the repo
+            // returns without throwing AND is private, trust GitHub's own
+            // access check". A subsequent `push` will surface any access
+            // mismatch immediately, so the residual risk is small.
+            const gitUser = await this.gitFacade.getUser(gitOptions);
+            const ownsRepo = gitUser?.login?.toLowerCase() === repoOwner.toLowerCase();
+
+            // Verify it exists and is private. If `getRepository` returns at
+            // all, the OAuth token has at least read access — which combined
+            // with the login-match check above (or a successful org-repo
+            // fetch) is a reasonable proxy for "user is authorized to
+            // configure sync against this repo".
             const repo = await this.gitFacade.getRepository(repoOwner, repoName, gitOptions);
             if (!repo) {
                 throw new Error(`Repository "${dto.repoFullName}" not found or inaccessible`);
+            }
+            if (!ownsRepo) {
+                // Org repo path — log it so audits can see who's pointing
+                // sync at a non-personal-namespace repo.
+                this.logger.warn(
+                    `account.sync.configure: user=${userId} pointing sync at non-personal repo ${repoOwner}/${repoName} (oauth-user=${gitUser?.login})`,
+                );
             }
             if (!repo.isPrivate) {
                 throw new Error(

@@ -11,11 +11,7 @@ import { WorkAdvancedPromptsRepository } from '../database/repositories/work-adv
 import { WorkScheduleRepository } from '../database/repositories/work-schedule.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
-import { Work } from '../entities/work.entity';
-import { WorkMember } from '../entities/work-member.entity';
-import { WorkCustomDomain } from '../entities/work-custom-domain.entity';
 import { UserPluginEntity } from '../plugins/entities/user-plugin.entity';
-import { WorkPluginEntity } from '../plugins/entities/work-plugin.entity';
 import type {
     AccountExportPayload,
     ImportPreview,

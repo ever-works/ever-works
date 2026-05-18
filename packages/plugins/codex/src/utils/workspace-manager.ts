@@ -1,5 +1,7 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
+// POSIX path joins keep test assertions and CLI-friendly paths stable across
+// platforms (Node accepts forward slashes on Windows for FS ops).
+import * as path from 'path/posix';
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { Brand, Category, ItemData, ReferenceEntry, Tag } from '@ever-works/plugin';

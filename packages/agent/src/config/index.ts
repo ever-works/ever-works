@@ -55,7 +55,16 @@ export const config = {
             return process.env.DATABASE_PORT;
         },
         autoMigrate() {
-            return process.env.DATABASE_AUTOMIGRATE !== 'false';
+            // C-07 PR-B: default to `false` everywhere except the unit-test
+            // environment. The audit batch 1 set DATABASE_AUTOMIGRATE=false
+            // explicitly in every k8s manifest (PR-A); this flip makes the
+            // safer default the new baseline so a future env / deploy that
+            // forgets to set the flag still doesn't run TypeORM `synchronize`
+            // against production. Opt back in by setting
+            // DATABASE_AUTOMIGRATE=true explicitly.
+            if (process.env.DATABASE_AUTOMIGRATE === 'true') return true;
+            if (process.env.DATABASE_AUTOMIGRATE === 'false') return false;
+            return process.env.NODE_ENV === 'test';
         },
         loggingEnabled() {
             return process.env.DATABASE_LOGGING === 'true';
@@ -204,7 +213,7 @@ export const config = {
             return process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER || 'ever-works';
         },
         getMinimalRepo() {
-            return process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_REPO || 'directory-web-minimal-template';
         },
         getMinimalBranch() {
             return process.env.WEBSITE_TEMPLATE_MINIMAL_BRANCH || 'main';

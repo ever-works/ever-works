@@ -56,18 +56,22 @@ describe('apps/api auth DTO validation', () => {
             expect(constraintsFor(errs, 'email').isEmail).toBeDefined();
         });
 
-        it('rejects password shorter than 6 chars via @MinLength(6)', async () => {
+        // H-02: minLength raised from 6 → 8 to match Better Auth runtime.
+        it('rejects password shorter than 8 chars via @MinLength(8)', async () => {
             const dto = plainToInstance(RegisterDto, { ...valid, password: 'a1bc' });
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'password').minLength).toBeDefined();
         });
 
-        it('rejects password starting with `.` via @Matches', async () => {
-            // The regex `^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$` rejects leading `.` and `\n`.
-            const dto = plainToInstance(RegisterDto, { ...valid, password: '.password1' });
+        it('rejects password with no digit-or-special — H-02 regex requires (?=.*[\\d\\W_])', async () => {
+            // The old regex `^[^.\n](?=.*[a-z])(?=.*[\d\w]).*$` was misleading:
+            // `\w` matches letters, so the "digit or special" lookahead was
+            // satisfied by any letter. H-02 tightened to `(?=.*[\d\W_])` which
+            // genuinely requires a digit or non-word char.
+            const dto = plainToInstance(RegisterDto, { ...valid, password: 'allletters' });
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'password').matches).toBe(
-                'Password must contain at least 1 lowercase letter and 1 number or special character',
+                'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
             );
         });
 
@@ -77,9 +81,14 @@ describe('apps/api auth DTO validation', () => {
             expect(constraintsFor(errs, 'password').matches).toBeDefined();
         });
 
-        it('accepts a 6-char password (boundary — not 7)', async () => {
-            // @MinLength(6) accepts exactly 6.
-            const dto = plainToInstance(RegisterDto, { ...valid, password: 'abc1de' });
+        it('rejects a 7-char password (H-02 minLength boundary — exactly 8 is the new floor)', async () => {
+            const dto = plainToInstance(RegisterDto, { ...valid, password: 'abc1def' });
+            const errs = await validate(dto);
+            expect(constraintsFor(errs, 'password').minLength).toBeDefined();
+        });
+
+        it('accepts an 8-char password with a digit (H-02 boundary — exactly 8)', async () => {
+            const dto = plainToInstance(RegisterDto, { ...valid, password: 'abc1defg' });
             expect(await validate(dto)).toHaveLength(0);
         });
 
@@ -140,14 +149,14 @@ describe('apps/api auth DTO validation', () => {
             expect(constraintsFor(errs, 'newPassword').minLength).toBeDefined();
         });
 
-        it('rejects newPassword that fails the @Matches regex', async () => {
+        it('rejects newPassword that fails the H-02 @Matches regex (no digit/special)', async () => {
             const dto = plainToInstance(UpdatePasswordDto, {
                 ...valid,
-                newPassword: '.startdot',
+                newPassword: 'allletter', // 9 chars, lowercase only, no digit or special
             });
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'newPassword').matches).toBe(
-                'Password must contain at least 1 lowercase letter and 1 number or special character',
+                'Password must be at least 8 chars and contain at least 1 lowercase letter and 1 number or special character',
             );
         });
 
@@ -285,8 +294,8 @@ describe('apps/api auth DTO validation', () => {
             expect(constraintsFor(errs, 'newPassword').minLength).toBeDefined();
         });
 
-        it('rejects newPassword with leading dot via @Matches', async () => {
-            const dto = plainToInstance(ResetPasswordDto, { ...valid, newPassword: '.dotstart1' });
+        it('rejects newPassword that fails the H-02 @Matches regex (no digit/special)', async () => {
+            const dto = plainToInstance(ResetPasswordDto, { ...valid, newPassword: 'allletter' });
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'newPassword').matches).toBeDefined();
         });

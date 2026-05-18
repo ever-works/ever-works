@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import path from 'node:path';
 
 /**
  * Vitest configuration for the apps/web unit-test suite.
@@ -16,6 +17,14 @@ import tsconfigPaths from 'vite-tsconfig-paths';
  */
 export default defineConfig({
     plugins: [react(), tsconfigPaths()],
+    resolve: {
+        // `server-only` is a Next.js-provided guard module that doesn't
+        // resolve outside the Next runtime. Alias it to a no-op shim so
+        // unit specs can import server-side modules (e.g. `lib/auth/crypto.ts`).
+        alias: {
+            'server-only': path.resolve(__dirname, './vitest.server-only.shim.ts'),
+        },
+    },
     test: {
         environment: 'jsdom',
         globals: true,

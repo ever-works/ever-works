@@ -57,14 +57,14 @@ describe('SyncEventRow (EW-628 Phase 7)', () => {
                 event={{
                     kind: 'failed',
                     source: 'manual',
-                    errorClass: 'GitPushRejected',
+                    errorClass: 'main-repo-push-rejected',
                     errorTail: 'fatal: non-fast-forward',
                 }}
             />,
         );
         expect(screen.getByTestId('sync-event-row-failed')).toBeInTheDocument();
         expect(screen.getByText(/Sync failed/i)).toBeInTheDocument();
-        expect(screen.getByText('GitPushRejected')).toBeInTheDocument();
+        expect(screen.getByText('main-repo-push-rejected')).toBeInTheDocument();
         // errorTail lives inside <details>; we don't open it in the test, but
         // it must be present in the DOM (collapsed content is still rendered).
         expect(screen.getByText('fatal: non-fast-forward')).toBeInTheDocument();

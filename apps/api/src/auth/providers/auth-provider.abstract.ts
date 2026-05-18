@@ -12,7 +12,10 @@ export abstract class AuthProvider {
         headers: Headers,
     ): Promise<TokenResponse>;
 
-    abstract issueSession(userId: string): Promise<TokenResponse>;
+    abstract issueSession(
+        userId: string,
+        clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+    ): Promise<TokenResponse>;
 
     abstract changePassword(
         currentPassword: string,

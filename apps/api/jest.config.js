@@ -9,9 +9,10 @@ module.exports = {
             {
                 diagnostics: {
                     // 151002: ts-jest specific warning
+                    // 2305: workspace package declarations may lag source exports (handled by moduleNameMapper)
                     // 2307: cross-package @src path alias not resolved by TS (handled by moduleNameMapper)
                     // 2589: deep type instantiation in zodToJsonSchema chain reachable via @ever-works/agent
-                    ignoreCodes: [151002, 2307, 2589],
+                    ignoreCodes: [151002, 2305, 2307, 2589],
                 },
             },
         ],
@@ -34,6 +35,11 @@ module.exports = {
         '^@src/(.*)$': '<rootDir>/$1',
         // Map workspace packages to their source TypeScript files for testing
         '^@ever-works/plugin$': '<rootDir>/../../../packages/plugin/src/index.ts',
+        // Specific subpath: `@ever-works/plugin/helpers/ssrf-guard` is a single
+        // file (not a folder with index), separated from `helpers/index.ts` so
+        // its `node:net`/`node:dns` imports stay out of the client bundle.
+        // Map BEFORE the catch-all `helpers` rule below so the regex order matters.
+        '^@ever-works/plugin/helpers/ssrf-guard$': '<rootDir>/../../../packages/plugin/src/helpers/ssrf-guard.ts',
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../../packages/plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../../packages/contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../../packages/contracts/src/$1/index.ts',

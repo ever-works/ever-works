@@ -4,7 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
-import { throttlerConfig } from './config/throttler.config';
+import { buildThrottlerConfig } from './config/throttler.config';
 import { WorksModule } from './works/works.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
@@ -48,7 +48,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         ScheduleModule.forRoot(),
         TwentyCrmModule.forRoot(),
         GitHubAppModule,
-        ThrottlerModule.forRoot(throttlerConfig),
+        // H-17/H-18: distributed throttler when THROTTLER_REDIS_URL is set,
+        // in-memory fallback otherwise. `forRootAsync` so the dynamic import
+        // of @nest-lab/throttler-storage-redis can resolve at bootstrap.
+        ThrottlerModule.forRootAsync({
+            useFactory: () => buildThrottlerConfig(),
+        }),
         EventEmitterModule.forRoot(),
         MonitoringModule.forRoot({
             sentry: {

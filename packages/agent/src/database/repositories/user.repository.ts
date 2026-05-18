@@ -44,6 +44,20 @@ export class UserRepository {
         return await this.findById(id);
     }
 
+    /**
+     * Atomically add `by` to a numeric column for a single user row. Wraps
+     * TypeORM's `repository.increment` which compiles down to a single
+     * `UPDATE … SET col = col + :by WHERE …` so concurrent callers don't
+     * lose increments the way a read-modify-write would.
+     *
+     * Used by the H-17 login-lockout path: two failed logins racing on the
+     * same email must each bump `failedLoginAttempts` by 1 (not collide on
+     * the same in-memory snapshot and overwrite).
+     */
+    async increment(id: string, column: 'failedLoginAttempts', by: number = 1): Promise<void> {
+        await this.repository.increment({ id }, column, by);
+    }
+
     async clearPasswordResetToken(id: string, token: string): Promise<boolean> {
         const result = await this.repository.update(
             {

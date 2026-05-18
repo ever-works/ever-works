@@ -50,7 +50,8 @@
 			"category": "pipeline",
 			"capabilities": [
 				"pipeline",
-				"form-schema-provider"
+				"form-schema-provider",
+				"code-edit"
 			],
 			"description": "Full pipeline plugin that delegates the entire generation to Gemini CLI",
 			"author": {
