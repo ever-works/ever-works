@@ -73,10 +73,12 @@ describe('WorkScheduleRepository', () => {
             }),
         );
         expect(setPayload.lastRunAt).toBe(setPayload.updatedAt);
-        expect(queryBuilder.where).toHaveBeenCalledWith({
-            id: 'schedule-1',
+        expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 'schedule-1' });
+        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(1, 'status = :status', {
             status: WorkScheduleStatus.ACTIVE,
-            nextRunAt,
+        });
+        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt = :nextRunAt', {
+            nextRunAt: nextRunAt.getTime(),
         });
         expect(result).toBe(nextRunAt);
     });
@@ -131,9 +133,11 @@ describe('WorkScheduleRepository', () => {
                 'work.sourceRepository',
             ]),
         );
-        expect(queryBuilder.where).toHaveBeenCalledWith({
+        expect(queryBuilder.where).toHaveBeenCalledWith('schedule.status = :status', {
             status: WorkScheduleStatus.ACTIVE,
-            nextRunAt: expect.any(Object),
+        });
+        expect(queryBuilder.andWhere).toHaveBeenCalledWith('schedule.nextRunAt <= :now', {
+            now: expect.any(Number),
         });
         expect(queryBuilder.orderBy).toHaveBeenCalledWith('schedule.nextRunAt', 'ASC');
         expect(queryBuilder.take).toHaveBeenCalledWith(25);

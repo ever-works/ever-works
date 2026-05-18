@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
+import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
@@ -76,6 +76,10 @@ export class WorkRepository {
             where: { id },
             relations: ['user'],
         });
+    }
+
+    async findByIdForAccess(id: string): Promise<Work | null> {
+        return this.repository.createQueryBuilder('work').where({ id }).getOne();
     }
 
     async findByIds(ids: string[]): Promise<Work[]> {
@@ -456,10 +460,10 @@ export class WorkRepository {
         const stalledWorks = await this.repository
             .createQueryBuilder('work')
             .select(['work.id', 'work.generateStatus'])
-            .where({
-                generationProgressedAt: LessThan(olderThan),
-                generationFinishedAt: IsNull(),
+            .where('work.generationProgressedAt < :olderThan', {
+                olderThan: olderThan.getTime(),
             })
+            .andWhere('work.generationFinishedAt IS NULL')
             .getMany();
 
         return stalledWorks;

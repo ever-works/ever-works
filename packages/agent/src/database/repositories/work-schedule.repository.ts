@@ -93,9 +93,9 @@ export class WorkScheduleRepository {
                 'work.owner',
                 'work.sourceRepository',
             ])
-            .where({
-                status: WorkScheduleStatus.ACTIVE,
-                nextRunAt: LessThanOrEqual(new Date()),
+            .where('schedule.status = :status', { status: WorkScheduleStatus.ACTIVE })
+            .andWhere('schedule.nextRunAt <= :now', {
+                now: Date.now(),
             })
             .orderBy('schedule.nextRunAt', 'ASC')
             .take(limit)
@@ -178,10 +178,10 @@ export class WorkScheduleRepository {
                 lastRunAt: dispatchedAt,
                 updatedAt: dispatchedAt,
             })
-            .where({
-                id: scheduleId,
-                status: WorkScheduleStatus.ACTIVE,
-                nextRunAt: originalNextRunAt,
+            .where('id = :id', { id: scheduleId })
+            .andWhere('status = :status', { status: WorkScheduleStatus.ACTIVE })
+            .andWhere('nextRunAt = :nextRunAt', {
+                nextRunAt: originalNextRunAt.getTime(),
             })
             .execute();
 

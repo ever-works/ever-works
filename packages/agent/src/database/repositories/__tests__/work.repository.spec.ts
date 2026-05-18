@@ -1,5 +1,5 @@
 import type { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
-import { In, IsNull, LessThan, LessThanOrEqual } from 'typeorm';
+import { In, IsNull, LessThanOrEqual } from 'typeorm';
 import { WorkRepository } from '../work.repository';
 import { Work } from '../../../entities/work.entity';
 import type { User } from '../../../entities';
@@ -197,6 +197,22 @@ describe('WorkRepository', () => {
                 where: { id: 'w1' },
                 relations: ['user'],
             });
+        });
+    });
+
+    describe('findByIdForAccess', () => {
+        it('loads the work row through query builder without eager user loading', async () => {
+            const row = { id: 'w1' } as Work;
+            const { chain, fns } = buildChain<Work | null>('getOne', row);
+            repository.createQueryBuilder.mockReturnValueOnce(
+                chain as unknown as SelectQueryBuilder<Work>,
+            );
+
+            await expect(service.findByIdForAccess('w1')).resolves.toBe(row);
+
+            expect(repository.findOne).not.toHaveBeenCalled();
+            expect(repository.createQueryBuilder).toHaveBeenCalledWith('work');
+            expect(fns.where).toHaveBeenCalledWith({ id: 'w1' });
         });
     });
 
@@ -653,10 +669,10 @@ describe('WorkRepository', () => {
             expect(repository.find).not.toHaveBeenCalled();
             expect(repository.createQueryBuilder).toHaveBeenCalledWith('work');
             expect(fns.select).toHaveBeenCalledWith(['work.id', 'work.generateStatus']);
-            expect(fns.where).toHaveBeenCalledWith({
-                generationProgressedAt: LessThan(olderThan),
-                generationFinishedAt: IsNull(),
+            expect(fns.where).toHaveBeenCalledWith('work.generationProgressedAt < :olderThan', {
+                olderThan: olderThan.getTime(),
             });
+            expect(fns.andWhere).toHaveBeenCalledWith('work.generationFinishedAt IS NULL');
         });
     });
 
