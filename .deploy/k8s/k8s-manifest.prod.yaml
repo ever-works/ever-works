@@ -196,6 +196,18 @@ spec:
               value: "$COMMUNITY_PR_VERIFIED_ORGS"
             - name: AGENT_BASH_AUDIT_LOG
               value: "$AGENT_BASH_AUDIT_LOG"
+            # C-04: host allow-list for user-supplied callback URLs.
+            # WEB_URL's host is always allowed by default — list extras here.
+            - name: ALLOWED_CALLBACK_HOSTS
+              value: "$ALLOWED_CALLBACK_HOSTS"
+            # H-17: per-user login lockout knobs (5 fails / 15 min by default).
+            - name: LOGIN_LOCKOUT_THRESHOLD
+              value: "$LOGIN_LOCKOUT_THRESHOLD"
+            - name: LOGIN_LOCKOUT_DURATION_MS
+              value: "$LOGIN_LOCKOUT_DURATION_MS"
+            # M-19: HTTP body parser limit (default 1mb).
+            - name: BODY_LIMIT
+              value: "$BODY_LIMIT"
 
             # Mail
             - name: MAILER_PROVIDER

@@ -136,6 +136,13 @@ jobs:
           PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
           COMMUNITY_PR_VERIFIED_ORGS: ever-works
           AGENT_BASH_AUDIT_LOG: 'true'
+          # C-04 host allow-list. Empty = WEB_URL's host only (fine for dev).
+          ALLOWED_CALLBACK_HOSTS: ''
+          # H-17 lockout knobs. Empty = built-in defaults (5 fails / 15 min).
+          LOGIN_LOCKOUT_THRESHOLD: ''
+          LOGIN_LOCKOUT_DURATION_MS: ''
+          # M-19 body limit — empty = default 1mb.
+          BODY_LIMIT: ''
 
           # EW-616 — kubeconfigs for platform-managed clusterSource values.
           EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
