@@ -54,7 +54,11 @@ services:
             dockerfile: .deploy/docker/web/Dockerfile
         restart: unless-stopped
         env_file: .env.compose
+        # PORT is a container-role value: web listens on 3000, API on 3100,
+        # MCP on 3200. Pin it inline so the env_file's API-targeted `PORT`
+        # value (3100) doesn't bleed into the other services.
         environment:
+            PORT: 3000
             API_URL: http://ever-works-api:3100
             NEXT_PUBLIC_WEB_URL: ${WEB_URL:-http://localhost:3000}
         depends_on:
@@ -64,6 +68,11 @@ services:
         networks:
             - ever-works-network
 
+    # MCP server is profile-gated because it refuses to start without
+    # `EVER_WORKS_API_KEY` — that key has to be minted via the web
+    # dashboard first. Bring it up explicitly once the platform is
+    # running and you have a key:
+    #   docker compose -f docker-compose.build.yml --profile mcp up -d ever-works-mcp
     ever-works-mcp:
         image: ever-works-mcp:local
         container_name: ever-works-mcp
@@ -71,8 +80,10 @@ services:
             context: .
             dockerfile: .deploy/docker/mcp/Dockerfile
         restart: unless-stopped
+        profiles: ['mcp']
         env_file: .env.compose
         environment:
+            PORT: 3200
             EVER_WORKS_API_URL: http://ever-works-api:3100
         depends_on:
             - ever-works-api

@@ -45,12 +45,19 @@ services:
         networks:
             - ever-works-network
 
+    # MCP server is profile-gated because it refuses to start without
+    # `EVER_WORKS_API_KEY` — that key has to be minted via the web
+    # dashboard first. Bring it up explicitly once the platform is
+    # running and you have a key:
+    #   docker compose -f docker-compose.demo.yml --profile mcp up -d ever-works-mcp
     ever-works-mcp:
         image: ghcr.io/ever-works/ever-works-mcp:latest
         container_name: ever-works-mcp
         restart: unless-stopped
+        profiles: ['mcp']
         env_file: .env.demo.compose
         environment:
+            PORT: 3200
             EVER_WORKS_API_URL: http://ever-works-api:3100
         depends_on:
             - ever-works-api
