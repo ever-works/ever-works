@@ -255,7 +255,7 @@ export class Work {
     @TimestampColumn({ nullable: true })
     sourceValidationLastRunAt?: Date | null;
 
-    // Activity Feed Sync (EW-120) — per-Work transport for surfacing
+    // Activity Feed sync — per-Work transport for surfacing
     // website-side events (signups, item submissions, reports) in the
     // platform Activity Feed tab. See ADR-004.
     //
