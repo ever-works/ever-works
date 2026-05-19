@@ -294,20 +294,38 @@ spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `web-vitals`, `pwa-offline`, `internationalization-rtl`, and `accessibility-axe-deep` from the storageState project so their unauth UI assertions hit fresh contexts.
 
-## Pass 9 — queued
+## Pass 9 — this PR (`chore/e2e-coverage-pass-9`)
 
-- [ ] `image-uploads.spec.ts` — image upload endpoint (work cover / item images): content-type validation, size cap, EXIF stripping
-- [ ] `notification-channels.spec.ts` — per-channel notification preferences (email / in-app / webhook)
-- [ ] `webhook-delivery-retry.spec.ts` — outbound webhook delivery: at-least-once delivery, exponential backoff, dead-letter
-- [ ] `feature-flags-runtime.spec.ts` — feature-flag overrides via `/api/config` or env, runtime toggling without restart
-- [ ] `slow-route-pagination.spec.ts` — large work + large items list — pagination must not OOM the server
-- [ ] `realtime-events.spec.ts` — SSE/WebSocket event stream for live updates (if exposed)
-- [ ] `bullmq-queue-status.spec.ts` — queue depth + per-job state exposed (if dashboards are wired)
-- [ ] `redis-cache-coherency.spec.ts` — cache-invalidation on mutation: change name → list shows new name immediately
-- [ ] `sentry-error-reporting.spec.ts` — uncaught client errors are forwarded to /sentry-tunnel proxy
-- [ ] `terms-acceptance-flow.spec.ts` — ToS gating: a fresh user must accept ToS before key actions
+Infra integration + content-handling + observability. **+10 new spec
+files.**
 
-## Pass 10+ — long-tail / hardening
+- [x] `image-uploads.spec.ts` — probe 4 upload paths, 1x1 PNG accepted, non-image content-type rejected without 5xx, stranger can't upload to another's work
+- [x] `notification-channels.spec.ts` — preferences endpoint requires auth, returns channel-shaped object, malformed PATCH 4xx, fresh user has SOME default channel enabled
+- [x] `webhook-delivery-retry.spec.ts` — webhook subscription rejects bogus URL + `javascript:` URL (SSRF guard), `/deliveries` endpoint exists and gates auth
+- [x] `feature-flags-runtime.spec.ts` — config endpoint JSON object, stable across calls, no `DATABASE_URL`/`JWT_SECRET`/etc leakage, authed sees ≥ unauth keys
+- [x] `slow-route-pagination.spec.ts` — `/api/works` with 25 owned rows under 30s, `/api/notifications` under load, 3-call degradation ratio < 5x
+- [x] `realtime-events.spec.ts` — probe 5 SSE candidate paths + 3 WS paths, content-type signals streaming, WS upgrade attempt over plain GET returns 4xx
+- [x] `bullmq-queue-status.spec.ts` — queue-status endpoint requires admin auth (regular user does NOT get queue admin shape), `/api/health` doesn't report Redis/BullMQ subsystem as down
+- [x] `redis-cache-coherency.spec.ts` — create → list, rename → detail + list, profile update → /profile/fresh all reflect new state immediately (no stale cache)
+- [x] `sentry-error-reporting.spec.ts` — Sentry tunnel path accepts envelope without 5xx, never echoes the DSN, login page doesn't preemptively capture events
+- [x] `terms-acceptance-flow.spec.ts` — fresh user has terms acceptance timestamp set (when exposed), accept-terms endpoint requires auth, accept-terms is idempotent, /en/terms page renders
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `sentry-error-reporting` from the storageState project so its unauth `/en/login` Sentry-event assertion measures the unauth case.
+
+## Pass 10 — queued
+
+- [ ] `mobile-touch.spec.ts` — touch gestures (swipe to dismiss, long-press menus) on key UI surfaces
+- [ ] `pdf-export.spec.ts` — work/usage PDF export (if exposed) renders without 5xx + content-disposition + sample bytes
+- [ ] `email-template-render.spec.ts` — preview-email-template endpoint (admin) returns parseable HTML, no template-engine errors
+- [ ] `recovery-codes.spec.ts` — 2FA backup-codes endpoint (once 2FA is configured): issue/list/revoke contract
+- [ ] `magic-link.spec.ts` — passwordless magic-link issuance + redemption flow (if exposed)
+- [ ] `sso-saml.spec.ts` — SAML SSO endpoint probe (enterprise feature; skip in non-SAML envs)
+- [ ] `team-billing.spec.ts` — per-team billing endpoints (admin / owner only)
+- [ ] `usage-quota.spec.ts` — soft / hard quota enforcement: 80% warning, 100% block
+- [ ] `audit-export-sanitization.spec.ts` — admin audit export strips PII based on org policy
+- [ ] `share-links.spec.ts` — public share links for a work: expiry, revocation, no-auth viewing
+
+## Pass 11+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
