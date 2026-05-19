@@ -43,7 +43,7 @@ export default defineConfig({
             // they assert things like "/works redirects to login" which is
             // only true when the user is signed out.
             testIgnore:
-                /\/(auth|navigation|password-reset|user-journey|works-public|works-api|api-public-contract|notifications|accessibility|seo-meta|error-pages|error-page-contract|website-templates|subscriptions|conversations|git-providers|forms-validation|i18n-locales|i18n-fallback|internationalization-rtl|screenshot-and-deploy|health-meta|performance-budget|responsive-viewports|error-recovery-unauth|keyboard-navigation|print-styles|public-pages-cache|screenshots-visual|chat-api-streaming|chat-api-events|csp-strict|web-vitals|pwa-offline|accessibility-axe-deep|sentry-error-reporting)\.spec\.ts$/,
+                /\/(auth|navigation|password-reset|user-journey|works-public|works-api|api-public-contract|notifications|accessibility|seo-meta|error-pages|error-page-contract|website-templates|subscriptions|conversations|git-providers|forms-validation|i18n-locales|i18n-fallback|internationalization-rtl|screenshot-and-deploy|health-meta|performance-budget|responsive-viewports|error-recovery-unauth|keyboard-navigation|print-styles|public-pages-cache|screenshots-visual|chat-api-streaming|chat-api-events|csp-strict|web-vitals|pwa-offline|accessibility-axe-deep|sentry-error-reporting|mobile-touch)\.spec\.ts$/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: './e2e/.auth/user.json',
@@ -54,7 +54,7 @@ export default defineConfig({
         {
             name: 'chromium-no-auth',
             testMatch:
-                /\/(auth|navigation|password-reset|user-journey|works-public|works-api|api-public-contract|notifications|accessibility|seo-meta|error-pages|error-page-contract|website-templates|subscriptions|conversations|git-providers|forms-validation|i18n-locales|i18n-fallback|internationalization-rtl|screenshot-and-deploy|health-meta|performance-budget|responsive-viewports|error-recovery-unauth|keyboard-navigation|print-styles|public-pages-cache|screenshots-visual|chat-api-streaming|chat-api-events|csp-strict|web-vitals|pwa-offline|accessibility-axe-deep|sentry-error-reporting)\.spec\.ts$/,
+                /\/(auth|navigation|password-reset|user-journey|works-public|works-api|api-public-contract|notifications|accessibility|seo-meta|error-pages|error-page-contract|website-templates|subscriptions|conversations|git-providers|forms-validation|i18n-locales|i18n-fallback|internationalization-rtl|screenshot-and-deploy|health-meta|performance-budget|responsive-viewports|error-recovery-unauth|keyboard-navigation|print-styles|public-pages-cache|screenshots-visual|chat-api-streaming|chat-api-events|csp-strict|web-vitals|pwa-offline|accessibility-axe-deep|sentry-error-reporting|mobile-touch)\.spec\.ts$/,
             use: {
                 ...devices['Desktop Chrome'],
             },
