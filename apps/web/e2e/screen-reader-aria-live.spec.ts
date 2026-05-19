@@ -54,8 +54,11 @@ test.describe('Accessibility — aria-live regions on login form', () => {
         await page.waitForTimeout(3_000);
         // After submit, look for a now-populated aria-live region OR
         // a visible error message with role=alert.
+        // Codex P1: `[role!="presentation"]` is not valid CSS — Playwright
+        // would throw a selector-parsing error before the test ran. Use
+        // the canonical `:not()` form instead.
         const announcedNow =
-            (await page.locator('[aria-live][role!="presentation"]').count()) +
+            (await page.locator('[aria-live]:not([role="presentation"])').count()) +
             (await page.locator('[role="alert"]').count()) +
             (await page.locator('[role="status"]').count());
         // Either there's an aria-live target (good), or the page just

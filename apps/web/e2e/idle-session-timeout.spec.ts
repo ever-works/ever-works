@@ -32,7 +32,9 @@ test.describe('Session — token lifecycle and idle-timeout contract', () => {
         expect(res.status(), `tampered token returned ${res.status()} — should be 401`).toBe(401);
     });
 
-    test('access token JWT exp claim is ≥ 1 hour in the future', async ({ request }) => {
+    test('access token JWT exp claim sets a usable lifetime (≥ 60s, informational on < 1h)', async ({
+        request,
+    }) => {
         const u = await registerUserViaAPI(request);
         const parts = u.access_token.split('.');
         if (parts.length !== 3) test.skip(true, 'access token is not a JWT');

@@ -35,10 +35,17 @@ test.describe('Webhook replay window — stale delivery timestamps are rejected'
             });
             if (res.status() === 404) continue;
             probed = true;
-            // Either 4xx (rejected) or 2xx (accepted). NEVER 5xx.
-            expect(res.status(), `${p}: stale-Date payload crashed: ${res.status()}`).toBeLessThan(
-                500,
-            );
+            // Codex P2: a 24h-old delivery must be REJECTED, not just
+            // "non-5xx". The prior `< 500` shape would let a server
+            // happily accept a stale payload (2xx), which is exactly
+            // the replay-window regression the spec exists to guard.
+            // Require 4xx. If the platform doesn't enforce a replay
+            // window yet, that's a real bug — fail loudly.
+            expect(
+                res.status(),
+                `${p}: stale 24h-old Date payload was not rejected: ${res.status()}`,
+            ).toBeGreaterThanOrEqual(400);
+            expect(res.status()).toBeLessThan(500);
         }
         if (!probed) test.skip(true, 'no webhook endpoint exposed');
     });
