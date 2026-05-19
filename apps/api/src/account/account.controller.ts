@@ -51,10 +51,10 @@ export class AccountController {
     ) {
         // The body type is a structural one — without explicit DTO
         // validators an empty `{}` reaches the service and throws
-        // unhandled, which surfaces as a 500. Surface a 400 for
-        // obviously-empty bodies before delegating.
-        if (!payload || typeof payload !== 'object' || !payload.data) {
-            throw new BadRequestException('Request body is empty or missing the `data` envelope');
+        // unhandled, which surfaces as a 500. Reject only truly empty
+        // bodies (no fields at all) so we surface a clean 400 instead.
+        if (!payload || typeof payload !== 'object' || Object.keys(payload).length === 0) {
+            throw new BadRequestException('Request body is empty');
         }
         return this.importService.previewImport(auth.userId, payload);
     }
