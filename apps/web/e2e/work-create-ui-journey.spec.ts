@@ -14,10 +14,15 @@ test.describe('Work create — full UI wizard', () => {
     test('user lands on /works/new and form renders', async ({ page }) => {
         await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
         await expect(page).not.toHaveURL(/\/login/);
-        // /works/new is variously a wizard or a single form. Either way
-        // there must be at least one text input and a submit button.
-        const input = page.locator('input[type="text"], input:not([type])').first();
-        await expect(input).toBeVisible({ timeout: 15_000 });
+        // /works/new is now a chooser screen (AI / Manual / Import) where
+        // the actual form is revealed AFTER picking a mode. We pin that
+        // the chooser renders something interactive — either a card / role
+        // = button to pick a mode, or a text input if a future redesign
+        // collapses it back to a single form.
+        const interactiveLocator = page.locator(
+            'input[type="text"], input:not([type]), button, [role="button"]',
+        );
+        await expect(interactiveLocator.first()).toBeVisible({ timeout: 15_000 });
     });
 
     test('submitting an empty form surfaces validation', async ({ page }) => {
