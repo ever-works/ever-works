@@ -17,7 +17,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
 test.describe('Invitation tokens — consumed once', () => {
     test('issuing an invitation returns a token-shaped response', async ({ request }) => {
         const owner = await registerUserViaAPI(request);
-        const tag = Date.now().toString(36);
+        const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const w = await createWorkViaAPI(request, owner.access_token, {
             name: `invite-${tag}`,
             slug: `invite-${tag}`,
@@ -42,7 +42,7 @@ test.describe('Invitation tokens — consumed once', () => {
     test('accepting an invitation twice returns 4xx on the second call', async ({ request }) => {
         const owner = await registerUserViaAPI(request);
         const invitee = await registerUserViaAPI(request);
-        const tag = Date.now().toString(36);
+        const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const w = await createWorkViaAPI(request, owner.access_token, {
             name: `invite-2x-${tag}`,
             slug: `invite-2x-${tag}`,

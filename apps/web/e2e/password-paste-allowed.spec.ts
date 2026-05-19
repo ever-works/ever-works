@@ -23,16 +23,28 @@ test.describe('Password fields — paste is allowed', () => {
             test.skip(true, 'password field not visible');
         }
         const pasteValue = 'Pasted#FromManager-Pass123';
-        // The cleanest way: directly fill the field as if a paste
-        // event occurred. We also verify there's no onpaste handler
-        // returning false.
+        // 1) No inline onpaste="return false" attribute.
         const onpaste = await pw.getAttribute('onpaste');
         expect(
             onpaste,
             `login password field has onpaste="${onpaste}" — blocks paste from password manager`,
         ).not.toMatch(/false|preventDefault/i);
-        // Simulate paste via setValue / dispatchEvent — Playwright's
-        // `fill` is the canonical way and matches a paste in behavior.
+        // 2) No JS-attached paste handler that calls preventDefault.
+        //    Dispatch a real ClipboardEvent and verify defaultPrevented stays false.
+        const prevented = await pw.evaluate((el) => {
+            const ev = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: new DataTransfer(),
+            });
+            el.dispatchEvent(ev);
+            return ev.defaultPrevented;
+        });
+        expect(
+            prevented,
+            'login password field has a paste listener that calls preventDefault — blocks password manager paste',
+        ).toBe(false);
+        // 3) Round-trip: fill() simulates a paste; value must populate.
         await pw.fill(pasteValue);
         const got = await pw.inputValue();
         expect(got, 'password field did not accept the pasted value').toBe(pasteValue);
@@ -51,6 +63,19 @@ test.describe('Password fields — paste is allowed', () => {
             onpaste,
             `register password field has onpaste="${onpaste}" — blocks paste`,
         ).not.toMatch(/false|preventDefault/i);
+        const prevented = await pw.evaluate((el) => {
+            const ev = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: new DataTransfer(),
+            });
+            el.dispatchEvent(ev);
+            return ev.defaultPrevented;
+        });
+        expect(
+            prevented,
+            'register password field has a paste listener that calls preventDefault — blocks password manager paste',
+        ).toBe(false);
         const pasteValue = 'Register#Pasted-Pass123';
         await pw.fill(pasteValue);
         const got = await pw.inputValue();

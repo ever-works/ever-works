@@ -15,7 +15,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
 test.describe('Concurrent update — last-write-wins / 409 / no Frankenstein merge', () => {
     test('two parallel PATCHes resolve to exactly one of the two values', async ({ request }) => {
         const u = await registerUserViaAPI(request);
-        const tag = Date.now().toString(36);
+        const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const w = await createWorkViaAPI(request, u.access_token, {
             name: `concurrent-${tag}`,
             slug: `concurrent-${tag}`,
@@ -53,7 +53,7 @@ test.describe('Concurrent update — last-write-wins / 409 / no Frankenstein mer
         request,
     }) => {
         const u = await registerUserViaAPI(request);
-        const tag = Date.now().toString(36);
+        const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const w = await createWorkViaAPI(request, u.access_token, {
             name: `etag-${tag}`,
             slug: `etag-${tag}`,

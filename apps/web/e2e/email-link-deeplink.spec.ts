@@ -34,14 +34,10 @@ test.describe("Email link deep-link — generation endpoints don't leak credenti
         ).toBe(false);
         // Also no plaintext token shapes returned directly to client.
         // (Tokens belong only in the emailed link.)
-        const longTokenShape = /"token"\s*:\s*"[A-Za-z0-9_-]{20,}"/.test(body);
-        if (longTokenShape) {
-            test.info().annotations.push({
-                type: 'warning',
-                description:
-                    'forgot-password response leaked token directly in body — should be email-only',
-            });
-        }
+        expect(
+            /"token"\s*:\s*"[A-Za-z0-9_-]{20,}"/.test(body),
+            'forgot-password response leaked token directly in body — should be email-only',
+        ).toBe(false);
     });
 
     test("POST /api/auth/send-verification response doesn't leak the verification token", async ({
@@ -52,13 +48,10 @@ test.describe("Email link deep-link — generation endpoints don't leak credenti
         });
         expect(res.status()).toBeLessThan(500);
         const body = await res.text();
-        const longTokenShape = /"token"\s*:\s*"[A-Za-z0-9_-]{20,}"/.test(body);
-        if (longTokenShape) {
-            test.info().annotations.push({
-                type: 'warning',
-                description: 'send-verification response leaked token directly in body',
-            });
-        }
+        expect(
+            /"token"\s*:\s*"[A-Za-z0-9_-]{20,}"/.test(body),
+            'send-verification response leaked token directly in body',
+        ).toBe(false);
     });
 
     test('reset-password endpoint rejects non-https deep-link tokens (or skip)', async ({
