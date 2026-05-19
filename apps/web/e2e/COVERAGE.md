@@ -380,18 +380,34 @@ Realtime + i18n + browser hygiene. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `referrer-policy-redirects`, `static-asset-fingerprint`, `feature-detect-storage`, and `iframe-sandbox` from the storageState project so their unauth UI assertions hit fresh contexts.
 
-## Pass 14 — queued
+## Pass 14 — this PR (`chore/e2e-coverage-pass-14`)
 
-- [ ] `service-isolation.spec.ts` — cross-module boundary: trigger endpoint A, verify side-effects don't leak to module B (e.g. work-deploy doesn't trigger notification subscription)
-- [ ] `metrics-endpoint.spec.ts` — `/api/metrics` (Prometheus format) returns `# HELP` + `# TYPE` lines + at least one `http_requests_total` series
-- [ ] `graphql-introspection.spec.ts` — if a GraphQL endpoint is exposed, introspection is disabled in production (returns 4xx for `__schema` query)
-- [ ] `connection-pool-leak.spec.ts` — 50 sequential authenticated requests don't exhaust the DB pool (no 503/504)
-- [ ] `idempotency-keys.spec.ts` — POST with `Idempotency-Key` header returns same response on retry (or skip if not wired)
-- [ ] `content-security-violations.spec.ts` — CSP `report-to` / `report-uri` endpoint accepts violation reports without 5xx
-- [ ] `secure-cookies-on-https.spec.ts` — when behind https, session cookies carry `Secure` attribute
-- [ ] `password-history.spec.ts` — `update-password` rejects reusing the last 3 passwords (if policy is configured)
-- [ ] `api-version-header.spec.ts` — `/api/health` carries `X-API-Version` (or similar) for client compatibility checks
-- [ ] `signed-url-expiry.spec.ts` — pre-signed upload URLs (if exposed) expire within 1 hour and 4xx after expiry
+Service boundary + observability + transport security. **+10 new spec
+files.**
+
+- [x] `service-isolation.spec.ts` — work-create doesn't regress /api/notifications shape, /api/health hits don't consume auth throttler bucket, profile id/email byte-stable across unrelated module writes
+- [x] `metrics-endpoint.spec.ts` — `/api/metrics` returns text/plain (not JSON) when exposed, carries `# HELP` + `# TYPE` directives + one canonical Prometheus series
+- [x] `graphql-introspection.spec.ts` — `/graphql` / `/api/graphql` either 404, reject introspection 4xx, return GraphQL errors, or empty schema — never a populated `__schema.types` array in production
+- [x] `connection-pool-leak.spec.ts` — 50 sequential authed /profile hits maintain ≥48/50 success rate, 20 parallel /api/health bursts ≤1 5xx
+- [x] `idempotency-keys.spec.ts` — POST /api/works with same `Idempotency-Key` retry stays < 500, empty key not 5xx
+- [x] `content-security-violations.spec.ts` — one of `/api/csp-report` / `/api/reports/csp` / `/api/security/csp-violations` accepts application/csp-report POST without 5xx; CSP report-to/report-uri presence soft-warns
+- [x] `secure-cookies-on-https.spec.ts` — auth cookies carry HttpOnly, carry Secure on https, carry SameSite=Lax/Strict/None — skip http for Secure
+- [x] `password-history.spec.ts` — rotating BACK to original password is either 4xx (history enforced) or informational (policy off); update-password without current_password rejected 4xx
+- [x] `api-version-header.spec.ts` — `/api/health` exposes a version via X-API-Version/X-Version/body version field that looks semver/sha/date-shaped; stable across calls
+- [x] `signed-url-expiry.spec.ts` — when a signed-URL endpoint exists, the URL carries `Expires=` / `X-Amz-Expires=` / `?exp=` / `?expires_in=` / `token=` / `signature=` marker; unauth GET on upload-url path is auth-gated 401/403/404
+
+## Pass 15 — queued
+
+- [ ] `db-readonly-replica.spec.ts` — if a read replica is configured, read-only endpoints (`/api/works`, `/api/notifications`) hit it; write endpoints don't
+- [ ] `feature-flag-runtime-toggle.spec.ts` — flipping a flag at runtime (via admin endpoint if exposed) reflects in next request without server restart
+- [ ] `webhook-redelivery.spec.ts` — failed webhook delivery is retried; backoff envelope shape probed
+- [ ] `multi-tenant-data-leak.spec.ts` — listing endpoints with `?owner=` / `?tenant=` / `?org_id=` query params never leak rows owned by another tenant
+- [ ] `oauth-pkce.spec.ts` — OAuth authorize URL carries `code_challenge` + `code_challenge_method=S256` (PKCE)
+- [ ] `audit-tamper-resistance.spec.ts` — manipulated activity-log entries don't pass integrity check (HMAC/signature if implemented)
+- [ ] `backup-restore-noop.spec.ts` — health check exposes last-backup timestamp; backup health probe < 500
+- [ ] `cloud-sdk-headers.spec.ts` — User-Agent allowlist; outbound HTTP from server carries a recognised UA
+- [ ] `webhook-secret-rotation.spec.ts` — rotating a webhook secret invalidates the old secret signature
+- [ ] `request-id-tracing.spec.ts` — `X-Request-ID` header echoes on response; uniquely generated when not provided
 
 ## Pass 15+ — long-tail / hardening
 
