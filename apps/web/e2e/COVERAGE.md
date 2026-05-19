@@ -194,26 +194,59 @@ Closed the 3 remaining hard gaps + deepened every `[~]` row from passes 1–2 + 
 - [x] `i18n-content.spec.ts` — login title varies across 6 locales + lang attribute match + unknown-locale fallback
 - [x] `template-catalog-deep.spec.ts` — template catalog list/get + customizations + user preferences
 
-## Pass 4 — queued (deep UI driving)
+## Pass 4 — this PR (`chore/e2e-coverage-pass-4`)
 
-These need authenticated UI fixtures (Playwright `storageState`) to drive properly:
+Deep UI driving (using the existing `e2e/.auth/user.json` storageState
+from `global-setup.ts`) + early pass-5 hardening. **+12 new spec files.**
 
-- `auth-state-fixture.spec.ts` — establish a reusable `storageState.json` so subsequent specs don't re-register
-- `dashboard-authenticated.spec.ts` — drive the home dashboard with a logged-in user (interactive widgets, search, navigation)
-- `work-create-ui-journey.spec.ts` — full create-work wizard journey, end-to-end
-- `plugin-toggle-ui.spec.ts` — actually click enable/disable on a plugin from the UI
-- `settings-profile-ui.spec.ts` — update profile fields via UI, persist, refresh, verify
-- `notifications-bell-ui.spec.ts` — notification dropdown open + mark read interactions
+- [x] `dashboard-authenticated.spec.ts` — home heading + nav chrome, stats overview, keyboard Tab, /works nav, user menu dropdown
+- [x] `work-create-ui-journey.spec.ts` — /works/new form renders, empty submit blocked, full wizard flow → detail URL
+- [x] `plugin-toggle-ui.spec.ts` — plugin index rows, detail navigation, toggle / configure affordance present
+- [x] `settings-profile-ui.spec.ts` — username pre-populated, save persists across reload, email read-only
+- [x] `notifications-bell-ui.spec.ts` — bell in header, click opens dropdown / panel
+- [x] `audit-log-immutable.spec.ts` — PATCH/PUT/DELETE on activity-log entries all rejected, stranger can't mutate
+- [x] `security-2fa.spec.ts` — 2FA status / enroll endpoint probe across 5 candidate paths (skips when not exposed)
+- [x] `performance-budget.spec.ts` — login + register load-time SLO, request-count ceiling
+- [x] `theme-toggle.spec.ts` — `<html>` carries a theme indicator, toggle flips it
+- [x] `responsive-viewports.spec.ts` — login page across mobile/tablet/desktop, no horizontal overflow, CTA on-screen
+- [x] `error-recovery.spec.ts` — `/works` doesn't white-screen on API 503, bell survives 500, login shows error on 401 (route-mocking)
+- [x] `keyboard-navigation.spec.ts` — Tab/Shift+Tab order on login form, Escape closes menu
+- [x] `api-schema-validation.spec.ts` — canonical user / works-list / health shape, typed field checks (no null timestamps, non-empty ids)
+- [x] `session-persistence.spec.ts` — reload + cross-page nav + new tab keep session; HttpOnly cookie present
 
-## Pass 5+ — long-tail
+Auth project routing — `playwright.config.ts` testIgnore now also
+excludes `performance-budget`, `responsive-viewports`, `error-recovery`,
+and `keyboard-navigation` from the storageState project so they run
+with a fresh, unauthenticated context.
 
-- `security-2fa.spec.ts` — 2FA enrollment + verify flow (if exposed)
-- `audit-log-immutable.spec.ts` — verify activity-log entries are append-only
-- `api-public-contract.spec.ts` deepening — add per-endpoint OpenAPI schema validation
-- `performance-budget.spec.ts` — measure home page TTFB / FCP / LCP per locale
-- `screenshots-visual.spec.ts` — visual-regression snapshots for key pages
+## Pass 5 — queued
 
-Then iteratively tighten any `[x]` that has thin assertions (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced with specific shape assertions once the body schemas stabilize).
+- [ ] `api-schema-validation` deepening — add OpenAPI / class-validator DTO checks for `/api/works/:id`, `/api/notifications`, `/api/subscriptions/plan`
+- [ ] `session-persistence` deepening — add cookie-flag inspection across redirect chains, idle-timeout boundary
+- [ ] `screenshots-visual.spec.ts` — Playwright `toMatchSnapshot` baselines for login, dashboard, settings, work-detail
+- [ ] `i18n-fallback.spec.ts` — unknown locale URL → default locale fallback, mixed-locale links don't break the layout
+- [ ] `csrf-double-submit.spec.ts` — POST without CSRF cookie / header, mismatched CSRF token, replay
+- [ ] `download-export.spec.ts` — drive `/api/works/:id/export-items` and `/api/activity-log/export` as authenticated downloads, assert content-disposition + sample row
+- [ ] `upload-attachment.spec.ts` — drive `/api/works/:id/import-items` with a small fixture file, verify created items appear in `/api/works/:id/items`
+- [ ] `concurrent-actions.spec.ts` — open two browser contexts as the same user, mutate from one, verify the other sees the change on next refresh
+- [ ] `print-styles.spec.ts` — `emulateMedia({ media: 'print' })` on key pages, verify layout doesn't collapse
+- [ ] `clipboard-actions.spec.ts` — copy-token / copy-API-key flows, verify clipboard write + UI feedback
+
+## Pass 6+ — long-tail / hardening
+
+Then iteratively tighten any `[x]` that still has thin assertions (the
+`expect(...).toBeLessThan(500)` smoke pattern should be replaced with
+specific shape assertions once the body schemas stabilize). Candidates:
+
+- [ ] `chat-api.spec.ts` — pin the streaming response shape (event names, completion sentinel)
+- [ ] `subscriptions-plan.spec.ts` — add a plan-switch lifecycle: free → standard → revert
+- [ ] `git-providers.spec.ts` — OAuth full happy-path with a mocked provider
+- [ ] `data-sync.spec.ts` — assert idempotency tokens are honoured
+
+Also queued for cross-cutting concerns:
+
+- [ ] `security-headers-strict.spec.ts` — promote helmet defaults to enforced (HSTS, CSP, X-Frame-Options)
+- [ ] `rate-limit.spec.ts` deepening — per-endpoint quota + 429 retry-after header
 
 ---
 
