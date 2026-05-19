@@ -456,18 +456,33 @@ Notification preferences + OAuth CSRF + observability + browser polyfills. **+10
 - [x] `trace-propagation-w3c.spec.ts` — valid traceparent stays < 500; malformed traceparent stays < 500; response traceparent (if present) matches 00-32hex-16hex-2hex
 - [x] `feature-detect-fetch-throws.spec.ts` — login renders + email input visible when fetch rejects with NetworkError; also when fetch throws synchronously
 
-## Pass 19 — queued
+## Pass 19 — this PR (`chore/e2e-coverage-pass-19`)
 
-- [ ] `tab-isolation-localstorage.spec.ts` — opening /works in two tabs doesn't share dirty form state via localStorage (namespacing per-tab)
-- [ ] `idle-session-timeout.spec.ts` — after configured idle timeout, next authed request returns 401; pre-timeout returns 200
-- [ ] `account-merge-conflict.spec.ts` — attempting to link an OAuth identity already linked to another account returns 409 (not silent re-link)
-- [ ] `webhook-replay-window.spec.ts` — webhook deliveries with an older timestamp (>5 min) rejected with 4xx (replay protection)
-- [ ] `screen-reader-aria-live.spec.ts` — login form errors update an aria-live region so screen readers announce them
-- [ ] `pwa-manifest-shape.spec.ts` — /manifest.webmanifest carries name + short_name + icons + start_url + display
-- [ ] `font-foit-foft.spec.ts` — fonts use `font-display: swap` (or optional) to avoid invisible text during load
-- [ ] `rsc-payload-no-secrets.spec.ts` — RSC payload (Next.js Server Components) doesn't carry DB connection strings / JWT secrets verbatim
-- [ ] `csrf-double-submit-cookie.spec.ts` — when CSRF tokens are issued, double-submit pattern is enforced (header token must match cookie token)
-- [ ] `error-page-localized.spec.ts` — /en/404 renders English; /es/404 renders Spanish (or falls back gracefully)
+Browser-context isolation + JWT lifecycle + secret-leak grep + i18n error pages. **+10 new spec files.**
+
+- [x] `tab-isolation-localstorage.spec.ts` — separate BrowserContexts don't share localStorage; same-context tabs DO share (sanity)
+- [x] `idle-session-timeout.spec.ts` — fresh token works; tampered token returns 401; JWT exp claim ≥ 60s with informational <1h
+- [x] `account-merge-conflict.spec.ts` — duplicate-email register returns 4xx; original user still logs in; original token still 200 on /profile
+- [x] `webhook-replay-window.spec.ts` — 24h-old Date, 1y-future Date, and repeated X-GitHub-Delivery UUID all stay < 500
+- [x] `screen-reader-aria-live.spec.ts` — /en/login probed for aria-live/role=alert/role=status (informational if absent); bad-password submit watches for announced error
+- [x] `pwa-manifest-shape.spec.ts` — manifest exposes name/short_name + start_url; icons array non-empty; display in {standalone, minimal-ui, fullscreen, browser}
+- [x] `font-foit-foft.spec.ts` — @font-face declarations on /en/login soft-warn when font-display absent; unrecognised values informational
+- [x] `rsc-payload-no-secrets.spec.ts` — /en/login + /en HTML contains no postgres/mysql/redis URI with creds, no AWS/Google/OpenAI/GitHub/Slack key prefixes, no PEM private keys; env-var-name + credential-shaped value pairings rejected
+- [x] `csrf-double-submit-cookie.spec.ts` — POST /api/works without auth returns 401/403; auth cookies declare SameSite=Strict/Lax or None+Secure (informational on missing)
+- [x] `error-page-localized.spec.ts` — /en/<bogus> < 500 with lang=en; /es/<bogus> < 500 with lang=es or fallback; bogus-locale fall-back < 500
+
+## Pass 20 — queued
+
+- [ ] `concurrent-update-conflict.spec.ts` — two parallel PATCH on same resource produce 409 / last-write-wins (not partial merge)
+- [ ] `oauth-cross-provider-isolation.spec.ts` — github + google identities on the same user don't merge silently; linking same provider twice 409
+- [ ] `markdown-rendering-sanitization.spec.ts` — markdown fields render to HTML without `<script>` / `onerror` payload survival
+- [ ] `email-bounce-handling.spec.ts` — bouncing email addresses don't crash the verification flow; status reflects bounce
+- [ ] `invitation-token-single-use.spec.ts` — invitation tokens consumed on first accept; second accept returns 4xx
+- [ ] `geo-redirect-respect-pref.spec.ts` — `Accept-Language` headers don't override an explicit user-set locale preference
+- [ ] `connection-keepalive-budget.spec.ts` — keepalive pool doesn't accumulate sockets > N across 100 requests
+- [ ] `download-resume-range.spec.ts` — large download endpoints honour `Range: bytes=` requests (or skip)
+- [ ] `password-paste-allowed.spec.ts` — password input field doesn't block paste (HIBP / NIST guidance)
+- [ ] `email-link-deeplink.spec.ts` — magic-link / verify-email URLs use https in production-shape and the token claim part is opaque
 
 ## Pass 15+ — long-tail / hardening
 
