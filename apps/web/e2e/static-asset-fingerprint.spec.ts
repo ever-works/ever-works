@@ -8,7 +8,19 @@ import { test, expect } from '@playwright/test';
  * already busts the cache on content change).
  */
 
+// Next.js only emits content-hashed `_next/static/*` URLs and long
+// `Cache-Control: immutable` headers in a production build (`next start`).
+// The e2e workflow runs `next dev` (NODE_ENV=development), which serves
+// chunks without stable hashes and with `Cache-Control: no-store`. Skip
+// when not running against a prod build.
+const IS_PROD_BUILD = process.env.NODE_ENV === 'production';
+
 test.describe('Static assets — URL fingerprinting', () => {
+    test.skip(
+        !IS_PROD_BUILD,
+        'static-asset fingerprinting requires `next start` (NODE_ENV=production)',
+    );
+
     test('_next/static URLs include a hash-shaped segment', async ({ page, baseURL }) => {
         // Greptile P2 / team rule: mutable accumulator arrays use
         // `let` per ever-co/ever-gauzy#8961.

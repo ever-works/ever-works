@@ -19,7 +19,12 @@ test.describe('Slug collision — same-owner namespace', () => {
         const slug = `dup-${Date.now().toString(36)}`;
         const r1 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'First with this slug', slug, organization: false },
+            data: {
+                name: 'First with this slug',
+                slug,
+                description: 'e2e dup first',
+                organization: false,
+            },
         });
         expect(r1.status()).toBeGreaterThanOrEqual(200);
         expect(r1.status()).toBeLessThan(300);
@@ -30,7 +35,12 @@ test.describe('Slug collision — same-owner namespace', () => {
 
         const r2 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'Second with same slug', slug, organization: false },
+            data: {
+                name: 'Second with same slug',
+                slug,
+                description: 'e2e dup second',
+                organization: false,
+            },
         });
         // Acceptable outcomes:
         //   - 409 / 422: same-slug rejection
@@ -61,11 +71,11 @@ test.describe('Slug collision — cross-owner namespace', () => {
         const b = await registerUserViaAPI(request);
         const r1 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(a.access_token),
-            data: { name: 'A work', slug, organization: false },
+            data: { name: 'A work', slug, description: 'e2e cross A', organization: false },
         });
         const r2 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(b.access_token),
-            data: { name: 'B work', slug, organization: false },
+            data: { name: 'B work', slug, description: 'e2e cross B', organization: false },
         });
         // Both must NOT be 5xx. We accept either:
         //   - Both 2xx (per-user namespace)
@@ -86,7 +96,12 @@ test.describe('Slug rename — happy path', () => {
         const stamp = Date.now().toString(36);
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: `rename ${stamp}`, slug: `before-${stamp}`, organization: false },
+            data: {
+                name: `rename ${stamp}`,
+                slug: `before-${stamp}`,
+                description: 'e2e rename',
+                organization: false,
+            },
         });
         expect(create.ok()).toBe(true);
         const created = await create.json();

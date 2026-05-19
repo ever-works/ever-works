@@ -11,11 +11,18 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  */
 
 test.describe('Telemetry — funnel endpoint', () => {
-    test('POST /api/telemetry/funnel without auth → 401', async ({ request }) => {
+    test('POST /api/telemetry/funnel without auth is accepted or 4xx (intentionally public)', async ({
+        request,
+    }) => {
+        // The funnel endpoint is intentionally @Public() — landing-page
+        // emit sites and the zero-friction G1 form post here BEFORE the
+        // user has any session. Auth-required would silently drop those
+        // events. We just pin that the endpoint exists (no 5xx, no 404)
+        // and rejects unknown shapes with a clean 4xx.
         const res = await request.post(`${API_BASE}/api/telemetry/funnel`, {
             data: { event: 'test', properties: {} },
         });
-        expect(res.status()).toBe(401);
+        expect([200, 201, 204, 400, 422]).toContain(res.status());
     });
 
     test('POST /api/telemetry/funnel with auth + well-formed body responds < 500', async ({

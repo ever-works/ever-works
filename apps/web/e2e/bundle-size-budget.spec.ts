@@ -14,7 +14,16 @@ import { test, expect } from '@playwright/test';
 const STATIC_BUDGET_BYTES = 5 * 1024 * 1024;
 const JS_FILE_COUNT_CEILING = 100;
 
+// Bundle-size budgets only apply to production builds (`next start`). The
+// dev server (`next dev`, used by CI's e2e workflow) ships an unminified
+// React + unsplit chunks, which legitimately exceeds the budget by 10x.
+const SKIP_REASON =
+    'bundle-size budgets only meaningful against `next start` (NODE_ENV=production)';
+const IS_PROD_BUILD = process.env.NODE_ENV === 'production';
+
 test.describe('Bundle size — first-load static assets', () => {
+    test.skip(!IS_PROD_BUILD, SKIP_REASON);
+
     test('login page _next/static aggregate transfer is under budget', async ({
         page,
         baseURL,

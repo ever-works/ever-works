@@ -13,7 +13,7 @@ test.describe('CORS — preflight on sensitive endpoints', () => {
         '/api/auth/login',
         '/api/auth/register',
         '/api/works',
-        '/api/api-keys',
+        '/api/auth/api-keys',
         '/api/notifications',
     ];
 

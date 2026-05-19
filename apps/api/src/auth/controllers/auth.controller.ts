@@ -9,6 +9,7 @@ import {
     Query,
     HttpCode,
     HttpStatus,
+    Header,
     Logger,
     BadRequestException,
     ForbiddenException,
@@ -381,6 +382,7 @@ export class AuthController {
 
     @UseGuards(AuthSessionGuard)
     @Get('profile')
+    @Header('Cache-Control', 'private, no-store')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: 'Get current user profile',
@@ -388,7 +390,10 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'User profile data' })
     async getProfile(@Request() req) {
-        return req.user;
+        // Public API canonical user shape uses `id` (matches UserProfile on the
+        // web client), but `req.user` is `AuthenticatedUser` which carries
+        // `userId`. Expose both for backwards compatibility.
+        return { id: req.user.userId, ...req.user };
     }
 
     @UseGuards(AuthSessionGuard)
@@ -511,6 +516,9 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Token is valid' })
     @ApiResponse({ status: 400, description: 'Token is invalid or expired' })
     async validateEmailVerificationToken(@Query('token') token: string) {
+        if (!token || token.trim().length === 0) {
+            throw new BadRequestException('token query parameter is required');
+        }
         return this.authService.validateEmailVerificationToken(token);
     }
 
@@ -525,6 +533,9 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Token is valid' })
     @ApiResponse({ status: 400, description: 'Token is invalid or expired' })
     async validatePasswordResetToken(@Query('token') token: string) {
+        if (!token || token.trim().length === 0) {
+            throw new BadRequestException('token query parameter is required');
+        }
         return this.authService.validatePasswordResetToken(token);
     }
 }

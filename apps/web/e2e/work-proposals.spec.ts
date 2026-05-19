@@ -69,9 +69,13 @@ test.describe('Work proposals — API contract', () => {
         request,
     }) => {
         const u = await registerUserViaAPI(request);
-        const res = await request.get(`${API_BASE}/api/me/work-proposals/dead-beef-non-existent`, {
-            headers: authedHeaders(u.access_token),
-        });
+        // Use a valid-shape UUID that does not exist. The controller's
+        // ParseUUIDPipe rejects non-UUIDs with 400, which would otherwise
+        // mask the "unknown id" path we're trying to exercise.
+        const res = await request.get(
+            `${API_BASE}/api/me/work-proposals/00000000-0000-0000-0000-000000000000`,
+            { headers: authedHeaders(u.access_token) },
+        );
         expect([403, 404]).toContain(res.status());
     });
 
@@ -80,7 +84,7 @@ test.describe('Work proposals — API contract', () => {
     }) => {
         const u = await registerUserViaAPI(request);
         const res = await request.post(
-            `${API_BASE}/api/me/work-proposals/dead-beef-non-existent/accept`,
+            `${API_BASE}/api/me/work-proposals/00000000-0000-0000-0000-000000000000/accept`,
             {
                 headers: authedHeaders(u.access_token),
             },

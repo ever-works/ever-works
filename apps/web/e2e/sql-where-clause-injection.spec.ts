@@ -49,7 +49,12 @@ test.describe('SQL injection — query parameters', () => {
         const aWorkName = `union-target-${Date.now().toString(36)}`;
         const aCreate = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(a.access_token),
-            data: { name: aWorkName, slug: aWorkName, organization: false },
+            data: {
+                name: aWorkName,
+                slug: aWorkName,
+                description: 'e2e union seed',
+                organization: false,
+            },
         });
         expect(aCreate.ok()).toBe(true);
 

@@ -18,9 +18,18 @@ test.describe('GitHub App — API contract', () => {
         expect(res.status(), `status was ${res.status()}`).toBeLessThan(500);
     });
 
-    test('GET /api/github-app/setup without auth → 401', async ({ request }) => {
+    test('GET /api/github-app/setup is publicly reachable (OAuth callback target)', async ({
+        request,
+    }) => {
+        // GitHub App's setup URL is hit by the GitHub redirect after an
+        // app installation — there's no Authorization header at that
+        // moment. The endpoint is intentionally @Public(). What we pin
+        // here is that the endpoint EXISTS (not 404) and responds with
+        // either a redirect (3xx), a setup-payload (2xx), or a clean
+        // validation error (4xx). 5xx is the regression we want to catch.
         const res = await request.get(`${API_BASE}/api/github-app/setup`);
-        expect([401, 403]).toContain(res.status());
+        expect(res.status(), `status was ${res.status()}`).toBeLessThan(500);
+        expect(res.status(), `setup endpoint should not 404`).not.toBe(404);
     });
 
     test('GET /api/github-app/installations without auth → 401', async ({ request }) => {

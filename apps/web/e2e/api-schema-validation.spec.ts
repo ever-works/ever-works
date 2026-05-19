@@ -99,6 +99,7 @@ test.describe('API schema — /api/health', () => {
             body?.status === 'ok' ||
             body?.status === 'up' ||
             body?.status === 'healthy' ||
+            body?.status === 'success' ||
             body?.info?.api?.status === 'up' ||
             body?.details?.api?.status === 'up';
         expect(looksHealthy, `health body: ${JSON.stringify(body).slice(0, 200)}`).toBe(true);

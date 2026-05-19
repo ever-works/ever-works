@@ -18,7 +18,7 @@ test.describe('API keys — full lifecycle', () => {
         const u = await registerUserViaAPI(request);
 
         // 1. Create.
-        const createRes = await request.post(`${API_BASE}/api/api-keys`, {
+        const createRes = await request.post(`${API_BASE}/api/auth/api-keys`, {
             headers: authedHeaders(u.access_token),
             data: { name: 'e2e-key-' + Date.now() },
         });
@@ -33,7 +33,7 @@ test.describe('API keys — full lifecycle', () => {
         expect(plaintext!.length).toBeGreaterThan(16);
 
         // 2. List — plaintext must NOT be present.
-        const listRes = await request.get(`${API_BASE}/api/api-keys`, {
+        const listRes = await request.get(`${API_BASE}/api/auth/api-keys`, {
             headers: authedHeaders(u.access_token),
         });
         expect(listRes.status()).toBe(200);
@@ -44,7 +44,7 @@ test.describe('API keys — full lifecycle', () => {
 
         // 3. Revoke.
         if (keyId) {
-            const revRes = await request.delete(`${API_BASE}/api/api-keys/${keyId}`, {
+            const revRes = await request.delete(`${API_BASE}/api/auth/api-keys/${keyId}`, {
                 headers: authedHeaders(u.access_token),
             });
             expect(revRes.status()).toBeLessThan(500);
@@ -52,13 +52,13 @@ test.describe('API keys — full lifecycle', () => {
         }
     });
 
-    test('GET /api/api-keys without auth → 401', async ({ request }) => {
-        const res = await request.get(`${API_BASE}/api/api-keys`);
+    test('GET /api/auth/api-keys without auth → 401', async ({ request }) => {
+        const res = await request.get(`${API_BASE}/api/auth/api-keys`);
         expect(res.status()).toBe(401);
     });
 
-    test('POST /api/api-keys without auth → 401', async ({ request }) => {
-        const res = await request.post(`${API_BASE}/api/api-keys`, {
+    test('POST /api/auth/api-keys without auth → 401', async ({ request }) => {
+        const res = await request.post(`${API_BASE}/api/auth/api-keys`, {
             data: { name: 'x' },
         });
         expect(res.status()).toBe(401);

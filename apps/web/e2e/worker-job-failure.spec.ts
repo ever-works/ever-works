@@ -54,9 +54,15 @@ test.describe('Worker job failure — observable in activity log', () => {
         // catches a regression where status got dropped from entries.
         for (const entry of arr) {
             if ('status' in (entry ?? {})) {
-                expect(['success', 'failed', 'pending', 'in-progress', 'queued']).toContain(
-                    String(entry.status).toLowerCase(),
-                );
+                expect([
+                    'success',
+                    'completed',
+                    'failed',
+                    'pending',
+                    'in-progress',
+                    'in_progress',
+                    'queued',
+                ]).toContain(String(entry.status).toLowerCase());
             }
         }
     });

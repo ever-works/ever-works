@@ -10,6 +10,7 @@ import {
     Inject,
     NotFoundException,
     Param,
+    Patch,
     Post,
     Put,
     Query,
@@ -455,6 +456,7 @@ export class WorksController {
     }
 
     @Put('works/:id')
+    @Patch('works/:id')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Update work',

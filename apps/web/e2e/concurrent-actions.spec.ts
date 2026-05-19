@@ -35,7 +35,7 @@ test.describe('Concurrent actions — two contexts, same user', () => {
         const name = `concurrent-${Date.now().toString(36)}`;
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name, slug: name, organization: false },
+            data: { name, slug: name, description: `e2e ${name}`, organization: false },
         });
         expect(create.status()).toBeGreaterThanOrEqual(200);
         expect(create.status()).toBeLessThan(300);
@@ -63,6 +63,7 @@ test.describe('Concurrent actions — two contexts, same user', () => {
                 data: {
                     name: `parallel-${stamp}-1`,
                     slug: `parallel-${stamp}-1`,
+                    description: `e2e parallel ${stamp}-1`,
                     organization: false,
                 },
             }),
@@ -71,6 +72,7 @@ test.describe('Concurrent actions — two contexts, same user', () => {
                 data: {
                     name: `parallel-${stamp}-2`,
                     slug: `parallel-${stamp}-2`,
+                    description: `e2e parallel ${stamp}-2`,
                     organization: false,
                 },
             }),

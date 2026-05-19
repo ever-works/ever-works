@@ -74,12 +74,12 @@ test.describe('Multi-user — work isolation', () => {
     test("user B cannot enumerate A's API keys", async ({ request }) => {
         const a = await registerUserViaAPI(request);
         // A creates one of its own keys (best effort — schema may differ).
-        await request.post(`${API_BASE}/api/api-keys`, {
+        await request.post(`${API_BASE}/api/auth/api-keys`, {
             headers: authedHeaders(a.access_token),
             data: { name: `iso-key-${Date.now()}` },
         });
         const b = await registerUserViaAPI(request);
-        const res = await request.get(`${API_BASE}/api/api-keys`, {
+        const res = await request.get(`${API_BASE}/api/auth/api-keys`, {
             headers: authedHeaders(b.access_token),
         });
         expect(res.status()).toBe(200);

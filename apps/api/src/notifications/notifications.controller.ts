@@ -1,6 +1,7 @@
 import {
     Controller,
     Get,
+    Header,
     Post,
     Param,
     Query,
@@ -36,6 +37,7 @@ export class NotificationsController {
      */
     @Get()
     @HttpCode(HttpStatus.OK)
+    @Header('Cache-Control', 'private, no-store')
     @ApiOperation({
         summary: 'Get notifications',
         description: 'Get all notifications for the current user',
