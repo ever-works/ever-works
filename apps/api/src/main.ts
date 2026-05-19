@@ -70,11 +70,25 @@ async function bootstrap() {
     // is both useless to real callers and a foot-gun for any future change
     // that drops the credentials flag.
     const allowedOrigins = assertProductionCorsConfig(process.env);
+    const effectiveOrigins =
+        allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'];
+    // H-19 follow-up: use a callback so we only echo `Access-Control-Allow-
+    // Origin` (and let cors set `Access-Control-Allow-Credentials`) when the
+    // request origin is on the allowlist. Passing `origin` as a static array
+    // makes the cors package still emit `ACAC: true` for evil origins (with
+    // an empty ACAO) — that's the exact cache-poisoning shape the
+    // cors-origin-allowlist e2e contract is meant to catch.
     app.enableCors({
-        origin:
-            allowedOrigins && allowedOrigins.length > 0
-                ? allowedOrigins
-                : ['http://localhost:3000'],
+        origin: (
+            origin: string | undefined,
+            callback: (err: Error | null, allow?: boolean) => void,
+        ) => {
+            if (!origin || effectiveOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(null, false);
+            }
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],

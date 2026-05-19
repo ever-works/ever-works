@@ -23,12 +23,15 @@ test.describe('Password fields — paste is allowed', () => {
             test.skip(true, 'password field not visible');
         }
         const pasteValue = 'Pasted#FromManager-Pass123';
-        // 1) No inline onpaste="return false" attribute.
+        // 1) No inline onpaste="return false" attribute. `.toMatch` errors
+        //    on null, so only check when the attribute is actually present.
         const onpaste = await pw.getAttribute('onpaste');
-        expect(
-            onpaste,
-            `login password field has onpaste="${onpaste}" — blocks paste from password manager`,
-        ).not.toMatch(/false|preventDefault/i);
+        if (onpaste !== null) {
+            expect(
+                onpaste,
+                `login password field has onpaste="${onpaste}" — blocks paste from password manager`,
+            ).not.toMatch(/false|preventDefault/i);
+        }
         // 2) No JS-attached paste handler that calls preventDefault.
         //    Dispatch a real ClipboardEvent and verify defaultPrevented stays false.
         const prevented = await pw.evaluate((el) => {
@@ -59,10 +62,12 @@ test.describe('Password fields — paste is allowed', () => {
             test.skip(true, 'password field not visible on register');
         }
         const onpaste = await pw.getAttribute('onpaste');
-        expect(
-            onpaste,
-            `register password field has onpaste="${onpaste}" — blocks paste`,
-        ).not.toMatch(/false|preventDefault/i);
+        if (onpaste !== null) {
+            expect(
+                onpaste,
+                `register password field has onpaste="${onpaste}" — blocks paste`,
+            ).not.toMatch(/false|preventDefault/i);
+        }
         const prevented = await pw.evaluate((el) => {
             const ev = new ClipboardEvent('paste', {
                 bubbles: true,

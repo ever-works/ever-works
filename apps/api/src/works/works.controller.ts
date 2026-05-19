@@ -456,7 +456,6 @@ export class WorksController {
     }
 
     @Put('works/:id')
-    @Patch('works/:id')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Update work',
@@ -482,6 +481,20 @@ export class WorksController {
             })
             .catch(() => {});
         return result;
+    }
+
+    // PATCH is a thin alias for PUT so REST consumers that prefer partial-
+    // update semantics (e.g. concurrent-update-conflict.spec.ts) hit the
+    // same handler. Stacking @Patch + @Put on the same method registers
+    // only one route in NestJS, so split into a separate handler.
+    @Patch('works/:id')
+    @HttpCode(HttpStatus.OK)
+    async patchWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateWorkDto: UpdateWorkDto,
+    ) {
+        return this.updateWork(auth, id, updateWorkDto);
     }
 
     @Post('works/:id/activity-sync/rotate-secret')

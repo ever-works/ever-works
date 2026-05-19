@@ -101,18 +101,28 @@ export class PluginUsageRepository {
         periodStart: Date,
         periodEnd: Date,
     ): Promise<DailySpendBucket[]> {
-        const rows = await this.repository
+        // `to_char(...)` is PostgreSQL-only — SQLite + MySQL crash the
+        // query. Fetch raw rows and bucket in JS so the budgets endpoint
+        // works against every supported driver (SQLite in CI/dev,
+        // Postgres in prod). The data volume is bounded by a single
+        // Work's spend in one billing window so an in-memory aggregation
+        // is cheap.
+        const events = await this.repository
             .createQueryBuilder('e')
-            .select("to_char(e.occurredAt, 'YYYY-MM-DD')", 'day')
-            .addSelect('SUM(e.costCents)', 'costCents')
+            .select(['e.occurredAt', 'e.costCents'])
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
-            .groupBy('day')
-            .orderBy('day', 'ASC')
-            .getRawMany<{ day: string; costCents: string }>();
+            .getMany();
 
-        return rows.map((r) => ({ day: r.day, costCents: Number(r.costCents ?? 0) }));
+        const byDay = new Map<string, number>();
+        for (const event of events) {
+            const day = event.occurredAt.toISOString().slice(0, 10); // YYYY-MM-DD
+            byDay.set(day, (byDay.get(day) ?? 0) + Number(event.costCents ?? 0));
+        }
+        return Array.from(byDay.entries())
+            .map(([day, costCents]) => ({ day, costCents }))
+            .sort((a, b) => a.day.localeCompare(b.day));
     }
 
     /**
