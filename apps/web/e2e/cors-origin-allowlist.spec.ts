@@ -31,10 +31,15 @@ test.describe('CORS — evil origins do not get credentialed access', () => {
             });
             const acao = res.headers()['access-control-allow-origin'] || '';
             const acac = res.headers()['access-control-allow-credentials'] || '';
-            const echoed = acao && (acao === origin || acao === '*');
+            const echoed = Boolean(acao) && (acao === origin || acao === '*');
             const credentialed = /true/i.test(acac);
+            // `Boolean(...)` coerce: `echoed && credentialed` would
+            // otherwise return the falsy operand verbatim (e.g. "")
+            // instead of `false`, making the toBe(false) assertion
+            // flake on strict-equality even when the CORS layer is
+            // doing the right thing.
             expect(
-                echoed && credentialed,
+                Boolean(echoed && credentialed),
                 `preflight echoes evil origin "${origin}" with credentials=true: ACAO="${acao}" ACAC="${acac}"`,
             ).toBe(false);
         }
