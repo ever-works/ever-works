@@ -471,18 +471,33 @@ Browser-context isolation + JWT lifecycle + secret-leak grep + i18n error pages.
 - [x] `csrf-double-submit-cookie.spec.ts` — POST /api/works without auth returns 401/403; auth cookies declare SameSite=Strict/Lax or None+Secure (informational on missing)
 - [x] `error-page-localized.spec.ts` — /en/<bogus> < 500 with lang=en; /es/<bogus> < 500 with lang=es or fallback; bogus-locale fall-back < 500
 
-## Pass 20 — queued
+## Pass 20 — this PR (`chore/e2e-coverage-pass-20`)
 
-- [ ] `concurrent-update-conflict.spec.ts` — two parallel PATCH on same resource produce 409 / last-write-wins (not partial merge)
-- [ ] `oauth-cross-provider-isolation.spec.ts` — github + google identities on the same user don't merge silently; linking same provider twice 409
-- [ ] `markdown-rendering-sanitization.spec.ts` — markdown fields render to HTML without `<script>` / `onerror` payload survival
-- [ ] `email-bounce-handling.spec.ts` — bouncing email addresses don't crash the verification flow; status reflects bounce
-- [ ] `invitation-token-single-use.spec.ts` — invitation tokens consumed on first accept; second accept returns 4xx
-- [ ] `geo-redirect-respect-pref.spec.ts` — `Accept-Language` headers don't override an explicit user-set locale preference
-- [ ] `connection-keepalive-budget.spec.ts` — keepalive pool doesn't accumulate sockets > N across 100 requests
-- [ ] `download-resume-range.spec.ts` — large download endpoints honour `Range: bytes=` requests (or skip)
-- [ ] `password-paste-allowed.spec.ts` — password input field doesn't block paste (HIBP / NIST guidance)
-- [ ] `email-link-deeplink.spec.ts` — magic-link / verify-email URLs use https in production-shape and the token claim part is opaque
+Concurrency + OAuth provider isolation + markdown sanitization + UX/i18n hygiene. **+10 new spec files.**
+
+- [x] `concurrent-update-conflict.spec.ts` — two parallel PATCHes resolve to exactly one value (no Frankenstein merge); If-Match with bogus ETag stays < 500 with informational on no-locking
+- [x] `oauth-cross-provider-isolation.spec.ts` — github + google connect URLs target distinct hostnames; same-provider re-connect rotates state; fresh user reports disconnected on all probed providers
+- [x] `markdown-rendering-sanitization.spec.ts` — 6 markdown payloads (script, iframe, onerror, javascript: links) round-trip through work-description without crashing; HTML responses never carry executable `<script>alert(1)</script>`
+- [x] `email-bounce-handling.spec.ts` — register + send-verification with RFC-2606 reserved-bounce TLDs (.invalid, .example, .test) stay < 500
+- [x] `invitation-token-single-use.spec.ts` — invitation issuance returns token-shaped payload; second accept on a consumed token is 4xx
+- [x] `geo-redirect-respect-pref.spec.ts` — `/es/login` with Accept-Language=en-US stays on /es/; `/en/login` with Accept-Language=es-ES stays on /en/
+- [x] `connection-keepalive-budget.spec.ts` — 100 sequential /health with ≤2 5xx and informational <30s; 20×5 parallel-burst keepalive with ≤2 5xx total
+- [x] `download-resume-range.spec.ts` — Range: bytes=0-99 returns 206/200/4xx never 5xx; 206 carries Content-Range header; 4 malformed Range strings stay < 500
+- [x] `password-paste-allowed.spec.ts` — login + register password inputs have no `onpaste="..false.."` handler; fill round-trips; autocomplete=off soft-warn
+- [x] `email-link-deeplink.spec.ts` — forgot-password + send-verification responses never echo password fields or long token shapes; reset-password with bogus tokens (empty, http://, javascript:) returns 4xx
+
+## Pass 21 — queued
+
+- [ ] `transactional-email-template.spec.ts` — `/api/email-templates` (admin) renders sample emails without unresolved `{{handlebars}}` markers (deepens pass-10 email-template-render with broader template coverage)
+- [ ] `mfa-recovery-codes-issuance.spec.ts` — when 2FA is enabled, exactly 10 recovery codes are issued; each is ≥ 12 chars and base32/numeric-friendly
+- [ ] `outbound-webhook-tls.spec.ts` — when delivering webhooks to subscriber URLs, the platform refuses http:// destinations in production (https-only outbound)
+- [ ] `large-list-streaming.spec.ts` — endpoints returning > 1000 rows stream the response (chunked encoding / NDJSON) rather than buffering whole body in memory
+- [ ] `error-id-correlation.spec.ts` — 5xx error responses include a correlation id (X-Request-ID or body.errorId) for support triage
+- [ ] `auth-method-coexistence.spec.ts` — a user with both password and OAuth identities can use either method to authenticate
+- [ ] `api-throttle-headers-burst.spec.ts` — Retry-After and X-RateLimit-Reset are aligned: Retry-After seconds ≤ Reset epoch delta
+- [ ] `multi-window-logout-broadcast.spec.ts` — logout in one BrowserContext, fresh fetch from the same context's other tab returns 401
+- [ ] `viewport-meta-shape.spec.ts` — `<meta name="viewport">` declares width=device-width AND initial-scale=1 (no fixed-zoom locks)
+- [ ] `cron-cancellation-flow.spec.ts` — cancelling a queued cron run returns 4xx if not running, 2xx if cancelled; idempotent
 
 ## Pass 15+ — long-tail / hardening
 
