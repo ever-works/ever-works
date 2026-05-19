@@ -37,7 +37,7 @@ interface PeriodWindow {
 }
 
 @ApiTags('Usage')
-@Controller('works/:workId/usage')
+@Controller('api/works/:workId/usage')
 export class UsageController {
     constructor(
         private readonly budgetService: BudgetService,

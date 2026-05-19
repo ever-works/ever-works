@@ -34,7 +34,7 @@ import { CreateBudgetDto, UpdateBudgetDto } from './dto/budget.dto';
  * cap rows themselves.
  */
 @ApiTags('Budgets')
-@Controller('works/:workId/budgets')
+@Controller('api/works/:workId/budgets')
 export class BudgetsController {
     constructor(
         private readonly budgetRepository: WorkBudgetRepository,

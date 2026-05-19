@@ -38,6 +38,33 @@ jobs:
       matrix:
         node-version: [22.x]
 
+    # Service containers — let the e2e suite exercise features that would
+    # otherwise skip themselves because the dependency isn't reachable.
+    #   - mailhog: SMTP sink on :1025 + web UI on :8025. Lets the email-
+    #     verification / password-reset / magic-link / invitation specs
+    #     actually send and (optionally) inspect outbound mail. No auth
+    #     required, no TLS, no real network egress.
+    #   - redis:   distributed throttler / rate-limit / cache backend.
+    #     Most of our cache/lock infra targets the `cache_entries` SQL
+    #     table, but the throttler picks up `THROTTLER_REDIS_URL` to
+    #     enable cross-replica rate limits, and several `rate-limit-*`
+    #     and `cache-*` specs check for those behaviours.
+    services:
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -139,9 +166,61 @@ jobs:
           # EMAIL_NOT_VERIFIED. Production still enforces the check (default
           # `true`); `false` is opt-in for test contexts only.
           REQUIRE_EMAIL_VERIFICATION: 'false'
+          # SMTP — point at the mailhog service container above. The
+          # specs that exercise the email flow (verification, reset,
+          # magic-link, invitation) can now actually emit mail. The
+          # MailerService still no-ops if MAILER_PROVIDER is unset,
+          # so we explicitly opt into the smtp transport.
+          MAILER_PROVIDER: smtp
+          SMTP_HOST: 127.0.0.1
+          SMTP_PORT: '1025'
+          SMTP_IGNORE_TLS: 'true'
+          SMTP_SECURE: 'false'
+          EMAIL_FROM_EMAIL: e2e-noreply@ever.works
+          # MailHog HTTP API for specs that want to read back sent mail
+          # to extract verification / reset tokens for end-to-end flows.
+          MAILHOG_URL: http://127.0.0.1:8025
+          # Redis — wire up the throttler so distributed rate-limit
+          # specs see cross-replica behaviour instead of the in-memory
+          # fallback. Per @nest-lab/throttler-storage-redis we just
+          # need the URL; the package is optional and silently falls
+          # back if not installed.
+          REDIS_URL: redis://127.0.0.1:6379
+          THROTTLER_REDIS_URL: redis://127.0.0.1:6379
+          # Subscriptions — flip the kill-switch so the plan / tier /
+          # billing-grace specs run their real branches. The default
+          # disabled state returns `plan: { code: 'free' }` (post-fix
+          # b709f9cb) but several specs assert paid-tier transitions
+          # that only fire when the module is on.
+          SUBSCRIPTIONS_ENABLED: 'true'
+          # OAuth — register test sentinels so the providers appear in
+          # /api/auth/providers and the OAuth-flow specs can reach
+          # /api/oauth/<provider>/authorize. The actual github.com /
+          # accounts.google.com endpoints will reject these client_ids,
+          # but each spec mocks the upstream provider at the
+          # Playwright route() layer so the real provider never sees
+          # the request. The credentials only need to exist for the
+          # platform-side provider registration to succeed.
+          GH_CLIENT_ID: e2e-fake-github-client-id
+          GH_CLIENT_SECRET: e2e-fake-github-client-secret-padding-to-32+
+          GOOGLE_CLIENT_ID: e2e-fake-google-client-id
+          GOOGLE_CLIENT_SECRET: e2e-fake-google-client-secret-padding-to-32+
+          # Platform secrets — set fake-but-shaped values so guards that
+          # require them at boot pass.
+          # - PLATFORM_API_SECRET_TOKEN: bearer for /api/activity-log/ingest
+          #   (PlatformSecretGuard, EW-120). Without it the guard 401s
+          #   even for valid callers and the ingest specs can't be
+          #   exercised end-to-end.
+          # - PLATFORM_ENCRYPTION_KEY: AES-256-GCM key (64 hex chars =
+          #   32 bytes) used by PlatformSyncSecretService.rotate. The
+          #   activity-sync rotate-secret spec needs this to succeed,
+          #   not just 409.
+          PLATFORM_API_SECRET_TOKEN: e2e-platform-secret-token-deterministic-32+chars
+          PLATFORM_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           # Web
           API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
+          WEB_URL: http://localhost:3000
           # Playwright
           CI: 'true'
           PLAYWRIGHT_BASE_URL: http://localhost:3000

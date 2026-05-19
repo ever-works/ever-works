@@ -3,7 +3,6 @@ import {
     ExecutionContext,
     Injectable,
     Logger,
-    ServiceUnavailableException,
     UnauthorizedException,
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
@@ -28,10 +27,15 @@ export class PlatformSecretGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
         const expected = process.env.PLATFORM_API_SECRET_TOKEN;
         if (!expected) {
-            this.logger.error(
-                'PLATFORM_API_SECRET_TOKEN is not configured; rejecting ingest request',
+            // No token configured (dev/CI without the secret): treat as
+            // "no caller can authenticate" rather than 503. This keeps
+            // the ingest endpoint's failure mode 401 in every env, which
+            // is also what the e2e contract pins (activity-log-export
+            // spec expects 401/403 for unauth ingest).
+            this.logger.warn(
+                'PLATFORM_API_SECRET_TOKEN is not configured; rejecting ingest request as unauthorized',
             );
-            throw new ServiceUnavailableException('Ingest endpoint not configured');
+            throw new UnauthorizedException('Ingest endpoint not configured');
         }
 
         const req = context.switchToHttp().getRequest<RequestLike>();

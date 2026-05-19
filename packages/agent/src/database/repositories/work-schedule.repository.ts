@@ -4,6 +4,31 @@ import { Repository, LessThanOrEqual } from 'typeorm';
 import { WorkSchedule } from '@src/entities/work-schedule.entity';
 import { WorkScheduleStatus, GenerateStatusType } from '@src/entities/types';
 
+const DISPATCH_SCHEDULE_SELECT = [
+    'schedule.id',
+    'schedule.workId',
+    'schedule.userId',
+    'schedule.cadence',
+    'schedule.status',
+    'schedule.billingMode',
+    'schedule.nextRunAt',
+    'schedule.lastRunAt',
+    'schedule.lastRunStatus',
+    'schedule.failureCount',
+    'schedule.maxFailureBeforePause',
+    'schedule.alwaysCreatePullRequest',
+    'schedule.scheduledFor',
+    'schedule.providerOverrides',
+    'schedule.createdAt',
+    'schedule.updatedAt',
+    'work.id',
+    'work.name',
+    'work.slug',
+    'work.userId',
+    'work.owner',
+    'work.sourceRepository',
+];
+
 @Injectable()
 export class WorkScheduleRepository {
     constructor(
@@ -66,15 +91,26 @@ export class WorkScheduleRepository {
     }
 
     async findDue(limit: number): Promise<WorkSchedule[]> {
-        return this.repository.find({
-            where: {
-                status: WorkScheduleStatus.ACTIVE,
-                nextRunAt: LessThanOrEqual(new Date()),
-            },
-            order: { nextRunAt: 'ASC' },
-            take: limit,
-            relations: ['work', 'user'],
-        });
+        return this.repository
+            .createQueryBuilder('schedule')
+            .leftJoinAndSelect('schedule.work', 'work')
+            .select(DISPATCH_SCHEDULE_SELECT)
+            .where('schedule.status = :status', { status: WorkScheduleStatus.ACTIVE })
+            .andWhere('schedule.nextRunAt <= :now', {
+                now: Date.now(),
+            })
+            .orderBy('schedule.nextRunAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    async findByIdForDispatch(id: string): Promise<WorkSchedule | null> {
+        return this.repository
+            .createQueryBuilder('schedule')
+            .leftJoinAndSelect('schedule.work', 'work')
+            .select(DISPATCH_SCHEDULE_SELECT)
+            .where({ id })
+            .getOne();
     }
 
     async findStuckGenerating(olderThan: Date): Promise<WorkSchedule[]> {
@@ -109,7 +145,6 @@ export class WorkScheduleRepository {
         }
 
         const originalNextRunAt = schedule.nextRunAt;
-        const originalNextRunAtMs = originalNextRunAt.getTime();
         const dispatchedAt = new Date();
 
         const result = await this.repository
@@ -124,7 +159,9 @@ export class WorkScheduleRepository {
             })
             .where('id = :id', { id: scheduleId })
             .andWhere('status = :status', { status: WorkScheduleStatus.ACTIVE })
-            .andWhere('nextRunAt = :nextRunAt', { nextRunAt: originalNextRunAtMs })
+            .andWhere('nextRunAt = :nextRunAt', {
+                nextRunAt: originalNextRunAt.getTime(),
+            })
             .execute();
 
         return (result.affected ?? 0) > 0 ? originalNextRunAt : null;

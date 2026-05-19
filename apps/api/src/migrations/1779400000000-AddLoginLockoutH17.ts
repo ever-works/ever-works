@@ -21,28 +21,32 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  */
 export class AddLoginLockoutH17_1779400000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumn(
-            'users',
+        const columns = [
             new TableColumn({
                 name: 'failedLoginAttempts',
                 type: 'int',
                 default: 0,
                 isNullable: false,
             }),
-        );
-
-        await queryRunner.addColumn(
-            'users',
             new TableColumn({
                 name: 'lockedUntil',
                 type: 'timestamp',
                 isNullable: true,
             }),
-        );
+        ];
+
+        for (const column of columns) {
+            if (!(await queryRunner.hasColumn('users', column.name))) {
+                await queryRunner.addColumn('users', column);
+            }
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropColumn('users', 'lockedUntil');
-        await queryRunner.dropColumn('users', 'failedLoginAttempts');
+        for (const columnName of ['lockedUntil', 'failedLoginAttempts']) {
+            if (await queryRunner.hasColumn('users', columnName)) {
+                await queryRunner.dropColumn('users', columnName);
+            }
+        }
     }
 }

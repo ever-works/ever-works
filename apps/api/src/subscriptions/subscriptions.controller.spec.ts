@@ -60,7 +60,7 @@ describe('SubscriptionsController', () => {
     });
 
     describe('getPlan', () => {
-        it('returns enabled=false envelope when subscriptions are disabled', async () => {
+        it('returns enabled=false envelope with the free plan as fallback when disabled', async () => {
             subscriptionService.summarizePlan.mockResolvedValue({
                 enabled: false,
                 plan: null,
@@ -71,7 +71,14 @@ describe('SubscriptionsController', () => {
 
             expect(authService.getUser).toHaveBeenCalledWith('user-1');
             expect(subscriptionService.summarizePlan).toHaveBeenCalledWith(user);
-            expect(result).toEqual({ status: 'success', enabled: false, plan: null });
+            // Disabled module returns plan: { code: 'free' } instead of null
+            // so the web client (and the e2e tier-gating contract) can read
+            // `plan.code` without special-casing the disabled state.
+            expect(result).toEqual({
+                status: 'success',
+                enabled: false,
+                plan: { code: 'free', name: 'Free' },
+            });
         });
 
         it('returns plan envelope mapping code/displayName/allowances when enabled', async () => {

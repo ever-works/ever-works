@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
+import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
@@ -13,6 +13,14 @@ import { config } from '../../config';
 function caseInsensitiveLike(search: string) {
     return Raw((alias) => buildCaseInsensitiveLikeClause(alias), { search });
 }
+
+const WORK_ACCESS_USER_SELECT = [
+    'user.id',
+    'user.username',
+    'user.email',
+    'user.committerName',
+    'user.committerEmail',
+];
 
 @Injectable()
 export class WorkRepository {
@@ -76,6 +84,15 @@ export class WorkRepository {
             where: { id },
             relations: ['user'],
         });
+    }
+
+    async findByIdForAccess(id: string): Promise<Work | null> {
+        return this.repository
+            .createQueryBuilder('work')
+            .leftJoin('work.user', 'user')
+            .addSelect(WORK_ACCESS_USER_SELECT)
+            .where({ id })
+            .getOne();
     }
 
     async findByIds(ids: string[]): Promise<Work[]> {
@@ -341,6 +358,23 @@ export class WorkRepository {
     }
 
     /**
+     * Conditional UPDATE for the lazy bootstrap of `webhookSecretEncrypted`.
+     * Same race-safe semantics as `setPlatformSyncSecretIfNull` — the first
+     * deploy that wins the conditional UPDATE persists its randomly-generated
+     * plaintext; concurrent deploys re-read.
+     */
+    async setWebhookSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ webhookSecretEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('webhookSecretEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Update platform-sync observability columns after a pull-transport
      * round-trip. Pass `lastSuccessAt` on success or
      * `{ lastErrorAt, lastErrorMessage }` on failure — partial updates are
@@ -453,12 +487,14 @@ export class WorkRepository {
     }
 
     async getUnfinishedGenerations(olderThan: Date): Promise<Work[]> {
-        const stalledWorks = await this.repository.find({
-            where: {
-                generationProgressedAt: LessThan(olderThan),
-                generationFinishedAt: IsNull(),
-            },
-        });
+        const stalledWorks = await this.repository
+            .createQueryBuilder('work')
+            .select(['work.id', 'work.generateStatus'])
+            .where('work.generationProgressedAt < :olderThan', {
+                olderThan: olderThan.getTime(),
+            })
+            .andWhere('work.generationFinishedAt IS NULL')
+            .getMany();
 
         return stalledWorks;
     }
@@ -703,6 +739,13 @@ export class WorkRepository {
         return this.repository
             .createQueryBuilder('work')
             .leftJoinAndSelect('work.user', 'user')
+            .select([
+                'work.id',
+                'work.generateStatus',
+                'work.itemsCount',
+                'work.updatedAt',
+                'user.id',
+            ])
             .where('COALESCE(work.itemsCount, 0) > 0')
             .orderBy('work.updatedAt', 'DESC')
             .addOrderBy('work.id', 'ASC')

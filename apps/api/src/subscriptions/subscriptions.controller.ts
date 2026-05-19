@@ -41,10 +41,14 @@ export class SubscriptionsController {
         const user = await this.authService.getUser(auth.userId);
         const summary = await this.subscriptionService.summarizePlan(user);
         if (!summary.enabled) {
+            // Subscriptions module is disabled in this deploy; every user is
+            // effectively on the free tier. Returning `plan: null` here used
+            // to leak the disabled-state to the client and broke any caller
+            // that read `plan.code` (web UI, e2e tier-gating contract).
             return {
                 status: 'success',
                 enabled: false,
-                plan: null,
+                plan: { code: 'free', name: 'Free' },
             };
         }
 
