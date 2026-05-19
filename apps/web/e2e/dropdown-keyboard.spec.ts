@@ -28,21 +28,22 @@ test.describe('Dropdown keyboard — open + arrow + select', () => {
         await firstItem.focus();
         await page.keyboard.press('ArrowDown');
         const activeText = await page.evaluate(() => document.activeElement?.textContent ?? '');
-        // Active element after ArrowDown should be a menu-shaped element
-        // (we don't pin a specific label).
+        // Active element after ArrowDown should still be inside a
+        // menu-shaped container. Greptile P1: previously this branch
+        // called test.skip when ArrowDown moved focus OUT of the menu,
+        // turning the exact regression this test exists to catch into a
+        // silent skip. Now we assert directly — a real bug fails the
+        // suite.
         const stillInsideMenu = await page.evaluate(
             () =>
                 document.activeElement?.closest(
                     '[role="menu"], [role="menubar"], [role="listbox"]',
                 ) !== null,
         );
-        if (!stillInsideMenu) {
-            test.skip(
-                true,
-                `ArrowDown moved focus outside the menu (active="${activeText.slice(0, 40)}")`,
-            );
-        }
-        expect(stillInsideMenu).toBe(true);
+        expect(
+            stillInsideMenu,
+            `ArrowDown moved focus outside the menu (active="${activeText.slice(0, 40)}")`,
+        ).toBe(true);
     });
 
     test('Escape closes an open menu', async ({ page }) => {

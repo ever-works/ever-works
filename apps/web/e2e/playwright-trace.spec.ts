@@ -12,9 +12,13 @@ import { test, expect } from '@playwright/test';
  * the value is the recording, not the pass/fail.
  */
 
-test.describe('Golden trace — login + dashboard + works', () => {
-    test.use({ trace: 'on' });
+// Codex P1: `test.use({ trace: 'on' })` must live at the top level of
+// the file, not inside a `describe`. Playwright refuses to load the
+// whole suite ("Cannot use({ trace }) in a describe group, because it
+// forces a new worker") which silently breaks every test discovery.
+test.use({ trace: 'on' });
 
+test.describe('Golden trace — login + dashboard + works', () => {
     test('walks the dashboard happy path under trace recording', async ({ page, baseURL }) => {
         const base = baseURL || 'http://localhost:3000';
         // 1. Login page renders.

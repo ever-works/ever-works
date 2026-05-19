@@ -31,7 +31,12 @@ test.describe('OAuth authorize URL — well-formed shape', () => {
         // Required OAuth 2.0 params.
         expect(u2.searchParams.get('client_id'), 'missing client_id').toBeTruthy();
         expect(u2.searchParams.get('redirect_uri'), 'missing redirect_uri').toBeTruthy();
-        expect(u2.searchParams.get('response_type') ?? 'code').toBe('code');
+        // Greptile P1: the previous shape used `?? 'code'` which made
+        // this assertion a no-op when the parameter was MISSING (null ??
+        // 'code' is 'code'). Now we directly compare the value, so a
+        // missing response_type — an OAuth 2.0 spec violation — fails
+        // the test instead of silently passing.
+        expect(u2.searchParams.get('response_type'), 'missing or wrong response_type').toBe('code');
         // GitHub uses comma-separated scopes; OAuth spec says space-separated.
         // Either way, a non-empty scope SHOULD be there.
         const scope = u2.searchParams.get('scope');

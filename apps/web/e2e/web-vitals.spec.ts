@@ -19,17 +19,18 @@ const CLS_CEILING = 0.5;
 async function collectVitals(
     page: import('@playwright/test').Page,
 ): Promise<Record<string, number>> {
-    // Inject web-vitals via the cdn build. The library exposes
-    // onLCP, onFCP, onCLS, onINP — we push each result into a global
-    // map that we read back at the end.
-    await page.addInitScript(() => {
-        (window as unknown as { __vitals?: Record<string, number> }).__vitals = {};
-    });
+    // Initialise the accumulator INSIDE the page.evaluate that follows.
+    // Earlier shape used addInitScript, but Greptile P1: addInitScript
+    // only takes effect on FUTURE navigations, so by the time we call
+    // page.evaluate after page.goto, __vitals is still undefined and the
+    // onLCP callbacks would throw outside the try/catch. Initialise on
+    // the live `window` here and the issue disappears.
     return page.evaluate(async () => {
         const w = window as unknown as {
             __vitals: Record<string, number>;
             __vitalsLoaded?: boolean;
         };
+        if (!w.__vitals) w.__vitals = {};
         // Load web-vitals from the official CDN. Skip if blocked.
         await new Promise<void>((resolve) => {
             const s = document.createElement('script');
