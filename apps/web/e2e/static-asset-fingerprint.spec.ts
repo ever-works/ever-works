@@ -10,7 +10,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Static assets — URL fingerprinting', () => {
     test('_next/static URLs include a hash-shaped segment', async ({ page, baseURL }) => {
-        const staticUrls: string[] = [];
+        // Greptile P2 / team rule: mutable accumulator arrays use
+        // `let` per ever-co/ever-gauzy#8961.
+        let staticUrls: string[] = [];
         page.on('request', (req) => {
             if (/\/_next\/static\//.test(req.url())) {
                 staticUrls.push(req.url());
@@ -39,7 +41,7 @@ test.describe('Static assets — URL fingerprinting', () => {
     });
 
     test('_next/static responses carry long Cache-Control max-age', async ({ page, baseURL }) => {
-        const headers: Array<{ url: string; cc: string }> = [];
+        let headers: Array<{ url: string; cc: string }> = [];
         page.on('response', (res) => {
             const url = res.url();
             if (/\/_next\/static\//.test(url)) {

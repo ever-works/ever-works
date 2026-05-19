@@ -22,7 +22,9 @@ const ROUTES = ['/en', '/en/works', '/en/settings'];
 test.describe('Hydration — no React hydration mismatches', () => {
     for (const route of ROUTES) {
         test(`${route} renders without hydration warnings`, async ({ page }) => {
-            const warnings: string[] = [];
+            // Greptile P2 / team rule: mutable accumulator arrays use
+            // `let` per ever-co/ever-gauzy#8961.
+            let warnings: string[] = [];
             page.on('console', (msg) => {
                 if (msg.type() !== 'warning' && msg.type() !== 'error') return;
                 const text = msg.text();
@@ -45,7 +47,7 @@ test.describe('Hydration — no React hydration mismatches', () => {
 
 test.describe('Hydration — no uncaught errors in the boot path', () => {
     test('/en doesn\'t log any "Uncaught" errors to console', async ({ page }) => {
-        const errs: string[] = [];
+        let errs: string[] = [];
         page.on('pageerror', (err) => {
             errs.push(err.message);
         });

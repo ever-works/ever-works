@@ -85,5 +85,15 @@ test.describe('Storage disabled — sessionStorage write throws', () => {
             waitUntil: 'domcontentloaded',
         });
         expect(res?.status() ?? 0).toBeLessThan(500);
+        // Greptile P2: status < 500 alone isn't enough — a white-screen
+        // render would also pass. Match the body-length assertion the
+        // other two tests in this file already carry.
+        const body = await page
+            .locator('body')
+            .innerText()
+            .catch(() => '');
+        expect(body.length, 'page rendered empty body when sessionStorage threw').toBeGreaterThan(
+            20,
+        );
     });
 });

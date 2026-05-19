@@ -58,6 +58,31 @@ test.describe('TimeZone — page text differs across TZ contexts', () => {
         // Both pages rendered; sanity check.
         expect(tokyoText.length).toBeGreaterThan(20);
         expect(laText.length).toBeGreaterThan(20);
+        // Greptile P1: the spec promised "distinct timestamps" across
+        // TZs but never compared the bodies. Now we look for at least
+        // ONE digit-bearing substring that differs between the two —
+        // any real timestamp differs by hour offset across Tokyo + LA.
+        const timeChunks = (txt: string): string[] =>
+            txt.match(
+                /\b\d{1,2}[:.,]\d{2}(?:[:.]\d{2})?(?:\s?[AP]M|\s?am|\s?pm|\s?[A-Z]{2,4})?\b/g,
+            ) ?? [];
+        const tokyoTimes = timeChunks(tokyoText);
+        const laTimes = timeChunks(laText);
+        // If neither page surfaced any clock-shaped tokens (purely
+        // relative strings like "5 min ago"), skip — we can't compare.
+        if (tokyoTimes.length === 0 && laTimes.length === 0) {
+            test.skip(
+                true,
+                "no clock-shaped timestamps surfaced in either body — can't verify TZ distinctness",
+            );
+        }
+        // Otherwise, the two body texts must NOT be identical at the
+        // timestamp positions.
+        const same = JSON.stringify(tokyoTimes.sort()) === JSON.stringify(laTimes.sort());
+        expect(
+            same,
+            `Tokyo and LA bodies rendered identical timestamp tokens — TZ not honored. tokyo=${tokyoTimes.slice(0, 3).join(', ')} la=${laTimes.slice(0, 3).join(', ')}`,
+        ).toBe(false);
     });
 });
 
