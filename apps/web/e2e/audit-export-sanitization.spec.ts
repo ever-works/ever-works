@@ -8,6 +8,9 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  * leak schema names).
  */
 
+// Greptile P2: include password-hash prefixes alongside the API-key
+// patterns so the activity-log path actually covers bcrypt/argon2/scrypt
+// (previously only the account-export test checked HASH_PATTERNS).
 const SECRET_PATTERNS = [
     /password.{0,5}hash/i,
     /\bjwt\b/i,
@@ -19,6 +22,9 @@ const SECRET_PATTERNS = [
     /AKIA[A-Z0-9]{16}/, // AWS access key ID
     /AIza[A-Za-z0-9_-]{35}/, // Google API key
     /sk-[a-zA-Z0-9]{20,}/, // OpenAI-style
+    /\$2[aby]?\$\d{2}\$[./A-Za-z0-9]{53}/, // bcrypt
+    /\$argon2[id]\$/, // argon2
+    /\$scrypt\$/i, // scrypt
 ];
 
 test.describe('Audit export — sanitization', () => {
