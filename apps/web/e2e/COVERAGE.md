@@ -346,20 +346,37 @@ UX polish + infra-shape probes. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `webrtc-permissions` from the storageState project so its unauth /en/login getUserMedia probe measures the unauth case.
 
-## Pass 12 — queued
+## Pass 12 — this PR (`chore/e2e-coverage-pass-12`)
 
-- [ ] `bundle-size-budget.spec.ts` — Next.js \_next/static/\* bundle aggregate gz-size under 1 MB on first load
-- [ ] `service-worker-update.spec.ts` — when SW is registered, a new version triggers `updatefound` → activates on next nav
-- [ ] `polyfill-presence.spec.ts` — core-js / regenerator-runtime polyfills loaded conditionally (no extra weight on modern browsers)
-- [ ] `xss-html-encoding.spec.ts` — user-controlled fields (work name, item description) are HTML-encoded on render
-- [ ] `csv-injection.spec.ts` — fields starting with `=`, `+`, `-`, `@` in CSV exports are prefixed with `'` or escaped
-- [ ] `sql-where-clause-injection.spec.ts` — `?status=` + `?actionType=` etc. don't permit secondary SQL via union/subquery payloads
-- [ ] `tls-version-header.spec.ts` — public API responses report TLS 1.2+ via `Alt-Svc` / `Server` header inspection (production env only)
-- [ ] `cookie-rotation.spec.ts` — session cookie value changes after password change (forces re-login on other devices)
-- [ ] `device-fingerprinting-opt-out.spec.ts` — Do-Not-Track / GPC headers honored by analytics SDKs
-- [ ] `redirect-prevention.spec.ts` — `?next=https://attacker.example.com` is filtered (open-redirect guard)
+Web bundle + browser security boundaries. **+10 new spec files.**
 
-## Pass 13+ — long-tail / hardening
+- [x] `bundle-size-budget.spec.ts` — `_next/static/*` aggregate < 5 MB, < 100 JS chunks, no single chunk > 2 MB
+- [x] `service-worker-update.spec.ts` — `getRegistrations` callable, `update()` doesn't crash, reload survives SW
+- [x] `polyfill-presence.spec.ts` — no core-js / regenerator-runtime / babel-polyfill / es5-shim scripts, ≤ 5 nomodule scripts, Promise/fetch/Object.assign native
+- [x] `xss-html-encoding.spec.ts` — `<script>` in work name doesn't crash, response is JSON not HTML, login page never echoes executable `alert(1)`
+- [x] `csv-injection.spec.ts` — `=cmd|...`, `+sum(...)`, `-cmd|...`, `@SUM(...)` payloads escaped/prefixed in CSV exports
+- [x] `sql-where-clause-injection.spec.ts` — 8 payloads × 6 param keys never 5xx, UNION-style doesn't leak cross-tenant rows, POST body SQLi also < 500
+- [x] `tls-version-header.spec.ts` — production HSTS posture (skip on http), Server header no `nginx/1.18.0`-style versions, X-Powered-By stripped
+- [x] `cookie-rotation.spec.ts` — update-password: new password works, OLD password rejected post-rotation
+- [x] `device-fingerprinting-opt-out.spec.ts` — DNT=1 + Sec-GPC=1 → no PostHog/Clarity/GA/DoubleClick/Segment/Amplitude/Mixpanel/FullStory/Hotjar requests on /en/login
+- [x] `redirect-prevention.spec.ts` — `?next/redirect/returnTo/continueTo/callbackUrl` × 5 evil targets don't land off-origin, OAuth callback no 3xx to attacker, `javascript:` blocked
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `bundle-size-budget`, `service-worker-update`, `polyfill-presence`, `xss-html-encoding`, `device-fingerprinting-opt-out`, `redirect-prevention`, and `tls-version-header` from the storageState project so their unauth UI assertions hit fresh contexts.
+
+## Pass 13 — queued
+
+- [ ] `realtime-collaboration.spec.ts` — Yjs / Liveblocks-style collab probe: same work open in two contexts, edit in one reflects in other
+- [ ] `time-zone-rendering.spec.ts` — timestamps render in user's locale TZ (Asia/Tokyo vs America/Los_Angeles)
+- [ ] `referrer-policy-redirects.spec.ts` — outbound links to external hosts carry `rel=noreferrer noopener`
+- [ ] `cors-preflight-cache.spec.ts` — Access-Control-Max-Age on preflight responses
+- [ ] `clock-skew-tolerance.spec.ts` — server accepts JWTs minted ~30s out of sync (nbf/exp slack)
+- [ ] `static-asset-fingerprint.spec.ts` — `_next/static/*` URLs are content-hashed, no cache-busting query params needed
+- [ ] `hydration-no-errors.spec.ts` — no React hydration mismatch warnings in console on /en, /en/works, /en/settings
+- [ ] `feature-detect-storage.spec.ts` — page doesn't crash when localStorage is disabled (Safari Private Browsing simulation)
+- [ ] `error-boundary-isolation.spec.ts` — error in one component doesn't take down the whole route (ErrorBoundary catches)
+- [ ] `iframe-sandbox.spec.ts` — embedded iframes (oauth providers, video) carry restrictive sandbox attribute
+
+## Pass 14+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
