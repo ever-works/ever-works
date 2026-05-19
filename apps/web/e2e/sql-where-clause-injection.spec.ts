@@ -24,7 +24,9 @@ const PARAM_KEYS = ['search', 'status', 'actionType', 'sort', 'filter', 'q'];
 test.describe('SQL injection — query parameters', () => {
     for (const payload of PAYLOADS) {
         for (const key of PARAM_KEYS) {
-            test(`/api/works?${key}=<sqli> responds < 500 (${payload.slice(0, 30)})`, async ({ request }) => {
+            test(`/api/works?${key}=<sqli> responds < 500 (${payload.slice(0, 30)})`, async ({
+                request,
+            }) => {
                 const u = await registerUserViaAPI(request);
                 const res = await request.get(
                     `${API_BASE}/api/works?${key}=${encodeURIComponent(payload)}`,
