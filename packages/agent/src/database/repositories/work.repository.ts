@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
+import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
@@ -76,6 +76,10 @@ export class WorkRepository {
             where: { id },
             relations: ['user'],
         });
+    }
+
+    async findByIdForAccess(id: string): Promise<Work | null> {
+        return this.repository.createQueryBuilder('work').where({ id }).getOne();
     }
 
     async findByIds(ids: string[]): Promise<Work[]> {
@@ -453,12 +457,14 @@ export class WorkRepository {
     }
 
     async getUnfinishedGenerations(olderThan: Date): Promise<Work[]> {
-        const stalledWorks = await this.repository.find({
-            where: {
-                generationProgressedAt: LessThan(olderThan),
-                generationFinishedAt: IsNull(),
-            },
-        });
+        const stalledWorks = await this.repository
+            .createQueryBuilder('work')
+            .select(['work.id', 'work.generateStatus'])
+            .where('work.generationProgressedAt < :olderThan', {
+                olderThan: olderThan.getTime(),
+            })
+            .andWhere('work.generationFinishedAt IS NULL')
+            .getMany();
 
         return stalledWorks;
     }
@@ -703,6 +709,13 @@ export class WorkRepository {
         return this.repository
             .createQueryBuilder('work')
             .leftJoinAndSelect('work.user', 'user')
+            .select([
+                'work.id',
+                'work.generateStatus',
+                'work.itemsCount',
+                'work.updatedAt',
+                'user.id',
+            ])
             .where('COALESCE(work.itemsCount, 0) > 0')
             .orderBy('work.updatedAt', 'DESC')
             .addOrderBy('work.id', 'ASC')

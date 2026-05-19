@@ -233,7 +233,7 @@ export class WorkScheduleService {
 
     async pauseSchedule(scheduleId: string) {
         this.ensureSchedulingEnabled();
-        const schedule = await this.scheduleRepository.findById(scheduleId);
+        const schedule = await this.scheduleRepository.findByIdForDispatch(scheduleId);
         if (!schedule) {
             return;
         }
@@ -256,7 +256,7 @@ export class WorkScheduleService {
             return null;
         }
 
-        const schedule = await this.scheduleRepository.findById(scheduleId);
+        const schedule = await this.scheduleRepository.findByIdForDispatch(scheduleId);
         if (!schedule) {
             return null;
         }
