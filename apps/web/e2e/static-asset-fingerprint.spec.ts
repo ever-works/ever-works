@@ -10,10 +10,11 @@ import { test, expect } from '@playwright/test';
 
 // Next.js only emits content-hashed `_next/static/*` URLs and long
 // `Cache-Control: immutable` headers in a production build (`next start`).
-// The e2e workflow runs `next dev` (NODE_ENV=development), which serves
-// chunks without stable hashes and with `Cache-Control: no-store`. Skip
-// when not running against a prod build.
-const IS_PROD_BUILD = process.env.NODE_ENV === 'production';
+// The default dev e2e job (`next dev`) serves chunks without stable
+// hashes and with `Cache-Control: no-store`. The dedicated
+// `e2e-prod-build` job sets `E2E_PROD_BUILD=1` so these specs run
+// there with the prod server invariants in place.
+const IS_PROD_BUILD = process.env.E2E_PROD_BUILD === '1' || process.env.NODE_ENV === 'production';
 
 test.describe('Static assets — URL fingerprinting', () => {
     test.skip(

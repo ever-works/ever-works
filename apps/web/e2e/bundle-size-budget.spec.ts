@@ -14,12 +14,13 @@ import { test, expect } from '@playwright/test';
 const STATIC_BUDGET_BYTES = 5 * 1024 * 1024;
 const JS_FILE_COUNT_CEILING = 100;
 
-// Bundle-size budgets only apply to production builds (`next start`). The
-// dev server (`next dev`, used by CI's e2e workflow) ships an unminified
-// React + unsplit chunks, which legitimately exceeds the budget by 10x.
-const SKIP_REASON =
-    'bundle-size budgets only meaningful against `next start` (NODE_ENV=production)';
-const IS_PROD_BUILD = process.env.NODE_ENV === 'production';
+// Bundle-size budgets only apply to production builds (`next start`).
+// The default dev e2e job (`next dev`) ships unminified React + unsplit
+// chunks, which legitimately exceeds the budget by 10x. The dedicated
+// `e2e-prod-build` job in .github/workflows/e2e.yml sets `E2E_PROD_BUILD=1`
+// (and runs the web under `next start`) so these specs run there.
+const SKIP_REASON = 'bundle-size budgets only meaningful against the e2e-prod-build job';
+const IS_PROD_BUILD = process.env.E2E_PROD_BUILD === '1' || process.env.NODE_ENV === 'production';
 
 test.describe('Bundle size — first-load static assets', () => {
     test.skip(!IS_PROD_BUILD, SKIP_REASON);

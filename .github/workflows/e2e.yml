@@ -246,3 +246,115 @@ jobs:
             /tmp/web.log
           retention-days: 7
           if-no-files-found: ignore
+
+  # Prod-build sub-job — runs ONLY the specs that need `next start`
+  # (bundle-size budgets, _next/static fingerprint + long Cache-Control).
+  # `next dev` ships unminified React + unsplit chunks and emits
+  # `Cache-Control: no-store`, so those invariants only hold against
+  # a production build. Keeping this a separate, focused job means we
+  # don't pay the cost of a prod build for the 1000+ dev-mode specs
+  # while still validating the ~4 prod-only invariants.
+  e2e-prod-build:
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        with:
+          version: 10.13.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages (excluding docs)
+        run: pnpm build --filter=!./apps/docs
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start API + prod web (`next start`), run prod-only specs
+        working-directory: apps/web
+        run: |
+          set -e
+
+          echo "::group::Starting API on :3100"
+          nohup pnpm --filter ever-works-api dev > /tmp/api.log 2>&1 &
+          disown $!
+          echo "::endgroup::"
+
+          echo "::group::Starting prod web on :3000 (next start)"
+          # `pnpm build` (above) already produced .next; just boot the
+          # prod server. NODE_ENV=production must be set BEFORE start
+          # so Next emits long Cache-Control + hashed chunks.
+          NODE_ENV=production nohup pnpm --filter ever-works-web start > /tmp/web.log 2>&1 &
+          disown $!
+          echo "::endgroup::"
+
+          echo "Waiting for API on :3100 ..."
+          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done' \
+            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+
+          echo "Waiting for prod Web on :3000 ..."
+          timeout 240 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done' \
+            || { echo "Prod Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+
+          echo "::group::Running prod-only Playwright specs"
+          trap '{
+            echo "::group::API log (last 200 lines)"
+            tail -n 200 /tmp/api.log || true
+            echo "::endgroup::"
+            echo "::group::Web log (last 200 lines)"
+            tail -n 200 /tmp/web.log || true
+            echo "::endgroup::"
+          }' EXIT
+          pnpm exec playwright test bundle-size-budget static-asset-fingerprint
+          echo "::endgroup::"
+        env:
+          # API + web env mirror the dev-mode job above; the only delta
+          # is NODE_ENV=production for the web server (set inline on
+          # the `start` command) so the asset-fingerprint / bundle-
+          # size invariants apply.
+          DATABASE_TYPE: sqlite
+          DATABASE_IN_MEMORY: 'true'
+          AUTH_SECRET: ever-works-e2e-ci-secret-padding-to-meet-32min-fake
+          NODE_ENV: development # API stays in dev for in-memory DB
+          DATABASE_AUTOMIGRATE: 'true'
+          REQUIRE_EMAIL_VERIFICATION: 'false'
+          API_URL: http://localhost:3100
+          NEXT_PUBLIC_API_URL: http://localhost:3100/api
+          WEB_URL: http://localhost:3000
+          CI: 'true'
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          # E2E_PROD_BUILD signals the prod-only specs that the web
+          # server is running under `next start` (so bundle-size +
+          # static-asset-fingerprint should run their full assertions,
+          # not skip). Decoupled from NODE_ENV so the test runner can
+          # stay in 'development' while the served pages are prod.
+          E2E_PROD_BUILD: '1'
+
+      - name: Upload Playwright prod-build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-prod-build-report-${{ github.ref_name }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report
+            apps/web/e2e/test-results
+          retention-days: 14
+          if-no-files-found: ignore
