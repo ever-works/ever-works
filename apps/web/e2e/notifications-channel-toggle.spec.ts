@@ -81,15 +81,23 @@ test.describe('Notifications — channel toggle reflects on next GET', () => {
         });
         // Either 4xx (rejected) or 2xx silent-ignore. NEVER 5xx.
         expect(res.status()).toBeLessThan(500);
-        if (res.ok()) {
-            const body = await res.json();
-            // If 200, must NOT have echoed the bogus key as accepted.
-            const echoedBogus = JSON.stringify(body).includes(bogus);
-            if (echoedBogus) {
-                test.info().annotations.push({
-                    type: 'informational',
-                    description: `unknown channel "${bogus}" was silently accepted into the payload`,
-                });
+        // Codex P2: 204 No Content (which `res.ok()` accepts) has no
+        // body, so `await res.json()` would throw and fail the test
+        // for the wrong reason. Gate on JSON content-type + non-empty
+        // body before parsing.
+        if (res.ok() && res.status() !== 204) {
+            const ct = res.headers()['content-type'] || '';
+            if (ct.includes('json')) {
+                const text = await res.text();
+                if (text.length > 0) {
+                    const echoedBogus = text.includes(bogus);
+                    if (echoedBogus) {
+                        test.info().annotations.push({
+                            type: 'informational',
+                            description: `unknown channel "${bogus}" was silently accepted into the payload`,
+                        });
+                    }
+                }
             }
         }
     });
