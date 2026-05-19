@@ -242,35 +242,47 @@ now also exclude `i18n-fallback`, `print-styles`, `public-pages-cache`,
 and `screenshots-visual` from the storageState project so they run
 fresh-context.
 
-## Pass 6 — queued
+## Pass 6 — this PR (`chore/e2e-coverage-pass-6`)
 
-- [ ] `webhook-signature.spec.ts` — verify github-app webhook HMAC signature validation rejects forged events
-- [ ] `pagination.spec.ts` — `/api/works`, `/api/notifications`, `/api/activity-log` honour `?limit`/`?offset`/`?cursor` consistently
-- [ ] `sort-filter.spec.ts` — list endpoints respect `?sort=name`, `?status=...` filters without 5xx
-- [ ] `large-payload.spec.ts` — boundary checks: 100 KB body accepted, 50 MB rejected with 413 (not 5xx)
-- [ ] `oauth-state-replay.spec.ts` — re-using a consumed OAuth state value returns 4xx, not a silent 200
-- [ ] `password-policy.spec.ts` — common-password rejection, length boundaries, special-char requirement (current vs new on update)
-- [ ] `account-deletion-flow.spec.ts` — full delete-my-account journey + tombstoning behaviour
-- [ ] `email-verification-flow.spec.ts` — full happy path: register → unverified state → resend → consume token → verified state
-- [ ] `password-reset-uniformity.spec.ts` — H-03 timing-uniformity at /forgot-password endpoint, deepening
-- [ ] `error-page-contract.spec.ts` — /500 + /403 page rendering, navigation back home
+Security + protocol hardening + boundary checks. **+10 new spec files.**
 
-## Pass 7+ — long-tail / hardening
+- [x] `webhook-signature.spec.ts` — github-app webhook HMAC validation (missing + bogus signature both rejected, signature never echoed back)
+- [x] `pagination.spec.ts` — `/api/works`, `/api/notifications`, `/api/activity-log` honour `?limit=1` + `?offset` without 5xx
+- [x] `sort-filter.spec.ts` — `?sort=name`, `?sort=-createdAt`, SQL-injection-style sort, `?status=...`, `?actionType=...` all respond < 500
+- [x] `large-payload.spec.ts` — 100 KB description accepted, 50 MB rejected with 4xx, huge query string rejected, 10K bulk items handled
+- [x] `oauth-state-replay.spec.ts` — random/unconsumed state → 4xx, callback without state → 4xx, two identical bogus callbacks both fail, two `/connect/url` calls return different state values
+- [x] `password-policy.spec.ts` — weak passwords rejected (length, complexity, common-passwords, empty, all-spaces), strong password works, update-password requires current password
+- [x] `account-deletion-flow.spec.ts` — probe 4 candidate delete-account paths, danger-zone UI page exposes destructive copy
+- [x] `email-verification-flow.spec.ts` — fresh user is unverified, send-verification responds < 500 (rate-limit OK), verify-email rejects bogus / empty tokens, validate-email-token never echoes the candidate token (H-01 contract)
+- [x] `password-reset-uniformity.spec.ts` — H-03 timing-uniformity (real vs bogus email within 3x mean), forgot-password ALWAYS returns 200/202 regardless of existence (no enumeration leak)
+- [x] `error-page-contract.spec.ts` — `/en/not-existent-route` → 404 page with home link, `/en/auth/error` renders, invalid `?error=BogusError` on `/en/login` doesn't crash
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `error-page-contract` from the storageState project so unauth UI assertions actually hit unauth pages.
+
+## Pass 7 — queued
+
+- [x] `cookie-flags-deep.spec.ts` (added in pass 6) — session-ish cookies have HttpOnly + safe SameSite, no PII in cookie names, no full session values in cookie names
+- [ ] `csp-strict.spec.ts` — Content-Security-Policy eventually moves from report-only to enforce; pin the families it allows
+- [ ] `chat-api-events.spec.ts` — pin specific SSE event names + completion sentinel (current chat-api-streaming checks content-type family only)
+- [ ] `git-providers-oauth-happy.spec.ts` — OAuth full happy-path with a mocked provider (full token exchange round-trip)
+- [ ] `audit-log-sequences.spec.ts` — extend audit-log-immutable to multi-mutation sequences (PATCH then GET, DELETE then GET, replay)
+- [ ] `multi-user-invitation.spec.ts` — extend multi-user-collab to invitation-accept flow, role downgrade
+- [ ] `bulk-operations.spec.ts` — `/api/works/bulk-*` endpoints if exposed; otherwise probe for batch endpoints
+- [ ] `search-fts.spec.ts` — `/api/works?q=...` full-text search across name/description, special-char handling, empty query
+- [ ] `unicode-collation.spec.ts` — non-ASCII (emoji, RTL, Han) in work names + items survives create→list→read round-trip
+- [ ] `concurrent-conflict.spec.ts` — two concurrent updates to the same work — last write wins / 409 conflict
+- [ ] `slug-collision.spec.ts` — creating two works with the same slug must 409 (or auto-disambiguate); existing slug-renames must roll back cleanly
+
+## Pass 8+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
 with specific shape assertions once the body schemas stabilize).
 Candidates:
 
-- [ ] `chat-api.spec.ts` — pin specific SSE event names + completion sentinel (current spec checks content-type family only)
-- [ ] `git-providers.spec.ts` — OAuth full happy-path with a mocked provider
-- [ ] `audit-log-immutable.spec.ts` — extend to multi-mutation sequences (PATCH then GET, DELETE then GET)
-- [ ] `multi-user-collab.spec.ts` — extend to invitation-accept flow, role downgrade
-
-Also queued for cross-cutting concerns:
-
-- [ ] `csp-strict.spec.ts` — Content-Security-Policy header eventually moves from report-only to enforce; pin the families it allows
-- [ ] `cookie-flags-deep.spec.ts` — every session-ish cookie has SameSite=Lax|Strict + Secure (when over https)
+- [ ] `audit-log-immutable` — confirm immutability across direct DB introspection on a test fixture (separate harness, not in scope for black-box e2e)
+- [ ] `web-vitals.spec.ts` — measure CLS / INP / LCP on key pages with web-vitals.js injected
+- [ ] `playwright-trace.spec.ts` — golden-path trace recording for regression triage
 
 ---
 
