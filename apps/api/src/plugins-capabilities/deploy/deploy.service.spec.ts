@@ -737,7 +737,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const { service, githubPlugin, webhookSecretService } = buildService({
                 plugin: { id: 'legacy' },
             });
-            webhookSecretService.getOrGenerate.mockRejectedValueOnce(new Error('encryption key missing'));
+            webhookSecretService.getOrGenerate.mockRejectedValueOnce(
+                new Error('encryption key missing'),
+            );
 
             await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
                 dispatched: true,

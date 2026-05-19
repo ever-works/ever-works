@@ -3,9 +3,7 @@ import { WebhookSecretService } from '../webhook-secret.service';
 import { WorkRepository } from '../../database/repositories/work.repository';
 import { Work } from '../../entities';
 
-type RepoMock = jest.Mocked<
-    Pick<WorkRepository, 'findById' | 'setWebhookSecretIfNull' | 'update'>
->;
+type RepoMock = jest.Mocked<Pick<WorkRepository, 'findById' | 'setWebhookSecretIfNull' | 'update'>>;
 
 const VALID_KEY_HEX = randomBytes(32).toString('hex');
 
@@ -79,10 +77,7 @@ describe('WebhookSecretService', () => {
             const plaintext = await service.getOrGenerate('work-1');
 
             expect(plaintext).toMatch(/^[0-9a-f]{64}$/);
-            expect(repo.setWebhookSecretIfNull).toHaveBeenCalledWith(
-                'work-1',
-                expect.any(String),
-            );
+            expect(repo.setWebhookSecretIfNull).toHaveBeenCalledWith('work-1', expect.any(String));
             // Persistence must not leak plaintext — the conditional UPDATE
             // gets the encrypted envelope, never the raw value.
             const enc = repo.setWebhookSecretIfNull.mock.calls[0][1];
@@ -123,9 +118,7 @@ describe('WebhookSecretService', () => {
             service = new WebhookSecretService(repo as unknown as WorkRepository);
             repo.findById
                 .mockResolvedValueOnce(makeWork({ webhookSecretEncrypted: null }))
-                .mockResolvedValueOnce(
-                    makeWork({ webhookSecretEncrypted: persistedEnvelope }),
-                );
+                .mockResolvedValueOnce(makeWork({ webhookSecretEncrypted: persistedEnvelope }));
             repo.setWebhookSecretIfNull.mockResolvedValueOnce(false);
 
             const result = await service.getOrGenerate('work-1');
@@ -145,9 +138,7 @@ describe('WebhookSecretService', () => {
                 .mockResolvedValueOnce(makeWork({ webhookSecretEncrypted: null }));
             repo.setWebhookSecretIfNull.mockResolvedValueOnce(false);
 
-            await expect(service.getOrGenerate('work-1')).rejects.toThrow(
-                /bootstrap race lost/,
-            );
+            await expect(service.getOrGenerate('work-1')).rejects.toThrow(/bootstrap race lost/);
         });
     });
 
