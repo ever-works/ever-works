@@ -50,10 +50,30 @@ test.describe('Read replica — write-then-read coherency', () => {
     }) => {
         const u = await registerUserViaAPI(request);
         // Create one work as a known row.
-        await createWorkViaAPI(request, u.access_token, {
+        const created = await createWorkViaAPI(request, u.access_token, {
             name: `coherency-${Date.now().toString(36)}`,
             slug: `coherency-${Date.now().toString(36)}`,
         });
+        // Codex P2: on a real read-replica the created work may take a
+        // few hundred ms to propagate. Without the wait, snapshots can
+        // legitimately differ for an early window — that's replica lag
+        // working as designed, not a coherency bug. Poll until the
+        // created id is visible before starting the rapid-read window
+        // so the test fails ONLY for true post-propagation drift.
+        const deadline = Date.now() + 5_000;
+        while (Date.now() < deadline) {
+            const probe = await request.get(`${API_BASE}/api/works`, {
+                headers: authedHeaders(u.access_token),
+            });
+            if (probe.ok()) {
+                const probeBody = await probe.json();
+                const arr: Array<{ id?: string }> = Array.isArray(probeBody)
+                    ? probeBody
+                    : (probeBody?.data ?? probeBody?.works ?? []);
+                if (arr.some((w) => w.id === created.id)) break;
+            }
+            await new Promise((r) => setTimeout(r, 250));
+        }
         const idSets: Set<string>[] = [];
         for (let i = 0; i < 5; i++) {
             const list = await request.get(`${API_BASE}/api/works`, {

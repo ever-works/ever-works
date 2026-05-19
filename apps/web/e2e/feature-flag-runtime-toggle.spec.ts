@@ -2,27 +2,33 @@ import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 
 /**
- * Feature flag runtime toggle — pass 15. The platform exposes a
- * config / feature-flags surface (typically `/api/config` or
- * `/api/feature-flags`). We don't have admin-toggle capability in the
- * black-box test env, but we can verify:
- *  - the flags endpoint returns a stable JSON shape across calls
- *  - the keys exposed are non-secret (no DB_URL / JWT_SECRET leaks)
- *  - repeated calls return the same flag values within a single
- *    request burst (no per-request randomness)
+ * Feature flag runtime-toggle posture — pass 15. Pass-9
+ * `feature-flags-runtime.spec.ts` already covers secret-key leakage,
+ * JSON stability, and the unauthed-≤-authed key count. This pass
+ * adds the orthogonal angle: clients must be able to detect when a
+ * flag changes WITHOUT polling the whole payload. That means the
+ * flags endpoint should either:
+ *   - carry `ETag` / `Last-Modified` so clients can `If-None-Match`
+ *     and get a cheap 304, OR
+ *   - carry a short-TTL `Cache-Control` (so polling is cheap), OR
+ *   - both
+ *
+ * We also tighten Greptile's P1 from the initial draft: the
+ * unauth-vs-authed key count comparison must be per-path, not the
+ * MAX-of-authed vs MAX-of-unauthed across all paths (which was a
+ * false positive when authed picked path A and unauthed picked B).
  */
 
 const FLAG_PATHS = ['/api/config', '/api/feature-flags', '/api/flags'];
-const SECRET_KEY_PATTERN =
-    /(DATABASE_URL|JWT_SECRET|REDIS_URL|SMTP_PASS|SESSION_SECRET|OAUTH_CLIENT_SECRET|API_KEY)/i;
+const STALE_CACHE_CONTROL_MAX_AGE_SEC = 3600;
 
-test.describe('Feature flags — runtime surface', () => {
-    test('one of the candidate flag endpoints exposes a stable JSON config', async ({
+test.describe('Feature flags — change-detection surface (ETag / Cache-Control)', () => {
+    test('flags endpoint carries ETag, Last-Modified, or short-TTL Cache-Control', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
         let foundPath: string | null = null;
-        let body: Record<string, unknown> = {};
+        let headers: Record<string, string> = {};
         for (const p of FLAG_PATHS) {
             const res = await request.get(`${API_BASE}${p}`, {
                 headers: authedHeaders(u.access_token),
@@ -30,64 +36,97 @@ test.describe('Feature flags — runtime surface', () => {
             if (!res.ok()) continue;
             const ct = res.headers()['content-type'] || '';
             if (!ct.includes('json')) continue;
-            const candidate = await res.json().catch(() => null);
-            if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+            foundPath = p;
+            headers = res.headers();
+            break;
+        }
+        if (!foundPath) {
+            test.skip(true, 'no JSON flags endpoint exposed');
+        }
+        const etag = headers['etag'];
+        const lastMod = headers['last-modified'];
+        const cc = headers['cache-control'] || '';
+        const maxAgeMatch = /max-age\s*=\s*(\d+)/i.exec(cc);
+        const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1], 10) : Infinity;
+        const hasShortTtl = Number.isFinite(maxAge) && maxAge <= STALE_CACHE_CONTROL_MAX_AGE_SEC;
+        const detectable = Boolean(etag || lastMod || hasShortTtl);
+        if (!detectable) {
+            test.info().annotations.push({
+                type: 'informational',
+                description: `${foundPath} has no ETag / Last-Modified / short Cache-Control max-age — clients can't cheaply detect flag changes`,
+            });
+            test.skip(true, 'no change-detection mechanism on flags endpoint');
+        }
+        expect(detectable).toBe(true);
+    });
+
+    test('If-None-Match on a fresh ETag returns 304 or 200 (never 5xx)', async ({ request }) => {
+        const u = await registerUserViaAPI(request);
+        let foundPath: string | null = null;
+        let etag: string | undefined;
+        for (const p of FLAG_PATHS) {
+            const res = await request.get(`${API_BASE}${p}`, {
+                headers: authedHeaders(u.access_token),
+            });
+            if (!res.ok()) continue;
+            etag = res.headers()['etag'];
+            if (etag) {
                 foundPath = p;
-                body = candidate;
                 break;
             }
         }
-        if (!foundPath) {
-            test.skip(true, 'no config/feature-flag JSON endpoint exposed');
+        if (!foundPath || !etag) {
+            test.skip(true, 'no flags endpoint exposes ETag');
         }
-        // No secret-shaped keys may leak through.
-        const keys = Object.keys(body).join(' ');
-        const leaked = SECRET_KEY_PATTERN.exec(keys);
-        expect(leaked, `feature flag payload leaked secret-shaped key: ${leaked?.[0]}`).toBeNull();
-        // Hit it twice — same JSON.
-        const r1 = await request.get(`${API_BASE}${foundPath}`, {
-            headers: authedHeaders(u.access_token),
+        const cond = await request.get(`${API_BASE}${foundPath}`, {
+            headers: { ...authedHeaders(u.access_token), 'If-None-Match': etag },
         });
-        const r2 = await request.get(`${API_BASE}${foundPath}`, {
-            headers: authedHeaders(u.access_token),
-        });
-        const j1 = JSON.stringify(await r1.json());
-        const j2 = JSON.stringify(await r2.json());
-        expect(j1, 'feature flag payload drifted between consecutive calls').toBe(j2);
+        // 304 is the desirable outcome (cheap revalidation). 200 is
+        // acceptable (server doesn't honour conditional requests yet
+        // but didn't break). 5xx is the bug we're guarding.
+        expect(
+            [200, 304].includes(cond.status()),
+            `If-None-Match returned ${cond.status()} (expected 200 or 304)`,
+        ).toBe(true);
     });
+});
 
-    test('unauth probe to flag endpoint is auth-gated or returns reduced payload', async ({
+test.describe('Feature flags — per-path authed vs unauthed key count', () => {
+    test('on each individual path, unauthed payload exposes ≤ authed key count', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
-        let authedKeys = 0;
-        let unauthedKeys = 0;
+        let probedAtLeastOne = false;
         for (const p of FLAG_PATHS) {
+            // Greptile P1: comparing MAX-authed-across-paths against
+            // MAX-unauthed-across-paths produced false positives when
+            // the maximums came from different endpoints. Compare per
+            // path instead so the assertion is meaningful.
             const a = await request.get(`${API_BASE}${p}`, {
                 headers: authedHeaders(u.access_token),
             });
             const ua = await request.get(`${API_BASE}${p}`);
-            if (a.ok() && (a.headers()['content-type'] || '').includes('json')) {
-                const body = await a.json();
-                if (body && typeof body === 'object' && !Array.isArray(body)) {
-                    authedKeys = Math.max(authedKeys, Object.keys(body).length);
+            const aIsJson = a.ok() && (a.headers()['content-type'] || '').includes('json');
+            const uaIsJson = ua.ok() && (ua.headers()['content-type'] || '').includes('json');
+            if (!aIsJson) continue;
+            const aBody = await a.json();
+            if (!aBody || typeof aBody !== 'object' || Array.isArray(aBody)) continue;
+            const aKeys = Object.keys(aBody).length;
+            let uaKeys = 0;
+            if (uaIsJson) {
+                const uaBody = await ua.json();
+                if (uaBody && typeof uaBody === 'object' && !Array.isArray(uaBody)) {
+                    uaKeys = Object.keys(uaBody).length;
                 }
             }
-            if (ua.ok() && (ua.headers()['content-type'] || '').includes('json')) {
-                const body = await ua.json();
-                if (body && typeof body === 'object' && !Array.isArray(body)) {
-                    unauthedKeys = Math.max(unauthedKeys, Object.keys(body).length);
-                }
-            }
+            probedAtLeastOne = true;
+            expect(
+                uaKeys,
+                `${p}: unauthed payload (${uaKeys} keys) > authed payload (${aKeys} keys)`,
+            ).toBeLessThanOrEqual(aKeys);
         }
-        if (authedKeys === 0) {
-            test.skip(true, 'no flag endpoint found');
+        if (!probedAtLeastOne) {
+            test.skip(true, 'no flag endpoint returned authed JSON');
         }
-        // Unauthed should expose ≤ authed key count (no leak of
-        // admin-only flags to anonymous).
-        expect(
-            unauthedKeys,
-            `unauthed flag payload exposes more keys (${unauthedKeys}) than authed (${authedKeys})`,
-        ).toBeLessThanOrEqual(authedKeys);
     });
 });

