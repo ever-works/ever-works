@@ -12,8 +12,9 @@ function makeRepo<T extends { id?: string }>() {
     let nextId = 1;
     const rows: T[] = [];
 
-    return {
+    const repo = {
         rows,
+        manager: undefined as any,
         create: jest.fn((input: Partial<T>) => input as T),
         save: jest.fn(async (input: T) => {
             const now = new Date('2026-05-19T00:00:00.000Z');
@@ -61,6 +62,8 @@ function makeRepo<T extends { id?: string }>() {
             return typeof take === 'number' ? result.slice(0, take) : result;
         }),
     };
+
+    return repo;
 }
 
 function makeService() {
@@ -68,13 +71,29 @@ function makeService() {
     const goals = makeRepo<any>();
     const runs = makeRepo<any>();
     const logs = makeRepo<any>();
+    const manager = {
+        getRepository: jest.fn((entity: unknown) => {
+            if ((entity as { name?: string }).name === 'WorkAgentGoal') return goals;
+            if ((entity as { name?: string }).name === 'WorkAgentRun') return runs;
+            if ((entity as { name?: string }).name === 'WorkAgentRunLog') return logs;
+            if ((entity as { name?: string }).name === 'WorkAgentPreference') return preferences;
+            throw new Error(`Unexpected repository: ${(entity as { name?: string }).name}`);
+        }),
+    };
+    const transaction = jest.fn(async (callback: (manager: any) => unknown) =>
+        callback(manager),
+    );
+    goals.manager = { transaction };
+    runs.manager = { transaction };
+    logs.manager = { transaction };
+    preferences.manager = { transaction };
     const service = new WorkAgentService(
         preferences as any,
         goals as any,
         runs as any,
         logs as any,
     );
-    return { service, preferences, goals, runs, logs };
+    return { service, preferences, goals, runs, logs, transaction };
 }
 
 describe('WorkAgentService', () => {
@@ -120,7 +139,7 @@ describe('WorkAgentService', () => {
     });
 
     it('queues a goal, run, and audit log when enabled', async () => {
-        const { service, goals, runs, logs } = makeService();
+        const { service, goals, runs, logs, transaction } = makeService();
         await service.updatePreferences('u1', {
             enabled: true,
             autoApproveLowImpact: true,
@@ -141,10 +160,11 @@ describe('WorkAgentService', () => {
         expect(runs.rows).toHaveLength(1);
         expect(logs.rows).toHaveLength(1);
         expect(logs.rows[0].message).toBe('Goal queued for the Work agent.');
+        expect(transaction).toHaveBeenCalledTimes(1);
     });
 
     it('cancels active runs for a cancelable goal and records a log entry', async () => {
-        const { service, runs, logs } = makeService();
+        const { service, runs, logs, transaction } = makeService();
         await service.updatePreferences('u1', { enabled: true });
         const { goal, run } = await service.createGoal('u1', {
             instruction: 'Create a Work for AI healthcare startups',
@@ -158,5 +178,27 @@ describe('WorkAgentService', () => {
             WorkAgentRunStatus.CANCELED,
         );
         expect(logs.rows.map((row) => row.step)).toContain('canceled');
+        expect(transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('recovers when concurrent preference creation hits a unique constraint', async () => {
+        const { service, preferences } = makeService();
+        const raced = {
+            id: 'existing',
+            userId: 'u1',
+            enabled: true,
+            autoApproveLowImpact: false,
+            dailySuggestionsEnabled: true,
+            guardrails: DEFAULT_WORK_AGENT_GUARDRAILS,
+        };
+        preferences.findOne
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(raced);
+        preferences.save.mockRejectedValueOnce({ code: '23505' });
+
+        const result = await service.getPreferences('u1');
+
+        expect(result.enabled).toBe(true);
+        expect(preferences.findOne).toHaveBeenCalledTimes(2);
     });
 });

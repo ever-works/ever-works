@@ -95,48 +95,56 @@ export class WorkAgentService {
 
         const guardrailsOverride = this.pickGuardrailOverride(input);
         const dryRun = input.dryRun ?? preference.guardrails.dryRunByDefault;
-        const goal = await this.goals.save(
-            this.goals.create({
-                userId,
-                instruction: input.instruction.trim(),
-                status: WorkAgentGoalStatus.PENDING,
-                source: WorkAgentGoalSource.USER,
-                dryRun,
-                guardrailsOverride:
-                    Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
-            }),
-        );
+        const { goal, run } = await this.goals.manager.transaction(async (manager) => {
+            const goalRepo = manager.getRepository(WorkAgentGoal);
+            const runRepo = manager.getRepository(WorkAgentRun);
+            const logRepo = manager.getRepository(WorkAgentRunLog);
 
-        const run = await this.runs.save(
-            this.runs.create({
-                userId,
-                goalId: goal.id,
-                status: WorkAgentRunStatus.QUEUED,
-                dryRun,
-                progressPercent: 0,
-                summary: {
-                    worksPlanned: 0,
-                    worksCreated: 0,
-                    itemsPlanned: 0,
-                    itemsCreated: 0,
-                    approvalsRequired: preference.autoApproveLowImpact ? 0 : 1,
-                },
-            }),
-        );
-
-        await this.logs.save(
-            this.logs.create({
-                userId,
-                runId: run.id,
-                level: WorkAgentRunLogLevel.INFO,
-                step: 'queued',
-                message: 'Goal queued for the Work agent.',
-                metadata: {
+            const savedGoal = await goalRepo.save(
+                goalRepo.create({
+                    userId,
+                    instruction: input.instruction.trim(),
+                    status: WorkAgentGoalStatus.PENDING,
+                    source: WorkAgentGoalSource.USER,
                     dryRun,
-                    guardrails: this.mergeGuardrails(preference.guardrails, guardrailsOverride),
-                },
-            }),
-        );
+                    guardrailsOverride:
+                        Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
+                }),
+            );
+
+            const savedRun = await runRepo.save(
+                runRepo.create({
+                    userId,
+                    goalId: savedGoal.id,
+                    status: WorkAgentRunStatus.QUEUED,
+                    dryRun,
+                    progressPercent: 0,
+                    summary: {
+                        worksPlanned: 0,
+                        worksCreated: 0,
+                        itemsPlanned: 0,
+                        itemsCreated: 0,
+                        approvalsRequired: preference.autoApproveLowImpact ? 0 : 1,
+                    },
+                }),
+            );
+
+            await logRepo.save(
+                logRepo.create({
+                    userId,
+                    runId: savedRun.id,
+                    level: WorkAgentRunLogLevel.INFO,
+                    step: 'queued',
+                    message: 'Goal queued for the Work agent.',
+                    metadata: {
+                        dryRun,
+                        guardrails: this.mergeGuardrails(preference.guardrails, guardrailsOverride),
+                    },
+                }),
+            );
+
+            return { goal: savedGoal, run: savedRun };
+        });
 
         return { goal: this.toGoalDto(goal), run: this.toRunDto(run) };
     }
@@ -173,34 +181,42 @@ export class WorkAgentService {
     }
 
     async cancelGoal(userId: string, goalId: string): Promise<WorkAgentGoalDto> {
-        const goal = await this.goals.findOne({ where: { id: goalId, userId } });
-        if (!goal) {
-            throw new NotFoundException('Work agent goal not found.');
-        }
-        if (!CANCELABLE_GOAL_STATUSES.includes(goal.status)) {
-            throw new BadRequestException('Work agent goal can no longer be canceled.');
-        }
+        const savedGoal = await this.goals.manager.transaction(async (manager) => {
+            const goalRepo = manager.getRepository(WorkAgentGoal);
+            const runRepo = manager.getRepository(WorkAgentRun);
+            const logRepo = manager.getRepository(WorkAgentRunLog);
 
-        goal.status = WorkAgentGoalStatus.CANCELED;
-        const savedGoal = await this.goals.save(goal);
+            const goal = await goalRepo.findOne({ where: { id: goalId, userId } });
+            if (!goal) {
+                throw new NotFoundException('Work agent goal not found.');
+            }
+            if (!CANCELABLE_GOAL_STATUSES.includes(goal.status)) {
+                throw new BadRequestException('Work agent goal can no longer be canceled.');
+            }
 
-        const activeRuns = await this.runs.find({
-            where: { userId, goalId, status: In(ACTIVE_RUN_STATUSES) },
+            goal.status = WorkAgentGoalStatus.CANCELED;
+            const canceledGoal = await goalRepo.save(goal);
+
+            const activeRuns = await runRepo.find({
+                where: { userId, goalId, status: In(ACTIVE_RUN_STATUSES) },
+            });
+            for (const run of activeRuns) {
+                run.status = WorkAgentRunStatus.CANCELED;
+                run.finishedAt = new Date();
+                await runRepo.save(run);
+                await logRepo.save(
+                    logRepo.create({
+                        userId,
+                        runId: run.id,
+                        level: WorkAgentRunLogLevel.INFO,
+                        step: 'canceled',
+                        message: 'Run canceled by the user.',
+                    }),
+                );
+            }
+
+            return canceledGoal;
         });
-        for (const run of activeRuns) {
-            run.status = WorkAgentRunStatus.CANCELED;
-            run.finishedAt = new Date();
-            await this.runs.save(run);
-            await this.logs.save(
-                this.logs.create({
-                    userId,
-                    runId: run.id,
-                    level: WorkAgentRunLogLevel.INFO,
-                    step: 'canceled',
-                    message: 'Run canceled by the user.',
-                }),
-            );
-        }
 
         return this.toGoalDto(savedGoal);
     }
@@ -215,15 +231,35 @@ export class WorkAgentService {
             return existing;
         }
 
-        return this.preferences.save(
-            this.preferences.create({
-                userId,
-                enabled: false,
-                autoApproveLowImpact: false,
-                dailySuggestionsEnabled: true,
-                guardrails: DEFAULT_WORK_AGENT_GUARDRAILS,
-            }),
-        );
+        try {
+            return await this.preferences.save(
+                this.preferences.create({
+                    userId,
+                    enabled: false,
+                    autoApproveLowImpact: false,
+                    dailySuggestionsEnabled: true,
+                    guardrails: { ...DEFAULT_WORK_AGENT_GUARDRAILS },
+                }),
+            );
+        } catch (error) {
+            if (!this.isUniqueConstraintError(error)) {
+                throw error;
+            }
+            const raced = await this.preferences.findOne({ where: { userId } });
+            if (!raced) {
+                throw error;
+            }
+            raced.guardrails = this.mergeGuardrails(
+                DEFAULT_WORK_AGENT_GUARDRAILS,
+                raced.guardrails,
+            );
+            return raced;
+        }
+    }
+
+    private isUniqueConstraintError(error: unknown): boolean {
+        const code = (error as { code?: string })?.code;
+        return code === '23505' || code === 'ER_DUP_ENTRY' || code === 'SQLITE_CONSTRAINT';
     }
 
     private mergeGuardrails(

@@ -46,6 +46,7 @@ export function WorkAgentSettings({
 }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
     const [isSaving, startSaving] = useTransition();
+    const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
     const [instruction, setInstruction] = useState('');
@@ -98,7 +99,7 @@ export function WorkAgentSettings({
     };
 
     const cancelGoal = (goalId: string) => {
-        startSaving(async () => {
+        startCanceling(async () => {
             try {
                 await cancelWorkAgentGoalAction(goalId);
                 toast.success(t('toasts.goalCanceled'));
@@ -332,7 +333,7 @@ export function WorkAgentSettings({
                                                     size="sm"
                                                     className="h-7 px-2 text-xs gap-1"
                                                     onClick={() => cancelGoal(goal.id)}
-                                                    disabled={isSaving}
+                                                    disabled={isCanceling}
                                                 >
                                                     <CircleStop className="w-3 h-3" />
                                                     {t('actions.stop')}
