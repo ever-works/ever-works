@@ -689,6 +689,62 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         });
     });
 
+    describe('SITE_URL + WEBHOOK_SECRET (Astro minimal-template parity)', () => {
+        it('pushes WEBHOOK_SECRET for every deploy (per-Work random token, like CRON_SECRET)', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: { id: 'legacy' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            // Both per-deploy random tokens are present and distinct.
+            expect(byKey.WEBHOOK_SECRET).toBeDefined();
+            expect(byKey.WEBHOOK_SECRET).toMatch(/^[0-9a-f]{64}$/);
+            expect(byKey.CRON_SECRET).toBeDefined();
+            expect(byKey.WEBHOOK_SECRET).not.toBe(byKey.CRON_SECRET);
+        });
+
+        it('derives SITE_URL from settings.ingressHost when applyEverWorksSubdomain set it', async () => {
+            const { service, githubPlugin, dnsService } = buildService({
+                deployProvider: 'ever-works',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                settings: { kubeconfig: 'apiVersion: v1' },
+            });
+            // Activate the DNS provider so applyEverWorksSubdomain templates
+            // `ingressHost` onto settings.
+            (dnsService.getProvider as jest.Mock).mockReturnValue({});
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.SITE_URL).toBe('https://my-site.ever.works');
+        });
+
+        it('does NOT push SITE_URL when ingressHost is unset (non-ever-works providers, or DNS unconfigured)', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                settings: { token: 'v1' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            expect(keys).not.toContain('SITE_URL');
+        });
+    });
+
     describe('default deployProvider fallback (EW-617 G6)', () => {
         // When work.deployProvider is null/empty (e.g. older row pre-migration
         // or anonymous quick-create that hasn't picked a provider yet), the

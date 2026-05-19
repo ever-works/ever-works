@@ -198,6 +198,7 @@ export class DeployService {
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
+        await this.ensureWebhookSecret(ctx);
 
         const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = env.branch ?? template.branch;
@@ -516,6 +517,30 @@ export class DeployService {
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
 
+        // SITE_URL — used by the deployed site for canonical URLs, sitemap.xml,
+        // RSS/Atom self-references, and OpenGraph. Falls back to placeholders
+        // when not set, which is fine for builds but bad for SEO on a live site.
+        //
+        // When `applyEverWorksSubdomain` resolved an `ingressHost` (i.e.
+        // `deployProvider === 'ever-works'` with Cloudflare DNS configured),
+        // SITE_URL is derived from it as `https://${ingressHost}`. For all
+        // other providers we leave SITE_URL unset and rely on the template's
+        // own fallback (the user can override in the Vercel project's env
+        // dashboard, or set SITE_URL in their own GitHub secrets after the
+        // fact).
+        const ingressHost = settings?.ingressHost;
+        if (typeof ingressHost === 'string' && ingressHost.trim().length > 0) {
+            try {
+                await this.setSecret(ctx, 'SITE_URL', `https://${ingressHost.trim()}`);
+            } catch (error: any) {
+                this.logger.error(
+                    `Failed to push SITE_URL secret for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
         // EW-120 dual-mode Activity Feed sync — push the secrets for the
         // active transport only. Disabled mode pushes nothing.
         //
@@ -767,6 +792,31 @@ export class DeployService {
         // Always set a cron secret for new deployments
         const cronSecret = this.generateSecureToken();
         await this.setSecret(ctx, 'CRON_SECRET', cronSecret);
+    }
+
+    /**
+     * Provision a per-Work `WEBHOOK_SECRET` so the deployed site's content-sync
+     * webhook endpoint can verify incoming GitHub push notifications. The
+     * minimal template's `@ever-works/astro-integration` reads this from
+     * `process.env.WEBHOOK_SECRET` at build time and registers a verifying
+     * `/api/webhook` endpoint iff defined; classic template ignores it. Push
+     * unconditionally — harmless on templates that don't consume it, required
+     * on templates that do.
+     *
+     * Failure is logged but not thrown — webhook verification degrades to
+     * "polling-only" rather than blocking the deploy.
+     */
+    private async ensureWebhookSecret(ctx: RepoContext) {
+        try {
+            const webhookSecret = this.generateSecureToken();
+            await this.setSecret(ctx, 'WEBHOOK_SECRET', webhookSecret);
+        } catch (error: any) {
+            this.logger.warn(
+                `Failed to push WEBHOOK_SECRET for ${ctx.owner}/${ctx.repo}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     private generateSecureToken(): string {
