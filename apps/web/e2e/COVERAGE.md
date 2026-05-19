@@ -219,34 +219,58 @@ excludes `performance-budget`, `responsive-viewports`, `error-recovery`,
 and `keyboard-navigation` from the storageState project so they run
 with a fresh, unauthenticated context.
 
-## Pass 5 — queued
+## Pass 5 — this PR (`chore/e2e-coverage-pass-5`)
 
-- [ ] `api-schema-validation` deepening — add OpenAPI / class-validator DTO checks for `/api/works/:id`, `/api/notifications`, `/api/subscriptions/plan`
-- [ ] `session-persistence` deepening — add cookie-flag inspection across redirect chains, idle-timeout boundary
-- [ ] `screenshots-visual.spec.ts` — Playwright `toMatchSnapshot` baselines for login, dashboard, settings, work-detail
-- [ ] `i18n-fallback.spec.ts` — unknown locale URL → default locale fallback, mixed-locale links don't break the layout
-- [ ] `csrf-double-submit.spec.ts` — POST without CSRF cookie / header, mismatched CSRF token, replay
-- [ ] `download-export.spec.ts` — drive `/api/works/:id/export-items` and `/api/activity-log/export` as authenticated downloads, assert content-disposition + sample row
-- [ ] `upload-attachment.spec.ts` — drive `/api/works/:id/import-items` with a small fixture file, verify created items appear in `/api/works/:id/items`
-- [ ] `concurrent-actions.spec.ts` — open two browser contexts as the same user, mutate from one, verify the other sees the change on next refresh
-- [ ] `print-styles.spec.ts` — `emulateMedia({ media: 'print' })` on key pages, verify layout doesn't collapse
-- [ ] `clipboard-actions.spec.ts` — copy-token / copy-API-key flows, verify clipboard write + UI feedback
+Long-tail hardening + cross-cutting concerns. **+13 new spec files.**
 
-## Pass 6+ — long-tail / hardening
+- [x] `download-export.spec.ts` — `/api/account/export`, `/api/activity-log/export` (+ workId filter), `/api/works/:id/usage/export` (incl. stranger isolation)
+- [x] `upload-import.spec.ts` — `/api/account/import/preview` + `/apply`, `/api/works/:id/import-items` (empty + minimal item + stranger isolation)
+- [x] `concurrent-actions.spec.ts` — same-user parallel API contexts (read consistency, create visibility, two simultaneous POSTs don't 5xx)
+- [x] `i18n-fallback.spec.ts` — unknown `/xx/login` locale falls back, root path redirects to a default locale, `<html lang>` matches URL locale
+- [x] `print-styles.spec.ts` — `emulateMedia({ media: 'print' })` keeps text content + submit buttons present on login + register
+- [x] `clipboard-actions.spec.ts` — copy affordance on `/settings/api-keys`, clipboard `writeText` hook fires when a copy button is clicked
+- [x] `security-headers-strict.spec.ts` — API nosniff + frame-options + no x-powered-by + referrer-policy; web clickjacking defense via XFO or `frame-ancestors`
+- [x] `rate-limit-deeper.spec.ts` — per-endpoint isolation (register throttle doesn't block /health), login throttle on wrong passwords, 429 body shape
+- [x] `subscriptions-plan-lifecycle.spec.ts` — fresh user = free, switch free → standard → free walkthrough, /plans advertises a paid tier, bogus code → 4xx
+- [x] `data-sync-idempotency.spec.ts` — GET key-set stable across repeated calls, repeated POST stays in same status family
+- [x] `public-pages-cache.spec.ts` — Cache-Control on /en/login + root, no long-term public caching of login
+- [x] `chat-api-streaming.spec.ts` — auth gate, malformed payload 4xx, content-type signals streaming or JSON
+- [x] `screenshots-visual.spec.ts` — visual-regression baselines for login / register / forgot-password (opt-in via `RUN_VISUAL_REGRESSION=1`; first run with `--update-snapshots`)
 
-Then iteratively tighten any `[x]` that still has thin assertions (the
-`expect(...).toBeLessThan(500)` smoke pattern should be replaced with
-specific shape assertions once the body schemas stabilize). Candidates:
+Auth project routing — `playwright.config.ts` testIgnore + testMatch
+now also exclude `i18n-fallback`, `print-styles`, `public-pages-cache`,
+and `screenshots-visual` from the storageState project so they run
+fresh-context.
 
-- [ ] `chat-api.spec.ts` — pin the streaming response shape (event names, completion sentinel)
-- [ ] `subscriptions-plan.spec.ts` — add a plan-switch lifecycle: free → standard → revert
+## Pass 6 — queued
+
+- [ ] `webhook-signature.spec.ts` — verify github-app webhook HMAC signature validation rejects forged events
+- [ ] `pagination.spec.ts` — `/api/works`, `/api/notifications`, `/api/activity-log` honour `?limit`/`?offset`/`?cursor` consistently
+- [ ] `sort-filter.spec.ts` — list endpoints respect `?sort=name`, `?status=...` filters without 5xx
+- [ ] `large-payload.spec.ts` — boundary checks: 100 KB body accepted, 50 MB rejected with 413 (not 5xx)
+- [ ] `oauth-state-replay.spec.ts` — re-using a consumed OAuth state value returns 4xx, not a silent 200
+- [ ] `password-policy.spec.ts` — common-password rejection, length boundaries, special-char requirement (current vs new on update)
+- [ ] `account-deletion-flow.spec.ts` — full delete-my-account journey + tombstoning behaviour
+- [ ] `email-verification-flow.spec.ts` — full happy path: register → unverified state → resend → consume token → verified state
+- [ ] `password-reset-uniformity.spec.ts` — H-03 timing-uniformity at /forgot-password endpoint, deepening
+- [ ] `error-page-contract.spec.ts` — /500 + /403 page rendering, navigation back home
+
+## Pass 7+ — long-tail / hardening
+
+Then iteratively tighten any `[x]` that still has thin assertions
+(the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
+with specific shape assertions once the body schemas stabilize).
+Candidates:
+
+- [ ] `chat-api.spec.ts` — pin specific SSE event names + completion sentinel (current spec checks content-type family only)
 - [ ] `git-providers.spec.ts` — OAuth full happy-path with a mocked provider
-- [ ] `data-sync.spec.ts` — assert idempotency tokens are honoured
+- [ ] `audit-log-immutable.spec.ts` — extend to multi-mutation sequences (PATCH then GET, DELETE then GET)
+- [ ] `multi-user-collab.spec.ts` — extend to invitation-accept flow, role downgrade
 
 Also queued for cross-cutting concerns:
 
-- [ ] `security-headers-strict.spec.ts` — promote helmet defaults to enforced (HSTS, CSP, X-Frame-Options)
-- [ ] `rate-limit.spec.ts` deepening — per-endpoint quota + 429 retry-after header
+- [ ] `csp-strict.spec.ts` — Content-Security-Policy header eventually moves from report-only to enforce; pin the families it allows
+- [ ] `cookie-flags-deep.spec.ts` — every session-ish cookie has SameSite=Lax|Strict + Secure (when over https)
 
 ---
 
