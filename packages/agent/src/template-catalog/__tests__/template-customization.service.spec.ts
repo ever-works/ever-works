@@ -354,6 +354,121 @@ describe('TemplateCustomizationService.createAndStart', () => {
     });
 });
 
+describe('TemplateCustomizationService.createAndStart — provision strip', () => {
+    // The strip removes reference samples / docs / e2e from the base template
+    // clone before pushing the fork to the user's GitHub org. We mount a real
+    // temp dir as the "base clone" and seed the same layout the upstream
+    // minimal template ships, then assert the strip removed the right things
+    // and the unrelated paths survived.
+    const fsPromises = jest.requireActual('node:fs/promises') as typeof import('node:fs/promises');
+    const pathMod = jest.requireActual('node:path') as typeof import('node:path');
+    const osMod = jest.requireActual('node:os') as typeof import('node:os');
+
+    async function seedFakeMinimalClone(): Promise<string> {
+        const root = await fsPromises.mkdtemp(pathMod.join(osMod.tmpdir(), 'tpl-strip-test-'));
+        // Reference samples + docs + e2e — should all be stripped.
+        const samples = [
+            'apps/sample-basic',
+            'apps/sample-events',
+            'apps/sample-git',
+            'apps/sample-jobs',
+            'apps/sample-real-estate',
+            'apps/docs',
+            'apps/web-e2e',
+        ];
+        for (const rel of samples) {
+            const abs = pathMod.join(root, rel);
+            await fsPromises.mkdir(abs, { recursive: true });
+            await fsPromises.writeFile(pathMod.join(abs, 'placeholder.txt'), 'x', 'utf8');
+        }
+        // apps/web — the only thing that SHOULD survive — plus packages/ui.
+        await fsPromises.mkdir(pathMod.join(root, 'apps/web/src'), { recursive: true });
+        await fsPromises.writeFile(
+            pathMod.join(root, 'apps/web/package.json'),
+            '{"name":"@ever-works/web-minimal"}',
+            'utf8',
+        );
+        await fsPromises.mkdir(pathMod.join(root, 'packages/ui/src'), { recursive: true });
+        await fsPromises.writeFile(
+            pathMod.join(root, 'packages/ui/package.json'),
+            '{"name":"@ever-works/ui"}',
+            'utf8',
+        );
+        return root;
+    }
+
+    it('strips apps/sample-*, apps/docs, apps/web-e2e from the cloned minimal base and commits the removal', async () => {
+        const { service, mocks } = makeService();
+        const tempBaseDir = await seedFakeMinimalClone();
+        mocks.gitFacade.cloneOrPull.mockResolvedValue(tempBaseDir);
+        jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+        try {
+            await service.createAndStart('user-1', baseInput);
+
+            // All strip paths must be gone.
+            for (const stripped of [
+                'apps/sample-basic',
+                'apps/sample-events',
+                'apps/sample-git',
+                'apps/sample-jobs',
+                'apps/sample-real-estate',
+                'apps/docs',
+                'apps/web-e2e',
+            ]) {
+                await expect(
+                    fsPromises.access(pathMod.join(tempBaseDir, stripped)),
+                ).rejects.toThrow();
+            }
+
+            // apps/web and packages/ui must survive.
+            await expect(
+                fsPromises.access(pathMod.join(tempBaseDir, 'apps/web/package.json')),
+            ).resolves.toBeUndefined();
+            await expect(
+                fsPromises.access(pathMod.join(tempBaseDir, 'packages/ui/package.json')),
+            ).resolves.toBeUndefined();
+
+            // The strip must have committed (so the user's repo history reflects
+            // the slim-down rather than a silent delta vs. upstream).
+            expect(mocks.gitFacade.addAll).toHaveBeenCalledWith('github', tempBaseDir);
+            expect(mocks.gitFacade.commit).toHaveBeenCalledWith(
+                'github',
+                tempBaseDir,
+                expect.stringMatching(/remove reference samples/),
+                expect.any(Object),
+            );
+        } finally {
+            await fsPromises.rm(tempBaseDir, { recursive: true, force: true });
+        }
+    });
+
+    it('skips the strip commit entirely when no strip paths exist on disk', async () => {
+        const { service, mocks } = makeService();
+        // Seed a minimal-template clone that has only apps/web — none of the
+        // strip paths exist. The strip helper should silently no-op and the
+        // gitFacade.addAll/commit calls (for the strip phase) should not
+        // fire because `removed.length === 0`.
+        const tempBaseDir = await fsPromises.mkdtemp(
+            pathMod.join(osMod.tmpdir(), 'tpl-strip-empty-'),
+        );
+        try {
+            await fsPromises.mkdir(pathMod.join(tempBaseDir, 'apps/web/src'), {
+                recursive: true,
+            });
+            mocks.gitFacade.cloneOrPull.mockResolvedValue(tempBaseDir);
+            jest.spyOn(service, 'execute').mockResolvedValue(undefined);
+
+            await service.createAndStart('user-1', baseInput);
+
+            expect(mocks.gitFacade.addAll).not.toHaveBeenCalled();
+            expect(mocks.gitFacade.commit).not.toHaveBeenCalled();
+        } finally {
+            await fsPromises.rm(tempBaseDir, { recursive: true, force: true });
+        }
+    });
+});
+
 describe('TemplateCustomizationService.execute', () => {
     function seedRunning(mocks: Mocks) {
         mocks.customizationRepository.findById.mockResolvedValue({

@@ -20,6 +20,7 @@ export * from './webhook-delivery.service';
 export * from './state-marker.service';
 export * from './anonymous-user-cleanup.service';
 export * from './platform-sync-secret.service';
+export * from './webhook-secret.service';
 export * from './zero-friction-funnel.service';
 export * from './deploy-ready-poller.service';
 export * from './category-icon';

@@ -13,20 +13,16 @@ Apply the user's UI request to this repository. Treat the request as a styling b
 
 \`\`\`
 apps/
-  web/                 ← PRIMARY canonical app. Default target for every request.
-  sample-basic/        ← niche sample (generic directory)
-  sample-events/       ← niche sample (events vertical)
-  sample-jobs/         ← niche sample (jobs vertical)
-  sample-real-estate/  ← niche sample (real-estate vertical)
-  sample-git/          ← niche sample (git-tools vertical)
-  ...                  ← other niche samples; same internal layout as apps/web
-  docs/                ← Docusaurus docs site — DO NOT modify
-  web-e2e/             ← Playwright tests — DO NOT modify
+  web/                 ← ONLY edit target. This is the directory site that gets deployed.
+                        Every UI change MUST land inside apps/web/. Nothing outside it
+                        ever reaches the deployed site (Vercel project rootDirectory
+                        is hard-pinned to apps/web, and the Dockerfile only COPYs
+                        apps/web for k8s deploys).
 
-  apps/<app>/src/
+  apps/web/src/
     styles/global.css      ← Tailwind v4 \`@theme\` tokens (--color-brand-*) + headless component styling via [data-component=...] / [data-part=...] selectors. PRIMARY styling lever.
     layouts/BaseLayout.astro ← page chrome (header, footer, nav, theme toggle). SECONDARY lever for layout-level tweaks.
-    components/            ← app-local Astro/React wrappers (BreadcrumbNav, ItemBrowser)
+    components/            ← app-local Astro/Preact wrappers (if present)
     pages/                 ← Astro file-based routes (index, item/[slug], category/[slug], tag/[slug], collection/[slug], comparison/[slug], 404, rss/atom/robots feeds). Edit visible markup/classes only.
     lib/                   ← content loaders + plugin config — do NOT modify
     env.d.ts, tsconfig.json, astro.config.ts, package.json ← do NOT modify
@@ -35,19 +31,17 @@ packages/
   ui/                  ← shared component library imported as @ever-works/ui/astro/* and @ever-works/ui/preact/*. DO NOT modify — overrides happen via the per-app global.css selectors.
   core/, adapters/, astro-integration/, plugin-*/, eslint-config/ ← runtime/build infrastructure — DO NOT modify
 
-.content/              ← markdown items/categories/tags (only present in some samples) — DO NOT modify
+.content/              ← markdown items/categories/tags (cloned at build time from the user's data repo) — DO NOT modify
 .deploy/, .github/, Dockerfile, .env.example ← infrastructure — DO NOT modify
 \`\`\`
 
 # Where to make edits
 
-1. **Theme tokens** — change \`apps/<app>/src/styles/global.css\` inside the \`@theme { ... }\` block. The \`--color-brand-*\` ramp is the canonical brand palette; replace its 11 stops to re-skin the whole site.
+1. **Theme tokens** — change \`apps/web/src/styles/global.css\` inside the \`@theme { ... }\` block. The \`--color-brand-*\` ramp is the canonical brand palette; replace its 11 stops to re-skin the whole site.
 2. **Component styling** — components from \`@ever-works/ui\` emit \`data-component\` / \`data-part\` attributes. Restyle them by editing the matching \`[data-component="..."] [data-part="..."]\` rules in the same \`global.css\`. Do NOT edit the source under \`packages/ui/\`.
-3. **Layout chrome** — adjust classes / structure in \`apps/<app>/src/layouts/BaseLayout.astro\` and the local Astro pages under \`apps/<app>/src/pages/\`.
-4. **Target app — pick exactly one.**
-   - Default: \`apps/web/\`. Edit only files inside \`apps/web/\`.
-   - If the user explicitly names a niche ("make the events theme purple", "for the jobs site …"), use the matching \`apps/sample-<niche>/\` instead.
-   - Do NOT fan changes out across multiple \`apps/sample-*/\` directories. One run = one app. The niche samples are independent variants the user opts into by name.
+3. **Layout chrome** — adjust classes / structure in \`apps/web/src/layouts/BaseLayout.astro\` and the local Astro pages under \`apps/web/src/pages/\`.
+
+**Target app is fixed.** Always edit \`apps/web/\` and only \`apps/web/\`. Do NOT touch any other \`apps/*\` directory. If you find stray \`apps/sample-*\`, \`apps/docs\`, or \`apps/web-e2e\` directories in the workspace, ignore them entirely — they are leftover reference samples that the platform normally strips from user-cloned forks and that never reach the deployed site. Any edits there would be lost.
 
 # Rules
 
@@ -60,6 +54,7 @@ packages/
 7. **No new files unless strictly needed for styling** (e.g. a new \`styles/<theme-name>.css\` imported by \`global.css\` is fine; a new component is not).
 8. **Accessibility:** keep color contrast ≥ AA in both light and dark mode. The site uses \`[data-theme="dark"]\` via the \`ThemeToggle\` component — verify dark-mode variants stay readable.
 9. **No commits, no PRs.** Just edit files in place — the orchestrator handles commit + push.
+10. **At least one visible-styling file MUST change.** A successful run must touch at least one of \`apps/web/src/styles/global.css\`, \`apps/web/src/layouts/BaseLayout.astro\`, or a file under \`apps/web/src/pages/\` or \`apps/web/src/components/\`. If the user's brief can't be satisfied without going elsewhere, prefer adding new selectors to \`global.css\` over reaching outside \`apps/web/\`.
 
 The user's customization request follows below.
 `;

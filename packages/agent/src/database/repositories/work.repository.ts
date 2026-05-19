@@ -358,6 +358,23 @@ export class WorkRepository {
     }
 
     /**
+     * Conditional UPDATE for the lazy bootstrap of `webhookSecretEncrypted`.
+     * Same race-safe semantics as `setPlatformSyncSecretIfNull` — the first
+     * deploy that wins the conditional UPDATE persists its randomly-generated
+     * plaintext; concurrent deploys re-read.
+     */
+    async setWebhookSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ webhookSecretEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('webhookSecretEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Update platform-sync observability columns after a pull-transport
      * round-trip. Pass `lastSuccessAt` on success or
      * `{ lastErrorAt, lastErrorMessage }` on failure — partial updates are

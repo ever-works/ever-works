@@ -278,6 +278,17 @@ export class Work {
     @Column({ type: 'text', nullable: true })
     platformSyncSecretEncrypted?: string | null;
 
+    // AES-256-GCM-encrypted per-Work webhook secret used by the deployed
+    // site's `/api/webhook` endpoint (registered by the minimal template's
+    // `@ever-works/astro-integration` when `process.env.WEBHOOK_SECRET` is
+    // set at build time) to verify incoming GitHub push notifications via
+    // X-Hub-Signature-256. Persistent across deploys so a GH-side webhook
+    // registered once stays valid through subsequent redeploys (rotating
+    // would silently break signature verification until the workflow
+    // re-registers the webhook). NULL until the first deploy provisions it.
+    @Column({ type: 'text', nullable: true })
+    webhookSecretEncrypted?: string | null;
+
     // Pull-mode observability — drives the degraded banner UX.
     @TimestampColumn({ nullable: true })
     platformSyncLastSuccessAt?: Date | null;

@@ -7,6 +7,8 @@ import {
     Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { TemplateCustomizationRepository } from '@src/database/repositories/template-customization.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
@@ -34,6 +36,30 @@ import { inferFrameworkFromRepository } from './utils/framework-inference';
 const GIT_PROVIDER_ID = 'github';
 const REPO_NAME_MAX = 90;
 const SUFFIX_LEN = 6;
+
+/**
+ * Paths inside a freshly cloned base template that should be stripped before
+ * pushing the per-template fork to the user's GitHub org. These directories
+ * exist in-tree for the source template's own developers (reference samples,
+ * docs site, e2e tests) but they never reach a deployed Work — Vercel pins
+ * `rootDirectory: apps/web` and the Dockerfile only COPYs `apps/web/`. Carrying
+ * them into every user-cloned fork would bloat repo size, slow `pnpm install`,
+ * waste CI minutes building things that never ship, and confuse users who open
+ * "their" repo expecting one app.
+ *
+ * Only paths inside the template clone are stripped. Workspace package
+ * directories under `packages/` are intentionally preserved — `apps/web/`
+ * depends on them.
+ */
+const PROVISION_STRIP_PATHS: readonly string[] = [
+    'apps/sample-basic',
+    'apps/sample-events',
+    'apps/sample-git',
+    'apps/sample-jobs',
+    'apps/sample-real-estate',
+    'apps/docs',
+    'apps/web-e2e',
+];
 
 export interface CreateAndStartCustomizationInput {
     baseTemplateId: string;
@@ -372,6 +398,27 @@ export class TemplateCustomizationService {
             gitOptions,
         );
 
+        // Strip reference samples / docs / e2e from the per-template fork
+        // before pushing. See PROVISION_STRIP_PATHS for the why. The strip
+        // is committed (when anything was removed) so the user's repo
+        // history reflects the deliberate slim-down rather than a silent
+        // delta vs. the upstream template.
+        const stripped = await this.stripProvisionedDir(baseDir, baseConfig);
+        if (stripped.length > 0) {
+            await this.gitFacade.addAll(GIT_PROVIDER_ID, baseDir);
+            await this.gitFacade.commit(
+                GIT_PROVIDER_ID,
+                baseDir,
+                `chore(template): remove reference samples for per-Work fork\n\n` +
+                    `These directories live in the upstream template for its own\n` +
+                    `developers (reference samples, docs site, e2e tests) and are\n` +
+                    `not part of a deployed Work site. Stripped to keep the fork\n` +
+                    `lean and avoid confusing the deploying user.\n\n` +
+                    stripped.map((p) => `- ${p}`).join('\n'),
+                committer,
+            );
+        }
+
         const personal = await this.gitFacade.getUser(gitOptions);
         const isOrg = personal.login.toLowerCase() !== targetOwner.toLowerCase();
 
@@ -403,6 +450,59 @@ export class TemplateCustomizationService {
             branch: created.defaultBranch || baseConfig.branch,
             repositoryUrl,
         };
+    }
+
+    /**
+     * Remove `PROVISION_STRIP_PATHS` directories from a freshly cloned base
+     * template. Returns the list of paths actually removed (relative to the
+     * workspace) so the caller can record them in a commit message — when
+     * the base template doesn't ship some of these (e.g. classic has no
+     * `apps/sample-*`), they're silently skipped.
+     *
+     * Strip is only applied to the `minimal` template today; the classic
+     * template has none of these paths and the helper short-circuits.
+     */
+    private async stripProvisionedDir(
+        workspaceDir: string,
+        baseConfig: WebsiteTemplateConfig,
+    ): Promise<string[]> {
+        if (baseConfig.id !== 'minimal') {
+            return [];
+        }
+        // `let` because `removed` is built up via push() through the loop —
+        // the binding is conceptually mutable. Repo convention prefers `let`
+        // for mutated locals over `const`.
+        let removed: string[] = [];
+        for (const relPath of PROVISION_STRIP_PATHS) {
+            const absPath = path.join(workspaceDir, relPath);
+            const existed = await fs
+                .access(absPath)
+                .then(() => true)
+                .catch(() => false);
+            if (!existed) {
+                // Not every base template ships every strip path; just
+                // skip silently.
+                continue;
+            }
+            try {
+                await fs.rm(absPath, { recursive: true, force: true });
+                removed.push(relPath);
+            } catch (error) {
+                // Don't block the provision on a strip failure. The repo
+                // will still work; it'll just be heavier than ideal.
+                this.logger.warn(
+                    `Failed to strip ${relPath} from ${workspaceDir}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        if (removed.length > 0) {
+            this.logger.log(
+                `Stripped ${removed.length} reference path(s) from ${baseConfig.id} fork: ${removed.join(', ')}`,
+            );
+        }
+        return removed;
     }
 
     private async resolveTargetOwner(userId: string, override?: string): Promise<string> {
