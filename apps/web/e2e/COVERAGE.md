@@ -411,18 +411,33 @@ Replication coherency + multi-tenant isolation + observability tracing. **+10 ne
 - [x] `webhook-secret-rotation.spec.ts` — rotate-secret endpoint auth-gated (401/403/404 unauth) and < 500 authed; response never echoes bcrypt/argon2 hash format
 - [x] `request-id-tracing.spec.ts` — /api/health generates request-id ≥ 8 chars; client-supplied X-Request-ID either echoed or informational; two consecutive requests get distinct ids
 
-## Pass 16 — queued
+## Pass 16 — this PR (`chore/e2e-coverage-pass-16`)
 
-- [ ] `worker-retry-budget.spec.ts` — failed jobs respect a max-retry ceiling; runaway retries don't 5xx the queue API
-- [ ] `cron-drift-tolerance.spec.ts` — cron job `nextRunAt` advances monotonically after triggers; drift < 60s between expected vs observed
-- [ ] `cors-origin-allowlist.spec.ts` — preflight from `https://evil.example` is rejected; preflight from `*.ever.works` is allowed
-- [ ] `cookie-flags-on-logout.spec.ts` — POST /logout sends Set-Cookie with Max-Age=0 / Expires in past
-- [ ] `error-detail-leak.spec.ts` — 5xx response bodies don't include stack traces / file paths / DB error codes verbatim
-- [ ] `notification-spam-throttle.spec.ts` — generating many notifications doesn't exceed a per-minute throttle
-- [ ] `time-window-coercion.spec.ts` — endpoints accepting `from`/`to` reject inverted ranges (from > to) with 4xx not 5xx
-- [ ] `archive-soft-delete.spec.ts` — soft-deleted entities are excluded from default listings but reachable via `?archived=1` (or skip if not modeled)
-- [ ] `usage-export-pii-isolation.spec.ts` — usage export never includes another tenant's user IDs / emails
-- [ ] `image-resize-bounds.spec.ts` — image-resize endpoint rejects extreme width/height (10000×10000+) with 4xx not 5xx; tiny dimensions (1×1) accepted
+Queue resilience + cross-origin posture + error-detail hygiene. **+10 new spec files.**
+
+- [x] `worker-retry-budget.spec.ts` — 10× rapid invalid-job POSTs to generate/extract paths all < 500; /api/queue/status (when exposed) doesn't expose admin shape to regular user
+- [x] `cron-drift-tolerance.spec.ts` — 3 valid cron expressions (hourly / daily / \*/15) accepted < 500; 3 garbage cron strings rejected < 500 (never 5xx)
+- [x] `cors-origin-allowlist.spec.ts` — preflight from 3 evil origins never returns ACAO + ACAC=true together; trusted-shape origin never gets ACAO=\* with ACAC=true (invalid CORS combo)
+- [x] `cookie-flags-on-logout.spec.ts` — /api/auth/logout (when cookie-based) issues Set-Cookie with Max-Age=0 OR Expires in past OR empty value for at least one auth cookie
+- [x] `error-detail-leak.spec.ts` — malformed JSON body, bogus-id GET, and 200-deep nested payload all return error envelopes that don't leak stack frames / Unix or Windows file paths / node_modules paths / MySQL/SQLite/PG error codes / Node ECONNREFUSED
+- [x] `notification-spam-throttle.spec.ts` — 30 rapid work-creates leave /api/notifications < 500 with ≤500 items in one call (pagination); /unread-count is a non-negative integer < 10000
+- [x] `time-window-coercion.spec.ts` — inverted (from > to), malformed, and 1-year-wide windows on activity-log + works endpoints all stay < 500
+- [x] `archive-soft-delete.spec.ts` — DELETEd work excluded from default listing; GET by id is 404 or carries archived/deletedAt marker — never 200 with no marker, never 5xx
+- [x] `usage-export-pii-isolation.spec.ts` — Alice's usage export contains neither bob.email nor bob.user.id; Bob's GET on Alice's `<work-id>/usage/export` is 401/403/404
+- [x] `image-resize-bounds.spec.ts` — 3 resize endpoint candidates × 10000×10000 dimensions stay < 500; 4× zero/negative dimensions also stay < 500
+
+## Pass 17 — queued
+
+- [ ] `circuit-breaker-state.spec.ts` — downstream-dependent endpoints expose breaker state via `/api/health/<dep>` and 503 trips don't cascade to /health root
+- [ ] `oauth-state-rotation.spec.ts` — `/connect/url` state TTL: state from 1+ hour ago no longer accepted at callback
+- [ ] `media-mime-sniffing.spec.ts` — uploads of `.txt` with `Content-Type: image/png` are rejected; `image/svg+xml` upload doesn't carry inline `<script>`
+- [ ] `oauth-redirect-uri-pin.spec.ts` — authorize URL `redirect_uri` exactly matches the registered callback path (no open redirector via path traversal)
+- [ ] `rate-limit-key-isolation.spec.ts` — Alice hitting 429 on /login doesn't lock out Bob from /login (per-account / per-IP isolation)
+- [ ] `cache-poisoning-vary.spec.ts` — endpoints that vary by header (Accept-Language, Authorization) carry `Vary` with that header
+- [ ] `pagination-cursor-stability.spec.ts` — `?cursor=` is opaque (server-controlled); replaying an old cursor returns coherent page (no skip / dup)
+- [ ] `bullmq-job-id-collision.spec.ts` — submitting the same generate request twice doesn't queue two identical jobs (dedup by content hash)
+- [ ] `feature-detect-cookies-blocked.spec.ts` — login flow survives browser with `document.cookie = ''` blocking (graceful degradation)
+- [ ] `auth-clock-tolerance.spec.ts` — JWT iat / nbf accept ±60s clock skew between client and server
 
 ## Pass 15+ — long-tail / hardening
 
