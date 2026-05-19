@@ -441,18 +441,33 @@ Circuit breakers + OAuth posture + cache-poisoning + cursor stability. **+10 new
 - [x] `feature-detect-cookies-blocked.spec.ts` — `document.cookie` getter returning `''` and setter throwing both leave /en/login renderable with email input fillable
 - [x] `auth-clock-tolerance.spec.ts` — 5 sequential /api/auth/profile hits over ~15s all < 500 with ≤1 401; server Date header within ±5 min of test clock
 
-## Pass 18 — queued
+## Pass 18 — this PR (`chore/e2e-coverage-pass-18`)
 
-- [ ] `notifications-channel-toggle.spec.ts` — disabling a channel (email/in-app/webhook) is reflected on next preferences GET; partial toggle 4xx on unknown channel key
-- [ ] `oauth-csrf-state-binding.spec.ts` — state issued for user A cannot be consumed at callback by user B (state→session binding)
-- [ ] `subscription-renewal-grace.spec.ts` — expired subscription stays usable for the grace window; budgets endpoint reflects grace status
-- [ ] `webhook-payload-truncation.spec.ts` — extremely large webhook bodies (10 MB+) rejected without 5xx; small bodies pass through with HMAC intact
-- [ ] `password-policy-zxcvbn.spec.ts` — zxcvbn-style weak passwords (`password123`, `qwerty`, common dictionary) rejected even if 12+ chars
-- [ ] `health-degraded-503.spec.ts` — when a non-critical dep is down, root /health stays 200 OK but /health/dep returns 503
-- [ ] `image-content-disposition.spec.ts` — image / file downloads carry `Content-Disposition: attachment` to prevent inline rendering of attacker content
-- [ ] `etag-strong-vs-weak.spec.ts` — ETags on mutable endpoints are weak (`W/"..."`) or absent; immutable assets carry strong ETags
-- [ ] `trace-propagation-w3c.spec.ts` — `traceparent` / `tracestate` headers are echoed or generated per W3C Trace Context spec
-- [ ] `feature-detect-fetch-throws.spec.ts` — login flow survives a browser whose `fetch` is polyfilled by something that rejects all requests with NetworkError
+Notification preferences + OAuth CSRF + observability + browser polyfills. **+10 new spec files.**
+
+- [x] `notifications-channel-toggle.spec.ts` — PATCH disable a channel reflects on next GET (round-trip); unknown channel key returns 4xx or silent ignore (never 5xx); informational signal if silently accepted
+- [x] `oauth-csrf-state-binding.spec.ts` — User B cannot redeem Alice's OAuth state at callback (state→session binding); anonymous unauth callback rejected
+- [x] `subscription-renewal-grace.spec.ts` — current-subscription endpoint exposes plan/tier field; /api/budgets returns JSON object without 5xx
+- [x] `webhook-payload-truncation.spec.ts` — 5MB payload to webhook stays < 500 (413/400/422 acceptable, never 5xx); unsigned small payload returns 4xx
+- [x] `password-policy-zxcvbn.spec.ts` — 8 common-but-12-chars passwords (password1234, qwerty123456, etc.) at least 1 rejected; if none rejected → informational skip (pass-6 length+complexity stands)
+- [x] `health-degraded-503.spec.ts` — root /api/health is always 200 (liveness); subsystem health uses 200 OR 503 only; 10x hammer never drifts from 200
+- [x] `image-content-disposition.spec.ts` — account/activity-log/usage exports carry `Content-Disposition: attachment`; filename hint informational
+- [x] `etag-strong-vs-weak.spec.ts` — /api/auth/profile ETag is weak (W/) or informational; static assets carry strong ETag OR immutable Cache-Control
+- [x] `trace-propagation-w3c.spec.ts` — valid traceparent stays < 500; malformed traceparent stays < 500; response traceparent (if present) matches 00-32hex-16hex-2hex
+- [x] `feature-detect-fetch-throws.spec.ts` — login renders + email input visible when fetch rejects with NetworkError; also when fetch throws synchronously
+
+## Pass 19 — queued
+
+- [ ] `tab-isolation-localstorage.spec.ts` — opening /works in two tabs doesn't share dirty form state via localStorage (namespacing per-tab)
+- [ ] `idle-session-timeout.spec.ts` — after configured idle timeout, next authed request returns 401; pre-timeout returns 200
+- [ ] `account-merge-conflict.spec.ts` — attempting to link an OAuth identity already linked to another account returns 409 (not silent re-link)
+- [ ] `webhook-replay-window.spec.ts` — webhook deliveries with an older timestamp (>5 min) rejected with 4xx (replay protection)
+- [ ] `screen-reader-aria-live.spec.ts` — login form errors update an aria-live region so screen readers announce them
+- [ ] `pwa-manifest-shape.spec.ts` — /manifest.webmanifest carries name + short_name + icons + start_url + display
+- [ ] `font-foit-foft.spec.ts` — fonts use `font-display: swap` (or optional) to avoid invisible text during load
+- [ ] `rsc-payload-no-secrets.spec.ts` — RSC payload (Next.js Server Components) doesn't carry DB connection strings / JWT secrets verbatim
+- [ ] `csrf-double-submit-cookie.spec.ts` — when CSRF tokens are issued, double-submit pattern is enforced (header token must match cookie token)
+- [ ] `error-page-localized.spec.ts` — /en/404 renders English; /es/404 renders Spanish (or falls back gracefully)
 
 ## Pass 15+ — long-tail / hardening
 
