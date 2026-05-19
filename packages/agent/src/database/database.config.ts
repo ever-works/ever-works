@@ -35,6 +35,10 @@ import {
     UserTemplatePreference,
     WebhookSubscription,
     WorkProposal,
+    WorkAgentPreference,
+    WorkAgentGoal,
+    WorkAgentRun,
+    WorkAgentRunLog,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -103,6 +107,10 @@ export const ENTITIES = [
     UserTemplatePreference,
     WebhookSubscription,
     WorkProposal,
+    WorkAgentPreference,
+    WorkAgentGoal,
+    WorkAgentRun,
+    WorkAgentRunLog,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

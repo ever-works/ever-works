@@ -34,4 +34,8 @@ export * from './template-customization.entity';
 export * from './user-template-preference.entity';
 export * from './webhook-subscription.entity';
 export * from './work-proposal.entity';
+export * from './work-agent-preference.entity';
+export * from './work-agent-goal.entity';
+export * from './work-agent-run.entity';
+export * from './work-agent-run-log.entity';
 export * from './types';
