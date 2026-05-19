@@ -41,7 +41,7 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  */
 export class AddDataRepoInstantSync1779100000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumns('works', [
+        const columns = [
             new TableColumn({
                 name: 'lastSyncedDataRepoSha',
                 type: 'varchar',
@@ -70,34 +70,70 @@ export class AddDataRepoInstantSync1779100000000 implements MigrationInterface {
                 type: 'bigint',
                 isNullable: true,
             }),
-        ]);
+        ];
 
-        await queryRunner.createIndex(
-            'works',
-            new TableIndex({
-                name: 'idx_work_sync_poller',
-                columnNames: ['githubAppInstalled', 'syncIntervalMinutes', 'lastPolledAt'],
-            }),
+        for (const column of columns) {
+            if (!(await queryRunner.hasColumn('works', column.name))) {
+                await queryRunner.addColumn('works', column);
+            }
+        }
+
+        const table = await queryRunner.getTable('works');
+        const hasPollerIndex = table?.indices.some(
+            (index) => index.name === 'idx_work_sync_poller',
+        );
+        const hasWebhookIndex = table?.indices.some(
+            (index) => index.name === 'idx_work_sync_webhook',
         );
 
-        await queryRunner.createIndex(
-            'works',
-            new TableIndex({
-                name: 'idx_work_sync_webhook',
-                columnNames: ['pendingSyncRequestedAt'],
-            }),
-        );
+        if (!hasPollerIndex) {
+            await queryRunner.createIndex(
+                'works',
+                new TableIndex({
+                    name: 'idx_work_sync_poller',
+                    columnNames: ['githubAppInstalled', 'syncIntervalMinutes', 'lastPolledAt'],
+                }),
+            );
+        }
+
+        if (!hasWebhookIndex) {
+            await queryRunner.createIndex(
+                'works',
+                new TableIndex({
+                    name: 'idx_work_sync_webhook',
+                    columnNames: ['pendingSyncRequestedAt'],
+                }),
+            );
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropIndex('works', 'idx_work_sync_webhook');
-        await queryRunner.dropIndex('works', 'idx_work_sync_poller');
-        await queryRunner.dropColumns('works', [
+        const table = await queryRunner.getTable('works');
+        const hasWebhookIndex = table?.indices.some(
+            (index) => index.name === 'idx_work_sync_webhook',
+        );
+        const hasPollerIndex = table?.indices.some(
+            (index) => index.name === 'idx_work_sync_poller',
+        );
+
+        if (hasWebhookIndex) {
+            await queryRunner.dropIndex('works', 'idx_work_sync_webhook');
+        }
+
+        if (hasPollerIndex) {
+            await queryRunner.dropIndex('works', 'idx_work_sync_poller');
+        }
+
+        for (const columnName of [
             'lastPolledAt',
             'githubAppInstalled',
             'syncIntervalMinutes',
             'pendingSyncRequestedAt',
             'lastSyncedDataRepoSha',
-        ]);
+        ]) {
+            if (await queryRunner.hasColumn('works', columnName)) {
+                await queryRunner.dropColumn('works', columnName);
+            }
+        }
     }
 }

@@ -25,7 +25,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  */
 export class AddActivityFeedSync1778746463309 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumns('works', [
+        const columns = [
             new TableColumn({
                 name: 'activitySyncMode',
                 type: 'varchar',
@@ -53,16 +53,26 @@ export class AddActivityFeedSync1778746463309 implements MigrationInterface {
                 type: 'text',
                 isNullable: true,
             }),
-        ]);
+        ];
+
+        for (const column of columns) {
+            if (!(await queryRunner.hasColumn('works', column.name))) {
+                await queryRunner.addColumn('works', column);
+            }
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropColumns('works', [
+        for (const columnName of [
             'platformSyncLastErrorMessage',
             'platformSyncLastErrorAt',
             'platformSyncLastSuccessAt',
             'platformSyncSecretEncrypted',
             'activitySyncMode',
-        ]);
+        ]) {
+            if (await queryRunner.hasColumn('works', columnName)) {
+                await queryRunner.dropColumn('works', columnName);
+            }
+        }
     }
 }

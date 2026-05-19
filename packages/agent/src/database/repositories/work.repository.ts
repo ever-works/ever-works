@@ -14,6 +14,14 @@ function caseInsensitiveLike(search: string) {
     return Raw((alias) => buildCaseInsensitiveLikeClause(alias), { search });
 }
 
+const WORK_ACCESS_USER_SELECT = [
+    'user.id',
+    'user.username',
+    'user.email',
+    'user.committerName',
+    'user.committerEmail',
+];
+
 @Injectable()
 export class WorkRepository {
     constructor(
@@ -79,7 +87,12 @@ export class WorkRepository {
     }
 
     async findByIdForAccess(id: string): Promise<Work | null> {
-        return this.repository.createQueryBuilder('work').where({ id }).getOne();
+        return this.repository
+            .createQueryBuilder('work')
+            .leftJoin('work.user', 'user')
+            .addSelect(WORK_ACCESS_USER_SELECT)
+            .where({ id })
+            .getOne();
     }
 
     async findByIds(ids: string[]): Promise<Work[]> {

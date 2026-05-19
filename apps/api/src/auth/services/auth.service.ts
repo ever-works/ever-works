@@ -111,7 +111,7 @@ export class AuthService {
 
     async validateSocialUser(socialUser: SocialAuthUser) {
         const isTrustedEmail = socialUser.emailVerified !== false;
-        let user = await this.userRepository.findByEmail(socialUser.email);
+        let user = await this.userRepository.findByEmailForSocialAuth(socialUser.email);
         const displayName = socialUser.displayName || socialUser.email.split('@')[0];
 
         if (!user) {
@@ -147,7 +147,7 @@ export class AuthService {
                 );
             }
 
-            user = await this.userRepository.update(user.id, {
+            user = await this.userRepository.updateForSocialAuth(user.id, {
                 username: socialUser.username || user.username || displayName,
                 avatar: socialUser.avatar || user.avatar,
                 registrationProvider: socialUser.provider,
