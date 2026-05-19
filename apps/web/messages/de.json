@@ -463,6 +463,37 @@
                 "description": "Wir konnten Ihr {provider}-Konto nicht verbinden. Bitte versuchen Sie es erneut."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideen für Sie",
+                "titleWithName": "Ideen für Sie, {username}"
+            },
+            "actions": {
+                "accept": "Diese Idee verwenden",
+                "dismiss": "Verwerfen",
+                "dismissAria": "Diese Idee verwerfen",
+                "refresh": "Mehr Ideen vorschlagen"
+            },
+            "researching": {
+                "title": "Entwurf von Ideen aus Ihrem Profil...",
+                "subtitle": "Das dauert in der Regel unter einer Minute."
+            },
+            "empty": {
+                "title": "Aktuell keine Ideen.",
+                "subtitle": "Neue Vorschläge erscheinen hier, wenn sie fertig sind."
+            },
+            "errors": {
+                "rateLimited": "Tageslimit erreicht. Versuchen Sie es morgen erneut.",
+                "generic": "Ideen konnten nicht aktualisiert werden. Bitte versuchen Sie es erneut."
+            },
+            "plugins": {
+                "label": "Empfohlene Plugins"
+            }
+        },
+        "discover": {
+            "title": "Entdecken",
+            "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
+        },
         "header": {
             "welcome": "Willkommen zurück, {username}!",
             "subtitle": "Verwalten Sie Ihre KI-gestützten Werke und verfolgen Sie deren Leistung",
@@ -677,6 +708,7 @@
                 "apiKeys": "API-Schlüssel",
                 "data": "Daten",
                 "githubApp": "GitHub-App",
+                "workAgent": "Arbeits-Agent",
                 "gitProviders": "Git-Anbieter",
                 "dangerZone": "Gefahrenzone"
             },
@@ -703,6 +735,72 @@
                 "branchUnknown": "Standardzweig nicht verfügbar",
                 "private": "Privat",
                 "public": "Öffentlich"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Autonomer Arbeits-Agent",
+                        "description": "Lassen Sie den Agenten Ziele auf hoher Ebene planen, recherchieren und vorbereiten."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Legen Sie Grenzen fest, bevor der Agent Arbeitsaufgaben erstellen, Elemente hinzufügen oder Budgets ausgeben kann."
+                    },
+                    "queue": {
+                        "title": "Ziel in die Warteschlange einreihen",
+                        "description": "Geben Sie dem Agenten eine allgemeine Anweisung. Sie startet als ausstehend und läuft innerhalb Ihrer Schutzmechanismen."
+                    },
+                    "liveRun": {
+                        "title": "Live-Ausführung",
+                        "description": "Aktueller Status und jüngste Aktivität des Agenten."
+                    },
+                    "recentGoals": {
+                        "title": "Letzte Ziele",
+                        "description": "Ausstehende, laufende und abgeschlossene Arbeits-Agent-Anweisungen."
+                    }
+                },
+                "fields": {
+                    "enabled": "Arbeits-Agent aktivieren",
+                    "autoApproveLowImpact": "Änderungen mit geringem Auswirkungsgrad automatisch genehmigen",
+                    "dailySuggestions": "Tägliche Vorschläge",
+                    "dryRunByDefault": "Standardmäßig Testlauf",
+                    "maxWorksPerRun": "Max. Arbeitsaufgaben pro Ausführung",
+                    "maxItemsPerWork": "Max. Elemente pro Arbeitsaufgabe",
+                    "maxBudgetPerRun": "Max. Budget pro Ausführung",
+                    "approvalThreshold": "Genehmigungsgrenzwert",
+                    "confirmBeforeCreate": "Vor dem Erstellen von Arbeitsaufgaben bestätigen",
+                    "confirmBeforeDelete": "Vor dem Löschen von Elementen bestätigen",
+                    "dryRunThisGoal": "Dieses Ziel als Testlauf ausführen"
+                },
+                "actions": {
+                    "saveSettings": "Einstellungen speichern",
+                    "queueGoal": "Ziel in die Warteschlange einreihen",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Erstellen Sie eine Arbeitsaufgabe zu den Top-50-KI-Startups im Gesundheitswesen"
+                },
+                "metrics": {
+                    "works": "Arbeitsaufgaben",
+                    "items": "Elemente"
+                },
+                "labels": {
+                    "dryRun": "Testlauf",
+                    "liveRun": "Live-Ausführung"
+                },
+                "empty": {
+                    "noActiveRun": "Keine aktive Arbeits-Agent-Ausführung.",
+                    "noGoals": "Noch keine Arbeits-Agent-Ziele.",
+                    "waitingForUpdate": "Warten auf das erste Update der Ausführung."
+                },
+                "toasts": {
+                    "settingsSaved": "Einstellungen des Arbeits-Agenten gespeichert",
+                    "settingsError": "Einstellungen konnten nicht gespeichert werden",
+                    "goalQueued": "Ziel des Arbeits-Agenten in die Warteschlange eingereiht",
+                    "goalError": "Ziel konnte nicht in die Warteschlange eingereiht werden",
+                    "goalCanceled": "Ziel des Arbeits-Agenten abgebrochen",
+                    "cancelError": "Ziel konnte nicht abgebrochen werden"
+                }
             },
             "data": {
                 "exportTitle": "Daten exportieren",
@@ -811,6 +909,11 @@
             "profile": {
                 "title": "Profil-Einstellungen",
                 "subtitle": "Aktualisieren Sie Ihre Profilinformationen und Avatar",
+                "budgetAlerts": {
+                    "title": "E-Mail-Benachrichtigungen für Budgets",
+                    "description": "Sie erhalten eine E-Mail, wenn der monatliche Ausgabe eines Verzeichnisses 75 %, 90 % oder 100 % des Limits überschreitet oder das Budget überschreitet. Die Benachrichtigung in der App wird unabhängig von dieser Einstellung immer ausgelöst.",
+                    "toggleLabel": "Sende mir E-Mail-Benachrichtigungen für Budgets"
+                },
                 "fields": {
                     "name": "Name",
                     "username": "Benutzername",
@@ -953,6 +1056,30 @@
             "totalItems": "Insgesamt Einträge",
             "activeWebsites": "Aktive Websites",
             "fromLastMonth": "vom letzten Monat"
+        },
+        "adminUsage": {
+            "title": "Plattform-Nutzung",
+            "description": "Ausgaben über mehrere Benutzer und Verzeichnisse für den aktuellen Zeitraum. Nur für selbst gehostete Betreiber.",
+            "periodLabel": "{period}",
+            "totalSpend": "Gesamtausgaben: {amount}",
+            "empty": "Keine Nutzung für diesen Zeitraum erfasst.",
+            "columnUser": "Benutzer",
+            "columnEmail": "E-Mail",
+            "columnWork": "Verzeichnis",
+            "columnUnits": "Einheiten",
+            "columnCost": "Kosten",
+            "loadFailed": "Admin-Nutzung konnte nicht geladen werden. Möglicherweise haben Sie keine Administratorzugriffsberechtigungen für die Plattform."
+        },
+        "budgets": {
+            "overviewTitle": "Ausgaben in {period}",
+            "overviewProgressLabel": "{percent}% des {cap}-Limits",
+            "overviewOverageSuffix": " (Überziehung erlaubt)",
+            "overviewEmpty": "Kein monatliches Limit festgelegt. Fügen Sie eines in Budgets & Usage hinzu, um Benachrichtigungen zu aktivieren.",
+            "topPluginsTitle": "Top-Plugins nach Ausgaben",
+            "topPluginsEmpty": "Bisher noch keine Nutzung für diesen Zeitraum erfasst.",
+            "trendTitle": "Tägliche Ausgaben — {period}",
+            "trendEmpty": "Bisher noch keine Nutzung für diesen Zeitraum erfasst.",
+            "trendDayLabel": "Tag {day}"
         },
         "workCard": {
             "status": {
@@ -1553,6 +1680,11 @@
                     "screenshotError": "Beim Aufnehmen des Screenshots ist ein Fehler aufgetreten",
                     "featured": "Empfohlener Eintrag",
                     "featuredHelp": "Diesen Eintrag als empfohlen im Werk markieren",
+                    "markdown": "Inhalt (Markdown, optional)",
+                    "markdownPlaceholder": "# Überschrift\n\nAusführliche Beschreibung. Unterstützt GitHub-Flavored Markdown.",
+                    "markdownHelp": "Ausführlicher Hauptinhalt für die Detailseite des Elements. Wenn leer, wird ein Stumpf aus Name, Beschreibung und Quell-URL verwendet. Unterstützt GitHub-Flavored Markdown.",
+                    "showPreview": "Vorschau",
+                    "hidePreview": "Vorschau ausblenden",
                     "updateWithPR": "Pull Request erstellen",
                     "updateWithPRHelp": "Änderungen als Pull Request einreichen statt direkt committen",
                     "cancel": "Abbrechen",
@@ -1571,6 +1703,11 @@
                 },
                 "editDisplay": "Anzeige bearbeiten",
                 "editDisplayDescription": "Empfohlener Status umschalten und Anzeigereihenfolge festlegen.",
+                "editContent": "Inhalt bearbeiten",
+                "editContentDescription": "Bearbeiten Sie den ausführlichen Markdown-Hauptinhalt für dieses Element. Wird in <slug>.md im Daten-Repository geschrieben.",
+                "editContentSuccess": "Elementinhalt aktualisiert.",
+                "editContentFailed": "Elementinhalt konnte nicht aktualisiert werden.",
+                "editContentError": "Beim Aktualisieren des Elementinhalts ist ein Fehler aufgetreten.",
                 "orderLabel": "Anzeigereihenfolge (optional)",
                 "orderHelp": "Kleinere Zahlen werden früher innerhalb empfohlener/nicht empfohlener Gruppen angezeigt.",
                 "deleteDialogTitle": "Eintrag löschen",
@@ -1939,7 +2076,72 @@
                 "tabs": {
                     "general": "Allgemein",
                     "members": "Mitglieder",
+                    "budgets": "Budgets",
                     "navigationLabel": "Einstellungs-Tabs"
+                },
+                "budgets": {
+                    "title": "Budgets & Nutzung",
+                    "description": "Legen Sie monatliche Ausgabenobergrenzen für dieses Verzeichnis fest. Benachrichtigungen werden bei 75 %, 90 % und 100 % ausgelöst; bei 100 % werden neue Plugin-Aufrufe blockiert, es sei denn, eine Überziehung ist erlaubt.",
+                    "periodLabel": "{period} · ausgegeben {spent}",
+                    "globalCap": {
+                        "heading": "Globales Limit",
+                        "capLabel": "Monatliches Limit ({currency})",
+                        "allowOverageLabel": "Überziehung erlauben (warnt, blockiert aber nicht bei 100 %)",
+                        "createButton": "Globales Limit erstellen",
+                        "saveButton": "Speichern",
+                        "removeButton": "Entfernen",
+                        "rowSpend": "Ausgegeben {spent} von {cap} ({percent}%)",
+                        "overageSuffix": " · Überziehung erlaubt",
+                        "errorPositive": "Geben Sie einen positiven Limitwert ein (z. B. 50,00).",
+                        "createSuccess": "Erstellung des globalen Budgets erfolgreich",
+                        "createError": "Erstellung des globalen Budgets fehlgeschlagen",
+                        "updateSuccess": "Aktualisierung des globalen Budgets erfolgreich",
+                        "updateError": "Aktualisierung des globalen Budgets fehlgeschlagen",
+                        "deleteSuccess": "Löschung des globalen Budgets erfolgreich",
+                        "deleteError": "Löschung des globalen Budgets fehlgeschlagen"
+                    },
+                    "pluginCaps": {
+                        "heading": "Plugin-spezifische Limits",
+                        "subheading": "Optional. Legt ein Limit für ein einzelnes Plugin fest, zusätzlich zum globalen Limit.",
+                        "empty": "Keine plugin-spezifischen Limits. Fügen Sie eines hinzu.",
+                        "rowSpend": "Ausgegeben {spent} von {cap} ({percent}%)",
+                        "overageSuffix": " · Überziehung erlaubt",
+                        "addHeading": "Plugin-Limit hinzufügen",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "z. B. openai",
+                        "pluginSelectPlaceholder": "Wählen Sie ein Plugin aus…",
+                        "noEligiblePlugins": "Aktivieren Sie ein KI-, Such-, Screenshot- oder Content-Extractor-Plugin für dieses Verzeichnis, um ein plugin-spezifisches Limit festzulegen.",
+                        "allPluginsCapped": "Alle berechtigten Plugins haben bereits ein Limit.",
+                        "noMatchingPlugins": "Keine Plugins entsprechen dieser Suche.",
+                        "capLabel": "Monatliches Limit ({currency})",
+                        "allowOverageLabel": "Überziehung erlauben",
+                        "addButton": "Limit hinzufügen",
+                        "saveButton": "Speichern",
+                        "deleteAria": "Budget löschen",
+                        "errorPluginRequired": "Plugin-ID ist erforderlich.",
+                        "errorPluginDuplicate": "Für dieses Plugin existiert bereits ein Budget.",
+                        "errorPositive": "Geben Sie einen positiven Limitwert ein.",
+                        "createSuccess": "Erstellung des Plugin-Budgets erfolgreich",
+                        "createError": "Erstellung des Plugin-Budgets fehlgeschlagen",
+                        "updateSuccess": "Aktualisierung des Plugin-Budgets erfolgreich",
+                        "updateError": "Aktualisierung des Plugin-Budgets fehlgeschlagen",
+                        "deleteSuccess": "Löschung des Plugin-Budgets erfolgreich",
+                        "deleteError": "Löschung des Plugin-Budgets fehlgeschlagen"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Ausgaben nach Plugin",
+                        "subheading": "{period} — schreibgeschützte Aufschlüsselung aus PluginUsageEvent.",
+                        "empty": "Keine Nutzung für diesen Zeitraum erfasst.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Fähigkeit",
+                        "columnUnits": "Einheiten",
+                        "columnCost": "Kosten"
+                    },
+                    "export": {
+                        "downloadCsv": "CSV herunterladen",
+                        "downloadingCsv": "CSV wird vorbereitet…",
+                        "csvFailed": "CSV-Export fehlgeschlagen"
+                    }
                 },
                 "sourceSettings": "Quell-Repository",
                 "originalSource": "Originalquelle",
@@ -2247,6 +2449,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Deploy-Status wird geladen...",
+                    "openWebsite": "Website öffnen"
+                },
                 "noProviderAlert": {
                     "title": "Kein Bereitstellungsanbieter",
                     "description": "Wählen Sie einen Bereitstellungsanbieter aus, um Ihre Werk-Website bereitzustellen.",
@@ -2488,6 +2694,10 @@
                 "configureNow": "Jetzt konfigurieren",
                 "formTitle": "Werk manuell erstellen",
                 "formSubtitle": "Konfigurieren Sie Ihr Werk mit voller Kontrolle über jede Einstellung",
+                "proposalBanner": {
+                    "title": "Vorausgefüllt aus einer KI-Vorschlag.",
+                    "subtitle": "Passen Sie alles vor der Erstellung an."
+                },
                 "basicInfo": "Grundlegende Informationen",
                 "nameLabel": "Werkname *",
                 "namePlaceholder": "z. B. Awesome AI Tools",
@@ -2969,6 +3179,11 @@
             "disable": "Deaktivieren",
             "settings": "Einstellungen",
             "saveSettings": "Einstellungen speichern",
+            "saveAndVerify": "Speichern & überprüfen",
+            "verifiesOnSaveHint": "Durch das Speichern dieses Plugins wird die Verbindung getestet und Cluster-/Kontoinformationen zurückgemeldet.",
+            "verifyClusterHeader": "Verbunden mit Cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Verbindung überprüft.",
+            "verifyNoIngressClasses": "Keine IngressClass auf diesem Cluster gefunden. Installieren Sie ingress-nginx oder Traefik, speichern Sie dann erneut, um zu aktualisieren.",
             "settingsTitle": "Plugin-Einstellungen",
             "settingsSaved": "Einstellungen erfolgreich gespeichert",
             "noSettings": "Dieses Plugin hat keine konfigurierbaren Einstellungen",
@@ -3028,7 +3243,15 @@
                 "addItem": "Hinzufügen",
                 "modify": "Ändern",
                 "cancel": "Abbrechen",
-                "enterNewValue": "Neuen Wert eingeben…"
+                "enterNewValue": "Neuen Wert eingeben…",
+                "clusterIngressClassPlaceholder": "z. B. nginx",
+                "clusterIngressClassUseDefault": "Cluster-Standard",
+                "clusterIngressClassDefault": "standard",
+                "clusterIngressClassUnknown": "unbekannter Controller",
+                "clusterIngressClassPreVerify": "Speichern & überprüfen, um die Ingress-Liste dieses Clusters zu erkennen. Leer lassen für den Cluster-Standard.",
+                "clusterIngressClassEmpty": "Keing Ingress-Controller erkannt. Installieren Sie ingress-nginx, Traefik oder einen anderen Controller in Ihrem Cluster, speichern Sie dann erneut, um diese Liste zu aktualisieren.",
+                "githubPackagesOAuthConnect": "Mit GitHub autorisieren (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "GitHub-Autorisierung konnte nicht gestartet werden. Versuchen Sie es erneut oder fügen Sie manuell einen PAT hinzu."
             },
             "oauth": {
                 "title": "Kontoverbindung",
@@ -3081,6 +3304,7 @@
             "subtitle": "Durchsuchen Sie die integrierten Website-Vorlagen, verwalten Sie Ihren benutzerdefinierten Katalog und steuern Sie, welche Vorlage neue Arbeiten verwendet.",
             "actions": {
                 "addTemplate": "Benutzerdefinierte Vorlage hinzufügen",
+                "customizeTemplate": "Mit KI erstellen",
                 "refreshTemplates": "Vorlagen aktualisieren"
             },
             "hero": {
@@ -3117,6 +3341,8 @@
                 "fork": "Forken",
                 "edit": "Bearbeiten",
                 "archive": "Archivieren",
+                "customizeAgain": "Anpassen",
+                "viewStatus": "Anpassungsstatus anzeigen",
                 "catalogOnly": "Katalogelement",
                 "openRepository": "Repository öffnen",
                 "previewAlt": "{name} Vorschau",
@@ -3124,7 +3350,15 @@
                 "branch": "Zweig: {branch}",
                 "syncBranches": "{count} Synchronisationszweige",
                 "betaBranch": "Beta: {branch}",
-                "noDescription": "Noch keine Beschreibung vorhanden."
+                "noDescription": "Noch keine Beschreibung vorhanden.",
+                "status": {
+                    "pending": "In der Warteschlange",
+                    "forking": "Forken",
+                    "customizing": "Anpassen",
+                    "pushing": "Pushen",
+                    "succeeded": "Angepasst",
+                    "failed": "Letzter Lauf fehlgeschlagen"
+                }
             },
             "dialog": {
                 "title": "Benutzerdefinierte Vorlage hinzufügen",
@@ -3198,7 +3432,70 @@
                 "refreshSuccess": "Vorlagenkatalog aktualisiert.",
                 "refreshFailed": "Vorlagen konnten nicht aktualisiert werden.",
                 "defaultUpdated": "Standardvorlage aktualisiert.",
-                "defaultFailed": "Standardvorlage konnte nicht aktualisiert werden."
+                "defaultFailed": "Standardvorlage konnte nicht aktualisiert werden.",
+                "customizeFailed": "Anpassung der Vorlage konnte nicht gestartet werden.",
+                "customizationSucceeded": "Anpassung der Vorlage abgeschlossen.",
+                "customizationFailed": "Anpassung der Vorlage fehlgeschlagen."
+            },
+            "customizeDialog": {
+                "title": "Eine benutzerdefinierte Vorlage mit KI erstellen",
+                "titleIterate": "{name} erneut anpassen",
+                "titleStatus": "Anpassungsstatus — {name}",
+                "description": "Wir duplizieren eine Basisvorlage in ein neues Repository in Ihrem GitHub-Konto, dann führen wir den ausgewählten KI-Agenten darauf aus, um nur UI-Änderungen anzuwenden. Die Funktionalität bleibt unberührt.",
+                "descriptionIterate": "Führen Sie eine weitere Runde von Agentenbearbeitungen auf demselben Repository aus. Jedes Mal wird ein neuer Commit gepusht.",
+                "descriptionStatus": "Live-Status der letzten Anpassungslauf für diese Vorlage.",
+                "templateLabel": "Vorlage",
+                "templateIterateHelp": "Wiederholung auf dem Repository dieser vorhandenen benutzerdefinierten Vorlage.",
+                "nameLabel": "Vorlagenname",
+                "namePlaceholder": "z. B. Dunkles Lila-Theme",
+                "nameHelp": "Wird in Ihrem Katalog angezeigt und zur Benennung des neuen GitHub-Repositorys verwendet.",
+                "baseLabel": "Basisschablone",
+                "baseHelp": "Nur als KI-anpassbar markierte Basisvorlagen sind aufgeführt.",
+                "providerLabel": "Code-Bearbeitungs-Agent",
+                "providerHelp": "Wählen Sie eines Ihrer installierten Code-Bearbeitungs-Plugins. Die Standardeinstellung ist vorausgewählt.",
+                "aiProviderLabel": "KI-Anbieter",
+                "aiProviderHelp": "{plugin} läuft gegen ein externes LLM — wählen Sie aus, welches Sie verwenden möchten.",
+                "targetLabel": "GitHub-Ziel",
+                "targetHelp": "Wo das neue Repository erstellt werden soll. Persönliches Konto oder eine Organisation, der Sie angehören.",
+                "personalTarget": "Persönliches Konto ({login})",
+                "organizationTarget": "Organisation ({login})",
+                "promptLabel": "Beschreiben Sie die gewünschte Benutzeroberfläche",
+                "promptPlaceholder": "Beispiel: Wechseln Sie zu einem dunklen Theme mit subtilen Lila-Akzenten, abgerundeten Ecken und einer modernen Serifen-Überschriftenschrift.",
+                "promptIteratePlaceholder": "Beispiel: Erhöhen Sie den Kontrast der Seitenleiste und wechseln Sie die Überschriftenschrift zu Inter.",
+                "promptHelp": "Seien Sie spezifisch beim Styling. Neue Funktionen sind nicht im Umfang — nur UI.",
+                "submit": "Benutzerdefinierte Vorlage erstellen",
+                "submitIterate": "Anpassung durchführen",
+                "retry": "Wiederholen",
+                "cancel": "Abbrechen",
+                "done": "Fertig",
+                "successHelp": "Ihre benutzerdefinierte Vorlage ist bereit. Sie erscheint nun in Ihrem Katalog.",
+                "status": {
+                    "pending": "In der Warteschlange...",
+                    "forking": "Neues Repository wird bereitgestellt...",
+                    "customizing": "Agent wendet Ihre Änderungen an...",
+                    "pushing": "Änderungen werden gepusht...",
+                    "succeeded": "Anpassung erfolgreich abgeschlossen.",
+                    "failed": "Anpassung fehlgeschlagen."
+                },
+                "toast": {
+                    "started": "Anpassung gestartet — dies dauert in der Regel einige Minuten.",
+                    "success": "Vorlage erfolgreich angepasst.",
+                    "failed": "Anpassung der Vorlage fehlgeschlagen.",
+                    "startFailed": "Anpassung konnte nicht gestartet werden."
+                },
+                "messages": {
+                    "nameRequired": "Vorlagenname ist erforderlich.",
+                    "baseRequired": "Wählen Sie eine Basisschablone.",
+                    "providerRequired": "Wählen Sie einen Code-Bearbeitungs-Agenten.",
+                    "aiProviderRequired": "Wählen Sie einen KI-Anbieter für den ausgewählten Agenten.",
+                    "promptTooShort": "Beschreiben Sie die Änderungen in mindestens einigen Wörtern.",
+                    "noCustomizableBases": "Keine anpassbaren Basisvorlagen verfügbar.",
+                    "noProviders": "Keine Code-Bearbeitungs-Agent-Plugins installiert oder aktiviert. Installieren Sie eines aus dem Plugin-Katalog (z. B. claude-code, codex, gemini, opencode).",
+                    "noAiProviders": "{plugin} erfordert einen KI-Anbieter, aber keiner ist installiert oder aktiviert. Installieren Sie einen (z. B. openai, anthropic, google) aus dem Plugin-Katalog.",
+                    "noTargets": "Verbinden Sie ein GitHub-Konto, um ein Ziel auszuwählen.",
+                    "browsePlugins": "Plugin-Katalog durchsuchen",
+                    "noRuns": "Noch keine Anpassungsläufe für diese Vorlage."
+                }
             }
         },
         "templateSelector": {
@@ -3343,6 +3640,7 @@
             "dashboard": "Dashboard",
             "activity": "Aktivitätsprotokoll",
             "works": "Werke",
+            "discover": "Entdecken",
             "newWork": "Neues Werk",
             "work": "Werk",
             "overview": "Übersicht",

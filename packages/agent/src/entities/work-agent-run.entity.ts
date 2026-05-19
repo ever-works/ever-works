@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { WorkAgentGoal } from './work-agent-goal.entity';
+import { TimestampColumn } from './_types';
 import type { ClassToObject } from './types';
 import { User } from './user.entity';
 
@@ -65,10 +66,10 @@ export class WorkAgentRun {
     @Column('simple-json')
     summary: WorkAgentRunSummary;
 
-    @Column({ nullable: true })
+    @TimestampColumn({ nullable: true })
     startedAt?: Date | null;
 
-    @Column({ nullable: true })
+    @TimestampColumn({ nullable: true })
     finishedAt?: Date | null;
 
     @Column({ type: 'text', nullable: true })
