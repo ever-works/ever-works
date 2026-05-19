@@ -259,30 +259,47 @@ Security + protocol hardening + boundary checks. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `error-page-contract` from the storageState project so unauth UI assertions actually hit unauth pages.
 
-## Pass 7 — queued
+## Pass 7 — this PR (`chore/e2e-coverage-pass-7`)
 
-- [x] `cookie-flags-deep.spec.ts` (added in pass 6) — session-ish cookies have HttpOnly + safe SameSite, no PII in cookie names, no full session values in cookie names
-- [ ] `csp-strict.spec.ts` — Content-Security-Policy eventually moves from report-only to enforce; pin the families it allows
-- [ ] `chat-api-events.spec.ts` — pin specific SSE event names + completion sentinel (current chat-api-streaming checks content-type family only)
-- [ ] `git-providers-oauth-happy.spec.ts` — OAuth full happy-path with a mocked provider (full token exchange round-trip)
-- [ ] `audit-log-sequences.spec.ts` — extend audit-log-immutable to multi-mutation sequences (PATCH then GET, DELETE then GET, replay)
-- [ ] `multi-user-invitation.spec.ts` — extend multi-user-collab to invitation-accept flow, role downgrade
-- [ ] `bulk-operations.spec.ts` — `/api/works/bulk-*` endpoints if exposed; otherwise probe for batch endpoints
-- [ ] `search-fts.spec.ts` — `/api/works?q=...` full-text search across name/description, special-char handling, empty query
-- [ ] `unicode-collation.spec.ts` — non-ASCII (emoji, RTL, Han) in work names + items survives create→list→read round-trip
-- [ ] `concurrent-conflict.spec.ts` — two concurrent updates to the same work — last write wins / 409 conflict
-- [ ] `slug-collision.spec.ts` — creating two works with the same slug must 409 (or auto-disambiguate); existing slug-renames must roll back cleanly
+Long-tail security + protocol + collation. **+10 new spec files.**
 
-## Pass 8+ — long-tail / hardening
+- [x] `csp-strict.spec.ts` — API + web Content-Security-Policy: no `script-src *`, `object-src 'none'`, `frame-ancestors 'none'|'self'`, web sets some CSP
+- [x] `chat-api-events.spec.ts` — streaming chat uses `data:` / `event:` framing or NDJSON, ends with a completion sentinel
+- [x] `git-providers-oauth-happy.spec.ts` — `/api/oauth/providers` shape, `/connect/url` returns github.com URL with embedded state, `/connection` fresh-user is disconnected, disconnect is idempotent
+- [x] `audit-log-sequences.spec.ts` — PATCH → GET preserves entry (no tamper leak), DELETE → GET still lists, replay PATCH stays in same status family
+- [x] `multi-user-invitation.spec.ts` — owner POST + list invitations happy path, stranger isolated from invite list + create, members CRUD smoke, owner shows up as OWNER in members
+- [x] `bulk-operations.spec.ts` — probe 4 bulk-op candidate paths, notifications read-all clears unread-count, work-scoped /items/bulk-\* respond < 500
+- [x] `search-fts.spec.ts` — `?q=` filters /api/works, SQL-injection-style payload responds < 500, very long query doesn't crash
+- [x] `unicode-collation.spec.ts` — emoji / RTL Arabic / Han / cyrillic+combining / surrogate-pair italic survive create → list → read byte-for-byte
+- [x] `concurrent-conflict.spec.ts` — two parallel PUTs land at A or B (no frankenstein merge), partial PATCHes don't 5xx, owner+stranger race rejects stranger's write
+- [x] `slug-collision.spec.ts` — same-owner duplicate slug → 409 or auto-disambiguated (never silent shadow), cross-owner duplicate handled cleanly, slug rename responds < 500
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `chat-api-events` and `csp-strict` from the storageState project so their unauth assertions actually hit unauth surfaces.
+
+## Pass 8 — queued
+
+- [ ] `audit-log-fixture.spec.ts` — direct DB introspection on a test fixture (separate harness, NOT in scope for black-box e2e — may stay in /apps/api/test as integration)
+- [ ] `web-vitals.spec.ts` — inject web-vitals.js, measure CLS / INP / LCP on login + dashboard, fail on egregious regressions only
+- [ ] `playwright-trace.spec.ts` — golden-path trace recording for regression triage (artifact-only test)
+- [ ] `pwa-offline.spec.ts` — if a service worker is registered, verify it doesn't break navigation when online
+- [ ] `internationalization-rtl.spec.ts` — `/ar/login` (Arabic locale) renders with `dir="rtl"` on `<html>` if Arabic is supported
+- [ ] `accessibility-axe-deep.spec.ts` — run axe-core against /en/works, /en/settings; pin violation count instead of "no critical violations"
+- [ ] `csv-export-schema.spec.ts` — activity-log + usage CSV exports contain expected header columns
+- [ ] `oauth-consent-screen.spec.ts` — `/connect/url` includes `prompt=consent` parameter (or skip if provider-specific)
+- [ ] `rate-limit-headers.spec.ts` — successful requests carry `X-RateLimit-Remaining` / `X-RateLimit-Reset` headers when throttler is configured
+- [ ] `dropdown-keyboard.spec.ts` — common dropdowns navigate with arrow keys + Enter to select
+
+## Pass 9+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
 with specific shape assertions once the body schemas stabilize).
 Candidates:
 
-- [ ] `audit-log-immutable` — confirm immutability across direct DB introspection on a test fixture (separate harness, not in scope for black-box e2e)
-- [ ] `web-vitals.spec.ts` — measure CLS / INP / LCP on key pages with web-vitals.js injected
-- [ ] `playwright-trace.spec.ts` — golden-path trace recording for regression triage
+- [ ] `chat-api-events` — pin EXACT SSE event names when the LLM provider is configured, instead of permissive "any framing"
+- [ ] `bulk-operations` — once endpoints exist, pin exact `{affected, errors}` shape
+- [ ] `slug-collision` — pin per-error response shape (`{code: "slug_taken"}` style)
+- [ ] `search-fts` — verify search-result ordering when relevance scoring is enabled
 
 ---
 
