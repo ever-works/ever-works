@@ -6,12 +6,24 @@ jest.mock('node:crypto', () => ({
     randomUUID: jest.fn(() => 'fixed-uuid-1234'),
 }));
 
-type Mocked = jest.Mocked<Pick<Repository<User>, 'create' | 'save' | 'findOne' | 'update'>>;
+type Mocked = jest.Mocked<
+    Pick<Repository<User>, 'create' | 'save' | 'findOne' | 'update' | 'createQueryBuilder'>
+>;
 
 describe('UserRepository', () => {
     let repository: Mocked;
     let service: UserRepository;
     const ORIGINAL_ENV = { ...process.env };
+
+    const mockUserQueryBuilder = (result: User | null) => {
+        const queryBuilder = {
+            select: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            getOne: jest.fn().mockResolvedValue(result),
+        };
+        repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+        return queryBuilder;
+    };
 
     beforeEach(() => {
         repository = {
@@ -19,6 +31,7 @@ describe('UserRepository', () => {
             save: jest.fn(),
             findOne: jest.fn(),
             update: jest.fn(),
+            createQueryBuilder: jest.fn(),
         };
         service = new UserRepository(repository as unknown as Repository<User>);
     });
@@ -95,6 +108,23 @@ describe('UserRepository', () => {
         });
     });
 
+    describe('findByEmailForSocialAuth', () => {
+        it('uses a narrow social-auth projection by email', async () => {
+            const row = { id: 'u1', email: 'a@b.com' } as User;
+            const queryBuilder = mockUserQueryBuilder(row);
+
+            await expect(service.findByEmailForSocialAuth('a@b.com')).resolves.toBe(row);
+
+            expect(repository.createQueryBuilder).toHaveBeenCalledWith('user');
+            expect(queryBuilder.select).toHaveBeenCalledWith(
+                expect.arrayContaining(['user.id', 'user.email', 'user.isActive']),
+            );
+            expect(queryBuilder.select.mock.calls[0][0]).not.toContain('user.failedLoginAttempts');
+            expect(queryBuilder.select.mock.calls[0][0]).not.toContain('user.lockedUntil');
+            expect(queryBuilder.where).toHaveBeenCalledWith({ email: 'a@b.com' });
+        });
+    });
+
     describe('findById', () => {
         it('queries by id', async () => {
             const row = { id: 'u1' } as User;
@@ -108,6 +138,23 @@ describe('UserRepository', () => {
         it('returns null on miss', async () => {
             repository.findOne.mockResolvedValueOnce(null);
             await expect(service.findById('missing')).resolves.toBeNull();
+        });
+    });
+
+    describe('findByIdForSocialAuth', () => {
+        it('uses the same narrow social-auth projection by id', async () => {
+            const row = { id: 'u1' } as User;
+            const queryBuilder = mockUserQueryBuilder(row);
+
+            await expect(service.findByIdForSocialAuth('u1')).resolves.toBe(row);
+
+            expect(repository.createQueryBuilder).toHaveBeenCalledWith('user');
+            expect(queryBuilder.select).toHaveBeenCalledWith(
+                expect.arrayContaining(['user.id', 'user.email', 'user.isActive']),
+            );
+            expect(queryBuilder.select.mock.calls[0][0]).not.toContain('user.failedLoginAttempts');
+            expect(queryBuilder.select.mock.calls[0][0]).not.toContain('user.lockedUntil');
+            expect(queryBuilder.where).toHaveBeenCalledWith({ id: 'u1' });
         });
     });
 
@@ -129,6 +176,24 @@ describe('UserRepository', () => {
             repository.findOne.mockResolvedValueOnce(null);
 
             await expect(service.update('missing', { username: 'x' })).resolves.toBeNull();
+        });
+    });
+
+    describe('updateForSocialAuth', () => {
+        it('updates by id then refetches with the narrow social-auth projection', async () => {
+            const refetched = { id: 'u1', email: 'a@b.com' } as User;
+            const queryBuilder = mockUserQueryBuilder(refetched);
+            repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
+
+            const result = await service.updateForSocialAuth('u1', {
+                registrationProvider: 'github',
+            });
+
+            expect(result).toBe(refetched);
+            expect(repository.update).toHaveBeenCalledWith('u1', {
+                registrationProvider: 'github',
+            });
+            expect(queryBuilder.where).toHaveBeenCalledWith({ id: 'u1' });
         });
     });
 

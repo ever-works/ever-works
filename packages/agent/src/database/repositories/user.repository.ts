@@ -5,6 +5,24 @@ import { User } from '../../entities/user.entity';
 import { config } from '../../config';
 import { randomUUID } from 'node:crypto';
 
+const SOCIAL_AUTH_USER_SELECT = [
+    'user.id',
+    'user.username',
+    'user.email',
+    'user.registrationProvider',
+    'user.isAnonymous',
+    'user.avatar',
+    'user.emailVerified',
+    'user.isActive',
+    'user.lastLoginAt',
+    'user.lastLoginIp',
+    'user.committerName',
+    'user.committerEmail',
+    'user.defaultPlanId',
+    'user.createdAt',
+    'user.updatedAt',
+];
+
 @Injectable()
 export class UserRepository {
     constructor(
@@ -33,10 +51,26 @@ export class UserRepository {
         });
     }
 
+    async findByEmailForSocialAuth(email: string): Promise<User | null> {
+        return this.repository
+            .createQueryBuilder('user')
+            .select(SOCIAL_AUTH_USER_SELECT)
+            .where({ email })
+            .getOne();
+    }
+
     async findById(id: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { id },
         });
+    }
+
+    async findByIdForSocialAuth(id: string): Promise<User | null> {
+        return this.repository
+            .createQueryBuilder('user')
+            .select(SOCIAL_AUTH_USER_SELECT)
+            .where({ id })
+            .getOne();
     }
 
     async findByIdForScheduledRun(id: string): Promise<User | null> {
@@ -74,6 +108,11 @@ export class UserRepository {
     async update(id: string, userData: Partial<User>): Promise<User> {
         await this.repository.update(id, userData);
         return await this.findById(id);
+    }
+
+    async updateForSocialAuth(id: string, userData: Partial<User>): Promise<User> {
+        await this.repository.update(id, userData);
+        return this.findByIdForSocialAuth(id);
     }
 
     /**

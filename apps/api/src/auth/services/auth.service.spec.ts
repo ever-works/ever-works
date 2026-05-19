@@ -30,7 +30,14 @@ describe('AuthService', () => {
     let userRepo: jest.Mocked<
         Pick<
             UserRepository,
-            'findByEmail' | 'findById' | 'findOne' | 'create' | 'update' | 'clearPasswordResetToken'
+            | 'findByEmail'
+            | 'findByEmailForSocialAuth'
+            | 'findById'
+            | 'findOne'
+            | 'create'
+            | 'update'
+            | 'updateForSocialAuth'
+            | 'clearPasswordResetToken'
         >
     >;
     let authAccountRepo: jest.Mocked<
@@ -48,10 +55,12 @@ describe('AuthService', () => {
     beforeEach(() => {
         userRepo = {
             findByEmail: jest.fn(),
+            findByEmailForSocialAuth: jest.fn(),
             findById: jest.fn(),
             findOne: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
+            updateForSocialAuth: jest.fn(),
             clearPasswordResetToken: jest.fn(),
         } as any;
         authAccountRepo = {
@@ -103,7 +112,7 @@ describe('AuthService', () => {
         });
 
         it('creates a new user when none exists and emits UserConfirmedEvent for trusted email', async () => {
-            userRepo.findByEmail.mockResolvedValue(null);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue(null);
             const created = { id: 'u-new', email: 'sa@b.co' };
             userRepo.create.mockResolvedValue(created as any);
             authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
@@ -130,7 +139,7 @@ describe('AuthService', () => {
         });
 
         it('does NOT emit UserConfirmedEvent when emailVerified is false', async () => {
-            userRepo.findByEmail.mockResolvedValue(null);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue(null);
             userRepo.create.mockResolvedValue({ id: 'u-new', email: 'x' } as any);
             authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
             jest.spyOn(bcrypt, 'hash').mockResolvedValue('h' as never);
@@ -146,7 +155,7 @@ describe('AuthService', () => {
         });
 
         it('falls back to email-prefix when displayName/username missing', async () => {
-            userRepo.findByEmail.mockResolvedValue(null);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue(null);
             userRepo.create.mockResolvedValue({ id: 'u-new' } as any);
             authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
             jest.spyOn(bcrypt, 'hash').mockResolvedValue('h' as never);
@@ -161,7 +170,7 @@ describe('AuthService', () => {
         });
 
         it('throws UnauthorizedException when account suspended', async () => {
-            userRepo.findByEmail.mockResolvedValue({
+            userRepo.findByEmailForSocialAuth.mockResolvedValue({
                 id: 'u-1',
                 isActive: false,
             } as any);
@@ -172,7 +181,10 @@ describe('AuthService', () => {
         });
 
         it('rejects unverified email when no existing provider link', async () => {
-            userRepo.findByEmail.mockResolvedValue({ id: 'u-1', isActive: true } as any);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                id: 'u-1',
+                isActive: true,
+            } as any);
             authAccountRepo.findProviderAccount.mockResolvedValue(null);
 
             await expect(
@@ -183,7 +195,7 @@ describe('AuthService', () => {
         });
 
         it('allows unverified email when provider link already exists', async () => {
-            userRepo.findByEmail.mockResolvedValue({
+            userRepo.findByEmailForSocialAuth.mockResolvedValue({
                 id: 'u-1',
                 isActive: true,
                 username: 'old',
@@ -192,7 +204,7 @@ describe('AuthService', () => {
             } as any);
             authAccountRepo.findProviderAccount.mockResolvedValue({ id: 'acc-1' } as any);
             const updated = { id: 'u-1', email: 'sa@b.co' };
-            userRepo.update.mockResolvedValue(updated as any);
+            userRepo.updateForSocialAuth.mockResolvedValue(updated as any);
             authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
 
             const result = await service.validateSocialUser(
@@ -200,7 +212,7 @@ describe('AuthService', () => {
             );
 
             expect(result).toBe(updated);
-            expect(userRepo.update).toHaveBeenCalledWith(
+            expect(userRepo.updateForSocialAuth).toHaveBeenCalledWith(
                 'u-1',
                 expect.objectContaining({
                     lastLoginAt: expect.any(Date),
@@ -210,7 +222,7 @@ describe('AuthService', () => {
         });
 
         it('upserts provider account with correct fields', async () => {
-            userRepo.findByEmail.mockResolvedValue(null);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue(null);
             userRepo.create.mockResolvedValue({ id: 'u-new' } as any);
             jest.spyOn(bcrypt, 'hash').mockResolvedValue('h' as never);
 
@@ -232,7 +244,7 @@ describe('AuthService', () => {
         });
 
         it('defaults tokenType to Bearer when missing', async () => {
-            userRepo.findByEmail.mockResolvedValue(null);
+            userRepo.findByEmailForSocialAuth.mockResolvedValue(null);
             userRepo.create.mockResolvedValue({ id: 'u-new' } as any);
             jest.spyOn(bcrypt, 'hash').mockResolvedValue('h' as never);
 
