@@ -29,7 +29,10 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
     } as RegisteredPlugin;
 }
 
-function makeRegistry(plugins: FakePlugin[], readyPlugins: FakePlugin[] = plugins): PluginRegistryService {
+function makeRegistry(
+    plugins: FakePlugin[],
+    readyPlugins: FakePlugin[] = plugins,
+): PluginRegistryService {
     return {
         getEnabledPluginsScoped: jest.fn().mockResolvedValue(plugins.map(makeRegistered)),
         getReady: jest.fn().mockReturnValue(readyPlugins.map(makeRegistered)),
@@ -223,10 +226,7 @@ describe('resolveAiProviderForResearch', () => {
     it('falls back to globally ready providers when user-scoped providers are not configured', async () => {
         const registry = makeRegistry(
             [{ id: 'user-openai' }],
-            [
-                { id: 'user-openai' },
-                { id: 'openrouter', defaultForCapabilities: ['ai-provider'] },
-            ],
+            [{ id: 'user-openai' }, { id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
         );
         const getProviderConfig = jest
             .fn()

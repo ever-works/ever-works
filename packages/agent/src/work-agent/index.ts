@@ -15,7 +15,4 @@ export {
     WorkAgentRunStatus,
     type WorkAgentRunSummary,
 } from '../entities/work-agent-run.entity';
-export {
-    WorkAgentRunLog,
-    WorkAgentRunLogLevel,
-} from '../entities/work-agent-run-log.entity';
+export { WorkAgentRunLog, WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';

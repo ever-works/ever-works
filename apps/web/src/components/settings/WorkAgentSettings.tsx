@@ -38,12 +38,7 @@ const STATUS_STYLES: Record<string, string> = {
     failed: 'bg-danger/10 text-danger border-danger/20',
 };
 
-export function WorkAgentSettings({
-    preferences,
-    goals,
-    activeRun,
-    logs,
-}: WorkAgentSettingsProps) {
+export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
     const [isSaving, startSaving] = useTransition();
     const [isCanceling, startCanceling] = useTransition();
@@ -142,9 +137,7 @@ export function WorkAgentSettings({
                         <ToggleRow
                             label={t('fields.dryRunByDefault')}
                             checked={localPreferences.guardrails.dryRunByDefault}
-                            onChange={(checked) =>
-                                updateGuardrail('dryRunByDefault', checked)
-                            }
+                            onChange={(checked) => updateGuardrail('dryRunByDefault', checked)}
                         />
                     </div>
                 </div>
@@ -282,10 +275,7 @@ export function WorkAgentSettings({
                                             value={activeRun.summary.itemsCreated}
                                         />
                                     </div>
-                                    <LogList
-                                        logs={logs}
-                                        emptyText={t('empty.waitingForUpdate')}
-                                    />
+                                    <LogList logs={logs} emptyText={t('empty.waitingForUpdate')} />
                                 </>
                             ) : (
                                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
@@ -322,11 +312,16 @@ export function WorkAgentSettings({
                                         </div>
                                         <div className="mt-3 flex items-center justify-between gap-3">
                                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                                {goal.dryRun ? t('labels.dryRun') : t('labels.liveRun')}
+                                                {goal.dryRun
+                                                    ? t('labels.dryRun')
+                                                    : t('labels.liveRun')}
                                             </span>
-                                            {['pending', 'planning', 'waiting-for-approval', 'running'].includes(
-                                                goal.status,
-                                            ) && (
+                                            {[
+                                                'pending',
+                                                'planning',
+                                                'waiting-for-approval',
+                                                'running',
+                                            ].includes(goal.status) && (
                                                 <Button
                                                     type="button"
                                                     variant="secondary"
@@ -473,20 +468,13 @@ function Metric({ label, value }: { label: string; value: number }) {
 
 function LogList({ logs, emptyText }: { logs: WorkAgentRunLog[]; emptyText: string }) {
     if (logs.length === 0) {
-        return (
-            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                {emptyText}
-            </p>
-        );
+        return <p className="text-xs text-text-muted dark:text-text-muted-dark">{emptyText}</p>;
     }
 
     return (
         <div className="space-y-2">
             {logs.slice(-6).map((log) => (
-                <div
-                    key={log.id}
-                    className="rounded-lg bg-surface dark:bg-surface-dark px-3 py-2"
-                >
+                <div key={log.id} className="rounded-lg bg-surface dark:bg-surface-dark px-3 py-2">
                     <div className="text-[11px] uppercase text-text-muted dark:text-text-muted-dark">
                         {log.step}
                     </div>

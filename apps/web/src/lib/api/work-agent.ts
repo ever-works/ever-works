@@ -114,7 +114,9 @@ export const workAgentAPI = {
         return serverFetch<WorkAgentGoal[]>('/me/work-agent/goals', { method: 'GET' });
     },
 
-    createGoal(input: CreateWorkAgentGoalInput): Promise<{ goal: WorkAgentGoal; run: WorkAgentRun }> {
+    createGoal(
+        input: CreateWorkAgentGoalInput,
+    ): Promise<{ goal: WorkAgentGoal; run: WorkAgentRun }> {
         return serverMutation<{ goal: WorkAgentGoal; run: WorkAgentRun }>({
             endpoint: '/me/work-agent/goals',
             data: input,

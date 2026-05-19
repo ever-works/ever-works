@@ -14,10 +14,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkAgentService } from '@ever-works/agent/work-agent';
-import {
-    CreateWorkAgentGoalDto,
-    UpdateWorkAgentPreferencesDto,
-} from './dto/work-agent.dto';
+import { CreateWorkAgentGoalDto, UpdateWorkAgentPreferencesDto } from './dto/work-agent.dto';
 
 @ApiTags('work-agent')
 @Controller('api/me/work-agent')
@@ -58,10 +55,7 @@ export class WorkAgentController {
     @Patch('goals/:id/cancel')
     @ApiOperation({ summary: 'Cancel a pending or active Work agent goal' })
     @HttpCode(HttpStatus.OK)
-    cancelGoal(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id', ParseUUIDPipe) id: string,
-    ) {
+    cancelGoal(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
         return this.service.cancelGoal(auth.userId, id);
     }
 
@@ -75,10 +69,7 @@ export class WorkAgentController {
     @Get('runs/:id/logs')
     @ApiOperation({ summary: 'List logs for a Work agent run' })
     @HttpCode(HttpStatus.OK)
-    listRunLogs(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id', ParseUUIDPipe) id: string,
-    ) {
+    listRunLogs(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
         return this.service.listRunLogs(auth.userId, id);
     }
 }

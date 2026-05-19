@@ -1,11 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-    WorkAgentGoal,
-    WorkAgentPreference,
-    WorkAgentRun,
-    WorkAgentRunLog,
-} from '../entities';
+import { WorkAgentGoal, WorkAgentPreference, WorkAgentRun, WorkAgentRunLog } from '../entities';
 import { DatabaseModule } from '../database/database.module';
 import { WorkAgentService } from './work-agent.service';
 

@@ -268,12 +268,7 @@ export class WorkAgentService {
     ): WorkAgentGuardrails {
         return {
             maxWorksPerRun: this.clampInt(override?.maxWorksPerRun, base.maxWorksPerRun, 1, 25),
-            maxItemsPerWork: this.clampInt(
-                override?.maxItemsPerWork,
-                base.maxItemsPerWork,
-                1,
-                500,
-            ),
+            maxItemsPerWork: this.clampInt(override?.maxItemsPerWork, base.maxItemsPerWork, 1, 500),
             maxBudgetCentsPerRun: this.clampInt(
                 override?.maxBudgetCentsPerRun,
                 base.maxBudgetCentsPerRun,
@@ -294,7 +289,9 @@ export class WorkAgentService {
         };
     }
 
-    private pickGuardrailOverride(input: Partial<WorkAgentGuardrails>): Partial<WorkAgentGuardrails> {
+    private pickGuardrailOverride(
+        input: Partial<WorkAgentGuardrails>,
+    ): Partial<WorkAgentGuardrails> {
         const keys: Array<keyof WorkAgentGuardrails> = [
             'maxWorksPerRun',
             'maxItemsPerWork',

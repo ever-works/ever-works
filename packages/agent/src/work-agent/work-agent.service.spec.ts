@@ -1,12 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import {
-    WorkAgentGoalStatus,
-    WorkAgentRunStatus,
-} from '../entities';
-import {
-    DEFAULT_WORK_AGENT_GUARDRAILS,
-    WorkAgentService,
-} from './work-agent.service';
+import { WorkAgentGoalStatus, WorkAgentRunStatus } from '../entities';
+import { DEFAULT_WORK_AGENT_GUARDRAILS, WorkAgentService } from './work-agent.service';
 
 function makeRepo<T extends { id?: string }>() {
     let nextId = 1;
@@ -80,9 +74,7 @@ function makeService() {
             throw new Error(`Unexpected repository: ${(entity as { name?: string }).name}`);
         }),
     };
-    const transaction = jest.fn(async (callback: (manager: any) => unknown) =>
-        callback(manager),
-    );
+    const transaction = jest.fn(async (callback: (manager: any) => unknown) => callback(manager));
     goals.manager = { transaction };
     runs.manager = { transaction };
     logs.manager = { transaction };
@@ -191,9 +183,7 @@ describe('WorkAgentService', () => {
             dailySuggestionsEnabled: true,
             guardrails: DEFAULT_WORK_AGENT_GUARDRAILS,
         };
-        preferences.findOne
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce(raced);
+        preferences.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(raced);
         preferences.save.mockRejectedValueOnce({ code: '23505' });
 
         const result = await service.getPreferences('u1');
