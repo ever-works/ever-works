@@ -358,8 +358,8 @@ export class ActivityLogService {
         const headers = ['Date', 'Action Type', 'Action', 'Status', 'Work', 'Summary'].join(',');
 
         const rows = activities.map((a) => {
-            const workName = (a.work?.name || '').replace(/"/g, '""');
-            const summary = this.formatSummary(a).replace(/"/g, '""');
+            const workName = csvSafeCell((a.work?.name || '').replace(/"/g, '""'));
+            const summary = csvSafeCell(this.formatSummary(a).replace(/"/g, '""'));
             return [
                 a.createdAt.toISOString(),
                 a.actionType,
@@ -372,4 +372,19 @@ export class ActivityLogService {
 
         return [headers, ...rows].join('\n');
     }
+}
+
+/**
+ * CSV-injection defense: if a user-controlled cell begins with `=`, `+`,
+ * `-`, `@`, TAB or CR, spreadsheet software (Excel, Numbers, Google
+ * Sheets) interprets it as a formula on open. Prefix such cells with a
+ * single quote so the formula is rendered as text. Wrapping in double
+ * quotes is NOT sufficient — spreadsheets unwrap them and re-evaluate.
+ */
+function csvSafeCell(value: string): string {
+    if (!value) return value;
+    if (/^[=+\-@\t\r]/.test(value)) {
+        return `'${value}`;
+    }
+    return value;
 }
