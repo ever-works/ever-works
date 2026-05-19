@@ -312,20 +312,37 @@ files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `sentry-error-reporting` from the storageState project so its unauth `/en/login` Sentry-event assertion measures the unauth case.
 
-## Pass 10 — queued
+## Pass 10 — this PR (`chore/e2e-coverage-pass-10`)
 
-- [ ] `mobile-touch.spec.ts` — touch gestures (swipe to dismiss, long-press menus) on key UI surfaces
-- [ ] `pdf-export.spec.ts` — work/usage PDF export (if exposed) renders without 5xx + content-disposition + sample bytes
-- [ ] `email-template-render.spec.ts` — preview-email-template endpoint (admin) returns parseable HTML, no template-engine errors
-- [ ] `recovery-codes.spec.ts` — 2FA backup-codes endpoint (once 2FA is configured): issue/list/revoke contract
-- [ ] `magic-link.spec.ts` — passwordless magic-link issuance + redemption flow (if exposed)
-- [ ] `sso-saml.spec.ts` — SAML SSO endpoint probe (enterprise feature; skip in non-SAML envs)
-- [ ] `team-billing.spec.ts` — per-team billing endpoints (admin / owner only)
-- [ ] `usage-quota.spec.ts` — soft / hard quota enforcement: 80% warning, 100% block
-- [ ] `audit-export-sanitization.spec.ts` — admin audit export strips PII based on org policy
-- [ ] `share-links.spec.ts` — public share links for a work: expiry, revocation, no-auth viewing
+Mobile + admin + enterprise features. **+10 new spec files.**
 
-## Pass 11+ — long-tail / hardening
+- [x] `mobile-touch.spec.ts` — iPhone 13 + Pixel 7 viewport, tap → fill → readback, submit reachable without horizontal scroll, viewport meta has width=device-width
+- [x] `pdf-export.spec.ts` — probe 5 PDF candidate paths, owner gets %PDF- magic bytes, stranger isolated (401/403/404)
+- [x] `email-template-render.spec.ts` — preview endpoint requires admin (regular user 401/403), no unresolved `{{handlebars}}` markers in rendered body
+- [x] `recovery-codes.spec.ts` — 4 candidate paths, without 2FA enrolled returns 4xx (not silent 200), POST regenerate also 4xx without 2FA
+- [x] `magic-link.spec.ts` — issuance always 2xx/204 (no email-existence signal), timing-uniformity 5x ratio between known/unknown emails, redemption with bogus/empty token 4xx
+- [x] `sso-saml.spec.ts` — metadata XML shape, init returns redirect or 4xx, ACS rejects bogus SAMLResponse, providers list returns array
+- [x] `team-billing.spec.ts` — unauth teams/orgs gates, stranger cannot read billing of unowned team (401/403/404), team-invitation listing requires auth
+- [x] `usage-quota.spec.ts` — usage endpoint requires auth, numeric shape for fresh user with no negative cost/usage values, hammering create-work N times never produces 5xx
+- [x] `audit-export-sanitization.spec.ts` — activity-log + account + usage exports never carry secret patterns (bcrypt/argon2/scrypt hashes, JWT, AWS/Google/Stripe/GitHub/OpenAI key prefixes), cross-tenant id/email isolation
+- [x] `share-links.spec.ts` — owner creates share returns ref (url/token/id), stranger cannot create on owner's work, DELETE auth-gated, public consumption endpoint reachable unauthed
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `mobile-touch` from the storageState project so the iPhone/Pixel device viewports actually hit the unauth login form.
+
+## Pass 11 — queued
+
+- [ ] `localization-strings.spec.ts` — verify all locale JSON files have the same key set (no missing translations), no placeholder text like `[MISSING]`
+- [ ] `worker-job-failure.spec.ts` — BullMQ worker failure paths: job retried with backoff, eventually moves to failed queue with error message
+- [ ] `database-migration-safety.spec.ts` — `/api/health/db` reports migration count + last-applied (if exposed)
+- [ ] `cron-schedules.spec.ts` — scheduled job listing endpoint (admin) returns expected cron strings
+- [ ] `webrtc-permissions.spec.ts` — if any pages request mic/camera (e.g. screen recording in work setup), the permission prompt is gated behind explicit user action
+- [ ] `tour-onboarding-replay.spec.ts` — `?tour=1` query param re-triggers the onboarding tour even for completed users
+- [ ] `dark-mode-pinned.spec.ts` — user-pinned dark mode survives reload + cross-tab (storage event)
+- [ ] `breadcrumbs-deep.spec.ts` — breadcrumb trail on nested routes (/works/[id]/items, /settings/api-keys) accurately reflects path
+- [ ] `keyboard-shortcuts.spec.ts` — `/` opens command palette / search, `?` shows shortcuts overlay (if wired)
+- [ ] `tooltip-hover.spec.ts` — info icon tooltips render on hover, dismissed by Escape
+
+## Pass 12+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
