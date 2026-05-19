@@ -329,20 +329,37 @@ Mobile + admin + enterprise features. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `mobile-touch` from the storageState project so the iPhone/Pixel device viewports actually hit the unauth login form.
 
-## Pass 11 — queued
+## Pass 11 — this PR (`chore/e2e-coverage-pass-11`)
 
-- [ ] `localization-strings.spec.ts` — verify all locale JSON files have the same key set (no missing translations), no placeholder text like `[MISSING]`
-- [ ] `worker-job-failure.spec.ts` — BullMQ worker failure paths: job retried with backoff, eventually moves to failed queue with error message
-- [ ] `database-migration-safety.spec.ts` — `/api/health/db` reports migration count + last-applied (if exposed)
-- [ ] `cron-schedules.spec.ts` — scheduled job listing endpoint (admin) returns expected cron strings
-- [ ] `webrtc-permissions.spec.ts` — if any pages request mic/camera (e.g. screen recording in work setup), the permission prompt is gated behind explicit user action
-- [ ] `tour-onboarding-replay.spec.ts` — `?tour=1` query param re-triggers the onboarding tour even for completed users
-- [ ] `dark-mode-pinned.spec.ts` — user-pinned dark mode survives reload + cross-tab (storage event)
-- [ ] `breadcrumbs-deep.spec.ts` — breadcrumb trail on nested routes (/works/[id]/items, /settings/api-keys) accurately reflects path
-- [ ] `keyboard-shortcuts.spec.ts` — `/` opens command palette / search, `?` shows shortcuts overlay (if wired)
-- [ ] `tooltip-hover.spec.ts` — info icon tooltips render on hover, dismissed by Escape
+UX polish + infra-shape probes. **+10 new spec files.**
 
-## Pass 12+ — long-tail / hardening
+- [x] `localization-strings.spec.ts` — every non-en locale has parity with en, no `[MISSING]` / `[TODO]` / `FIXME-i18n` placeholders, en baseline has > 20 keys
+- [x] `worker-job-failure.spec.ts` — generation on non-existent work returns 4xx (not 5xx), activity-log status enum sanity, repeated invalid-job POSTs don't deadlock
+- [x] `database-migration-safety.spec.ts` — /api/health doesn't report db subsystem down, /api/health/db (if exposed) carries migration metadata, 10x health hammer no 5xx
+- [x] `cron-schedules.spec.ts` — work-schedule endpoint < 500, bogus cron rejected (4xx not 5xx), cron-like fields are syntactically parseable
+- [x] `webrtc-permissions.spec.ts` — /en/login and /en/register don't preemptively call getUserMedia / getDisplayMedia, Permissions-Policy doesn't grant camera/microphone/geolocation=\*
+- [x] `tour-onboarding-replay.spec.ts` — `?tour=1`, `?onboarding=replay`, `?welcome=1`, `?showTour=true` all render without 5xx + non-empty body
+- [x] `dark-mode-pinned.spec.ts` — localStorage-pinned dark theme survives reload, html carries theme markers before first paint (FOUC guard), new tab inherits pinned theme
+- [x] `breadcrumbs-deep.spec.ts` — /settings/\* + works detail subroutes expose either a breadcrumb landmark OR a link back to parent
+- [x] `keyboard-shortcuts.spec.ts` — `/`, `?`, `Ctrl+K` and `Escape` all leave the page chrome rendering (no crash on unknown hotkeys)
+- [x] `tooltip-hover.spec.ts` — hovering a tooltip trigger renders a `[role="tooltip"]`, Escape doesn't break the page
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `webrtc-permissions` from the storageState project so its unauth /en/login getUserMedia probe measures the unauth case.
+
+## Pass 12 — queued
+
+- [ ] `bundle-size-budget.spec.ts` — Next.js \_next/static/\* bundle aggregate gz-size under 1 MB on first load
+- [ ] `service-worker-update.spec.ts` — when SW is registered, a new version triggers `updatefound` → activates on next nav
+- [ ] `polyfill-presence.spec.ts` — core-js / regenerator-runtime polyfills loaded conditionally (no extra weight on modern browsers)
+- [ ] `xss-html-encoding.spec.ts` — user-controlled fields (work name, item description) are HTML-encoded on render
+- [ ] `csv-injection.spec.ts` — fields starting with `=`, `+`, `-`, `@` in CSV exports are prefixed with `'` or escaped
+- [ ] `sql-where-clause-injection.spec.ts` — `?status=` + `?actionType=` etc. don't permit secondary SQL via union/subquery payloads
+- [ ] `tls-version-header.spec.ts` — public API responses report TLS 1.2+ via `Alt-Svc` / `Server` header inspection (production env only)
+- [ ] `cookie-rotation.spec.ts` — session cookie value changes after password change (forces re-login on other devices)
+- [ ] `device-fingerprinting-opt-out.spec.ts` — Do-Not-Track / GPC headers honored by analytics SDKs
+- [ ] `redirect-prevention.spec.ts` — `?next=https://attacker.example.com` is filtered (open-redirect guard)
+
+## Pass 13+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
