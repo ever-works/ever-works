@@ -36,6 +36,13 @@ jest.mock('../entities', () => ({
     UserTemplatePreference: class UserTemplatePreference {},
     WebhookSubscription: class WebhookSubscription {},
     WorkProposal: class WorkProposal {},
+    // Work Agent control-plane entities (introduced in #868). Without
+    // these mocks the database.config import resolves them to undefined
+    // because the parent jest.mock() above shadows the real barrel.
+    WorkAgentPreference: class WorkAgentPreference {},
+    WorkAgentGoal: class WorkAgentGoal {},
+    WorkAgentRun: class WorkAgentRun {},
+    WorkAgentRunLog: class WorkAgentRunLog {},
 }));
 jest.mock('../entities/cache.entity', () => ({
     CacheEntry: class CacheEntry {},
