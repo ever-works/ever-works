@@ -114,25 +114,12 @@ export interface ResolvedAiProvider {
     modelName: string;
 }
 
-/**
- * Walks the user's enabled ai-provider plugins in priority order and returns
- * the first one with a usable config (baseUrl + apiKey + model). Capped by
- * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
- * through every configured key. Auth-shape errors re-throw so misconfigured
- * keys aren't silently masked by trying the next provider.
- */
-export async function resolveAiProviderForResearch(
+async function resolveAiProviderFromChain(
     aiFacade: AiFacadeService,
-    registry: PluginRegistryService,
-    userId: string,
+    chain: RegisteredPlugin[],
+    userId: string | undefined,
     logger?: Logger,
 ): Promise<ResolvedAiProvider | null> {
-    const chain = capChain(
-        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
-        getProviderFallbackMax(),
-    );
-    if (chain.length === 0) return null;
-
     for (const candidate of chain) {
         try {
             const cfg = await aiFacade.getProviderConfig({
@@ -161,4 +148,52 @@ export async function resolveAiProviderForResearch(
         }
     }
     return null;
+}
+
+/**
+ * Walks the user's enabled ai-provider plugins in priority order and returns
+ * the first one with a usable config (baseUrl + apiKey + model). Capped by
+ * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
+ * through every configured key.
+ *
+ * If the user-scoped chain has no usable config, falls back to globally ready
+ * AI providers so env/admin configured platform defaults can power research
+ * without requiring every new user to configure an AI plugin first. Auth-shape
+ * errors re-throw so misconfigured keys aren't silently masked by trying the
+ * next provider.
+ */
+export async function resolveAiProviderForResearch(
+    aiFacade: AiFacadeService,
+    registry: PluginRegistryService,
+    userId: string,
+    logger?: Logger,
+): Promise<ResolvedAiProvider | null> {
+    const chain = capChain(
+        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
+        getProviderFallbackMax(),
+    );
+    const scoped = await resolveAiProviderFromChain(aiFacade, chain, userId, logger);
+    if (scoped) return scoped;
+
+    const globalChain = capChain(
+        registry
+            .getReady()
+            .filter((p) => p.manifest.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER))
+            .sort((a, b) => {
+                const ad = a.manifest.defaultForCapabilities?.includes(
+                    PLUGIN_CAPABILITIES.AI_PROVIDER,
+                )
+                    ? 0
+                    : 1;
+                const bd = b.manifest.defaultForCapabilities?.includes(
+                    PLUGIN_CAPABILITIES.AI_PROVIDER,
+                )
+                    ? 0
+                    : 1;
+                return ad - bd;
+            }),
+        getProviderFallbackMax(),
+    );
+
+    return resolveAiProviderFromChain(aiFacade, globalChain, undefined, logger);
 }

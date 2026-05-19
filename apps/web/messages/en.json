@@ -708,6 +708,7 @@
                 "apiKeys": "API Keys",
                 "data": "Data",
                 "githubApp": "GitHub App",
+                "workAgent": "Work Agent",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
             },
@@ -734,6 +735,72 @@
                 "branchUnknown": "Default branch unavailable",
                 "private": "Private",
                 "public": "Public"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Autonomous Work agent",
+                        "description": "Let the agent plan, research, and prepare Works from high-level goals."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Set hard limits before the agent can create Works, add items, or spend budget."
+                    },
+                    "queue": {
+                        "title": "Queue a goal",
+                        "description": "Give the agent a broad instruction. It starts as pending and runs inside your guardrails."
+                    },
+                    "liveRun": {
+                        "title": "Live run",
+                        "description": "Current state and recent agent activity."
+                    },
+                    "recentGoals": {
+                        "title": "Recent goals",
+                        "description": "Pending, running, and completed Work agent instructions."
+                    }
+                },
+                "fields": {
+                    "enabled": "Enable Work agent",
+                    "autoApproveLowImpact": "Auto-approve low-impact changes",
+                    "dailySuggestions": "Daily suggestions",
+                    "dryRunByDefault": "Dry run by default",
+                    "maxWorksPerRun": "Max Works per run",
+                    "maxItemsPerWork": "Max items per Work",
+                    "maxBudgetPerRun": "Max budget per run",
+                    "approvalThreshold": "Approval threshold",
+                    "confirmBeforeCreate": "Confirm before creating Works",
+                    "confirmBeforeDelete": "Confirm before deleting items",
+                    "dryRunThisGoal": "Dry run this goal"
+                },
+                "actions": {
+                    "saveSettings": "Save settings",
+                    "queueGoal": "Queue goal",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
+                },
+                "metrics": {
+                    "works": "Works",
+                    "items": "Items"
+                },
+                "labels": {
+                    "dryRun": "Dry run",
+                    "liveRun": "Live run"
+                },
+                "empty": {
+                    "noActiveRun": "No active Work agent run.",
+                    "noGoals": "No Work agent goals yet.",
+                    "waitingForUpdate": "Waiting for the first run update."
+                },
+                "toasts": {
+                    "settingsSaved": "Work agent settings saved",
+                    "settingsError": "Failed to save settings",
+                    "goalQueued": "Work agent goal queued",
+                    "goalError": "Failed to queue goal",
+                    "goalCanceled": "Work agent goal canceled",
+                    "cancelError": "Failed to cancel goal"
+                }
             },
             "data": {
                 "exportTitle": "Export Data",

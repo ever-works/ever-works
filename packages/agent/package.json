@@ -136,6 +136,10 @@
         "./user-research": {
             "types": "./dist/user-research/index.d.ts",
             "default": "./dist/user-research/index.js"
+        },
+        "./work-agent": {
+            "types": "./dist/work-agent/index.d.ts",
+            "default": "./dist/work-agent/index.js"
         }
     },
     "scripts": {

@@ -30,6 +30,7 @@ import { DataSyncModule } from './data-sync/data-sync.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
+import { WorkAgentModule } from './work-agent/work-agent.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import {
@@ -90,6 +91,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         OnboardingModule,
         TemplateCatalogModule,
         WorkProposalsModule,
+        WorkAgentModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
     ],
