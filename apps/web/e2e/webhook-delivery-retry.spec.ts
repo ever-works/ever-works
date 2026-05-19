@@ -20,9 +20,7 @@ const SUBSCRIPTION_PATHS = [
 const DELIVERIES_SUFFIXES = ['/deliveries', '/events', '/logs', '/history'];
 
 test.describe('Webhook subscriptions — CRUD probe', () => {
-    test('POST subscription with bogus URL is rejected (or skipped if not exposed)', async ({
-        request,
-    }) => {
+    test('POST subscription with bogus URL is rejected with 4xx', async ({ request }) => {
         const u = await registerUserViaAPI(request);
         let found = false;
         for (const path of SUBSCRIPTION_PATHS) {
@@ -35,7 +33,11 @@ test.describe('Webhook subscriptions — CRUD probe', () => {
             });
             if (res.status() === 404) continue;
             found = true;
-            // URL validation should reject. 400/422 accepted; 5xx not.
+            // Codex P2: previous `< 500` check would let a 2xx accept of
+            // "not-a-url" silently pass — the EXACT validation regression
+            // this test is meant to catch. URL validation MUST reject
+            // with 4xx (typically 400/422). Never 2xx, never 5xx.
+            expect(res.status()).toBeGreaterThanOrEqual(400);
             expect(res.status()).toBeLessThan(500);
             return;
         }
