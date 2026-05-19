@@ -363,20 +363,37 @@ Web bundle + browser security boundaries. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `bundle-size-budget`, `service-worker-update`, `polyfill-presence`, `xss-html-encoding`, `device-fingerprinting-opt-out`, `redirect-prevention`, and `tls-version-header` from the storageState project so their unauth UI assertions hit fresh contexts.
 
-## Pass 13 — queued
+## Pass 13 — this PR (`chore/e2e-coverage-pass-13`)
 
-- [ ] `realtime-collaboration.spec.ts` — Yjs / Liveblocks-style collab probe: same work open in two contexts, edit in one reflects in other
-- [ ] `time-zone-rendering.spec.ts` — timestamps render in user's locale TZ (Asia/Tokyo vs America/Los_Angeles)
-- [ ] `referrer-policy-redirects.spec.ts` — outbound links to external hosts carry `rel=noreferrer noopener`
-- [ ] `cors-preflight-cache.spec.ts` — Access-Control-Max-Age on preflight responses
-- [ ] `clock-skew-tolerance.spec.ts` — server accepts JWTs minted ~30s out of sync (nbf/exp slack)
-- [ ] `static-asset-fingerprint.spec.ts` — `_next/static/*` URLs are content-hashed, no cache-busting query params needed
-- [ ] `hydration-no-errors.spec.ts` — no React hydration mismatch warnings in console on /en, /en/works, /en/settings
-- [ ] `feature-detect-storage.spec.ts` — page doesn't crash when localStorage is disabled (Safari Private Browsing simulation)
-- [ ] `error-boundary-isolation.spec.ts` — error in one component doesn't take down the whole route (ErrorBoundary catches)
-- [ ] `iframe-sandbox.spec.ts` — embedded iframes (oauth providers, video) carry restrictive sandbox attribute
+Realtime + i18n + browser hygiene. **+10 new spec files.**
 
-## Pass 14+ — long-tail / hardening
+- [x] `realtime-collaboration.spec.ts` — rename in one context visible to the next GET, parallel renames produce deterministic final state, 3 parallel create-work all show in list
+- [x] `time-zone-rendering.spec.ts` — Asia/Tokyo + America/Los_Angeles render distinct timestamps (no ISO leak in visible text), `Intl.DateTimeFormat(navigator.language)` no raw ISO
+- [x] `referrer-policy-redirects.spec.ts` — external `target=_blank` links carry `rel=noopener noreferrer`, Referrer-Policy header in safe set (no-referrer / strict-origin / same-origin / strict-origin-when-cross-origin)
+- [x] `cors-preflight-cache.spec.ts` — Access-Control-Max-Age in [300s, 86400s], no `Allow-Headers='*'` with `Allow-Credentials=true`, preflight returns 200/204
+- [x] `clock-skew-tolerance.spec.ts` — access_token works immediately on register (no nbf future-reject), 5 consecutive uses don't 401, server `Date` header within 5 min of test runner
+- [x] `static-asset-fingerprint.spec.ts` — `_next/static/*` URLs are hashed (>50%), >70% carry `max-age >= 3600`
+- [x] `hydration-no-errors.spec.ts` — /en, /en/works, /en/settings each emit ≤1 hydration warning + ≤1 pageerror in console
+- [x] `feature-detect-storage.spec.ts` — login page survives `localStorage.setItem` throwing, `getItem` throwing, `sessionStorage.setItem` throwing
+- [x] `error-boundary-isolation.spec.ts` — `/works/non-existent` + `/works/non-existent/items` render without nuking shell, /works with API 503 still shows nav
+- [x] `iframe-sandbox.spec.ts` — cross-origin iframes on /en/login + /en/register + /en carry `sandbox` attribute (not `allow-scripts allow-same-origin` combo), no `camera=* | microphone=* | payment=* | geolocation=*` allow attributes
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `referrer-policy-redirects`, `static-asset-fingerprint`, `feature-detect-storage`, and `iframe-sandbox` from the storageState project so their unauth UI assertions hit fresh contexts.
+
+## Pass 14 — queued
+
+- [ ] `service-isolation.spec.ts` — cross-module boundary: trigger endpoint A, verify side-effects don't leak to module B (e.g. work-deploy doesn't trigger notification subscription)
+- [ ] `metrics-endpoint.spec.ts` — `/api/metrics` (Prometheus format) returns `# HELP` + `# TYPE` lines + at least one `http_requests_total` series
+- [ ] `graphql-introspection.spec.ts` — if a GraphQL endpoint is exposed, introspection is disabled in production (returns 4xx for `__schema` query)
+- [ ] `connection-pool-leak.spec.ts` — 50 sequential authenticated requests don't exhaust the DB pool (no 503/504)
+- [ ] `idempotency-keys.spec.ts` — POST with `Idempotency-Key` header returns same response on retry (or skip if not wired)
+- [ ] `content-security-violations.spec.ts` — CSP `report-to` / `report-uri` endpoint accepts violation reports without 5xx
+- [ ] `secure-cookies-on-https.spec.ts` — when behind https, session cookies carry `Secure` attribute
+- [ ] `password-history.spec.ts` — `update-password` rejects reusing the last 3 passwords (if policy is configured)
+- [ ] `api-version-header.spec.ts` — `/api/health` carries `X-API-Version` (or similar) for client compatibility checks
+- [ ] `signed-url-expiry.spec.ts` — pre-signed upload URLs (if exposed) expire within 1 hour and 4xx after expiry
+
+## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
