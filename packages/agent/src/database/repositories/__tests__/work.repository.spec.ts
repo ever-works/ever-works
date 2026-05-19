@@ -31,6 +31,7 @@ function buildChain<TResult>(terminalName: string, terminalResolved: TResult) {
         'addOrderBy',
         'select',
         'addSelect',
+        'leftJoin',
         'leftJoinAndSelect',
         'skip',
         'take',
@@ -201,7 +202,7 @@ describe('WorkRepository', () => {
     });
 
     describe('findByIdForAccess', () => {
-        it('loads the work row through query builder without eager user loading', async () => {
+        it('loads the work row plus safe owner fields through query builder', async () => {
             const row = { id: 'w1' } as Work;
             const { chain, fns } = buildChain<Work | null>('getOne', row);
             repository.createQueryBuilder.mockReturnValueOnce(
@@ -212,6 +213,14 @@ describe('WorkRepository', () => {
 
             expect(repository.findOne).not.toHaveBeenCalled();
             expect(repository.createQueryBuilder).toHaveBeenCalledWith('work');
+            expect(fns.leftJoin).toHaveBeenCalledWith('work.user', 'user');
+            expect(fns.addSelect).toHaveBeenCalledWith([
+                'user.id',
+                'user.username',
+                'user.email',
+                'user.committerName',
+                'user.committerEmail',
+            ]);
             expect(fns.where).toHaveBeenCalledWith({ id: 'w1' });
         });
     });
