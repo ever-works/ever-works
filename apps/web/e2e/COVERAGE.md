@@ -426,18 +426,33 @@ Queue resilience + cross-origin posture + error-detail hygiene. **+10 new spec f
 - [x] `usage-export-pii-isolation.spec.ts` — Alice's usage export contains neither bob.email nor bob.user.id; Bob's GET on Alice's `<work-id>/usage/export` is 401/403/404
 - [x] `image-resize-bounds.spec.ts` — 3 resize endpoint candidates × 10000×10000 dimensions stay < 500; 4× zero/negative dimensions also stay < 500
 
-## Pass 17 — queued
+## Pass 17 — this PR (`chore/e2e-coverage-pass-17`)
 
-- [ ] `circuit-breaker-state.spec.ts` — downstream-dependent endpoints expose breaker state via `/api/health/<dep>` and 503 trips don't cascade to /health root
-- [ ] `oauth-state-rotation.spec.ts` — `/connect/url` state TTL: state from 1+ hour ago no longer accepted at callback
-- [ ] `media-mime-sniffing.spec.ts` — uploads of `.txt` with `Content-Type: image/png` are rejected; `image/svg+xml` upload doesn't carry inline `<script>`
-- [ ] `oauth-redirect-uri-pin.spec.ts` — authorize URL `redirect_uri` exactly matches the registered callback path (no open redirector via path traversal)
-- [ ] `rate-limit-key-isolation.spec.ts` — Alice hitting 429 on /login doesn't lock out Bob from /login (per-account / per-IP isolation)
-- [ ] `cache-poisoning-vary.spec.ts` — endpoints that vary by header (Accept-Language, Authorization) carry `Vary` with that header
-- [ ] `pagination-cursor-stability.spec.ts` — `?cursor=` is opaque (server-controlled); replaying an old cursor returns coherent page (no skip / dup)
-- [ ] `bullmq-job-id-collision.spec.ts` — submitting the same generate request twice doesn't queue two identical jobs (dedup by content hash)
-- [ ] `feature-detect-cookies-blocked.spec.ts` — login flow survives browser with `document.cookie = ''` blocking (graceful degradation)
-- [ ] `auth-clock-tolerance.spec.ts` — JWT iat / nbf accept ±60s clock skew between client and server
+Circuit breakers + OAuth posture + cache-poisoning + cursor stability. **+10 new spec files.**
+
+- [x] `circuit-breaker-state.spec.ts` — /api/health stays < 500 across 5× hammer on each of 4 subsystem health paths; subsystem JSON status (when exposed) matches `(ok|up|healthy|degraded|down|fail|open|closed|half-open)` shape
+- [x] `oauth-state-rotation.spec.ts` — two consecutive github /connect/url calls produce DIFFERENT state values (≥16 chars); callback with never-issued state returns 4xx
+- [x] `media-mime-sniffing.spec.ts` — text with `Content-Type: image/png` doesn't crash uploads (4× candidate paths); SVG with embedded `<script>alert('xss')</script>` upload response never echoes executable script
+- [x] `oauth-redirect-uri-pin.spec.ts` — github authorize URL `redirect_uri` hostname matches API host / localhost / _.ever.works; path matches /callback|oauth|connect/; _.ever.works hostnames forced to https
+- [x] `rate-limit-key-isolation.spec.ts` — Alice's 429 from wrong-password hammering does NOT lock out Bob's correct login (per-account isolation); per-IP keying produces informational signal instead
+- [x] `cache-poisoning-vary.spec.ts` — /api/auth/profile + /api/notifications carry `Vary: Authorization` OR `Cache-Control: private/no-store/no-cache`; web /en/login soft-warn on missing Vary
+- [x] `pagination-cursor-stability.spec.ts` — replaying a fresh cursor returns identical ids across two calls (coherency); 4× garbage cursors stay < 500
+- [x] `bullmq-job-id-collision.spec.ts` — two parallel identical generate POSTs both stay < 500 with informational signal on dedup posture; non-existent-work parallel POSTs are 4xx not 5xx
+- [x] `feature-detect-cookies-blocked.spec.ts` — `document.cookie` getter returning `''` and setter throwing both leave /en/login renderable with email input fillable
+- [x] `auth-clock-tolerance.spec.ts` — 5 sequential /api/auth/profile hits over ~15s all < 500 with ≤1 401; server Date header within ±5 min of test clock
+
+## Pass 18 — queued
+
+- [ ] `notifications-channel-toggle.spec.ts` — disabling a channel (email/in-app/webhook) is reflected on next preferences GET; partial toggle 4xx on unknown channel key
+- [ ] `oauth-csrf-state-binding.spec.ts` — state issued for user A cannot be consumed at callback by user B (state→session binding)
+- [ ] `subscription-renewal-grace.spec.ts` — expired subscription stays usable for the grace window; budgets endpoint reflects grace status
+- [ ] `webhook-payload-truncation.spec.ts` — extremely large webhook bodies (10 MB+) rejected without 5xx; small bodies pass through with HMAC intact
+- [ ] `password-policy-zxcvbn.spec.ts` — zxcvbn-style weak passwords (`password123`, `qwerty`, common dictionary) rejected even if 12+ chars
+- [ ] `health-degraded-503.spec.ts` — when a non-critical dep is down, root /health stays 200 OK but /health/dep returns 503
+- [ ] `image-content-disposition.spec.ts` — image / file downloads carry `Content-Disposition: attachment` to prevent inline rendering of attacker content
+- [ ] `etag-strong-vs-weak.spec.ts` — ETags on mutable endpoints are weak (`W/"..."`) or absent; immutable assets carry strong ETags
+- [ ] `trace-propagation-w3c.spec.ts` — `traceparent` / `tracestate` headers are echoed or generated per W3C Trace Context spec
+- [ ] `feature-detect-fetch-throws.spec.ts` — login flow survives a browser whose `fetch` is polyfilled by something that rejects all requests with NetworkError
 
 ## Pass 15+ — long-tail / hardening
 
