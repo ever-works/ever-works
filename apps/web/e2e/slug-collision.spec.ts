@@ -19,7 +19,7 @@ test.describe('Slug collision — same-owner namespace', () => {
         const slug = `dup-${Date.now().toString(36)}`;
         const r1 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'First with this slug', slug },
+            data: { name: 'First with this slug', slug, organization: false },
         });
         expect(r1.status()).toBeGreaterThanOrEqual(200);
         expect(r1.status()).toBeLessThan(300);
@@ -30,7 +30,7 @@ test.describe('Slug collision — same-owner namespace', () => {
 
         const r2 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'Second with same slug', slug },
+            data: { name: 'Second with same slug', slug, organization: false },
         });
         // Acceptable outcomes:
         //   - 409 / 422: same-slug rejection
@@ -61,11 +61,11 @@ test.describe('Slug collision — cross-owner namespace', () => {
         const b = await registerUserViaAPI(request);
         const r1 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(a.access_token),
-            data: { name: 'A work', slug },
+            data: { name: 'A work', slug, organization: false },
         });
         const r2 = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(b.access_token),
-            data: { name: 'B work', slug },
+            data: { name: 'B work', slug, organization: false },
         });
         // Both must NOT be 5xx. We accept either:
         //   - Both 2xx (per-user namespace)
@@ -86,7 +86,7 @@ test.describe('Slug rename — happy path', () => {
         const stamp = Date.now().toString(36);
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: `rename ${stamp}`, slug: `before-${stamp}` },
+            data: { name: `rename ${stamp}`, slug: `before-${stamp}`, organization: false },
         });
         expect(create.ok()).toBe(true);
         const created = await create.json();

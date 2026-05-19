@@ -57,7 +57,11 @@ test.describe('API schema — /api/works list', () => {
         // Seed at least one work so the list has an entry.
         const seed = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: `schema-${Date.now().toString(36)}`, slug: `schema-${Date.now()}` },
+            data: {
+                name: `schema-${Date.now().toString(36)}`,
+                slug: `schema-${Date.now()}`,
+                organization: false,
+            },
         });
         if (!seed.ok()) {
             test.skip(true, `couldn't seed work (${seed.status()})`);

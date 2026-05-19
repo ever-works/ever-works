@@ -33,6 +33,7 @@ test.describe('Markdown — script/iframe/onerror payloads round-trip safely', (
                     name: `md-${tag}`,
                     slug: `md-${tag}`,
                     description: md,
+                    organization: false,
                 },
             });
             // Either accepted or rejected (validation). Never 5xx.

@@ -32,6 +32,7 @@ test.describe('Unicode — create / read round-trip', () => {
                     name: variant.value,
                     slug: `unicode-${variant.label.replace(/[^a-z]/g, '')}-${stamp}`,
                     description: `unicode round-trip test: ${variant.value}`,
+                    organization: false,
                 },
             });
             if (!create.ok()) {
@@ -63,7 +64,7 @@ test.describe('Unicode — list endpoint includes unicode names without mangling
         const slug = `unicode-list-${Date.now().toString(36)}`;
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name, slug },
+            data: { name, slug, organization: false },
         });
         if (!create.ok()) test.skip(true, `couldn't create unicode work (${create.status()})`);
 

@@ -24,6 +24,7 @@ test.describe('Idempotency — repeated POST with same key', () => {
         const payload = {
             name: `idem-${Date.now().toString(36)}`,
             slug: `idem-${Date.now().toString(36)}`,
+            organization: false,
         };
         const first = await request.post(`${API_BASE}/api/works`, {
             headers: { ...authedHeaders(u.access_token), 'Idempotency-Key': key },
@@ -54,6 +55,7 @@ test.describe('Idempotency — repeated POST with same key', () => {
             data: {
                 name: `idem-empty-${Date.now().toString(36)}`,
                 slug: `idem-empty-${Date.now().toString(36)}`,
+                organization: false,
             },
         });
         // Empty key should either be rejected (4xx) or ignored (success).

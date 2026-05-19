@@ -18,7 +18,7 @@ test.describe('Cache coherency — write-then-read consistency', () => {
         const stamp = Date.now().toString(36);
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: `cache-${stamp}`, slug: `cache-${stamp}` },
+            data: { name: `cache-${stamp}`, slug: `cache-${stamp}`, organization: false },
         });
         expect(create.ok()).toBe(true);
         const created = await create.json();

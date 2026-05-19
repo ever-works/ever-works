@@ -77,6 +77,7 @@ test.describe('Quota — exceeded responses', () => {
                 data: {
                     name: `quota-${stamp}-${i}`,
                     slug: `quota-${stamp}-${i}`,
+                    organization: false,
                 },
             });
             if (res.status() >= 500) {

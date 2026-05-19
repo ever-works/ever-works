@@ -35,7 +35,7 @@ test.describe('Concurrent actions — two contexts, same user', () => {
         const name = `concurrent-${Date.now().toString(36)}`;
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name, slug: name },
+            data: { name, slug: name, organization: false },
         });
         expect(create.status()).toBeGreaterThanOrEqual(200);
         expect(create.status()).toBeLessThan(300);
@@ -60,11 +60,19 @@ test.describe('Concurrent actions — two contexts, same user', () => {
         const [r1, r2] = await Promise.all([
             request.post(`${API_BASE}/api/works`, {
                 headers: authedHeaders(u.access_token),
-                data: { name: `parallel-${stamp}-1`, slug: `parallel-${stamp}-1` },
+                data: {
+                    name: `parallel-${stamp}-1`,
+                    slug: `parallel-${stamp}-1`,
+                    organization: false,
+                },
             }),
             request.post(`${API_BASE}/api/works`, {
                 headers: authedHeaders(u.access_token),
-                data: { name: `parallel-${stamp}-2`, slug: `parallel-${stamp}-2` },
+                data: {
+                    name: `parallel-${stamp}-2`,
+                    slug: `parallel-${stamp}-2`,
+                    organization: false,
+                },
             }),
         ]);
         // Neither response is allowed to crash (5xx); 2xx for both is the

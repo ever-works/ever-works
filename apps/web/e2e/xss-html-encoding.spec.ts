@@ -22,7 +22,11 @@ test.describe('XSS — work name JSON response', () => {
         const u = await registerUserViaAPI(request);
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: XSS_NAME, slug: `xss-${Date.now().toString(36)}` },
+            data: {
+                name: XSS_NAME,
+                slug: `xss-${Date.now().toString(36)}`,
+                organization: false,
+            },
         });
         // Either accepted (200/201) — value will be returned verbatim
         // in JSON, which is safe because JSON responses don't execute —
@@ -65,6 +69,7 @@ test.describe('XSS — work name JSON response', () => {
                 name: `xss-desc-${Date.now().toString(36)}`,
                 slug: `xss-desc-${Date.now().toString(36)}`,
                 description: XSS_IMG,
+                organization: false,
             },
         });
         expect(create.status()).toBeLessThan(500);
@@ -86,7 +91,11 @@ test.describe('XSS — rendered HTML response does not echo raw script tags', ()
         const tainted = `xss-stored-${Date.now().toString(36)}-<script>alert(1)</script>`;
         const create = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: tainted, slug: `xss-render-${Date.now().toString(36)}` },
+            data: {
+                name: tainted,
+                slug: `xss-render-${Date.now().toString(36)}`,
+                organization: false,
+            },
         });
         if (!create.ok()) test.skip(true, `couldn't create tainted work (${create.status()})`);
         const created = await create.json();

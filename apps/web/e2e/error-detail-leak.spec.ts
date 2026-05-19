@@ -71,7 +71,13 @@ test.describe('Error responses — no stack/path/DB-code leakage', () => {
         for (let i = 0; i < 200; i++) nested = { x: nested };
         const res = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'deep', slug: 'deep', extras: nested },
+            data: {
+                name: 'deep',
+                slug: 'deep',
+                description: 'deep nested probe',
+                organization: false,
+                extras: nested,
+            },
         });
         const body = await res.text();
         const leak = leaks(body);

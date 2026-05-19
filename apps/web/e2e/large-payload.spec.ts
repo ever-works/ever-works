@@ -27,6 +27,7 @@ test.describe('Large payload — body-size limits honoured', () => {
                 name: `large-100kb-${Date.now().toString(36)}`,
                 slug: `large-100kb-${Date.now().toString(36)}`,
                 description,
+                organization: false,
             },
         });
         // Could be 201/200 (accepted) or 400/422 (validation rejects
@@ -47,7 +48,7 @@ test.describe('Large payload — body-size limits honoured', () => {
         const huge = fillerString(10 * MB);
         const res = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: 'huge', slug: 'huge', description: huge },
+            data: { name: 'huge', slug: 'huge', description: huge, organization: false },
         });
         // The server MUST reject this with a 4xx — typically 413 (Payload
         // Too Large), 400, or 422. A 5xx means body-parser crashed or
@@ -75,7 +76,12 @@ test.describe('Large payload — items import body', () => {
         // Create the work first.
         const w = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
-            data: { name: `import-bulk-${Date.now().toString(36)}` },
+            data: {
+                name: `import-bulk-${Date.now().toString(36)}`,
+                slug: `import-bulk-${Date.now().toString(36)}`,
+                description: 'e2e bulk import seed',
+                organization: false,
+            },
         });
         if (!w.ok()) test.skip(true, "couldn't seed work for bulk import");
         const wJson = await w.json();
