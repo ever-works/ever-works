@@ -80,6 +80,11 @@ test.describe('Imports — /api/works/:id/import-items', () => {
         const w = await createWorkViaAPI(request, u.access_token, {
             name: `import-min-${Date.now().toString(36)}`,
         });
+        // Capture the timestamp ONCE — separate Date.now() calls on a
+        // slow CI runner (or during a GC pause) can land in different
+        // milliseconds, producing a name/slug mismatch the server might
+        // reject for stable derivation rules.
+        const itemTag = Date.now().toString(36);
         // Send a single item with the bare minimum — name + slug. The
         // controller may reject for missing required fields, but it must
         // never crash on a well-formed but minimal payload.
@@ -88,8 +93,8 @@ test.describe('Imports — /api/works/:id/import-items', () => {
             data: {
                 items: [
                     {
-                        name: `e2e-item-${Date.now().toString(36)}`,
-                        slug: `e2e-item-${Date.now().toString(36)}`,
+                        name: `e2e-item-${itemTag}`,
+                        slug: `e2e-item-${itemTag}`,
                     },
                 ],
             },

@@ -39,15 +39,16 @@ test.describe('Security headers — API surface', () => {
 
     test('GET /api/health sets a referrer policy', async ({ request }) => {
         const res = await request.get(`${API_BASE}/api/health`);
-        const h = res.headers();
-        // Helmet defaults to `no-referrer`. Any non-empty referrer
-        // policy is acceptable; missing is not.
-        if (h['referrer-policy']) {
-            expect(h['referrer-policy'].length).toBeGreaterThan(0);
-        }
-        // If no referrer-policy is set, treat as a warning by skipping
-        // — but log it so we notice in CI artifacts.
-        if (!h['referrer-policy']) {
+        const policy = res.headers()['referrer-policy'];
+        // Helmet defaults to `no-referrer`. We treat any non-empty
+        // referrer-policy as acceptable; a missing header is a
+        // configuration smell but not a hard fail (helmet may be
+        // intentionally disabled in some envs). Use a clean if/else so
+        // the intent is unambiguous — the bot review (greptile P2)
+        // called out the previous two-branch shape as confusing.
+        if (policy) {
+            expect(policy.length).toBeGreaterThan(0);
+        } else {
             test.skip(true, 'API does not set Referrer-Policy — helmet possibly disabled');
         }
     });

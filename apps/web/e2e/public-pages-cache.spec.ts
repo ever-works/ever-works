@@ -17,14 +17,27 @@ test.describe('Cache-Control — auth-public pages should not be aggressively ca
         // across users would be a privacy leak (form state, csrf tokens).
         if (cc) {
             const isPublic = /\bpublic\b/i.test(cc) && !/private/.test(cc);
-            const longMaxAge = /max-age\s*=\s*(\d+)/i.exec(cc);
-            const seconds = longMaxAge ? parseInt(longMaxAge[1], 10) : 0;
-            // Either it should NOT be public-cacheable, OR the max-age
-            // must be tiny (< 5 minutes). Long-term public cache is wrong.
-            expect(
-                !isPublic || seconds < 300,
-                `login cache-control allows long public caching: "${cc}"`,
-            ).toBe(true);
+            const maxAgeMatch = /max-age\s*=\s*(\d+)/i.exec(cc);
+            const sMaxAgeMatch = /s-maxage\s*=\s*(\d+)/i.exec(cc);
+            const seconds = maxAgeMatch ? parseInt(maxAgeMatch[1], 10) : null;
+            const sSeconds = sMaxAgeMatch ? parseInt(sMaxAgeMatch[1], 10) : null;
+            if (isPublic) {
+                // A bare `public` directive with no max-age / s-maxage
+                // is dangerous — CDNs and shared proxies apply heuristic
+                // caching (typically 10% of Last-Modified age), which
+                // for a login page means tokens / CSRF state can leak
+                // across users. Reject that explicitly.
+                expect(
+                    seconds !== null || sSeconds !== null,
+                    `login uses bare "public" Cache-Control with no max-age/s-maxage: "${cc}"`,
+                ).toBe(true);
+                // When max-age IS set, it must be tiny (<5 min).
+                const effectiveSeconds = Math.max(seconds ?? 0, sSeconds ?? 0);
+                expect(
+                    effectiveSeconds < 300,
+                    `login cache-control allows long public caching (${effectiveSeconds}s): "${cc}"`,
+                ).toBe(true);
+            }
         }
     });
 
