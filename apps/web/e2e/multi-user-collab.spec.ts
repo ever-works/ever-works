@@ -39,7 +39,9 @@ test.describe('Multi-user — work isolation', () => {
 
     test("user B's GET /api/works lists ONLY B's works, not A's", async ({ request }) => {
         const a = await registerUserViaAPI(request);
-        await createWorkViaAPI(request, a.access_token, { name: `iso-list-a-${Date.now()}` });
+        const aWork = await createWorkViaAPI(request, a.access_token, {
+            name: `iso-list-a-${Date.now()}`,
+        });
         const b = await registerUserViaAPI(request);
         const bWork = await createWorkViaAPI(request, b.access_token, {
             name: `iso-list-b-${Date.now()}`,
@@ -51,9 +53,12 @@ test.describe('Multi-user — work isolation', () => {
         const body = await res.json();
         const list = Array.isArray(body) ? body : (body?.works ?? body?.data ?? []);
         const ids = list.map((w: { id: string }) => w.id);
+        // B must see their own work in the list.
         expect(ids).toContain(bWork.id);
-        // We don't assert that A's work is absent (membership may evolve),
-        // but if it's present it'd be a flag for cross-tenant leakage.
+        // CRITICAL — A's work must NOT appear in B's list. If this ever
+        // flips, /api/works is leaking cross-tenant data and the test is
+        // worth more than the regression noise.
+        expect(ids).not.toContain(aWork.id);
     });
 
     test("user B cannot read user A's items via /api/works/:id/items", async ({ request }) => {

@@ -9,7 +9,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  */
 
 test.describe('Subscriptions — fresh user defaults to free tier', () => {
-    test('GET /api/subscriptions/plan for fresh user returns a low-tier plan', async ({
+    test('GET /api/subscriptions/plan for fresh user returns the FREE plan', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -19,21 +19,20 @@ test.describe('Subscriptions — fresh user defaults to free tier', () => {
         expect(res.status()).toBe(200);
         const body = await res.json();
         // Acceptable plan shapes from the controller: `{plan: {code}}`,
-        // `{code}`, `{tier}`, `{id}` — at least one should be present and
-        // resemble a free / starter identifier.
+        // `{code}`, `{tier}`, `{id}` — at least one should be present.
         const code = String(
             body?.plan?.code ?? body?.code ?? body?.tier ?? body?.id ?? '',
         ).toLowerCase();
-        expect(code).not.toBe('');
-        // Free-tier identifiers are usually 'free', 'starter', 'basic',
-        // 'community', or an integer 0. Loose check is enough.
-        const looksFree =
-            code.includes('free') ||
-            code.includes('starter') ||
-            code.includes('basic') ||
-            code.includes('community') ||
-            code === '0';
-        expect(looksFree, `plan code looks like a low tier: ${code}`).toBe(true);
+        expect(code, 'plan response missing code').not.toBe('');
+        // Ever Works' SubscriptionPlanCode enum has exactly three values:
+        // free, standard, premium. A fresh user MUST land on 'free'.
+        // Pinning the exact value here so a misconfigured default lights
+        // up immediately. If the enum is ever renamed, the spec and the
+        // enum should change together — that's the design intent.
+        expect(code).toBe('free');
+        // Defensive — a fresh user must NOT land on a paid tier.
+        const PAID_TIERS = new Set(['standard', 'premium', 'pro', 'enterprise', 'team']);
+        expect(PAID_TIERS.has(code), `fresh user landed on paid tier ${code}`).toBe(false);
     });
 });
 

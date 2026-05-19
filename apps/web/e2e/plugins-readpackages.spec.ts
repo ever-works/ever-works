@@ -24,11 +24,14 @@ test.describe('Read-packages OAuth — initiation URL', () => {
         request,
     }) => {
         const u = await registerUserViaAPI(request);
+        // callbackUrl must reflect the current test env (`${API_BASE}`),
+        // NOT production. If the API ever validates the callback against
+        // a registered redirect-URI list, a hardcoded prod URL would 400
+        // in CI; if it doesn't validate, the redirect would still point
+        // at prod and mask scope/URL mismatches.
         const res = await request.get(
             `${API_BASE}/api/oauth/github/read-packages/connect/url?callbackUrl=` +
-                encodeURIComponent(
-                    'https://app.ever.works/api/oauth/github/callback/plugins/read-packages',
-                ),
+                encodeURIComponent(`${API_BASE}/api/oauth/github/callback/plugins/read-packages`),
             { headers: authedHeaders(u.access_token) },
         );
         if (res.status() === 400) {

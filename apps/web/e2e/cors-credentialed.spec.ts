@@ -46,10 +46,18 @@ test.describe('CORS — preflight on sensitive endpoints', () => {
             },
         });
         // Server should either reject (4xx) or omit the allow-origin header.
-        // What's NOT acceptable is mirroring the attacker's origin back.
+        // What's NOT acceptable is mirroring the attacker's origin back,
+        // OR returning `*` — browsers refuse `*` with credentials, but a
+        // server policy that echoes wildcard is still wrong by design.
         const allowOrigin = res.headers()['access-control-allow-origin'];
         if (allowOrigin) {
-            expect(allowOrigin).not.toBe('https://attacker.example.com');
+            expect(allowOrigin, `server echoed attacker origin back as CORS allow-origin`).not.toBe(
+                'https://attacker.example.com',
+            );
+            expect(
+                allowOrigin,
+                `server returned wildcard '*' allow-origin on a credentialed-eligible endpoint`,
+            ).not.toBe('*');
         }
     });
 });

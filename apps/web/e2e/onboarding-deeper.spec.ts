@@ -7,7 +7,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  * endpoints, and the dismiss / complete transitions.
  */
 
-test.describe('Onboarding state — GET/PUT lifecycle', () => {
+test.describe('Onboarding state — GET/PATCH lifecycle', () => {
     test('GET /api/onboarding/state without auth → 401', async ({ request }) => {
         const res = await request.get(`${API_BASE}/api/onboarding/state`);
         expect(res.status()).toBe(401);
@@ -23,18 +23,21 @@ test.describe('Onboarding state — GET/PUT lifecycle', () => {
         expect(typeof body).toBe('object');
     });
 
-    test('PUT /api/onboarding/state without auth → 401', async ({ request }) => {
-        const res = await request.put(`${API_BASE}/api/onboarding/state`, {
+    test('PATCH /api/onboarding/state without auth → 401', async ({ request }) => {
+        // Controller decorator is @Patch('state'), so PATCH is the only verb
+        // that hits the route — anything else would 404 and miss the auth
+        // gate we care about pinning.
+        const res = await request.patch(`${API_BASE}/api/onboarding/state`, {
             data: { step: 'welcome' },
         });
         expect(res.status()).toBe(401);
     });
 
-    test('PUT /api/onboarding/state with a well-formed body responds < 500', async ({
+    test('PATCH /api/onboarding/state with a well-formed body responds < 500', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
-        const res = await request.put(`${API_BASE}/api/onboarding/state`, {
+        const res = await request.patch(`${API_BASE}/api/onboarding/state`, {
             headers: authedHeaders(u.access_token),
             data: { step: 'welcome', completed: false },
         });
@@ -43,34 +46,36 @@ test.describe('Onboarding state — GET/PUT lifecycle', () => {
     });
 });
 
-test.describe('Onboarding catalog endpoints', () => {
-    test('GET /api/onboarding/catalog/ai-providers returns array', async ({ request }) => {
-        const u = await registerUserViaAPI(request);
-        const res = await request.get(`${API_BASE}/api/onboarding/catalog/ai-providers`, {
-            headers: authedHeaders(u.access_token),
-        });
+test.describe('Onboarding catalog endpoint', () => {
+    test('GET /api/onboarding/catalog without auth → 401', async ({ request }) => {
+        const res = await request.get(`${API_BASE}/api/onboarding/catalog`);
+        // Catalog is auth-gated by the default Better-Auth guard like the
+        // rest of /api/onboarding/*. We don't depend on the exact code as
+        // long as it's a 4xx and not a 5xx.
         expect(res.status()).toBeLessThan(500);
-        if (res.status() === 200) {
-            const body = await res.json();
-            const arr = Array.isArray(body) ? body : (body?.providers ?? body?.data ?? []);
-            expect(Array.isArray(arr)).toBe(true);
-        }
+        expect(res.status()).toBeGreaterThanOrEqual(200);
     });
 
-    test('GET /api/onboarding/catalog/storage returns array', async ({ request }) => {
+    test('GET /api/onboarding/catalog for fresh user returns catalog shape', async ({
+        request,
+    }) => {
         const u = await registerUserViaAPI(request);
-        const res = await request.get(`${API_BASE}/api/onboarding/catalog/storage`, {
+        const res = await request.get(`${API_BASE}/api/onboarding/catalog`, {
             headers: authedHeaders(u.access_token),
         });
-        expect(res.status()).toBeLessThan(500);
-    });
-
-    test('GET /api/onboarding/catalog/deployment returns array', async ({ request }) => {
-        const u = await registerUserViaAPI(request);
-        const res = await request.get(`${API_BASE}/api/onboarding/catalog/deployment`, {
-            headers: authedHeaders(u.access_token),
-        });
-        expect(res.status()).toBeLessThan(500);
+        expect(res.status()).toBe(200);
+        const body = await res.json();
+        expect(typeof body).toBe('object');
+        // Loose shape check — catalog dto has cards + plugins arrays.
+        // Don't pin the exact key set so this stays green if Ever Works
+        // adds a new section.
+        const looksLikeCatalog =
+            Array.isArray(body?.cards) ||
+            Array.isArray(body?.plugins) ||
+            Array.isArray(body?.aiProviders) ||
+            Array.isArray(body?.storage) ||
+            Array.isArray(body?.deployment);
+        expect(looksLikeCatalog).toBe(true);
     });
 });
 

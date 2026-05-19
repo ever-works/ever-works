@@ -56,12 +56,44 @@ test.describe('Auth — authenticated endpoints', () => {
         expect(res.status()).toBe(200);
         const body = await res.json();
         expect(body?.id ?? body?.user?.id).toBe(u.user.id);
-        // Password / secrets MUST NEVER appear in profile responses.
-        const s = JSON.stringify(body);
-        expect(s).not.toContain('password');
-        expect(s).not.toContain('tokenHash');
-        expect(s).not.toContain('emailVerificationToken');
-        expect(s).not.toContain('passwordResetToken');
+        // Password hash / verification / reset secrets MUST NEVER appear
+        // in profile responses. We can't blindly grep for the substring
+        // 'password' because legitimate metadata fields like
+        // `passwordUpdatedAt`, `passwordStrength`, or `passwordHint` would
+        // false-positive. Walk the object and inspect KEYS only — that
+        // catches secret-bearing fields without exploding on metadata.
+        const SECRET_KEYS = new Set([
+            'password',
+            'passwordhash',
+            'password_hash',
+            'hashedpassword',
+            'hashed_password',
+            'tokenhash',
+            'token_hash',
+            'emailverificationtoken',
+            'email_verification_token',
+            'passwordresettoken',
+            'password_reset_token',
+            'refreshtoken',
+            'refresh_token',
+        ]);
+        const offending: string[] = [];
+        const walk = (val: unknown): void => {
+            if (val === null || typeof val !== 'object') return;
+            if (Array.isArray(val)) {
+                val.forEach(walk);
+                return;
+            }
+            for (const [k, v] of Object.entries(val)) {
+                if (SECRET_KEYS.has(k.toLowerCase())) offending.push(k);
+                walk(v);
+            }
+        };
+        walk(body);
+        expect(
+            offending,
+            `profile leaked secret-bearing field(s): ${offending.join(', ')}`,
+        ).toEqual([]);
     });
 
     test('GET /api/auth/profile/fresh re-fetches and returns user object', async ({ request }) => {
@@ -118,22 +150,38 @@ test.describe('Auth — authenticated endpoints', () => {
         request,
     }) => {
         const u = await registerUserViaAPI(request);
+        // Sanity-check the token works pre-logout. If it doesn't, the
+        // whole test premise is invalid.
+        const before = await request.get(`${API_BASE}/api/auth/profile`, {
+            headers: authedHeaders(u.access_token),
+        });
+        expect(before.status()).toBe(200);
+
         const logout = await request.post(`${API_BASE}/api/auth/logout`, {
             headers: authedHeaders(u.access_token),
         });
-        expect(logout.status()).toBeLessThan(500);
-        if (logout.status() === 200 || logout.status() === 204) {
-            const after = await request.get(`${API_BASE}/api/auth/profile`, {
-                headers: authedHeaders(u.access_token),
-            });
-            // After logout the same token should NOT grant profile access.
-            // Some implementations return 401; some lazily invalidate.
-            // Reject silent 200 with full profile.
-            if (after.status() === 200) {
-                // Acceptable only if endpoint stub returns minimal/empty.
-                const body = await after.json();
-                expect(body?.email).not.toBe(u.email);
-            }
+        // The endpoint must either accept the request (2xx) or, if it's
+        // stateless, return a well-formed 2xx/3xx. A 5xx or 4xx for a
+        // valid token is a real bug — fail loudly.
+        expect(logout.status(), `logout status ${logout.status()}`).toBeLessThan(400);
+
+        // CRITICAL — the same token must NOT grant profile access after
+        // logout. We require an explicit 401/403 (true invalidation) OR,
+        // if the server returns 200, the response body must not include
+        // the logged-out user's email. A profile call returning the same
+        // user post-logout is a failed boundary, period.
+        const after = await request.get(`${API_BASE}/api/auth/profile`, {
+            headers: authedHeaders(u.access_token),
+        });
+        if (after.status() === 200) {
+            const body = await after.json();
+            const observedEmail = body?.email ?? body?.user?.email;
+            expect(
+                observedEmail,
+                `token still resolves to ${u.email} after logout — auth boundary leak`,
+            ).not.toBe(u.email);
+        } else {
+            expect([401, 403]).toContain(after.status());
         }
     });
 });
