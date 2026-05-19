@@ -33,7 +33,13 @@ test.describe('Activity log — append-only / immutable', () => {
             );
         }
         const body = await list.json();
-        const arr = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? body?.logs ?? []);
+        // Activity-log controller (apps/api/src/activity-log/activity-log.controller.ts)
+        // returns `{ activities, total }`. We also accept the older
+        // shapes (`entries`, `data`, `logs`) so this spec stays robust
+        // if the response envelope ever changes again.
+        const arr = Array.isArray(body)
+            ? body
+            : (body?.activities ?? body?.entries ?? body?.data ?? body?.logs ?? []);
         if (arr.length === 0) {
             test.skip(true, 'no activity-log entries yet for the freshly created work');
         }
@@ -71,7 +77,13 @@ test.describe('Activity log — append-only / immutable', () => {
             test.skip(true, `activity-log list returned ${list.status()}`);
         }
         const body = await list.json();
-        const arr = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? body?.logs ?? []);
+        // Activity-log controller (apps/api/src/activity-log/activity-log.controller.ts)
+        // returns `{ activities, total }`. We also accept the older
+        // shapes (`entries`, `data`, `logs`) so this spec stays robust
+        // if the response envelope ever changes again.
+        const arr = Array.isArray(body)
+            ? body
+            : (body?.activities ?? body?.entries ?? body?.data ?? body?.logs ?? []);
         if (arr.length === 0) {
             test.skip(true, 'no entries to probe');
         }
@@ -107,7 +119,9 @@ test.describe('Activity log — append-only / immutable', () => {
         });
         if (list.status() !== 200) test.skip(true, 'list unavailable');
         const body = await list.json();
-        const arr = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? []);
+        const arr = Array.isArray(body)
+            ? body
+            : (body?.activities ?? body?.entries ?? body?.data ?? []);
         if (arr.length === 0) test.skip(true, 'no entries');
         const entryId = arr[0]?.id;
         if (!entryId) test.skip(true, 'no id field');
