@@ -1,4 +1,4 @@
-import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import { PlatformSecretGuard } from './platform-secret.guard';
 
@@ -43,10 +43,14 @@ describe('PlatformSecretGuard', () => {
         expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
     });
 
-    it('throws ServiceUnavailable when the platform token env var is missing', () => {
+    it('throws Unauthorized when the platform token env var is missing', () => {
+        // A missing PLATFORM_API_SECRET_TOKEN used to surface as 503,
+        // which crashes uptime probes and contradicts the e2e contract
+        // ("ingest without auth → 401/403"). It now surfaces as 401:
+        // no caller can authenticate when the secret is absent.
         delete process.env.PLATFORM_API_SECRET_TOKEN;
         const ctx = ctxWithHeader('Bearer anything');
-        expect(() => guard.canActivate(ctx)).toThrow(ServiceUnavailableException);
+        expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
     });
 
     it('rejects when provided token has the same length but different bytes (constant-time)', () => {

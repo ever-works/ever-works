@@ -774,6 +774,12 @@ export class WorksController {
         @Param('id') id: string,
         @Body() body: ExecuteImportRequestBody,
     ): Promise<ExecuteImportResult> {
+        // Validate ownership BEFORE body shape: a stranger probing this
+        // route with any payload (even a malformed one) must get a
+        // 403/404, not a leak of "your body is missing a rows field".
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+
         if (!Array.isArray(body?.rows)) {
             throw new BadRequestException({
                 status: 'error',
@@ -785,8 +791,6 @@ export class WorksController {
         const defaultStatus =
             typeof body.default_status === 'string' ? body.default_status : 'pending';
 
-        const user = await this.authService.getUser(auth.userId);
-        const configResult = await this.workQueryService.workConfig(id, user);
         const settings = configResult.config?.settings;
         if (!settings?.import_enabled) {
             throw new NotFoundException({

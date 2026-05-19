@@ -24,10 +24,14 @@ test.describe('Work members — API contract', () => {
         });
         expect(res.status()).toBe(200);
         const body = await res.json();
+        // Members controller returns { members, owner } — owner is a
+        // sibling field, not folded into the members list. A fresh work
+        // has zero collaborator members but always has an owner, so we
+        // count members + owner together.
         const arr = Array.isArray(body) ? body : (body?.members ?? body?.data ?? []);
         expect(Array.isArray(arr)).toBe(true);
-        // The owner should always be in the list of a fresh work.
-        expect(arr.length).toBeGreaterThanOrEqual(1);
+        const totalPeople = arr.length + (body?.owner ? 1 : 0);
+        expect(totalPeople, 'no members nor owner returned').toBeGreaterThanOrEqual(1);
     });
 
     test("GET /api/works/:id/members for a stranger's work → 403 or 404", async ({ request }) => {

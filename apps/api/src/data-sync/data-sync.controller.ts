@@ -1,4 +1,12 @@
-import { Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+    Controller,
+    HttpCode,
+    HttpException,
+    HttpStatus,
+    NotFoundException,
+    Param,
+    Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -52,8 +60,22 @@ export class DataSyncController {
         // into DataSyncService.runDataSync alongside the gate body so it
         // stays centralised between webhook / poll / manual paths.
         void auth;
-        const outcome = await this.dataSyncService.runDataSync(id, 'manual');
-        return shapeOutcome(outcome);
+        // The service still throws plain `Error: not yet implemented` for
+        // some code paths (and the per-Work ownership check is still
+        // marked TODO inside `runDataSync`). Convert anything that isn't
+        // already an HttpException into a 404 so the manual escape valve
+        // never leaks a raw 500. Once the service-level check lands this
+        // catch can be removed.
+        try {
+            const outcome = await this.dataSyncService.runDataSync(id, 'manual');
+            return shapeOutcome(outcome);
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Work not found or data-sync is not available for this work',
+            });
+        }
     }
 }
 

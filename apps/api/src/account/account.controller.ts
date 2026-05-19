@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Controller,
     Get,
     Post,
@@ -30,6 +31,7 @@ export class AccountController {
 
     @Get('export')
     @HttpCode(HttpStatus.OK)
+    @Header('Content-Disposition', 'attachment; filename="account-export.json"')
     async exportData(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('includeSecrets') includeSecrets: string,
@@ -47,6 +49,13 @@ export class AccountController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() payload: AccountExportPayload,
     ) {
+        // The body type is a structural one — without explicit DTO
+        // validators an empty `{}` reaches the service and throws
+        // unhandled, which surfaces as a 500. Surface a 400 for
+        // obviously-empty bodies before delegating.
+        if (!payload || typeof payload !== 'object' || !payload.data) {
+            throw new BadRequestException('Request body is empty or missing the `data` envelope');
+        }
         return this.importService.previewImport(auth.userId, payload);
     }
 

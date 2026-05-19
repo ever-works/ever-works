@@ -45,7 +45,13 @@ test.describe('Work items — read endpoints', () => {
         });
         expect(res.status()).toBe(200);
         const body = await res.json();
-        const n = typeof body === 'number' ? body : (body?.count ?? body?.total);
+        // workCount() returns { status, items, categories, tags } — see
+        // work-query.service.ts. Accept any of the documented numeric
+        // fields so the test is not coupled to one specific key name.
+        const n =
+            typeof body === 'number'
+                ? body
+                : (body?.count ?? body?.total ?? body?.items ?? body?.categories ?? body?.tags);
         expect(typeof n).toBe('number');
         expect(n).toBeGreaterThanOrEqual(0);
     });
