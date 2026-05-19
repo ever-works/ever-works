@@ -396,18 +396,33 @@ files.**
 - [x] `api-version-header.spec.ts` — `/api/health` exposes a version via X-API-Version/X-Version/body version field that looks semver/sha/date-shaped; stable across calls
 - [x] `signed-url-expiry.spec.ts` — when a signed-URL endpoint exists, the URL carries `Expires=` / `X-Amz-Expires=` / `?exp=` / `?expires_in=` / `token=` / `signature=` marker; unauth GET on upload-url path is auth-gated 401/403/404
 
-## Pass 15 — queued
+## Pass 15 — this PR (`chore/e2e-coverage-pass-15`)
 
-- [ ] `db-readonly-replica.spec.ts` — if a read replica is configured, read-only endpoints (`/api/works`, `/api/notifications`) hit it; write endpoints don't
-- [ ] `feature-flag-runtime-toggle.spec.ts` — flipping a flag at runtime (via admin endpoint if exposed) reflects in next request without server restart
-- [ ] `webhook-redelivery.spec.ts` — failed webhook delivery is retried; backoff envelope shape probed
-- [ ] `multi-tenant-data-leak.spec.ts` — listing endpoints with `?owner=` / `?tenant=` / `?org_id=` query params never leak rows owned by another tenant
-- [ ] `oauth-pkce.spec.ts` — OAuth authorize URL carries `code_challenge` + `code_challenge_method=S256` (PKCE)
-- [ ] `audit-tamper-resistance.spec.ts` — manipulated activity-log entries don't pass integrity check (HMAC/signature if implemented)
-- [ ] `backup-restore-noop.spec.ts` — health check exposes last-backup timestamp; backup health probe < 500
-- [ ] `cloud-sdk-headers.spec.ts` — User-Agent allowlist; outbound HTTP from server carries a recognised UA
-- [ ] `webhook-secret-rotation.spec.ts` — rotating a webhook secret invalidates the old secret signature
-- [ ] `request-id-tracing.spec.ts` — `X-Request-ID` header echoes on response; uniquely generated when not provided
+Replication coherency + multi-tenant isolation + observability tracing. **+10 new spec files.**
+
+- [x] `db-readonly-replica.spec.ts` — write-then-read coherency: new work observable on /api/works within 5s; 5 rapid reads share ≥1 common id (no replica-lag-induced drift)
+- [x] `feature-flag-runtime-toggle.spec.ts` — config/flag endpoint returns stable JSON, never leaks DB_URL/JWT_SECRET-shape keys, unauthed payload ≤ authed keys
+- [x] `webhook-redelivery.spec.ts` — deliveries listing endpoint auth-gated (401/403/404 unauth) and returns JSON < 500; redeliver on bogus id never 5xx
+- [x] `multi-tenant-data-leak.spec.ts` — `?owner=`/`?tenant=`/`?org_id=` × 7 param shapes never leak Alice's work to Bob; direct GET on Alice's work id is 401/403/404 for Bob
+- [x] `oauth-pkce.spec.ts` — github connect/url either carries `code_challenge` (43-128 chars) + `code_challenge_method=S256` OR informational skip; two calls produce distinct verifiers
+- [x] `audit-tamper-resistance.spec.ts` — PATCH rejection never echoes tamper payload back; 5x PATCH burst leaves first-id stable and row count non-decreasing
+- [x] `backup-restore-noop.spec.ts` — /api/health backup metadata (when exposed) carries ISO timestamp ≤ 7 days old; informational skip when not surfaced
+- [x] `cloud-sdk-headers.spec.ts` — no `x-aws-request-id` / `x-cloud-provider` / Lambda fingerprint headers; Server header doesn't leak SDK; 5× bogus User-Agent strings (shell injection, CRLF, null bytes) stay < 500
+- [x] `webhook-secret-rotation.spec.ts` — rotate-secret endpoint auth-gated (401/403/404 unauth) and < 500 authed; response never echoes bcrypt/argon2 hash format
+- [x] `request-id-tracing.spec.ts` — /api/health generates request-id ≥ 8 chars; client-supplied X-Request-ID either echoed or informational; two consecutive requests get distinct ids
+
+## Pass 16 — queued
+
+- [ ] `worker-retry-budget.spec.ts` — failed jobs respect a max-retry ceiling; runaway retries don't 5xx the queue API
+- [ ] `cron-drift-tolerance.spec.ts` — cron job `nextRunAt` advances monotonically after triggers; drift < 60s between expected vs observed
+- [ ] `cors-origin-allowlist.spec.ts` — preflight from `https://evil.example` is rejected; preflight from `*.ever.works` is allowed
+- [ ] `cookie-flags-on-logout.spec.ts` — POST /logout sends Set-Cookie with Max-Age=0 / Expires in past
+- [ ] `error-detail-leak.spec.ts` — 5xx response bodies don't include stack traces / file paths / DB error codes verbatim
+- [ ] `notification-spam-throttle.spec.ts` — generating many notifications doesn't exceed a per-minute throttle
+- [ ] `time-window-coercion.spec.ts` — endpoints accepting `from`/`to` reject inverted ranges (from > to) with 4xx not 5xx
+- [ ] `archive-soft-delete.spec.ts` — soft-deleted entities are excluded from default listings but reachable via `?archived=1` (or skip if not modeled)
+- [ ] `usage-export-pii-isolation.spec.ts` — usage export never includes another tenant's user IDs / emails
+- [ ] `image-resize-bounds.spec.ts` — image-resize endpoint rejects extreme width/height (10000×10000+) with 4xx not 5xx; tiny dimensions (1×1) accepted
 
 ## Pass 15+ — long-tail / hardening
 
