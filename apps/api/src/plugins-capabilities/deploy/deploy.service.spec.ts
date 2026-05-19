@@ -138,6 +138,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             getOrGenerate: jest.fn().mockResolvedValue('hex'.repeat(21) + 'h'), // 64 hex chars
         };
 
+        // Same per-Work-persistent shape as PlatformSyncSecretService.
+        const webhookSecretService = {
+            getOrGenerate: jest.fn().mockResolvedValue('webhook'.repeat(9) + 'a'), // 64 chars
+        };
+
         // EW-617 G5: DNS automation no-ops in tests (no env vars). The
         // dns service still needs to be present so the constructor wires
         // — `getProvider` returns null and `ensureWorkSubdomain` is a
@@ -162,6 +167,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             websiteTemplateResolver as any,
             eventEmitter as any,
             platformSyncSecretService as any,
+            webhookSecretService as any,
             dnsService as any,
             funnel as any,
         );
@@ -176,6 +182,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             githubPlugin,
             eventEmitter,
             platformSyncSecretService,
+            webhookSecretService,
             dnsService,
             funnel,
         };
@@ -690,8 +697,8 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
     });
 
     describe('SITE_URL + WEBHOOK_SECRET (Astro minimal-template parity)', () => {
-        it('pushes WEBHOOK_SECRET for every deploy (per-Work random token, like CRON_SECRET)', async () => {
-            const { service, githubPlugin } = buildService({
+        it('pushes WEBHOOK_SECRET via the persistent per-Work store (not regenerated each deploy)', async () => {
+            const { service, githubPlugin, webhookSecretService } = buildService({
                 plugin: { id: 'legacy' },
             });
 
@@ -699,14 +706,49 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
             const { secrets } = captureCalls(githubPlugin);
             const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
-            // Both per-deploy random tokens are present and distinct.
-            expect(byKey.WEBHOOK_SECRET).toBeDefined();
-            expect(byKey.WEBHOOK_SECRET).toMatch(/^[0-9a-f]{64}$/);
+            // Must call into the persistence-aware service, not regenerate ad-hoc.
+            expect(webhookSecretService.getOrGenerate).toHaveBeenCalledWith('work-1');
+            expect(byKey.WEBHOOK_SECRET).toBe('webhook'.repeat(9) + 'a');
+            // Distinct from CRON_SECRET (which IS per-deploy by design).
             expect(byKey.CRON_SECRET).toBeDefined();
             expect(byKey.WEBHOOK_SECRET).not.toBe(byKey.CRON_SECRET);
         });
 
-        it('derives SITE_URL from settings.ingressHost when applyEverWorksSubdomain set it', async () => {
+        it('reuses the SAME WEBHOOK_SECRET across multiple deploys of the same Work (no rotation drift)', async () => {
+            const { service, githubPlugin, webhookSecretService } = buildService({
+                plugin: { id: 'legacy' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+            await service.deploy('work-1', 'user-1', {});
+
+            // Both deploys must have consulted the same persistent store,
+            // producing the same plaintext both times.
+            expect(webhookSecretService.getOrGenerate).toHaveBeenCalledTimes(2);
+            const webhookSecretsPushed = githubPlugin.setActionSecret.mock.calls
+                .map((c: any[]) => c[0])
+                .filter((s: any) => s.key === 'WEBHOOK_SECRET')
+                .map((s: any) => s.value);
+            expect(webhookSecretsPushed).toHaveLength(2);
+            expect(webhookSecretsPushed[0]).toBe(webhookSecretsPushed[1]);
+        });
+
+        it('does NOT block the deploy when webhookSecretService.getOrGenerate throws', async () => {
+            const { service, githubPlugin, webhookSecretService } = buildService({
+                plugin: { id: 'legacy' },
+            });
+            webhookSecretService.getOrGenerate.mockRejectedValueOnce(new Error('encryption key missing'));
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
+            const secretKeys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            expect(secretKeys).not.toContain('WEBHOOK_SECRET');
+            // CRON_SECRET still landed — webhook failure is contained.
+            expect(secretKeys).toContain('CRON_SECRET');
+        });
+
+        it('derives SITE_URL from settings.ingressHost when applyEverWorksSubdomain set it, and writes it as a variable not a secret', async () => {
             const { service, githubPlugin, dnsService } = buildService({
                 deployProvider: 'ever-works',
                 plugin: {
@@ -722,9 +764,14 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
             await service.deploy('work-1', 'user-1', {});
 
-            const { secrets } = captureCalls(githubPlugin);
-            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
-            expect(byKey.SITE_URL).toBe('https://my-site.ever.works');
+            const { secrets, variables } = captureCalls(githubPlugin);
+            const varByKey = Object.fromEntries(variables.map((v: any) => [v.key, v.value]));
+            // Public URL: pushed as a variable (visible/overridable in repo
+            // settings UI), not buried as a secret.
+            expect(varByKey.SITE_URL).toBe('https://my-site.ever.works');
+            // Belt-and-suspenders: must NOT also be in secrets.
+            const secretKeys = secrets.map((s: any) => s.key);
+            expect(secretKeys).not.toContain('SITE_URL');
         });
 
         it('does NOT push SITE_URL when ingressHost is unset (non-ever-works providers, or DNS unconfigured)', async () => {
@@ -740,8 +787,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
             await service.deploy('work-1', 'user-1', {});
 
-            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
-            expect(keys).not.toContain('SITE_URL');
+            const { secrets, variables } = captureCalls(githubPlugin);
+            expect(secrets.map((s: any) => s.key)).not.toContain('SITE_URL');
+            expect(variables.map((v: any) => v.key)).not.toContain('SITE_URL');
         });
     });
 

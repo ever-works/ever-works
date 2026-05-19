@@ -147,6 +147,7 @@ import { WorksConfigWriterService } from '@src/works-config/services/works-confi
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { WebhookSecretService } from './webhook-secret.service';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 import { DeployReadyPollerService } from './deploy-ready-poller.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
@@ -222,6 +223,7 @@ describe('WorkModule', () => {
             SettingsSchemaValidatorService,
             EverWorksDeployQuotaService,
             PlatformSyncSecretService,
+            WebhookSecretService,
             EverWorksGitProvider,
             EverWorksDnsService,
             ZeroFrictionFunnelService,
@@ -303,14 +305,16 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 31-entry shape (28 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 32-entry shape (29 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
             // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
             // (nightly cleanup of expired anonymous Users).
             // Bumped to 30 with the EW-617 G8 ZeroFrictionFunnelService.
             // Bumped to 31 with the EW-617 G8 DeployReadyPollerService.
-            expect(meta('exports')).toHaveLength(31);
+            // Bumped to 32 with WebhookSecretService for per-Work persistent
+            // WEBHOOK_SECRET (mirrors PlatformSyncSecretService pattern).
+            expect(meta('exports')).toHaveLength(32);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

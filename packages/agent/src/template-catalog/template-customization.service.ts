@@ -469,7 +469,10 @@ export class TemplateCustomizationService {
         if (baseConfig.id !== 'minimal') {
             return [];
         }
-        const removed: string[] = [];
+        // `let` because `removed` is built up via push() through the loop —
+        // the binding is conceptually mutable. Repo convention prefers `let`
+        // for mutated locals over `const`.
+        let removed: string[] = [];
         for (const relPath of PROVISION_STRIP_PATHS) {
             const absPath = path.join(workspaceDir, relPath);
             const existed = await fs

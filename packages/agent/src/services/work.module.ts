@@ -33,6 +33,7 @@ import { WorksConfigService } from '@src/works-config/services/works-config.serv
 import { WorksConfigSyncListener } from '@src/works-config/services/works-config-sync.listener';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
+import { WebhookSecretService } from './webhook-secret.service';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 import { DeployReadyPollerService } from './deploy-ready-poller.service';
 import { ItemHealthService } from './item-health.service';
@@ -103,6 +104,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         SettingsSchemaValidatorService,
         EverWorksDeployQuotaService,
         PlatformSyncSecretService,
+        WebhookSecretService,
         ZeroFrictionFunnelService,
         DeployReadyPollerService,
         // EW-614 — `EverWorksGitProvider` creates the per-Work repository in
@@ -151,6 +153,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorksConfigProjectionService,
         WorksConfigRepositorySyncService,
         PlatformSyncSecretService,
+        WebhookSecretService,
         ZeroFrictionFunnelService,
         DeployReadyPollerService,
         CommunityPrModule,
