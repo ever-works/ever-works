@@ -18,10 +18,16 @@ const DELETE_PATHS = [
 
 test.describe('Account deletion — endpoint probe', () => {
     test('an account deletion endpoint exists and requires auth (or skip)', async ({ request }) => {
+        // Important: call request.delete / request.post inline. Extracting
+        // them into a variable loses the APIRequestContext `this` binding
+        // and throws `TypeError: Cannot read properties of undefined` at
+        // call time (Playwright 1.59.x routes through `this.fetch`).
         let found: { method: string; path: string; status: number } | null = null;
         for (const p of DELETE_PATHS) {
-            const fn = p.method === 'DELETE' ? request.delete : request.post;
-            const res = await fn(`${API_BASE}${p.path}`);
+            const res =
+                p.method === 'DELETE'
+                    ? await request.delete(`${API_BASE}${p.path}`)
+                    : await request.post(`${API_BASE}${p.path}`);
             if (res.status() !== 404 && res.status() !== 405) {
                 found = { method: p.method, path: p.path, status: res.status() };
                 break;
@@ -87,9 +93,12 @@ test.describe('Account deletion — danger-zone UI page', () => {
         // If the page didn't load, the body would be empty / contain
         // a 5xx string. We require non-empty.
         expect(body.length, 'danger-zone page rendered empty body').toBeGreaterThan(20);
-        if (!looksDangerous) {
-            test.skip(true, 'danger zone page exists but no destructive affordance copy found');
-        }
-        expect(looksDangerous).toBe(true);
+        // Single assertion — earlier shape called test.skip first which
+        // made the assertion dead code and let a missing-affordance
+        // regression pass silently. Greptile P2 fix.
+        expect(
+            looksDangerous,
+            'danger zone page exists but no destructive affordance copy found',
+        ).toBe(true);
     });
 });

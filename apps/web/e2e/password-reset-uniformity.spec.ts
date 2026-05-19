@@ -14,7 +14,14 @@ import { API_BASE, registerUserViaAPI } from './helpers/api';
  * the mean ratio to be within a generous window.
  */
 
-const SAMPLE_SIZE = 4;
+// 8 samples + a 5x ratio threshold is loose enough to survive
+// CI scheduler jitter on dev-mode runners (Greptile P2 callout —
+// a single GC pause was shifting one mean by 200-400 ms and
+// pushing the ratio past 3x on otherwise-healthy servers). A
+// real enumeration leak typically presents as 10x+, so 5x still
+// catches the regression we care about.
+const SAMPLE_SIZE = 8;
+const TIMING_RATIO_THRESHOLD = 5;
 
 async function measure(
     request: import('@playwright/test').APIRequestContext,
@@ -31,7 +38,9 @@ async function measure(
 }
 
 test.describe('Password reset — timing uniformity (H-03)', () => {
-    test('mean response time for known vs unknown emails is within 3x', async ({ request }) => {
+    test(`mean response time for known vs unknown emails is within ${TIMING_RATIO_THRESHOLD}x`, async ({
+        request,
+    }) => {
         const real = await registerUserViaAPI(request);
         const realTimes: number[] = [];
         const bogusTimes: number[] = [];
@@ -62,7 +71,7 @@ test.describe('Password reset — timing uniformity (H-03)', () => {
         expect(
             ratio,
             `timing ratio ${ratio.toFixed(2)}x (real=${realMean}ms, bogus=${bogusMean}ms) — possible enumeration leak`,
-        ).toBeLessThan(3);
+        ).toBeLessThan(TIMING_RATIO_THRESHOLD);
     });
 
     test('forgot-password always returns 200/202 — does NOT leak existence', async ({

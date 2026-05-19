@@ -37,10 +37,14 @@ test.describe('Large payload — body-size limits honoured', () => {
         }
     });
 
-    test('50 MB payload is rejected with 4xx (not 5xx)', async ({ request }) => {
+    test('10 MB payload is rejected with 4xx (not 5xx)', async ({ request }) => {
         const u = await registerUserViaAPI(request);
-        // 50 MB filler — most Express body-parser configs cap at 1-10 MB.
-        const huge = fillerString(50 * MB);
+        // 10 MB filler — still well above the typical 1 MB Express
+        // body-parser ceiling, but safe enough to avoid OOM-killing
+        // a 256 MB CI worker. Greptile P2 callout: a 50 MB JS string
+        // takes ~100 MB in V8's UTF-16 representation, and serialising
+        // it via Playwright pushes peak RSS to 150-200 MB.
+        const huge = fillerString(10 * MB);
         const res = await request.post(`${API_BASE}/api/works`, {
             headers: authedHeaders(u.access_token),
             data: { name: 'huge', slug: 'huge', description: huge },
