@@ -58,22 +58,28 @@ test.describe('Concurrent update — same work, two writers', () => {
         ).toBe(true);
     });
 
-    test('two parallel PATCH-style partial updates do not 5xx', async ({ request }) => {
+    test('two parallel PATCH partial updates do not 5xx', async ({ request }) => {
         const u = await registerUserViaAPI(request);
         const w = await createWorkViaAPI(request, u.access_token, {
             name: `patch-conflict-${Date.now().toString(36)}`,
         });
-        // Patch different fields — least-conflicting case.
+        // True PATCH semantics — partial body, not a full PUT replacement.
+        // Greptile P1 callout: previously used PUT but titled the test
+        // "PATCH-style", which would conflate the two HTTP verbs even
+        // though many APIs handle them differently.
         const [r1, r2] = await Promise.all([
-            request.put(`${API_BASE}/api/works/${w.id}`, {
+            request.patch(`${API_BASE}/api/works/${w.id}`, {
                 headers: authedHeaders(u.access_token),
                 data: { description: 'desc from A' },
             }),
-            request.put(`${API_BASE}/api/works/${w.id}`, {
+            request.patch(`${API_BASE}/api/works/${w.id}`, {
                 headers: authedHeaders(u.access_token),
                 data: { description: 'desc from B' },
             }),
         ]);
+        // The platform may not expose PATCH at all on /api/works/:id —
+        // it could route PUT exclusively. 405 (Method Not Allowed) is
+        // acceptable here; never 5xx.
         expect(r1.status()).toBeLessThan(500);
         expect(r2.status()).toBeLessThan(500);
     });

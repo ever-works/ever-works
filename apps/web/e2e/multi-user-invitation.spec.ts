@@ -103,6 +103,13 @@ test.describe('Multi-user invitations — members CRUD smoke', () => {
         );
         if (!self) test.skip(true, 'owner not in /members list — may use a separate self endpoint');
         const role = String(self?.role ?? self?.userRole ?? '').toLowerCase();
-        expect(role.includes('owner') || role === 'admin' || role === 'manager').toBe(true);
+        // Owner-level only. "manager" is a distinct lower-privilege role
+        // in the WorkMemberRole enum (owner > manager > editor > viewer);
+        // accepting it here would let a member-promotion regression pass.
+        // Greptile P2 callout.
+        expect(
+            role.includes('owner') || role === 'admin',
+            `owner row reported as "${role}" — should be owner/admin`,
+        ).toBe(true);
     });
 });

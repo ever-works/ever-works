@@ -21,6 +21,13 @@ test.describe('Git OAuth — happy-path endpoints', () => {
         const res = await request.get(`${API_BASE}/api/oauth/providers`, {
             headers: authedHeaders(u.access_token),
         });
+        // Skip-guard before the hard assertion — in envs where the
+        // endpoint is feature-flagged off, a 404/403 should skip
+        // cleanly rather than fail with a confusing 200-expected error.
+        // Greptile P2 callout.
+        if (res.status() === 404 || res.status() === 403) {
+            test.skip(true, `oauth/providers not exposed in this env (${res.status()})`);
+        }
         expect(res.status()).toBe(200);
         const body = await res.json();
         const arr = Array.isArray(body) ? body : (body?.providers ?? body?.data ?? []);
