@@ -476,10 +476,17 @@ describe('AuthController', () => {
     });
 
     describe('getProfile (GET /api/auth/profile)', () => {
-        it('returns the in-request user verbatim (set by AuthSessionGuard)', async () => {
+        it('returns the in-request user with a canonical `id` alias for `userId`', async () => {
             const user = { userId: 'u1', email: 'a@b.co' };
 
-            await expect(controller.getProfile({ user } as any)).resolves.toBe(user);
+            // The controller exposes both `id` (canonical web/contracts
+            // shape) and `userId` (legacy AuthenticatedUser shape) so
+            // every consumer can read whichever field it expects.
+            await expect(controller.getProfile({ user } as any)).resolves.toEqual({
+                id: 'u1',
+                userId: 'u1',
+                email: 'a@b.co',
+            });
         });
     });
 
