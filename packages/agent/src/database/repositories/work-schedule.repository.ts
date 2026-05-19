@@ -4,6 +4,31 @@ import { Repository, LessThanOrEqual } from 'typeorm';
 import { WorkSchedule } from '@src/entities/work-schedule.entity';
 import { WorkScheduleStatus, GenerateStatusType } from '@src/entities/types';
 
+const DISPATCH_SCHEDULE_SELECT = [
+    'schedule.id',
+    'schedule.workId',
+    'schedule.userId',
+    'schedule.cadence',
+    'schedule.status',
+    'schedule.billingMode',
+    'schedule.nextRunAt',
+    'schedule.lastRunAt',
+    'schedule.lastRunStatus',
+    'schedule.failureCount',
+    'schedule.maxFailureBeforePause',
+    'schedule.alwaysCreatePullRequest',
+    'schedule.scheduledFor',
+    'schedule.providerOverrides',
+    'schedule.createdAt',
+    'schedule.updatedAt',
+    'work.id',
+    'work.name',
+    'work.slug',
+    'work.userId',
+    'work.owner',
+    'work.sourceRepository',
+];
+
 @Injectable()
 export class WorkScheduleRepository {
     constructor(
@@ -69,30 +94,7 @@ export class WorkScheduleRepository {
         return this.repository
             .createQueryBuilder('schedule')
             .leftJoinAndSelect('schedule.work', 'work')
-            .select([
-                'schedule.id',
-                'schedule.workId',
-                'schedule.userId',
-                'schedule.cadence',
-                'schedule.status',
-                'schedule.billingMode',
-                'schedule.nextRunAt',
-                'schedule.lastRunAt',
-                'schedule.lastRunStatus',
-                'schedule.failureCount',
-                'schedule.maxFailureBeforePause',
-                'schedule.alwaysCreatePullRequest',
-                'schedule.scheduledFor',
-                'schedule.providerOverrides',
-                'schedule.createdAt',
-                'schedule.updatedAt',
-                'work.id',
-                'work.name',
-                'work.slug',
-                'work.userId',
-                'work.owner',
-                'work.sourceRepository',
-            ])
+            .select(DISPATCH_SCHEDULE_SELECT)
             .where('schedule.status = :status', { status: WorkScheduleStatus.ACTIVE })
             .andWhere('schedule.nextRunAt <= :now', {
                 now: Date.now(),
@@ -106,30 +108,7 @@ export class WorkScheduleRepository {
         return this.repository
             .createQueryBuilder('schedule')
             .leftJoinAndSelect('schedule.work', 'work')
-            .select([
-                'schedule.id',
-                'schedule.workId',
-                'schedule.userId',
-                'schedule.cadence',
-                'schedule.status',
-                'schedule.billingMode',
-                'schedule.nextRunAt',
-                'schedule.lastRunAt',
-                'schedule.lastRunStatus',
-                'schedule.failureCount',
-                'schedule.maxFailureBeforePause',
-                'schedule.alwaysCreatePullRequest',
-                'schedule.scheduledFor',
-                'schedule.providerOverrides',
-                'schedule.createdAt',
-                'schedule.updatedAt',
-                'work.id',
-                'work.name',
-                'work.slug',
-                'work.userId',
-                'work.owner',
-                'work.sourceRepository',
-            ])
+            .select(DISPATCH_SCHEDULE_SELECT)
             .where({ id })
             .getOne();
     }
