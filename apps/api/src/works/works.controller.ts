@@ -511,7 +511,19 @@ export class WorksController {
                 message: `Activity-sync secret rotation is only supported for pull-mode Works; current mode is "${work.activitySyncMode}".`,
             });
         }
-        await this.platformSyncSecretService.rotate(id);
+        try {
+            await this.platformSyncSecretService.rotate(id);
+        } catch (error) {
+            // PLATFORM_ENCRYPTION_KEY may be missing or misconfigured in
+            // dev/CI environments. Surface as 422 (configuration issue)
+            // rather than a raw 500 so the contract stays <500.
+            const message =
+                error instanceof Error ? error.message : 'Failed to rotate activity-sync secret';
+            throw new ConflictException({
+                error: 'rotation-unavailable',
+                message,
+            });
+        }
         this.activityLogService
             .log({
                 userId: auth.userId,

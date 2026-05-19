@@ -259,17 +259,17 @@ export class AuthService {
     }
 
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+        // H-03: do the same expensive work on BOTH branches before any
+        // branch-specific behaviour so wall-clock time can't distinguish
+        // a registered user from an unknown email. We need the bcrypt on
+        // the user-exists branch too — the previous version only did
+        // bcrypt on the no-user branch, which left the user-exists path
+        // ~10x faster on a warm CI runner and broke the timing-uniformity
+        // contract (apps/web/e2e/password-reset-uniformity.spec.ts).
+        await this.randomHashedPassword().catch(() => undefined);
+
         const user = await this.userRepository.findByEmail(forgotPasswordDto.email);
         if (!user) {
-            // H-03: equalize the CPU cost of the no-user branch with the
-            // user-exists branch so an attacker can't distinguish via timing.
-            // The user-exists branch does a DB UPDATE that writes ~64 bytes
-            // of indexed columns + emits an event; doing a throwaway bcrypt
-            // here is a closer cost match than just returning immediately.
-            // The bcrypt cost is pulled from `getBcryptCost()` so the no-user
-            // branch matches whatever cost the user-exists branch uses for
-            // password verification (see randomHashedPassword below).
-            await this.randomHashedPassword().catch(() => undefined);
             return { message: 'If the email exists, a reset link has been sent' };
         }
 
