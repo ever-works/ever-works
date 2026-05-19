@@ -42,7 +42,12 @@ test.describe("Usage exports — never leak another tenant's identifiers", () =>
                 foundLeak = `bob.email leaked in ${path}`;
                 break;
             }
-            if (bob.user.id && text.includes(bob.user.id)) {
+            // Greptile P1: `registerUserViaAPI` types `user` as
+            // non-optional but the runtime payload may not carry it on
+            // every env. Safe-navigate so a missing user object doesn't
+            // crash the test with TypeError before the assertion runs.
+            const bobId = bob.user?.id;
+            if (bobId && text.includes(bobId)) {
                 foundLeak = `bob.user.id leaked in ${path}`;
                 break;
             }

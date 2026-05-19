@@ -20,7 +20,7 @@ const RESIZE_CANDIDATES = [
 ];
 
 test.describe('Image resize — extreme dimensions rejected without 5xx', () => {
-    test('10000×10000 resize request returns 4xx (not 5xx)', async ({ request }) => {
+    test('10000×10000 resize request returns 4xx (not 2xx, not 5xx)', async ({ request }) => {
         const u = await registerUserViaAPI(request);
         let probed = false;
         for (const tpl of RESIZE_CANDIDATES) {
@@ -33,7 +33,19 @@ test.describe('Image resize — extreme dimensions rejected without 5xx', () => 
             });
             if (res.status() === 404) continue;
             probed = true;
-            expect(res.status(), `${tpl} 10000×10000 crashed: ${res.status()}`).toBeLessThan(500);
+            // Greptile P2: the prior `<500` shape accepted 2xx, which
+            // would let a server happily process a 10000×10000 resize
+            // (the exact DoS scenario this spec exists to guard). The
+            // platform must REJECT extreme dimensions — 400/413/422
+            // are the canonical shapes.
+            expect(
+                res.status(),
+                `${tpl} 10000×10000 was not rejected: ${res.status()}`,
+            ).toBeGreaterThanOrEqual(400);
+            expect(
+                res.status(),
+                `${tpl} 10000×10000 crashed with 5xx: ${res.status()}`,
+            ).toBeLessThan(500);
         }
         if (!probed) test.skip(true, 'no resize endpoint exposed');
     });
