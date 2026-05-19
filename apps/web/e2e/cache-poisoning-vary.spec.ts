@@ -67,14 +67,16 @@ test.describe('Vary header — locale-varying web pages carry Vary: Accept-Langu
         // Accept-Language. Cookie / RSC / private all acceptable.
         const safeVary = /\b(Accept-Language|Cookie|RSC|Next-Router-State-Tree)\b/i.test(vary);
         const safeCC = /\b(private|no-store|no-cache)\b/i.test(cc);
-        const noCachePoisoning = safeVary || safeCC || !vary;
-        // Just sanity-check we have *some* posture against shared-cache
-        // poisoning — soft-warn rather than hard-fail because /en/login
-        // is locale-pinned by URL and cacheable.
+        // Codex P2: the prior `|| !vary` bypass let a response with
+        // neither Vary nor protective Cache-Control pass silently —
+        // exactly the cache-poisoning shape this test exists to catch.
+        // Drop the bypass so a missing Vary AND missing protective CC
+        // surfaces as a warning.
+        const noCachePoisoning = safeVary || safeCC;
         if (!noCachePoisoning) {
             test.info().annotations.push({
                 type: 'warning',
-                description: `/en/login Vary="${vary}" CC="${cc}" — review for cache poisoning`,
+                description: `/en/login has neither Vary nor protective Cache-Control — review for cache poisoning (Vary="${vary}" CC="${cc}")`,
             });
         }
     });

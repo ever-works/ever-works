@@ -5,19 +5,28 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  * BullMQ job ID collision / dedup — pass 17. Submitting the same
  * generate request twice in rapid succession should NOT queue two
  * identical jobs — BullMQ's `jobId` (content hash or explicit key)
- * should dedup. We don't have a direct queue-inspection endpoint, but
- * we can probe via the activity-log: two rapid-fire generate POSTs
- * for the same work should not produce two distinct accept signals.
+ * should dedup at some layer (HTTP-level 409, queue-level idempotency
+ * key, or invisible queue dedup).
+ *
+ * Bot review (Greptile P1 + Codex P2): the prior shape computed
+ * `goodShape` but only annotated, so a regression where both calls
+ * returned 200 silently passed. Tightened so a pair-of-200s without
+ * any queue-dedup signal fails the assertion. The activity-log probe
+ * deferred to a future pass (the API doesn't yet expose a per-work
+ * job-accept listing in this env).
  */
 
 test.describe('BullMQ job dedup — duplicate generate requests do not double-queue', () => {
-    test('two rapid identical generate POSTs leave activity-log with ≤ 2 accept entries', async ({
+    test('two rapid identical generate POSTs produce a queue-dedup signal (or both 4xx)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
+        // Greptile P2: capture timestamp once so name + slug stay
+        // identical even across a millisecond tick.
+        const tag = Date.now().toString(36);
         const w = await createWorkViaAPI(request, u.access_token, {
-            name: `dedup-${Date.now().toString(36)}`,
-            slug: `dedup-${Date.now().toString(36)}`,
+            name: `dedup-${tag}`,
+            slug: `dedup-${tag}`,
         });
         // Fire two identical generate requests in parallel.
         const [r1, r2] = await Promise.all([
@@ -30,23 +39,25 @@ test.describe('BullMQ job dedup — duplicate generate requests do not double-qu
                 data: { mode: 'standard' },
             }),
         ]);
-        // Both responses < 500.
-        expect(r1.status()).toBeLessThan(500);
-        expect(r2.status()).toBeLessThan(500);
-        // At least one of {409, 202, 200, 429} should appear — the
-        // server signaled "queued" or "duplicate". A pair of 200s
-        // suggests no dedup, but isn't itself a fail because the
-        // dedup may happen invisibly at the queue layer.
         const statuses = [r1.status(), r2.status()];
-        const goodShape =
-            statuses.every((s) => s < 500) &&
-            statuses.some((s) => s === 200 || s === 202 || s === 409 || s === 429);
-        if (!goodShape) {
-            test.info().annotations.push({
-                type: 'informational',
-                description: `dedup probe got statuses ${statuses.join(', ')}`,
-            });
-        }
+        // Both responses < 500 — server must not 5xx on duplicate.
+        expect(r1.status(), `first generate crashed: ${r1.status()}`).toBeLessThan(500);
+        expect(r2.status(), `second generate crashed: ${r2.status()}`).toBeLessThan(500);
+        // The pair must include at least one dedup signal:
+        //  - 409 conflict (HTTP-level dedup)
+        //  - 429 too-many-requests (rate-limit catching the burst)
+        //  - 4xx generally (some validator caught the duplicate)
+        // If BOTH return 2xx, the test passes only when the endpoint
+        // is configured to return 202 (queued — acceptable since the
+        // dedup may happen invisibly in BullMQ). A pair of 200s with
+        // no further signal is a smell we still want to surface.
+        const dedupSignal =
+            statuses.some((s) => s >= 400 && s < 500) || statuses.every((s) => s === 202);
+        const bothPlain200 = statuses.every((s) => s === 200);
+        expect(
+            dedupSignal || !bothPlain200,
+            `dedup probe shows no signal: statuses=${statuses.join(',')} — duplicate may double-queue`,
+        ).toBe(true);
     });
 
     test('rapid double-fire of generate on a non-existent work returns 4xx (not 5xx) for both', async ({
