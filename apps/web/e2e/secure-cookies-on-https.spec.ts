@@ -84,10 +84,16 @@ test.describe('Cookies — Secure + HttpOnly attributes', () => {
             test.skip(true, 'no auth cookies set');
         }
         for (const c of authCookies) {
-            // SameSite=None without Secure is invalid; SameSite=Lax /
-            // Strict / explicit Secure-paired None all acceptable.
-            const hasSameSite = /SameSite=(Lax|Strict|None)/i.test(c.value);
-            expect(hasSameSite, `auth cookie missing SameSite: ${c.value.slice(0, 80)}`).toBe(true);
+            // Greptile P2: SameSite=None without Secure is invalid —
+            // RFC 6265bis says browsers must downgrade to Lax or reject
+            // it. Require either SameSite=Lax/Strict, OR
+            // SameSite=None + Secure as the only acceptable combos.
+            const laxOrStrict = /SameSite=(Lax|Strict)/i.test(c.value);
+            const noneWithSecure = /SameSite=None/i.test(c.value) && /Secure/i.test(c.value);
+            expect(
+                laxOrStrict || noneWithSecure,
+                `auth cookie has unsafe SameSite/Secure combo: ${c.value.slice(0, 120)}`,
+            ).toBe(true);
         }
     });
 });

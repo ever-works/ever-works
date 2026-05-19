@@ -22,13 +22,28 @@ test.describe('GraphQL — introspection disabled in production', () => {
             const probe = await request.post(`${API_BASE}${p}`, {
                 data: { query: '{__typename}' },
             });
-            if (probe.status() !== 404) {
+            // Greptile P2: a bare non-404 isn't proof the path is
+            // GraphQL — a REST endpoint that 401s would also pass.
+            // Require either a 200 JSON response that round-trips a
+            // `data.__typename` / `errors` field, OR a 400/422 that
+            // carries a `errors[]` array (GraphQL servers commonly
+            // return this on malformed queries). Anything else is
+            // shape-mismatched and we skip rather than mis-assert.
+            if (probe.status() === 404) continue;
+            const ct = probe.headers()['content-type'] || '';
+            if (!ct.includes('json')) continue;
+            const body = await probe.json().catch(() => null);
+            if (!body) continue;
+            const looksLikeGraphQL =
+                typeof body?.data?.__typename === 'string' ||
+                (Array.isArray(body?.errors) && body.errors.length > 0);
+            if (looksLikeGraphQL) {
                 foundPath = p;
                 break;
             }
         }
         if (!foundPath) {
-            test.skip(true, 'no GraphQL endpoint exposed in this env');
+            test.skip(true, 'no GraphQL endpoint with GraphQL-shaped response in this env');
         }
         const res = await request.post(`${API_BASE}${foundPath}`, {
             data: { query: INTROSPECTION_QUERY },

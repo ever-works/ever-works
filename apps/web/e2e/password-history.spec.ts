@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, loginViaAPI, registerUserViaAPI } from './helpers/api';
 
 /**
  * Password history — pass 14. If the platform enforces a password
@@ -21,18 +21,25 @@ test.describe('Password history — recent passwords cannot be reused', () => {
         const p0 = `${STRONG_BASE}-A${Date.now().toString(36)}`;
         const p1 = `${STRONG_BASE}-B${Date.now().toString(36)}`;
         const u = await registerUserViaAPI(request, { password: p0 });
-        // Rotate to P1.
+        // Codex P2: global ValidationPipe uses forbidNonWhitelisted, so
+        // snake_case duplicates get the request rejected with 400 before
+        // the password-change logic runs. Stick to the DTO field names.
         const r1 = await request.post(`${API_BASE}/api/auth/update-password`, {
             headers: authedHeaders(u.access_token),
-            data: { current_password: p0, new_password: p1, currentPassword: p0, newPassword: p1 },
+            data: { currentPassword: p0, newPassword: p1 },
         });
         if (!r1.ok()) {
             test.skip(true, `first rotation failed (${r1.status()}) — endpoint may differ`);
         }
-        // Now try rotating BACK to P0.
+        // Greptile P1: many JWT setups invalidate the pre-rotation token
+        // after password change. Using `u.access_token` for the second
+        // rotation would 401 from token revocation, not history policy.
+        // Re-login with P1 to get a fresh token before the second
+        // rotation, so a 4xx unambiguously means history enforcement.
+        const refresh = await loginViaAPI(request, { email: u.email, password: p1 });
         const r2 = await request.post(`${API_BASE}/api/auth/update-password`, {
-            headers: authedHeaders(u.access_token),
-            data: { current_password: p1, new_password: p0, currentPassword: p1, newPassword: p0 },
+            headers: authedHeaders(refresh.access_token),
+            data: { currentPassword: p1, newPassword: p0 },
         });
         if (r2.ok()) {
             // Platform does not enforce password history — informational
@@ -50,11 +57,11 @@ test.describe('Password history — recent passwords cannot be reused', () => {
         expect(r2.status()).toBeLessThan(500);
     });
 
-    test('update-password without current_password is rejected', async ({ request }) => {
+    test('update-password without currentPassword is rejected', async ({ request }) => {
         const u = await registerUserViaAPI(request);
         const res = await request.post(`${API_BASE}/api/auth/update-password`, {
             headers: authedHeaders(u.access_token),
-            data: { new_password: 'Brand1New#Pass', newPassword: 'Brand1New#Pass' },
+            data: { newPassword: 'Brand1New#Pass' },
         });
         // No current password = silent acceptance would let a stolen
         // session change the password without re-auth. Must be 4xx.
