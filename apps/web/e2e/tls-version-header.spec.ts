@@ -21,10 +21,13 @@ test.describe('Transport security — production HSTS posture', () => {
         const maxAge = /max-age\s*=\s*(\d+)/i.exec(hsts!);
         if (maxAge) {
             const seconds = parseInt(maxAge[1], 10);
+            // Greptile P1: the comment claimed 6-month OWASP minimum but
+            // the actual threshold was 30 days (2,592,000 s). Tightened
+            // to the actual OWASP recommendation (15,552,000 s = 180d).
             expect(
                 seconds,
-                `HSTS max-age=${seconds}s is below the recommended 6-month minimum`,
-            ).toBeGreaterThanOrEqual(2_592_000); // 30 days as a soft floor
+                `HSTS max-age=${seconds}s is below the recommended 6-month minimum (15552000 s)`,
+            ).toBeGreaterThanOrEqual(15_552_000);
         }
     });
 

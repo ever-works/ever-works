@@ -59,7 +59,8 @@ test.describe('Bundle size — first-load static assets', () => {
     });
 
     test('no single JS chunk exceeds 2 MB', async ({ page, baseURL }) => {
-        const oversized: Array<{ url: string; bytes: number }> = [];
+        // Mutated by the response listener — `let` per team style rule.
+        let oversized: Array<{ url: string; bytes: number }> = [];
         page.on('response', async (res) => {
             const url = res.url();
             if (!/\/_next\/static\/.*\.(js|mjs)$/.test(url)) return;

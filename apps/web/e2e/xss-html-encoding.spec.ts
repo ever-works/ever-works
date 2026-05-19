@@ -72,21 +72,60 @@ test.describe('XSS — work name JSON response', () => {
 });
 
 test.describe('XSS — rendered HTML response does not echo raw script tags', () => {
-    test('a public-facing rendered page never includes a literal <script>alert', async ({
+    test('the API response that carries a tainted work escapes it (or returns JSON)', async ({
+        request,
+    }) => {
+        // Codex P2: the previous shape navigated to /en/login which
+        // never includes the tainted work — a stored-XSS regression
+        // on the actual rendering path would still pass. Now we POST
+        // a work with an XSS payload in the name and GET the detail
+        // endpoint that would render it. JSON content-type is safe
+        // by encoding; HTML content-type must NOT carry an executable
+        // <script> with the alert(1) canary.
+        const u = await registerUserViaAPI(request);
+        const tainted = `xss-stored-${Date.now().toString(36)}-<script>alert(1)</script>`;
+        const create = await request.post(`${API_BASE}/api/works`, {
+            headers: authedHeaders(u.access_token),
+            data: { name: tainted, slug: `xss-render-${Date.now().toString(36)}` },
+        });
+        if (!create.ok()) test.skip(true, `couldn't create tainted work (${create.status()})`);
+        const created = await create.json();
+        const id = created?.work?.id ?? created?.id ?? created?.data?.id;
+        if (!id) test.skip(true, 'no id from create');
+        const detail = await request.get(`${API_BASE}/api/works/${id}`, {
+            headers: authedHeaders(u.access_token),
+        });
+        const ct = detail.headers()['content-type'] || '';
+        if (ct.includes('json')) {
+            // JSON is safe by content-type — the browser doesn't
+            // execute <script> tags in JSON. We just verify the field
+            // round-trips as a string and isn't accidentally double-
+            // encoded.
+            const body = await detail.json();
+            const name = body?.name ?? body?.work?.name ?? body?.data?.name;
+            expect(typeof name).toBe('string');
+            expect(name, 'name was double-encoded').not.toContain('&amp;lt;');
+        } else {
+            // HTML response — must NOT carry executable alert(1).
+            const html = await detail.text();
+            const matches = html.match(
+                /<script[^>]*>[\s\S]*?alert\s*\(\s*1\s*\)[\s\S]*?<\/script>/gi,
+            );
+            expect(
+                matches,
+                `detail HTML contained executable alert(1): ${matches?.join(', ')}`,
+            ).toBeNull();
+        }
+    });
+
+    test('login page never includes executable alert(1) (sanity baseline)', async ({
         page,
         baseURL,
     }) => {
-        // We use the login page as a baseline — no user data is rendered
-        // there, so no XSS should ever appear. If we DID see a literal
-        // `<script>alert(` in a normal page, that'd be a smoking gun
-        // (suggests build-time injection from user data).
         await page.goto(`${baseURL || 'http://localhost:3000'}/en/login`, {
             waitUntil: 'domcontentloaded',
         });
         const html = await page.content();
-        // We allow the literal string in HTML text content (e.g. a docs
-        // page explaining XSS), but we shouldn't see a runnable script
-        // tag with the well-known canary payload.
         const matches = html.match(/<script[^>]*>[\s\S]*?alert\s*\(\s*1\s*\)[\s\S]*?<\/script>/gi);
         expect(
             matches,

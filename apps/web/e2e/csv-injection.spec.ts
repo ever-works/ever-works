@@ -40,16 +40,15 @@ test.describe('CSV injection — formula-prefix payloads in exports', () => {
             for (const cell of cells) {
                 const trimmed = cell.replace(/^"|"$/g, '');
                 if (!trimmed.startsWith('=cmd')) continue;
-                // Found a cell starting with =cmd. The CSV-injection
-                // defense is to ensure it's either:
-                //   - Inside double quotes that don't strip the `'`
-                //   - Prefixed with `'` (Excel treats as literal)
-                //   - Surrounded with a non-formula sentinel
-                // Best-effort detection: if the raw cell starts with
-                // `'=` or `"=cmd`, it's safe.
+                // Found a cell starting with =cmd. Codex P2 callout:
+                // wrapping the formula in double quotes ("=cmd...") is
+                // NOT safe — spreadsheet software unwraps the quotes
+                // and STILL evaluates `=cmd` as a formula. Only an
+                // explicit single-quote PREFIX before the `=` (`'=cmd`
+                // or `"'=cmd"`) is defensively safe.
                 const raw = cell.trim();
                 const isSafe =
-                    raw.startsWith("'") || raw.startsWith('"=') || raw.startsWith('"\\=');
+                    raw.startsWith("'=") || raw.startsWith('"\'=') || raw.startsWith('\\=');
                 expect(
                     isSafe,
                     `CSV cell starts with formula payload unsafely: ${raw.slice(0, 60)}`,
@@ -84,17 +83,21 @@ test.describe('CSV injection — formula-prefix payloads in exports', () => {
         if (!body) test.skip(true, 'empty body');
         // Find any cell starting bare with +sum / -cmd / @SUM — the
         // injection vector. We accept the safe prefixed forms.
+        // Greptile P2: renamed inner `u` (was shadowing the outer
+        // registered user). `cell` is clearer.
         const dangerousCells = body
             .split(/\r?\n/)
             .flatMap((line) => line.split(','))
             .map((c) => c.trim())
             .filter((c) => {
-                const u = c.replace(/^"|"$/g, '');
+                const cell = c.replace(/^"|"$/g, '');
                 return (
-                    (u.startsWith('+sum') || u.startsWith('-cmd') || u.startsWith('@SUM')) &&
+                    (cell.startsWith('+sum') ||
+                        cell.startsWith('-cmd') ||
+                        cell.startsWith('@SUM')) &&
                     !c.startsWith("'") &&
-                    !c.startsWith('"=') &&
-                    !c.startsWith('"\'')
+                    !c.startsWith('"\'') &&
+                    !c.startsWith('"\\=')
                 );
             });
         expect(

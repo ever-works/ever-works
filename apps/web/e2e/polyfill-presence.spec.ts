@@ -14,7 +14,8 @@ test.describe('Polyfills — modern browser excludes legacy bundles', () => {
         page,
         baseURL,
     }) => {
-        const scriptUrls: string[] = [];
+        // Mutated by the request listener — `let` per team style rule.
+        let scriptUrls: string[] = [];
         page.on('request', (req) => {
             if (req.resourceType() === 'script') {
                 scriptUrls.push(req.url());

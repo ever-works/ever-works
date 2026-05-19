@@ -35,7 +35,8 @@ test.describe('DNT / GPC honored — login page without consent', () => {
             },
         });
         const page = await context.newPage();
-        const analyticsHits: string[] = [];
+        // Mutated by the request listener — `let` per team style rule.
+        let analyticsHits: string[] = [];
         page.on('request', (req) => {
             const url = req.url();
             if (ANALYTICS_HOSTS.some((h) => h.test(url))) {
