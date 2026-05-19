@@ -6,7 +6,9 @@ jest.mock('@ever-works/agent/entities', () => ({}));
 
 describe('GitHubAppOnboardingService', () => {
     beforeAll(() => {
-        process.env.AUTH_SECRET = 'test-auth-secret';
+        // H-14: config.auth.secret() now enforces a 32-char minimum, so
+        // use a 32+ byte fixture instead of the historic 15-char one.
+        process.env.AUTH_SECRET = 'test-auth-secret-test-auth-secret';
     });
 
     const createService = () => {

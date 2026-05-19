@@ -32,10 +32,25 @@ export const config = {
     },
 
     auth: {
+        // H-14 (companion to apps/web/src/lib/auth/crypto.ts): the web tier
+        // refuses to seal the auth cookie when AUTH_SECRET is shorter than
+        // 32 characters, because the previous "pad short secrets with a
+        // constant" path produced a predictable key. The API consumes the
+        // same env var for JWT signing, so anchor both tiers on the same
+        // minimum here and surface the misconfiguration at first call —
+        // which `main.ts` triggers eagerly at boot — instead of mid-flow
+        // during an OAuth callback (see 2026-05-18 incident).
         secret: () => {
             const secret = process.env.AUTH_SECRET;
             if (!secret) {
                 throw new Error('AUTH_SECRET environment variable is required');
+            }
+            if (secret.length < 32) {
+                throw new Error(
+                    'AUTH_SECRET must be at least 32 characters of high-entropy material ' +
+                        '(e.g. `openssl rand -base64 48`). The web tier refuses to seal cookies ' +
+                        'with a shorter secret, so logins silently break in the OAuth callback.',
+                );
             }
             return secret;
         },

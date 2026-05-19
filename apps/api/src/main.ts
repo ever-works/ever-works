@@ -10,10 +10,20 @@ import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
+import { config as appConfig } from './config/constants';
 
 async function bootstrap() {
     // Load environment variables from .env file
     configDotenv({ path: path.resolve(process.cwd(), '.env') });
+
+    // H-14: fail fast on a misconfigured AUTH_SECRET (missing or shorter
+    // than 32 chars). The web tier's `setAuthAccessCookie` will refuse to
+    // seal cookies with a short secret, so without this check the API
+    // boots clean and the misconfiguration only surfaces mid-OAuth-callback
+    // as an opaque "Authentication Error" (see 2026-05-18 incident).
+    // Aliased to `appConfig` because `bootstrap()` also declares a local
+    // `const config` for Swagger.
+    appConfig.auth.secret();
 
     // Initialize Sentry and PostHog
     initSentry();
