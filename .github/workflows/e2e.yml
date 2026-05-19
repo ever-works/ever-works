@@ -221,6 +221,16 @@ jobs:
           API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
           WEB_URL: http://localhost:3000
+          # CORS — declare the dev server origin explicitly so:
+          # 1. cors-origin-allowlist e2e contract sees a non-default
+          #    allowlist (the fallback `localhost:3000` works fine but
+          #    sourcing it from env exercises the same plumbing prod uses).
+          # 2. Auth callback URLs may use either /api or web routes;
+          #    ALLOWED_CALLBACK_HOSTS keeps the host allow-list aligned
+          #    so reset/verify links built against the web origin pass
+          #    the C-04 host check.
+          ALLOWED_ORIGINS: http://localhost:3000
+          ALLOWED_CALLBACK_HOSTS: localhost:3000
           # Playwright
           CI: 'true'
           PLAYWRIGHT_BASE_URL: http://localhost:3000
