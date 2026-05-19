@@ -16,28 +16,48 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  */
 export class AddActivityLogIngestEventId1778677529777 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumn(
-            'activity_log',
-            new TableColumn({
-                name: 'ingestEventId',
-                type: 'varchar',
-                length: '64',
-                isNullable: true,
-            }),
+        if (!(await queryRunner.hasColumn('activity_log', 'ingestEventId'))) {
+            await queryRunner.addColumn(
+                'activity_log',
+                new TableColumn({
+                    name: 'ingestEventId',
+                    type: 'varchar',
+                    length: '64',
+                    isNullable: true,
+                }),
+            );
+        }
+
+        const table = await queryRunner.getTable('activity_log');
+        const hasIngestIndex = table?.indices.some(
+            (index) => index.name === 'idx_activity_log_work_ingest_event',
         );
-        await queryRunner.createIndex(
-            'activity_log',
-            new TableIndex({
-                name: 'idx_activity_log_work_ingest_event',
-                columnNames: ['workId', 'ingestEventId'],
-                isUnique: true,
-                where: '"ingestEventId" IS NOT NULL',
-            }),
-        );
+
+        if (!hasIngestIndex) {
+            await queryRunner.createIndex(
+                'activity_log',
+                new TableIndex({
+                    name: 'idx_activity_log_work_ingest_event',
+                    columnNames: ['workId', 'ingestEventId'],
+                    isUnique: true,
+                    where: '"ingestEventId" IS NOT NULL',
+                }),
+            );
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropIndex('activity_log', 'idx_activity_log_work_ingest_event');
-        await queryRunner.dropColumn('activity_log', 'ingestEventId');
+        const table = await queryRunner.getTable('activity_log');
+        const hasIngestIndex = table?.indices.some(
+            (index) => index.name === 'idx_activity_log_work_ingest_event',
+        );
+
+        if (hasIngestIndex) {
+            await queryRunner.dropIndex('activity_log', 'idx_activity_log_work_ingest_event');
+        }
+
+        if (await queryRunner.hasColumn('activity_log', 'ingestEventId')) {
+            await queryRunner.dropColumn('activity_log', 'ingestEventId');
+        }
     }
 }
