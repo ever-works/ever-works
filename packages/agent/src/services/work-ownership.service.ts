@@ -28,7 +28,7 @@ export class WorkOwnershipService {
         userId: string,
         minimumRole?: WorkMemberRole,
     ): Promise<WorkAccessResult> {
-        const work = await this.workRepository.findById(workId);
+        const work = await this.workRepository.findByIdForAccess(workId);
 
         if (!work) {
             throw new NotFoundException({
@@ -130,7 +130,7 @@ export class WorkOwnershipService {
      * Get the user's role in a work, or null if no access.
      */
     async getUserRole(workId: string, userId: string): Promise<WorkMemberRole | null> {
-        const work = await this.workRepository.findById(workId);
+        const work = await this.workRepository.findByIdForAccess(workId);
 
         if (!work) {
             return null;

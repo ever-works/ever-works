@@ -1,7 +1,17 @@
-import { Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+    Controller,
+    ForbiddenException,
+    HttpCode,
+    HttpException,
+    HttpStatus,
+    NotFoundException,
+    Param,
+    Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
+import { WorkRepository } from '@ever-works/agent/database';
 import { DataSyncService } from './data-sync.service';
 import type { DataSyncOutcome } from './data-sync.types';
 
@@ -32,7 +42,10 @@ import type { DataSyncOutcome } from './data-sync.types';
 @ApiTags('data-sync')
 @Controller()
 export class DataSyncController {
-    constructor(private readonly dataSyncService: DataSyncService) {}
+    constructor(
+        private readonly dataSyncService: DataSyncService,
+        private readonly workRepository: WorkRepository,
+    ) {}
 
     @Post('api/works/:id/sync')
     @HttpCode(HttpStatus.ACCEPTED)
@@ -47,13 +60,38 @@ export class DataSyncController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ): Promise<ForceSyncResponse> {
-        // Auth presence (`auth.userId`) is asserted by the global guard
-        // before reaching here; the per-Work write-access check moves
-        // into DataSyncService.runDataSync alongside the gate body so it
-        // stays centralised between webhook / poll / manual paths.
-        void auth;
-        const outcome = await this.dataSyncService.runDataSync(id, 'manual');
-        return shapeOutcome(outcome);
+        // Per-Work ownership / access check. The service docstring
+        // promises this check lives "alongside the gate body" inside
+        // `runDataSync`, but the gate body is still stubbed — so a
+        // stranger probing this endpoint would otherwise get a 2xx
+        // `enqueued` envelope and reveal that the Work exists. Gate at
+        // the controller until the service-level check lands.
+        const work = await this.workRepository.findById(id);
+        if (!work) {
+            throw new NotFoundException({ status: 'error', message: 'Work not found' });
+        }
+        if (work.userId !== auth.userId) {
+            throw new ForbiddenException({
+                status: 'error',
+                message: 'You do not have permission to sync this work',
+            });
+        }
+        // The service still throws plain `Error: not yet implemented` for
+        // some code paths (and the per-Work ownership check is still
+        // marked TODO inside `runDataSync`). Convert anything that isn't
+        // already an HttpException into a 404 so the manual escape valve
+        // never leaks a raw 500. Once the service-level check lands this
+        // catch can be removed.
+        try {
+            const outcome = await this.dataSyncService.runDataSync(id, 'manual');
+            return shapeOutcome(outcome);
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Work not found or data-sync is not available for this work',
+            });
+        }
     }
 }
 

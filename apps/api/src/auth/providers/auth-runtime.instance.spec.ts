@@ -78,11 +78,13 @@ describe('createAuthRuntimeInstance', () => {
     const ORIGINAL_ENV = { ...process.env };
 
     beforeEach(() => {
-        // Reset env to a known baseline. AUTH_SECRET is required by config.auth.secret().
+        // Reset env to a known baseline. AUTH_SECRET is required by
+        // config.auth.secret() AND must satisfy the H-14 minimum length
+        // (32 chars) — use a deterministic 32-byte value.
         for (const key of [...SOCIAL_ENV_KEYS, ...RUNTIME_ENV_KEYS]) {
             delete process.env[key];
         }
-        process.env.AUTH_SECRET = 'test-secret';
+        process.env.AUTH_SECRET = 'a'.repeat(32);
 
         betterAuthMock.mockClear();
         betterAuthMock.mockReturnValue({ __betterAuthInstance: true });
@@ -233,11 +235,12 @@ describe('createAuthRuntimeInstance', () => {
 
     describe('secret', () => {
         it('reads from `config.auth.secret()` (delegates to AUTH_SECRET env var)', () => {
-            process.env.AUTH_SECRET = 'sup3r-secret';
+            const strong = 'b'.repeat(48);
+            process.env.AUTH_SECRET = strong;
 
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
-            expect(getCapturedOptions().secret).toBe('sup3r-secret');
+            expect(getCapturedOptions().secret).toBe(strong);
         });
 
         it('lets the `config.auth.secret()` AUTH_SECRET-required error propagate', () => {
@@ -246,6 +249,16 @@ describe('createAuthRuntimeInstance', () => {
             expect(() =>
                 createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any),
             ).toThrow('AUTH_SECRET environment variable is required');
+        });
+
+        // H-14: surface a too-short AUTH_SECRET at construction time instead
+        // of mid-OAuth-callback (see 2026-05-18 incident).
+        it('lets the `config.auth.secret()` AUTH_SECRET-min-length error propagate', () => {
+            process.env.AUTH_SECRET = 'short';
+
+            expect(() =>
+                createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any),
+            ).toThrow(/at least 32 characters/);
         });
     });
 

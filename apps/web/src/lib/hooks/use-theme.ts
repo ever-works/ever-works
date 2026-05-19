@@ -38,8 +38,25 @@ export function useTheme(): UseThemeReturn {
             return 'light';
         }
 
-        const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Brave, Safari ITP, locked-down enterprise profiles, and
+        // private-browsing modes all make `localStorage.getItem` throw.
+        // Letting that throw inside `useState`'s lazy initialiser
+        // aborts React's render and leaves the page blank — that's
+        // the exact regression feature-detect-storage.spec is built
+        // to catch. Wrap every browser-API access in try/catch and
+        // fall back to a sensible default.
+        let storedTheme: Theme | null = null;
+        try {
+            storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+        } catch {
+            storedTheme = null;
+        }
+        let prefersDark = false;
+        try {
+            prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch {
+            prefersDark = false;
+        }
         return storedTheme || (prefersDark ? 'dark' : 'light');
     });
 
@@ -50,7 +67,12 @@ export function useTheme(): UseThemeReturn {
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-            const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+            let storedTheme: Theme | null = null;
+            try {
+                storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+            } catch {
+                storedTheme = null;
+            }
             if (!storedTheme) {
                 setTheme(event.matches ? 'dark' : 'light');
             }
@@ -75,7 +97,11 @@ export function useTheme(): UseThemeReturn {
     const toggleTheme = (newTheme?: Theme) => {
         const targetTheme: Theme = newTheme || (theme === 'dark' ? 'light' : 'dark');
         setTheme(targetTheme);
-        localStorage.setItem(THEME_STORAGE_KEY, targetTheme);
+        try {
+            localStorage.setItem(THEME_STORAGE_KEY, targetTheme);
+        } catch {
+            // localStorage may be disabled — DOM still gets the update.
+        }
         applyTheme(targetTheme);
     };
 

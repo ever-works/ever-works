@@ -153,11 +153,24 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
     });
 
     describe('forceSync — surfaces service errors', () => {
-        it('rethrows when runDataSync rejects (NestJS exception filter handles the HTTP response)', async () => {
+        it('converts plain Error rejections to NotFoundException (keeps response 4xx)', async () => {
+            // Until DataSyncService has its own ownership / not-implemented
+            // guard, the controller maps plain-Error throws to 404 so the
+            // manual escape valve never leaks a 5xx for a stranger probe
+            // or a half-wired service stub.
             const boom = new Error('internal boom');
             dataSyncService.runDataSync.mockRejectedValueOnce(boom);
 
-            await expect(controller.forceSync(stubUser, 'work-boom')).rejects.toBe(boom);
+            await expect(controller.forceSync(stubUser, 'work-boom')).rejects.toMatchObject({
+                status: 404,
+            });
+        });
+
+        it('rethrows HttpException subclasses verbatim (NestJS exception filter handles HTTP mapping)', async () => {
+            const httpErr = new (require('@nestjs/common').ForbiddenException)('stranger');
+            dataSyncService.runDataSync.mockRejectedValueOnce(httpErr);
+
+            await expect(controller.forceSync(stubUser, 'work-forbidden')).rejects.toBe(httpErr);
         });
     });
 });

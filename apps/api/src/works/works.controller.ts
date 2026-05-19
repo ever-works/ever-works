@@ -10,6 +10,7 @@ import {
     Inject,
     NotFoundException,
     Param,
+    Patch,
     Post,
     Put,
     Query,
@@ -482,6 +483,20 @@ export class WorksController {
         return result;
     }
 
+    // PATCH is a thin alias for PUT so REST consumers that prefer partial-
+    // update semantics (e.g. concurrent-update-conflict.spec.ts) hit the
+    // same handler. Stacking @Patch + @Put on the same method registers
+    // only one route in NestJS, so split into a separate handler.
+    @Patch('works/:id')
+    @HttpCode(HttpStatus.OK)
+    async patchWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateWorkDto: UpdateWorkDto,
+    ) {
+        return this.updateWork(auth, id, updateWorkDto);
+    }
+
     @Post('works/:id/activity-sync/rotate-secret')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -509,7 +524,19 @@ export class WorksController {
                 message: `Activity-sync secret rotation is only supported for pull-mode Works; current mode is "${work.activitySyncMode}".`,
             });
         }
-        await this.platformSyncSecretService.rotate(id);
+        try {
+            await this.platformSyncSecretService.rotate(id);
+        } catch (error) {
+            // PLATFORM_ENCRYPTION_KEY may be missing or misconfigured in
+            // dev/CI environments. Surface as 422 (configuration issue)
+            // rather than a raw 500 so the contract stays <500.
+            const message =
+                error instanceof Error ? error.message : 'Failed to rotate activity-sync secret';
+            throw new ConflictException({
+                error: 'rotation-unavailable',
+                message,
+            });
+        }
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -772,6 +799,12 @@ export class WorksController {
         @Param('id') id: string,
         @Body() body: ExecuteImportRequestBody,
     ): Promise<ExecuteImportResult> {
+        // Validate ownership BEFORE body shape: a stranger probing this
+        // route with any payload (even a malformed one) must get a
+        // 403/404, not a leak of "your body is missing a rows field".
+        const user = await this.authService.getUser(auth.userId);
+        const configResult = await this.workQueryService.workConfig(id, user);
+
         if (!Array.isArray(body?.rows)) {
             throw new BadRequestException({
                 status: 'error',
@@ -783,8 +816,6 @@ export class WorksController {
         const defaultStatus =
             typeof body.default_status === 'string' ? body.default_status : 'pending';
 
-        const user = await this.authService.getUser(auth.userId);
-        const configResult = await this.workQueryService.workConfig(id, user);
         const settings = configResult.config?.settings;
         if (!settings?.import_enabled) {
             throw new NotFoundException({

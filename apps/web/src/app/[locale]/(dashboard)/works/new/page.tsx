@@ -33,6 +33,13 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
     const { proposal: proposalId } = await searchParams;
     const user = await getAuthFromCookie();
 
+    // Defense: rendering with `user!` (non-null assertion) crashes the page
+    // when the cookie is missing or stale. Redirect to login first so the
+    // server response is a clean 307 instead of a 500.
+    if (!user) {
+        redirect('/login');
+    }
+
     // Get all available git providers and their connection status
     let providers: ProviderWithConnection[] = [];
     let defaultProviderId: string | null = null;

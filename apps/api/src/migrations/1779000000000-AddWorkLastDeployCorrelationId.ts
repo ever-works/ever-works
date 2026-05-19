@@ -11,18 +11,22 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  */
 export class AddWorkLastDeployCorrelationId1779000000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumn(
-            'works',
-            new TableColumn({
-                name: 'lastDeployCorrelationId',
-                type: 'varchar',
-                length: '64',
-                isNullable: true,
-            }),
-        );
+        if (!(await queryRunner.hasColumn('works', 'lastDeployCorrelationId'))) {
+            await queryRunner.addColumn(
+                'works',
+                new TableColumn({
+                    name: 'lastDeployCorrelationId',
+                    type: 'varchar',
+                    length: '64',
+                    isNullable: true,
+                }),
+            );
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropColumn('works', 'lastDeployCorrelationId');
+        if (await queryRunner.hasColumn('works', 'lastDeployCorrelationId')) {
+            await queryRunner.dropColumn('works', 'lastDeployCorrelationId');
+        }
     }
 }

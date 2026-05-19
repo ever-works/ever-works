@@ -10,10 +10,20 @@ import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
+import { config as appConfig } from './config/constants';
 
 async function bootstrap() {
     // Load environment variables from .env file
     configDotenv({ path: path.resolve(process.cwd(), '.env') });
+
+    // H-14: fail fast on a misconfigured AUTH_SECRET (missing or shorter
+    // than 32 chars). The web tier's `setAuthAccessCookie` will refuse to
+    // seal cookies with a short secret, so without this check the API
+    // boots clean and the misconfiguration only surfaces mid-OAuth-callback
+    // as an opaque "Authentication Error" (see 2026-05-18 incident).
+    // Aliased to `appConfig` because `bootstrap()` also declares a local
+    // `const config` for Swagger.
+    appConfig.auth.secret();
 
     // Initialize Sentry and PostHog
     initSentry();
@@ -70,11 +80,25 @@ async function bootstrap() {
     // is both useless to real callers and a foot-gun for any future change
     // that drops the credentials flag.
     const allowedOrigins = assertProductionCorsConfig(process.env);
+    const effectiveOrigins =
+        allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'];
+    // H-19 follow-up: use a callback so we only echo `Access-Control-Allow-
+    // Origin` (and let cors set `Access-Control-Allow-Credentials`) when the
+    // request origin is on the allowlist. Passing `origin` as a static array
+    // makes the cors package still emit `ACAC: true` for evil origins (with
+    // an empty ACAO) — that's the exact cache-poisoning shape the
+    // cors-origin-allowlist e2e contract is meant to catch.
     app.enableCors({
-        origin:
-            allowedOrigins && allowedOrigins.length > 0
-                ? allowedOrigins
-                : ['http://localhost:3000'],
+        origin: (
+            origin: string | undefined,
+            callback: (err: Error | null, allow?: boolean) => void,
+        ) => {
+            if (!origin || effectiveOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(null, false);
+            }
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],

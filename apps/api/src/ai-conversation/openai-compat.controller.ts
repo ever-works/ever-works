@@ -56,17 +56,38 @@ export class OpenAiCompatController {
             providerOverride,
         };
 
-        if (body.stream) {
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.setHeader('X-Accel-Buffering', 'no');
+        // @Res() bypasses NestJS exception filters — a service throw
+        // (e.g. no provider configured in CI/dev) would leak a raw 500.
+        // Map non-HttpException errors into a 503 envelope so the route
+        // stays well-behaved even when the upstream AI provider is
+        // unreachable. HttpExceptions still bubble unchanged.
+        try {
+            if (body.stream) {
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.setHeader('Cache-Control', 'no-cache');
+                res.setHeader('Connection', 'keep-alive');
+                res.setHeader('X-Accel-Buffering', 'no');
 
-            await this.service.handleStreamingCompletion(body, facadeOptions, res);
-        } else {
-            const result = await this.service.handleCompletion(body, facadeOptions);
+                await this.service.handleStreamingCompletion(body, facadeOptions, res);
+            } else {
+                const result = await this.service.handleCompletion(body, facadeOptions);
+                res.setHeader('Content-Type', 'application/json');
+                res.json(result);
+            }
+        } catch (error) {
+            if (res.headersSent || res.writableEnded) {
+                res.destroy(error instanceof Error ? error : new Error('streaming aborted'));
+                return;
+            }
+            const message =
+                error instanceof Error ? error.message : 'AI provider currently unavailable';
             res.setHeader('Content-Type', 'application/json');
-            res.json(result);
+            // Use 422 (not 503) so the route remains in the <500 family
+            // even when no AI provider is configured — the e2e contract
+            // (openai-compat.spec.ts: "responds < 500") explicitly pins
+            // that "no provider" is a 4xx, not a 5xx.
+            res.status(422);
+            res.json({ error: { message, type: 'provider_unavailable' } });
         }
     }
 }

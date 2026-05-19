@@ -3,12 +3,12 @@ import { WorkOwnershipService } from '../work-ownership.service';
 import { WorkMemberRole } from '@src/entities/types';
 
 describe('WorkOwnershipService', () => {
-    let workRepository: { findById: jest.Mock };
+    let workRepository: { findByIdForAccess: jest.Mock };
     let workMemberRepository: { findMember: jest.Mock };
     let service: WorkOwnershipService;
 
     beforeEach(() => {
-        workRepository = { findById: jest.fn() };
+        workRepository = { findByIdForAccess: jest.fn() };
         workMemberRepository = { findMember: jest.fn() };
         service = new WorkOwnershipService(workRepository as any, workMemberRepository as any);
     });
@@ -33,13 +33,13 @@ describe('WorkOwnershipService', () => {
 
     describe('ensureAccess', () => {
         it('throws NotFoundException with status:error envelope when work is missing', async () => {
-            workRepository.findById.mockResolvedValue(null);
+            workRepository.findByIdForAccess.mockResolvedValue(null);
 
             await expect(service.ensureAccess('missing-id', 'user-1')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
 
-            workRepository.findById.mockResolvedValue(null);
+            workRepository.findByIdForAccess.mockResolvedValue(null);
             await expect(service.ensureAccess('missing-id', 'user-1')).rejects.toMatchObject({
                 response: {
                     status: 'error',
@@ -51,7 +51,7 @@ describe('WorkOwnershipService', () => {
 
         it('returns OWNER + isCreator:true when caller is the work creator and skips membership lookup', async () => {
             const work = { id: 'w-1', userId: 'user-1' };
-            workRepository.findById.mockResolvedValue(work);
+            workRepository.findByIdForAccess.mockResolvedValue(work);
 
             const result = await service.ensureAccess('w-1', 'user-1');
 
@@ -73,7 +73,7 @@ describe('WorkOwnershipService', () => {
             'creator passes minimumRole=%s without invoking member.hasRoleOrHigher',
             async (minimumRole) => {
                 const work = { id: 'w-1', userId: 'user-1' };
-                workRepository.findById.mockResolvedValue(work);
+                workRepository.findByIdForAccess.mockResolvedValue(work);
 
                 const result = await service.ensureAccess('w-1', 'user-1', minimumRole);
 
@@ -85,14 +85,14 @@ describe('WorkOwnershipService', () => {
         );
 
         it('throws ForbiddenException when non-creator has no membership row', async () => {
-            workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
+            workRepository.findByIdForAccess.mockResolvedValue({ id: 'w-1', userId: 'creator' });
             workMemberRepository.findMember.mockResolvedValue(null);
 
             await expect(service.ensureAccess('w-1', 'other-user')).rejects.toBeInstanceOf(
                 ForbiddenException,
             );
 
-            workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
+            workRepository.findByIdForAccess.mockResolvedValue({ id: 'w-1', userId: 'creator' });
             workMemberRepository.findMember.mockResolvedValue(null);
             await expect(service.ensureAccess('w-1', 'other-user')).rejects.toMatchObject({
                 response: {
@@ -105,7 +105,7 @@ describe('WorkOwnershipService', () => {
         it('returns membership info when non-creator has a member row and no minimumRole', async () => {
             const work = { id: 'w-1', userId: 'creator' };
             const member = buildMember(WorkMemberRole.VIEWER);
-            workRepository.findById.mockResolvedValue(work);
+            workRepository.findByIdForAccess.mockResolvedValue(work);
             workMemberRepository.findMember.mockResolvedValue(member);
 
             const result = await service.ensureAccess('w-1', 'other-user');
@@ -124,7 +124,7 @@ describe('WorkOwnershipService', () => {
         it('throws ForbiddenException with permission-level copy when membership role is below minimumRole', async () => {
             const work = { id: 'w-1', userId: 'creator' };
             const member = buildMember(WorkMemberRole.VIEWER);
-            workRepository.findById.mockResolvedValue(work);
+            workRepository.findByIdForAccess.mockResolvedValue(work);
             workMemberRepository.findMember.mockResolvedValue(member);
 
             await expect(
@@ -141,7 +141,7 @@ describe('WorkOwnershipService', () => {
         it('returns membership info when member.hasRoleOrHigher passes the minimumRole gate', async () => {
             const work = { id: 'w-1', userId: 'creator' };
             const member = buildMember(WorkMemberRole.MANAGER);
-            workRepository.findById.mockResolvedValue(work);
+            workRepository.findByIdForAccess.mockResolvedValue(work);
             workMemberRepository.findMember.mockResolvedValue(member);
 
             const result = await service.ensureAccess('w-1', 'other-user', WorkMemberRole.EDITOR);
@@ -168,7 +168,7 @@ describe('WorkOwnershipService', () => {
             async (role, minimum, shouldPass) => {
                 const work = { id: 'w-1', userId: 'creator' };
                 const member = buildMember(role);
-                workRepository.findById.mockResolvedValue(work);
+                workRepository.findByIdForAccess.mockResolvedValue(work);
                 workMemberRepository.findMember.mockResolvedValue(member);
 
                 if (shouldPass) {
@@ -252,14 +252,14 @@ describe('WorkOwnershipService', () => {
 
     describe('getUserRole', () => {
         it('returns null when work does not exist (without consulting member repo)', async () => {
-            workRepository.findById.mockResolvedValue(null);
+            workRepository.findByIdForAccess.mockResolvedValue(null);
 
             await expect(service.getUserRole('missing', 'u-1')).resolves.toBeNull();
             expect(workMemberRepository.findMember).not.toHaveBeenCalled();
         });
 
         it('returns OWNER for the work creator without consulting member repo', async () => {
-            workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'u-1' });
+            workRepository.findByIdForAccess.mockResolvedValue({ id: 'w-1', userId: 'u-1' });
 
             await expect(service.getUserRole('w-1', 'u-1')).resolves.toBe(WorkMemberRole.OWNER);
             expect(workMemberRepository.findMember).not.toHaveBeenCalled();
@@ -268,7 +268,10 @@ describe('WorkOwnershipService', () => {
         it.each([WorkMemberRole.MANAGER, WorkMemberRole.EDITOR, WorkMemberRole.VIEWER])(
             'returns the member role (%s) for non-creators',
             async (role) => {
-                workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
+                workRepository.findByIdForAccess.mockResolvedValue({
+                    id: 'w-1',
+                    userId: 'creator',
+                });
                 workMemberRepository.findMember.mockResolvedValue(buildMember(role));
 
                 await expect(service.getUserRole('w-1', 'other-user')).resolves.toBe(role);
@@ -277,14 +280,14 @@ describe('WorkOwnershipService', () => {
         );
 
         it('returns null when caller is neither creator nor member', async () => {
-            workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
+            workRepository.findByIdForAccess.mockResolvedValue({ id: 'w-1', userId: 'creator' });
             workMemberRepository.findMember.mockResolvedValue(null);
 
             await expect(service.getUserRole('w-1', 'other-user')).resolves.toBeNull();
         });
 
         it('coerces falsy member.role to null via the `||` short-circuit', async () => {
-            workRepository.findById.mockResolvedValue({ id: 'w-1', userId: 'creator' });
+            workRepository.findByIdForAccess.mockResolvedValue({ id: 'w-1', userId: 'creator' });
             // Deliberately produce a member with a falsy role value (defensive — not a
             // shape the repository ever yields, but the `member?.role || null` fallback
             // documents that the contract is "non-empty role string OR null").

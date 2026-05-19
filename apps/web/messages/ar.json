@@ -463,6 +463,37 @@
                 "description": "لم نتمكن من ربط حساب {provider} الخاص بك. يرجى المحاولة مرة أخرى."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "الأفكار لك",
+                "titleWithName": "الأفكار لك، {username}"
+            },
+            "actions": {
+                "accept": "استخدم هذه الفكرة",
+                "dismiss": "تجاهل",
+                "dismissAria": "تجاهل هذه الفكرة",
+                "refresh": "اقترح المزيد من الأفكار"
+            },
+            "researching": {
+                "title": "صياغة الأفكار من ملفك الشخصي...",
+                "subtitle": "يستغرق عادة أقل من دقيقة."
+            },
+            "empty": {
+                "title": "لا توجد أفكار حالياً.",
+                "subtitle": "ستظهر المقترحات الجديدة هنا عندما تكون جاهزة."
+            },
+            "errors": {
+                "rateLimited": "تم الوصول إلى الحصة اليومية. جرب مرة غداً.",
+                "generic": "لم يتمكن من تحديث الأفكار. يرجى المحاولة مرة أخرى."
+            },
+            "plugins": {
+                "label": "الإضافات المقترحة"
+            }
+        },
+        "discover": {
+            "title": "اكتشف",
+            "subtitle": "أفكار عمل معدة بواسطة الذكاء الاصطناعي مصممة خصيصاً لك."
+        },
         "header": {
             "welcome": "مرحباً بعودتك، {username}!",
             "subtitle": "إدارة أعمالك المدعومة بالذكاء الاصطناعي وتتبع أدائها",
@@ -677,6 +708,7 @@
                 "apiKeys": "مفاتيح API",
                 "data": "البيانات",
                 "githubApp": "تطبيق GitHub",
+                "workAgent": "وكيل العمل",
                 "gitProviders": "مزودو Git",
                 "dangerZone": "منطقة الخطر"
             },
@@ -703,6 +735,72 @@
                 "branchUnknown": "الفرع الافتراضي غير متاح",
                 "private": "خاص",
                 "public": "عام"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "وكيل العمل المستقل",
+                        "description": "دع الوكيل يخطط، ويبحث، ويعد الأعمال من الأهداف عالية المستوى."
+                    },
+                    "guardrails": {
+                        "title": "حواجز السلامة",
+                        "description": "عيّن حدوداً صارمة قبل أن يتمكن الوكيل من إنشاء الأعمال، وإضافة عناصر، أو إنفاق الميزانية."
+                    },
+                    "queue": {
+                        "title": "ضع هدفًا في ق الانتظار",
+                        "description": "أعط الوكيل تعليمات عامة. يبدأ كـ معلق ويتم تشغيله ضمن حدودك الآمنة."
+                    },
+                    "liveRun": {
+                        "title": "تشغيل مباشر",
+                        "description": "الحالة الحالية والأنشطة الأخيرة للوكيل."
+                    },
+                    "recentGoals": {
+                        "title": "الأهداف الحديثة",
+                        "description": "التعليمات المعقولة والجارية والمكتملة لوكيل العمل."
+                    }
+                },
+                "fields": {
+                    "enabled": "فعّل وكيل العمل",
+                    "autoApproveLowImpact": "موافقة تلقائية على التغييرات ذات التأثير المنخفض",
+                    "dailySuggestions": "الاقتراحات اليومية",
+                    "dryRunByDefault": "التشغيل التجريبي بشكل افتراضي",
+                    "maxWorksPerRun": "الحد الأقصى للأعمال لكل تشغيل",
+                    "maxItemsPerWork": "الحد الأقصى للعناصر لكل عمل",
+                    "maxBudgetPerRun": "الحد الأقصى للميزانية لكل تشغيل",
+                    "approvalThreshold": "عتبة الموافقة",
+                    "confirmBeforeCreate": "تأكد قبل إنشاء الأعمال",
+                    "confirmBeforeDelete": "تأكد قبل حذف العناصر",
+                    "dryRunThisGoal": "تشغيل هذا الهدف تجريبياً"
+                },
+                "actions": {
+                    "saveSettings": "حفظ الإعدادات",
+                    "queueGoal": "ضع الهدف في قائمة الانتظار",
+                    "stop": "توقف"
+                },
+                "queue": {
+                    "placeholder": "أنشئ عملًا حول أفضل 50 شركة ناشئة للذكاء الاصطناعي في مجال الرعاية الصحية"
+                },
+                "metrics": {
+                    "works": "الأعمال",
+                    "items": "العناصر"
+                },
+                "labels": {
+                    "dryRun": "تشغيل تجريبي",
+                    "liveRun": "تشغيل مباشر"
+                },
+                "empty": {
+                    "noActiveRun": "لا يوجد تشغيل نشط لوكيل العمل.",
+                    "noGoals": "لا توجد أهداف لوكيل العمل بعد.",
+                    "waitingForUpdate": "في انتظار أول تحديث للتشغيل."
+                },
+                "toasts": {
+                    "settingsSaved": "تم حفظ إعدادات وكيل العمل",
+                    "settingsError": "فشل حفظ الإعدادات",
+                    "goalQueued": "تم وضع هدف وكيل العمل في قائمة الانتظار",
+                    "goalError": "فشل وضع الهدف في قائمة الانتظار",
+                    "goalCanceled": "تم إلغاء هدف وكيل العمل",
+                    "cancelError": "فشل إلغاء الهدف"
+                }
             },
             "data": {
                 "exportTitle": "تصدير البيانات",
@@ -811,6 +909,11 @@
             "profile": {
                 "title": "إعدادات الملف الشخصي",
                 "subtitle": "تحديث معلومات ملفك الشخصي والصورة الرمزية",
+                "budgetAlerts": {
+                    "title": "تنبيهات الميزانية عبر البريد الإلكتروني",
+                    "description": "ستتلقى بريدًا إلكترونيًا عندما يتجا إنفاق الدليل الشهري 75%، 90%، 100%، أو يتجاوز الحد المسموح به. يتم إرسال الإشعار داخل التطبيق دائمًا بغض النظر عن هذا الإعداد.",
+                    "toggleLabel": "أرسل لي تنبيهات الميزانية عبر البريد الإلكتروني"
+                },
                 "fields": {
                     "name": "الاسم",
                     "username": "اسم المستخدم",
@@ -953,6 +1056,30 @@
             "totalItems": "إجمالي العناصر",
             "activeWebsites": "المواقع النشطة",
             "fromLastMonth": "من الشهر الماضي"
+        },
+        "adminUsage": {
+            "title": "استخدام المنصة",
+            "description": "الإنفاق عبر المستخدمين والدلائل للفترة الحالية. لمشغلي الاستضافة الذاتية فقط.",
+            "periodLabel": "{period}",
+            "totalSpend": "إجمالي الإنفاق: {amount}",
+            "empty": "لم يتم تسجيل أي استخدام خلال هذه الفترة.",
+            "columnUser": "المستخدم",
+            "columnEmail": "البريد الإلكتروني",
+            "columnWork": "الدليل",
+            "columnUnits": "الوحدات",
+            "columnCost": "التكلفة",
+            "loadFailed": "تعذر تحميل استخدام المشرف. قد لا يكون لديك صلاحية مشرف المنصة."
+        },
+        "budgets": {
+            "overviewTitle": "الإنفاق في {period}",
+            "overviewProgressLabel": "{percent}% من الحصة {cap}",
+            "overviewOverageSuffix": " (السماح بالإنفاق الزائد)",
+            "overviewEmpty": "لم يتم تحديد حد شهري. أضف واحدًا في الميزانية والاستخدام لتفعيل التنبيهات.",
+            "topPluginsTitle": "أفضل الإضافات حسب الإنفاق",
+            "topPluginsEmpty": "لم يتم تسجيل أي استخدام خلال هذه الفترة.",
+            "trendTitle": "الإنفاق اليومي — {period}",
+            "trendEmpty": "لم يتم تسجيل أي استخدام خلال هذه الفترة.",
+            "trendDayLabel": "اليوم {day}"
         },
         "workCard": {
             "status": {
@@ -1553,6 +1680,11 @@
                     "screenshotError": "حدث خطأ أثناء التقاط لقطة الشاشة",
                     "featured": "عنصر مميز",
                     "featuredHelp": "حدد هذا العنصر كمميز في العمل",
+                    "markdown": "المحتوى (Markdown، اختياري)",
+                    "markdownPlaceholder": "# العنوان\n\nوصف مفصل. يدعم Markdown بأسلوب GitHub.",
+                    "markdownHelp": "الجسم المفصل لصفحة تفاصيل العنصر. عند تركه فارغًا، يتم استخدام بُنية مُهملة مبنية من الاسم + الوصف + عنوان URL المصدر. يدعم Markdown بأسلوب GitHub.",
+                    "showPreview": "معاينة",
+                    "hidePreview": "إخفاء المعاينة",
                     "updateWithPR": "إنشاء طلب سحب",
                     "updateWithPRHelp": "إرسال التغييرات كطلب سحب بدلاً من الالتزام المباشر",
                     "cancel": "إلغاء",
@@ -1571,6 +1703,11 @@
                 },
                 "editDisplay": "تعديل العرض",
                 "editDisplayDescription": "تبديل حالة المميز وتعيين ترتيب العرض.",
+                "editContent": "تعديل المحتوى",
+                "editContentDescription": "تعديل الجسم المفصل لـ Markdown لهذا العنصر. يُكتب إلى <slug>.md في مستودع البيانات.",
+                "editContentSuccess": "تم تحديث محتوى العنصر.",
+                "editContentFailed": "فشل تحديث محتوى العنصر.",
+                "editContentError": "حدث خطأ أثناء تحديث محتوى العنصر.",
                 "orderLabel": "ترتيب العرض (اختياري)",
                 "orderHelp": "الأرقام الأقل تظهر أولاً داخل مجموعات المميز/غير المميز.",
                 "deleteDialogTitle": "حذف العنصر",
@@ -1939,7 +2076,72 @@
                 "tabs": {
                     "general": "عام",
                     "members": "الأعضاء",
+                    "budgets": "الميزانيات",
                     "navigationLabel": "علامات تبويب الإعداد"
+                },
+                "budgets": {
+                    "title": "الميزانيات والاستخدام",
+                    "description": "عيّن حدود الإنفاق الشهرية لهذا الدليل. يتم إرسال التنبيهات عند 75%، 90%، 100%؛ عند 100% يتم حظر مكالمات الإضافات الجديدة إلا إذا كان السماح بالإنفاق الزائد مسموحًا به.",
+                    "periodLabel": "{period} · أنفق {spent}",
+                    "globalCap": {
+                        "heading": "الحد الأقصى العام",
+                        "capLabel": "الحد الشهري ({currency})",
+                        "allowOverageLabel": "السماح بالإنفاق الزائد (تنبيه ولكن لا تمنع عند 100%)",
+                        "createButton": "إنشاء حد أقصى عام",
+                        "saveButton": "حفظ",
+                        "removeButton": "إزالة",
+                        "rowSpend": "أنفق {spent} من {cap} ({percent}%)",
+                        "overageSuffix": " · السماح بالإنفاق الزائد",
+                        "errorPositive": "أدخل قيمة حد إيجابية (مثال: 50.00).",
+                        "createSuccess": "نجاح إنشاء الميزانية العامة",
+                        "createError": "فشل إنشاء الميزانية العامة",
+                        "updateSuccess": "نجاح تحديث الميزانية العامة",
+                        "updateError": "فشل تحديث الميزانية العامة",
+                        "deleteSuccess": "نجاح حذف الميزانية العامة",
+                        "deleteError": "فشل حذف الميزانية العامة"
+                    },
+                    "pluginCaps": {
+                        "heading": "الحدود لكل إضافة",
+                        "subheading": "اختياري. يحد الإضافة الواحدة إلى جانب الحد الأقصى العام.",
+                        "empty": "لا توجد حدود لكل إضافة. أضف واحدًا أدناه.",
+                        "rowSpend": "أنفق {spent} من {cap} ({percent}%)",
+                        "overageSuffix": " · السماح بالإنفاق الزائد",
+                        "addHeading": "إضافة حد للإضافة",
+                        "pluginIdLabel": "الإضافة",
+                        "pluginIdPlaceholder": "مثال: openai",
+                        "pluginSelectPlaceholder": "اختر إضافة...",
+                        "noEligiblePlugins": "فعّل إضافة ذكاء اصطناعي أو بحث أو لقطة شاشة أو مستخرج محتوى لهذا الدليل لتحديد حد للإضافة.",
+                        "allPluginsCapped": "جميع الإضافات المؤهلة لديها بالفعل حد.",
+                        "noMatchingPlugins": "لا توجد إضافات تتطابق مع هذا البحث.",
+                        "capLabel": "الحد الشهري ({currency})",
+                        "allowOverageLabel": "السماح بالإنفاق الزائد",
+                        "addButton": "إضافة حد",
+                        "saveButton": "حفظ",
+                        "deleteAria": "حذف الميزانية",
+                        "errorPluginRequired": "معرّف الإضافة مطلوب.",
+                        "errorPluginDuplicate": "توجد بالفعل ميزانية لهذه الإضافة.",
+                        "errorPositive": "أدخل قيمة حد إيجابية.",
+                        "createSuccess": "نجاح إنشاء ميزانية الإضافة",
+                        "createError": "فشل إنشاء ميزانية الإضافة",
+                        "updateSuccess": "نجاح تحديث ميزانية الإضافة",
+                        "updateError": "فشل تحديث ميزانية الإضافة",
+                        "deleteSuccess": "نجاح حذف ميزانية الإضافة",
+                        "deleteError": "فشل حذف ميزانية الإضافة"
+                    },
+                    "spendByPlugin": {
+                        "heading": "الإنفاق حسب الإضافة",
+                        "subheading": "{period} — تحليل للقراءة فقط مصدره PluginUsageEvent.",
+                        "empty": "لم يتم تسجيل أي استخدام خلال هذه الفترة.",
+                        "columnPlugin": "الإضافة",
+                        "columnCapability": "القدرة",
+                        "columnUnits": "الوحدات",
+                        "columnCost": "التكلفة"
+                    },
+                    "export": {
+                        "downloadCsv": "تنزيل CSV",
+                        "downloadingCsv": "إعداد CSV...",
+                        "csvFailed": "فشل تصدير CSV"
+                    }
                 },
                 "sourceSettings": "مستودع المصدر",
                 "originalSource": "المصدر الأصلي",
@@ -2247,6 +2449,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "تحميل حالة النشر...",
+                    "openWebsite": "فتح الموقع"
+                },
                 "noProviderAlert": {
                     "title": "لا يوجد مزود نشر",
                     "description": "حدد مزود نشر لنشر موقع عملك.",
@@ -2488,6 +2694,10 @@
                 "configureNow": "تهيئة الآن",
                 "formTitle": "إنشاء عمل يدويًا",
                 "formSubtitle": "تهيئة عملك مع السيطرة الكاملة على كل إعداد",
+                "proposalBanner": {
+                    "title": "مملوء مسبقًا من اقتراح ذكاء اصطناعي.",
+                    "subtitle": "عدل أي شيء قبل الإنشاء."
+                },
                 "basicInfo": "معلومات أساسية",
                 "nameLabel": "اسم العمل *",
                 "namePlaceholder": "مثلًا، أدوات الذكاء الاصطناعي الرائعة",
@@ -2969,6 +3179,11 @@
             "disable": "إلغاء التفعيل",
             "settings": "الإعدادات",
             "saveSettings": "حفظ الإعدادات",
+            "saveAndVerify": "حفظ وتحقق",
+            "verifiesOnSaveHint": "حفظ هذه الإضافة يختبر الاتصال ويعود بمعلومات الكتلة/الحساب.",
+            "verifyClusterHeader": "متصل بالكتلة '{name}' ({version}).",
+            "verifySuccessHeader": "تم التحقق من الاتصال.",
+            "verifyNoIngressClasses": "لم يتم العثور على IngressClass في هذه الكتلة. قم بتثبيت ingress-nginx أو Traefik ثم أعد الحفظ لتحديثها.",
             "settingsTitle": "إعدادات الملحقة",
             "settingsSaved": "تم حفظ الإعدادات بنجاح",
             "noSettings": "هذه الملحقة ليس لديها إعدادات قابلة للتكوين",
@@ -3028,7 +3243,15 @@
                 "addItem": "إضافة",
                 "modify": "تعديل",
                 "cancel": "إلغاء",
-                "enterNewValue": "أدخل قيمة جديدة..."
+                "enterNewValue": "أدخل قيمة جديدة...",
+                "clusterIngressClassPlaceholder": "مثال: nginx",
+                "clusterIngressClassUseDefault": "الافتراضي للكتلة",
+                "clusterIngressClassDefault": "الافتراضي",
+                "clusterIngressClassUnknown": "متحكم غير معروف",
+                "clusterIngressClassPreVerify": "احفظ وتحقق لاكتشاف قائمة IngressClass لهذه الكتلة. اتركها فارغة للكتلة الافتراضية.",
+                "clusterIngressClassEmpty": "لم يتم اكتشاف أي متحكم دخول. قم بتثبيت ingress-nginx أو Traefik أو متحكم آخر في كتلتك، ثم أعد الحفظ لتحديث هذه القائمة.",
+                "githubPackagesOAuthConnect": "التخويل عبر GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "فشل بدء التخويل عبر GitHub. جرب مرة أخرى أو الصق PAT يدويًا."
             },
             "oauth": {
                 "title": "ربط الحساب",
@@ -3081,6 +3304,7 @@
             "subtitle": "استعرض القوالب الجاهزة للموقع، gérer كتالوجك المخصص، وتحكم في أي قالب سيبدأ به الأعمال الجديدة.",
             "actions": {
                 "addTemplate": "إضافة قالب مخصص",
+                "customizeTemplate": "إنشاء بالذكاء الاصطناعي",
                 "refreshTemplates": "تحديث القوالب"
             },
             "hero": {
@@ -3117,6 +3341,8 @@
                 "fork": "شُتّت",
                 "edit": "تعديل",
                 "archive": "أرشفة",
+                "customizeAgain": "تخصيص مرة أخرى",
+                "viewStatus": "عرض حالة التخصيص",
                 "catalogOnly": "عنصر الكتالوج فقط",
                 "openRepository": "فتح المستودع",
                 "previewAlt": "{name} معاينة",
@@ -3124,7 +3350,15 @@
                 "branch": "الفرع: {branch}",
                 "syncBranches": "{count} فروع مزامنة",
                 "betaBranch": "Beta: {branch}",
-                "noDescription": "لا يوجد وصف بعد."
+                "noDescription": "لا يوجد وصف بعد.",
+                "status": {
+                    "pending": "في قائمة الانتظار",
+                    "forking": "التفرع",
+                    "customizing": "التخصيص",
+                    "pushing": "الإرسال",
+                    "succeeded": "تم التخصيص",
+                    "failed": "فشل آخر تشغيل"
+                }
             },
             "dialog": {
                 "title": "إضافة قالب مخصص",
@@ -3198,7 +3432,70 @@
                 "refreshSuccess": "تم تحديث كتالوج القوالب。",
                 "refreshFailed": "فشل تحديث القوالب。",
                 "defaultUpdated": "تم تحديث القالب الافتراضي。",
-                "defaultFailed": "فشل تحديث القالب الافتراضي。"
+                "defaultFailed": "فشل تحديث القالب الافتراضي。",
+                "customizeFailed": "فشل بدء تخصيص القالب.",
+                "customizationSucceeded": "اكتمل تخصيص القالب.",
+                "customizationFailed": "فشل تخصيص القالب."
+            },
+            "customizeDialog": {
+                "title": "إنشاء قالب مخصص بالذكاء الاصطناعي",
+                "titleIterate": "تخصيص {name} مرة أخرى",
+                "titleStatus": "حالة التخصيص — {name}",
+                "description": "نكرن قالب أساسي إلى مستودع جديد في حسابك على GitHub، ثم نركض الوكيل الذكي المختار ضده لتنفيذ تغييرات واجهة المستخدم فقط. وظيفية القالب تظل كما هي.",
+                "descriptionIterate": "تشغيل جولة أخرى من تعديلات الوكيل في نفس المستودع. يتم إدخال التزام (commit) جديد في كل مرة.",
+                "descriptionStatus": "حالة مباشرة لأحدث تشغيل تخصيص لهذا القالب.",
+                "templateLabel": "القالب",
+                "templateIterateHelp": "إعادة التشغيل على مستودع هذا القالب المخصص الموجود.",
+                "nameLabel": "اسم القالب",
+                "namePlaceholder": "مثال: السمة البنفسجية الداكنة",
+                "nameHelp": "يظهر في فهرسك ويستخدم لتسمية المستودع الجديد على GitHub.",
+                "baseLabel": "القالب الأساسي",
+                "baseHelp": "تم سرد القواعد المميزة بأنها قابلة للتخصيص بالذكاء الاصطناعي فقط.",
+                "providerLabel": "وكيل تعديل الكود",
+                "providerHelp": "اختر واحدًا من إضافات تعديل الكود المثبتة. الافتراضي محدد مسبقًا.",
+                "aiProviderLabel": "مزود الذكاء الاصطناعي",
+                "aiProviderHelp": "{plugin} يعامل مقابل نموذج لغوي كبير خارجي — اختر أي واحد تستخدمه.",
+                "targetLabel": "وجهة GitHub",
+                "targetHelp": "أين يتم إنشاء المستودع الجديد. حساب شخصي أو منظمة تنتمي إليها.",
+                "personalTarget": "حساب شخصي ({login})",
+                "organizationTarget": "منظمة ({login})",
+                "promptLabel": "صف واجهة المستخدم التي تريدها",
+                "promptPlaceholder": "مثال: التبديل إلى سمة داكنة مع لمسات بنفسجية خفيفة، زوايا دائرية، وعنوان محرف حديث أكثر.",
+                "promptIteratePlaceholder": "مثال: زيادة تباين الشريط الجانبي والتبديل إلى خط عنوان Inter.",
+                "promptHelp": "كن محددًا حول التصميم. الميزات الجديدة خارج نطاق التركيز — واجهة المستخدم فقط.",
+                "submit": "إنشاء قالب مخصص",
+                "submitIterate": "تشغيل التخصيص",
+                "retry": "إعادة المحاولة",
+                "cancel": "إلغاء",
+                "done": "تم",
+                "successHelp": "قالبك المخصص جاهز الآن. يظهر الآن في فهرسك.",
+                "status": {
+                    "pending": "في قائمة الانتظار...",
+                    "forking": "تجهيز المستودع الجديد...",
+                    "customizing": "الوكيل يطبق تغييراتك...",
+                    "pushing": "إرسال التغييرات...",
+                    "succeeded": "اكتمل التخصيص بنجاح.",
+                    "failed": "فشل التخصيص."
+                },
+                "toast": {
+                    "started": "بدأ التخصيص — عادة ما يستغرق بضع دقائق.",
+                    "success": "تم تخصيص القالب بنجاح.",
+                    "failed": "فشل تخصيص القالب.",
+                    "startFailed": "لم يتمكن من بدء التخصيص."
+                },
+                "messages": {
+                    "nameRequired": "اسم القالب مطلوب.",
+                    "baseRequired": "اختر قالبًا أساسيًا.",
+                    "providerRequired": "اختر وكيل تعديل كود.",
+                    "aiProviderRequired": "اختر مزود ذكاء اصطناعي للوكيل المحدد.",
+                    "promptTooShort": "صف التغييرات في كلمات على الأقل.",
+                    "noCustomizableBases": "لا توجد قوالب أساسية قابلة للتخصيص متاحة.",
+                    "noProviders": "لا توجد إضافات وكيل تعديل كود مثبتة أو مفعلة. قم بتثبيت واحدة من فهرس الإضافات (مثل claude-code، codex، gemini، opencode).",
+                    "noAiProviders": "يتطلب {plugin} مزود ذكاء اصطناعي، لكن لا توجد مثبتة أو مفعلة. قم بتثبيت واحد (مثل openai، anthropic، google) من فهرس الإضافات.",
+                    "noTargets": "اتصل بحساب GitHub لاختيار وجهة.",
+                    "browsePlugins": "استعرض فهرس الإضافات",
+                    "noRuns": "لا توجد عمليات تخصيص بعد لهذا القالب."
+                }
             }
         },
         "templateSelector": {
@@ -3343,6 +3640,7 @@
             "dashboard": "لوحة التحكم",
             "activity": "سجل النشاط",
             "works": "الأعمال",
+            "discover": "اكتشف",
             "newWork": "عمل جديد",
             "work": "العمل",
             "overview": "نظرة عامة",

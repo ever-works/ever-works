@@ -15,6 +15,7 @@ import type { AiFacadeService } from '../../facades/ai.facade';
 type FakePlugin = {
     id: string;
     defaultForCapabilities?: string[];
+    capabilities?: string[];
 };
 
 function makeRegistered(p: FakePlugin): RegisteredPlugin {
@@ -22,14 +23,19 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
         plugin: { id: p.id } as RegisteredPlugin['plugin'],
         manifest: {
             defaultForCapabilities: p.defaultForCapabilities,
+            capabilities: p.capabilities ?? ['ai-provider', 'search'],
         } as unknown as RegisteredPlugin['manifest'],
         state: 'loaded',
     } as RegisteredPlugin;
 }
 
-function makeRegistry(plugins: FakePlugin[]): PluginRegistryService {
+function makeRegistry(
+    plugins: FakePlugin[],
+    readyPlugins: FakePlugin[] = plugins,
+): PluginRegistryService {
     return {
         getEnabledPluginsScoped: jest.fn().mockResolvedValue(plugins.map(makeRegistered)),
+        getReady: jest.fn().mockReturnValue(readyPlugins.map(makeRegistered)),
     } as unknown as PluginRegistryService;
 }
 
@@ -215,6 +221,91 @@ describe('resolveAiProviderForResearch', () => {
 
         expect(result?.providerId).toBe('anthropic');
         expect(getProviderConfig).toHaveBeenCalledTimes(2);
+    });
+
+    it('falls back to globally ready providers when user-scoped providers are not configured', async () => {
+        const registry = makeRegistry(
+            [{ id: 'user-openai' }],
+            [{ id: 'user-openai' }, { id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
+        );
+        const getProviderConfig = jest
+            .fn()
+            .mockResolvedValueOnce({
+                providerId: 'user-openai',
+                baseUrl: 'https://api.openai.com/v1',
+                apiKey: '',
+                defaultModel: 'gpt-4o',
+                routing: {},
+            })
+            .mockResolvedValueOnce({
+                providerId: 'openrouter',
+                providerName: 'OpenRouter',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                apiKey: 'sk-or-test',
+                defaultModel: 'openai/gpt-5-mini',
+                routing: {},
+            });
+
+        const result = await resolveAiProviderForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result).toMatchObject({
+            providerId: 'openrouter',
+            providerName: 'OpenRouter',
+            modelName: 'openai/gpt-5-mini',
+        });
+        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
+            userId: 'u',
+            providerOverride: 'user-openai',
+        });
+        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
+            userId: undefined,
+            providerOverride: 'openrouter',
+        });
+    });
+
+    it('retries the same provider globally when user settings shadow an env/admin config', async () => {
+        const registry = makeRegistry(
+            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
+            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
+        );
+        const getProviderConfig = jest
+            .fn()
+            .mockResolvedValueOnce({
+                providerId: 'openrouter',
+                providerName: 'OpenRouter',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                apiKey: '',
+                defaultModel: 'openai/gpt-5-mini',
+                routing: {},
+            })
+            .mockResolvedValueOnce({
+                providerId: 'openrouter',
+                providerName: 'OpenRouter',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                apiKey: 'sk-or-env',
+                defaultModel: 'openai/gpt-5-mini',
+                routing: {},
+            });
+
+        const result = await resolveAiProviderForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result?.providerId).toBe('openrouter');
+        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
+            userId: 'u',
+            providerOverride: 'openrouter',
+        });
+        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
+            userId: undefined,
+            providerOverride: 'openrouter',
+        });
     });
 
     it('re-throws auth errors instead of silently masking with the next provider', async () => {

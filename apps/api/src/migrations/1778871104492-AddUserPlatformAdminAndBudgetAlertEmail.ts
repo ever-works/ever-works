@@ -13,28 +13,33 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  */
 export class AddUserPlatformAdminAndBudgetAlertEmail1778871104492 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumn(
-            'users',
+        const columns = [
             new TableColumn({
                 name: 'isPlatformAdmin',
                 type: 'boolean',
                 default: false,
                 isNullable: false,
             }),
-        );
-        await queryRunner.addColumn(
-            'users',
             new TableColumn({
                 name: 'emailBudgetAlerts',
                 type: 'boolean',
                 default: true,
                 isNullable: false,
             }),
-        );
+        ];
+
+        for (const column of columns) {
+            if (!(await queryRunner.hasColumn('users', column.name))) {
+                await queryRunner.addColumn('users', column);
+            }
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.dropColumn('users', 'emailBudgetAlerts');
-        await queryRunner.dropColumn('users', 'isPlatformAdmin');
+        for (const columnName of ['emailBudgetAlerts', 'isPlatformAdmin']) {
+            if (await queryRunner.hasColumn('users', columnName)) {
+                await queryRunner.dropColumn('users', columnName);
+            }
+        }
     }
 }

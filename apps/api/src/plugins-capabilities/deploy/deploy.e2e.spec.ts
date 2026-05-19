@@ -154,7 +154,10 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
         const platformSyncSecretService = {
             getOrGenerate: jest.fn().mockResolvedValue('platform-sync-secret'),
         };
-        // 9th DI arg added on develop post-EW-616 — Ever Works DNS service.
+        const webhookSecretService = {
+            getOrGenerate: jest.fn().mockResolvedValue('webhook-secret-persisted'),
+        };
+        // 10th DI arg added on develop post-EW-616 — Ever Works DNS service.
         // No deploy path under test reaches it, so a typeless stub is fine.
         const dnsService = {};
         // 10th DI arg — zero-friction funnel telemetry. Stub emit() so
@@ -176,6 +179,7 @@ describe('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + real 
             websiteTemplateResolver as any,
             eventEmitter,
             platformSyncSecretService as any,
+            webhookSecretService as any,
             dnsService as any,
             funnel as any,
         );

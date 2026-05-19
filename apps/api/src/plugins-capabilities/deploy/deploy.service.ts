@@ -19,7 +19,11 @@ import {
     DeploymentEnvironment,
     DeploymentTriggerSource,
 } from '@ever-works/agent/entities';
-import { PlatformSyncSecretService, ZeroFrictionFunnelService } from '@ever-works/agent/services';
+import {
+    PlatformSyncSecretService,
+    WebhookSecretService,
+    ZeroFrictionFunnelService,
+} from '@ever-works/agent/services';
 import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
@@ -107,6 +111,7 @@ export class DeployService {
         private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
+        private readonly webhookSecretService: WebhookSecretService,
         private readonly dnsService: EverWorksDnsService,
         private readonly funnel: ZeroFrictionFunnelService,
     ) {}
@@ -198,6 +203,7 @@ export class DeployService {
         await this.setKubernetesGhcrPullSecret(ctx, work, userId);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
+        await this.ensureWebhookSecret(ctx, work);
 
         const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = env.branch ?? template.branch;
@@ -516,6 +522,36 @@ export class DeployService {
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
 
+        // SITE_URL — used by the deployed site for canonical URLs, sitemap.xml,
+        // RSS/Atom self-references, and OpenGraph. Falls back to placeholders
+        // when not set, which is fine for builds but bad for SEO on a live site.
+        //
+        // Pushed as a **GitHub Actions variable** (not a secret) — it is a
+        // public URL with no security sensitivity, and storing it as a variable
+        // makes it visible in the repo's Settings → Actions UI and easily
+        // overridable from the dashboard without a redeploy. Mirrors
+        // DEPLOY_PROVIDER's posture.
+        //
+        // When `applyEverWorksSubdomain` resolved an `ingressHost` (i.e.
+        // `deployProvider === 'ever-works'` with Cloudflare DNS configured),
+        // SITE_URL is derived from it as `https://${ingressHost}`. For all
+        // other providers we leave SITE_URL unset and rely on the template's
+        // own fallback (the user can override in the Vercel project's env
+        // dashboard, or set SITE_URL in the repo's Variables after the
+        // fact).
+        const ingressHost = settings?.ingressHost;
+        if (typeof ingressHost === 'string' && ingressHost.trim().length > 0) {
+            try {
+                await this.setVariable(ctx, 'SITE_URL', `https://${ingressHost.trim()}`);
+            } catch (error: any) {
+                this.logger.error(
+                    `Failed to push SITE_URL variable for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
         // EW-120 dual-mode Activity Feed sync — push the secrets for the
         // active transport only. Disabled mode pushes nothing.
         //
@@ -767,6 +803,39 @@ export class DeployService {
         // Always set a cron secret for new deployments
         const cronSecret = this.generateSecureToken();
         await this.setSecret(ctx, 'CRON_SECRET', cronSecret);
+    }
+
+    /**
+     * Provision the per-Work `WEBHOOK_SECRET` so the deployed site's
+     * content-sync webhook endpoint can verify incoming GitHub push
+     * notifications. The minimal template's `@ever-works/astro-integration`
+     * reads this from `process.env.WEBHOOK_SECRET` at build time and
+     * registers a verifying `/api/webhook` endpoint iff defined; classic
+     * template ignores it. Pushed on every deploy (harmless on templates
+     * that don't consume it, required on templates that do).
+     *
+     * **Persistence**: the secret value is read from (and lazily provisioned
+     * onto) `Work.webhookSecretEncrypted` via `WebhookSecretService` so the
+     * same plaintext is pushed across every deploy of the same Work. Rotating
+     * on every deploy would silently invalidate the GitHub-side webhook
+     * registration — every payload would fail X-Hub-Signature-256 verification
+     * until the workflow re-registered the webhook. The persistence pattern
+     * mirrors `PlatformSyncSecretService` for the EW-120 pull-mode HMAC.
+     *
+     * Failure is logged but not thrown — webhook verification degrades to
+     * "polling-only" rather than blocking the deploy.
+     */
+    private async ensureWebhookSecret(ctx: RepoContext, work: Work) {
+        try {
+            const webhookSecret = await this.webhookSecretService.getOrGenerate(work.id);
+            await this.setSecret(ctx, 'WEBHOOK_SECRET', webhookSecret);
+        } catch (error: any) {
+            this.logger.warn(
+                `Failed to push WEBHOOK_SECRET for ${ctx.owner}/${ctx.repo}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     private generateSecureToken(): string {

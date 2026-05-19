@@ -107,6 +107,7 @@ export async function createWorkViaAPI(
             name: payload.name,
             slug,
             description: payload.description || `e2e ${payload.name}`,
+            organization: false,
         },
     });
     if (!res.ok()) {

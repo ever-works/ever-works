@@ -34,45 +34,68 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
 export class HashAuthSessionTokensH01_1779300000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         // 1. Drop NOT NULL on the legacy plaintext column.
-        await queryRunner.query(`
-            ALTER TABLE "session"
-            ALTER COLUMN "token" DROP NOT NULL
-        `);
+        const sessionTable = await queryRunner.getTable('session');
+        const tokenColumn = sessionTable?.findColumnByName('token');
+        if (tokenColumn && !tokenColumn.isNullable) {
+            const nullableTokenColumn = tokenColumn.clone();
+            nullableTokenColumn.isNullable = true;
+            await queryRunner.changeColumn('session', tokenColumn, nullableTokenColumn);
+        }
 
         // 2. Add `tokenHash` (nullable, unique).
-        await queryRunner.addColumn(
-            'session',
-            new TableColumn({
-                name: 'tokenHash',
-                type: 'varchar',
-                isNullable: true,
-            }),
+        if (!(await queryRunner.hasColumn('session', 'tokenHash'))) {
+            await queryRunner.addColumn(
+                'session',
+                new TableColumn({
+                    name: 'tokenHash',
+                    type: 'varchar',
+                    isNullable: true,
+                }),
+            );
+        }
+
+        const tableWithTokenHash = await queryRunner.getTable('session');
+        const hasTokenHashIndex = tableWithTokenHash?.indices.some(
+            (index) => index.name === 'IDX_session_tokenHash',
         );
 
-        await queryRunner.createIndex(
-            'session',
-            new TableIndex({
-                name: 'IDX_session_tokenHash',
-                columnNames: ['tokenHash'],
-                isUnique: true,
-            }),
-        );
+        if (!hasTokenHashIndex) {
+            await queryRunner.createIndex(
+                'session',
+                new TableIndex({
+                    name: 'IDX_session_tokenHash',
+                    columnNames: ['tokenHash'],
+                    isUnique: true,
+                }),
+            );
+        }
 
         // 3. Invalidate every in-flight bearer. The application code stops
         //    looking up by `token` after this deploy; any value left here
         //    is dead weight that we deliberately scrub.
-        await queryRunner.query(`
-            UPDATE "session"
-               SET "token" = NULL
-             WHERE "token" IS NOT NULL
-        `);
+        await queryRunner.manager
+            .createQueryBuilder()
+            .update('session')
+            .set({ token: null })
+            .where('token IS NOT NULL')
+            .execute();
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         // Irreversible by design: the plaintext bearers are gone. We still
         // unwind the schema so a rollback isn't completely stuck.
-        await queryRunner.dropIndex('session', 'IDX_session_tokenHash');
-        await queryRunner.dropColumn('session', 'tokenHash');
+        const table = await queryRunner.getTable('session');
+        const hasTokenHashIndex = table?.indices.some(
+            (index) => index.name === 'IDX_session_tokenHash',
+        );
+
+        if (hasTokenHashIndex) {
+            await queryRunner.dropIndex('session', 'IDX_session_tokenHash');
+        }
+
+        if (await queryRunner.hasColumn('session', 'tokenHash')) {
+            await queryRunner.dropColumn('session', 'tokenHash');
+        }
         // We do NOT re-add NOT NULL to `token` — the column may legitimately
         // contain NULL rows now and a reverse migration shouldn't fail on
         // them.

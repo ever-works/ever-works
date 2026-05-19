@@ -178,6 +178,7 @@ describe('WorkGenerationService', () => {
         };
         userRepository = {
             findById: jest.fn(),
+            findByIdForScheduledRun: jest.fn(),
         };
         screenshotFacade = {
             isAvailable: jest.fn().mockReturnValue(true),
@@ -1280,7 +1281,7 @@ describe('WorkGenerationService', () => {
     //  runScheduledUpdate
     // ════════════════════════════════════════════════════════════════════
     describe('runScheduledUpdate', () => {
-        it('uses schedule.user verbatim when present — does NOT call userRepository.findById', async () => {
+        it('uses schedule.user verbatim when present — does NOT call userRepository.findByIdForScheduledRun', async () => {
             // Avoids an N+1 lookup on the cron path: callers preload the
             // user via JOIN and we MUST trust it.
             const user = buildUser({ id: 'u-1' });
@@ -1311,14 +1312,14 @@ describe('WorkGenerationService', () => {
             const service = buildService({ withDispatcher: true });
             await service.runScheduledUpdate(schedule);
 
-            expect(userRepository.findById).not.toHaveBeenCalled();
+            expect(userRepository.findByIdForScheduledRun).not.toHaveBeenCalled();
             expect(workScheduleService.validateRunEntitlement).toHaveBeenCalledWith(schedule, user);
         });
 
-        it('falls back to userRepository.findById when schedule.user is unset', async () => {
+        it('falls back to userRepository.findByIdForScheduledRun when schedule.user is unset', async () => {
             const work = buildWork();
             const fetchedUser = buildUser({ id: 'u-1' });
-            userRepository.findById.mockResolvedValue(fetchedUser);
+            userRepository.findByIdForScheduledRun.mockResolvedValue(fetchedUser);
             ownershipService.ensureCanEdit.mockResolvedValue({ work } as any);
 
             dataGenerator.getConfig.mockResolvedValue({
@@ -1341,11 +1342,11 @@ describe('WorkGenerationService', () => {
             });
             await service.runScheduledUpdate(schedule);
 
-            expect(userRepository.findById).toHaveBeenCalledWith('u-1');
+            expect(userRepository.findByIdForScheduledRun).toHaveBeenCalledWith('u-1');
         });
 
-        it('throws NotFoundException when schedule.user is unset AND userRepository.findById returns null', async () => {
-            userRepository.findById.mockResolvedValue(null);
+        it('throws NotFoundException when schedule.user is unset AND userRepository.findByIdForScheduledRun returns null', async () => {
+            userRepository.findByIdForScheduledRun.mockResolvedValue(null);
             const schedule = buildSchedule({ user: undefined, userId: 'u-missing' });
 
             const service = buildService();
@@ -1550,7 +1551,7 @@ describe('WorkGenerationService', () => {
             // GENERATING when a step before any inner finalization
             // throws (e.g. our own NotFoundException above).
             const schedule = buildSchedule({ user: undefined, userId: 'u-missing' });
-            userRepository.findById.mockResolvedValue(null);
+            userRepository.findByIdForScheduledRun.mockResolvedValue(null);
 
             const service = buildService();
             await expect(service.runScheduledUpdate(schedule)).rejects.toThrow(

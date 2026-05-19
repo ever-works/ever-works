@@ -90,20 +90,35 @@ describe('config/constants', () => {
     });
 
     describe('config.auth.secret', () => {
+        const STRONG_SECRET = 'a'.repeat(32);
+
         it('throws when AUTH_SECRET is missing', () => {
             expect(() => config.auth.secret()).toThrow(
                 'AUTH_SECRET environment variable is required',
             );
         });
 
-        it('returns the AUTH_SECRET value when set', () => {
-            process.env.AUTH_SECRET = 's3cret';
-            expect(config.auth.secret()).toBe('s3cret');
+        it('returns the AUTH_SECRET value when set with sufficient length', () => {
+            process.env.AUTH_SECRET = STRONG_SECRET;
+            expect(config.auth.secret()).toBe(STRONG_SECRET);
         });
 
         it('throws on empty string (falsy)', () => {
             process.env.AUTH_SECRET = '';
             expect(() => config.auth.secret()).toThrow();
+        });
+
+        // H-14: keep the API in lockstep with apps/web/src/lib/auth/crypto.ts —
+        // a sub-32-char secret silently breaks every OAuth callback when the
+        // web tier tries to seal cookies (see 2026-05-18 incident).
+        it('throws when AUTH_SECRET is shorter than 32 characters', () => {
+            process.env.AUTH_SECRET = 'a'.repeat(31);
+            expect(() => config.auth.secret()).toThrow(/at least 32 characters/);
+        });
+
+        it('accepts exactly 32 characters', () => {
+            process.env.AUTH_SECRET = STRONG_SECRET;
+            expect(config.auth.secret()).toBe(STRONG_SECRET);
         });
     });
 
