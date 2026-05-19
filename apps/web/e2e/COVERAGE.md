@@ -57,15 +57,15 @@
 
 ### Public / auth
 
-| Route                              | Status | Spec(s)                                |
-| ---------------------------------- | ------ | -------------------------------------- |
-| `/[locale]/(auth)/login`           | [x]    | auth.spec.ts, accessibility.spec.ts    |
-| `/[locale]/(auth)/register`        | [x]    | auth.spec.ts, forms-validation.spec.ts |
-| `/[locale]/(auth)/forgot-password` | [x]    | password-reset.spec.ts                 |
-| `/[locale]/(auth)/reset-password`  | [x]    | password-reset.spec.ts                 |
-| `/[locale]/(auth)/auth/error`      | [x]    | error-pages.spec.ts                    |
-| `/[locale]/claim/[token]`          | [~]    | zero-friction-flow.spec.ts             |
-| `/[locale]/[...rest]` (404)        | [x]    | error-pages.spec.ts                    |
+| Route                              | Status | Spec(s)                                        |
+| ---------------------------------- | ------ | ---------------------------------------------- |
+| `/[locale]/(auth)/login`           | [x]    | auth.spec.ts, accessibility.spec.ts            |
+| `/[locale]/(auth)/register`        | [x]    | auth.spec.ts, forms-validation.spec.ts         |
+| `/[locale]/(auth)/forgot-password` | [x]    | password-reset.spec.ts                         |
+| `/[locale]/(auth)/reset-password`  | [x]    | password-reset.spec.ts                         |
+| `/[locale]/(auth)/auth/error`      | [x]    | error-pages.spec.ts                            |
+| `/[locale]/claim/[token]`          | [x]    | claim-flow.spec.ts, zero-friction-flow.spec.ts |
+| `/[locale]/[...rest]` (404)        | [x]    | error-pages.spec.ts                            |
 
 ### Dashboard
 
@@ -76,7 +76,7 @@
 | `/[locale]/(dashboard)/discover`                    | [x]    | dashboard-comprehensive.spec.ts                    |
 | `/[locale]/(dashboard)/admin/usage`                 | [x]    | budgets.spec.ts                                    |
 | `/[locale]/(dashboard)/plugins`                     | [x]    | plugins.spec.ts                                    |
-| `/[locale]/(dashboard)/plugins/[pluginId]`          | [~]    | plugins.spec.ts                                    |
+| `/[locale]/(dashboard)/plugins/[pluginId]`          | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts          |
 | `/[locale]/(dashboard)/profile`                     | [x]    | profile.spec.ts                                    |
 | `/[locale]/(dashboard)/templates`                   | [x]    | website-templates.spec.ts                          |
 | `/[locale]/(dashboard)/settings`                    | [x]    | settings.spec.ts                                   |
@@ -85,68 +85,68 @@
 | `/[locale]/(dashboard)/settings/data`               | [x]    | account-data.spec.ts                               |
 | `/[locale]/(dashboard)/settings/danger`             | [x]    | account-data.spec.ts                               |
 | `/[locale]/(dashboard)/settings/github-app`         | [x]    | github-app.spec.ts                                 |
-| `/[locale]/(dashboard)/settings/plugins/[category]` | [~]    | plugins.spec.ts, settings-extra.spec.ts            |
+| `/[locale]/(dashboard)/settings/plugins/[category]` | [x]    | plugin-detail-ui.spec.ts, settings-extra.spec.ts   |
 
 ### Works
 
-| Route                                                           | Status | Spec(s)                                          |
-| --------------------------------------------------------------- | ------ | ------------------------------------------------ |
-| `/[locale]/(dashboard)/works`                                   | [x]    | works.spec.ts, works-detail.spec.ts              |
-| `/[locale]/(dashboard)/works/new`                               | [x]    | works-detail.spec.ts, zero-friction-flow.spec.ts |
-| `/[locale]/(dashboard)/works/[id]`                              | [x]    | works-detail.spec.ts                             |
-| `/[locale]/(dashboard)/works/[id]/activity`                     | [~]    | activity-log.spec.ts                             |
-| `/[locale]/(dashboard)/works/[id]/deploy`                       | [x]    | screenshot-and-deploy.spec.ts                    |
-| `/[locale]/(dashboard)/works/[id]/generator`                    | [~]    | works-detail.spec.ts                             |
-| `/[locale]/(dashboard)/works/[id]/generator/comparisons`        | [x]    | work-generator.spec.ts                           |
-| `/[locale]/(dashboard)/works/[id]/generator/comparisons/[slug]` | [x]    | work-generator.spec.ts                           |
-| `/[locale]/(dashboard)/works/[id]/generator/history`            | [x]    | work-generator.spec.ts                           |
-| `/[locale]/(dashboard)/works/[id]/generator/schedule`           | [x]    | work-generator.spec.ts                           |
-| `/[locale]/(dashboard)/works/[id]/items`                        | [x]    | items-import-export.spec.ts                      |
-| `/[locale]/(dashboard)/works/[id]/members`                      | [x]    | work-members.spec.ts                             |
-| `/[locale]/(dashboard)/works/[id]/plugins`                      | [~]    | plugins.spec.ts                                  |
-| `/[locale]/(dashboard)/works/[id]/settings`                     | [x]    | settings-extra.spec.ts                           |
-| `/[locale]/(dashboard)/works/[id]/settings/budgets-usage`       | [x]    | budgets.spec.ts                                  |
-| `/[locale]/(dashboard)/works/[id]/settings/members`             | [x]    | work-members.spec.ts                             |
+| Route                                                           | Status | Spec(s)                                             |
+| --------------------------------------------------------------- | ------ | --------------------------------------------------- |
+| `/[locale]/(dashboard)/works`                                   | [x]    | works.spec.ts, works-detail.spec.ts                 |
+| `/[locale]/(dashboard)/works/new`                               | [x]    | works-detail.spec.ts, zero-friction-flow.spec.ts    |
+| `/[locale]/(dashboard)/works/[id]`                              | [x]    | works-detail.spec.ts                                |
+| `/[locale]/(dashboard)/works/[id]/activity`                     | [x]    | activity-feed-perwork.spec.ts, activity-log.spec.ts |
+| `/[locale]/(dashboard)/works/[id]/deploy`                       | [x]    | screenshot-and-deploy.spec.ts                       |
+| `/[locale]/(dashboard)/works/[id]/generator`                    | [x]    | work-generator.spec.ts, works-detail.spec.ts        |
+| `/[locale]/(dashboard)/works/[id]/generator/comparisons`        | [x]    | work-generator.spec.ts                              |
+| `/[locale]/(dashboard)/works/[id]/generator/comparisons/[slug]` | [x]    | work-generator.spec.ts                              |
+| `/[locale]/(dashboard)/works/[id]/generator/history`            | [x]    | work-generator.spec.ts                              |
+| `/[locale]/(dashboard)/works/[id]/generator/schedule`           | [x]    | work-generator.spec.ts                              |
+| `/[locale]/(dashboard)/works/[id]/items`                        | [x]    | items-import-export.spec.ts                         |
+| `/[locale]/(dashboard)/works/[id]/members`                      | [x]    | work-members.spec.ts                                |
+| `/[locale]/(dashboard)/works/[id]/plugins`                      | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts           |
+| `/[locale]/(dashboard)/works/[id]/settings`                     | [x]    | settings-extra.spec.ts                              |
+| `/[locale]/(dashboard)/works/[id]/settings/budgets-usage`       | [x]    | budgets.spec.ts                                     |
+| `/[locale]/(dashboard)/works/[id]/settings/members`             | [x]    | work-members.spec.ts                                |
 
 ### Web API routes (Next.js)
 
-| Route                                                    | Status | Spec(s)                                    |
-| -------------------------------------------------------- | ------ | ------------------------------------------ |
-| `/api/health`                                            | [x]    | health-meta.spec.ts                        |
-| `/api/auth/authorize`                                    | [~]    | oauth-state.spec.ts                        |
-| `/api/auth/provider/callback/[providerId]`               | [x]    | oauth-state.spec.ts                        |
-| `/api/auth/reset-password`                               | [x]    | password-reset.spec.ts                     |
-| `/api/auth/verify-email`                                 | [~]    | auth.spec.ts                               |
-| `/api/chat`                                              | [x]    | chat-api.spec.ts                           |
-| `/api/github-app/callback`                               | [x]    | github-app.spec.ts                         |
-| `/api/github-app/setup`                                  | [x]    | github-app.spec.ts                         |
-| `/api/oauth/[providerId]/callback`                       | [x]    | oauth-state.spec.ts                        |
-| `/api/oauth/[providerId]/callback/plugins`               | [~]    | plugins.spec.ts                            |
-| `/api/oauth/[providerId]/callback/plugins/read-packages` | [ ]    | _gap — plugins-readpackages.spec.ts (new)_ |
-| `/api/works/[id]/comparisons/generation-status`          | [x]    | work-generator.spec.ts                     |
-| `/api/works/[id]/deploy/status`                          | [x]    | screenshot-and-deploy.spec.ts              |
-| `/api/works/[id]/export-items`                           | [x]    | items-import-export.spec.ts                |
-| `/api/works/[id]/import-items`                           | [x]    | items-import-export.spec.ts                |
-| `/api/works/[id]/usage/export`                           | [x]    | budgets.spec.ts                            |
-| `/api/activity-log/[id]`                                 | [~]    | activity-log.spec.ts                       |
-| `/api/activity-log/export`                               | [ ]    | _gap — activity-log-export.spec.ts (new)_  |
+| Route                                                    | Status | Spec(s)                                           |
+| -------------------------------------------------------- | ------ | ------------------------------------------------- |
+| `/api/health`                                            | [x]    | health-meta.spec.ts                               |
+| `/api/auth/authorize`                                    | [x]    | oauth-authorize-flow.spec.ts, oauth-state.spec.ts |
+| `/api/auth/provider/callback/[providerId]`               | [x]    | oauth-state.spec.ts                               |
+| `/api/auth/reset-password`                               | [x]    | password-reset.spec.ts                            |
+| `/api/auth/verify-email`                                 | [x]    | auth-providers-list.spec.ts, auth.spec.ts         |
+| `/api/chat`                                              | [x]    | chat-api.spec.ts                                  |
+| `/api/github-app/callback`                               | [x]    | github-app.spec.ts                                |
+| `/api/github-app/setup`                                  | [x]    | github-app.spec.ts                                |
+| `/api/oauth/[providerId]/callback`                       | [x]    | oauth-state.spec.ts                               |
+| `/api/oauth/[providerId]/callback/plugins`               | [x]    | plugins-readpackages.spec.ts, plugins.spec.ts     |
+| `/api/oauth/[providerId]/callback/plugins/read-packages` | [x]    | plugins-readpackages.spec.ts                      |
+| `/api/works/[id]/comparisons/generation-status`          | [x]    | work-generator.spec.ts                            |
+| `/api/works/[id]/deploy/status`                          | [x]    | screenshot-and-deploy.spec.ts                     |
+| `/api/works/[id]/export-items`                           | [x]    | items-import-export.spec.ts                       |
+| `/api/works/[id]/import-items`                           | [x]    | items-import-export.spec.ts                       |
+| `/api/works/[id]/usage/export`                           | [x]    | budgets.spec.ts                                   |
+| `/api/activity-log/[id]`                                 | [x]    | activity-log-export.spec.ts, activity-log.spec.ts |
+| `/api/activity-log/export`                               | [x]    | activity-log-export.spec.ts                       |
 
 ---
 
 ## Cross-cutting concerns
 
-| Concern                               | Status | Spec(s)                                 |
-| ------------------------------------- | ------ | --------------------------------------- |
-| i18n routing (locale handling)        | [x]    | i18n-locales.spec.ts                    |
-| Navigation & breadcrumbs              | [x]    | navigation.spec.ts                      |
-| SEO meta tags                         | [x]    | seo-meta.spec.ts                        |
-| Accessibility                         | [x]    | accessibility.spec.ts                   |
-| CORS / preflight                      | [x]    | health-meta.spec.ts                     |
-| Form validation client-side           | [x]    | forms-validation.spec.ts                |
-| OAuth state CSRF                      | [x]    | oauth-state.spec.ts                     |
-| Public API unauth contract            | [x]    | api-public-contract.spec.ts             |
-| Concurrent multi-user (collaboration) | [ ]    | _gap — multi-user-collab.spec.ts (new)_ |
-| Rate limiting / throttler             | [x]    | rate-limit.spec.ts                      |
+| Concern                               | Status | Spec(s)                     |
+| ------------------------------------- | ------ | --------------------------- |
+| i18n routing (locale handling)        | [x]    | i18n-locales.spec.ts        |
+| Navigation & breadcrumbs              | [x]    | navigation.spec.ts          |
+| SEO meta tags                         | [x]    | seo-meta.spec.ts            |
+| Accessibility                         | [x]    | accessibility.spec.ts       |
+| CORS / preflight                      | [x]    | health-meta.spec.ts         |
+| Form validation client-side           | [x]    | forms-validation.spec.ts    |
+| OAuth state CSRF                      | [x]    | oauth-state.spec.ts         |
+| Public API unauth contract            | [x]    | api-public-contract.spec.ts |
+| Concurrent multi-user (collaboration) | [x]    | multi-user-collab.spec.ts   |
+| Rate limiting / throttler             | [x]    | rate-limit.spec.ts          |
 
 ---
 
@@ -176,36 +176,44 @@ New specs being added (15):
 - [x] `password-reset-edge.spec.ts` — bogus / empty / expired tokens + H-03 timing-uniformity
 - [x] `conversations-crud.spec.ts` — conversation CRUD lifecycle + stranger access
 
-## Pass 3 — queued
+## Pass 3 — this PR (`chore/e2e-coverage-pass-3`)
 
-Still gap-row:
+Closed the 3 remaining hard gaps + deepened every `[~]` row from passes 1–2 + started pass 4+ hardening early. **+13 new spec files.**
 
-- [ ] `plugins-readpackages.spec.ts` — read-packages OAuth subflow (`/api/oauth/:p/callback/plugins/read-packages`)
-- [ ] `activity-log-export.spec.ts` — `/api/activity-log/export` web route
-- [ ] `multi-user-collab.spec.ts` — concurrent users on a shared work (Playwright multi-context)
+- [x] `plugins-readpackages.spec.ts` — read-packages OAuth subflow + main plugin callback deepening + providers/connection endpoints
+- [x] `activity-log-export.spec.ts` — `/api/activity-log/export` + `running-count` + `summary` + `:id` + ingest + web route
+- [x] `multi-user-collab.spec.ts` — cross-tenant isolation (work / items / API keys / notifications) + invitation smoke
+- [x] `auth-providers-list.spec.ts` — `/api/auth/providers` + `/anonymous` + `/claim` + `/profile` + `/profile/fresh` + `/update-password` + `/send-verification` + `/logout` + `/logout-all` + verify-email edges
+- [x] `oauth-authorize-flow.spec.ts` — `/api/auth/authorize` web-tier route
+- [x] `plugin-detail-ui.spec.ts` — plugin detail per known plugin-id + settings/plugins/[category] per category + works/[id]/plugins
+- [x] `sitemap-robots.spec.ts` — sitemap.xml, robots.txt, favicon
+- [x] `cors-credentialed.spec.ts` — credentialed preflight on sensitive paths + security headers sanity
+- [x] `subscriptions-tiers.spec.ts` — fresh user defaults to free tier + plan switching + unknown code rejection
+- [x] `onboarding-deeper.spec.ts` — state GET/PUT lifecycle + catalog endpoints + dismiss/complete transitions
+- [x] `webhook-subscriptions.spec.ts` — webhook subscription endpoint probe (skips if not exposed)
+- [x] `i18n-content.spec.ts` — login title varies across 6 locales + lang attribute match + unknown-locale fallback
+- [x] `template-catalog-deep.spec.ts` — template catalog list/get + customizations + user preferences
 
-Plus deepening these `[~]`:
+## Pass 4 — queued (deep UI driving)
 
-- `/[locale]/(dashboard)/plugins/[pluginId]` — plugin detail page interactions (toggle, configure, validate)
-- `/[locale]/(dashboard)/settings/plugins/[category]` — settings/plugins/[category] config flow
-- `/[locale]/(dashboard)/works/[id]/plugins` — work-scoped plugin UI
-- `/[locale]/(dashboard)/works/[id]/activity` — per-work activity UI
-- `/[locale]/(dashboard)/works/[id]/generator` — full UI journey for generation
-- `/api/auth/authorize` — OAuth authorize web route (currently only oauth-state covers it)
-- `/api/auth/verify-email` — verify-email web route (auth.spec.ts touches it lightly)
-- `/api/oauth/[providerId]/callback/plugins` — plugin OAuth callback web route
+These need authenticated UI fixtures (Playwright `storageState`) to drive properly:
 
-## Pass 4+ — hardening / cross-cutting deepening
+- `auth-state-fixture.spec.ts` — establish a reusable `storageState.json` so subsequent specs don't re-register
+- `dashboard-authenticated.spec.ts` — drive the home dashboard with a logged-in user (interactive widgets, search, navigation)
+- `work-create-ui-journey.spec.ts` — full create-work wizard journey, end-to-end
+- `plugin-toggle-ui.spec.ts` — actually click enable/disable on a plugin from the UI
+- `settings-profile-ui.spec.ts` — update profile fields via UI, persist, refresh, verify
+- `notifications-bell-ui.spec.ts` — notification dropdown open + mark read interactions
 
-- `webhook-subscription.spec.ts` — webhook subscription CRUD (if exposed)
-- `seo-sitemap.spec.ts` — sitemap.xml, robots.txt
-- `i18n-content.spec.ts` — verify actual translated strings render per locale (not just html lang)
-- `cors-credentials.spec.ts` — credentialed CORS pre-flight
+## Pass 5+ — long-tail
+
 - `security-2fa.spec.ts` — 2FA enrollment + verify flow (if exposed)
-- `audit-log-immutable.spec.ts` — verify activity-log entries are append-only (no edit/delete endpoints)
-- `subscription-tiers.spec.ts` — feature gates per plan (anonymous TTL, schedule cadence limits)
+- `audit-log-immutable.spec.ts` — verify activity-log entries are append-only
+- `api-public-contract.spec.ts` deepening — add per-endpoint OpenAPI schema validation
+- `performance-budget.spec.ts` — measure home page TTFB / FCP / LCP per locale
+- `screenshots-visual.spec.ts` — visual-regression snapshots for key pages
 
-Then iteratively turn every `[~]` into `[x]` and tighten any `[x]` that has thin assertions.
+Then iteratively tighten any `[x]` that has thin assertions (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced with specific shape assertions once the body schemas stabilize).
 
 ---
 
