@@ -276,20 +276,38 @@ Long-tail security + protocol + collation. **+10 new spec files.**
 
 Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `chat-api-events` and `csp-strict` from the storageState project so their unauth assertions actually hit unauth surfaces.
 
-## Pass 8 — queued
+## Pass 8 — this PR (`chore/e2e-coverage-pass-8`)
 
-- [ ] `audit-log-fixture.spec.ts` — direct DB introspection on a test fixture (separate harness, NOT in scope for black-box e2e — may stay in /apps/api/test as integration)
-- [ ] `web-vitals.spec.ts` — inject web-vitals.js, measure CLS / INP / LCP on login + dashboard, fail on egregious regressions only
-- [ ] `playwright-trace.spec.ts` — golden-path trace recording for regression triage (artifact-only test)
-- [ ] `pwa-offline.spec.ts` — if a service worker is registered, verify it doesn't break navigation when online
-- [ ] `internationalization-rtl.spec.ts` — `/ar/login` (Arabic locale) renders with `dir="rtl"` on `<html>` if Arabic is supported
-- [ ] `accessibility-axe-deep.spec.ts` — run axe-core against /en/works, /en/settings; pin violation count instead of "no critical violations"
-- [ ] `csv-export-schema.spec.ts` — activity-log + usage CSV exports contain expected header columns
-- [ ] `oauth-consent-screen.spec.ts` — `/connect/url` includes `prompt=consent` parameter (or skip if provider-specific)
-- [ ] `rate-limit-headers.spec.ts` — successful requests carry `X-RateLimit-Remaining` / `X-RateLimit-Reset` headers when throttler is configured
-- [ ] `dropdown-keyboard.spec.ts` — common dropdowns navigate with arrow keys + Enter to select
+Observability + accessibility + protocol-shape coverage. **+10 new
+spec files.**
 
-## Pass 9+ — long-tail / hardening
+- [x] `web-vitals.spec.ts` — inject web-vitals via CDN, measure LCP / FCP / CLS on login + register with loose CI-friendly ceilings (LCP 8s, FCP 6s, CLS 0.5)
+- [x] `playwright-trace.spec.ts` — golden-path trace recording for regression triage (artifact-only — login → dashboard → works → settings)
+- [x] `pwa-offline.spec.ts` — service worker registration is queryable, /manifest.webmanifest reachable, /sw.js reachable (skips when not registered)
+- [x] `internationalization-rtl.spec.ts` — `/ar/` / `/he/` / `/fa/` / `/ur/` carry `dir="rtl"`, `/en/` stays `ltr`, locale flip back to en doesn't blank the page
+- [x] `accessibility-axe-deep.spec.ts` — axe-core injected via CDN against login + register, serious+ violations bounded below 10, color-contrast violations ≤ 3
+- [x] `csv-export-schema.spec.ts` — activity-log + usage CSV header rows contain recognised column families; no PII (email, token) in header row
+- [x] `oauth-consent-screen.spec.ts` — github authorize URL has client_id + redirect_uri + scope + response_type=code + state; redirect_uri is https in prod-shaped URLs; redirect_uri belongs to localhost or \*.ever.works (no external redirector)
+- [x] `rate-limit-headers.spec.ts` — successful requests carry `X-RateLimit-Limit`/`Remaining`/`Reset`, remaining never increases between consecutive calls, 429 carries Retry-After (numeric or HTTP-date)
+- [x] `dropdown-keyboard.spec.ts` — ArrowDown moves focus inside an opened menu, Escape closes it, Enter on a menu item produces a visible effect
+- [x] (deferred) `audit-log-fixture` — direct DB introspection lives in `/apps/api/test` integration suite, not in black-box e2e; tracked as long-tail.
+
+Routing — `playwright.config.ts` testIgnore + testMatch now also exclude `web-vitals`, `pwa-offline`, `internationalization-rtl`, and `accessibility-axe-deep` from the storageState project so their unauth UI assertions hit fresh contexts.
+
+## Pass 9 — queued
+
+- [ ] `image-uploads.spec.ts` — image upload endpoint (work cover / item images): content-type validation, size cap, EXIF stripping
+- [ ] `notification-channels.spec.ts` — per-channel notification preferences (email / in-app / webhook)
+- [ ] `webhook-delivery-retry.spec.ts` — outbound webhook delivery: at-least-once delivery, exponential backoff, dead-letter
+- [ ] `feature-flags-runtime.spec.ts` — feature-flag overrides via `/api/config` or env, runtime toggling without restart
+- [ ] `slow-route-pagination.spec.ts` — large work + large items list — pagination must not OOM the server
+- [ ] `realtime-events.spec.ts` — SSE/WebSocket event stream for live updates (if exposed)
+- [ ] `bullmq-queue-status.spec.ts` — queue depth + per-job state exposed (if dashboards are wired)
+- [ ] `redis-cache-coherency.spec.ts` — cache-invalidation on mutation: change name → list shows new name immediately
+- [ ] `sentry-error-reporting.spec.ts` — uncaught client errors are forwarded to /sentry-tunnel proxy
+- [ ] `terms-acceptance-flow.spec.ts` — ToS gating: a fresh user must accept ToS before key actions
+
+## Pass 10+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
 (the `expect(...).toBeLessThan(500)` smoke pattern should be replaced
@@ -300,6 +318,7 @@ Candidates:
 - [ ] `bulk-operations` — once endpoints exist, pin exact `{affected, errors}` shape
 - [ ] `slug-collision` — pin per-error response shape (`{code: "slug_taken"}` style)
 - [ ] `search-fts` — verify search-result ordering when relevance scoring is enabled
+- [ ] `accessibility-axe-deep` — extend to authenticated dashboard pages once axe-core stability is confirmed in CI
 
 ---
 
