@@ -5,13 +5,19 @@ import {
     WorkAgentGoal,
     WorkAgentGoalSource,
     WorkAgentGoalStatus,
+} from '../entities/work-agent-goal.entity';
+import {
     WorkAgentGuardrails,
     WorkAgentPreference,
+} from '../entities/work-agent-preference.entity';
+import {
     WorkAgentRun,
+    WorkAgentRunStatus,
+} from '../entities/work-agent-run.entity';
+import {
     WorkAgentRunLog,
     WorkAgentRunLogLevel,
-    WorkAgentRunStatus,
-} from '../entities';
+} from '../entities/work-agent-run-log.entity';
 import type {
     CreateWorkAgentGoalInput,
     UpdateWorkAgentPreferencesInput,
