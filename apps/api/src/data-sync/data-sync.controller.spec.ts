@@ -9,8 +9,14 @@ jest.mock('@ever-works/agent/activity-log', () => ({
 jest.mock('@ever-works/agent/generators', () => ({
     MarkdownGeneratorService: class MarkdownGeneratorService {},
 }));
+// WorkRepository class shell for the controller's new ownership-check
+// dependency. The spec replaces this with a jest.Mocked instance in
+// beforeEach so the controller can call findById without touching a
+// real database.
 jest.mock('@ever-works/agent/database', () => ({
-    WorkRepository: class WorkRepository {},
+    WorkRepository: class WorkRepository {
+        findById = jest.fn();
+    },
 }));
 jest.mock('@ever-works/agent/config', () => ({
     config: {
@@ -25,6 +31,7 @@ jest.mock('@ever-works/agent/config', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { WorkRepository } from '@ever-works/agent/database';
 import { DataSyncController } from './data-sync.controller';
 import { DataSyncService } from './data-sync.service';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -54,6 +61,7 @@ const stubUser: AuthenticatedUser = { userId: 'user-42' } as unknown as Authenti
 describe('DataSyncController (EW-628 Phase 6)', () => {
     let controller: DataSyncController;
     let dataSyncService: jest.Mocked<DataSyncService>;
+    let workRepository: jest.Mocked<WorkRepository>;
 
     beforeEach(async () => {
         dataSyncService = {
@@ -61,9 +69,19 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
             isLocked: jest.fn(),
         } as unknown as jest.Mocked<DataSyncService>;
 
+        // Default: every Work belongs to the stub caller so the new
+        // ownership gate doesn't trip in tests that don't care about
+        // it. Tests that DO care override the mock explicitly.
+        workRepository = {
+            findById: jest.fn().mockResolvedValue({ id: 'work-stub', userId: stubUser.userId }),
+        } as unknown as jest.Mocked<WorkRepository>;
+
         const module: TestingModule = await Test.createTestingModule({
             controllers: [DataSyncController],
-            providers: [{ provide: DataSyncService, useValue: dataSyncService }],
+            providers: [
+                { provide: DataSyncService, useValue: dataSyncService },
+                { provide: WorkRepository, useValue: workRepository },
+            ],
         }).compile();
 
         controller = module.get(DataSyncController);

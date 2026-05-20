@@ -10,6 +10,12 @@ import { API_BASE } from './helpers/api';
  */
 
 const WEBHOOK_PATHS = [
+    // Actual mounted route in apps/api/src/integrations/github-app/
+    // github-app-webhook.controller.ts (`@Controller('api/github-app')`
+    // + `@Post('webhooks')`).
+    '/api/github-app/webhooks',
+    // Historical / aspirational paths kept as fallback so the test
+    // still picks up the endpoint if it ever gets renamed.
     '/api/github-app/webhook',
     '/api/integrations/github-app/webhook',
     '/api/webhooks/github',
