@@ -30,6 +30,7 @@ import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
+import { RequestMagicLinkDto, RedeemMagicLinkDto } from '../dto/magic-link.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { CreateAnonymousDto } from '../dto/anonymous.dto';
 import { AuthSessionGuard } from '../guards/auth-session.guard';
@@ -87,6 +88,10 @@ export class AuthController {
     getConfiguredProviders() {
         return {
             emailPassword: true,
+            // 1f — Surface magic-link availability so the web login UI
+            // can show / hide the "Email me a link" tab. Gated by env
+            // (default off) so operators can roll it out gradually.
+            magicLink: (process.env.MAGIC_LINK_ENABLED ?? 'false').toLowerCase() === 'true',
             socialProviders: this.socialAuthService.getConfiguredProviders(),
         };
     }
@@ -537,5 +542,57 @@ export class AuthController {
             throw new BadRequestException('token query parameter is required');
         }
         return this.authService.validatePasswordResetToken(token);
+    }
+
+    /**
+     * 1f — Magic-link issuance. Public endpoint, intentionally returns
+     * the same response shape for "email exists" and "email unknown"
+     * to prevent enumeration. Rate-limited tighter than the global cap
+     * because an issuance burst is the natural setup for a token-
+     * brute-force attempt against the redeem endpoint below.
+     */
+    @Public()
+    @Throttle({ default: { limit: 5, ttl: 60 * 1000 } })
+    @Post('magic-link')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Request a magic login link',
+        description:
+            'Generates a one-time login link and emails it to the supplied address. Response is identical regardless of whether the email exists.',
+    })
+    @ApiResponse({ status: 200, description: 'Issuance accepted' })
+    async requestMagicLink(@Body() dto: RequestMagicLinkDto) {
+        return this.authService.requestMagicLink(dto);
+    }
+
+    /**
+     * 1f — Magic-link redemption. Public endpoint. Invalid or expired
+     * tokens always 400 with a uniform message — never disclose
+     * whether the token shape was wrong vs the token didn't match a
+     * user. Rate-limited at 10/min/IP so a leaked log line can't be
+     * combined with cheap brute-force.
+     */
+    @Public()
+    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
+    @Post('magic-link/redeem')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Redeem a magic link and issue a session',
+        description: 'Consumes the magic-link token and returns a session token + user profile.',
+    })
+    @ApiResponse({ status: 200, description: 'Session issued' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+    async redeemMagicLink(@Body() dto: RedeemMagicLinkDto, @Request() req) {
+        const user = await this.authService.redeemMagicLink(dto.token);
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+        return this.authProvider.issueSession(user.id, { ipAddress, userAgent });
     }
 }

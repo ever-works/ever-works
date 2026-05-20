@@ -113,6 +113,16 @@ export class User {
     @Column({ nullable: true })
     passwordResetExpires: Date;
 
+    // 1f — Magic-link passwordless auth. Stored as sha256(token); raw
+    // token only travels via the link in the issuance email. Same
+    // PortableDateColumn dance as `lockedUntil` so sqlite + postgres
+    // pick the right column type per dialect.
+    @Column({ nullable: true })
+    magicLinkToken?: string | null;
+
+    @PortableDateColumn({ nullable: true })
+    magicLinkExpires?: Date | null;
+
     // Git committer overrides (optional — fallback to username/email if not set)
     @Column({ type: 'varchar', nullable: true })
     committerName?: string | null;

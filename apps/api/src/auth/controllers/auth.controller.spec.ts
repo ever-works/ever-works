@@ -10,6 +10,7 @@ jest.mock('@ever-works/agent/services', () => ({
     ZeroFrictionFunnelService: class ZeroFrictionFunnelService {},
 }));
 
+import { BadRequestException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import type { AuthService } from '../services/auth.service';
 import type { AnonymousAuthService } from '../services/anonymous-auth.service';
@@ -34,6 +35,8 @@ describe('AuthController', () => {
             | 'consumePasswordResetToken'
             | 'validateEmailVerificationToken'
             | 'validatePasswordResetToken'
+            | 'requestMagicLink'
+            | 'redeemMagicLink'
         >
     >;
     let socialAuth: jest.Mocked<Pick<SocialAuthService, 'getConfiguredProviders'>>;
@@ -69,6 +72,8 @@ describe('AuthController', () => {
             consumePasswordResetToken: jest.fn().mockResolvedValue(undefined),
             validateEmailVerificationToken: jest.fn(),
             validatePasswordResetToken: jest.fn(),
+            requestMagicLink: jest.fn(),
+            redeemMagicLink: jest.fn(),
         } as any;
         socialAuth = { getConfiguredProviders: jest.fn() } as any;
         anonymousAuth = { createAnonymousUser: jest.fn() } as any;
@@ -286,22 +291,40 @@ describe('AuthController', () => {
     });
 
     describe('getConfiguredProviders (GET /api/auth/providers)', () => {
+        // 1f — magic-link gate. Save/restore so the env doesn't leak.
+        const SAVED_MAGIC = process.env.MAGIC_LINK_ENABLED;
+        afterEach(() => {
+            if (SAVED_MAGIC === undefined) delete process.env.MAGIC_LINK_ENABLED;
+            else process.env.MAGIC_LINK_ENABLED = SAVED_MAGIC;
+        });
+
         it('returns email/password always-on plus the configured social provider list', () => {
+            delete process.env.MAGIC_LINK_ENABLED;
             socialAuth.getConfiguredProviders.mockReturnValue(['github', 'google'] as any);
 
             expect(controller.getConfiguredProviders()).toEqual({
                 emailPassword: true,
+                magicLink: false,
                 socialProviders: ['github', 'google'],
             });
         });
 
         it('returns empty socialProviders array when none configured', () => {
+            delete process.env.MAGIC_LINK_ENABLED;
             socialAuth.getConfiguredProviders.mockReturnValue([] as any);
 
             expect(controller.getConfiguredProviders()).toEqual({
                 emailPassword: true,
+                magicLink: false,
                 socialProviders: [],
             });
+        });
+
+        it('flips magicLink:true when MAGIC_LINK_ENABLED=true', () => {
+            process.env.MAGIC_LINK_ENABLED = 'true';
+            socialAuth.getConfiguredProviders.mockReturnValue([] as any);
+
+            expect(controller.getConfiguredProviders().magicLink).toBe(true);
         });
     });
 
@@ -683,6 +706,51 @@ describe('AuthController', () => {
 
             expect(authService.validatePasswordResetToken).toHaveBeenCalledWith('tok');
             expect(result).toEqual({ valid: false });
+        });
+    });
+
+    describe('requestMagicLink (POST /api/auth/magic-link) — 1f', () => {
+        it('forwards to authService.requestMagicLink and never echoes a token in the response', async () => {
+            authService.requestMagicLink = jest.fn().mockResolvedValue({
+                message: 'If the email is registered, a magic link has been sent',
+            }) as any;
+
+            const result = await controller.requestMagicLink({ email: 'a@b.co' } as any);
+
+            expect(authService.requestMagicLink).toHaveBeenCalledWith({ email: 'a@b.co' });
+            expect(result).toEqual({
+                message: 'If the email is registered, a magic link has been sent',
+            });
+            expect((result as any).token).toBeUndefined();
+        });
+    });
+
+    describe('redeemMagicLink (POST /api/auth/magic-link/redeem) — 1f', () => {
+        const req: any = { headers: { 'user-agent': 'UA' }, ip: '127.0.0.1' };
+
+        it('redeems the token, issues a session, and forwards client info to the provider', async () => {
+            authService.redeemMagicLink = jest.fn().mockResolvedValue({ id: 'u-1' }) as any;
+            authProvider.issueSession.mockResolvedValue({ access_token: 'ses-1' } as any);
+
+            const result = await controller.redeemMagicLink({ token: 'tok' } as any, req);
+
+            expect(authService.redeemMagicLink).toHaveBeenCalledWith('tok');
+            expect(authProvider.issueSession).toHaveBeenCalledWith('u-1', {
+                ipAddress: '127.0.0.1',
+                userAgent: 'UA',
+            });
+            expect(result).toEqual({ access_token: 'ses-1' });
+        });
+
+        it('lets BadRequestException from the service bubble up (no session issued)', async () => {
+            authService.redeemMagicLink = jest
+                .fn()
+                .mockRejectedValue(new BadRequestException('Invalid magic link')) as any;
+
+            await expect(
+                controller.redeemMagicLink({ token: 'bogus' } as any, req),
+            ).rejects.toThrow('Invalid magic link');
+            expect(authProvider.issueSession).not.toHaveBeenCalled();
         });
     });
 });
