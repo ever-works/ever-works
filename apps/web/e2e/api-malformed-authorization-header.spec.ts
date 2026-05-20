@@ -9,6 +9,9 @@ import { API_BASE } from './helpers/api';
 
 const PROTECTED_PATH = '/api/users/me';
 
+// Each entry MUST be unique by `header.slice(0, 60)` because the test
+// title key is derived from it — duplicates break Playwright's
+// collection step with "duplicate test title" for the entire suite.
 const MALFORMED_AUTH_HEADERS = [
     '',
     'Bearer',
@@ -21,7 +24,6 @@ const MALFORMED_AUTH_HEADERS = [
     'Digest realm="x"',
     'Bearer null',
     'Bearer undefined',
-    'Bearer ',
     'Bearer foo\nbar',
     'Token abc123',
     'Bearer ' + Array(20).fill('a').join('.'),
@@ -29,9 +31,11 @@ const MALFORMED_AUTH_HEADERS = [
 ];
 
 test.describe('API auth: malformed Authorization header handling', () => {
-    for (const header of MALFORMED_AUTH_HEADERS) {
+    for (const [index, header] of MALFORMED_AUTH_HEADERS.entries()) {
         const label = JSON.stringify(header.slice(0, 60));
-        test(`Authorization=${label} returns 4xx not 5xx`, async ({ request }) => {
+        // Include the array index in the title so two payloads that
+        // happen to share the first 60 chars never collide.
+        test(`#${index} Authorization=${label} returns 4xx not 5xx`, async ({ request }) => {
             const res = await request.get(`${API_BASE}${PROTECTED_PATH}`, {
                 headers: { Authorization: header },
             });
