@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
         with:
           version: 10.13.1
 
@@ -193,6 +193,11 @@ jobs:
           # b709f9cb) but several specs assert paid-tier transitions
           # that only fire when the module is on.
           SUBSCRIPTIONS_ENABLED: 'true'
+          # Magic-link passwordless auth (1f). Flip on so /api/auth/providers
+          # advertises it, the magic-link issuance + redemption endpoints
+          # exercise their real branches, and the e2e magic-link.spec.ts
+          # specs run against a live email round-trip via MailHog.
+          MAGIC_LINK_ENABLED: 'true'
           # OAuth — register test sentinels so the providers appear in
           # /api/auth/providers and the OAuth-flow specs can reach
           # /api/oauth/<provider>/authorize. The actual github.com /

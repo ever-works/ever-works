@@ -61,7 +61,7 @@ interface MockDeps {
         ingressHostFor: jest.Mock;
     };
     funnel: { emit: jest.Mock };
-    eventEmitter: { emit: jest.Mock };
+    eventEmitter: { emit: jest.Mock; emitAsync: jest.Mock };
 }
 
 function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
@@ -95,7 +95,7 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         createRepository: jest.fn(),
     };
 
-    const eventEmitter = { emit: jest.fn() };
+    const eventEmitter = { emit: jest.fn(), emitAsync: jest.fn().mockResolvedValue([]) };
 
     // EW-617 G5: DNS provider mock — no-op by default.
     const everWorksDns = {
@@ -401,7 +401,9 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         );
 
         // WorkCreatedEvent emitted with platformActor payload.
-        expect(deps.eventEmitter.emit).toHaveBeenCalledWith(
+        // Switched `emit` → `emitAsync` in commit 1652b3f8 so the
+        // ActivityLog listener completes BEFORE createWork returns.
+        expect(deps.eventEmitter.emitAsync).toHaveBeenCalledWith(
             'work.created',
             expect.objectContaining({
                 platformActor: {
@@ -433,8 +435,9 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         const persisted = deps.workRepo.create.mock.calls[0][0];
         expect(persisted.storageProvider).toBe('ever-works-git');
         expect(persisted.owner).toBe(baseDto.owner); // not overridden
-        // Event still emitted, but without platformActor payload.
-        const emitted = deps.eventEmitter.emit.mock.calls[0]?.[1];
+        // Event still emitted (via emitAsync — see comment above on the
+        // EW-614 success-path assertion), but without platformActor payload.
+        const emitted = deps.eventEmitter.emitAsync.mock.calls[0]?.[1];
         expect(emitted?.platformActor).toBeUndefined();
     });
 

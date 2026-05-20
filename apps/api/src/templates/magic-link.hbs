@@ -1,0 +1,154 @@
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>Sign in to {{appName}}</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+                    sans-serif;
+                background-color: #f8fafc;
+                line-height: 1.6;
+            }
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+            .logo-section {
+                padding: 40px 20px 30px;
+                text-align: center;
+            }
+            .logo-title {
+                font-size: 28px;
+                font-weight: 600;
+                color: #1e293b;
+                margin: 0;
+            }
+            .logo-subtitle {
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 5px 0 0;
+            }
+            .main-card {
+                margin: 0 20px 40px;
+                background-color: #ffffff;
+                border-radius: 8px;
+                padding: 40px 30px;
+            }
+            .icon {
+                text-align: center;
+                font-size: 40px;
+                margin-bottom: 20px;
+            }
+            .title {
+                font-size: 24px;
+                color: #1e293b;
+                font-weight: 600;
+                text-align: center;
+                margin: 0 0 10px;
+            }
+            .subtitle {
+                text-align: center;
+                color: #64748b;
+                margin: 0 0 30px;
+                font-size: 16px;
+            }
+            .button {
+                display: inline-block;
+                text-decoration: none;
+                background-color: #1e293b;
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: 500;
+                padding: 12px 48px;
+                border-radius: 6px;
+                text-align: center;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .button-container {
+                text-align: center;
+                margin: 25px 0;
+            }
+            .security-notice {
+                text-align: center;
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 30px 0 0;
+            }
+            .divider {
+                border: 0;
+                border-top: 1px solid #e2e8f0;
+                margin: 30px 0;
+            }
+            .help-text {
+                text-align: center;
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 0;
+            }
+            .footer {
+                padding: 0 20px 40px;
+                text-align: center;
+            }
+            .footer-text {
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='logo-section'>
+                <h1 class='logo-title'>{{appName}}</h1>
+                <p class='logo-subtitle'>by {{companyOwner}}</p>
+            </div>
+
+            <div class='main-card'>
+                <div class='icon'>✨</div>
+
+                <h2 class='title'>Sign in to {{appName}}</h2>
+
+                <p class='subtitle'>
+                    {{#if firstName}}Hi {{firstName}}, click{{else}}Click{{/if}}
+                    the button below to sign in to your
+                    {{appName}}
+                    account. No password needed.
+                </p>
+
+                <div class='button-container'>
+                    <a href='{{magicLinkUrl}}' class='button'>
+                        Sign in to
+                        {{appName}}
+                    </a>
+                </div>
+
+                <p class='security-notice'>
+                    This link expires in
+                    {{expiresIn}}
+                    and can only be used once.
+                </p>
+
+                <hr class='divider' />
+
+                <p class='help-text'>
+                    Didn't request this? You can safely ignore this email.<br />
+                    Someone may have typed your email address by mistake.
+                </p>
+            </div>
+
+            <div class='footer'>
+                <p class='footer-text'>
+                    ©
+                    {{currentYear}}
+                    {{companyOwner}}
+                    All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>

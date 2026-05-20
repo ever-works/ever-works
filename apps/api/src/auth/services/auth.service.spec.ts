@@ -23,7 +23,12 @@ import { createHash } from 'crypto';
 import { AuthService } from './auth.service';
 import type { UserRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '../../events';
+import {
+    UserCreatedEvent,
+    UserConfirmedEvent,
+    UserForgotPasswordEvent,
+    UserMagicLinkRequestedEvent,
+} from '../../events';
 
 describe('AuthService', () => {
     let service: AuthService;
@@ -852,6 +857,166 @@ describe('AuthService', () => {
                 message: 'Token is valid',
                 email: 'a@b.co',
                 expiresAt: expiry,
+            });
+        });
+    });
+
+    describe('requestMagicLink (1f)', () => {
+        it('returns generic envelope and skips persistence when email unknown', async () => {
+            userRepo.findByEmail.mockResolvedValue(null);
+            const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
+            bcryptSpy.mockClear();
+
+            const result = await service.requestMagicLink({ email: 'no@one.test' } as any);
+
+            expect(result).toEqual({
+                message: 'If the email is registered, a magic link has been sent',
+            });
+            expect(emitter.emit).not.toHaveBeenCalled();
+            expect(userRepo.update).not.toHaveBeenCalled();
+            // Timing-uniformity: the dummy hash MUST be called on the no-user
+            // branch too, otherwise the user-exists branch takes ~10x longer.
+            expect(bcryptSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('persists sha256(token) and emits UserMagicLinkRequestedEvent with raw token (15 min TTL)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            const result = await service.requestMagicLink({
+                email: 'a@b.co',
+                magicLinkCallbackUrl: 'https://x.test/login/magic',
+            } as any);
+
+            // Response must NOT echo the raw token.
+            expect(result).toEqual({
+                message: 'If the email is registered, a magic link has been sent',
+            });
+            expect((result as any).token).toBeUndefined();
+
+            const updateInput = userRepo.update.mock.calls[0][1];
+            const persistedHash = updateInput.magicLinkToken as string;
+            expect(typeof persistedHash).toBe('string');
+            expect(persistedHash).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
+            const expires = updateInput.magicLinkExpires as Date;
+            // 15 minutes ± 1 minute slack
+            const delta = expires.getTime() - Date.now();
+            expect(delta).toBeGreaterThan(14 * 60 * 1000);
+            expect(delta).toBeLessThan(16 * 60 * 1000);
+
+            expect(emitter.emit).toHaveBeenCalledWith(
+                UserMagicLinkRequestedEvent.EVENT_NAME,
+                expect.any(UserMagicLinkRequestedEvent),
+            );
+            const event = emitter.emit.mock.calls[0][1] as UserMagicLinkRequestedEvent;
+            // Persisted hash MUST be sha256 of the raw token in the event.
+            expect(persistedHash).toBe(
+                createHash('sha256').update(event.magicLinkToken, 'utf8').digest('hex'),
+            );
+            // URL is built from the validated callback host.
+            expect(event.magicLinkUrl).toBe(
+                `https://x.test/login/magic?token=${event.magicLinkToken}`,
+            );
+            // The token in the event is raw (not the hash).
+            expect(event.magicLinkToken).not.toBe(persistedHash);
+            expect(event.expiresIn).toBe('15 minutes');
+        });
+
+        it('falls back to default URL when callbackUrl missing', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.requestMagicLink({ email: 'a@b.co' } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserMagicLinkRequestedEvent;
+            expect(event.magicLinkUrl).toMatch(/^https:\/\/app\.test\/login\/magic-link\?token=/);
+        });
+
+        it('falls back to default URL when callbackUrl host not in allow-list (no open-redirect via magic-link)', async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.requestMagicLink({
+                email: 'a@b.co',
+                magicLinkCallbackUrl: 'https://attacker.evil/steal',
+            } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserMagicLinkRequestedEvent;
+            // MUST default to the platform host, NEVER stitch into attacker.evil
+            expect(event.magicLinkUrl).toMatch(/^https:\/\/app\.test\//);
+            expect(event.magicLinkUrl).not.toContain('attacker.evil');
+        });
+
+        it("doesn't echo the raw token anywhere in the response", async () => {
+            userRepo.findByEmail.mockResolvedValue({ id: 'u-1' } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            const result = await service.requestMagicLink({ email: 'a@b.co' } as any);
+            const event = emitter.emit.mock.calls[0][1] as UserMagicLinkRequestedEvent;
+            const flat = JSON.stringify(result);
+            expect(flat).not.toContain(event.magicLinkToken);
+        });
+    });
+
+    describe('redeemMagicLink (1f)', () => {
+        it('rejects empty token (uniform 400)', async () => {
+            await expect(service.redeemMagicLink('')).rejects.toThrow(BadRequestException);
+            await expect(service.redeemMagicLink('   ')).rejects.toThrow(BadRequestException);
+        });
+
+        it('rejects unknown token with the SAME message as "no link outstanding"', async () => {
+            userRepo.findOne.mockResolvedValue(null);
+            await expect(service.redeemMagicLink('bogus')).rejects.toThrow('Invalid magic link');
+        });
+
+        it('rejects expired token and wipes the column (no second-chance redeem)', async () => {
+            userRepo.findOne.mockResolvedValue({
+                id: 'u-1',
+                magicLinkExpires: new Date(Date.now() - 1000),
+            } as any);
+            await expect(service.redeemMagicLink('expired-token')).rejects.toThrow(
+                'Magic link expired',
+            );
+            // Wipe-on-expiry: even though redemption failed, the row must
+            // be cleared so the same token can never be replayed.
+            expect(userRepo.update).toHaveBeenCalledWith('u-1', {
+                magicLinkToken: null,
+                magicLinkExpires: null,
+            });
+        });
+
+        it('on success returns the user AND wipes the token (single-use)', async () => {
+            const user = {
+                id: 'u-1',
+                email: 'a@b.co',
+                magicLinkExpires: new Date(Date.now() + 60_000),
+            };
+            userRepo.findOne.mockResolvedValue(user as any);
+
+            const result = await service.redeemMagicLink('valid-token');
+
+            expect(result).toBe(user);
+            // Single-use enforcement: the token column is cleared as part
+            // of the successful redeem.
+            expect(userRepo.update).toHaveBeenCalledWith('u-1', {
+                magicLinkToken: null,
+                magicLinkExpires: null,
+            });
+        });
+
+        it('looks up by sha256(token), never by raw token', async () => {
+            userRepo.findOne.mockResolvedValue(null);
+            try {
+                await service.redeemMagicLink('raw-token-abc');
+            } catch {
+                // expected — we only care about how findOne was called
+            }
+            expect(userRepo.findOne).toHaveBeenCalledWith({
+                where: {
+                    magicLinkToken: createHash('sha256')
+                        .update('raw-token-abc', 'utf8')
+                        .digest('hex'),
+                },
             });
         });
     });

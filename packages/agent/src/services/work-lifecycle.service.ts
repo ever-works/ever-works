@@ -330,7 +330,16 @@ export class WorkLifecycleService {
                       htmlUrl: everWorksRepo.htmlUrl,
                   }
                 : undefined;
-            this.eventEmitter.emit(
+            // `emitAsync` awaits every listener's promise before the
+            // controller returns. The audit-log-immutable + audit-log-
+            // sequences specs query `/api/activity-log?workId=<new>`
+            // immediately after createWork resolves — with the prior
+            // fire-and-forget `emit`, the activity_log INSERT raced
+            // with the response and the specs sometimes saw an empty
+            // list (skip path). Listeners already catch their own
+            // errors so awaiting can't turn a logging failure into a
+            // create failure.
+            await this.eventEmitter.emitAsync(
                 WorkCreatedEvent.EVENT_NAME,
                 new WorkCreatedEvent(dir, platformActor),
             );

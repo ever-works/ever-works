@@ -25,6 +25,7 @@ import { redirect } from 'next/navigation';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
 import { slugify } from '@ever-works/plugin';
 import { ApiResponseError, serverMutation } from '@/lib/api/server-api';
+import { workProposalsAPI } from '@/lib/api/work-proposals';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -65,6 +66,25 @@ const getCreateWorkSchema = async () => {
 
     return createWorkSchema;
 };
+
+async function markProposalAcceptedWithRetry(proposalId: string, workId: string): Promise<void> {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+            await workProposalsAPI.accept(proposalId, workId);
+            revalidatePath('/[locale]/(dashboard)/(home)', 'page');
+            revalidatePath('/[locale]/(dashboard)/discover', 'page');
+            return;
+        } catch (error) {
+            if (attempt === 2) {
+                console.warn('Failed to mark Work proposal as accepted after AI Work creation:', {
+                    proposalId,
+                    workId,
+                    error,
+                });
+            }
+        }
+    }
+}
 
 const checkOrganization = (
     connectionInfo: GitProviderConnectionInfo | null,
@@ -180,6 +200,7 @@ interface AIWorkOptions {
         pipeline?: string;
     };
     pluginConfig?: Record<string, unknown>;
+    proposalId?: string;
 }
 
 export async function createWorkWithAI(request: AIWorkOptions) {
@@ -198,6 +219,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             .transform((val) => sanitizeName(val, 100))
             .pipe(z.string().max(100, t('name.maxLength'))),
         gitProvider: z.string().optional(),
+        proposalId: z.string().uuid().optional(),
     });
 
     const createWorkSchema = await getCreateWorkSchema();
@@ -208,6 +230,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             prompt: request.prompt,
             name: request.name,
             gitProvider: request.gitProvider,
+            proposalId: request.proposalId,
         });
         if (!validation.success) {
             return {
@@ -292,6 +315,10 @@ export async function createWorkWithAI(request: AIWorkOptions) {
                 ...(request.pluginConfig || {}),
             },
         });
+
+        if (request.proposalId) {
+            await markProposalAcceptedWithRetry(request.proposalId, work.id);
+        }
 
         return {
             success: true,

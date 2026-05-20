@@ -16,6 +16,7 @@ import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 import { WorksController } from './works.controller';
 import { MembersController } from './members.controller';
 import { InvitationsController } from './invitations.controller';
+import { BulkItemsController } from './bulk-items.controller';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -50,6 +51,6 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
     ],
-    controllers: [WorksController, MembersController, InvitationsController],
+    controllers: [WorksController, MembersController, InvitationsController, BulkItemsController],
 })
 export class WorksModule {}

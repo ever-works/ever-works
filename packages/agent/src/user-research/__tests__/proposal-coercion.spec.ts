@@ -16,6 +16,8 @@ function makeDraft(over: Partial<PermissiveWorkProposalDraft> = {}): PermissiveW
             { name: 'description', type: 'markdown' },
         ],
         recommendedPlugins: [{ pluginId: 'github', reason: 'pulls README' }],
+        generatedPrompt:
+            'Create a Work of open source AI tools for developers with categories, GitHub URLs, and concise summaries.',
         reasoning: 'Matches user expertise.',
         ...over,
     };
@@ -27,6 +29,7 @@ describe('coerceWorkProposal', () => {
         expect(result).not.toBeNull();
         expect(result!.slugSuggestion).toBe('open-source-ai-tools');
         expect(result!.suggestedFields).toHaveLength(2);
+        expect(result!.generatedPrompt).toContain('open source AI tools');
     });
 
     it('slugifies a non-kebab-case slug suggestion (strict regex: no underscores)', () => {
@@ -129,6 +132,7 @@ describe('coerceWorkProposal', () => {
         expect(result).not.toBeNull();
         expect(result!.suggestedFields).toEqual([]);
         expect(result!.recommendedPlugins).toEqual([]);
+        expect(result!.generatedPrompt).toContain('Open Source AI Tools');
         expect(result!.reasoning).toBe('');
     });
 
@@ -148,6 +152,7 @@ describe('coerceWorkProposal', () => {
                 { name: 123, type: 'datetime' },
             ],
             recommendedPlugins: [{ pluginId: 7, reason: false }, 'bad plugin'],
+            generatedPrompt: 123,
             reasoning: 99,
         });
 
@@ -159,6 +164,7 @@ describe('coerceWorkProposal', () => {
         ]);
         expect(result!.suggestedFields).toEqual([{ name: 'Website', type: 'url' }]);
         expect(result!.recommendedPlugins).toEqual([{ pluginId: '7', reason: 'false' }]);
+        expect(result!.generatedPrompt).toContain('Create a Work named "123456789"');
         expect(result!.reasoning).toBe('99');
     });
 });

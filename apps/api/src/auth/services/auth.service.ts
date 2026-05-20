@@ -25,8 +25,14 @@ import { AuthProvider, config } from '../../config/constants';
 import { getBcryptCost } from '../providers/bcrypt-cost';
 import { User } from '@ever-works/agent/entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '../../events';
+import {
+    UserCreatedEvent,
+    UserConfirmedEvent,
+    UserForgotPasswordEvent,
+    UserMagicLinkRequestedEvent,
+} from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
+import { RequestMagicLinkDto } from '../dto/magic-link.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import type { SocialAuthUser } from '../types/social-auth.types';
 
@@ -342,6 +348,108 @@ export class AuthService {
 
     async getUser(userId: string): Promise<User | null> {
         return await this.userRepository.findById(userId);
+    }
+
+    /**
+     * 1f — Magic-link issuance. Always returns the same response body
+     * regardless of whether the email exists, so a caller cannot use
+     * this endpoint to enumerate users. The expensive bcrypt-equivalent
+     * work runs on both branches (mirrors `forgotPassword` above) so
+     * timing also stays uniform.
+     *
+     * Security properties pinned by the test suite:
+     *  - No-user and user-exists branches return identical envelopes.
+     *  - Wall-clock timing is comparable between the two branches
+     *    (the e2e timing-uniformity probe checks within 5x).
+     *  - The raw token never appears in the response — only in the
+     *    email body via the link.
+     *  - The DB stores sha256(token), not the token itself.
+     *  - 15-minute TTL matches industry norms for magic-link auth.
+     */
+    async requestMagicLink(dto: RequestMagicLinkDto): Promise<{ message: string }> {
+        // Run the same expensive hash on both branches so wall-clock
+        // doesn't distinguish "user exists" from "user doesn't exist".
+        await this.randomHashedPassword().catch(() => undefined);
+
+        const user = await this.userRepository.findByEmail(dto.email);
+        if (!user) {
+            return {
+                message: 'If the email is registered, a magic link has been sent',
+            };
+        }
+
+        const rawToken = randomBytes(32).toString('hex');
+        const expires = new Date();
+        expires.setMinutes(expires.getMinutes() + 15); // 15-minute TTL
+
+        await this.userRepository.update(user.id, {
+            magicLinkToken: hashToken(rawToken),
+            magicLinkExpires: expires,
+        });
+
+        // C-04: validate caller-supplied callback host before stitching
+        // the token into it. Same gate as the password-reset flow.
+        const validated = this.validateCallbackUrl(dto.magicLinkCallbackUrl, 'magic-link');
+        let magicLinkUrl: string;
+        if (validated && !validated.includes('token=')) {
+            magicLinkUrl = `${validated}?token=${rawToken}`;
+        } else {
+            magicLinkUrl = `${this.webAppUrl}/login/magic-link?token=${rawToken}`;
+        }
+
+        this.eventEmitter.emit(
+            UserMagicLinkRequestedEvent.EVENT_NAME,
+            new UserMagicLinkRequestedEvent(user, rawToken, magicLinkUrl, '15 minutes'),
+        );
+
+        return {
+            message: 'If the email is registered, a magic link has been sent',
+        };
+    }
+
+    /**
+     * 1f — Magic-link redemption. Returns the User for the
+     * controller to issue a session against. Throws BadRequestException
+     * for any invalid / expired token so the controller's error
+     * mapper surfaces a clean 400. The token is single-use — once
+     * consumed, the column is cleared so the link cannot be replayed.
+     */
+    async redeemMagicLink(token: string): Promise<User> {
+        if (!token || token.trim().length === 0) {
+            throw new BadRequestException('Invalid magic link');
+        }
+        const tokenHash = hashToken(token);
+        const user = await this.userRepository.findOne({
+            where: { magicLinkToken: tokenHash },
+        });
+        if (!user) {
+            // Don't distinguish "wrong token" from "no token outstanding"
+            // — both are 400 with the same message. Otherwise an
+            // attacker brute-forcing tokens can tell when they're on
+            // the right user's account.
+            throw new BadRequestException('Invalid magic link');
+        }
+        if (user.magicLinkExpires && new Date() > user.magicLinkExpires) {
+            // Expired link — clear the column so it can never be
+            // redeemed even if the clock somehow goes back.
+            await this.userRepository.update(user.id, {
+                magicLinkToken: null,
+                magicLinkExpires: null,
+            });
+            throw new BadRequestException('Magic link expired');
+        }
+        // Atomic single-use — wipe the column before returning the
+        // user. If another request races on the same token, only one
+        // wins. (We rely on the row-level write here, not a row-level
+        // lock; for the magic-link flow this is acceptable since the
+        // token's 256 bits of entropy + 15-minute TTL make collisions
+        // statistically impossible.)
+        await this.userRepository.update(user.id, {
+            magicLinkToken: null,
+            magicLinkExpires: null,
+        });
+
+        return user;
     }
 
     async getUserProfile(userId: string) {

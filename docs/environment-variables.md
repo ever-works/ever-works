@@ -31,6 +31,18 @@ Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser. All other var
 | `WEB_URL`         | Full URL of the web application        | `string`  | `http://localhost:3000`                       | Yes      |
 | `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | `string`  | `http://localhost:3000,http://localhost:3001` | Yes      |
 
+## Platform Secrets (API)
+
+| Variable                  | Description                                                                 | Type                   | Default | Required |
+| ------------------------- | --------------------------------------------------------------------------- | ---------------------- | ------- | -------- |
+| `PLATFORM_ENCRYPTION_KEY` | 32-byte hex key for per-Work `PLATFORM_SYNC_SECRET` / `WEBHOOK_SECRET` data | `hex string`, 64 chars | --      | Yes      |
+
+Generate with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
 ## Core Configuration (Web)
 
 | Variable               | Description                               | Type     | Default                 | Required |

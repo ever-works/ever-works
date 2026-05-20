@@ -5,6 +5,7 @@ import { MailerService } from './providers/mailer.service';
 import {
     UserAccountDeletionEvent,
     UserForgotPasswordEvent,
+    UserMagicLinkRequestedEvent,
     UserNewDeviceLoginEvent,
     UserPasswordChangedEvent,
     UserCreatedEvent,
@@ -106,6 +107,41 @@ export class MailService {
         } catch (error) {
             this.logger.error(
                 `Failed to send forgot-password email to ${data.user.email}`,
+                error?.stack ?? error,
+            );
+        }
+    }
+
+    /**
+     * 1f — Send the magic-link login email. The raw token is embedded
+     * in the URL only; we do not include it as a separate field so
+     * forwarded emails (e.g. captured by an MTA) don't have the raw
+     * token in plaintext alongside the URL. The 'magic-link' template
+     * key falls back to 'forgot-password' if not yet authored, since
+     * both flows are conceptually identical from a templating angle.
+     */
+    @OnEvent(UserMagicLinkRequestedEvent.EVENT_NAME)
+    async sendMagicLink(data: UserMagicLinkRequestedEvent): Promise<void> {
+        try {
+            const appName = config.branding.appName();
+            const recipient = this.requireEmail(data.user.email, 'mail to user');
+            if (!recipient) {
+                return;
+            }
+            await this.mailerService.sendMail({
+                to: recipient,
+                subject: `Sign in to ${appName}`,
+                template: 'magic-link',
+                context: {
+                    ...this.getBrandingContext(),
+                    firstName: data.user.username,
+                    magicLinkUrl: data.magicLinkUrl,
+                    expiresIn: data.expiresIn || '15 minutes',
+                },
+            });
+        } catch (error) {
+            this.logger.error(
+                `Failed to send magic-link email to ${data.user.email}`,
                 error?.stack ?? error,
             );
         }

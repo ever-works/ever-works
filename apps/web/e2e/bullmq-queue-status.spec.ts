@@ -2,9 +2,19 @@ import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 
 /**
- * BullMQ queue status — pass 9. The platform uses BullMQ for background
- * jobs. If a queue-status / job-state endpoint is exposed (admin
- * dashboard / health probe), pin its auth gate + shape.
+ * BullMQ queue status — pass 9 (revisited 2026-05-20).
+ *
+ * Status: the platform does NOT ship BullMQ — background work is
+ * managed by Trigger.dev (`packages/tasks/`). Grep confirms no
+ * package.json declares `bullmq` or `@nestjs/bullmq` as a dependency.
+ * Trigger.dev exposes its own dashboard and does not surface a
+ * generic `/api/queues` endpoint, so all probes below correctly miss
+ * and the spec skips. Keeping the file in place as a contract: if
+ * someone wires up BullMQ in the future, these tests will start
+ * exercising the real auth gate without further work.
+ *
+ * If a queue-status / job-state endpoint is exposed (admin dashboard
+ * / health probe), pin its auth gate + shape.
  */
 
 const QUEUE_PATHS = [

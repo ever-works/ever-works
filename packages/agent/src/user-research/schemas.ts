@@ -48,6 +48,7 @@ export const workProposalSchema = z.object({
             }),
         )
         .max(5),
+    generatedPrompt: z.string().min(20).max(1000),
     reasoning: z.string().max(280),
 });
 
@@ -78,6 +79,7 @@ export const permissiveWorkProposalSchema = z
         suggestedCategories: z.unknown().optional(),
         suggestedFields: z.unknown().optional(),
         recommendedPlugins: z.unknown().optional(),
+        generatedPrompt: z.unknown().optional(),
         reasoning: z.unknown().optional(),
     })
     .passthrough();
