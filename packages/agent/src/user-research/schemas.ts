@@ -70,41 +70,22 @@ export type WorkProposalsBatch = z.infer<typeof workProposalsBatchSchema>;
  * before persisting. Anything still un-salvageable is dropped, and we only
  * fail if zero valid proposals remain.
  */
-export const permissiveWorkProposalSchema = z.object({
-    title: z.string(),
-    description: z.string(),
-    slugSuggestion: z.string(),
-    suggestedCategories: z.array(
-        z.object({
-            name: z.string(),
-            slug: z.string(),
-        }),
-    ),
-    suggestedFields: z
-        .array(
-            z.object({
-                name: z.string(),
-                type: z.string(),
-            }),
-        )
-        .optional()
-        .default([]),
-    recommendedPlugins: z
-        .array(
-            z.object({
-                pluginId: z.string(),
-                reason: z.string(),
-            }),
-        )
-        .optional()
-        .default([]),
-    reasoning: z.string().optional().default(''),
-});
+export const permissiveWorkProposalSchema = z
+    .object({
+        title: z.unknown().optional(),
+        description: z.unknown().optional(),
+        slugSuggestion: z.unknown().optional(),
+        suggestedCategories: z.unknown().optional(),
+        suggestedFields: z.unknown().optional(),
+        recommendedPlugins: z.unknown().optional(),
+        reasoning: z.unknown().optional(),
+    })
+    .passthrough();
 
 export type PermissiveWorkProposalDraft = z.infer<typeof permissiveWorkProposalSchema>;
 
 export const permissiveWorkProposalsBatchSchema = z.object({
-    proposals: z.array(permissiveWorkProposalSchema),
+    proposals: z.array(permissiveWorkProposalSchema).optional().default([]),
 });
 
 export type PermissiveWorkProposalsBatch = z.infer<typeof permissiveWorkProposalsBatchSchema>;

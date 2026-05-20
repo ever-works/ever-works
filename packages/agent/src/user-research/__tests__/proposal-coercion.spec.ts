@@ -131,4 +131,34 @@ describe('coerceWorkProposal', () => {
         expect(result!.recommendedPlugins).toEqual([]);
         expect(result!.reasoning).toBe('');
     });
+
+    it('salvages malformed primitive/container values from loose LLM output', () => {
+        const result = coerceWorkProposal({
+            title: 123456789,
+            description:
+                'A curated Work of AI healthcare startups with funding, focus area, and website details.',
+            slugSuggestion: null,
+            suggestedCategories: [
+                { name: 'Diagnostics', slug: 42 },
+                { name: true, slug: 'clinical-ai' },
+                'bad category',
+            ],
+            suggestedFields: [
+                { name: 'Website', type: 'link' },
+                { name: 123, type: 'datetime' },
+            ],
+            recommendedPlugins: [{ pluginId: 7, reason: false }, 'bad plugin'],
+            reasoning: 99,
+        });
+
+        expect(result).not.toBeNull();
+        expect(result!.slugSuggestion).toBe('123456789');
+        expect(result!.suggestedCategories).toEqual([
+            { name: 'Diagnostics', slug: '42' },
+            { name: 'true', slug: 'clinical-ai' },
+        ]);
+        expect(result!.suggestedFields).toEqual([{ name: 'Website', type: 'url' }]);
+        expect(result!.recommendedPlugins).toEqual([{ pluginId: '7', reason: 'false' }]);
+        expect(result!.reasoning).toBe('99');
+    });
 });
