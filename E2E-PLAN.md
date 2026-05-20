@@ -91,7 +91,7 @@ then build out the feature backlog below.
   body. Now accepts `optOut` and `emailNotifications` (inverse alias) as
   optional booleans.
 - **1h** — Investigated; device-auth controller routes (`/api/device-auth/
-  :pluginId/{start,status}`) already match the e2e spec list. No code needed.
+:pluginId/{start,status}`) already match the e2e spec list. No code needed.
 - **1i** — Item bulk operations (`be3127d7`). New `BulkItemsController`
   with bulk-delete / bulk-update / bulk-publish; owner-gated via
   `ensureCanEdit`; 100-item cap; sequential loop (intentional — repo lock);
@@ -119,4 +119,3 @@ cover the env gaps that triggered the most skips.
 The `e2e (22.x)` job recovered to **1410 passed / 5 failed** mid-run on a
 flaky probe (handled in `75540f96`). After the SQLite-compat fix for
 magic-link (`d5a423f3`) the suite is expected to come back to clean green.
-
