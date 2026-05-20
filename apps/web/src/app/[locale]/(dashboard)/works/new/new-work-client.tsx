@@ -34,7 +34,7 @@ export default function NewWorkClient({
     proposal,
 }: NewWorkClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(
-        proposal ? 'manual' : null,
+        proposal ? 'ai' : null,
     );
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
         defaultProviderId || providers[0]?.provider.id || null,
@@ -264,6 +264,7 @@ export default function NewWorkClient({
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
+                        proposal={proposal ?? undefined}
                     />
                 )}
                 {creationMode === 'manual' && (

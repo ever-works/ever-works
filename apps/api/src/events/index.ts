@@ -62,6 +62,24 @@ export class UserForgotPasswordEvent extends BaseUserEvent {
     }
 }
 
+/**
+ * 1f — Magic-link issuance. The raw token is the link the user clicks;
+ * it never appears in any other surface (logs, response body, etc.).
+ * The mail listener stitches it into a verifiable URL and emails it.
+ */
+export class UserMagicLinkRequestedEvent extends BaseUserEvent {
+    static EVENT_NAME = 'user.magic_link_requested';
+
+    constructor(
+        public user: User,
+        public magicLinkToken: string,
+        public magicLinkUrl: string,
+        public expiresIn?: string, // e.g. '15 minutes'
+    ) {
+        super();
+    }
+}
+
 export class UserPasswordChangedEvent extends BaseUserEvent {
     static EVENT_NAME = 'user.password_changed';
 

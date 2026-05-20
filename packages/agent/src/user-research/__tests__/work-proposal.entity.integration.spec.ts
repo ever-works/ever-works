@@ -76,6 +76,7 @@ describe('WorkProposal entity', () => {
                 suggestedCategories: [{ name: 'OSS', slug: 'oss' }],
                 suggestedFields: [{ name: 'github_url', type: 'url' }],
                 recommendedPlugins: [{ pluginId: 'tavily', reason: 'search' }],
+                generatedPrompt: 'Create a Work of AI agent frameworks with links and summaries.',
                 reasoning: 'matches profile',
                 source: WorkProposalSource.AUTO_SIGNUP,
                 status: WorkProposalStatus.PENDING,
@@ -86,5 +87,6 @@ describe('WorkProposal entity', () => {
         expect(found.status).toBe(WorkProposalStatus.PENDING);
         expect(found.source).toBe(WorkProposalSource.AUTO_SIGNUP);
         expect(found.suggestedCategories).toEqual([{ name: 'OSS', slug: 'oss' }]);
+        expect(found.generatedPrompt).toContain('AI agent frameworks');
     });
 });

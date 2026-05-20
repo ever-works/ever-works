@@ -43,6 +43,8 @@ describe('workProposalSchema', () => {
         ],
         suggestedFields: [{ name: 'github_url', type: 'url' as const }],
         recommendedPlugins: [{ pluginId: 'tavily', reason: 'web search' }],
+        generatedPrompt:
+            'Create a Work of AI agent frameworks with open-source and commercial categories, links, and summaries.',
         reasoning: 'Matches profile expertise in AI agents.',
     };
 
@@ -84,6 +86,8 @@ describe('workProposalsBatchSchema', () => {
         ],
         suggestedFields: [],
         recommendedPlugins: [],
+        generatedPrompt:
+            'Create a Work of AI agent frameworks with categories, links, summaries, and useful metadata.',
         reasoning: 'reason',
     };
 
