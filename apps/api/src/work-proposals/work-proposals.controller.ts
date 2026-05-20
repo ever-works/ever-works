@@ -100,10 +100,23 @@ export class WorkProposalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: UpdateWorkProposalPreferencesDto,
     ) {
-        if (typeof body?.optOut !== 'boolean') {
-            throw new BadRequestException('optOut is required and must be boolean');
+        // Accept either field. `optOut` is the canonical persisted shape;
+        // `emailNotifications` is the web-client-friendly inverse
+        // (notifications on === !opted-out). Sending neither is fine —
+        // the partial PUT is a no-op and we re-read current state.
+        let nextOptOut: boolean | undefined;
+        if (typeof body?.optOut === 'boolean') {
+            nextOptOut = body.optOut;
+        } else if (typeof body?.emailNotifications === 'boolean') {
+            nextOptOut = !body.emailNotifications;
         }
-        return this.service.updatePreferences(auth.userId, body.optOut);
+        if (nextOptOut === undefined) {
+            // Caller sent a body that validated cleanly but contained
+            // neither field — return current prefs without touching the
+            // user row. This keeps the endpoint idempotent.
+            return this.service.getPreferences(auth.userId);
+        }
+        return this.service.updatePreferences(auth.userId, nextOptOut);
     }
 
     @Get(':id')

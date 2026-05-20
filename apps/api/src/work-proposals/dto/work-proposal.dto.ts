@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
 
 export class ListWorkProposalsQueryDto {
@@ -28,8 +28,22 @@ export class AcceptWorkProposalDto {
 }
 
 export class UpdateWorkProposalPreferencesDto {
-    @ApiProperty({ description: 'When true, the user opts out of background research.' })
-    optOut: boolean;
+    @ApiProperty({
+        description: 'When true, the user opts out of background research.',
+        required: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    optOut?: boolean;
+
+    @ApiProperty({
+        description:
+            'When true, the user receives proposal notification emails. Alias of !optOut for back-compat with the web client.',
+        required: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    emailNotifications?: boolean;
 }
 
 export class WorkProposalResponseDto {
