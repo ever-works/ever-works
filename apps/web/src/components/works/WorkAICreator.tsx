@@ -20,12 +20,15 @@ import { Lightbulb, Check } from 'lucide-react';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
+import type { WorkProposal } from '@/lib/api/work-proposals';
+import { acceptProposalAction } from '@/app/actions/dashboard/work-proposals';
 
 interface WorkAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
+    proposal?: WorkProposal;
 }
 
 export function WorkAICreator({
@@ -33,9 +36,10 @@ export function WorkAICreator({
     gitConnected,
     deployProvider,
     websiteTemplates,
+    proposal,
 }: WorkAICreatorProps) {
-    const [prompt, setPrompt] = useState('');
-    const [workName, setWorkName] = useState('');
+    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? '');
+    const [workName, setWorkName] = useState(proposal?.title ?? '');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
     const [websiteTemplateId, setWebsiteTemplateId] = useState('');
@@ -136,6 +140,9 @@ export function WorkAICreator({
                 }
 
                 if (result.work) {
+                    if (proposal) {
+                        acceptProposalAction(proposal.id, result.work.id).catch(() => undefined);
+                    }
                     router.push(ROUTES.DASHBOARD_WORK(result.work.id));
                 } else {
                     router.push(ROUTES.DASHBOARD_WORKS);

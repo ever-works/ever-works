@@ -12,6 +12,8 @@ const TITLE_MIN = 8;
 const TITLE_MAX = 80;
 const DESCRIPTION_MIN = 20;
 const DESCRIPTION_MAX = 280;
+const GENERATED_PROMPT_MIN = 20;
+const GENERATED_PROMPT_MAX = 1000;
 const REASONING_MAX = 280;
 const CATEGORIES_MIN = 2;
 const CATEGORIES_MAX = 8;
@@ -36,6 +38,27 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 function clipMax(s: string, max: number): string {
     return s.length > max ? s.slice(0, max).trimEnd() : s;
+}
+
+function buildFallbackGeneratedPrompt(input: {
+    title: string;
+    description: string;
+    suggestedCategories: Array<{ name: string; slug: string }>;
+    suggestedFields: Array<{ name: string; type: SuggestedFieldType }>;
+    recommendedPlugins: Array<{ pluginId: string; reason: string }>;
+}): string {
+    const categories = input.suggestedCategories.map((c) => c.name).join(', ');
+    const fields = input.suggestedFields.map((f) => `${f.name} (${f.type})`).join(', ');
+    const plugins = input.recommendedPlugins.map((p) => p.pluginId).join(', ');
+    const parts = [
+        `Create a Work named "${input.title}".`,
+        input.description,
+        categories ? `Organize it around these categories: ${categories}.` : '',
+        fields ? `Track these item fields where useful: ${fields}.` : '',
+        plugins ? `Use these relevant plugins if configured: ${plugins}.` : '',
+        'Research high-quality items and generate useful descriptions, categories, and metadata.',
+    ].filter(Boolean);
+    return clipMax(parts.join(' '), GENERATED_PROMPT_MAX);
 }
 
 /** Strip anything the strict slug regex `/^[a-z0-9]+(?:-[a-z0-9]+)*$/` rejects. */
@@ -124,6 +147,17 @@ export function coerceWorkProposal(draft: PermissiveWorkProposalDraft): WorkProp
         }))
         .slice(0, PLUGINS_MAX);
 
+    let generatedPrompt = clipMax(stringValue(draft.generatedPrompt).trim(), GENERATED_PROMPT_MAX);
+    if (generatedPrompt.length < GENERATED_PROMPT_MIN) {
+        generatedPrompt = buildFallbackGeneratedPrompt({
+            title,
+            description,
+            suggestedCategories,
+            suggestedFields,
+            recommendedPlugins,
+        });
+    }
+
     const reasoning = clipMax(stringValue(draft.reasoning).trim(), REASONING_MAX);
 
     const candidate = {
@@ -133,6 +167,7 @@ export function coerceWorkProposal(draft: PermissiveWorkProposalDraft): WorkProp
         suggestedCategories,
         suggestedFields,
         recommendedPlugins,
+        generatedPrompt,
         reasoning,
     };
 

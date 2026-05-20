@@ -18,6 +18,7 @@ export interface WorkProposal {
     suggestedCategories: Array<{ name: string; slug: string }>;
     suggestedFields: Array<{ name: string; type: string }>;
     recommendedPlugins: Array<{ pluginId: string; reason: string }>;
+    generatedPrompt: string;
     reasoning: string;
     source: WorkProposalSource;
     status: WorkProposalStatus;

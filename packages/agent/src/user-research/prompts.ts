@@ -55,6 +55,7 @@ For each proposal:
 - suggestedCategories: 2-8 categories with name + slug. Categories should partition the space meaningfully.
 - suggestedFields: optional custom fields (max 10). Common: github_url, pricing, screenshots, demo_url. Use the right type for each.
 - recommendedPlugins: 1-5 plugin IDs from the available list. Match plugins to the Work's needs (e.g., a code-tools directory benefits from "github").
+- generatedPrompt: a complete prompt for Ever Works AI creation. It should tell the AI what items to research, how many initial items to generate when obvious, what categories/fields to use, and any quality constraints. This is what pre-fills the user's "Describe Your Work" field.
 - reasoning: one sentence tying this proposal to specific facts about the user.
 
 ## QUALITY RULES
