@@ -15,11 +15,16 @@ export class AddWorkProposalGeneratedPrompt1779800000000 implements MigrationInt
                     "'Create a Work from this personalized idea. Research relevant items, categories, fields, and metadata based on the proposal details.'",
             }),
         );
-        await queryRunner.changeColumn(
-            'work_proposals',
-            'generatedPrompt',
-            new TableColumn({ name: 'generatedPrompt', type: 'text' }),
-        );
+        const driverType = queryRunner.connection.options.type;
+        if (driverType === 'postgres' || driverType === 'cockroachdb') {
+            await queryRunner.query(
+                'ALTER TABLE "work_proposals" ALTER COLUMN "generatedPrompt" DROP DEFAULT',
+            );
+        } else if (driverType === 'mysql' || driverType === 'mariadb') {
+            await queryRunner.query(
+                'ALTER TABLE `work_proposals` ALTER COLUMN `generatedPrompt` DROP DEFAULT',
+            );
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

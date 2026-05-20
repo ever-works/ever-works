@@ -21,7 +21,6 @@ import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
-import { acceptProposalAction } from '@/app/actions/dashboard/work-proposals';
 
 interface WorkAICreatorProps {
     gitProvider?: string;
@@ -131,6 +130,7 @@ export function WorkAICreator({
                 providers: buildSelectedProviders(formSchema),
                 pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 websiteTemplateId: websiteTemplateId || undefined,
+                proposalId: proposal?.id,
             });
 
             if (result.success) {
@@ -140,9 +140,6 @@ export function WorkAICreator({
                 }
 
                 if (result.work) {
-                    if (proposal) {
-                        acceptProposalAction(proposal.id, result.work.id).catch(() => undefined);
-                    }
                     router.push(ROUTES.DASHBOARD_WORK(result.work.id));
                 } else {
                     router.push(ROUTES.DASHBOARD_WORKS);
