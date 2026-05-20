@@ -18,6 +18,7 @@ export interface CreateWorkProposalInput {
     suggestedCategories: WorkProposalCategory[];
     suggestedFields: WorkProposalField[];
     recommendedPlugins: WorkProposalRecommendedPlugin[];
+    generatedPrompt: string;
     reasoning: string;
     source: WorkProposalSource;
     generationRunId?: string;

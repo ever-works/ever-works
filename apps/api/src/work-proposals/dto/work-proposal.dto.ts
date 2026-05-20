@@ -91,6 +91,10 @@ export class WorkProposalResponseDto {
     recommendedPlugins: Array<{ pluginId: string; reason: string }>;
 
     @ApiProperty()
+    @IsString()
+    generatedPrompt: string;
+
+    @ApiProperty()
     reasoning: string;
 
     @ApiProperty({ enum: WorkProposalSource })

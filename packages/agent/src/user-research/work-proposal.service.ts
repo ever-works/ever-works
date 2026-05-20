@@ -164,6 +164,7 @@ export class WorkProposalService {
             recommendedPlugins: (
                 p.recommendedPlugins as Array<{ pluginId: string; reason: string }>
             ).filter((rp) => pluginSet.has(rp.pluginId)),
+            generatedPrompt: p.generatedPrompt,
             reasoning: p.reasoning,
             source: opts.source,
             generationRunId: opts.generationRunId,

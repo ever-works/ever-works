@@ -73,6 +73,9 @@ export class WorkProposal {
     recommendedPlugins: WorkProposalRecommendedPlugin[];
 
     @Column({ type: 'text' })
+    generatedPrompt: string;
+
+    @Column({ type: 'text' })
     reasoning: string;
 
     @Column({ type: 'varchar', default: WorkProposalSource.AUTO_SIGNUP })
