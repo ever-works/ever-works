@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -11,7 +11,7 @@ import {
 } from '@/app/actions/dashboard/work-proposals';
 import { WorkProposalCard } from './WorkProposalCard';
 
-const POLL_INTERVAL_MS = 6_000;
+const POLL_INTERVAL_MS = 2_500;
 const POLL_MAX_MS = 120_000;
 
 interface WorkProposalsSectionProps {
@@ -34,6 +34,29 @@ export function WorkProposalsSection({
     const [pendingRefresh, startRefreshTransition] = useTransition();
     const [refreshError, setRefreshError] = useState<string | null>(null);
 
+    const refreshListAndStatus = useCallback(async () => {
+        const [status, list] = await Promise.all([
+            getProposalsStatusAction(),
+            listProposalsAction(),
+        ]);
+        setProposals(list);
+        setResearching(status.researching);
+        setCanRefresh(status.canRefresh);
+        return status;
+    }, []);
+
+    useEffect(() => {
+        setProposals(initialProposals);
+    }, [initialProposals]);
+
+    useEffect(() => {
+        setResearching(initiallyResearching);
+    }, [initiallyResearching]);
+
+    useEffect(() => {
+        setCanRefresh(initiallyCanRefresh);
+    }, [initiallyCanRefresh]);
+
     useEffect(() => {
         if (!researching) return;
         let cancelled = false;
@@ -41,33 +64,25 @@ export function WorkProposalsSection({
 
         const loop = async () => {
             while (!cancelled && Date.now() < deadline) {
-                await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-                if (cancelled) return;
                 try {
-                    const [status, list] = await Promise.all([
-                        getProposalsStatusAction(),
-                        listProposalsAction(),
-                    ]);
-                    if (cancelled) return;
-                    setProposals(list);
-                    setResearching(status.researching);
-                    setCanRefresh(status.canRefresh);
-                    if (!status.researching) return;
+                    const status = await refreshListAndStatus();
+                    if (cancelled || !status.researching) return;
                 } catch {
-                    // Network blip — keep polling until deadline.
+                    // Network blip: keep polling until deadline.
                 }
+
+                await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
             }
-            // Deadline reached while the server still reports researching —
-            // clear the spinner so the user isn't stuck. They can refresh manually.
+
             if (!cancelled) {
                 setResearching(false);
             }
         };
-        loop();
+        void loop();
         return () => {
             cancelled = true;
         };
-    }, [researching]);
+    }, [refreshListAndStatus, researching]);
 
     const handleRefresh = () => {
         setRefreshError(null);
@@ -76,6 +91,9 @@ export function WorkProposalsSection({
                 const result = await refreshProposalsAction();
                 if (result.status === 'queued') {
                     setResearching(true);
+                    window.setTimeout(() => {
+                        void refreshListAndStatus().catch(() => undefined);
+                    }, 1_000);
                 } else if (result.status === 'rate-limited') {
                     setRefreshError(t('errors.rateLimited'));
                     setCanRefresh(false);
@@ -92,8 +110,6 @@ export function WorkProposalsSection({
 
     const showEmpty = proposals.length === 0 && !researching;
     const showResearching = researching && proposals.length === 0;
-    // The button is meaningful only when the user has quota left or is
-    // already mid-run (in which case it doubles as the spinner indicator).
     const showRefreshButton = canRefresh || researching;
 
     return (
@@ -130,7 +146,7 @@ export function WorkProposalsSection({
             )}
 
             {showResearching && (
-                <div className="rounded-md p-5 bg-card dark:bg-surface-secondary-dark border border-card-border text-sm text-text-secondary dark:text-text-secondary-dark">
+                <div className="rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <div className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>{t('researching.title')}</span>
