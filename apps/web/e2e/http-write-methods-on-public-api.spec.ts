@@ -9,24 +9,24 @@ import { API_BASE } from './helpers/api';
  */
 
 const READ_ONLY_PUBLIC_PATHS = [
-	'/api/health',
-	'/api/version',
-	'/api/info',
-	'/api/works',
-	'/api/auth/providers',
-	'/.well-known/agent.json',
+    '/api/health',
+    '/api/version',
+    '/api/info',
+    '/api/works',
+    '/api/auth/providers',
+    '/.well-known/agent.json',
 ];
 
 const NON_GET_METHODS: Array<'PUT' | 'PATCH' | 'DELETE'> = ['PUT', 'PATCH', 'DELETE'];
 
 test.describe('Public API: write-method rejection shape', () => {
-	for (const path of READ_ONLY_PUBLIC_PATHS) {
-		for (const method of NON_GET_METHODS) {
-			test(`${method} ${path} returns 4xx, not 5xx`, async ({ request }) => {
-				const res = await request.fetch(`${API_BASE}${path}`, { method });
-				expect(res.status(), `${method} ${path}`).toBeLessThan(500);
-				expect(res.status(), `${method} ${path}`).toBeGreaterThanOrEqual(400);
-			});
-		}
-	}
+    for (const path of READ_ONLY_PUBLIC_PATHS) {
+        for (const method of NON_GET_METHODS) {
+            test(`${method} ${path} returns 4xx, not 5xx`, async ({ request }) => {
+                const res = await request.fetch(`${API_BASE}${path}`, { method });
+                expect(res.status(), `${method} ${path}`).toBeLessThan(500);
+                expect(res.status(), `${method} ${path}`).toBeGreaterThanOrEqual(400);
+            });
+        }
+    }
 });
