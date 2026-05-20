@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateObject } from 'ai';
 import { AiFacadeService } from '../facades/ai.facade';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -69,9 +68,9 @@ export class WorkProposalService {
             .map((p) => p.plugin.id)
             .filter(Boolean);
 
-        let resolvedModel;
         let providerName: string;
         let modelName: string;
+        let providerId: string;
         try {
             const resolved = await resolveAiProviderForResearch(
                 this.aiFacade,
@@ -87,7 +86,7 @@ export class WorkProposalService {
                     error: 'ai-provider-not-configured',
                 };
             }
-            resolvedModel = resolved.model;
+            providerId = resolved.providerId;
             providerName = resolved.providerName;
             modelName = resolved.modelName;
         } catch (err) {
@@ -102,18 +101,25 @@ export class WorkProposalService {
         try {
             // Use the permissive schema so low-quality model output (sloppy
             // slugs, wrong enum values, off-by-one length bounds) doesn't
-            // make generateObject reject the whole batch. coerceWorkProposal
+            // make JSON generation reject the whole batch. coerceWorkProposal
             // below clips/slugifies/filters each draft into the strict shape.
-            const result = await generateObject({
-                model: resolvedModel,
-                schema: permissiveWorkProposalsBatchSchema,
-                system: PROPOSALS_SYSTEM_PROMPT,
-                prompt: buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
-                temperature: 0.4,
-                maxRetries: 2,
-            });
+            const result = await this.aiFacade.askJson(
+                [
+                    PROPOSALS_SYSTEM_PROMPT,
+                    buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
+                ].join('\n\n'),
+                permissiveWorkProposalsBatchSchema,
+                {
+                    temperature: 0.4,
+                    routing: {
+                        providerOverride: providerId,
+                        modelOverride: modelName,
+                    },
+                },
+                { userId },
+            );
 
-            const raw = result.object.proposals ?? [];
+            const raw = result.result.proposals ?? [];
             drafts = raw
                 .map((p) => coerceWorkProposal(p))
                 .filter((p): p is WorkProposalDraft => p !== null);

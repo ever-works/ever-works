@@ -169,7 +169,14 @@ describe('EW-628 data-sync e2e — orchestration across G3 + G7 + controller', (
     const seedWork = (id: string, patch: Partial<Record<string, unknown>> = {}) => {
         const work = {
             id,
+            // Both shapes — the legacy `user` relation and the
+            // canonical `userId` foreign key. The data-sync controller
+            // now reads `work.userId` for the ownership gate, but the
+            // dispatcher / G7 code reads `work.user`. Keep both populated
+            // in the in-memory stub so each consumer sees what it
+            // expects.
             user: { id: 'user-1' },
+            userId: 'user-1',
             generateStatus: { status: GenerateStatusType.GENERATED },
             githubAppInstalled: false,
             syncIntervalMinutes: 5,

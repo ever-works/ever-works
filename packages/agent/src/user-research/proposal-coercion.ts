@@ -18,6 +18,22 @@ const CATEGORIES_MAX = 8;
 const FIELDS_MAX = 10;
 const PLUGINS_MAX = 5;
 
+function stringValue(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+}
+
+function arrayValue(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+}
+
 function clipMax(s: string, max: number): string {
     return s.length > max ? s.slice(0, max).trimEnd() : s;
 }
@@ -68,40 +84,47 @@ function coerceFieldType(raw: string): SuggestedFieldType | null {
  * or fewer than 2 valid categories — both are hard DB requirements).
  */
 export function coerceWorkProposal(draft: PermissiveWorkProposalDraft): WorkProposalDraft | null {
-    const title = clipMax(draft.title?.trim() ?? '', TITLE_MAX);
+    const title = clipMax(stringValue(draft.title).trim(), TITLE_MAX);
     if (title.length < TITLE_MIN) return null;
 
-    const description = clipMax(draft.description?.trim() ?? '', DESCRIPTION_MAX);
+    const description = clipMax(stringValue(draft.description).trim(), DESCRIPTION_MAX);
     if (description.length < DESCRIPTION_MIN) return null;
 
     // Slug derived from the LLM hint, falling back to the title so we never
     // bail on a missing/garbled slug.
-    const slugSuggestion = safeSlug(draft.slugSuggestion, title);
+    const slugSuggestion = safeSlug(stringValue(draft.slugSuggestion), title);
     if (slugSuggestion.length === 0) return null;
 
-    const suggestedCategories = (draft.suggestedCategories ?? [])
-        .map((c) => {
-            const slug = safeSlug(c.slug || c.name, c.name);
-            return slug.length > 0 ? { name: c.name?.trim() || slug, slug } : null;
+    const suggestedCategories = arrayValue(draft.suggestedCategories)
+        .map((raw) => {
+            const c = objectValue(raw);
+            const name = stringValue(c.name).trim();
+            const slug = safeSlug(stringValue(c.slug) || name, name);
+            return slug.length > 0 ? { name: name || slug, slug } : null;
         })
         .filter((c): c is { name: string; slug: string } => c !== null)
         .slice(0, CATEGORIES_MAX);
     if (suggestedCategories.length < CATEGORIES_MIN) return null;
 
-    const suggestedFields = (draft.suggestedFields ?? [])
-        .map((f) => {
-            const type = coerceFieldType(f.type ?? '');
-            return type ? { name: (f.name ?? '').trim() || type, type } : null;
+    const suggestedFields = arrayValue(draft.suggestedFields)
+        .map((raw) => {
+            const f = objectValue(raw);
+            const type = coerceFieldType(stringValue(f.type));
+            return type ? { name: stringValue(f.name).trim() || type, type } : null;
         })
         .filter((f): f is { name: string; type: SuggestedFieldType } => f !== null)
         .slice(0, FIELDS_MAX);
 
-    const recommendedPlugins = (draft.recommendedPlugins ?? [])
-        .filter((p) => typeof p.pluginId === 'string' && p.pluginId.trim().length > 0)
-        .map((p) => ({ pluginId: p.pluginId.trim(), reason: (p.reason ?? '').trim() }))
+    const recommendedPlugins = arrayValue(draft.recommendedPlugins)
+        .map((raw) => objectValue(raw))
+        .filter((p) => stringValue(p.pluginId).trim().length > 0)
+        .map((p) => ({
+            pluginId: stringValue(p.pluginId).trim(),
+            reason: stringValue(p.reason).trim(),
+        }))
         .slice(0, PLUGINS_MAX);
 
-    const reasoning = clipMax(draft.reasoning?.trim() ?? '', REASONING_MAX);
+    const reasoning = clipMax(stringValue(draft.reasoning).trim(), REASONING_MAX);
 
     const candidate = {
         title,

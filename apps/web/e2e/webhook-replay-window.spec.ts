@@ -14,6 +14,9 @@ import { API_BASE } from './helpers/api';
  */
 
 const WEBHOOK_PATHS = [
+    // Actual mounted route in apps/api/src/integrations/github-app/
+    // github-app-webhook.controller.ts.
+    '/api/github-app/webhooks',
     '/api/github-app/webhook',
     '/api/integrations/github-app/webhook',
     '/api/webhooks/github',
