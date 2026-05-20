@@ -33,6 +33,7 @@ import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
+import { UploadsModule } from './uploads/uploads.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -94,6 +95,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         WorkAgentModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
+        UploadsModule,
     ],
     providers: [
         {
