@@ -34,6 +34,7 @@ import { WorkAgentModule } from './work-agent/work-agent.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -96,6 +97,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
+        WebhooksModule,
     ],
     providers: [
         {
