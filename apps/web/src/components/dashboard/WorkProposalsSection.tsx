@@ -46,18 +46,6 @@ export function WorkProposalsSection({
     }, []);
 
     useEffect(() => {
-        setProposals(initialProposals);
-    }, [initialProposals]);
-
-    useEffect(() => {
-        setResearching(initiallyResearching);
-    }, [initiallyResearching]);
-
-    useEffect(() => {
-        setCanRefresh(initiallyCanRefresh);
-    }, [initiallyCanRefresh]);
-
-    useEffect(() => {
         if (!researching) return;
         let cancelled = false;
         const deadline = Date.now() + POLL_MAX_MS;
