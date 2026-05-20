@@ -117,7 +117,13 @@ export class User {
     // token only travels via the link in the issuance email. Same
     // PortableDateColumn dance as `lockedUntil` so sqlite + postgres
     // pick the right column type per dialect.
-    @Column({ nullable: true })
+    //
+    // Note: `type: 'varchar'` is REQUIRED — without it TypeORM tries to
+    // infer the column type from `string | null` and falls back to
+    // "Object", which better-sqlite3 then refuses with
+    // DataTypeNotSupportedError. This bites the e2e CI run (sqlite
+    // in-memory) but not Postgres prod, so it's easy to miss locally.
+    @Column({ type: 'varchar', nullable: true })
     magicLinkToken?: string | null;
 
     @PortableDateColumn({ nullable: true })
