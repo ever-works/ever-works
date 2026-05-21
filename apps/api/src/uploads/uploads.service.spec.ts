@@ -292,6 +292,19 @@ describe('UploadsService', () => {
             expect(captured[0].workId).toBe(workId);
         });
 
+        it('propagates workId into the returned URL as a ?workId= query (EW-644 Codex P1 #3)', async () => {
+            // Without this, github-storage `data-repo` keys (dr:<workId>:...)
+            // can't be reconstructed on the serve route.
+            const workId = '22222222-3333-4444-5555-666666666666';
+            const out = await svc.saveImage(userId, fakeFile({}), { workId });
+            expect(out.url).toMatch(/\?workId=22222222-3333-4444-5555-666666666666$/);
+        });
+
+        it('does not add a workId query string when no workId is provided', async () => {
+            const out = await svc.saveImage(userId, fakeFile({}));
+            expect(out.url).not.toContain('workId=');
+        });
+
         it('rejects a malformed workId before reaching the backend', async () => {
             await expect(
                 svc.saveImage(userId, fakeFile({}), { workId: 'not-a-uuid' }),

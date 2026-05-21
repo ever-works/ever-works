@@ -235,11 +235,25 @@ export class UploadsService {
         // the controller reads through `backend.getObject(deriveKey(...))`
         // to do the actual fetch. Operators who want a CDN / public-bucket
         // direct URL can still introspect the active plugin themselves.
+        // EW-644 (Codex P1, second-pass review): in `data-repo` mode the
+        // backend encoded the resolved `workId` into the storage key
+        // (`dr:<workId>:<path>`) and emitted a URL with `?workId=<id>`.
+        // We override the backend URL to the canonical API route (above
+        // PR #890 hardening), so we must propagate the `workId` query
+        // string here — without it, the serve route's
+        // `deriveKey(userId, filename, workId)` can't reconstruct the
+        // `dr:<workId>:...` key and the upload's URL serves 500 / wrong
+        // file. Backends that ignore `workId` (local-fs, S3, MinIO,
+        // github-storage in mode `separate-repo`) are unaffected — the
+        // query string is harmless extra metadata they don't read.
+        const url = workId
+            ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
+            : `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
         return {
             // `id` historically was the sha256 (object segment of the key).
             // Keep that shape for existing callers.
             id: hash,
-            url: `/api/uploads/${encodeURIComponent(userId)}/${filename}`,
+            url,
             filename,
             size: file.size,
             mimeType: sniffed.mime,
