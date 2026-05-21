@@ -819,6 +819,9 @@ importers:
       superjson:
         specifier: ^1.13.3
         version: 1.13.3
+      turndown:
+        specifier: ^7.2.2
+        version: 7.2.2
       typeorm:
         specifier: ^0.3.28
         version: 0.3.28(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
@@ -868,6 +871,9 @@ importers:
       '@types/semver':
         specifier: ^7.7.1
         version: 7.7.1
+      '@types/turndown':
+        specifier: ^5.0.5
+        version: 5.0.6
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
