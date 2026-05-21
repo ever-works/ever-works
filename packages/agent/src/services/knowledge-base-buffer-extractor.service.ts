@@ -216,9 +216,7 @@ export class KnowledgeBaseBufferExtractorService {
         try {
             markdown = this.turndown.turndown(html).trim();
         } catch (error) {
-            throw new Error(
-                `KB DOCX HTML→Markdown conversion failed: ${(error as Error).message}`,
-            );
+            throw new Error(`KB DOCX HTML→Markdown conversion failed: ${(error as Error).message}`);
         }
         if (!markdown) {
             throw new Error('KB DOCX extraction produced empty Markdown after Turndown pass');
