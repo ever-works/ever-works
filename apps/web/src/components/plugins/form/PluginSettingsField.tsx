@@ -13,6 +13,7 @@ import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
 import { GithubPackagesOAuthButton } from './GithubPackagesOAuthButton';
+import { GithubOwnerWidget, GithubRepoWidget } from './GithubRepoWidgets';
 import { isType, getPrimaryType } from './utils';
 
 interface PluginSettingsFieldProps {
@@ -25,6 +26,16 @@ interface PluginSettingsFieldProps {
     /** Plugin-validation result (e.g. detected IngressClass list for the
      *  k8s plugin). Custom widgets read fields off this. */
     validationDetails?: Record<string, unknown> | null;
+    /**
+     * EW-644 — optional sibling-field access. The form renderer can pass
+     * this so widgets that depend on other fields (e.g. `github-repo`
+     * lists repos for the currently-selected `owner`) can read/write
+     * sibling state without prop drilling through every callback.
+     */
+    siblings?: {
+        get: (name: string) => unknown;
+        set: (name: string, value: unknown) => void;
+    };
 }
 
 interface ClusterIngressClassDescriptor {
@@ -42,6 +53,7 @@ export function PluginSettingsField({
     onChange,
     pluginId,
     validationDetails,
+    siblings,
 }: PluginSettingsFieldProps) {
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
@@ -246,6 +258,28 @@ export function PluginSettingsField({
                     pluginId={pluginId}
                     value={String(value ?? schema.default ?? '')}
                     onChange={(val) => onChange(val || null)}
+                />
+            );
+        }
+
+        // EW-644 — GitHub owner / repo selectors for the github-storage
+        // plugin's `separate-repo` mode. Reuses the same OAuth-backed
+        // data layer the Work-creation flow uses.
+        if (schema.widget === 'github-owner') {
+            return (
+                <GithubOwnerWidget
+                    value={String(value ?? schema.default ?? '')}
+                    onChange={(v) => onChange(v)}
+                    siblings={siblings}
+                />
+            );
+        }
+        if (schema.widget === 'github-repo') {
+            return (
+                <GithubRepoWidget
+                    value={String(value ?? schema.default ?? '')}
+                    onChange={(v) => onChange(v)}
+                    siblings={siblings}
                 />
             );
         }

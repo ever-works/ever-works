@@ -36,6 +36,16 @@ export interface StoragePutInput {
 	 * derive the key prefix for the chosen layout.
 	 */
 	readonly ownerId?: string;
+	/**
+	 * Optional Work ID. Backends that resolve their destination per-Work
+	 * require this — e.g. `@ever-works/github-storage-plugin` in mode
+	 * `data-repo` uses it to look up the Work's data repo coordinates
+	 * (`Work.owner`, branch, OAuth token) at upload time. Backends that
+	 * don't care (local-fs, aws-s3, minio, github-storage in mode
+	 * `separate-repo`) ignore it. Anonymous uploads leave this undefined.
+	 * Added in EW-644.
+	 */
+	readonly workId?: string;
 }
 
 /**
@@ -126,8 +136,16 @@ export interface IStoragePlugin extends IPlugin {
 	 * to that shape — but any backend with a prefix MUST implement it,
 	 * otherwise owner-gated reads will 404 for files it successfully
 	 * wrote (Codex P1 finding on PR #890).
+	 *
+	 * EW-644 — the optional third argument is the `workId` the caller
+	 * received as a `?workId=` query param on the serve route. Backends
+	 * that resolve their destination per-Work (e.g. github-storage in
+	 * mode `data-repo`) encode it into the returned key so a subsequent
+	 * `getObject`/`deleteObject` can recover the Work's coordinates
+	 * without an external lookup. Backends that ignore `workId` (local-fs,
+	 * S3, MinIO) just emit the same shape as before.
 	 */
-	deriveKey?(ownerId: string, filename: string): string;
+	deriveKey?(ownerId: string, filename: string, workId?: string): string;
 
 	/**
 	 * Optional: delete every object stored under a given owner. Called

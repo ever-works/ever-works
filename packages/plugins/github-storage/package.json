@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/github-storage-plugin",
-	"version": "1.0.0",
-	"description": "GitHub-blob storage backend for Ever Works — stores uploaded objects as files in a configured repository. Only enabled when a GitHub token is configured.",
+	"version": "1.1.0",
+	"description": "GitHub-blob storage backend for Ever Works — stores uploaded objects as files in a configured repository or the Work's data repo. Supports Git LFS.",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
@@ -45,14 +45,15 @@
 		"plugin": {
 			"id": "github-storage",
 			"name": "GitHub Storage",
-			"version": "1.0.0",
+			"version": "1.1.0",
 			"category": "storage",
 			"capabilities": [
 				"storage",
 				"put-object",
-				"get-object"
+				"get-object",
+				"lfs"
 			],
-			"description": "Stores uploaded objects as files in a configured GitHub repository. Useful for low-traffic deployments that already have a GitHub PAT and want to avoid running a separate object store.",
+			"description": "Stores uploaded objects as commits in a GitHub repository. Pick between a dedicated storage repo or reusing the Work's existing data repo, with optional Git LFS support.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -61,22 +62,28 @@
 			"builtIn": false,
 			"envVars": [
 				{
+					"name": "GITHUB_STORAGE_MODE",
+					"required": false,
+					"secret": false,
+					"description": "`separate-repo` (default) or `data-repo`. `data-repo` reuses each Work's existing data repo and looks up coordinates per upload."
+				},
+				{
 					"name": "GITHUB_STORAGE_TOKEN",
 					"required": false,
 					"secret": true,
-					"description": "GitHub Personal Access Token with `contents:write` scope on the storage repo."
+					"description": "GitHub Personal Access Token with `contents:write` scope on the storage repo. Required in `separate-repo` mode; ignored in `data-repo` mode (the Work-owner OAuth token is used)."
 				},
 				{
 					"name": "GITHUB_STORAGE_OWNER",
 					"required": false,
 					"secret": false,
-					"description": "Owner (user or org) of the storage repository."
+					"description": "Owner (user or org) of the storage repository. Required in `separate-repo` mode."
 				},
 				{
 					"name": "GITHUB_STORAGE_REPO",
 					"required": false,
 					"secret": false,
-					"description": "Storage repository name."
+					"description": "Storage repository name. Required in `separate-repo` mode."
 				},
 				{
 					"name": "GITHUB_STORAGE_BRANCH",
@@ -89,6 +96,36 @@
 					"required": false,
 					"secret": false,
 					"description": "Prefix prepended to every blob path (default `uploads`)."
+				},
+				{
+					"name": "GITHUB_STORAGE_LFS_ENABLED",
+					"required": false,
+					"secret": false,
+					"description": "When true (default for fresh installs), uploads are stored as Git LFS objects with a pointer file in the tree. Defaults to false for already-deployed installs (set legacy env vars only, no mode set) to preserve byte-for-byte commit shape."
+				},
+				{
+					"name": "GITHUB_STORAGE_LFS_TRANSPORT",
+					"required": false,
+					"secret": false,
+					"description": "`api` (default) — uses the GitHub LFS Batch API directly over HTTPS, no binaries required. `git-cli` — shells out to `git` + `git-lfs` (both must be on PATH). The plugin probes for the binaries at boot when `git-cli` is selected and refuses to start if either is missing."
+				},
+				{
+					"name": "GITHUB_STORAGE_TRANSPORT",
+					"required": false,
+					"secret": false,
+					"description": "`auto` (default — picks per mode), `contents-api`, or `clone-and-push`. Controls how the pointer or blob is committed."
+				},
+				{
+					"name": "GITHUB_STORAGE_API_HOST",
+					"required": false,
+					"secret": false,
+					"description": "LFS Batch API host base. Defaults to `https://github.com`. GitHub Enterprise Server deployments set this to their host (e.g. `https://ghe.example.com`)."
+				},
+				{
+					"name": "GITHUB_STORAGE_DATA_REPO_BRANCH",
+					"required": false,
+					"secret": false,
+					"description": "Branch the `data-repo` mode resolver uses for every Work's data repo. Defaults to `main`. Set to `master` (or a custom branch) for repos that don't follow the modern default."
 				}
 			]
 		}
