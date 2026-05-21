@@ -32,13 +32,13 @@ Extend the plugin so the operator picks **where uploads land** (own repo vs. the
 
 ## 4. Concepts
 
-| Term                       | Meaning                                                                                                                                                                                                                                            |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Mode A — `separate-repo`** | Plugin owns the storage repo. Operator picks `owner`/`repo` once; every upload lands there. Backwards-compatible with today's behaviour.                                                                                                            |
-| **Mode B — `data-repo`**     | Plugin resolves the destination repo **per upload** from the Work's data-repo coordinates (`Work.owner`, plus the data repo identity already used by `MarkdownGeneratorService` and friends). No global owner/repo settings.                          |
-| **LFS pointer write**      | A tiny text file the size of a pointer that the git tree commits. The actual bytes live on GitHub's LFS storage host, addressed by `sha256:<digest>`.                                                                                                |
-| **LFS Batch API**          | The standard `POST {repo}.git/info/lfs/objects/batch` endpoint that, given `{oid, size, operation:'upload'}`, returns a signed URL to PUT the blob to. No git binary required.                                                                       |
-| **Transport**              | The mechanism used to write the final pointer-or-blob into the repo: `contents-api` (Octokit, no working tree) or `clone-and-push` (isomorphic-git, in-memory working tree — matches how the platform writes to data repos today).                  |
+| Term                         | Meaning                                                                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mode A — `separate-repo`** | Plugin owns the storage repo. Operator picks `owner`/`repo` once; every upload lands there. Backwards-compatible with today's behaviour.                                                                                           |
+| **Mode B — `data-repo`**     | Plugin resolves the destination repo **per upload** from the Work's data-repo coordinates (`Work.owner`, plus the data repo identity already used by `MarkdownGeneratorService` and friends). No global owner/repo settings.       |
+| **LFS pointer write**        | A tiny text file the size of a pointer that the git tree commits. The actual bytes live on GitHub's LFS storage host, addressed by `sha256:<digest>`.                                                                              |
+| **LFS Batch API**            | The standard `POST {repo}.git/info/lfs/objects/batch` endpoint that, given `{oid, size, operation:'upload'}`, returns a signed URL to PUT the blob to. No git binary required.                                                     |
+| **Transport**                | The mechanism used to write the final pointer-or-blob into the repo: `contents-api` (Octokit, no working tree) or `clone-and-push` (isomorphic-git, in-memory working tree — matches how the platform writes to data repos today). |
 
 ## 5. User-visible surface
 
@@ -69,14 +69,14 @@ The Owner / Repository selectors reuse `OwnerFilter` + the repo list from [`apps
 
 ### 5.2 Defaults
 
-| Setting        | Default for mode `separate-repo`            | Default for mode `data-repo`                |
-| -------------- | ------------------------------------------- | ------------------------------------------- |
-| `mode`         | `separate-repo` (preserves current behaviour) | —                                          |
-| `branch`       | `main` (existing default)                    | resolved from Work's data-repo metadata     |
-| `pathPrefix`   | `uploads`                                    | `uploads`                                   |
-| `lfsEnabled`   | `true`                                       | `true`                                      |
-| `lfsTransport` | `api`                                        | `api`                                       |
-| `transport`    | `auto` → `contents-api`                      | `auto` → `clone-and-push` (matches platform default) |
+| Setting        | Default for mode `separate-repo`              | Default for mode `data-repo`                         |
+| -------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `mode`         | `separate-repo` (preserves current behaviour) | —                                                    |
+| `branch`       | `main` (existing default)                     | resolved from Work's data-repo metadata              |
+| `pathPrefix`   | `uploads`                                     | `uploads`                                            |
+| `lfsEnabled`   | `true`                                        | `true`                                               |
+| `lfsTransport` | `api`                                         | `api`                                                |
+| `transport`    | `auto` → `contents-api`                       | `auto` → `clone-and-push` (matches platform default) |
 
 ### 5.3 Backwards compatibility
 
@@ -135,7 +135,7 @@ A new helper inside the plugin — `WorkRepoResolver` — converts a `workId` in
 // apps/api/src/uploads/storage-backend.factory.ts (new)
 const ctx = makeStubContext('github-storage');
 if (wanted === 'github-storage') {
-  (ctx as unknown as { workRepoResolver: WorkRepoResolver }).workRepoResolver = workRepoResolver;
+	(ctx as unknown as { workRepoResolver: WorkRepoResolver }).workRepoResolver = workRepoResolver;
 }
 await plugin.onLoad(ctx);
 ```
@@ -147,11 +147,11 @@ The plugin reads `context.workRepoResolver?.resolve(workId)` lazily on each `put
 LFS commits two artifacts:
 
 1. **The pointer file** at `<pathPrefix>/<owner>/<hash><ext>`. Content:
-   ```
-   version https://git-lfs.github.com/spec/v1
-   oid sha256:<sha256-of-content>
-   size <bytes>
-   ```
+    ```
+    version https://git-lfs.github.com/spec/v1
+    oid sha256:<sha256-of-content>
+    size <bytes>
+    ```
 2. **The `.gitattributes` file** at the repo root, ensuring `*` under the path prefix is tracked by LFS. The plugin adds the line `${pathPrefix}/** filter=lfs diff=lfs merge=lfs -text` **idempotently** (read current contents first, skip if already present).
 
 The blob upload itself happens **before** the pointer commit:
@@ -185,10 +185,10 @@ Requires `git` ≥ 2.40 and `git-lfs` ≥ 3.4 on `PATH`. Fail-fast with a clear 
 
 ### 6.6 Transport choice (non-LFS uploads)
 
-| Mode             | `transport: auto` resolves to    | Why                                                                                                                       |
-| ---------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `separate-repo`  | `contents-api`                   | Current behaviour. No churn for existing deployments.                                                                       |
-| `data-repo`      | `clone-and-push`                 | Matches how the platform writes to data repos elsewhere — see [`git-operations.ts`](../../../../packages/plugin/src/git/git-operations.ts). Same lock-file/refs pattern that the rest of the agent uses. |
+| Mode            | `transport: auto` resolves to | Why                                                                                                                                                                                                      |
+| --------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `separate-repo` | `contents-api`                | Current behaviour. No churn for existing deployments.                                                                                                                                                    |
+| `data-repo`     | `clone-and-push`              | Matches how the platform writes to data repos elsewhere — see [`git-operations.ts`](../../../../packages/plugin/src/git/git-operations.ts). Same lock-file/refs pattern that the rest of the agent uses. |
 
 Operators can override per-deployment via the explicit `contents-api` / `clone-and-push` values.
 

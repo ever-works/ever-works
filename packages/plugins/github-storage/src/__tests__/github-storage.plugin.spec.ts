@@ -15,7 +15,10 @@ const octokitMockState = {
 };
 
 class RequestErrorMock extends Error {
-	constructor(public status: number, message = 'fake') {
+	constructor(
+		public status: number,
+		message = 'fake'
+	) {
 		super(message);
 	}
 }

@@ -2,13 +2,7 @@ export { GitHubStoragePlugin } from './github-storage.plugin.js';
 export { GitHubStoragePlugin as default } from './github-storage.plugin.js';
 
 // LFS helpers (importable by the API for ad-hoc tooling / tests)
-export {
-	formatPointer,
-	parsePointer,
-	ensureGitattributes,
-	gitattributesLine,
-	type LfsPointer
-} from './lfs-pointer.js';
+export { formatPointer, parsePointer, ensureGitattributes, gitattributesLine, type LfsPointer } from './lfs-pointer.js';
 export {
 	lfsBatch,
 	lfsUpload,

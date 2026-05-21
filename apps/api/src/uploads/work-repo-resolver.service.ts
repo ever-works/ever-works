@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WorkRepository } from '@ever-works/agent/database';
 import { GitFacadeService } from '@ever-works/agent/facades';
-import type {
-    WorkRepoResolver,
-    ResolvedWorkRepo,
-} from '@ever-works/github-storage-plugin';
+import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-storage-plugin';
 
 /**
  * EW-644 — concrete `WorkRepoResolver` for the github-storage plugin's

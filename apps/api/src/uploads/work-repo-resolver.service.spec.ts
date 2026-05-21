@@ -14,7 +14,9 @@ type MockGitFacade = jest.Mocked<Pick<GitFacadeService, 'getAccessToken'>>;
 
 const workId = '11111111-2222-3333-4444-555555555555';
 
-function makeWork(overrides?: Partial<{ owner: string | undefined; slug: string; userId: string }>) {
+function makeWork(
+    overrides?: Partial<{ owner: string | undefined; slug: string; userId: string }>,
+) {
     const owner = overrides?.owner ?? 'acme';
     const slug = overrides?.slug ?? 'docs-site';
     const userId = overrides?.userId ?? 'user-42';

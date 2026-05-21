@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	formatPointer,
-	parsePointer,
-	ensureGitattributes,
-	gitattributesLine
-} from '../lfs-pointer.js';
+import { formatPointer, parsePointer, ensureGitattributes, gitattributesLine } from '../lfs-pointer.js';
 
 describe('lfs-pointer', () => {
 	describe('formatPointer', () => {
@@ -49,14 +44,8 @@ describe('lfs-pointer', () => {
 
 		it('rejects malformed oid or size', () => {
 			const oid = '3'.repeat(64);
-			expect(
-				parsePointer(`version https://git-lfs.github.com/spec/v1\noid sha256:short\nsize 1\n`)
-			).toBeNull();
-			expect(
-				parsePointer(
-					`version https://git-lfs.github.com/spec/v1\noid sha256:${oid}\nsize -3\n`
-				)
-			).toBeNull();
+			expect(parsePointer(`version https://git-lfs.github.com/spec/v1\noid sha256:short\nsize 1\n`)).toBeNull();
+			expect(parsePointer(`version https://git-lfs.github.com/spec/v1\noid sha256:${oid}\nsize -3\n`)).toBeNull();
 		});
 
 		it('refuses to treat oversized blobs as candidate pointer files', () => {
@@ -84,17 +73,12 @@ describe('lfs-pointer', () => {
 	describe('ensureGitattributes', () => {
 		it('returns null when the line is already present', () => {
 			expect(
-				ensureGitattributes(
-					'# comment\nuploads/** filter=lfs diff=lfs merge=lfs -text\n',
-					'uploads'
-				)
+				ensureGitattributes('# comment\nuploads/** filter=lfs diff=lfs merge=lfs -text\n', 'uploads')
 			).toBeNull();
 		});
 
 		it('appends the line with a newline separator when the file is missing', () => {
-			expect(ensureGitattributes(null, 'uploads')).toBe(
-				'uploads/** filter=lfs diff=lfs merge=lfs -text\n'
-			);
+			expect(ensureGitattributes(null, 'uploads')).toBe('uploads/** filter=lfs diff=lfs merge=lfs -text\n');
 		});
 
 		it('appends to existing content with proper newline handling', () => {

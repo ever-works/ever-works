@@ -23,17 +23,17 @@ Tasks are numbered T1…Tn. Each commit on the PR references its T-IDs in the bo
 ## Phase 3 — Plugin core: orchestrator (1 commit)
 
 - [ ] **T9.** Rewrite `github-storage.plugin.ts`:
-  - Read full settings (mode, transport, lfs*, owner/repo/branch/pathPrefix, token) from env + settings store.
-  - In `putObject({buffer, filename, ownerId, workId})`:
-    1. Resolve destination via `mode`. If `data-repo`, require `workId`; otherwise resolve from settings.
-    2. Compute `oid`, `size`, `ext`, `path = <pathPrefix>/<ownerId>/<oid><ext>`.
-    3. Pick `transport`: explicit value, or `auto` → `clone-and-push` for `data-repo`, `contents-api` for `separate-repo`.
-    4. If `lfsEnabled`:
-       - `await lfsBatch(...)` for upload action.
-       - If `actions.upload.href` present, `await lfsUpload(...)`.
-       - Ensure `.gitattributes` line exists for `pathPrefix` (read-then-write via the chosen transport, idempotent).
-       - Write pointer via transport.
-    5. Else: write raw bytes via transport (same shape as today).
+    - Read full settings (mode, transport, lfs\*, owner/repo/branch/pathPrefix, token) from env + settings store.
+    - In `putObject({buffer, filename, ownerId, workId})`:
+        1. Resolve destination via `mode`. If `data-repo`, require `workId`; otherwise resolve from settings.
+        2. Compute `oid`, `size`, `ext`, `path = <pathPrefix>/<ownerId>/<oid><ext>`.
+        3. Pick `transport`: explicit value, or `auto` → `clone-and-push` for `data-repo`, `contents-api` for `separate-repo`.
+        4. If `lfsEnabled`:
+            - `await lfsBatch(...)` for upload action.
+            - If `actions.upload.href` present, `await lfsUpload(...)`.
+            - Ensure `.gitattributes` line exists for `pathPrefix` (read-then-write via the chosen transport, idempotent).
+            - Write pointer via transport.
+        5. Else: write raw bytes via transport (same shape as today).
 - [ ] **T10.** `getObject`: if file content matches the pointer regex, fetch via LFS (use the batch API with `operation: download`); otherwise base64-decode the file content as today.
 - [ ] **T11.** `deleteObject`: unchanged for direct blobs. For LFS pointer files, delete the pointer commit and best-effort delete the LFS object (best-effort because the LFS purge endpoint is not always available; log a warning).
 - [ ] **T12.** Update `package.json` `everworks.plugin` block: bump version to `1.1.0`, add new env vars, add `"lfs"` to `capabilities`.
@@ -59,14 +59,14 @@ Tasks are numbered T1…Tn. Each commit on the PR references its T-IDs in the bo
 ## Phase 6 — End-to-end tests (1 commit)
 
 - [ ] **T25.** Playwright spec `apps/web/e2e/github-storage-settings.spec.ts`:
-  - Open `/dashboard/plugins/github-storage`.
-  - Toggle mode `separate-repo` → `data-repo` and assert owner/repo/branch/pathPrefix fields disappear.
-  - Toggle LFS on/off and assert the `lfsTransport` field shows/hides.
-  - Save, reload, assert persistence.
+    - Open `/dashboard/plugins/github-storage`.
+    - Toggle mode `separate-repo` → `data-repo` and assert owner/repo/branch/pathPrefix fields disappear.
+    - Toggle LFS on/off and assert the `lfsTransport` field shows/hides.
+    - Save, reload, assert persistence.
 - [ ] **T26.** Playwright spec `apps/web/e2e/github-storage-upload.spec.ts`:
-  - Mock the Octokit + LFS Batch API endpoints with `page.route(...)`.
-  - Post a small upload via the dashboard upload form.
-  - Assert: (a) LFS batch POST happened, (b) blob PUT to signed URL happened, (c) pointer commit PUT happened, (d) the file appears in the uploads list under the expected key.
+    - Mock the Octokit + LFS Batch API endpoints with `page.route(...)`.
+    - Post a small upload via the dashboard upload form.
+    - Assert: (a) LFS batch POST happened, (b) blob PUT to signed URL happened, (c) pointer commit PUT happened, (d) the file appears in the uploads list under the expected key.
 
 ## Phase 7 — PR + bot loop (NN #14 / #18 / #19)
 

@@ -57,28 +57,29 @@ expose an LFS object purge endpoint. This matches the standard
 The `transport` setting controls how the pointer or raw blob is
 committed:
 
-| Value             | Behaviour                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| `auto` (default)  | `contents-api` for `separate-repo`, `clone-and-push` for `data-repo`.                       |
-| `contents-api`    | Direct `Octokit.repos.createOrUpdateFileContents` call. No working tree.                    |
-| `clone-and-push`  | `isomorphic-git` clone + commit + push — the same path the rest of the platform uses for data-repo writes. |
+| Value            | Behaviour                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `auto` (default) | `contents-api` for `separate-repo`, `clone-and-push` for `data-repo`.                                      |
+| `contents-api`   | Direct `Octokit.repos.createOrUpdateFileContents` call. No working tree.                                   |
+| `clone-and-push` | `isomorphic-git` clone + commit + push — the same path the rest of the platform uses for data-repo writes. |
 
 A future ticket will add a `git-cli` LFS transport (shell-out to `git`
-+ `git-lfs`); the LFS Batch API is sufficient for github.com and avoids
-a runtime dependency on the binaries.
+
+- `git-lfs`); the LFS Batch API is sufficient for github.com and avoids
+  a runtime dependency on the binaries.
 
 ## Environment variables
 
-| Variable                       | Notes                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `GITHUB_STORAGE_MODE`          | `separate-repo` (default) or `data-repo`.                                                          |
-| `GITHUB_STORAGE_TOKEN`         | PAT with `contents:write` on the storage repo. Required in `separate-repo` mode.                  |
-| `GITHUB_STORAGE_OWNER`         | Required in `separate-repo` mode.                                                                 |
-| `GITHUB_STORAGE_REPO`          | Required in `separate-repo` mode.                                                                 |
-| `GITHUB_STORAGE_BRANCH`        | Default `main`.                                                                                   |
-| `GITHUB_STORAGE_PATH_PREFIX`   | Default `uploads`.                                                                                |
-| `GITHUB_STORAGE_LFS_ENABLED`   | `true`/`false`. See defaults above.                                                                |
-| `GITHUB_STORAGE_TRANSPORT`     | `auto` / `contents-api` / `clone-and-push`.                                                       |
+| Variable                         | Notes                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `GITHUB_STORAGE_MODE`            | `separate-repo` (default) or `data-repo`.                                                                                  |
+| `GITHUB_STORAGE_TOKEN`           | PAT with `contents:write` on the storage repo. Required in `separate-repo` mode.                                           |
+| `GITHUB_STORAGE_OWNER`           | Required in `separate-repo` mode.                                                                                          |
+| `GITHUB_STORAGE_REPO`            | Required in `separate-repo` mode.                                                                                          |
+| `GITHUB_STORAGE_BRANCH`          | Default `main`.                                                                                                            |
+| `GITHUB_STORAGE_PATH_PREFIX`     | Default `uploads`.                                                                                                         |
+| `GITHUB_STORAGE_LFS_ENABLED`     | `true`/`false`. See defaults above.                                                                                        |
+| `GITHUB_STORAGE_TRANSPORT`       | `auto` / `contents-api` / `clone-and-push`.                                                                                |
 | `GITHUB_STORAGE_PUBLIC_URL_BASE` | Optional: public raw URL base (e.g. CDN in front of a public repo). When unset, reads route through the authenticated API. |
 
 ## Tickets

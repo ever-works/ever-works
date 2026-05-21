@@ -80,9 +80,7 @@ describe('lfsBatch (upload)', () => {
 			async () =>
 				new Response(
 					JSON.stringify({
-						objects: [
-							{ oid: 'd'.repeat(64), size: 1, error: { code: 404, message: 'not found' } }
-						]
+						objects: [{ oid: 'd'.repeat(64), size: 1, error: { code: 404, message: 'not found' } }]
 					}),
 					{ status: 200, headers: { 'Content-Type': 'application/vnd.git-lfs+json' } }
 				)
@@ -123,9 +121,7 @@ describe('lfsUpload', () => {
 describe('lfsDownload', () => {
 	it('streams the body back as a Buffer', async () => {
 		const bytes = Buffer.from([1, 2, 3, 4, 5]);
-		const { fn } = mockFetch([
-			async () => new Response(new Uint8Array(bytes), { status: 200 })
-		]);
+		const { fn } = mockFetch([async () => new Response(new Uint8Array(bytes), { status: 200 })]);
 		const out = await lfsDownload({ href: 'https://lfs.example.com/dl' }, fn);
 		expect(out.ok).toBe(true);
 		if (out.ok) {

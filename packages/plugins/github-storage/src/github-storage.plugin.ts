@@ -14,12 +14,7 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { GitOperations } from '@ever-works/plugin/git';
-import {
-	formatPointer,
-	parsePointer,
-	ensureGitattributes,
-	gitattributesLine
-} from './lfs-pointer.js';
+import { formatPointer, parsePointer, ensureGitattributes, gitattributesLine } from './lfs-pointer.js';
 import { lfsBatch, lfsUpload, lfsDownload, type LfsBatchTarget } from './lfs-batch.js';
 import type { WorkRepoResolver, ResolvedWorkRepo } from './work-repo-resolver.js';
 
@@ -375,12 +370,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		});
 	}
 
-	private async commitFile(
-		cfg: ResolvedConfig,
-		path: string,
-		bytes: Buffer,
-		message: string
-	): Promise<void> {
+	private async commitFile(cfg: ResolvedConfig, path: string, bytes: Buffer, message: string): Promise<void> {
 		const transport = resolveTransport(cfg);
 		if (transport === 'clone-and-push') {
 			await this.commitViaCloneAndPush(cfg, path, bytes, message);
@@ -541,9 +531,7 @@ function readLfsEnabled(): boolean {
 		// existing deployments keep the same commit shape. Fresh
 		// deployments hit the schema default `true` instead.
 		const legacy =
-			!process.env.GITHUB_STORAGE_MODE &&
-			!!process.env.GITHUB_STORAGE_OWNER &&
-			!!process.env.GITHUB_STORAGE_REPO;
+			!process.env.GITHUB_STORAGE_MODE && !!process.env.GITHUB_STORAGE_OWNER && !!process.env.GITHUB_STORAGE_REPO;
 		return !legacy;
 	}
 	return /^(1|true|yes|on)$/i.test(raw);
