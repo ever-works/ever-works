@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    BadRequestException,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import type { IStoragePlugin } from '@ever-works/plugin';
@@ -85,7 +91,17 @@ export class UploadsService {
     private readonly maxSize: number;
     private backendPromise?: Promise<IStoragePlugin>;
 
-    constructor(backend?: IStoragePlugin) {
+    // EW-637 follow-up — `@Optional()` is REQUIRED here. `IStoragePlugin`
+    // is a TypeScript interface (erased at runtime), so Nest can't tell
+    // there's no provider it should try to resolve at index 0. Without
+    // `@Optional()`, every API boot dies with `UnknownDependenciesException:
+    // Nest can't resolve dependencies of the UploadsService (?)` — the
+    // agent unit tests pass (they instantiate directly with `new
+    // UploadsService(backend)`), but E2E / production boots crash. With
+    // `@Optional()` Nest passes `undefined` when no provider matches and
+    // the service falls back to `getActiveStorageBackend()` lazily on
+    // the first call. Tests still inject the backend via the constructor.
+    constructor(@Optional() backend?: IStoragePlugin) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
             this.backendPromise = Promise.resolve(backend);
