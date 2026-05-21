@@ -1,10 +1,18 @@
-import { IsString, IsOptional, IsNumber, IsArray, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, IsUUID, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SearchDto {
     @ApiProperty({ description: 'Search query', example: 'best project management tools' })
     @IsString()
     query: string;
+
+    @ApiPropertyOptional({
+        description: 'Optional work context for provider resolution and usage attribution',
+        example: 'a0499a65-9b8c-4bf7-857e-895f52da30b3',
+    })
+    @IsOptional()
+    @IsUUID()
+    workId?: string;
 
     @ApiPropertyOptional({
         description: 'Maximum number of results',

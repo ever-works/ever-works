@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import { PlatformSecretGuard } from './platform-secret.guard';
 
@@ -12,11 +12,17 @@ function ctxWithHeader(authorization?: string): ExecutionContext {
 
 describe('PlatformSecretGuard', () => {
     let guard: PlatformSecretGuard;
+    let warnSpy: jest.SpyInstance;
     const originalToken = process.env.PLATFORM_API_SECRET_TOKEN;
 
     beforeEach(() => {
+        warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
         guard = new PlatformSecretGuard();
         process.env.PLATFORM_API_SECRET_TOKEN = 'platform-shared-secret-value-32x';
+    });
+
+    afterEach(() => {
+        warnSpy.mockRestore();
     });
 
     afterAll(() => {

@@ -52,7 +52,7 @@ export class AdminUsageController {
 
     @Get()
     @ApiOperation({
-        summary: 'EW-602: cross-user × cross-Work spend (self-hosted admin)',
+        summary: 'Cross-user and cross-Work spend for self-hosted admins',
     })
     async list(@Query('period') period?: string): Promise<AdminUsageResponse> {
         const window = this.resolvePeriodWindow(period);

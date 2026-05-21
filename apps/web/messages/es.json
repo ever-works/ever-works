@@ -463,6 +463,37 @@
                 "description": "No pudimos conectar tu cuenta de {provider}. Por favor, inténtalo de nuevo."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideas para ti",
+                "titleWithName": "Ideas para ti, {username}"
+            },
+            "actions": {
+                "accept": "Usar esta idea",
+                "dismiss": "Descartar",
+                "dismissAria": "Descartar esta idea",
+                "refresh": "Sugerir más ideas"
+            },
+            "researching": {
+                "title": "Redactando ideas de tu perfil...",
+                "subtitle": "Esto suele tardar menos de un minuto."
+            },
+            "empty": {
+                "title": "No hay ideas por ahora.",
+                "subtitle": "Nuevas sugerencias aparecerán aquí cuando estén listas."
+            },
+            "errors": {
+                "rateLimited": "Límite diario alcanzado. Inténtalo de nuevo mañana.",
+                "generic": "No se pudieron actualizar las ideas. Por favor, inténtalo de nuevo."
+            },
+            "plugins": {
+                "label": "Plugins sugeridos"
+            }
+        },
+        "discover": {
+            "title": "Descubrir",
+            "subtitle": "Ideas de trabajo seleccionadas por IA adaptadas para ti."
+        },
         "header": {
             "welcome": "¡Bienvenido de nuevo, {username}!",
             "subtitle": "Gestiona tus trabajos impulsados por IA y sigue su rendimiento",
@@ -677,6 +708,7 @@
                 "apiKeys": "Claves API",
                 "data": "Datos",
                 "githubApp": "GitHub App",
+                "workAgent": "Agente de trabajo",
                 "gitProviders": "Proveedores de Git",
                 "dangerZone": "Zona de peligro"
             },
@@ -703,6 +735,72 @@
                 "branchUnknown": "Rama predeterminada no disponible",
                 "private": "Privado",
                 "public": "Público"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Agente de trabajo autónomo",
+                        "description": "Permite que el agente planifique, investigue y prepare trabajos a partir de objetivos de alto nivel."
+                    },
+                    "guardrails": {
+                        "title": "Limitaciones",
+                        "description": "Establece límites estrictos antes de que el agente pueda crear trabajos, agregar elementos o gastar presupuesto."
+                    },
+                    "queue": {
+                        "title": "Encolar objetivo",
+                        "description": "Dale al agente una instrucción general. Comienza como pendiente y se ejecuta dentro de tus limitaciones."
+                    },
+                    "liveRun": {
+                        "title": "Ejecución en vivo",
+                        "description": "Estado actual y actividad reciente del agente."
+                    },
+                    "recentGoals": {
+                        "title": "Objetivos recientes",
+                        "description": "Instrucciones del agente de trabajo pendientes, en ejecución y completadas."
+                    }
+                },
+                "fields": {
+                    "enabled": "Habilitar agente de trabajo",
+                    "autoApproveLowImpact": "Aprobar automáticamente cambios de bajo impacto",
+                    "dailySuggestions": "Sugerencias diarias",
+                    "dryRunByDefault": "Ejecución de prueba por defecto",
+                    "maxWorksPerRun": "Máximo de trabajos por ejecución",
+                    "maxItemsPerWork": "Máximo de elementos por trabajo",
+                    "maxBudgetPerRun": "Máximo de presupuesto por ejecución",
+                    "approvalThreshold": "Umbral de aprobación",
+                    "confirmBeforeCreate": "Confirmar antes de crear trabajos",
+                    "confirmBeforeDelete": "Confirmar antes de eliminar elementos",
+                    "dryRunThisGoal": "Ejecución de prueba para este objetivo"
+                },
+                "actions": {
+                    "saveSettings": "Guardar configuración",
+                    "queueGoal": "Encolar objetivo",
+                    "stop": "Detener"
+                },
+                "queue": {
+                    "placeholder": "Crear un trabajo de las 50 startups de IA en salud más importantes"
+                },
+                "metrics": {
+                    "works": "Trabajos",
+                    "items": "Elementos"
+                },
+                "labels": {
+                    "dryRun": "Ejecución de prueba",
+                    "liveRun": "Ejecución en vivo"
+                },
+                "empty": {
+                    "noActiveRun": "No hay ejecución activa del agente de trabajo.",
+                    "noGoals": "Aún no hay objetivos para el agente de trabajo.",
+                    "waitingForUpdate": "Esperando la primera actualización de ejecución."
+                },
+                "toasts": {
+                    "settingsSaved": "Configuración del agente de trabajo guardada",
+                    "settingsError": "Error al guardar la configuración",
+                    "goalQueued": "Objetivo del agente de trabajo en cola",
+                    "goalError": "Error al encolar el objetivo",
+                    "goalCanceled": "Objetivo del agente de trabajo cancelado",
+                    "cancelError": "Error al cancelar el objetivo"
+                }
             },
             "data": {
                 "exportTitle": "Exportar datos",
@@ -811,6 +909,11 @@
             "profile": {
                 "title": "Configuración de perfil",
                 "subtitle": "Actualiza la información de tu perfil y avatar",
+                "budgetAlerts": {
+                    "title": "Alertas de presupuesto por correo electrónico",
+                    "description": "Recibe un correo electrónico cuando el gasto mensual de un directorio supera el 75%, 90%, 100% o supera el límite. La notificación en la aplicación siempre se activa independientemente de esta configuración.",
+                    "toggleLabel": "Envíame alertas de presupuesto por correo electrónico"
+                },
                 "fields": {
                     "name": "Nombre",
                     "username": "Nombre de usuario",
@@ -953,6 +1056,30 @@
             "totalItems": "Total de elementos",
             "activeWebsites": "Sitios web activos",
             "fromLastMonth": "del último mes"
+        },
+        "adminUsage": {
+            "title": "Uso de la plataforma",
+            "description": "Gasto entre usuarios y directorios para el período actual. Solo para operadores auto-hospedados.",
+            "periodLabel": "{period}",
+            "totalSpend": "Gasto total: {amount}",
+            "empty": "No se registró uso en este período.",
+            "columnUser": "Usuario",
+            "columnEmail": "Correo electrónico",
+            "columnWork": "Directorio",
+            "columnUnits": "Unidades",
+            "columnCost": "Costo",
+            "loadFailed": "No se pudo cargar el uso administrativo. Es posible que no tengas acceso de administrador de plataforma."
+        },
+        "budgets": {
+            "overviewTitle": "Gasto en {period}",
+            "overviewProgressLabel": "{percent}% del límite de {cap}",
+            "overviewOverageSuffix": " (sobrecarga permitida)",
+            "overviewEmpty": "No se estableció un límite mensual. Agrega uno en Presupuestos y Uso para habilitar alertas.",
+            "topPluginsTitle": "Principales plugins por gasto",
+            "topPluginsEmpty": "Aún no se ha registrado uso en este período.",
+            "trendTitle": "Gasto diario — {period}",
+            "trendEmpty": "Aún no se ha registrado uso en este período.",
+            "trendDayLabel": "Día {day}"
         },
         "workCard": {
             "status": {
@@ -1453,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Cargar más",
+                    "loadingMore": "Cargando..."
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1480,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Vuelve a implementar el sitio del directorio con el punto final de actividades más reciente.",
+                        "disabled": "Activa la sincronización de actividades en Configuración para recopilar eventos del sitio.",
+                        "timeout": "Vuelve a intenta actualizar o verifica el sitio implementado si esto continúa ocurriendo.",
+                        "unauthorized": "Gira el secreto de sincronización de actividades, luego vuelve a implementar el sitio del directorio.",
+                        "upstream_5xx": "Verifica los registros del sitio implementado y vuelve a intentarlo después de que se recupere.",
+                        "network": "Verifica la URL del sitio implementado y la accesibilidad de la red.",
+                        "parse_error": "Vuelve a implementar el sitio del directorio para que devuelva la carga útil de actividades esperada."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
@@ -1553,6 +1691,11 @@
                     "screenshotError": "Ocurrió un error al capturar la captura de pantalla",
                     "featured": "Elemento destacado",
                     "featuredHelp": "Marca este elemento como destacado en el trabajo",
+                    "markdown": "Contenido (Markdown, opcional)",
+                    "markdownPlaceholder": "# Encabezado\n\nDescripción en formato largo. Soporta Markdown con sabor a GitHub.",
+                    "markdownHelp": "Cuerpo en formato largo para la página de detalles del elemento. Cuando está vacío, se usa un stub construido a partir de nombre + descripción + URL de origen. Soporta Markdown con sabor a GitHub.",
+                    "showPreview": "Vista previa",
+                    "hidePreview": "Ocultar vista previa",
                     "updateWithPR": "Crear solicitud de extracción",
                     "updateWithPRHelp": "Envía los cambios como una solicitud de extracción en lugar de un commit directo",
                     "cancel": "Cancelar",
@@ -1571,6 +1714,11 @@
                 },
                 "editDisplay": "Editar visualización",
                 "editDisplayDescription": "Alterna el estado destacado y establece el orden de visualización.",
+                "editContent": "Editar contenido",
+                "editContentDescription": "Edita el cuerpo en formato Markdown para este elemento. Se escribe en <slug>.md en el repositorio de datos.",
+                "editContentSuccess": "Contenido del elemento actualizado.",
+                "editContentFailed": "Error al actualizar el contenido del elemento.",
+                "editContentError": "Ocurrió un error al actualizar el contenido del elemento.",
                 "orderLabel": "Orden de visualización (opcional)",
                 "orderHelp": "Números más bajos se muestran antes dentro de los grupos destacados/no destacados.",
                 "deleteDialogTitle": "Eliminar elemento",
@@ -1939,7 +2087,72 @@
                 "tabs": {
                     "general": "General",
                     "members": "Miembros",
+                    "budgets": "Presupuestos",
                     "navigationLabel": "Pestañas de configuración"
+                },
+                "budgets": {
+                    "title": "Presupuestos y Uso",
+                    "description": "Establece límites mensuales de gasto para este directorio. Las alertas se activan en el 75%, 90%, 100%; en el 100% las nuevas llamadas de plugin se bloquean a menos que se permita sobrecarga.",
+                    "periodLabel": "{period} · gastado {spent}",
+                    "globalCap": {
+                        "heading": "Límite global",
+                        "capLabel": "Límite mensual ({currency})",
+                        "allowOverageLabel": "Permitir sobrecarga (advertir pero no bloquear en el 100%)",
+                        "createButton": "Crear límite global",
+                        "saveButton": "Guardar",
+                        "removeButton": "Eliminar",
+                        "rowSpend": "Gastado {spent} de {cap} ({percent}%)",
+                        "overageSuffix": " · sobrecarga permitida",
+                        "errorPositive": "Ingresa un valor de límite positivo (ej. 50.00).",
+                        "createSuccess": "Creación de presupuesto global exitosa",
+                        "createError": "Error en la creación de presupuesto global",
+                        "updateSuccess": "Actualización de presupuesto global exitosa",
+                        "updateError": "Error en la actualización de presupuesto global",
+                        "deleteSuccess": "Eliminación de presupuesto global exitosa",
+                        "deleteError": "Error en la eliminación de presupuesto global"
+                    },
+                    "pluginCaps": {
+                        "heading": "Límites por plugin",
+                        "subheading": "Opcional. Establece un límite para un plugin individual junto con el límite global.",
+                        "empty": "Sin límites por plugin. Agrega uno a continuación.",
+                        "rowSpend": "Gastado {spent} de {cap} ({percent}%)",
+                        "overageSuffix": " · sobrecarga permitida",
+                        "addHeading": "Agregar límite de plugin",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "ej. openai",
+                        "pluginSelectPlaceholder": "Selecciona un plugin...",
+                        "noEligiblePlugins": "Habilita un plugin de IA, búsqueda, captura de pantalla o extractor de contenido para este directorio para establecer un límite por plugin.",
+                        "allPluginsCapped": "Todos los plugins elegibles ya tienen un límite.",
+                        "noMatchingPlugins": "Ningún plugin coincide con esta búsqueda.",
+                        "capLabel": "Límite mensual ({currency})",
+                        "allowOverageLabel": "Permitir sobrecarga",
+                        "addButton": "Agregar límite",
+                        "saveButton": "Guardar",
+                        "deleteAria": "Eliminar presupuesto",
+                        "errorPluginRequired": "Se requiere el ID del plugin.",
+                        "errorPluginDuplicate": "Ya existe un presupuesto para este plugin.",
+                        "errorPositive": "Ingresa un valor de límite positivo.",
+                        "createSuccess": "Creación de presupuesto de plugin exitosa",
+                        "createError": "Error en la creación de presupuesto de plugin",
+                        "updateSuccess": "Actualización de presupuesto de plugin exitosa",
+                        "updateError": "Error en la actualización de presupuesto de plugin",
+                        "deleteSuccess": "Eliminación de presupuesto de plugin exitosa",
+                        "deleteError": "Error en la eliminación de presupuesto de plugin"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Gasto por plugin",
+                        "subheading": "{period} — desglose de solo lectura obtenido de PluginUsageEvent.",
+                        "empty": "No se registró uso en este período.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capacidad",
+                        "columnUnits": "Unidades",
+                        "columnCost": "Costo"
+                    },
+                    "export": {
+                        "downloadCsv": "Descargar CSV",
+                        "downloadingCsv": "Preparando CSV...",
+                        "csvFailed": "Error en la exportación de CSV"
+                    }
                 },
                 "sourceSettings": "Repositorio de origen",
                 "originalSource": "Origen original",
@@ -2247,6 +2460,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Cargando estado de implementación...",
+                    "openWebsite": "Abrir sitio web"
+                },
                 "noProviderAlert": {
                     "title": "Sin Proveedor de Despliegue",
                     "description": "Selecciona un proveedor de despliegue para desplegar tu sitio web de trabajo.",
@@ -2488,6 +2705,10 @@
                 "configureNow": "Configurar ahora",
                 "formTitle": "Crear Trabajo Manualmente",
                 "formSubtitle": "Configura tu trabajo con control total sobre cada configuración",
+                "proposalBanner": {
+                    "title": "Prellenado desde una sugerencia de IA.",
+                    "subtitle": "Ajusta algo antes de crear."
+                },
                 "basicInfo": "Información Básica",
                 "nameLabel": "Nombre del Trabajo *",
                 "namePlaceholder": "p. ej., Herramientas de IA Geniales",
@@ -2969,6 +3190,11 @@
             "disable": "Deshabilitar",
             "settings": "Configuración",
             "saveSettings": "Guardar configuración",
+            "saveAndVerify": "Guardar y verificar",
+            "verifiesOnSaveHint": "Guardar este plugin prueba la conexión y devuelve información del clúster/cuenta.",
+            "verifyClusterHeader": "Conectado al clúster '{name}' ({version}).",
+            "verifySuccessHeader": "Conexión verificada.",
+            "verifyNoIngressClasses": "No se encontró IngressClass en este clúster. Instala ingress-nginx o Traefik, luego vuelve a guardar para actualizar.",
             "settingsTitle": "Configuración del complemento",
             "settingsSaved": "Configuración guardada correctamente",
             "noSettings": "Este complemento no tiene configuración personalizable",
@@ -3028,7 +3254,15 @@
                 "addItem": "Añadir",
                 "modify": "Modificar",
                 "cancel": "Cancelar",
-                "enterNewValue": "Introducir nuevo valor..."
+                "enterNewValue": "Introducir nuevo valor...",
+                "clusterIngressClassPlaceholder": "ej. nginx",
+                "clusterIngressClassUseDefault": "Predeterminado de clúster",
+                "clusterIngressClassDefault": "predeterminado",
+                "clusterIngressClassUnknown": "controlador desconocido",
+                "clusterIngressClassPreVerify": "Guardar y verificar para detectar la lista de IngressClass de este clúster. Déjalo en blanco para el predeterminado del clúster.",
+                "clusterIngressClassEmpty": "No se detectó controlador de entrada. Instala ingress-nginx, Traefik u otro controlador en tu clúster, luego vuelve a guardar para actualizar esta lista.",
+                "githubPackagesOAuthConnect": "Autorizar con GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "Error al iniciar la autorización de GitHub. Vuelve a intentarlo o pega un PAT manualmente."
             },
             "oauth": {
                 "title": "Conexión de cuenta",
@@ -3081,6 +3315,7 @@
             "subtitle": "Explore las plantillas de sitio web integradas, administre su catálogo personal y controle qué plantilla usan los nuevos trabajos al comenzar.",
             "actions": {
                 "addTemplate": "Agregar plantilla personalizada",
+                "customizeTemplate": "Crear con IA",
                 "refreshTemplates": "Actualizar plantillas"
             },
             "hero": {
@@ -3117,6 +3352,8 @@
                 "fork": "Ramificar",
                 "edit": "Editar",
                 "archive": "Archivar",
+                "customizeAgain": "Personalizar de nuevo",
+                "viewStatus": "Ver estado de personalización",
                 "catalogOnly": "Elemento del catálogo",
                 "openRepository": "Abrir repositorio",
                 "previewAlt": "{name} vista previa",
@@ -3124,7 +3361,15 @@
                 "branch": "Rama: {branch}",
                 "syncBranches": "{count} ramas de sincronización",
                 "betaBranch": "Beta: {branch}",
-                "noDescription": "Aún no hay descripción."
+                "noDescription": "Aún no hay descripción.",
+                "status": {
+                    "pending": "En cola",
+                    "forking": "Realizando fork",
+                    "customizing": "Personalizando",
+                    "pushing": "Haciendo push",
+                    "succeeded": "Personalizado",
+                    "failed": "Última ejecución fallida"
+                }
             },
             "dialog": {
                 "title": "Agregar plantilla personalizada",
@@ -3198,7 +3443,70 @@
                 "refreshSuccess": "Catálogo de plantillas actualizado.",
                 "refreshFailed": "Error al actualizar las plantillas.",
                 "defaultUpdated": "Plantilla predeterminada actualizada.",
-                "defaultFailed": "Error al actualizar la plantilla predeterminada."
+                "defaultFailed": "Error al actualizar la plantilla predeterminada.",
+                "customizeFailed": "No se pudo iniciar la personalización de la plantilla.",
+                "customizationSucceeded": "Personalización de plantilla completada.",
+                "customizationFailed": "Falló la personalización de la plantilla."
+            },
+            "customizeDialog": {
+                "title": "Crear una plantilla personalizada con IA",
+                "titleIterate": "Personalizar {name} de nuevo",
+                "titleStatus": "Estado de personalización — {name}",
+                "description": "Duplicamos una plantilla base en un nuevo repositorio en tu cuenta de GitHub, luego ejecutamos tu agente de IA seleccionado sobre él para aplicar cambios solo de interfaz de usuario. La funcionalidad permanece sin cambios.",
+                "descriptionIterate": "Ejecutar otra ronda de ediciones del agente en el mismo repositorio. Se hace push de un nuevo commit cada vez.",
+                "descriptionStatus": "Estado en tiempo real de la última ejecución de personalización para esta plantilla.",
+                "templateLabel": "Plantilla",
+                "templateIterateHelp": "Ejecutando de nuevo en el repositorio de esta plantilla personalizada existente.",
+                "nameLabel": "Nombre de la plantilla",
+                "namePlaceholder": "p. ej. Tema Morado Oscuro",
+                "nameHelp": "Se muestra en tu catálogo y se usa para nombrar el nuevo repositorio de GitHub.",
+                "baseLabel": "Plantilla base",
+                "baseHelp": "Solo se enumeran las bases marcadas como personalizables por IA.",
+                "providerLabel": "Agente de edición de código",
+                "providerHelp": "Elige uno de tus complementos de edición de código instalados. El predeterminado está preseleccionado.",
+                "aiProviderLabel": "Proveedor de IA",
+                "aiProviderHelp": "{plugin} se ejecuta contra un LLM externo — elige cuál usar.",
+                "targetLabel": "Destino de GitHub",
+                "targetHelp": "Dónde crear el nuevo repositorio. Cuenta personal o una organización a la que perteneces.",
+                "personalTarget": "Cuenta personal ({login})",
+                "organizationTarget": "Organización ({login})",
+                "promptLabel": "Describe la interfaz de usuario que deseas",
+                "promptPlaceholder": "Ejemplo: cambiar a un tema oscuro con acentos morados sutiles, esquinas redondeadas y una tipografía moderna de serifas para los títulos.",
+                "promptIteratePlaceholder": "Ejemplo: aumentar el contraste de la barra lateral y cambiar la tipografía de los títulos a Inter.",
+                "promptHelp": "Sé específico sobre el estilo. Las nuevas características están fuera del alcance — solo interfaz de usuario.",
+                "submit": "Crear plantilla personalizada",
+                "submitIterate": "Ejecutar personalización",
+                "retry": "Reintentar",
+                "cancel": "Cancelar",
+                "done": "Hecho",
+                "successHelp": "Tu plantilla personalizada está lista. Ahora aparece en tu catálogo.",
+                "status": {
+                    "pending": "En cola…",
+                    "forking": "Provisionando el nuevo repositorio…",
+                    "customizing": "El agente está aplicando tus cambios…",
+                    "pushing": "Haciendo push de los cambios…",
+                    "succeeded": "Personalización completada con éxito.",
+                    "failed": "Falló la personalización."
+                },
+                "toast": {
+                    "started": "Personalización iniciada — esto normalmente toma unos minutos.",
+                    "success": "Plantilla personalizada con éxito.",
+                    "failed": "Falló la personalización de la plantilla.",
+                    "startFailed": "No se pudo iniciar la personalización."
+                },
+                "messages": {
+                    "nameRequired": "Se requiere el nombre de la plantilla.",
+                    "baseRequired": "Elige una plantilla base.",
+                    "providerRequired": "Elige un agente de edición de código.",
+                    "aiProviderRequired": "Elige un proveedor de IA para el agente seleccionado.",
+                    "promptTooShort": "Describe los cambios en al menos unas pocas palabras.",
+                    "noCustomizableBases": "No hay plantillas base personalizables disponibles.",
+                    "noProviders": "No hay complementos de agente de edición de código instalados o habilitados. Instala uno desde el catálogo de complementos (p. ej. claude-code, codex, gemini, opencode).",
+                    "noAiProviders": "{plugin} requiere un proveedor de IA, pero ninguno está instalado o habilitado. Instala uno (p. ej. openai, anthropic, google) desde el catálogo de complementos.",
+                    "noTargets": "Conecta una cuenta de GitHub para elegir un destino.",
+                    "browsePlugins": "Explorar catálogo de complementos",
+                    "noRuns": "Aún no hay ejecuciones de personalización para esta plantilla."
+                }
             }
         },
         "templateSelector": {
@@ -3343,6 +3651,7 @@
             "dashboard": "Panel",
             "activity": "Registro de actividad",
             "works": "Trabajos",
+            "discover": "Descubrir",
             "newWork": "Nuevo trabajo",
             "work": "Trabajo",
             "overview": "Resumen",

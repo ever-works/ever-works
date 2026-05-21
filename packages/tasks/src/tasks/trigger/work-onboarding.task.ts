@@ -58,12 +58,16 @@ export const workOnboardingTask = task({
         // (status URL + signed webhook + state marker) stable.
 
         logger.warn(
-            'work-onboarding.handoff_pending — final pipeline integration deferred to T9d completion',
+            'work-onboarding.handoff_pending — final pipeline integration is not wired yet',
             {
                 workId: payload.workId,
             },
         );
 
-        return { onboardingId: payload.onboardingId, workId: payload.workId, status: 'queued' };
+        return {
+            onboardingId: payload.onboardingId,
+            workId: payload.workId,
+            status: 'handoff-pending',
+        };
     },
 });
