@@ -195,3 +195,29 @@ describe('UploadsController', () => {
         });
     });
 });
+
+// ============================================================================
+// NestJS DI smoke test — guard against the EW-637 regression where
+// `UploadsService(backend?: IStoragePlugin)` lacked `@Optional()`. At
+// runtime `IStoragePlugin` is an erased TS interface, so Nest has no
+// token to resolve and the API boot dies with `UnknownDependenciesException`.
+// The agent unit tests above don't catch this — they `new UploadsService(...)`
+// and bypass DI entirely. Bootstrapping a TestingModule with the real
+// providers list is what would have flagged it pre-merge.
+// ============================================================================
+
+import { Test } from '@nestjs/testing';
+
+describe('UploadsService — Nest DI', () => {
+    it('resolves with no storage-plugin provider (falls back to factory)', async () => {
+        // No IStoragePlugin / no factory binding here — the service should
+        // accept that and lazily resolve on first call via the env-driven
+        // backend factory (which we DO NOT exercise in this test).
+        const moduleRef = await Test.createTestingModule({
+            providers: [UploadsService],
+        }).compile();
+        const svc = moduleRef.get(UploadsService);
+        expect(svc).toBeInstanceOf(UploadsService);
+        await moduleRef.close();
+    });
+});
