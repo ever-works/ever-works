@@ -49,7 +49,7 @@ export class UsageController {
 
     @Get('summary')
     @ApiOperation({
-        summary: 'EW-602: per-Work usage summary for a billing period',
+        summary: 'Per-Work usage summary for a billing period',
     })
     async getSummary(
         @CurrentUser() auth: AuthenticatedUser,
@@ -97,7 +97,7 @@ export class UsageController {
 
     @Get('export')
     @ApiOperation({
-        summary: 'EW-602: download per-Work usage events as CSV for the billing period',
+        summary: 'Download per-Work usage events as CSV for the billing period',
     })
     @Header('Cache-Control', 'no-store')
     async exportCsv(
@@ -172,7 +172,7 @@ export class UsageController {
 
     @Get('trend')
     @ApiOperation({
-        summary: 'EW-602: per-Work daily spend buckets across the billing period',
+        summary: 'Per-Work daily spend buckets across the billing period',
     })
     async getTrend(
         @CurrentUser() auth: AuthenticatedUser,

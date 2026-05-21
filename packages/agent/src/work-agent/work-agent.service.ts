@@ -97,15 +97,26 @@ export class WorkAgentService {
             const runRepo = manager.getRepository(WorkAgentRun);
             const logRepo = manager.getRepository(WorkAgentRunLog);
 
+            const effectiveGuardrails = this.mergeGuardrails(
+                preference.guardrails,
+                guardrailsOverride,
+            );
+            const agentPlanSummary = this.buildInitialPlanSummary(input.instruction, dryRun);
+            const approvalSummary = dryRun
+                ? 'Dry-run plan prepared. Review before enabling live execution.'
+                : 'Live execution requires approval before any Work is created.';
+
             const savedGoal = await goalRepo.save(
                 goalRepo.create({
                     userId,
                     instruction: input.instruction.trim(),
-                    status: WorkAgentGoalStatus.PENDING,
+                    status: WorkAgentGoalStatus.WAITING_FOR_APPROVAL,
                     source: WorkAgentGoalSource.USER,
                     dryRun,
                     guardrailsOverride:
                         Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
+                    agentPlanSummary,
+                    approvalSummary,
                 }),
             );
 
@@ -113,32 +124,39 @@ export class WorkAgentService {
                 runRepo.create({
                     userId,
                     goalId: savedGoal.id,
-                    status: WorkAgentRunStatus.QUEUED,
+                    status: WorkAgentRunStatus.WAITING_FOR_APPROVAL,
                     dryRun,
-                    progressPercent: 0,
+                    progressPercent: 10,
                     summary: {
-                        worksPlanned: 0,
+                        worksPlanned: Math.min(1, effectiveGuardrails.maxWorksPerRun),
                         worksCreated: 0,
-                        itemsPlanned: 0,
+                        itemsPlanned: effectiveGuardrails.maxItemsPerWork,
                         itemsCreated: 0,
-                        approvalsRequired: preference.autoApproveLowImpact ? 0 : 1,
+                        approvalsRequired: 1,
                     },
                 }),
             );
 
-            await logRepo.save(
+            await logRepo.save([
                 logRepo.create({
                     userId,
                     runId: savedRun.id,
                     level: WorkAgentRunLogLevel.INFO,
-                    step: 'queued',
-                    message: 'Goal queued for the Work agent.',
+                    step: 'plan-prepared',
+                    message: 'Goal converted into an approval-ready agent plan.',
                     metadata: {
                         dryRun,
-                        guardrails: this.mergeGuardrails(preference.guardrails, guardrailsOverride),
+                        guardrails: effectiveGuardrails,
                     },
                 }),
-            );
+                logRepo.create({
+                    userId,
+                    runId: savedRun.id,
+                    level: WorkAgentRunLogLevel.INFO,
+                    step: 'approval-required',
+                    message: approvalSummary,
+                }),
+            ]);
 
             return { goal: savedGoal, run: savedRun };
         });
@@ -311,6 +329,11 @@ export class WorkAgentService {
             return fallback;
         }
         return Math.min(max, Math.max(min, Math.trunc(value)));
+    }
+
+    private buildInitialPlanSummary(instruction: string, dryRun: boolean): string {
+        const mode = dryRun ? 'dry-run' : 'live';
+        return `Prepared a ${mode} Work-agent plan for: ${instruction.trim()}`;
     }
 
     private toPreferencesDto(preference: WorkAgentPreference): WorkAgentPreferencesDto {

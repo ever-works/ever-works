@@ -12,6 +12,7 @@ interface DegradedBannerProps {
 export function DegradedBanner({ degraded }: DegradedBannerProps) {
     const t = useTranslations('dashboard.workDetail.activity.degraded');
 
+    const actionLabel = t(`action.${degraded.reason}`);
     const lastSuccessLabel = degraded.lastSuccessAt
         ? t('lastSuccess', {
               time: formatDistanceToNow(new Date(degraded.lastSuccessAt), { addSuffix: true }),
@@ -47,6 +48,14 @@ export function DegradedBanner({ degraded }: DegradedBannerProps) {
                     <div className="mt-0.5 text-text-secondary dark:text-text-secondary-dark">
                         {lastSuccessLabel}
                     </div>
+                    <div className="mt-1 text-text-secondary dark:text-text-secondary-dark">
+                        {actionLabel}
+                    </div>
+                    {degraded.detail && (
+                        <code className="mt-1 block max-w-full truncate rounded bg-warning/10 px-1 py-0.5 text-[11px] text-warning-foreground dark:text-text-dark">
+                            {degraded.detail}
+                        </code>
+                    )}
                 </div>
             </div>
         </div>

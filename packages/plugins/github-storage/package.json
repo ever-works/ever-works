@@ -1,0 +1,96 @@
+{
+	"name": "@ever-works/github-storage-plugin",
+	"version": "1.0.0",
+	"description": "GitHub-blob storage backend for Ever Works — stores uploaded objects as files in a configured repository. Only enabled when a GitHub token is configured.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"octokit": "^4.0.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "github-storage",
+			"name": "GitHub Storage",
+			"version": "1.0.0",
+			"category": "storage",
+			"capabilities": [
+				"storage",
+				"put-object",
+				"get-object"
+			],
+			"description": "Stores uploaded objects as files in a configured GitHub repository. Useful for low-traffic deployments that already have a GitHub PAT and want to avoid running a separate object store.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"systemPlugin": false,
+			"builtIn": false,
+			"envVars": [
+				{
+					"name": "GITHUB_STORAGE_TOKEN",
+					"required": false,
+					"secret": true,
+					"description": "GitHub Personal Access Token with `contents:write` scope on the storage repo."
+				},
+				{
+					"name": "GITHUB_STORAGE_OWNER",
+					"required": false,
+					"secret": false,
+					"description": "Owner (user or org) of the storage repository."
+				},
+				{
+					"name": "GITHUB_STORAGE_REPO",
+					"required": false,
+					"secret": false,
+					"description": "Storage repository name."
+				},
+				{
+					"name": "GITHUB_STORAGE_BRANCH",
+					"required": false,
+					"secret": false,
+					"description": "Branch to commit blobs to (default `main`)."
+				},
+				{
+					"name": "GITHUB_STORAGE_PATH_PREFIX",
+					"required": false,
+					"secret": false,
+					"description": "Prefix prepended to every blob path (default `uploads`)."
+				}
+			]
+		}
+	}
+}

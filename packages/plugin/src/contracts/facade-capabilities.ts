@@ -12,7 +12,14 @@ export const PLUGIN_CAPABILITIES = {
 	GIT_PROVIDER: 'git-provider',
 	OAUTH: 'oauth',
 	DEVICE_AUTH: 'device-auth',
-	PROMPT_PROVIDER: 'prompt-provider'
+	PROMPT_PROVIDER: 'prompt-provider',
+	// EW-637 — pluggable object storage. `put-object` + `get-object` are the
+	// floor; `presigned-put` is opt-in for backends that can hand the
+	// browser a direct-upload URL (S3, MinIO).
+	STORAGE: 'storage',
+	PUT_OBJECT: 'put-object',
+	GET_OBJECT: 'get-object',
+	PRESIGNED_PUT: 'presigned-put'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

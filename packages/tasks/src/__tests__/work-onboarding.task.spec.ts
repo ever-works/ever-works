@@ -73,7 +73,7 @@ describe('workOnboardingTask', () => {
     });
 
     describe('run()', () => {
-        it('returns {onboardingId, workId, status:"queued"} envelope', async () => {
+        it('returns {onboardingId, workId, status:"handoff-pending"} envelope', async () => {
             const result = await registeredConfig.run({
                 onboardingId: 'onb-1',
                 workId: 'w-1',
@@ -82,7 +82,7 @@ describe('workOnboardingTask', () => {
             expect(result).toEqual({
                 onboardingId: 'onb-1',
                 workId: 'w-1',
-                status: 'queued',
+                status: 'handoff-pending',
             });
         });
 

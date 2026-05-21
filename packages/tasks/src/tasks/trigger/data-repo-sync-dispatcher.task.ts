@@ -66,7 +66,7 @@ export const dataRepoSyncDispatcherTask = schedules.task({
             const summary = await dispatcher.dispatchDue();
 
             (logger as { log?: (m: string) => void }).log?.(
-                `EW-628 dispatch tick — due=${summary.dueCount} dispatched=${summary.dispatched} skipped=${summary.skipped} failed=${summary.failed}`,
+                `Data-sync dispatch tick — due=${summary.dueCount} dispatched=${summary.dispatched} skipped=${summary.skipped} failed=${summary.failed}`,
             );
 
             return {

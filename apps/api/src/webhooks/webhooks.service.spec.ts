@@ -13,7 +13,8 @@ describe('WebhooksService', () => {
         createForAccount: jest.Mock;
         findById: jest.Mock;
         pause: jest.Mock;
-        repository: { update: jest.Mock; delete: jest.Mock };
+        updateSecret: jest.Mock;
+        delete: jest.Mock;
     };
     let secrets: WebhookSecretService;
     let service: WebhooksService;
@@ -37,10 +38,8 @@ describe('WebhooksService', () => {
             })),
             findById: jest.fn(),
             pause: jest.fn().mockResolvedValue(undefined),
-            repository: {
-                update: jest.fn().mockResolvedValue(undefined),
-                delete: jest.fn().mockResolvedValue(undefined),
-            },
+            updateSecret: jest.fn().mockResolvedValue(undefined),
+            delete: jest.fn().mockResolvedValue(undefined),
         };
         // Use real secret service in passthrough mode so we can assert
         // the raw secret shape without an encryption key.
@@ -162,7 +161,7 @@ describe('WebhooksService', () => {
                 accountId: 'someone-else',
             });
             await expect(service.remove(ACCOUNT, 'wh-other')).rejects.toThrow(NotFoundException);
-            expect(repo.repository.delete).not.toHaveBeenCalled();
+            expect(repo.delete).not.toHaveBeenCalled();
         });
 
         it("rotateSecret() on another account's row returns NotFound", async () => {
@@ -173,7 +172,7 @@ describe('WebhooksService', () => {
             await expect(service.rotateSecret(ACCOUNT, 'wh-other')).rejects.toThrow(
                 NotFoundException,
             );
-            expect(repo.repository.update).not.toHaveBeenCalled();
+            expect(repo.updateSecret).not.toHaveBeenCalled();
         });
     });
 
@@ -197,14 +196,10 @@ describe('WebhooksService', () => {
             const result = await service.rotateSecret(ACCOUNT, 'wh-1');
 
             expect(result.signingSecret).toMatch(/^[A-Za-z0-9_-]{43}$/);
-            expect(repo.repository.update).toHaveBeenCalledWith(
-                'wh-1',
-                expect.objectContaining({ secretEncrypted: expect.any(String) }),
-            );
+            expect(repo.updateSecret).toHaveBeenCalledWith('wh-1', expect.any(String));
             // The persisted encrypted value MUST be different from the
             // old one (we just rotated).
-            const writtenEncrypted = (repo.repository.update.mock.calls[0][1] as any)
-                .secretEncrypted as string;
+            const writtenEncrypted = repo.updateSecret.mock.calls[0][1] as string;
             expect(writtenEncrypted).not.toBe('old-encrypted');
         });
     });

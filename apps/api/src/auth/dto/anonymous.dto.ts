@@ -20,7 +20,7 @@ export class CreateAnonymousDto {
 
     @ApiPropertyOptional({
         description:
-            'UUID minted client-side at the start of the zero-friction funnel (EW-617). Used to stitch funnel events together in PostHog.',
+            'UUID minted client-side at the start of the zero-friction funnel. Used to stitch funnel events together in PostHog.',
         format: 'uuid',
     })
     @IsOptional()

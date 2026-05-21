@@ -8,6 +8,7 @@ import {
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../../plugins/repositories/work-plugin.repository';
+import { PluginUsageService } from '../../usage/plugin-usage.service';
 import type {
     IAiProviderPlugin,
     PluginManifest,
@@ -19,6 +20,7 @@ describe('AiFacadeService', () => {
     let service: AiFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
     let settingsService: jest.Mocked<PluginSettingsService>;
+    let pluginUsageService: jest.Mocked<Pick<PluginUsageService, 'record'>>;
 
     const defaultFacadeOptions = { userId: 'test-user' };
 
@@ -116,6 +118,10 @@ describe('AiFacadeService', () => {
     });
 
     beforeEach(async () => {
+        pluginUsageService = {
+            record: jest.fn().mockResolvedValue(null),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AiFacadeService,
@@ -132,6 +138,10 @@ describe('AiFacadeService', () => {
                     useValue: {
                         getSettings: jest.fn().mockResolvedValue({}),
                     },
+                },
+                {
+                    provide: PluginUsageService,
+                    useValue: pluginUsageService,
                 },
             ],
         }).compile();
@@ -501,6 +511,63 @@ describe('AiFacadeService', () => {
             ).rejects.toThrow('Rate limit');
 
             expect(aiPlugin.askJson).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('createStreamingChatCompletion', () => {
+        it('records completed streaming calls with work/user attribution', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const chunks = [];
+            for await (const chunk of service.createStreamingChatCompletion(
+                { messages: [{ role: 'user', content: 'hello' }] },
+                { userId: 'user-1', workId: 'work-1' },
+            )) {
+                chunks.push(chunk);
+            }
+
+            expect(chunks).toHaveLength(2);
+            expect(pluginUsageService.record).toHaveBeenCalledWith({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'openai-provider',
+                capability: 'ai',
+                units: 2,
+                costCents: 0,
+                modelId: 'gpt-4',
+                metadata: {
+                    operation: 'createStreamingChatCompletion',
+                    chunkCount: 2,
+                    contentChars: 4,
+                },
+            });
+        });
+
+        it('does not surface usage recording failures as stream errors', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            pluginUsageService.record.mockRejectedValueOnce(new Error('db down'));
+
+            const chunks = [];
+            await expect(
+                (async () => {
+                    for await (const chunk of service.createStreamingChatCompletion(
+                        { messages: [{ role: 'user', content: 'hello' }] },
+                        { userId: 'user-1', workId: 'work-1' },
+                    )) {
+                        chunks.push(chunk);
+                    }
+                })(),
+            ).resolves.toBeUndefined();
+
+            expect(chunks).toHaveLength(2);
         });
     });
 

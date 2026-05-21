@@ -50,7 +50,7 @@ test.describe('Session — token lifecycle and idle-timeout contract', () => {
         }
         const exp = typeof payload.exp === 'number' ? payload.exp : undefined;
         if (!exp) test.skip(true, 'no exp claim on JWT');
-        const expMs = exp * 1000;
+        const expMs = exp! * 1000;
         const futureMs = expMs - Date.now();
         // ≥ 1 hour (3600s) is industry typical for access tokens.
         // Some apps use shorter (15 min) — soft-warn instead.

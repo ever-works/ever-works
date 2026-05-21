@@ -31,6 +31,7 @@ export class BatchDeployDto {
 
 export class BatchDeployItemResultDto {
     workId: string;
+    deploymentId?: string;
     slug: string;
     status: 'pending' | 'error';
     message: string;

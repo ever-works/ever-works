@@ -29,7 +29,7 @@ test.describe("OAuth CSRF — state issued for user A is rejected at user B's ca
         if (!aliceRes.ok()) test.skip(true, '/connect/url not available');
         const aliceUrl = extractAuthorizeUrl(await aliceRes.json().catch(() => null));
         if (!aliceUrl) test.skip(true, 'no URL field in connect/url body');
-        const aliceState = new URL(aliceUrl).searchParams.get('state');
+        const aliceState = new URL(aliceUrl!).searchParams.get('state');
         if (!aliceState) test.skip(true, 'no state on authorize URL');
         // Codex P1: a bare 4xx assertion isn't enough — the same 4xx
         // would also fire when an INVALID `code` is exchanged with a
@@ -42,7 +42,7 @@ test.describe("OAuth CSRF — state issued for user A is rejected at user B's ca
         // different status or error shape than (B), which gets past
         // state and fails at the code exchange.
         const bobAttempt = await request.get(
-            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(aliceState)}`,
+            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(aliceState!)}`,
             { headers: authedHeaders(bob.access_token) },
         );
         expect(
@@ -58,10 +58,10 @@ test.describe("OAuth CSRF — state issued for user A is rejected at user B's ca
         if (!aliceRes2.ok()) test.skip(true, 'second /connect/url failed');
         const aliceUrl2 = extractAuthorizeUrl(await aliceRes2.json().catch(() => null));
         if (!aliceUrl2) test.skip(true, 'no URL in second connect/url');
-        const aliceState2 = new URL(aliceUrl2).searchParams.get('state');
+        const aliceState2 = new URL(aliceUrl2!).searchParams.get('state');
         if (!aliceState2) test.skip(true, 'no state on second connect/url');
         const aliceAttempt = await request.get(
-            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(aliceState2)}`,
+            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(aliceState2!)}`,
             { headers: authedHeaders(alice.access_token) },
         );
         // The differentiator: when Bob uses Alice's state, the state
@@ -90,10 +90,10 @@ test.describe("OAuth CSRF — state issued for user A is rejected at user B's ca
         if (!aliceRes.ok()) test.skip(true, '/connect/url not available');
         const aliceUrl = extractAuthorizeUrl(await aliceRes.json().catch(() => null));
         if (!aliceUrl) test.skip(true, 'no URL');
-        const state = new URL(aliceUrl).searchParams.get('state');
+        const state = new URL(aliceUrl!).searchParams.get('state');
         if (!state) test.skip(true, 'no state');
         const res = await request.get(
-            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(state)}`,
+            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(state!)}`,
         );
         expect(
             res.status(),

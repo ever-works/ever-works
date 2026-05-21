@@ -1,10 +1,33 @@
-import { BadRequestException, HttpStatus } from '@nestjs/common';
+// EW-637 — UploadsController transitively imports AnonymousAuthService,
+// which pulls in @ever-works/agent/database (TypeORM repositories). The
+// database module's @src/config alias is resolvable in the API runtime
+// but not in this isolated jest context, so we mock the agent surface
+// the same way auth.controller.spec.ts does.
+jest.mock('@ever-works/agent/database', () => ({}));
+
+import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
+import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
+import type { PluginContext } from '@ever-works/plugin';
+import type { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+
+const stubContext = (id: string): PluginContext => {
+    const log = new Logger(`StoragePlugin/${id}`);
+    return {
+        pluginId: id,
+        logger: {
+            log: (m: string) => log.log(m),
+            error: (m: string) => log.error(m),
+            warn: (m: string) => log.warn(m),
+            debug: (m: string) => log.debug(m),
+        },
+    } as unknown as PluginContext;
+};
 
 const TINY_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAarVyFEAAAAASUVORK5CYII=',
@@ -76,15 +99,25 @@ describe('UploadsController', () => {
     let controller: UploadsController;
     let service: UploadsService;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         root = resolve(
             tmpdir(),
             `ever-works-uploads-ctl-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         );
         process.env.UPLOADS_DIR = root;
         delete process.env.UPLOADS_MAX_BYTES;
-        service = new UploadsService();
-        controller = new UploadsController(service);
+        const backend = new LocalFsStoragePlugin();
+        await backend.onLoad(stubContext('local-fs'));
+        service = new UploadsService(backend);
+        // The anonymous-auth service is only invoked by /anonymous and
+        // /presign endpoints — pass a stub that throws if these tests
+        // ever exercise it accidentally.
+        const anonStub = {
+            createAnonymousUser: () => {
+                throw new Error('AnonymousAuthService stub: not expected in these tests');
+            },
+        } as unknown as AnonymousAuthService;
+        controller = new UploadsController(service, anonStub);
     });
 
     afterEach(async () => {

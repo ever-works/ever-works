@@ -1580,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Зареди още",
+                    "loadingMore": "Зареждане..."
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1607,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Преизградете директорията на сайта с последния крайна точка на активност.",
+                        "disabled": "Включете синхронизацията на активност в Настройки, за да събирате събития от сайта.",
+                        "timeout": "Опитайте отново опресняването или проверете внедрен сайт, ако това продължава.",
+                        "unauthorized": "Променете тайната за синхронизация на активността, след това преизградете директорията на сайта.",
+                        "upstream_5xx": "Проверете дневниците на внедрения сайт и опитайте отново след възстановяването му.",
+                        "network": "Проверете URL адреса на внедрения сайт и достъпа до мрежата.",
+                        "parse_error": "Преизградете директорията на сайта, така че да връща очаквания активен товар."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"

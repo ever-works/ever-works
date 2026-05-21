@@ -1,8 +1,8 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { promises as fs } from 'node:fs';
-import { join, resolve, normalize, sep } from 'node:path';
-import { tmpdir } from 'node:os';
+import { extname } from 'node:path';
+import type { IStoragePlugin } from '@ever-works/plugin';
+import { getActiveStorageBackend } from './storage-backend.factory';
 
 export interface UploadResult {
     id: string;
@@ -11,6 +11,13 @@ export interface UploadResult {
     size: number;
     mimeType: string;
     hash: string;
+    /**
+     * Opaque storage-backend key. Same as `id` for the legacy local-fs
+     * layout; for other backends (S3, MinIO, GitHub) this may differ.
+     * The anonymous-upload flow returns it as `uploadId` so the website
+     * can hand it back when submitting the prompt.
+     */
+    key?: string;
 }
 
 /**
@@ -55,33 +62,61 @@ const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/web
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MiB
 
+/**
+ * EW-637 — UploadsService is now the validation + dispatch layer in front
+ * of an `IStoragePlugin`. The storage backend is selected at boot time by
+ * `STORAGE_BACKEND` (default `local-fs`); the validation, MIME sniffing,
+ * size cap, and user-scoping rules live HERE so they apply uniformly
+ * regardless of the active backend.
+ *
+ * Backwards-compatibility:
+ *  - `saveImage(userId, file)` and `readFile(userId, filename)` retain
+ *    their original signatures + response shapes. The existing controller
+ *    and unit tests don't need changes; `id`/`filename`/`url` keep the
+ *    same look. Internally, `id` is now `<sha256>` (the storage key's
+ *    object segment) — same as before for the disk backend.
+ *  - The constructor takes an optional `IStoragePlugin`. The DI module
+ *    wires in the env-selected backend; tests can pass a custom one or
+ *    fall back to local-fs (default `STORAGE_BACKEND`).
+ */
 @Injectable()
 export class UploadsService {
     private readonly logger = new Logger(UploadsService.name);
-    private readonly storageRoot: string;
     private readonly maxSize: number;
+    private backendPromise?: Promise<IStoragePlugin>;
 
-    constructor() {
-        // `UPLOADS_DIR` is an operator-controlled absolute path; default
-        // to a per-process tmp dir so dev / CI work out of the box and
-        // never collide with another instance.
-        this.storageRoot = resolve(process.env.UPLOADS_DIR || join(tmpdir(), 'ever-works-uploads'));
+    constructor(backend?: IStoragePlugin) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
+        if (backend) {
+            this.backendPromise = Promise.resolve(backend);
+        }
+    }
+
+    /**
+     * Returns the active storage backend, instantiating it once and reusing
+     * the same instance for the lifetime of the service. Exposed for the
+     * controller's presign / availability checks.
+     */
+    async getBackend(): Promise<IStoragePlugin> {
+        if (!this.backendPromise) {
+            this.backendPromise = getActiveStorageBackend();
+        }
+        return this.backendPromise;
     }
 
     /**
      * Validate + persist an uploaded image. Returns the canonical
      * reference shape (id + url + metadata). Throws BadRequestException
-     * for any validation failure — never lets bad bytes hit disk.
+     * for any validation failure — never lets bad bytes hit storage.
      *
      * Security properties pinned by the test suite:
      *  - MIME must be in the allow-list (no SVG, no octet-stream)
      *  - Magic bytes MUST match the declared MIME (no lying)
      *  - Size must be <= configured max
-     *  - Storage path is user-scoped so a stranger can never see / overwrite
-     *    another user's files even if they guess the filename
+     *  - Storage is user-scoped via the active plugin so a stranger can never see /
+     *    overwrite another user's files even if they guess the filename
      *  - Filename is derived from the SHA-256 of the bytes; no part of
-     *    the client-supplied originalname reaches disk (defeats path
+     *    the client-supplied originalname reaches storage (defeats path
      *    traversal in `../../etc/passwd`-style payloads)
      */
     async saveImage(
@@ -131,19 +166,37 @@ export class UploadsService {
 
         const hash = createHash('sha256').update(file.buffer).digest('hex');
         const filename = `${hash}.${sniffed.ext}`;
-        const userDir = this.userDir(userId);
-        await fs.mkdir(userDir, { recursive: true });
-        const absPath = this.resolveSafe(userDir, filename);
-        await fs.writeFile(absPath, file.buffer, { flag: 'w' });
 
-        const url = `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
+        const backend = await this.getBackend();
+        const { key, url } = await backend.putObject({
+            buffer: file.buffer,
+            filename,
+            mimeType: sniffed.mime,
+            size: file.size,
+            ownerId: userId,
+        });
+
         return {
+            // `id` historically was the sha256 (object segment of the key).
+            // Keep that shape for existing callers.
             id: hash,
-            url,
+            // Resolve `url` to the platform-served route. Plugins return a
+            // backend-native URL (S3 / raw.githubusercontent / local route);
+            // for the legacy callers that expect `/api/uploads/<owner>/<file>`,
+            // we synthesize that path regardless of the backend so existing
+            // clients keep working. The plugin's URL is exposed via the
+            // backend factory for callers that want direct CDN access.
+            url: url.startsWith('http')
+                ? url
+                : `/api/uploads/${encodeURIComponent(userId)}/${filename}`,
             filename,
             size: file.size,
             mimeType: sniffed.mime,
             hash,
+            // Keep the storage key around for callers that want to round-
+            // trip via the IStoragePlugin abstraction (anonymous uploads
+            // hand this back as `uploadId`).
+            key,
         };
     }
 
@@ -158,24 +211,34 @@ export class UploadsService {
     ): Promise<{ buffer: Buffer; mimeType: string }> {
         this.assertValidUserId(userId);
         this.assertValidFilename(filename);
-        const userDir = this.userDir(userId);
-        const absPath = this.resolveSafe(userDir, filename);
-        let buffer: Buffer;
+        const backend = await this.getBackend();
+
+        // Reconstruct the storage key from the legacy <userId>/<filename>
+        // path shape. For local-fs and the S3-family plugins this is the
+        // exact key; github-storage embeds its own path-prefix and
+        // therefore is NOT compatible with the legacy /:userId/:filename
+        // route. Operators using github-storage should route reads through
+        // the plugin-native URL returned by saveImage.
+        const key = `${userId}/${filename}`;
+
+        let result: { buffer: Buffer; mimeType: string };
         try {
-            buffer = await fs.readFile(absPath);
+            result = await backend.getObject(key);
         } catch (err) {
-            // Either the user-scoped directory or the file inside it
-            // doesn't exist — surface as 404 rather than letting ENOENT
-            // bubble up as a 500.
-            const code = (err as NodeJS.ErrnoException).code;
-            if (code === 'ENOENT' || code === 'ENOTDIR') {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (/not found/i.test(msg) || /ENOENT/i.test(msg)) {
                 throw new NotFoundException({ status: 'error', message: 'Upload not found' });
             }
             throw err;
         }
-        const sniffed = this.sniffMagicBytes(buffer);
-        const mimeType = sniffed?.mime ?? 'application/octet-stream';
-        return { buffer, mimeType };
+
+        // Re-sniff the magic bytes on read — this is what the original
+        // implementation did for all backends, and it's a defense against
+        // a malicious storage backend (or operator misconfig) handing back
+        // bytes whose Content-Type metadata doesn't match the payload.
+        const sniffed = this.sniffMagicBytes(result.buffer);
+        const mimeType = sniffed?.mime ?? result.mimeType ?? 'application/octet-stream';
+        return { buffer: result.buffer, mimeType };
     }
 
     private sniffMagicBytes(buf: Buffer): { mime: string; ext: string } | null {
@@ -196,34 +259,10 @@ export class UploadsService {
         return null;
     }
 
-    private userDir(userId: string): string {
-        return resolve(this.storageRoot, userId);
-    }
-
-    /**
-     * Resolve `filename` under `userDir`, then re-check it really IS
-     * still under `userDir`. Defeats `..` segments and absolute paths.
-     */
-    private resolveSafe(userDir: string, filename: string): string {
-        const candidate = resolve(userDir, filename);
-        const userDirNorm = normalize(userDir + sep);
-        const candidateNorm = normalize(candidate);
-        if (!candidateNorm.startsWith(userDirNorm)) {
-            // Path traversal attempt — the resolve() output escaped the
-            // user-scoped directory. Refuse loudly.
-            throw new BadRequestException({
-                status: 'error',
-                code: 'InvalidPath',
-                message: 'Resolved path escapes user storage root',
-            });
-        }
-        return candidate;
-    }
-
     private assertValidUserId(userId: string): void {
         // userIds are UUIDv4 in this codebase. Reject anything with path
         // separators / null bytes / control characters to keep the
-        // resolveSafe check honest.
+        // storage-key construction honest.
         if (!userId || !/^[A-Za-z0-9_-]{1,128}$/.test(userId)) {
             throw new BadRequestException({
                 status: 'error',
@@ -237,6 +276,19 @@ export class UploadsService {
         // Only allow `<hex64>.<ext>` shapes — same format saveImage
         // writes. Anything else is invalid by construction.
         if (!filename || !/^[a-f0-9]{64}\.(png|jpg|jpeg|gif|webp)$/.test(filename)) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'InvalidFilename',
+                message: 'Invalid filename',
+            });
+        }
+        // Defensive: although the regex above already restricts to
+        // canonical hash-named files, extract the extension here as a
+        // belt-and-suspenders check — the spec uses both alphanumeric and
+        // dot characters and a malicious key would have to slip past the
+        // regex to reach this point. Throw on anything unexpected.
+        const ext = extname(filename).toLowerCase();
+        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
             throw new BadRequestException({
                 status: 'error',
                 code: 'InvalidFilename',

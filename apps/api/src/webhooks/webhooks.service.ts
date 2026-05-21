@@ -89,15 +89,7 @@ export class WebhooksService {
     ): Promise<{ subscription: WebhookSubscriptionView; signingSecret: string }> {
         const row = await this.findOwn(accountId, id);
         const { raw, encrypted } = this.secrets.generateSecret();
-        // The repository doesn't expose a generic update for the
-        // secret column. Save via the repository's internal handle by
-        // re-creating against the same accountId is the wrong move
-        // (we'd lose lastDeliveryAt). Instead we go via the typed
-        // repo's `pause` pattern — pause + manual update via TypeORM
-        // would split the operation. For now, rotation simply
-        // re-encrypts and writes via a single SQL update; we expose
-        // a small repo method for it below.
-        await this.repo['repository'].update(row.id, { secretEncrypted: encrypted });
+        await this.repo.updateSecret(row.id, encrypted);
         const updated = await this.repo.findById(row.id);
         return {
             subscription: this.toView(updated ?? row),
@@ -107,7 +99,17 @@ export class WebhooksService {
 
     async remove(accountId: string, id: string): Promise<void> {
         const row = await this.findOwn(accountId, id);
-        await this.repo['repository'].delete(row.id);
+        await this.repo.delete(row.id);
+    }
+
+    /**
+     * Internal helper used by {@link import('./webhooks-deliveries.service.ts').WebhooksDeliveriesService}
+     * and the test-fire endpoint. Returns the raw entity (NOT the view) so
+     * the caller can decrypt the secret. Cross-account access is masked
+     * as 404 — same enumeration-defense as `findOwn`.
+     */
+    async findOwnEntity(accountId: string, id: string): Promise<WebhookSubscription> {
+        return this.findOwn(accountId, id);
     }
 
     private async findOwn(accountId: string, id: string): Promise<WebhookSubscription> {

@@ -13,6 +13,13 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
  * — the read path treats them as plaintext until the next write
  * re-encrypts.
  *
+ * The Trigger.dev `webhook-delivery` task lives in `packages/tasks` and
+ * cannot import from `apps/api`. To share the exact same envelope
+ * layout, the agent package carries an identically-shaped sibling at
+ * `packages/agent/src/services/webhook-subscription-secret.service.ts`.
+ * They must stay byte-compatible — any change here MUST be mirrored
+ * there (and vice versa).
+ *
  * Security notes:
  *  - The key MUST be 32 bytes. We accept hex (64 chars), base64 (44
  *    chars), or raw utf-8 (32 chars) and surface a clear error

@@ -2,8 +2,15 @@
 
 **Feature ID**: `work-members`
 **Spec**: `./spec.md`
-**Status**: `Done` (Retrospective)
-**Last updated**: 2026-05-01
+**Status**: `Shipped` (Retrospective)
+**Last updated**: 2026-05-21
+
+> **Note (EW-632 close-out).** This plan reflects the original direct-invite
+> flow only. The tokenised-claim flow added by PR #687 (EW-600) is documented
+> in `./spec.md` §5.1 — its architecture differs from the diagram below
+> (token issuance + sha256 hash at rest + public claim preview endpoint +
+> CAS-based status transitions). Treat the spec as authoritative; this plan
+> is left intact as a historical record of phase 1.
 
 ---
 

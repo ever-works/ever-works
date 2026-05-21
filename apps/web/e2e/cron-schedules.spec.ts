@@ -73,7 +73,7 @@ test.describe('Scheduled jobs — work-schedule endpoint', () => {
         if (!candidates || candidates.length === 0) {
             test.skip(true, 'no cron-like field in schedule body');
         }
-        for (const c of candidates) {
+        for (const c of candidates!) {
             const valueMatch = c.match(/:\s*"([^"]+)"/);
             if (!valueMatch) continue;
             const val = valueMatch[1];

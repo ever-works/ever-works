@@ -26,4 +26,5 @@ export * from './repositories/template.repository';
 export * from './repositories/template-customization.repository';
 export * from './repositories/user-template-preference.repository';
 export * from './repositories/webhook-subscription.repository';
+export * from './repositories/webhook-delivery.repository';
 export * from './database-init.service';

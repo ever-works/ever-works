@@ -78,7 +78,7 @@ test.describe('OAuth authorize URL — well-formed shape', () => {
         const u2 = new URL(body.url);
         const redirect = u2.searchParams.get('redirect_uri');
         if (!redirect) test.skip(true, 'no redirect_uri');
-        const parsed = new URL(redirect);
+        const parsed = new URL(redirect!);
         // The redirect URI must NOT be a github.com / arbitrary external
         // host — that would be an open-redirect chain. Acceptable hosts
         // are: localhost (dev), 127.0.0.1, *.ever.works.
