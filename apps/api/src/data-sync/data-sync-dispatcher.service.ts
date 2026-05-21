@@ -83,7 +83,7 @@ export class DataSyncDispatcherService {
 
         if (!config.subscriptions.dataSync.dispatcherEnabled()) {
             this.logger.debug(
-                'EW-628 dispatcher disabled (subscriptions.dataSync.dispatcherEnabled=false); skipping tick',
+                'Data-sync dispatcher disabled (subscriptions.dataSync.dispatcherEnabled=false); skipping tick',
             );
             return summary;
         }
@@ -112,7 +112,7 @@ export class DataSyncDispatcherService {
                 await this.workRepository.update(work.id, { lastPolledAt: new Date() });
             } catch (err) {
                 this.logger.warn(
-                    `EW-628 poller: failed to stamp lastPolledAt for work=${work.id}: ${(err as Error).message ?? err}`,
+                    `Data-sync poller: failed to stamp lastPolledAt for work=${work.id}: ${(err as Error).message ?? err}`,
                 );
             }
             await this.runOne(work.id, 'poll', summary);
@@ -120,7 +120,7 @@ export class DataSyncDispatcherService {
 
         if (summary.dueCount > 0) {
             this.logger.debug(
-                `EW-628 dispatch tick — webhook=${webhookDue.length} poller=${pollerDue.length} dispatched=${summary.dispatched} skipped=${summary.skipped} failed=${summary.failed}`,
+                `Data-sync dispatch tick — webhook=${webhookDue.length} poller=${pollerDue.length} dispatched=${summary.dispatched} skipped=${summary.skipped} failed=${summary.failed}`,
             );
         }
         return summary;
@@ -169,7 +169,7 @@ export class DataSyncDispatcherService {
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             this.logger.warn(
-                `EW-628 dispatcher: runDataSync(${workId}, ${source}) threw: ${message}`,
+                `Data-sync dispatcher: runDataSync(${workId}, ${source}) threw: ${message}`,
             );
             summary.failed += 1;
             summary.entries.push({

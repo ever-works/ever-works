@@ -200,7 +200,7 @@ export class ActivityLogController {
     @Throttle({ default: { limit: 60, ttl: 60_000 } })
     @HttpCode(202)
     @ApiOperation({
-        summary: 'Ingest a website-sourced activity event (EW-120)',
+        summary: 'Ingest a website-sourced activity event',
         description:
             'Called by the deployed directory site when a user registers, submits an item, or files/resolves a report. Authenticated via the `PLATFORM_API_SECRET_TOKEN` bearer token; idempotent by `(workId, eventId)`; rate-limited at 60 req/min per IP. Returns 409 when the target Work is configured for a non-push transport (pull / disabled).',
     })

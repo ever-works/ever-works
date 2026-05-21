@@ -369,7 +369,7 @@ export class MarkdownGeneratorService {
 
         const afterSha = await this.captureDataRepoHeadSha(work, user).catch((err) => {
             this.logger.warn(
-                `EW-628: failed to capture data-repo HEAD SHA for work=${work.id}: ${
+                `Failed to capture data-repo HEAD SHA for work=${work.id}: ${
                     err instanceof Error ? err.message : String(err)
                 }`,
             );

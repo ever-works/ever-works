@@ -417,9 +417,7 @@ export class DeployService {
             hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
         });
         if (failure) {
-            this.logger.warn(
-                `EW-616 deploy-matrix violation [${failure.code}]: ${failure.message}`,
-            );
+            this.logger.warn(`Deploy-matrix violation [${failure.code}]: ${failure.message}`);
             throw new BadRequestException(failure.message);
         }
 
