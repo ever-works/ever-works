@@ -307,6 +307,7 @@ describe('agent/tasks submodule', () => {
             expect(runtimeKeys).toEqual(
                 [
                     'TEMPLATE_CUSTOMIZATION_DISPATCHER',
+                    'WEBHOOK_DELIVERY_DISPATCHER',
                     'WORK_GENERATION_DISPATCHER',
                     'WORK_GENERATION_MODE',
                     'WORK_IMPORT_DISPATCHER',
