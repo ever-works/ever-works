@@ -411,7 +411,10 @@ export class KnowledgeBaseBufferExtractorService {
             return value.toISOString();
         }
         if (typeof value === 'object') {
-            const obj = value as Record<string, unknown>;
+            // The exceljs union doesn't overlap with `Record<string, unknown>`
+            // structurally, so cast through `unknown` to satisfy the
+            // `--strict` compiler while keeping the runtime shape probe.
+            const obj = value as unknown as Record<string, unknown>;
             if (typeof obj.text === 'string') return obj.text;
             if (Array.isArray(obj.richText)) {
                 return obj.richText
