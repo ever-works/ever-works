@@ -173,11 +173,123 @@ describe('KnowledgeBaseBufferExtractorService', () => {
         });
     });
 
+    describe('XLSX extraction', () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const ExcelJS = require('exceljs');
+        const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+        async function buildXlsxBuffer(
+            sheets: Array<{ name: string; rows: unknown[][] }>,
+        ): Promise<Buffer> {
+            const wb = new ExcelJS.Workbook();
+            for (const { name, rows } of sheets) {
+                const ws = wb.addWorksheet(name);
+                for (const row of rows) {
+                    ws.addRow(row);
+                }
+            }
+            return (await wb.xlsx.writeBuffer()) as Buffer;
+        }
+
+        it('renders each sheet as a Markdown table under an h2 heading', async () => {
+            const buffer = await buildXlsxBuffer([
+                {
+                    name: 'People',
+                    rows: [
+                        ['Name', 'Role'],
+                        ['Alice', 'PM'],
+                        ['Bob', 'Eng'],
+                    ],
+                },
+                {
+                    name: 'Budgets',
+                    rows: [
+                        ['Quarter', 'Amount'],
+                        ['Q1', 1000],
+                        ['Q2', 2500],
+                    ],
+                },
+            ]);
+
+            const result = await service.extract(buffer, XLSX_MIME);
+
+            expect(result).not.toBeNull();
+            expect(result!.via).toBe('xlsx-exceljs');
+            expect(result!.markdown).toMatch(/^##\s+People/m);
+            expect(result!.markdown).toMatch(/\|\s+Name\s+\|\s+Role\s+\|/);
+            expect(result!.markdown).toMatch(/\|\s+Alice\s+\|\s+PM\s+\|/);
+            expect(result!.markdown).toMatch(/^##\s+Budgets/m);
+            expect(result!.markdown).toMatch(/\|\s+Q2\s+\|\s+2500\s+\|/);
+        });
+
+        it('escapes pipes and newlines in cell values', async () => {
+            const buffer = await buildXlsxBuffer([
+                {
+                    name: 'Tricky',
+                    rows: [['Col'], ['a|b'], ['line1\nline2']],
+                },
+            ]);
+
+            const result = await service.extract(buffer, XLSX_MIME);
+
+            expect(result!.markdown).toContain('a\\|b');
+            expect(result!.markdown).toContain('line1 line2');
+            expect(result!.markdown).not.toContain('line1\nline2');
+        });
+
+        it('emits an empty-sheet marker for sheets with no header row', async () => {
+            const buffer = await buildXlsxBuffer([{ name: 'Blank', rows: [] }]);
+            const result = await service.extract(buffer, XLSX_MIME);
+            expect(result!.markdown).toMatch(/## Blank[\s\S]*empty sheet/);
+        });
+
+        it('throws on a corrupt buffer with a clear label', async () => {
+            await expect(service.extract(Buffer.from('not-a-zip'), XLSX_MIME)).rejects.toThrow(
+                /KB XLSX extraction failed:/,
+            );
+        });
+    });
+
+    describe('CSV / TSV extraction', () => {
+        it('renders a CSV buffer as a Markdown table via papaparse', async () => {
+            const csv = 'name,role\nAlice,PM\nBob,Eng\n';
+            const result = await service.extract(Buffer.from(csv, 'utf-8'), 'text/csv');
+            expect(result).not.toBeNull();
+            expect(result!.via).toBe('csv-papaparse');
+            expect(result!.markdown).toMatch(/\|\s+name\s+\|\s+role\s+\|/);
+            expect(result!.markdown).toMatch(/\|\s+Alice\s+\|\s+PM\s+\|/);
+            expect(result!.markdown).toMatch(/\|\s+Bob\s+\|\s+Eng\s+\|/);
+        });
+
+        it('handles a TSV buffer with tab delimiter', async () => {
+            const tsv = 'name\trole\nAlice\tPM\nBob\tEng\n';
+            const result = await service.extract(
+                Buffer.from(tsv, 'utf-8'),
+                'text/tab-separated-values',
+            );
+            expect(result).not.toBeNull();
+            expect(result!.via).toBe('tsv-papaparse');
+            expect(result!.markdown).toMatch(/\|\s+Alice\s+\|\s+PM\s+\|/);
+        });
+
+        it('also accepts text/tsv alias', async () => {
+            const result = await service.extract(Buffer.from('a\tb\n1\t2\n', 'utf-8'), 'text/tsv');
+            expect(result?.via).toBe('tsv-papaparse');
+        });
+
+        it('throws on a CSV with no rows', async () => {
+            await expect(
+                service.extract(Buffer.from('\n\n\n', 'utf-8'), 'text/csv'),
+            ).rejects.toThrow(/KB delimited-text extraction produced no rows/);
+        });
+    });
+
     describe('unsupported MIME types', () => {
         it.each([
             // Legacy .doc binary format — mammoth doesn't support it.
             'application/msword',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            // Legacy .xls binary format — exceljs only reads OOXML.
+            'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'image/png',
             'video/mp4',
@@ -198,10 +310,19 @@ describe('KnowledgeBaseBufferExtractorService', () => {
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 ),
             ).toBe(true);
-            expect(service.supports('application/msword')).toBe(false);
             expect(
                 service.supports(
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+            ).toBe(true);
+            expect(service.supports('text/csv')).toBe(true);
+            expect(service.supports('text/tab-separated-values')).toBe(true);
+            expect(service.supports('text/tsv')).toBe(true);
+            expect(service.supports('application/msword')).toBe(false);
+            expect(service.supports('application/vnd.ms-excel')).toBe(false);
+            expect(
+                service.supports(
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
                 ),
             ).toBe(false);
             expect(service.supports('image/png')).toBe(false);
