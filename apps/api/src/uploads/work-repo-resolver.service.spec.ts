@@ -5,27 +5,12 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
 
-// Mock global fetch so the branch-probing path doesn't hit github.com.
-const fetchMock = jest.fn();
-global.fetch = fetchMock as unknown as typeof fetch;
-function mockProbeResponse(body: unknown, init?: ResponseInit) {
-    fetchMock.mockResolvedValueOnce({
-        ok: !init?.status || init.status < 400,
-        status: init?.status ?? 200,
-        statusText: init?.statusText ?? 'OK',
-        json: async () => body,
-    } as unknown as Response);
-}
-function mockProbeError(err: Error) {
-    fetchMock.mockRejectedValueOnce(err);
-}
-
 import { WorkRepoResolverService } from './work-repo-resolver.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { GitFacadeService } from '@ever-works/agent/facades';
 
 type MockWorkRepository = jest.Mocked<Pick<WorkRepository, 'findById'>>;
-type MockGitFacade = jest.Mocked<Pick<GitFacadeService, 'getAccessToken'>>;
+type MockGitFacade = jest.Mocked<Pick<GitFacadeService, 'getAccessToken' | 'getRepository'>>;
 
 const workId = '11111111-2222-3333-4444-555555555555';
 
@@ -52,8 +37,10 @@ describe('WorkRepoResolverService (EW-644)', () => {
 
     beforeEach(() => {
         workRepo = { findById: jest.fn() } as MockWorkRepository;
-        gitFacade = { getAccessToken: jest.fn() } as MockGitFacade;
-        fetchMock.mockReset();
+        gitFacade = {
+            getAccessToken: jest.fn(),
+            getRepository: jest.fn(),
+        } as MockGitFacade;
         delete process.env.GITHUB_STORAGE_DATA_REPO_BRANCH;
         resolver = new WorkRepoResolverService(
             workRepo as unknown as WorkRepository,
@@ -61,10 +48,12 @@ describe('WorkRepoResolverService (EW-644)', () => {
         );
     });
 
-    it('probes the repo default branch via the GitHub REST API when no env override is set', async () => {
+    it('probes the repo default branch via GitFacadeService when no env override is set', async () => {
         workRepo.findById.mockResolvedValueOnce(makeWork() as never);
         gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
-        mockProbeResponse({ default_branch: 'master' });
+        gitFacade.getRepository.mockResolvedValueOnce({
+            defaultBranch: 'master',
+        } as never);
         const out = await resolver.resolve(workId);
         expect(out).toEqual({
             owner: 'acme',
@@ -72,12 +61,13 @@ describe('WorkRepoResolverService (EW-644)', () => {
             branch: 'master',
             token: 'ghp_token_123',
         });
-        expect(fetchMock).toHaveBeenCalledWith(
-            'https://api.github.com/repos/acme/docs-site-data',
+        expect(gitFacade.getRepository).toHaveBeenCalledWith(
+            'acme',
+            'docs-site-data',
             expect.objectContaining({
-                headers: expect.objectContaining({
-                    Authorization: 'Bearer ghp_token_123',
-                }),
+                userId: 'user-42',
+                providerId: 'github',
+                workId,
             }),
         );
     });
@@ -88,28 +78,30 @@ describe('WorkRepoResolverService (EW-644)', () => {
         gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
         const out = await resolver.resolve(workId);
         expect(out.branch).toBe('release');
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(gitFacade.getRepository).not.toHaveBeenCalled();
     });
 
     it('falls back to main and logs a warning when the probe fails', async () => {
         workRepo.findById.mockResolvedValueOnce(makeWork() as never);
         gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
-        mockProbeError(new Error('502 from upstream'));
+        gitFacade.getRepository.mockRejectedValueOnce(new Error('502 from upstream'));
         const out = await resolver.resolve(workId);
         expect(out.branch).toBe('main');
     });
 
     it('caches the probed branch per <owner>/<repo>', async () => {
-        // Two consecutive resolves on the same Work should call fetch
-        // exactly once. The second hit reads the cache.
+        // Two consecutive resolves on the same Work should call the
+        // facade exactly once. The second hit reads the cache.
         workRepo.findById.mockResolvedValue(makeWork() as never);
         gitFacade.getAccessToken.mockResolvedValue('ghp_token_123');
-        mockProbeResponse({ default_branch: 'master' });
+        gitFacade.getRepository.mockResolvedValueOnce({
+            defaultBranch: 'master',
+        } as never);
         const a = await resolver.resolve(workId);
         const b = await resolver.resolve(workId);
         expect(a.branch).toBe('master');
         expect(b.branch).toBe('master');
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(gitFacade.getRepository).toHaveBeenCalledTimes(1);
     });
 
     it('throws a clear error when the Work is not found', async () => {

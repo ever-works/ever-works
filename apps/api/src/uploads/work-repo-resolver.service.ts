@@ -78,7 +78,7 @@ export class WorkRepoResolverService implements WorkRepoResolver {
             );
         }
 
-        const branch = await this.resolveBranch(owner, repo, token);
+        const branch = await this.resolveBranch(work.userId, workId, owner, repo);
 
         return { owner, repo, branch, token };
     }
@@ -90,13 +90,22 @@ export class WorkRepoResolverService implements WorkRepoResolver {
      *   1. `GITHUB_STORAGE_DATA_REPO_BRANCH` env override — pinned for
      *      the whole deployment.
      *   2. Cached probe result, if not expired.
-     *   3. Fresh `octokit.repos.get(default_branch)` probe, cached.
+     *   3. Fresh `GitFacadeService.getRepository(...)` probe, cached.
+     *      Routes through the github plugin's Octokit wrapper — same
+     *      path the rest of the platform uses for GitHub REST calls,
+     *      so we don't reinvent auth / GHE base URL / rate-limit
+     *      handling here.
      *   4. `'main'` fallback if the probe fails for any reason — the
      *      worst case is a non-ff push that the operator can fix by
      *      setting the env var. We don't throw on probe failure so a
      *      transient GitHub blip doesn't break uploads.
      */
-    private async resolveBranch(owner: string, repo: string, token: string): Promise<string> {
+    private async resolveBranch(
+        userId: string,
+        workId: string,
+        owner: string,
+        repo: string,
+    ): Promise<string> {
         const pinned = process.env.GITHUB_STORAGE_DATA_REPO_BRANCH;
         if (pinned) return pinned;
 
@@ -107,26 +116,12 @@ export class WorkRepoResolverService implements WorkRepoResolver {
         }
 
         try {
-            // Talk to the GitHub REST API directly via Node 22's global
-            // fetch — the api package doesn't depend on octokit (only
-            // the storage plugin does), and the probe needs just one
-            // field (`default_branch`) so pulling in the whole SDK
-            // would be overkill.
-            const res = await fetch(
-                `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        Accept: 'application/vnd.github+json',
-                        'X-GitHub-Api-Version': '2022-11-28',
-                    },
-                },
-            );
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-            const body = (await res.json()) as { default_branch?: string };
-            const branch = body.default_branch || 'main';
+            const repoInfo = await this.gitFacade.getRepository(owner, repo, {
+                userId,
+                providerId: this.PROVIDER_ID,
+                workId,
+            });
+            const branch = repoInfo?.defaultBranch || 'main';
             this.branchCache.set(cacheKey, {
                 branch,
                 expiresAtMs: Date.now() + this.BRANCH_CACHE_TTL_MS,
