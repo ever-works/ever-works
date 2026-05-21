@@ -245,6 +245,31 @@ describe('commitWithLfsCli (EW-644)', () => {
 		await expect(fsp.stat(dest!)).rejects.toMatchObject({ code: 'ENOENT' });
 	});
 
+	it('threads the AbortSignal through to every spawned command (canonical CLI envelope)', async () => {
+		const ac = new AbortController();
+		const recordedSignals: Array<AbortSignal | undefined> = [];
+		const { ok } = makeExec();
+		for (let i = 0; i < 8; i++) ok();
+		// Custom exec that records the signal we receive on each call,
+		// instead of using the makeExec() helper directly.
+		const recordingExec: ExecImpl = async (_cmd, _args, opts) => {
+			recordedSignals.push(opts.signal);
+			return { stdout: '', stderr: '', exitCode: 0 };
+		};
+		await commitWithLfsCli(
+			{ ...baseCfg, signal: ac.signal },
+			'uploads',
+			[{ path: 'uploads/u/h.txt', content: Buffer.from('hi') }],
+			'm',
+			committer,
+			recordingExec
+		);
+		expect(recordedSignals.length).toBeGreaterThan(0);
+		for (const s of recordedSignals) {
+			expect(s).toBe(ac.signal);
+		}
+	});
+
 	// Sanity: the impl shouldn't write to the host's real tmpdir
 	// outside the test's control. Verify mkdtemp goes under os.tmpdir().
 	it('uses os.tmpdir() for the working clone (no surprises)', async () => {
