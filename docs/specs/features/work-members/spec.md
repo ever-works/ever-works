@@ -61,7 +61,7 @@ Two invitation flows coexist:
 - **Given** I try to direct-invite an email without an Ever Works
   account, **when** the lookup fails, **then** I get `404`. The
   caller should fall back to the tokenised claim flow (`POST
-  /api/works/:id/invitations`) for off-platform recipients.
+/api/works/:id/invitations`) for off-platform recipients.
 - **Given** I try to assign role `owner` via the direct-invite
   endpoint, **when** the validator checks the role, **then** the
   request is rejected with `400` (use the `owner-claim` invitation
@@ -150,7 +150,7 @@ Recipients consume the token via the public claim endpoints in
 
 - `GET  /api/claim/preview?token=...` — public, throttled (10/min/IP),
   read-only. Returns `{ workName, role, expiresAt,
-  expectedProviderUsername?, sourceUrl? }`.
+expectedProviderUsername?, sourceUrl? }`.
 - `POST /api/claim/accept` — authenticated, throttled. Body:
   `{ token }`. On success creates a `WorkMember` row (member roles)
   or transfers `work.userId` (owner-claim role) via CAS, and marks
@@ -214,14 +214,14 @@ _None on develop._
 - User-facing doc: [`../../../features/work-members.md`](../../../features/work-members.md)
 - API ref: [`../../../api/authentication.md`](../../../api/authentication.md)
 - Implementation:
-  - Controllers: `apps/api/src/works/members.controller.ts`,
-    `apps/api/src/works/invitations.controller.ts`,
-    `apps/api/src/onboarding/claim.controller.ts`
-  - Services: `packages/agent/src/services/work-member.service.ts`,
-    `packages/agent/src/services/work-invitation.service.ts`,
-    `packages/agent/src/services/work-ownership.service.ts`
-  - Entities: `packages/agent/src/entities/work-member.entity.ts`,
-    `packages/agent/src/entities/work-invitation.entity.ts`
+    - Controllers: `apps/api/src/works/members.controller.ts`,
+      `apps/api/src/works/invitations.controller.ts`,
+      `apps/api/src/onboarding/claim.controller.ts`
+    - Services: `packages/agent/src/services/work-member.service.ts`,
+      `packages/agent/src/services/work-invitation.service.ts`,
+      `packages/agent/src/services/work-ownership.service.ts`
+    - Entities: `packages/agent/src/entities/work-member.entity.ts`,
+      `packages/agent/src/entities/work-invitation.entity.ts`
 - E2E specs (`apps/web/e2e/`): `work-members.spec.ts`,
   `multi-user-invitation.spec.ts`,
   `invitation-token-single-use.spec.ts`,
