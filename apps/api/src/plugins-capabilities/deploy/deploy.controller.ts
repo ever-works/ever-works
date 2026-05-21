@@ -195,6 +195,7 @@ export class DeployController {
 
         return {
             status: 'pending',
+            deploymentId,
             slug: work.slug,
             owner: work.getRepoOwner('website'),
             repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
@@ -424,6 +425,7 @@ export class DeployController {
                     work,
                     auth.userId,
                     batchDeployDto.teamScope,
+                    deployResult.deploymentId,
                 );
             }
         }

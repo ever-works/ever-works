@@ -84,13 +84,61 @@ describe('ActivityFeedClient', () => {
         expect(screen.getByText('title.timeout')).toBeInTheDocument();
     });
 
+    it('loads the next page when nextCursor is present', async () => {
+        mockGetActivityFeed
+            .mockResolvedValueOnce(
+                emptySuccess({
+                    nextCursor: '2026-05-13T00:00:00.000Z',
+                    entries: [
+                        {
+                            id: 'entry-1',
+                            source: 'platform-activity-log',
+                            type: 'work_created',
+                            status: 'completed',
+                            category: 'settings',
+                            timestamp: '2026-05-13T00:00:00.000Z',
+                            summary: 'First entry',
+                        },
+                    ],
+                }),
+            )
+            .mockResolvedValueOnce(
+                emptySuccess({
+                    entries: [
+                        {
+                            id: 'entry-2',
+                            source: 'platform-activity-log',
+                            type: 'work_updated',
+                            status: 'completed',
+                            category: 'settings',
+                            timestamp: '2026-05-12T00:00:00.000Z',
+                            summary: 'Second entry',
+                        },
+                    ],
+                }),
+            );
+
+        render(<ActivityFeedClient workId="work-1" initialCategory="all" />);
+        expect(await screen.findByText('First entry')).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: 'actions.loadMore' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Second entry')).toBeInTheDocument();
+        });
+        expect(mockGetActivityFeed).toHaveBeenLastCalledWith(
+            'work-1',
+            expect.objectContaining({ cursor: '2026-05-13T00:00:00.000Z' }),
+        );
+    });
+
     it('updates URL when filter chip is clicked', async () => {
         mockGetActivityFeed.mockResolvedValue(emptySuccess());
 
         render(<ActivityFeedClient workId="work-1" initialCategory="all" />);
         await waitFor(() => expect(mockGetActivityFeed).toHaveBeenCalledTimes(1));
 
-        const usersChip = await screen.findByRole('tab', { name: 'users' });
+        const usersChip = await screen.findByRole('button', { name: 'users' });
         await userEvent.click(usersChip);
 
         expect(mockReplace).toHaveBeenCalled();

@@ -32,7 +32,7 @@ export class UpdateProfileDto {
 
     @ApiPropertyOptional({
         description:
-            'EW-602: receive budget threshold alert emails (75/90/100/overage). ' +
+            'Receive budget threshold alert emails (75/90/100/overage). ' +
             'The in-app notification always fires; this only gates the email channel.',
     })
     @IsBoolean()
