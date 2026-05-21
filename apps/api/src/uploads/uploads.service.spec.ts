@@ -1,8 +1,26 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
+import type { PluginContext } from '@ever-works/plugin';
 import { UploadsService } from './uploads.service';
+
+// Minimal stub matching what the storage-backend factory hands plugins
+// at boot — only the logger is read by LocalFsStoragePlugin.onLoad().
+const stubContext = (id: string): PluginContext => {
+    const log = new Logger(`StoragePlugin/${id}`);
+    return {
+        pluginId: id,
+        logger: {
+            log: (m: string) => log.log(m),
+            error: (m: string) => log.error(m),
+            warn: (m: string) => log.warn(m),
+            debug: (m: string) => log.debug(m),
+        },
+    } as unknown as PluginContext;
+};
 
 const TINY_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAarVyFEAAAAASUVORK5CYII=',
@@ -41,7 +59,13 @@ describe('UploadsService', () => {
         );
         process.env.UPLOADS_DIR = root;
         delete process.env.UPLOADS_MAX_BYTES;
-        service = new UploadsService();
+        // EW-637 — inject a fresh local-fs storage plugin so each test
+        // sees the new UPLOADS_DIR. Plugins are lazy in production via
+        // getActiveStorageBackend(); tests skip the env-resolution cache
+        // by passing the plugin directly to the service constructor.
+        const backend = new LocalFsStoragePlugin();
+        await backend.onLoad(stubContext('local-fs'));
+        service = new UploadsService(backend);
     });
 
     afterEach(async () => {
@@ -168,7 +192,9 @@ describe('UploadsService', () => {
 
         it('rejects oversized files', async () => {
             process.env.UPLOADS_MAX_BYTES = '100';
-            const s = new UploadsService();
+            const localBackend = new LocalFsStoragePlugin();
+            await localBackend.onLoad(stubContext('local-fs'));
+            const s = new UploadsService(localBackend);
             const big = Buffer.concat([TINY_PNG, Buffer.alloc(200)]);
             await expect(
                 s.saveImage(userId, {
