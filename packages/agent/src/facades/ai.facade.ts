@@ -418,20 +418,24 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             }
         } finally {
             if (chunkCount > 0) {
-                await this.pluginUsageService?.record({
-                    workId: facadeOptions.workId,
-                    userId: facadeOptions.userId,
-                    pluginId: plugin.id,
-                    capability: PluginUsageCapability.AI,
-                    units: chunkCount,
-                    costCents: 0,
-                    modelId: streamedModel,
-                    metadata: {
-                        operation: 'createStreamingChatCompletion',
-                        chunkCount,
-                        contentChars,
-                    },
-                });
+                this.pluginUsageService
+                    ?.record({
+                        workId: facadeOptions.workId,
+                        userId: facadeOptions.userId,
+                        pluginId: plugin.id,
+                        capability: PluginUsageCapability.AI,
+                        units: chunkCount,
+                        costCents: 0,
+                        modelId: streamedModel,
+                        metadata: {
+                            operation: 'createStreamingChatCompletion',
+                            chunkCount,
+                            contentChars,
+                        },
+                    })
+                    .catch(() => {
+                        // Usage writes are best-effort and must not turn a successful stream into an error.
+                    });
             }
         }
     }

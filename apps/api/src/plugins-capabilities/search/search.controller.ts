@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@ne
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SearchFacadeService, NoProviderError } from '@ever-works/agent/facades';
 import { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import type { JsonSchema } from '@ever-works/plugin';
 import { CurrentUser, AuthSessionGuard } from '../../auth';
@@ -17,6 +18,7 @@ export class SearchController {
         private readonly searchFacade: SearchFacadeService,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly pluginSettings: PluginSettingsService,
+        private readonly ownershipService: WorkOwnershipService,
     ) {}
 
     /**
@@ -150,6 +152,10 @@ export class SearchController {
     @ApiResponse({ status: 200, description: 'Search results' })
     @ApiResponse({ status: 400, description: 'Search failed or no provider configured' })
     async search(@CurrentUser() auth: AuthenticatedUser, @Body() dto: SearchDto) {
+        if (dto.workId) {
+            await this.ownershipService.ensureCanView(dto.workId, auth.userId);
+        }
+
         const provider = await this.resolveConfiguredProvider(auth.userId, dto.workId);
 
         if (!provider) {

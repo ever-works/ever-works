@@ -546,6 +546,29 @@ describe('AiFacadeService', () => {
                 },
             });
         });
+
+        it('does not surface usage recording failures as stream errors', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            pluginUsageService.record.mockRejectedValueOnce(new Error('db down'));
+
+            const chunks = [];
+            await expect(
+                (async () => {
+                    for await (const chunk of service.createStreamingChatCompletion(
+                        { messages: [{ role: 'user', content: 'hello' }] },
+                        { userId: 'user-1', workId: 'work-1' },
+                    )) {
+                        chunks.push(chunk);
+                    }
+                })(),
+            ).resolves.toBeUndefined();
+
+            expect(chunks).toHaveLength(2);
+        });
     });
 
     describe('provider resolution with active work provider', () => {
