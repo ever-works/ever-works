@@ -1580,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Load More",
+                    "loadingMore": "Loading…"
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1607,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Redeploy the directory site with the latest activity feed endpoint.",
+                        "disabled": "Turn on activity sync in Settings to collect website events.",
+                        "timeout": "Retry refresh or check the deployed site if this keeps happening.",
+                        "unauthorized": "Rotate the activity sync secret, then redeploy the directory site.",
+                        "upstream_5xx": "Check the deployed site logs and retry after it recovers.",
+                        "network": "Check the deployed site URL and network reachability.",
+                        "parse_error": "Redeploy the directory site so it returns the expected activity payload."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
