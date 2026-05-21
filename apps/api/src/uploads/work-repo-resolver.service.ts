@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Octokit } from 'octokit';
 import { WorkRepository } from '@ever-works/agent/database';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-storage-plugin';
@@ -108,9 +107,26 @@ export class WorkRepoResolverService implements WorkRepoResolver {
         }
 
         try {
-            const octokit = new Octokit({ auth: token });
-            const { data } = await octokit.rest.repos.get({ owner, repo });
-            const branch = data.default_branch || 'main';
+            // Talk to the GitHub REST API directly via Node 22's global
+            // fetch — the api package doesn't depend on octokit (only
+            // the storage plugin does), and the probe needs just one
+            // field (`default_branch`) so pulling in the whole SDK
+            // would be overkill.
+            const res = await fetch(
+                `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/vnd.github+json',
+                        'X-GitHub-Api-Version': '2022-11-28',
+                    },
+                },
+            );
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            const body = (await res.json()) as { default_branch?: string };
+            const branch = body.default_branch || 'main';
             this.branchCache.set(cacheKey, {
                 branch,
                 expiresAtMs: Date.now() + this.BRANCH_CACHE_TTL_MS,
