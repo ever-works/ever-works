@@ -352,15 +352,11 @@ describe('SearchController', () => {
                 workId: 'work-1',
                 includeSecrets: true,
             });
-            expect(searchFacade.search).toHaveBeenCalledWith(
-                'q',
-                expect.any(Object),
-                {
-                    userId: 'user-1',
-                    workId: 'work-1',
-                    providerOverride: 'tavily',
-                },
-            );
+            expect(searchFacade.search).toHaveBeenCalledWith('q', expect.any(Object), {
+                userId: 'user-1',
+                workId: 'work-1',
+                providerOverride: 'tavily',
+            });
         });
 
         it('rejects dto.workId before provider resolution when the user cannot view the work', async () => {
