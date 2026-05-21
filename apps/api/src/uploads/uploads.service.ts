@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    BadRequestException,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import type { IStoragePlugin } from '@ever-works/plugin';
@@ -85,7 +91,17 @@ export class UploadsService {
     private readonly maxSize: number;
     private backendPromise?: Promise<IStoragePlugin>;
 
-    constructor(backend?: IStoragePlugin) {
+    // EW-637 follow-up — `@Optional()` is REQUIRED here. `IStoragePlugin`
+    // is a TypeScript interface (erased at runtime), so Nest can't tell
+    // there's no provider it should try to resolve at index 0. Without
+    // `@Optional()`, every API boot dies with `UnknownDependenciesException:
+    // Nest can't resolve dependencies of the UploadsService (?)` — the
+    // agent unit tests pass (they instantiate directly with `new
+    // UploadsService(backend)`), but E2E / production boots crash. With
+    // `@Optional()` Nest passes `undefined` when no provider matches and
+    // the service falls back to `getActiveStorageBackend()` lazily on
+    // the first call. Tests still inject the backend via the constructor.
+    constructor(@Optional() backend?: IStoragePlugin) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
             this.backendPromise = Promise.resolve(backend);
@@ -168,7 +184,7 @@ export class UploadsService {
         const filename = `${hash}.${sniffed.ext}`;
 
         const backend = await this.getBackend();
-        const { key, url } = await backend.putObject({
+        const { key } = await backend.putObject({
             buffer: file.buffer,
             filename,
             mimeType: sniffed.mime,
@@ -176,19 +192,20 @@ export class UploadsService {
             ownerId: userId,
         });
 
+        // Codex P1 finding on PR #890: returning the plugin's backend-native
+        // URL (S3 / MinIO / raw.githubusercontent.com) directly broke two
+        // invariants — (a) private buckets / private repos respond with
+        // 401/404 because the URL isn't signed, and (b) it sidesteps the
+        // owner-gated `UploadsController.serve` check that is the
+        // documented access model. Always return the API-routed URL;
+        // the controller reads through `backend.getObject(deriveKey(...))`
+        // to do the actual fetch. Operators who want a CDN / public-bucket
+        // direct URL can still introspect the active plugin themselves.
         return {
             // `id` historically was the sha256 (object segment of the key).
             // Keep that shape for existing callers.
             id: hash,
-            // Resolve `url` to the platform-served route. Plugins return a
-            // backend-native URL (S3 / raw.githubusercontent / local route);
-            // for the legacy callers that expect `/api/uploads/<owner>/<file>`,
-            // we synthesize that path regardless of the backend so existing
-            // clients keep working. The plugin's URL is exposed via the
-            // backend factory for callers that want direct CDN access.
-            url: url.startsWith('http')
-                ? url
-                : `/api/uploads/${encodeURIComponent(userId)}/${filename}`,
+            url: `/api/uploads/${encodeURIComponent(userId)}/${filename}`,
             filename,
             size: file.size,
             mimeType: sniffed.mime,
@@ -213,13 +230,17 @@ export class UploadsService {
         this.assertValidFilename(filename);
         const backend = await this.getBackend();
 
-        // Reconstruct the storage key from the legacy <userId>/<filename>
-        // path shape. For local-fs and the S3-family plugins this is the
-        // exact key; github-storage embeds its own path-prefix and
-        // therefore is NOT compatible with the legacy /:userId/:filename
-        // route. Operators using github-storage should route reads through
-        // the plugin-native URL returned by saveImage.
-        const key = `${userId}/${filename}`;
+        // Codex P1 finding on PR #890: don't hardcode the storage key
+        // shape — each backend layers its own path prefix on top of
+        // `<ownerId>/<filename>` (`uploads/...` for S3/MinIO/GitHub;
+        // bare `<ownerId>/<filename>` for local-fs). Ask the plugin to
+        // reconstruct its own canonical key from the URL segments. If
+        // the plugin doesn't implement `deriveKey` (older third-party
+        // backends, in-test mocks), fall back to the legacy shape so
+        // existing local-fs setups keep working unchanged.
+        const key = backend.deriveKey
+            ? backend.deriveKey(userId, filename)
+            : `${userId}/${filename}`;
 
         let result: { buffer: Buffer; mimeType: string };
         try {

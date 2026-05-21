@@ -9,11 +9,13 @@ import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { Test } from '@nestjs/testing';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import type { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
+import type { AuthProvider } from '../auth/providers/auth-provider.abstract';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 const stubContext = (id: string): PluginContext => {
@@ -117,7 +119,14 @@ describe('UploadsController', () => {
                 throw new Error('AnonymousAuthService stub: not expected in these tests');
             },
         } as unknown as AnonymousAuthService;
-        controller = new UploadsController(service, anonStub);
+        // AuthProvider is consumed by `tryAuthenticate` on the @Public()
+        // upload routes (Codex P2 follow-up). These auth-required tests
+        // never hit that path, so we hand it a stub that returns null
+        // (treated as "no session present" by the controller).
+        const authProviderStub = {
+            authenticate: async () => null,
+        } as unknown as AuthProvider;
+        controller = new UploadsController(service, anonStub, authProviderStub);
     });
 
     afterEach(async () => {
@@ -185,5 +194,29 @@ describe('UploadsController', () => {
             expect(Buffer.isBuffer(calls.sent)).toBe(true);
             expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
         });
+    });
+});
+
+// ============================================================================
+// NestJS DI smoke test — guard against the EW-637 regression where
+// `UploadsService(backend?: IStoragePlugin)` lacked `@Optional()`. At
+// runtime `IStoragePlugin` is an erased TS interface, so Nest has no
+// token to resolve and the API boot dies with `UnknownDependenciesException`.
+// The agent unit tests above don't catch this — they `new UploadsService(...)`
+// and bypass DI entirely. Bootstrapping a TestingModule with the real
+// providers list is what would have flagged it pre-merge.
+// ============================================================================
+
+describe('UploadsService — Nest DI', () => {
+    it('resolves with no storage-plugin provider (falls back to factory)', async () => {
+        // No IStoragePlugin / no factory binding here — the service should
+        // accept that and lazily resolve on first call via the env-driven
+        // backend factory (which we DO NOT exercise in this test).
+        const moduleRef = await Test.createTestingModule({
+            providers: [UploadsService],
+        }).compile();
+        const svc = moduleRef.get(UploadsService);
+        expect(svc).toBeInstanceOf(UploadsService);
+        await moduleRef.close();
     });
 });
