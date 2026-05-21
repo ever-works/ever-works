@@ -30,6 +30,7 @@ import { TemplateRepository } from './repositories/template.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
+import { WebhookDeliveryRepository } from './repositories/webhook-delivery.repository';
 
 /**
  * `DatabaseModule` is a wire-format-stable contract: every NestJS feature
@@ -85,6 +86,7 @@ describe('DatabaseModule decorator metadata', () => {
         UserRepository,
         UserSubscriptionRepository,
         UserTemplatePreferenceRepository,
+        WebhookDeliveryRepository,
         WebhookSubscriptionRepository,
         WorkAdvancedPromptsRepository,
         WorkBudgetAlertStateRepository,
@@ -106,10 +108,12 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('declares EXACTLY 29 providers (regression guard against silent additions)', () => {
+        it('declares EXACTLY 30 providers (regression guard against silent additions)', () => {
+            // Bumped from 29 → 30 in the EW-634 follow-up that landed
+            // `WebhookDeliveryRepository` for the new `webhook_deliveries` table.
             const providers = getMeta('providers');
             expect(providers.length).toBe(REPOSITORY_PROVIDERS.length);
-            expect(providers.length).toBe(29);
+            expect(providers.length).toBe(30);
         });
 
         it('every provider is a class constructor (function with prototype) — pinned so a future `useClass`/`useFactory` swap is deliberate', () => {
@@ -149,12 +153,13 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('exports EXACTLY 30 symbols — TypeOrmModule + 29 repositories (regression guard)', () => {
+        it('exports EXACTLY 31 symbols — TypeOrmModule + 30 repositories (regression guard)', () => {
             // Pinned so a future "stop exporting WorkRepository" tweak (which
-            // would orphan every consumer) breaks loudly.
+            // would orphan every consumer) breaks loudly. Bumped 30 → 31
+            // in the EW-634 follow-up that added `WebhookDeliveryRepository`.
             const exports = getMeta('exports');
             expect(exports.length).toBe(REPOSITORY_PROVIDERS.length + 1);
-            expect(exports.length).toBe(30);
+            expect(exports.length).toBe(31);
         });
 
         it('exports list is exactly the providers list + TypeOrmModule (no provider held back from consumers)', () => {
