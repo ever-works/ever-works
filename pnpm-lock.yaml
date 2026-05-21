@@ -69,9 +69,21 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@ever-works/aws-s3-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/aws-s3
       '@ever-works/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ever-works/github-storage-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/github-storage
+      '@ever-works/local-fs-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/local-fs
+      '@ever-works/minio-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/minio
       '@ever-works/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
@@ -27776,7 +27788,7 @@ snapshots:
   binary-version-check@6.1.0:
     dependencies:
       binary-version: 7.1.0
-      semver: 7.7.4
+      semver: 7.8.0
       semver-truncate: 3.0.0
 
   binary-version@7.1.0:
@@ -31987,7 +31999,7 @@ snapshots:
       jest-util: 29.7.0
       natural-compare: 1.4.0
       pretty-format: 29.7.0
-      semver: 7.7.4
+      semver: 7.8.0
     transitivePeerDependencies:
       - supports-color
 
@@ -33966,7 +33978,7 @@ snapshots:
 
   node-abi@3.87.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.0
 
   node-abort-controller@3.1.1: {}
 
