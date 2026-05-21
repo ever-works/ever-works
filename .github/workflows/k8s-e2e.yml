@@ -30,8 +30,15 @@ permissions:
   contents: read
 
 concurrency:
+  # Only cancel-in-progress on PR pushes (where rapid iteration is the
+  # whole point). On main/stage/develop, the workflow can take 5+ minutes
+  # to spin up the kind cluster — if a second push lands while the first
+  # is still in setup, cancelling it shows "FAILURE" after 2-3 seconds in
+  # the PR check rollup, which is indistinguishable from a real test
+  # failure unless you click into the logs. Let branch-push runs finish
+  # so their result is a real signal.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   e2e:
