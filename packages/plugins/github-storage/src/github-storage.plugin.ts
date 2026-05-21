@@ -16,6 +16,7 @@ import type {
 import { GitOperations } from '@ever-works/plugin/git';
 import { formatPointer, parsePointer, ensureGitattributes, gitattributesLine } from './lfs-pointer.js';
 import { lfsBatch, lfsUpload, lfsDownload, type LfsBatchTarget } from './lfs-batch.js';
+import { commitWithLfsCli, probeGitCliBinaries } from './lfs-cli.js';
 import type { WorkRepoResolver, ResolvedWorkRepo } from './work-repo-resolver.js';
 
 /**
@@ -124,6 +125,16 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 				description:
 					'When on, uploads are stored as Git LFS objects: the bytes live on GitHub LFS; the tree gets a tiny pointer file. Recommended for any non-tiny binaries.',
 				'x-envVar': 'GITHUB_STORAGE_LFS_ENABLED'
+			},
+			lfsTransport: {
+				type: 'string',
+				enum: ['api', 'git-cli'],
+				default: 'api',
+				title: 'LFS transport',
+				description:
+					'How LFS objects reach the server. `api` (default) talks to the GitHub LFS Batch API directly over HTTPS — no `git`/`git-lfs` binaries required. `git-cli` shells out to `git` + `git-lfs` (requires both on PATH; reserved for hosts that prefer the native binaries over HTTP signed URLs).',
+				'x-envVar': 'GITHUB_STORAGE_LFS_TRANSPORT',
+				'x-showIf': { field: 'lfsEnabled', value: true }
 			},
 			transport: {
 				type: 'string',
@@ -281,7 +292,30 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log(`GitHub storage plugin loaded (mode=${readMode()}, lfs=${readLfsEnabled()})`);
+		const lfsEnabled = readLfsEnabled();
+		const lfsTransport = readLfsTransport();
+		context.logger.log(
+			`GitHub storage plugin loaded (mode=${readMode()}, lfs=${lfsEnabled}, lfsTransport=${lfsEnabled ? lfsTransport : 'n/a'})`
+		);
+		// EW-644 — `lfsTransport: git-cli` shells out to `git` + `git-lfs`.
+		// Probe both binaries here so a misconfigured host fails at boot
+		// rather than on the first upload (where the error would surface
+		// as a confusing spawn ENOENT). Probe failures throw — the
+		// uploads-backend factory's `isAvailable()` check turns that into
+		// a clean "STORAGE_BACKEND=github-storage but isAvailable()
+		// returned false" startup error.
+		if (lfsEnabled && lfsTransport === 'git-cli') {
+			const probe = await probeGitCliBinaries();
+			if (!probe.git.available || !probe.gitLfs.available) {
+				throw new Error(
+					`github-storage: lfsTransport='git-cli' requires both 'git' and 'git-lfs' on PATH. ` +
+						`git: ${probe.git.available ? probe.git.version : `MISSING (${probe.git.error})`}, ` +
+						`git-lfs: ${probe.gitLfs.available ? probe.gitLfs.version : `MISSING (${probe.gitLfs.error})`}. ` +
+						`Install the binaries, or switch to lfsTransport='api' (GitHub LFS Batch API, no binaries).`
+				);
+			}
+			context.logger.log(`github-storage: git-cli probe OK — ${probe.git.version} / ${probe.gitLfs.version}`);
+		}
 	}
 
 	async onUnload(): Promise<void> {
@@ -339,6 +373,28 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		ownerId: string,
 		ext: string
 	): Promise<void> {
+		// EW-644 — `lfsTransport: git-cli` shells out to `git` + `git-lfs`
+		// for the entire upload. The CLI tracks `<pathPrefix>/**` via
+		// `git lfs track`, so the raw buffer goes into the working tree
+		// and git-lfs intercepts the `git add` to upload + write the
+		// pointer file in one go. The Batch-API path below is the
+		// default and recommended route.
+		if (cfg.lfsTransport === 'git-cli') {
+			await commitWithLfsCli(
+				{
+					owner: cfg.owner,
+					repo: cfg.repo,
+					branch: cfg.branch,
+					token: cfg.token,
+					hostBase: process.env.GITHUB_STORAGE_API_HOST || undefined
+				},
+				cfg.pathPrefix,
+				[{ path, content: buffer }],
+				`upload(${ownerId}): ${hash}${ext} (lfs)`,
+				{ name: 'Ever Works Bot', email: 'bot@ever.works' }
+			);
+			return;
+		}
 		const target: LfsBatchTarget = {
 			owner: cfg.owner,
 			repo: cfg.repo,
@@ -536,6 +592,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		return {
 			mode: 'data-repo',
 			lfsEnabled: readLfsEnabled(),
+			lfsTransport: readLfsTransport(),
 			pathPrefix: readPathPrefix(),
 			publicRawUrl: process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined,
 			...resolved
@@ -545,6 +602,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 	private cfgForRead(): ResolvedConfig {
 		const mode = readMode();
 		const lfsEnabled = readLfsEnabled();
+		const lfsTransport = readLfsTransport();
 		const pathPrefix = readPathPrefix();
 		const branch = process.env.GITHUB_STORAGE_BRANCH || 'main';
 		const owner = process.env.GITHUB_STORAGE_OWNER || '';
@@ -558,12 +616,13 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			);
 		}
 		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
-		return { mode, lfsEnabled, owner, repo, branch, pathPrefix, token, publicRawUrl };
+		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token, publicRawUrl };
 	}
 
 	private async resolveCfg(input: StoragePutInput): Promise<ResolvedConfig> {
 		const mode = readMode();
 		const lfsEnabled = readLfsEnabled();
+		const lfsTransport = readLfsTransport();
 		const pathPrefix = readPathPrefix();
 		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
 		if (mode === 'data-repo') {
@@ -579,7 +638,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 				);
 			}
 			const resolved: ResolvedWorkRepo = await resolver.resolve(input.workId);
-			return { mode, lfsEnabled, ...resolved, pathPrefix, publicRawUrl };
+			return { mode, lfsEnabled, lfsTransport, ...resolved, pathPrefix, publicRawUrl };
 		}
 		const owner = process.env.GITHUB_STORAGE_OWNER || '';
 		const repo = process.env.GITHUB_STORAGE_REPO || '';
@@ -590,13 +649,14 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 				'github-storage mode `separate-repo` requires GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO.'
 			);
 		}
-		return { mode, lfsEnabled, owner, repo, branch, pathPrefix, token, publicRawUrl };
+		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token, publicRawUrl };
 	}
 }
 
 interface ResolvedConfig extends ResolvedWorkRepo {
 	mode: 'separate-repo' | 'data-repo';
 	lfsEnabled: boolean;
+	lfsTransport: 'api' | 'git-cli';
 	pathPrefix: string;
 	publicRawUrl?: string;
 }
@@ -610,6 +670,11 @@ interface TransportFile {
 function readMode(): 'separate-repo' | 'data-repo' {
 	const raw = (process.env.GITHUB_STORAGE_MODE || 'separate-repo').toLowerCase();
 	return raw === 'data-repo' ? 'data-repo' : 'separate-repo';
+}
+
+function readLfsTransport(): 'api' | 'git-cli' {
+	const raw = (process.env.GITHUB_STORAGE_LFS_TRANSPORT || 'api').toLowerCase();
+	return raw === 'git-cli' ? 'git-cli' : 'api';
 }
 
 function readLfsEnabled(): boolean {

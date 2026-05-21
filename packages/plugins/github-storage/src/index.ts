@@ -14,3 +14,14 @@ export {
 	type LfsActionDescriptor
 } from './lfs-batch.js';
 export type { WorkRepoResolver, ResolvedWorkRepo } from './work-repo-resolver.js';
+export {
+	probeGitCliBinaries,
+	commitWithLfsCli,
+	type LfsCliConfig,
+	type LfsCliCommitter,
+	type LfsCliFile,
+	type BinaryProbeResult,
+	type ProbeResult,
+	type ExecImpl,
+	type ExecResult
+} from './lfs-cli.js';

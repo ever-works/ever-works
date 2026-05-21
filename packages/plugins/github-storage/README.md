@@ -52,21 +52,31 @@ referenced by any older commits and the public GitHub API does not
 expose an LFS object purge endpoint. This matches the standard
 `git lfs rm` behaviour and is intentional.
 
-## Transport
+### LFS transport
+
+The `lfsTransport` setting picks how LFS objects reach the server:
+
+| Value           | Behaviour                                                                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api` (default) | Calls the GitHub LFS Batch API over HTTPS directly via the Octokit token. No `git`/`git-lfs` binaries needed. Recommended for almost every deployment.                                                                                                                                |
+| `git-cli`       | Shells out to `git` + `git-lfs`. Clones to a temp dir, runs `git lfs install --local`, `git lfs track "<pathPrefix>/**"`, writes the file, `git add`, `git commit`, `git push`. Requires both binaries on PATH (the plugin probes at boot and refuses to start if either is missing). |
+
+The `git-cli` path is reserved for hosts that would rather rely on the
+native binaries than HTTP signed URLs — e.g. environments that proxy
+git but block the LFS Batch host, or shops with strict supply-chain
+rules about which HTTP clients can talk to GitHub.
+
+## Write transport (non-LFS)
 
 The `transport` setting controls how the pointer or raw blob is
-committed:
+committed when **`lfsTransport: api`** is in use (the `git-cli` path
+handles the whole flow itself):
 
 | Value            | Behaviour                                                                                                  |
 | ---------------- | ---------------------------------------------------------------------------------------------------------- |
 | `auto` (default) | `contents-api` for `separate-repo`, `clone-and-push` for `data-repo`.                                      |
 | `contents-api`   | Direct `Octokit.repos.createOrUpdateFileContents` call. No working tree.                                   |
 | `clone-and-push` | `isomorphic-git` clone + commit + push — the same path the rest of the platform uses for data-repo writes. |
-
-A future ticket will add a `git-cli` LFS transport (shell-out to `git`
-
-- `git-lfs`); the LFS Batch API is sufficient for github.com and avoids
-  a runtime dependency on the binaries.
 
 ## Environment variables
 
@@ -79,6 +89,7 @@ A future ticket will add a `git-cli` LFS transport (shell-out to `git`
 | `GITHUB_STORAGE_BRANCH`          | Default `main`.                                                                                                            |
 | `GITHUB_STORAGE_PATH_PREFIX`     | Default `uploads`.                                                                                                         |
 | `GITHUB_STORAGE_LFS_ENABLED`     | `true`/`false`. See defaults above.                                                                                        |
+| `GITHUB_STORAGE_LFS_TRANSPORT`   | `api` (default) / `git-cli`. The `git-cli` path requires `git` ≥ 2.40 and `git-lfs` ≥ 3.4 on PATH.                         |
 | `GITHUB_STORAGE_TRANSPORT`       | `auto` / `contents-api` / `clone-and-push`.                                                                                |
 | `GITHUB_STORAGE_PUBLIC_URL_BASE` | Optional: public raw URL base (e.g. CDN in front of a public repo). When unset, reads route through the authenticated API. |
 

@@ -104,6 +104,12 @@
 					"description": "When true (default for fresh installs), uploads are stored as Git LFS objects with a pointer file in the tree. Defaults to false for already-deployed installs (set legacy env vars only, no mode set) to preserve byte-for-byte commit shape."
 				},
 				{
+					"name": "GITHUB_STORAGE_LFS_TRANSPORT",
+					"required": false,
+					"secret": false,
+					"description": "`api` (default) — uses the GitHub LFS Batch API directly over HTTPS, no binaries required. `git-cli` — shells out to `git` + `git-lfs` (both must be on PATH). The plugin probes for the binaries at boot when `git-cli` is selected and refuses to start if either is missing."
+				},
+				{
 					"name": "GITHUB_STORAGE_TRANSPORT",
 					"required": false,
 					"secret": false,

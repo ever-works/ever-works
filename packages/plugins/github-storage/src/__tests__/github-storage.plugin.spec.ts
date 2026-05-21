@@ -53,6 +53,18 @@ vi.mock('@ever-works/plugin/git', () => ({
 	}))
 }));
 
+// EW-644 — mock the git-cli LFS transport so orchestrator tests don't
+// shell out to real binaries. Tracks invocations so we can assert
+// the orchestrator delegates correctly when `lfsTransport: git-cli`.
+const lfsCliMockState = {
+	commit: vi.fn(),
+	probe: vi.fn()
+};
+vi.mock('../lfs-cli.js', () => ({
+	commitWithLfsCli: (...args: unknown[]) => lfsCliMockState.commit(...args),
+	probeGitCliBinaries: () => lfsCliMockState.probe()
+}));
+
 // node:fs writeFile / mkdir are used by the clone-and-push transport.
 // Mock them so we can assert what the plugin wrote without touching disk.
 const fsMockState = {
@@ -84,12 +96,21 @@ beforeEach(() => {
 	gitOpsMockState.push.mockReset();
 	fsMockState.writeFile.mockClear();
 	fsMockState.mkdir.mockClear();
+	lfsCliMockState.commit.mockReset();
+	lfsCliMockState.probe.mockReset();
+	// Default: every git-cli probe says binaries are present so onLoad
+	// doesn't throw. Individual tests can override before loadPlugin().
+	lfsCliMockState.probe.mockResolvedValue({
+		git: { available: true, version: 'git version 2.45.0' },
+		gitLfs: { available: true, version: 'git-lfs/3.5.0' }
+	});
 	fetchCalls.length = 0;
 	fetchQueue = [];
 	vi.stubGlobal('fetch', fetchMock);
 	// Reset every env var the plugin reads. Each test sets only what it needs.
 	delete process.env.GITHUB_STORAGE_MODE;
 	delete process.env.GITHUB_STORAGE_LFS_ENABLED;
+	delete process.env.GITHUB_STORAGE_LFS_TRANSPORT;
 	delete process.env.GITHUB_STORAGE_TRANSPORT;
 	delete process.env.GITHUB_STORAGE_TOKEN;
 	delete process.env.GITHUB_STORAGE_OWNER;
@@ -455,6 +476,72 @@ describe('GitHubStoragePlugin — data-repo read/delete round-trip (EW-644 Codex
 		const plugin = await loadPlugin();
 		await plugin.onLoad(ctx({ workRepoResolver: { resolve: vi.fn() } }));
 		expect(plugin.deriveKey('user1', 'abc.txt', 'work-7')).toBe('dr:work-7:uploads/user1/abc.txt');
+	});
+});
+
+describe('GitHubStoragePlugin — lfsTransport: git-cli (EW-644)', () => {
+	beforeEach(() => {
+		process.env.GITHUB_STORAGE_MODE = 'separate-repo';
+		process.env.GITHUB_STORAGE_LFS_ENABLED = 'true';
+		process.env.GITHUB_STORAGE_LFS_TRANSPORT = 'git-cli';
+		process.env.GITHUB_STORAGE_TOKEN = 'ghp_xxx';
+		process.env.GITHUB_STORAGE_OWNER = 'acme';
+		process.env.GITHUB_STORAGE_REPO = 'storage';
+	});
+
+	it('delegates putObject to commitWithLfsCli when lfsTransport=git-cli', async () => {
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx());
+		lfsCliMockState.commit.mockResolvedValueOnce(undefined);
+
+		await plugin.putObject({
+			buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+			filename: 'p.png',
+			mimeType: 'image/png',
+			size: 4,
+			ownerId: 'user1'
+		});
+
+		expect(lfsCliMockState.commit).toHaveBeenCalledTimes(1);
+		const [cfg, prefix, files, msg, committer] = lfsCliMockState.commit.mock.calls[0];
+		expect(cfg).toMatchObject({
+			owner: 'acme',
+			repo: 'storage',
+			token: 'ghp_xxx'
+		});
+		expect(prefix).toBe('uploads');
+		expect(files).toHaveLength(1);
+		expect((files as Array<{ path: string }>)[0].path).toMatch(/^uploads\/user1\/[0-9a-f]{64}\.png$/);
+		expect(msg).toMatch(/upload\(user1\): [0-9a-f]{64}\.png \(lfs\)/);
+		expect(committer).toEqual({ name: 'Ever Works Bot', email: 'bot@ever.works' });
+		// Batch API path NOT used — no fetch calls, no Octokit commit.
+		expect(fetchCalls).toHaveLength(0);
+		expect(octokitMockState.createOrUpdateFileContents).not.toHaveBeenCalled();
+	});
+
+	it('refuses to load when git-cli is selected but binaries are missing', async () => {
+		lfsCliMockState.probe.mockResolvedValueOnce({
+			git: { available: false, error: 'spawn git ENOENT' },
+			gitLfs: { available: false, error: 'spawn git-lfs ENOENT' }
+		});
+		const plugin = await loadPlugin();
+		await expect(plugin.onLoad(ctx())).rejects.toThrow(/requires both 'git' and 'git-lfs'/);
+	});
+
+	it('refuses to load when git is present but git-lfs is missing', async () => {
+		lfsCliMockState.probe.mockResolvedValueOnce({
+			git: { available: true, version: 'git version 2.45.0' },
+			gitLfs: { available: false, error: 'spawn git-lfs ENOENT' }
+		});
+		const plugin = await loadPlugin();
+		await expect(plugin.onLoad(ctx())).rejects.toThrow(/git-lfs:.*MISSING/);
+	});
+
+	it('skips the probe when LFS is disabled (only probes when actually used)', async () => {
+		process.env.GITHUB_STORAGE_LFS_ENABLED = 'false';
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx());
+		expect(lfsCliMockState.probe).not.toHaveBeenCalled();
 	});
 });
 
