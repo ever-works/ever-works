@@ -230,7 +230,22 @@ export class WebhookEventDispatcherService {
     private async enqueue(payload: WebhookDeliveryPayload): Promise<string | null> {
         if (this.remoteDispatcher) {
             const runId = await this.remoteDispatcher.dispatchWebhookDelivery(payload);
-            if (runId) return runId;
+            if (runId) {
+                // EW-634 Codex P2 follow-up: persist the Trigger run id
+                // on the pending delivery row immediately so the
+                // deliveries API can correlate row → Trigger run even
+                // before the first attempt finishes. Best-effort —
+                // failure here doesn't change the dispatch outcome.
+                await this.deliveries
+                    .markEnqueued(payload.deliveryId, runId)
+                    .catch((err) =>
+                        this.logger.error(
+                            `webhook.mark_enqueued_failed delivery=${payload.deliveryId} reason=${(err as Error).message}`,
+                            err as Error,
+                        ),
+                    );
+                return runId;
+            }
         }
         // In-process fallback. Fire-and-forget — the orchestrator records
         // its own delivery row updates. We do NOT await here when invoked

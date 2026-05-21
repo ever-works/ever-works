@@ -49,17 +49,23 @@ export const webhookDeliveryTask = task<'webhook-delivery', WebhookDeliveryPaylo
         factor: 6,
         randomize: true,
     },
-    run: async (payload: WebhookDeliveryPayload) => {
+    run: async (payload: WebhookDeliveryPayload, { ctx }) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWebhookDeliveryModule);
         appContext.useLogger(createTriggerLogger('WebhookDelivery'));
 
         try {
             const orchestrator = appContext.get(WebhookSubscriptionDeliveryService);
+            // EW-634 Codex P2 follow-up: pass the Trigger run id through
+            // to the orchestrator so the `webhook_deliveries.triggerRunId`
+            // column stays populated across attempts. The producer side
+            // stamps it via `markEnqueued` at enqueue time; this keeps
+            // it correct on each retry's recordAttempt update too.
             const outcome = await orchestrator.dispatch({
                 deliveryId: payload.deliveryId,
                 subscriptionId: payload.subscriptionId,
                 event: payload.eventName,
                 payload: payload.payload,
+                triggerRunId: ctx?.run?.id ?? null,
             });
 
             if (outcome.shouldRetry) {
