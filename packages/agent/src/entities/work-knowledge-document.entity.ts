@@ -13,12 +13,7 @@ import { User } from './user.entity';
 import { Work } from './work.entity';
 import { WorkAgentRun } from './work-agent-run.entity';
 import { ClassToObject } from './types';
-import {
-    KbDocumentClass,
-    KbDocumentSource,
-    KbDocumentStatus,
-    KbLockMode,
-} from './kb-types';
+import { KbDocumentClass, KbDocumentSource, KbDocumentStatus, KbLockMode } from './kb-types';
 import { WorkKnowledgeUpload } from './work-knowledge-upload.entity';
 
 /**

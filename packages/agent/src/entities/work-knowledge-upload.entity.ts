@@ -66,7 +66,11 @@ export class WorkKnowledgeUpload {
     @Column({ type: 'varchar', length: 64, nullable: true, name: 'normalized_format' })
     normalizedFormat?: string | null;
 
-    @Column({ type: 'varchar', default: KbUploadExtractionStatus.PENDING, name: 'extraction_status' })
+    @Column({
+        type: 'varchar',
+        default: KbUploadExtractionStatus.PENDING,
+        name: 'extraction_status',
+    })
     extractionStatus: KbUploadExtractionStatus;
 
     @Column({ type: 'varchar', length: 64, nullable: true, name: 'extraction_plugin_id' })
