@@ -27,14 +27,10 @@ test.describe('Multi-user invitations — owner happy path', () => {
             data: INVITE_PAYLOAD(invitee.email),
         });
         // EW-600 invitation flow is now baseline behaviour — owner POSTing a
-        // well-formed payload to their own work must succeed. The earlier
-        // defensive skip-on-4xx was a holdover from before the endpoint
-        // landed; the test now asserts.
-        expect(
-            create.status(),
-            `expected invitation to be created, got ${create.status()}`,
-        ).toBeGreaterThanOrEqual(200);
-        expect(create.status()).toBeLessThan(300);
+        // well-formed payload to their own work must succeed. Pinned to the
+        // exact 201 the controller returns (matches work-members.spec.ts so
+        // both specs catch any accidental status-code regression). Greptile P2.
+        expect(create.status(), `expected 201 Created, got ${create.status()}`).toBe(201);
 
         const list = await request.get(`${API_BASE}/api/works/${w.id}/invitations`, {
             headers: authedHeaders(owner.access_token),

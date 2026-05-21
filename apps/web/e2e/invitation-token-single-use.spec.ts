@@ -92,7 +92,10 @@ test.describe('Invitation tokens — consumed once', () => {
         );
         expect(preview1.status(), 'first preview must succeed').toBe(200);
         const preview1Body = await preview1.json();
-        expect(preview1Body.role).toBe('editor');
+        // Role casing is not pinned by the spec — normalize for comparison
+        // so both lowercase enum strings and uppercase enum names match.
+        // Greptile P1.
+        expect(String(preview1Body.role).toLowerCase()).toBe('editor');
 
         const preview2 = await request.get(
             `${API_BASE}/api/claim/preview?token=${encodeURIComponent(token!)}`,

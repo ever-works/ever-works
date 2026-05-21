@@ -52,7 +52,10 @@ test.describe('Member invitation — full lifecycle', () => {
         );
         expect(preview.status(), `preview failed: ${preview.status()}`).toBe(200);
         const previewBody = await preview.json();
-        expect(previewBody.role).toBe('editor');
+        // Role string casing is not pinned by the spec; normalize for
+        // comparison so both lowercase enum strings ('editor') and
+        // uppercase enum names ('EDITOR') match. Greptile P1.
+        expect(String(previewBody.role).toLowerCase()).toBe('editor');
         expect(previewBody.workName).toContain('mem-lifecycle');
 
         // 3. Invitee accepts. Token is consumed; a WorkMember row is
@@ -65,7 +68,7 @@ test.describe('Member invitation — full lifecycle', () => {
         expect(accept.status()).toBeLessThan(300);
         const acceptBody = await accept.json();
         expect(acceptBody.workId).toBe(w.id);
-        expect(acceptBody.role).toBe('editor');
+        expect(String(acceptBody.role).toLowerCase()).toBe('editor');
 
         // 4. Owner lists members; invitee must now appear with role=editor.
         const list = await request.get(`${API_BASE}/api/works/${w.id}/members`, {
@@ -73,7 +76,13 @@ test.describe('Member invitation — full lifecycle', () => {
         });
         expect(list.status()).toBe(200);
         const listBody = await list.json();
-        const members = listBody?.members ?? [];
+        // Defensive unwrap — matches the idiom used by the peer specs in
+        // this directory so a future API shape change (plain array vs
+        // `{ members: [] }`) doesn't silently surface as "invitee not in
+        // members list". Greptile P2.
+        const members = Array.isArray(listBody)
+            ? listBody
+            : (listBody?.members ?? listBody?.data ?? []);
         const inviteeMember = members.find(
             (m: { userId?: string; user?: { id?: string } }) =>
                 m?.userId === invitee.user.id || m?.user?.id === invitee.user.id,
@@ -98,7 +107,10 @@ test.describe('Member invitation — full lifecycle', () => {
             headers: authedHeaders(owner.access_token),
         });
         const list2Body = await list2.json();
-        const inviteeAfter = (list2Body?.members ?? []).find(
+        const members2 = Array.isArray(list2Body)
+            ? list2Body
+            : (list2Body?.members ?? list2Body?.data ?? []);
+        const inviteeAfter = members2.find(
             (m: { userId?: string; user?: { id?: string } }) =>
                 m?.userId === invitee.user.id || m?.user?.id === invitee.user.id,
         );
