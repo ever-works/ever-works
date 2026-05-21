@@ -112,6 +112,23 @@ export interface IStoragePlugin extends IPlugin {
 	 */
 	presignPut?(input: StoragePresignInput): Promise<StoragePresignResult>;
 
+	/**
+	 * Reconstruct the plugin's canonical storage key from the legacy
+	 * `/api/uploads/:ownerId/:filename` URL shape. Each backend layers
+	 * its own path prefix on top of `<ownerId>/<filename>` (`uploads/...`
+	 * for S3/MinIO/GitHub; bare `<ownerId>/<filename>` for local-fs), so
+	 * the API's read route cannot guess the right key without asking the
+	 * plugin. Returns the exact key the plugin would have written for
+	 * `putObject({ ownerId, filename })`.
+	 *
+	 * Plugins that follow the bare `<ownerId>/<filename>` convention
+	 * (local-fs) can leave this unset — the uploads service falls back
+	 * to that shape — but any backend with a prefix MUST implement it,
+	 * otherwise owner-gated reads will 404 for files it successfully
+	 * wrote (Codex P1 finding on PR #890).
+	 */
+	deriveKey?(ownerId: string, filename: string): string;
+
 	/** Whether the backend is healthy / configured. Used by the
 	 *  uploads service at startup to fail loudly when the operator
 	 *  selected an unconfigured backend. */

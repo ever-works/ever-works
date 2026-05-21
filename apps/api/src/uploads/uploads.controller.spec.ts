@@ -14,6 +14,7 @@ import { UploadsService } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import type { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
+import type { AuthProvider } from '../auth/providers/auth-provider.abstract';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 const stubContext = (id: string): PluginContext => {
@@ -117,7 +118,14 @@ describe('UploadsController', () => {
                 throw new Error('AnonymousAuthService stub: not expected in these tests');
             },
         } as unknown as AnonymousAuthService;
-        controller = new UploadsController(service, anonStub);
+        // AuthProvider is consumed by `tryAuthenticate` on the @Public()
+        // upload routes (Codex P2 follow-up). These auth-required tests
+        // never hit that path, so we hand it a stub that returns null
+        // (treated as "no session present" by the controller).
+        const authProviderStub = {
+            authenticate: async () => null,
+        } as unknown as AuthProvider;
+        controller = new UploadsController(service, anonStub, authProviderStub);
     });
 
     afterEach(async () => {

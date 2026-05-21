@@ -185,6 +185,20 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 		}
 	}
 
+	/**
+	 * S3 keys (and MinIO via inheritance) follow `uploads/<ownerId>/<filename>` —
+	 * see `buildKey`. The API's owner-gated read route hands us the
+	 * `<ownerId>/<filename>` segment from the URL; we re-prepend `uploads/`
+	 * so the GetObject call hits the right key.
+	 *
+	 * Without this method, `UploadsService.readFile` would fall back to
+	 * the legacy bare `<ownerId>/<filename>` shape and 404 every S3
+	 * read (Codex P1 finding on PR #890).
+	 */
+	deriveKey(ownerId: string, filename: string): string {
+		return `uploads/${ownerId}/${filename}`;
+	}
+
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		context.logger.log('AWS S3 storage plugin loaded');
