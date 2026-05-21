@@ -9,6 +9,7 @@ import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { Test } from '@nestjs/testing';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
@@ -205,8 +206,6 @@ describe('UploadsController', () => {
 // and bypass DI entirely. Bootstrapping a TestingModule with the real
 // providers list is what would have flagged it pre-merge.
 // ============================================================================
-
-import { Test } from '@nestjs/testing';
 
 describe('UploadsService — Nest DI', () => {
     it('resolves with no storage-plugin provider (falls back to factory)', async () => {
