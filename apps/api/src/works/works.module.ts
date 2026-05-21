@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import { WorkModule } from '@ever-works/agent/services';
+import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
 import { CacheEntryRepository } from '@ever-works/agent/cache';
@@ -17,6 +17,8 @@ import { WorksController } from './works.controller';
 import { MembersController } from './members.controller';
 import { InvitationsController } from './invitations.controller';
 import { BulkItemsController } from './bulk-items.controller';
+import { KbController } from './kb.controller';
+import { OrgKbController } from './org-kb.controller';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -39,6 +41,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         ActivityLogModule,
         ItemsGeneratorModule,
         ActivityFeedModule,
+        KnowledgeBaseModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -51,6 +54,13 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
     ],
-    controllers: [WorksController, MembersController, InvitationsController, BulkItemsController],
+    controllers: [
+        WorksController,
+        MembersController,
+        InvitationsController,
+        BulkItemsController,
+        KbController,
+        OrgKbController,
+    ],
 })
 export class WorksModule {}
