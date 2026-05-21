@@ -778,7 +778,6 @@ export class KnowledgeBaseService {
                 buffer: fetched.buffer,
                 originalFilename: upload.originalFilename,
                 mimeType: fetched.mimeType ?? upload.mimeType,
-                size: upload.fileSize,
             },
             targetClass: undefined,
             tags: upload.tags ?? undefined,
