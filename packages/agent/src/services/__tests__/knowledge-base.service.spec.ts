@@ -515,6 +515,76 @@ describe('KnowledgeBaseService', () => {
             );
         });
 
+        it('HTML upload: routes through KnowledgeBaseBufferExtractorService and creates a doc', async () => {
+            // Build a fresh service WITH the buffer extractor wired so
+            // we exercise the new Phase 1B/c routing branch.
+            const { KnowledgeBaseBufferExtractorService: BufferExtractor } =
+                await import('../knowledge-base-buffer-extractor.service');
+            const module2: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    BufferExtractor,
+                ],
+            }).compile();
+            const wired = module2.get(KnowledgeBaseService);
+
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/research/abc.html', url: '' });
+            const uploadRow = buildUpload({
+                mimeType: 'text/html',
+                originalFilename: 'briefing.html',
+            });
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            uploadRepo.update.mockResolvedValue({
+                ...uploadRow,
+                extractionStatus: 'succeeded' as KbUploadExtractionStatus,
+            });
+            const docRow = buildDocument({
+                id: '00000000-0000-0000-0000-000000000040',
+                path: 'research/briefing.md',
+                kbDocumentClass: 'research' as KbDocumentClass,
+            });
+            docRepo.create.mockResolvedValue(docRow);
+            docRepo.findById.mockResolvedValue(docRow);
+
+            const result = await wired.createUpload({
+                workId: WORK_ID,
+                userId: USER_ID,
+                file: {
+                    buffer: Buffer.from('<h1>Briefing</h1><p>Quarterly review notes.</p>', 'utf-8'),
+                    originalFilename: 'briefing.html',
+                    mimeType: 'text/html',
+                    size: 46,
+                },
+                targetClass: 'research' as KbDocumentClass,
+                tags: ['briefing'],
+            });
+
+            expect(result.document?.id).toBe(docRow.id);
+            expect(docRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: 'research/briefing.md',
+                    kbDocumentClass: 'research',
+                    source: 'imported',
+                }),
+            );
+            const extractedCall = activityLog.log.mock.calls.find(
+                (c) =>
+                    (c[0] as { actionType: string }).actionType ===
+                    ActivityActionType.KB_UPLOAD_EXTRACTED,
+            );
+            expect(extractedCall?.[0].details?.extractedVia).toBe('html-turndown');
+        });
+
         it('unsupported MIME: marks upload skipped + emits kb_upload_extraction_skipped', async () => {
             storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.bin', url: '' });
             const uploadRow = buildUpload({ mimeType: 'application/pdf' });

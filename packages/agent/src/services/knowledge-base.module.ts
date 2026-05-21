@@ -14,6 +14,7 @@ import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowle
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
+import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { WorkOwnershipService } from './work-ownership.service';
 
 /**
@@ -56,6 +57,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeCitationRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
+        KnowledgeBaseBufferExtractorService,
     ],
     exports: [
         WorkKnowledgeDocumentRepository,
@@ -64,6 +66,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeCitationRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
+        KnowledgeBaseBufferExtractorService,
     ],
 })
 export class KnowledgeBaseModule {}

@@ -15,6 +15,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { WorkOwnershipService } from './work-ownership.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
+import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { KbUploadExtractionStatus } from '../entities/kb-types';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
@@ -138,6 +139,12 @@ export class KnowledgeBaseService {
         @Inject(KB_STORAGE_PLUGIN)
         private readonly storage?: IStoragePlugin,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // EW-641 Phase 1B/c — extractor router for non-text MIME types
+        // (HTML now, PDF/DOCX/XLSX/PPTX in follow-up commits). Optional
+        // so isolated unit tests without DOM/Turndown plumbing still
+        // construct; when absent, the service falls back to the
+        // built-in text-passthrough check.
+        @Optional() private readonly bufferExtractor?: KnowledgeBaseBufferExtractorService,
     ) {}
 
     /**
@@ -831,12 +838,60 @@ export class KnowledgeBaseService {
             title?: string;
         },
     ): Promise<WorkKnowledgeDocument | null> {
-        const body = this.bodyForTextMimeType(input.file.buffer, input.file.mimeType);
+        let body: string | null = null;
+        let extractedVia: string | null = null;
+
+        if (this.bufferExtractor) {
+            try {
+                const extracted = this.bufferExtractor.extract(
+                    input.file.buffer,
+                    input.file.mimeType,
+                );
+                if (extracted) {
+                    body = extracted.markdown;
+                    extractedVia = extracted.via;
+                }
+            } catch (error) {
+                // The extractor selected a route but failed mid-extract
+                // (e.g. malformed HTML). Mark the upload failed so the
+                // operator sees the error in the row + activity log;
+                // retry-extraction is the recovery path.
+                const reason = (error as Error).message;
+                await this.uploadRepository.update(upload.id, {
+                    extractionStatus: KbUploadExtractionStatus.FAILED,
+                    extractionFinishedAt: new Date(),
+                    extractionError: reason,
+                });
+                await this.recordUploadActivity(
+                    input.workId,
+                    input.userId,
+                    ActivityActionType.KB_UPLOAD_EXTRACTION_FAILED,
+                    `Extraction failed for ${input.file.originalFilename}`,
+                    {
+                        uploadId: upload.id,
+                        mimeType: input.file.mimeType,
+                        error: reason,
+                    },
+                    ActivityStatus.FAILED,
+                );
+                throw error;
+            }
+        }
+
+        // Built-in text passthrough is the fallback when the buffer
+        // extractor service is not wired (unit tests, isolated deploys).
+        if (body === null) {
+            body = this.bodyForTextMimeType(input.file.buffer, input.file.mimeType);
+            if (body !== null) {
+                extractedVia = 'text-passthrough-fallback';
+            }
+        }
+
         if (body === null) {
             await this.uploadRepository.update(upload.id, {
                 extractionStatus: KbUploadExtractionStatus.SKIPPED,
                 extractionFinishedAt: new Date(),
-                extractionError: `Extractor routing for ${input.file.mimeType} not yet implemented (Phase 1B/c)`,
+                extractionError: `No extractor route for ${input.file.mimeType} yet (PDF/DOCX/XLSX/PPTX/Notion arrive in follow-up Phase 1B/c commits)`,
             });
             await this.recordUploadActivity(
                 input.workId,
@@ -887,6 +942,7 @@ export class KnowledgeBaseService {
                 {
                     uploadId: upload.id,
                     documentId: docRow.id,
+                    extractedVia,
                     mimeType: input.file.mimeType,
                 },
             );

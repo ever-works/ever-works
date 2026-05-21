@@ -28,6 +28,7 @@ export * from './deploy-ready-poller.service';
 export * from './category-icon';
 export * from './knowledge-base.service';
 export * from './knowledge-base-git-mirror.service';
+export * from './knowledge-base-buffer-extractor.service';
 export * from './knowledge-base.module';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
