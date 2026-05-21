@@ -1,9 +1,15 @@
 jest.mock('@ever-works/agent/database', () => ({ UserRepository: class {} }));
 jest.mock('@ever-works/agent/entities', () => ({ AuthSession: class {} }));
 
+import { Logger } from '@nestjs/common';
 import { AnonymousAuthService } from './anonymous-auth.service';
 
 describe('AnonymousAuthService (EW-617 G2)', () => {
+    let logSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    });
     const buildService = () => {
         const created: any[] = [];
         const userRepository = {
@@ -34,6 +40,7 @@ describe('AnonymousAuthService (EW-617 G2)', () => {
     };
 
     afterEach(() => {
+        logSpy.mockRestore();
         delete process.env.ANONYMOUS_USER_TTL_DAYS;
     });
 

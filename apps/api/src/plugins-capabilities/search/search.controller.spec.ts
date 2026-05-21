@@ -11,6 +11,9 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     PluginSettingsService: class {},
 }));
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class {},
+}));
 jest.mock('../../auth', () => ({
     AuthSessionGuard: class {},
     CurrentUser: () => () => undefined,
@@ -21,12 +24,14 @@ import { SearchController } from './search.controller';
 import { NoProviderError } from '@ever-works/agent/facades';
 import type { SearchFacadeService } from '@ever-works/agent/facades';
 import type { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
+import type { WorkOwnershipService } from '@ever-works/agent/services';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
 describe('SearchController', () => {
     let searchFacade: { search: jest.Mock };
     let pluginRegistry: { getEnabledPluginsScoped: jest.Mock };
     let pluginSettings: { getSettings: jest.Mock };
+    let ownershipService: { ensureCanView: jest.Mock };
     let controller: SearchController;
     const auth: AuthenticatedUser = { userId: 'user-1' } as any;
 
@@ -34,10 +39,12 @@ describe('SearchController', () => {
         searchFacade = { search: jest.fn() };
         pluginRegistry = { getEnabledPluginsScoped: jest.fn() };
         pluginSettings = { getSettings: jest.fn() };
+        ownershipService = { ensureCanView: jest.fn().mockResolvedValue(undefined) };
         controller = new SearchController(
             searchFacade as unknown as SearchFacadeService,
             pluginRegistry as unknown as PluginRegistryService,
             pluginSettings as unknown as PluginSettingsService,
+            ownershipService as unknown as WorkOwnershipService,
         );
     });
 
@@ -325,6 +332,42 @@ describe('SearchController', () => {
                 },
                 expect.any(Object),
             );
+        });
+
+        it('uses dto.workId for scoped provider resolution and usage attribution', async () => {
+            pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([registered('tavily')]);
+            pluginSettings.getSettings.mockResolvedValue({});
+            searchFacade.search.mockResolvedValue([]);
+
+            await controller.search(auth, { query: 'q', workId: 'work-1' } as any);
+
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(pluginRegistry.getEnabledPluginsScoped).toHaveBeenCalledWith(
+                'search',
+                'work-1',
+                'user-1',
+            );
+            expect(pluginSettings.getSettings).toHaveBeenCalledWith('tavily', {
+                userId: 'user-1',
+                workId: 'work-1',
+                includeSecrets: true,
+            });
+            expect(searchFacade.search).toHaveBeenCalledWith('q', expect.any(Object), {
+                userId: 'user-1',
+                workId: 'work-1',
+                providerOverride: 'tavily',
+            });
+        });
+
+        it('rejects dto.workId before provider resolution when the user cannot view the work', async () => {
+            ownershipService.ensureCanView.mockRejectedValue(new Error('forbidden'));
+
+            await expect(
+                controller.search(auth, { query: 'q', workId: 'work-1' } as any),
+            ).rejects.toThrow('forbidden');
+
+            expect(pluginRegistry.getEnabledPluginsScoped).not.toHaveBeenCalled();
+            expect(searchFacade.search).not.toHaveBeenCalled();
         });
 
         it('wraps NoProviderError in BadRequestException with "Enable a search plugin" message', async () => {

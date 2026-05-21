@@ -310,11 +310,11 @@ export class GitHubAppSyncService {
                 ),
             );
             this.logger.debug(
-                `EW-628 push: stamped pendingSyncRequestedAt on ${works.length} Work(s) for ${repoFullName}`,
+                `GitHub push: stamped pendingSyncRequestedAt on ${works.length} Work(s) for ${repoFullName}`,
             );
         } catch (err) {
             this.logger.warn(
-                `EW-628 push handler failed for ${repoFullName}: ${
+                `GitHub push handler failed for ${repoFullName}: ${
                     err instanceof Error ? err.message : String(err)
                 }`,
             );

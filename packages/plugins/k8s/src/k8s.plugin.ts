@@ -152,7 +152,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				default: 'custom-kubeconfig',
 				title: 'Target cluster',
 				description:
-					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org owning the website repo — see EW-616. The form renderer's generic enum widget shows this as a Select."
+					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org that owns the website repo."
 			},
 			kubeconfig: {
 				type: 'string',

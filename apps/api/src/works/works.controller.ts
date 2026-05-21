@@ -500,7 +500,7 @@ export class WorksController {
     @Post('works/:id/activity-sync/rotate-secret')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Rotate the per-Work pull-transport HMAC secret (EW-120)',
+        summary: 'Rotate the per-Work pull-transport HMAC secret',
         description:
             'Generates a fresh `PLATFORM_SYNC_SECRET` and persists it AES-256-GCM-encrypted on the Work row. The new value only reaches the deployed site at the next deploy — the response includes `redeployRequired: true` so the settings UI can surface that warning. Pull-mode Works only; 409 returned for push/disabled.',
     })
@@ -789,7 +789,7 @@ export class WorksController {
     @ApiOperation({
         summary: 'Execute a validated bulk item import',
         description:
-            'Writes the validated rows to the directory data repository under a single commit, then either pushes directly (when `autoapproval` is true) or opens a PR. Honors the per-row `duplicate_strategy` (skip or update). Phase 3 of EW-533.',
+            'Writes the validated rows to the directory data repository under a single commit, then either pushes directly (when `autoapproval` is true) or opens a PR. Honors the per-row `duplicate_strategy` (skip or update).',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Import result + optional PR details' })

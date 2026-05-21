@@ -766,16 +766,16 @@
             "workAgent": {
                 "sections": {
                     "agent": {
-                        "title": "Autonomous Work agent",
-                        "description": "Let the agent plan, research, and prepare Works from high-level goals."
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
-                        "description": "Set hard limits before the agent can create Works, add items, or spend budget."
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
                         "title": "Queue a goal",
-                        "description": "Give the agent a broad instruction. It starts as pending and runs inside your guardrails."
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
                         "title": "Live run",
@@ -802,6 +802,7 @@
                 "actions": {
                     "saveSettings": "Save settings",
                     "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
                 "queue": {
@@ -823,7 +824,7 @@
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
-                    "goalQueued": "Work agent goal queued",
+                    "goalQueued": "Work agent plan prepared",
                     "goalError": "Failed to queue goal",
                     "goalCanceled": "Work agent goal canceled",
                     "cancelError": "Failed to cancel goal"
@@ -1607,7 +1608,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Load More",
+                    "loadingMore": "Loading…"
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1634,7 +1637,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Redeploy the directory site with the latest activity feed endpoint.",
+                        "disabled": "Turn on activity sync in Settings to collect website events.",
+                        "timeout": "Retry refresh or check the deployed site if this keeps happening.",
+                        "unauthorized": "Rotate the activity sync secret, then redeploy the directory site.",
+                        "upstream_5xx": "Check the deployed site logs and retry after it recovers.",
+                        "network": "Check the deployed site URL and network reachability.",
+                        "parse_error": "Redeploy the directory site so it returns the expected activity payload."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
