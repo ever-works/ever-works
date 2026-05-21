@@ -315,7 +315,11 @@ export class KbController {
                 mimeType: file.mimetype,
                 size: file.size,
             },
-            targetClass: body.targetClass,
+            // Cast at the controller→service boundary — contracts package
+            // exposes the class union as string literals while the agent
+            // entity package keeps it as a runtime enum (Phase 1A handoff
+            // gotcha #6). Runtime-equivalent, nominally distinct.
+            targetClass: body.targetClass as KbDocumentClass | undefined,
             tags: body.tags,
             description: body.description ?? null,
             title: body.title,
