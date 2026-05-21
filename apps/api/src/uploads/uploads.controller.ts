@@ -220,11 +220,11 @@ export class UploadsController {
             'Requests a pre-signed upload URL for direct browser-to-cloud upload. Only available when STORAGE_BACKEND supports it (S3, MinIO). Returns 501 for local-fs / github-storage.',
     })
     @ApiResponse({ status: 200, description: 'Returns { url, key, fields?, expiresAt }' })
-    @ApiResponse({ status: 501, description: 'Backend does not support presign — use POST /api/uploads' })
-    async presign(
-        @Body() body: PresignUploadDto,
-        @Req() req: AnonRequest,
-    ) {
+    @ApiResponse({
+        status: 501,
+        description: 'Backend does not support presign — use POST /api/uploads',
+    })
+    async presign(@Body() body: PresignUploadDto, @Req() req: AnonRequest) {
         const backend = await this.uploads.getBackend();
         if (!backend.presignPut) {
             throw new NotImplementedException({

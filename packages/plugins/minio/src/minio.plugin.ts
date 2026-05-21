@@ -1,10 +1,5 @@
 import { AwsS3StoragePlugin, type S3Config } from '@ever-works/aws-s3-plugin';
-import type {
-	PluginCategory,
-	PluginManifest,
-	JsonSchema,
-	PluginContext
-} from '@ever-works/plugin';
+import type { PluginCategory, PluginManifest, JsonSchema, PluginContext } from '@ever-works/plugin';
 
 /**
  * EW-637 — MinIO storage backend.
@@ -82,8 +77,7 @@ export class MinioStoragePlugin extends AwsS3StoragePlugin {
 			accessKeyId: process.env.MINIO_ACCESS_KEY,
 			secretAccessKey: process.env.MINIO_SECRET_KEY,
 			forcePathStyle: true,
-			presignExpiresSeconds:
-				Number(process.env.MINIO_PRESIGN_EXPIRES_SECONDS) || 600
+			presignExpiresSeconds: Number(process.env.MINIO_PRESIGN_EXPIRES_SECONDS) || 600
 		};
 	}
 

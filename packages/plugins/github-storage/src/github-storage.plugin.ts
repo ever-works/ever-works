@@ -230,10 +230,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		const owner = process.env.GITHUB_STORAGE_OWNER || '';
 		const repo = process.env.GITHUB_STORAGE_REPO || '';
 		const branch = process.env.GITHUB_STORAGE_BRANCH || 'main';
-		const pathPrefix = (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(
-			/(^\/+|\/+$)/g,
-			''
-		);
+		const pathPrefix = (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(/(^\/+|\/+$)/g, '');
 		if (!token || !owner || !repo) {
 			throw new Error(
 				'github-storage plugin not configured: GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO required'

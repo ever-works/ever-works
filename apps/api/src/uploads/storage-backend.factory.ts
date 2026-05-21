@@ -25,26 +25,26 @@ import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
  * the stub keeps those as no-ops.
  */
 function makeStubContext(pluginId: string): PluginContext {
-	const nestLogger = new Logger(`StoragePlugin/${pluginId}`);
-	const logger: PluginLogger = {
-		log: (m, ...a) => nestLogger.log(formatMsg(m, a)),
-		error: (m, ...a) => nestLogger.error(formatMsg(m, a)),
-		warn: (m, ...a) => nestLogger.warn(formatMsg(m, a)),
-		debug: (m, ...a) => nestLogger.debug(formatMsg(m, a)),
-		verbose: (m, ...a) => nestLogger.verbose?.(formatMsg(m, a)),
-	};
-	// Storage plugins only ever touch `logger` and `pluginId` in our
-	// codebase. Anything else is cast through `unknown` so we don't have
-	// to stub the entire plugin SDK surface (cache, http, events, etc).
-	return {
-		pluginId,
-		logger,
-	} as unknown as PluginContext;
+    const nestLogger = new Logger(`StoragePlugin/${pluginId}`);
+    const logger: PluginLogger = {
+        log: (m, ...a) => nestLogger.log(formatMsg(m, a)),
+        error: (m, ...a) => nestLogger.error(formatMsg(m, a)),
+        warn: (m, ...a) => nestLogger.warn(formatMsg(m, a)),
+        debug: (m, ...a) => nestLogger.debug(formatMsg(m, a)),
+        verbose: (m, ...a) => nestLogger.verbose?.(formatMsg(m, a)),
+    };
+    // Storage plugins only ever touch `logger` and `pluginId` in our
+    // codebase. Anything else is cast through `unknown` so we don't have
+    // to stub the entire plugin SDK surface (cache, http, events, etc).
+    return {
+        pluginId,
+        logger,
+    } as unknown as PluginContext;
 }
 
 function formatMsg(message: string, args: unknown[]): string {
-	if (args.length === 0) return message;
-	return `${message} ${args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}`;
+    if (args.length === 0) return message;
+    return `${message} ${args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}`;
 }
 
 export type StorageBackendId = 'local-fs' | 'aws-s3' | 'minio' | 'github-storage';
@@ -53,31 +53,31 @@ let cached: IStoragePlugin | undefined;
 let cachedId: StorageBackendId | undefined;
 
 export function resolveStorageBackendId(): StorageBackendId {
-	const raw = (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase();
-	switch (raw) {
-		case 'local-fs':
-		case 'aws-s3':
-		case 'minio':
-		case 'github-storage':
-			return raw;
-		default:
-			throw new Error(
-				`STORAGE_BACKEND="${raw}" is not a supported backend. ` +
-					`Choose one of: local-fs, aws-s3, minio, github-storage.`
-			);
-	}
+    const raw = (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase();
+    switch (raw) {
+        case 'local-fs':
+        case 'aws-s3':
+        case 'minio':
+        case 'github-storage':
+            return raw;
+        default:
+            throw new Error(
+                `STORAGE_BACKEND="${raw}" is not a supported backend. ` +
+                    `Choose one of: local-fs, aws-s3, minio, github-storage.`,
+            );
+    }
 }
 
 export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
-	const wanted = resolveStorageBackendId();
-	if (cached && cachedId === wanted) return cached;
+    const wanted = resolveStorageBackendId();
+    if (cached && cachedId === wanted) return cached;
 
-	const plugin = await instantiate(wanted);
-	await plugin.onLoad(makeStubContext(plugin.id));
+    const plugin = await instantiate(wanted);
+    await plugin.onLoad(makeStubContext(plugin.id));
 
-	cached = plugin;
-	cachedId = wanted;
-	return plugin;
+    cached = plugin;
+    cachedId = wanted;
+    return plugin;
 }
 
 /**
@@ -85,44 +85,44 @@ export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
  * STORAGE_BACKEND between cases; production code never calls it.
  */
 export function resetStorageBackendCache(): void {
-	cached = undefined;
-	cachedId = undefined;
+    cached = undefined;
+    cachedId = undefined;
 }
 
 async function instantiate(id: StorageBackendId): Promise<IStoragePlugin> {
-	switch (id) {
-		case 'local-fs':
-			// Bundled — always available, no dynamic import needed.
-			return new LocalFsStoragePlugin();
-		case 'aws-s3': {
-			const mod = await import('@ever-works/aws-s3-plugin').catch((err) => {
-				throw new Error(
-					`STORAGE_BACKEND=aws-s3 but @ever-works/aws-s3-plugin failed to load: ${
-						err instanceof Error ? err.message : String(err)
-					}`
-				);
-			});
-			return new mod.AwsS3StoragePlugin();
-		}
-		case 'minio': {
-			const mod = await import('@ever-works/minio-plugin').catch((err) => {
-				throw new Error(
-					`STORAGE_BACKEND=minio but @ever-works/minio-plugin failed to load: ${
-						err instanceof Error ? err.message : String(err)
-					}`
-				);
-			});
-			return new mod.MinioStoragePlugin();
-		}
-		case 'github-storage': {
-			const mod = await import('@ever-works/github-storage-plugin').catch((err) => {
-				throw new Error(
-					`STORAGE_BACKEND=github-storage but @ever-works/github-storage-plugin failed to load: ${
-						err instanceof Error ? err.message : String(err)
-					}`
-				);
-			});
-			return new mod.GitHubStoragePlugin();
-		}
-	}
+    switch (id) {
+        case 'local-fs':
+            // Bundled — always available, no dynamic import needed.
+            return new LocalFsStoragePlugin();
+        case 'aws-s3': {
+            const mod = await import('@ever-works/aws-s3-plugin').catch((err) => {
+                throw new Error(
+                    `STORAGE_BACKEND=aws-s3 but @ever-works/aws-s3-plugin failed to load: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            });
+            return new mod.AwsS3StoragePlugin();
+        }
+        case 'minio': {
+            const mod = await import('@ever-works/minio-plugin').catch((err) => {
+                throw new Error(
+                    `STORAGE_BACKEND=minio but @ever-works/minio-plugin failed to load: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            });
+            return new mod.MinioStoragePlugin();
+        }
+        case 'github-storage': {
+            const mod = await import('@ever-works/github-storage-plugin').catch((err) => {
+                throw new Error(
+                    `STORAGE_BACKEND=github-storage but @ever-works/github-storage-plugin failed to load: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            });
+            return new mod.GitHubStoragePlugin();
+        }
+    }
 }

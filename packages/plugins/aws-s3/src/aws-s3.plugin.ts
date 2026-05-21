@@ -53,12 +53,7 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 	readonly name: string = 'AWS S3';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'storage';
-	readonly capabilities: readonly string[] = [
-		'storage',
-		'put-object',
-		'get-object',
-		'presigned-put'
-	];
+	readonly capabilities: readonly string[] = ['storage', 'put-object', 'get-object', 'presigned-put'];
 
 	readonly providerName: string = 'aws-s3';
 
@@ -233,8 +228,7 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 		const endpoint = overrides.endpoint;
 		const forcePathStyle = overrides.forcePathStyle ?? false;
 		const presignExpiresSeconds =
-			overrides.presignExpiresSeconds ??
-			(Number(process.env.AWS_S3_PRESIGN_EXPIRES_SECONDS) || 600);
+			overrides.presignExpiresSeconds ?? (Number(process.env.AWS_S3_PRESIGN_EXPIRES_SECONDS) || 600);
 
 		if (!region || !bucket) {
 			throw new Error(
