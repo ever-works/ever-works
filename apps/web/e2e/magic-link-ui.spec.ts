@@ -163,34 +163,34 @@ test.describe('Magic-link login UI — EW-633', () => {
     // direct `data-testid="magic-link-error"` to the Suspense fallback,
     // or assert on the locale-prefixed URL the goto eventually settles
     // on instead of relying on the bare path).
-    test.fixme(
-        'opening /login/magic-link without a token shows a friendly error and a resend CTA',
-        async ({ page, request }) => {
-            if (!(await isMagicLinkEnabled(request))) {
-                test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
-            }
+    test.fixme('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
+        page,
+        request,
+    }) => {
+        if (!(await isMagicLinkEnabled(request))) {
+            test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
+        }
 
-            await page.goto('/login/magic-link');
-            await expect(page.getByTestId('magic-link-error')).toBeVisible();
-            const resend = page.getByTestId('magic-link-request-new');
-            await expect(resend).toBeVisible();
-            await resend.click();
-            await page.waitForURL(/\/login\?tab=magic-link/);
-        },
-    );
+        await page.goto('/login/magic-link');
+        await expect(page.getByTestId('magic-link-error')).toBeVisible();
+        const resend = page.getByTestId('magic-link-request-new');
+        await expect(resend).toBeVisible();
+        await resend.click();
+        await page.waitForURL(/\/login\?tab=magic-link/);
+    });
 
-    test.fixme(
-        'opening /login/magic-link with an invalid token shows the error path',
-        async ({ page, request }) => {
-            if (!(await isMagicLinkEnabled(request))) {
-                test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
-            }
+    test.fixme('opening /login/magic-link with an invalid token shows the error path', async ({
+        page,
+        request,
+    }) => {
+        if (!(await isMagicLinkEnabled(request))) {
+            test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
+        }
 
-            await page.goto('/login/magic-link?token=deadbeef-not-a-real-token');
-            await expect(page.getByTestId('magic-link-error')).toBeVisible({
-                timeout: 15_000,
-            });
-            await expect(page.getByTestId('magic-link-request-new')).toBeVisible();
-        },
-    );
+        await page.goto('/login/magic-link?token=deadbeef-not-a-real-token');
+        await expect(page.getByTestId('magic-link-error')).toBeVisible({
+            timeout: 15_000,
+        });
+        await expect(page.getByTestId('magic-link-request-new')).toBeVisible();
+    });
 });
