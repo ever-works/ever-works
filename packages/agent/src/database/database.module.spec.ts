@@ -1,36 +1,9 @@
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from './database.module';
-import { ApiKeyRepository } from './repositories/api-key.repository';
-import { WorkRepository } from './repositories/work.repository';
-import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
-import { WorkCustomDomainRepository } from './repositories/work-custom-domain.repository';
-import { WorkDeploymentRepository } from './repositories/work-deployment.repository';
-import { WorkMemberRepository } from './repositories/work-member.repository';
-import { WorkInvitationRepository } from './repositories/work-invitation.repository';
-import { RefreshTokenRepository } from './repositories/refresh-token.repository';
-import { AuthAccountRepository } from './repositories/auth-account.repository';
-import { UserRepository } from './repositories/user.repository';
-import { WorkGenerationHistoryRepository } from './repositories/work-generation-history.repository';
-import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
-import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
-import { WorkScheduleRepository } from './repositories/work-schedule.repository';
-import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
-import { PluginUsageRepository } from './repositories/plugin-usage.repository';
-import { WorkBudgetRepository } from './repositories/work-budget.repository';
-import { WorkBudgetAlertStateRepository } from './repositories/work-budget-alert-state.repository';
-import { NotificationRepository } from './repositories/notification.repository';
-import { ActivityLogRepository } from './repositories/activity-log.repository';
-import { ConversationRepository } from './repositories/conversation.repository';
-import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
-import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
-import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
-import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
-import { TemplateRepository } from './repositories/template.repository';
-import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
-import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
-import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
-import { WebhookDeliveryRepository } from './repositories/webhook-delivery.repository';
+import { REPOSITORY_PROVIDERS } from './_repository-inventory';
+import { AGENT_ENTITY_NAMES } from './_entity-names';
+import * as entitiesBarrel from '../entities';
 
 /**
  * `DatabaseModule` is a wire-format-stable contract: every NestJS feature
@@ -53,67 +26,28 @@ import { WebhookDeliveryRepository } from './repositories/webhook-delivery.repos
  * suite restricts itself to the static `@Module()` decorator metadata
  * (`imports` shape, providers list, exports list) so the surface is
  * pinned regardless of the runtime DataSource.
+ *
+ * EW-638 — the inventory of repository providers used to live duplicated
+ * here. It now lives in `_repository-inventory.ts` so a new repository
+ * is a single deliberate edit in one place. This suite asserts the
+ * module's wiring matches the inventory.
  */
 describe('DatabaseModule decorator metadata', () => {
     function getMeta(key: 'imports' | 'providers' | 'exports'): unknown[] {
         return (Reflect.getMetadata(key, DatabaseModule) ?? []) as unknown[];
     }
 
-    /**
-     * The documented repository providers (kept here so adding a new
-     * repository is an explicit, type-checked update — silently appending
-     * a provider to `database.module.ts` without bumping this list will
-     * break the regression-guard test). Order does not matter at runtime
-     * but the list is sorted alphabetically by class name to make diffs
-     * easy to read.
-     */
-    const REPOSITORY_PROVIDERS = [
-        ActivityLogRepository,
-        ApiKeyRepository,
-        AuthAccountRepository,
-        ConversationRepository,
-        GitHubAppInstallationRepoRepository,
-        GitHubAppInstallationRepository,
-        GitHubAppUserLinkRepository,
-        NotificationRepository,
-        OnboardingRequestRepository,
-        PluginUsageRepository,
-        RefreshTokenRepository,
-        SubscriptionPlanRepository,
-        TemplateCustomizationRepository,
-        TemplateRepository,
-        UsageLedgerRepository,
-        UserRepository,
-        UserSubscriptionRepository,
-        UserTemplatePreferenceRepository,
-        WebhookDeliveryRepository,
-        WebhookSubscriptionRepository,
-        WorkAdvancedPromptsRepository,
-        WorkBudgetAlertStateRepository,
-        WorkBudgetRepository,
-        WorkCustomDomainRepository,
-        WorkDeploymentRepository,
-        WorkGenerationHistoryRepository,
-        WorkInvitationRepository,
-        WorkMemberRepository,
-        WorkRepository,
-        WorkScheduleRepository,
-    ] as const;
-
     describe('@Module() providers', () => {
-        it('declares every documented repository provider', () => {
+        it('declares every documented repository provider (sourced from `_repository-inventory.ts`)', () => {
             const providers = getMeta('providers');
             for (const repo of REPOSITORY_PROVIDERS) {
                 expect(providers).toContain(repo);
             }
         });
 
-        it('declares EXACTLY 30 providers (regression guard against silent additions)', () => {
-            // Bumped from 29 → 30 in the EW-634 follow-up that landed
-            // `WebhookDeliveryRepository` for the new `webhook_deliveries` table.
+        it('declares EXACTLY as many providers as the inventory lists (regression guard against silent additions)', () => {
             const providers = getMeta('providers');
             expect(providers.length).toBe(REPOSITORY_PROVIDERS.length);
-            expect(providers.length).toBe(30);
         });
 
         it('every provider is a class constructor (function with prototype) — pinned so a future `useClass`/`useFactory` swap is deliberate', () => {
@@ -153,13 +87,12 @@ describe('DatabaseModule decorator metadata', () => {
             }
         });
 
-        it('exports EXACTLY 31 symbols — TypeOrmModule + 30 repositories (regression guard)', () => {
+        it('exports the inventory count + 1 (TypeOrmModule) symbols — regression guard', () => {
             // Pinned so a future "stop exporting WorkRepository" tweak (which
-            // would orphan every consumer) breaks loudly. Bumped 30 → 31
-            // in the EW-634 follow-up that added `WebhookDeliveryRepository`.
+            // would orphan every consumer) breaks loudly. The count tracks
+            // `_repository-inventory.ts` automatically.
             const exports = getMeta('exports');
             expect(exports.length).toBe(REPOSITORY_PROVIDERS.length + 1);
-            expect(exports.length).toBe(31);
         });
 
         it('exports list is exactly the providers list + TypeOrmModule (no provider held back from consumers)', () => {
@@ -266,6 +199,49 @@ describe('DatabaseModule decorator metadata', () => {
 
         it('exports the class under the documented name (so a string-based registry would still find it)', () => {
             expect(DatabaseModule.name).toBe('DatabaseModule');
+        });
+    });
+
+    /**
+     * EW-638 drift detection — `_entity-names.ts` MUST list exactly the
+     * entity classes that the real `../entities` barrel exposes. If a new
+     * entity ships without updating `_entity-names.ts`, the mock barrel
+     * in `database.config.spec.ts` will be missing an entry and that
+     * spec will fail with "every entry is a function" → "undefined".
+     *
+     * We catch the drift here instead, where the failure message is
+     * actionable ("entity X is in the real barrel but missing from
+     * `_entity-names.ts` — add it") rather than the cryptic mock-shadow
+     * "undefined" error.
+     */
+    describe('entity-names inventory drift (EW-638)', () => {
+        const realEntityNames = Object.keys(entitiesBarrel)
+            .filter((name) => {
+                const value = (entitiesBarrel as Record<string, unknown>)[name];
+                // Entity classes are the only `function`-typed exports
+                // the barrel emits. Interface/type exports erase at
+                // runtime, and TypeScript enums + `const`-tuple arrays
+                // become plain `object`-typed values — so a single
+                // `typeof === 'function'` + PascalCase check is enough
+                // to isolate entity classes without false positives.
+                // (Entity NAMES are allowed to end in "Repository", e.g.
+                // `GitHubAppInstallationRepository`, which models the
+                // GitHub repo that an installation is granted access to;
+                // a stricter suffix filter would wrongly strip it.)
+                return typeof value === 'function' && /^[A-Z]/.test(name);
+            })
+            .sort();
+
+        const inventoryNames = [...AGENT_ENTITY_NAMES].sort();
+
+        it('every name in `_entity-names.ts` corresponds to a real export in `../entities`', () => {
+            const missingFromReal = inventoryNames.filter((n) => !realEntityNames.includes(n));
+            expect(missingFromReal).toEqual([]);
+        });
+
+        it('every entity class exported by `../entities` is listed in `_entity-names.ts`', () => {
+            const missingFromInventory = realEntityNames.filter((n) => !inventoryNames.includes(n));
+            expect(missingFromInventory).toEqual([]);
         });
     });
 });
