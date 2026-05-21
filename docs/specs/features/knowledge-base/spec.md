@@ -17,7 +17,7 @@ Every Work generated and maintained by the Ever Works platform operates against 
 
 This spec introduces a **per-Work Knowledge Base** (KB): a first-class, structured, Git-backed corpus of typed knowledge documents that the Work's agents and generation pipelines retrieve from on every run, and that the platform's UI surfaces as an editable workbench. Users upload source material (PDFs, Word docs, spreadsheets, markdown, images, video, URLs); the platform stores originals in the Work's configured Storage plugin and writes a normalized, agent-readable copy of each into the Git data repo at `.content/kb/`. A typed classification (`brand` / `legal` / `seo` / `glossary` / `competitors` / `personas` / `style` / `research` / `output` / `freeform`) gates how each document is used by the agent runtime. A WYSIWYG editor, inline viewers for non-markdown originals, hierarchical folder structure, and an AI side-panel with `@mention`-based retrieval and citations make the KB a primary surface in the Work workbench.
 
-**Strategic intent.** The platform's positioning rests on the *maintain* half of "research → generate → deploy → maintain". The KB is the substrate that makes "maintain" mean something: it is the institutional context the agent operates from on every scheduled regeneration, every community PR, every comparison, every content refresh. Without it, every run starts from prompt scratch. With it, the runtime accumulates a durable, owned, version-controlled understanding of what each business actually is.
+**Strategic intent.** The platform's positioning rests on the _maintain_ half of "research → generate → deploy → maintain". The KB is the substrate that makes "maintain" mean something: it is the institutional context the agent operates from on every scheduled regeneration, every community PR, every comparison, every content refresh. Without it, every run starts from prompt scratch. With it, the runtime accumulates a durable, owned, version-controlled understanding of what each business actually is.
 
 ---
 
@@ -30,7 +30,7 @@ This spec introduces a **per-Work Knowledge Base** (KB): a first-class, structur
 - **G3.** Make the KB the canonical context source consumed by the Work's agents, generators, comparison pipeline, scheduled updates, and community PR flow.
 - **G4.** Provide a workbench UI to browse, edit, tag, classify, lock, restore, and search the KB, plus inline viewers for the original uploads in their native formats.
 - **G5.** Expose the KB to AI conversation as `@mention`-able context with cited responses.
-- **G6.** Let agents write *back* into the KB — research notes, generated outputs (slides, dashboards, reports) — under the same governance as user-created docs.
+- **G6.** Let agents write _back_ into the KB — research notes, generated outputs (slides, dashboards, reports) — under the same governance as user-created docs.
 - **G7.** Support organization-level inheritance for the classes where it makes sense (`legal`, `style`, `seo`), with Work-level override, reusing the established `PluginSettingsService` 4-level resolution pattern.
 - **G8.** Per-document lock semantics (compatible with the existing pattern for scheduled regeneration safety).
 - **G9.** Audit trail: every KB mutation flows through `ActivityLog` and Git history.
@@ -56,19 +56,19 @@ This spec introduces a **per-Work Knowledge Base** (KB): a first-class, structur
 
 The KB inherits the platform's existing principles. The relevant ones, restated for this feature:
 
-1. **Git-first.** The agent-readable KB layer is *always* in the Work's Git data repository. Originals may live in any configured Storage plugin; the extracted, normalized KB form is in Git. This guarantees: portable, inspectable, diff-able, versioned, recoverable, and accessible to every downstream pipeline that already reads `.content/`.
+1. **Git-first.** The agent-readable KB layer is _always_ in the Work's Git data repository. Originals may live in any configured Storage plugin; the extracted, normalized KB form is in Git. This guarantees: portable, inspectable, diff-able, versioned, recoverable, and accessible to every downstream pipeline that already reads `.content/`.
 2. **Plugin-driven.** Storage of originals uses whatever Storage plugin the Work has configured (`github-storage`, `aws-s3`, `minio`, `local-fs`). Extraction uses the configured Content Extractor plugins (`pdf-extractor`, `local-content-extractor`, `notion-extractor`, `scrapfly`). No new ingest mechanisms.
 3. **Two-layer storage.** Originals (binary) and extracted KB (Markdown + sidecar YAML) are conceptually distinct surfaces. They may share a Storage when `github-storage` is selected, but the abstraction is two layers.
 4. **Typed classification.** Documents have a `kbDocumentClass` enum that drives how the agent treats them — `legal` is verbatim-or-omitted, `brand` is soft guidance, `glossary` is term-substitution, etc.
 5. **Format normalization rules**:
-   - `pdf`, `docx`, `pptx`, `odt`, `rtf` → Markdown (text + image references).
-   - `xlsx`, `xlsm`, `csv`, `tsv` → Markdown table + preserved raw file.
-   - `html`, `htm` → Markdown via configured extractor.
-   - Images (`png`, `jpg`, `jpeg`, `webp`, `gif`, `svg`) → kept in original format; image reference inserted into Markdown index.
-   - Video (any source format) → normalized to `mp4` (configurable, `mp4` default).
-   - Audio (any source format) → normalized to `mp3` (configurable, `mp3` default) + transcript Markdown.
-   - URL → Markdown via extractor.
-   - Markdown → stored verbatim, frontmatter merged with KB metadata.
+    - `pdf`, `docx`, `pptx`, `odt`, `rtf` → Markdown (text + image references).
+    - `xlsx`, `xlsm`, `csv`, `tsv` → Markdown table + preserved raw file.
+    - `html`, `htm` → Markdown via configured extractor.
+    - Images (`png`, `jpg`, `jpeg`, `webp`, `gif`, `svg`) → kept in original format; image reference inserted into Markdown index.
+    - Video (any source format) → normalized to `mp4` (configurable, `mp4` default).
+    - Audio (any source format) → normalized to `mp3` (configurable, `mp3` default) + transcript Markdown.
+    - URL → Markdown via extractor.
+    - Markdown → stored verbatim, frontmatter merged with KB metadata.
 6. **Inheritance only where it makes sense.** Brand identity is always per-Work. `legal`, `style`, and `seo` support org-level default + Work-level override. `glossary`, `competitors`, `personas`, `research`, `output`, `freeform` are always per-Work in v1.
 7. **Agents are first-class authors.** The KB schema is symmetric — agent-authored documents carry the same shape as user-authored ones, with provenance fields recording which agent run produced them.
 8. **Mirror existing conventions.** Entity shapes, migration filenames, API route layout, web route layout, and on-disk YAML/Markdown shape mirror the existing Ever Works codebase — not a parallel universe of its own.
@@ -117,7 +117,7 @@ A dedicated workbench page under the Work's nav (`/works/:id/kb`) provides:
 
 By default, all KB documents are **Work-scoped**. Three classes are exceptions and support org-level inheritance: `legal` (master privacy policy, terms, regulated copy), `style` (org-wide editorial style guide, banned words, voice/tense rules), and `seo` (org-wide SEO playbook, structured-data conventions). An organization may publish documents of these classes; all Works in the org inherit them unless the Work overrides with its own document at the same `path`. Resolution follows the existing 4-level pattern used by `PluginSettingsService`: plugin defaults → organization → Work → user (the user level is unused for KB; it remains in the resolution chain for symmetry).
 
-Brand identity, glossary, competitors, personas, research, output, and freeform classes are *not* inheritable. Each Work owns these. This is a deliberate constraint to prevent cross-Work brand drift and to keep audience/competitive/research material specific to each site.
+Brand identity, glossary, competitors, personas, research, output, and freeform classes are _not_ inheritable. Each Work owns these. This is a deliberate constraint to prevent cross-Work brand drift and to keep audience/competitive/research material specific to each site.
 
 ---
 
@@ -191,8 +191,8 @@ Brand identity, glossary, competitors, personas, research, output, and freeform 
 
 **Persistence model**. The KB lives in two places simultaneously and these must stay in sync:
 
-1. **Database** (PostgreSQL) — fast queries, indexes, joins, audit. Source of truth for *metadata* (which docs exist, their tags, classes, statuses, ownership, locks, indexing state).
-2. **Git data repository** — source of truth for *content*. The KB markdown + sidecar YAML is committed and pushed; downstream pipelines (generation, deployment, comparisons, scheduled updates) read from Git as today.
+1. **Database** (PostgreSQL) — fast queries, indexes, joins, audit. Source of truth for _metadata_ (which docs exist, their tags, classes, statuses, ownership, locks, indexing state).
+2. **Git data repository** — source of truth for _content_. The KB markdown + sidecar YAML is committed and pushed; downstream pipelines (generation, deployment, comparisons, scheduled updates) read from Git as today.
 
 The DB row and the Git files are kept in sync by `KnowledgeBaseService` (the orchestrator). DB writes happen first; Git commits second; if the Git commit fails, the DB row is rolled back. Reads can happen from either depending on the call site — UI reads from DB; agent pipelines read from Git (because they already do, and Git is the durable source).
 
@@ -207,43 +207,45 @@ All entities mirror the existing TypeORM conventions: UUID primary keys, `@Creat
 File: `packages/agent/src/entities/work-knowledge-document.entity.ts`
 Table: `work_knowledge_documents`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | `@PrimaryGeneratedColumn('uuid')` |
-| `workId` | uuid, nullable | Either `workId` or `organizationId` must be set (CHECK constraint). Work-scoped docs set this. |
-| `organizationId` | uuid, nullable | Org-scoped docs set this; restricted at validation time to `kbDocumentClass IN ('legal', 'style', 'seo')` in v1. |
-| `path` | varchar(512), indexed | Forward-slash separated, relative to `.content/kb/`. Example: `brand/voice.md`. Unique within `(workId, path)` and `(organizationId, path)`. |
-| `slug` | varchar(255), indexed | Kebab-case, last path segment without extension. Example: `voice`. |
-| `title` | varchar(255) | Human-readable title. |
-| `description` | text, nullable | One-sentence summary used in tree tooltips and agent listings. |
-| `kbDocumentClass` | enum (varchar) | One of: `brand`, `legal`, `seo`, `glossary`, `competitors`, `personas`, `style`, `research`, `output`, `freeform`. |
-| `tags` | simple-json (string[]) | Array of tag slugs. |
-| `categories` | simple-json (string[]) | Array of category slugs. Optional secondary grouping. |
-| `status` | enum (varchar) | `draft` / `active` / `archived`. Default `active`. |
-| `locked` | boolean | Default `false`. When `true`, scheduled regeneration and agent runs may not mutate this doc. |
-| `lockMode` | enum (varchar), nullable | When `locked=true`: `full` (no changes) or `additions-only`. |
-| `language` | varchar(8) | BCP-47, default `en`. |
-| `wordCount` | int, nullable | Auto-computed on save. |
-| `tokenCount` | int, nullable | Estimated; auto-computed on save. |
-| `source` | enum (varchar) | `user` / `agent` / `imported` / `seeded`. |
-| `sourceUploadId` | uuid, nullable, FK | → `work_knowledge_uploads.id`. Set when this doc was derived from an upload. |
-| `sourceUrl` | varchar(2048), nullable | If imported from a URL via an extractor plugin. |
-| `generatedByAgentRunId` | uuid, nullable, FK | → `work_agent_runs.id`. Provenance for `source='agent'`. |
-| `createdById` | uuid, nullable, FK | → `users.id`. Null for agent-authored. |
-| `updatedById` | uuid, nullable, FK | → `users.id`. Null for agent-authored. |
-| `lastIndexedAt` | timestamptz, nullable | When the search index last incorporated this doc. |
-| `lastCommitSha` | varchar(40), nullable | Last Git commit SHA that touched this doc. |
-| `metadata` | simple-json, nullable | Free-form extension dict for future fields. |
-| `createdAt` | timestamptz | `@CreateDateColumn` |
-| `updatedAt` | timestamptz | `@UpdateDateColumn` |
+| Column                  | Type                     | Notes                                                                                                                                        |
+| ----------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                    | uuid PK                  | `@PrimaryGeneratedColumn('uuid')`                                                                                                            |
+| `workId`                | uuid, nullable           | Either `workId` or `organizationId` must be set (CHECK constraint). Work-scoped docs set this.                                               |
+| `organizationId`        | uuid, nullable           | Org-scoped docs set this; restricted at validation time to `kbDocumentClass IN ('legal', 'style', 'seo')` in v1.                             |
+| `path`                  | varchar(512), indexed    | Forward-slash separated, relative to `.content/kb/`. Example: `brand/voice.md`. Unique within `(workId, path)` and `(organizationId, path)`. |
+| `slug`                  | varchar(255), indexed    | Kebab-case, last path segment without extension. Example: `voice`.                                                                           |
+| `title`                 | varchar(255)             | Human-readable title.                                                                                                                        |
+| `description`           | text, nullable           | One-sentence summary used in tree tooltips and agent listings.                                                                               |
+| `kbDocumentClass`       | enum (varchar)           | One of: `brand`, `legal`, `seo`, `glossary`, `competitors`, `personas`, `style`, `research`, `output`, `freeform`.                           |
+| `tags`                  | simple-json (string[])   | Array of tag slugs.                                                                                                                          |
+| `categories`            | simple-json (string[])   | Array of category slugs. Optional secondary grouping.                                                                                        |
+| `status`                | enum (varchar)           | `draft` / `active` / `archived`. Default `active`.                                                                                           |
+| `locked`                | boolean                  | Default `false`. When `true`, scheduled regeneration and agent runs may not mutate this doc.                                                 |
+| `lockMode`              | enum (varchar), nullable | When `locked=true`: `full` (no changes) or `additions-only`.                                                                                 |
+| `language`              | varchar(8)               | BCP-47, default `en`.                                                                                                                        |
+| `wordCount`             | int, nullable            | Auto-computed on save.                                                                                                                       |
+| `tokenCount`            | int, nullable            | Estimated; auto-computed on save.                                                                                                            |
+| `source`                | enum (varchar)           | `user` / `agent` / `imported` / `seeded`.                                                                                                    |
+| `sourceUploadId`        | uuid, nullable, FK       | → `work_knowledge_uploads.id`. Set when this doc was derived from an upload.                                                                 |
+| `sourceUrl`             | varchar(2048), nullable  | If imported from a URL via an extractor plugin.                                                                                              |
+| `generatedByAgentRunId` | uuid, nullable, FK       | → `work_agent_runs.id`. Provenance for `source='agent'`.                                                                                     |
+| `createdById`           | uuid, nullable, FK       | → `users.id`. Null for agent-authored.                                                                                                       |
+| `updatedById`           | uuid, nullable, FK       | → `users.id`. Null for agent-authored.                                                                                                       |
+| `lastIndexedAt`         | timestamptz, nullable    | When the search index last incorporated this doc.                                                                                            |
+| `lastCommitSha`         | varchar(40), nullable    | Last Git commit SHA that touched this doc.                                                                                                   |
+| `metadata`              | simple-json, nullable    | Free-form extension dict for future fields.                                                                                                  |
+| `createdAt`             | timestamptz              | `@CreateDateColumn`                                                                                                                          |
+| `updatedAt`             | timestamptz              | `@UpdateDateColumn`                                                                                                                          |
 
 **Relations:**
+
 - `@ManyToOne(() => Work)` on `workId`, `onDelete: 'CASCADE'`.
 - `@ManyToOne(() => Organization)` on `organizationId`, `onDelete: 'CASCADE'`.
 - `@ManyToOne(() => WorkKnowledgeUpload)` on `sourceUploadId`, `onDelete: 'SET NULL'`.
 - `@ManyToOne(() => WorkAgentRun)` on `generatedByAgentRunId`, `onDelete: 'SET NULL'`.
 
 **Indexes:**
+
 - `@Index(['workId', 'kbDocumentClass'])`
 - `@Index(['organizationId', 'kbDocumentClass'])`
 - `@Index(['workId', 'path'], { unique: true })` — when `workId` is set
@@ -252,6 +254,7 @@ Table: `work_knowledge_documents`
 - `@Index(['workId', 'updatedAt'])`
 
 **CHECK constraint** (migration SQL):
+
 ```sql
 CHECK ((work_id IS NOT NULL AND organization_id IS NULL)
     OR (work_id IS NULL AND organization_id IS NOT NULL))
@@ -264,35 +267,37 @@ Table: `work_knowledge_uploads`
 
 Tracks original uploaded source files. Lives in the database for metadata + indexing, while the actual file bytes live in the Storage plugin.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `workId` | uuid, FK, NOT NULL | Uploads are always Work-scoped. |
-| `storageProvider` | varchar(64) | Which Storage plugin ID was used. Example: `github-storage`, `aws-s3`, `minio`, `local-fs`. |
-| `storagePath` | varchar(1024) | Path within the storage. Example: `kb-originals/research/2026-q2/mckinsey-market-sizing.pdf`. |
-| `originalFilename` | varchar(512) | Filename as uploaded. |
-| `mimeType` | varchar(128) | Detected content type. |
-| `fileSize` | bigint | Bytes. |
-| `sha256` | varchar(64), indexed | Content hash for dedup detection. |
-| `normalizedFormat` | varchar(64), nullable | If a media-format normalization happened (e.g. `mp4`), the target format slug. |
-| `extractionStatus` | enum (varchar) | `pending` / `running` / `succeeded` / `failed` / `skipped` (e.g. for already-Markdown). |
-| `extractionPluginId` | varchar(64), nullable | Which extractor plugin was used. |
-| `extractionError` | text, nullable | If `extractionStatus='failed'`. |
-| `extractionStartedAt` | timestamptz, nullable | |
-| `extractionFinishedAt` | timestamptz, nullable | |
-| `extractedDocumentId` | uuid, nullable, FK | → `work_knowledge_documents.id`. The KB doc this upload was extracted into. |
-| `uploadedById` | uuid, FK | → `users.id`. Null for agent-imported. |
-| `tags` | simple-json (string[]) | Inherited from the user's upload form; copied to the derived KB document on first extraction. |
-| `categories` | simple-json (string[]) | Same. |
-| `metadata` | simple-json, nullable | E.g. EXIF for images, duration for video, page count for PDF. |
-| `createdAt` | timestamptz | |
-| `updatedAt` | timestamptz | |
+| Column                 | Type                   | Notes                                                                                         |
+| ---------------------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| `id`                   | uuid PK                |                                                                                               |
+| `workId`               | uuid, FK, NOT NULL     | Uploads are always Work-scoped.                                                               |
+| `storageProvider`      | varchar(64)            | Which Storage plugin ID was used. Example: `github-storage`, `aws-s3`, `minio`, `local-fs`.   |
+| `storagePath`          | varchar(1024)          | Path within the storage. Example: `kb-originals/research/2026-q2/mckinsey-market-sizing.pdf`. |
+| `originalFilename`     | varchar(512)           | Filename as uploaded.                                                                         |
+| `mimeType`             | varchar(128)           | Detected content type.                                                                        |
+| `fileSize`             | bigint                 | Bytes.                                                                                        |
+| `sha256`               | varchar(64), indexed   | Content hash for dedup detection.                                                             |
+| `normalizedFormat`     | varchar(64), nullable  | If a media-format normalization happened (e.g. `mp4`), the target format slug.                |
+| `extractionStatus`     | enum (varchar)         | `pending` / `running` / `succeeded` / `failed` / `skipped` (e.g. for already-Markdown).       |
+| `extractionPluginId`   | varchar(64), nullable  | Which extractor plugin was used.                                                              |
+| `extractionError`      | text, nullable         | If `extractionStatus='failed'`.                                                               |
+| `extractionStartedAt`  | timestamptz, nullable  |                                                                                               |
+| `extractionFinishedAt` | timestamptz, nullable  |                                                                                               |
+| `extractedDocumentId`  | uuid, nullable, FK     | → `work_knowledge_documents.id`. The KB doc this upload was extracted into.                   |
+| `uploadedById`         | uuid, FK               | → `users.id`. Null for agent-imported.                                                        |
+| `tags`                 | simple-json (string[]) | Inherited from the user's upload form; copied to the derived KB document on first extraction. |
+| `categories`           | simple-json (string[]) | Same.                                                                                         |
+| `metadata`             | simple-json, nullable  | E.g. EXIF for images, duration for video, page count for PDF.                                 |
+| `createdAt`            | timestamptz            |                                                                                               |
+| `updatedAt`            | timestamptz            |                                                                                               |
 
 **Relations:**
+
 - `@ManyToOne(() => Work)`, `onDelete: 'CASCADE'`.
 - `@OneToOne(() => WorkKnowledgeDocument)` on `extractedDocumentId`, `onDelete: 'SET NULL'`.
 
 **Indexes:**
+
 - `@Index(['workId', 'extractionStatus'])`
 - `@Index(['workId', 'sha256'])` — fast dedup lookup
 - `@Index(['workId', 'createdAt'])`
@@ -304,16 +309,16 @@ Table: `work_knowledge_tags`
 
 A small lookup table for tag normalization + UI autocomplete. Documents store `tags: string[]` (slugs); this table provides the human-readable name, color, and description for each slug.
 
-| Column | Type |
-| --- | --- |
-| `id` | uuid PK |
-| `workId` | uuid, FK NOT NULL |
-| `slug` | varchar(64), indexed |
-| `name` | varchar(128) |
-| `color` | varchar(16), nullable |
-| `description` | text, nullable |
-| `createdAt` | timestamptz |
-| `updatedAt` | timestamptz |
+| Column        | Type                  |
+| ------------- | --------------------- |
+| `id`          | uuid PK               |
+| `workId`      | uuid, FK NOT NULL     |
+| `slug`        | varchar(64), indexed  |
+| `name`        | varchar(128)          |
+| `color`       | varchar(16), nullable |
+| `description` | text, nullable        |
+| `createdAt`   | timestamptz           |
+| `updatedAt`   | timestamptz           |
 
 Unique constraint on `(workId, slug)`.
 
@@ -324,18 +329,19 @@ Table: `work_knowledge_citations`
 
 Records every time a KB document was used as context in an agent run, scheduled regeneration, AI conversation message, or community PR proposal. Powers the "what context was used" audit trail and the "what referenced this doc" reverse lookup.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `workId` | uuid, FK NOT NULL | |
-| `documentId` | uuid, FK NOT NULL | → `work_knowledge_documents.id` |
-| `consumerType` | enum (varchar) | `agent-run` / `generation-history` / `conversation-message` / `community-pr` / `comparison` |
-| `consumerId` | uuid | Polymorphic FK by `consumerType`. |
-| `chunkRange` | simple-json, nullable | `{ start, end }` byte/line offsets if a partial section was cited. |
-| `relevanceScore` | float, nullable | If a retrieval ranking produced a score. |
-| `createdAt` | timestamptz | |
+| Column           | Type                  | Notes                                                                                       |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------- |
+| `id`             | uuid PK               |                                                                                             |
+| `workId`         | uuid, FK NOT NULL     |                                                                                             |
+| `documentId`     | uuid, FK NOT NULL     | → `work_knowledge_documents.id`                                                             |
+| `consumerType`   | enum (varchar)        | `agent-run` / `generation-history` / `conversation-message` / `community-pr` / `comparison` |
+| `consumerId`     | uuid                  | Polymorphic FK by `consumerType`.                                                           |
+| `chunkRange`     | simple-json, nullable | `{ start, end }` byte/line offsets if a partial section was cited.                          |
+| `relevanceScore` | float, nullable       | If a retrieval ranking produced a score.                                                    |
+| `createdAt`      | timestamptz           |                                                                                             |
 
 **Indexes:**
+
 - `@Index(['documentId', 'createdAt'])`
 - `@Index(['consumerType', 'consumerId'])`
 - `@Index(['workId', 'createdAt'])`
@@ -355,20 +361,20 @@ where `WorkKbConfig`:
 
 ```ts
 interface WorkKbConfig {
-  enabled: boolean;                // default true on new Works
-  storagePluginId: string;         // resolved from Work.storageProvider if absent
-  originalsBasePath?: string;      // default 'kb-originals/'
-  extractionRules?: Partial<ExtractionRulesConfig>; // per-Work override
-  retrievalConfig?: {
-    maxContextDocs?: number;       // hard cap; default 12
-    maxContextTokens?: number;     // hard cap; default 8000
-    classFilters?: KbDocumentClass[]; // restrict retrieval to these classes
-  };
-  inheritance?: {
-    legal?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
-    style?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
-    seo?:   'inherit' | 'override' | 'disabled';  // default 'inherit'
-  };
+	enabled: boolean; // default true on new Works
+	storagePluginId: string; // resolved from Work.storageProvider if absent
+	originalsBasePath?: string; // default 'kb-originals/'
+	extractionRules?: Partial<ExtractionRulesConfig>; // per-Work override
+	retrievalConfig?: {
+		maxContextDocs?: number; // hard cap; default 12
+		maxContextTokens?: number; // hard cap; default 8000
+		classFilters?: KbDocumentClass[]; // restrict retrieval to these classes
+	};
+	inheritance?: {
+		legal?: 'inherit' | 'override' | 'disabled'; // default 'inherit'
+		style?: 'inherit' | 'override' | 'disabled'; // default 'inherit'
+		seo?: 'inherit' | 'override' | 'disabled'; // default 'inherit'
+	};
 }
 ```
 
@@ -505,7 +511,7 @@ Two notes:
 **Rules:**
 
 - Top-level folder names match `kbDocumentClass` values exactly.
-- Each document is a *pair*: `<slug>.yml` (sidecar metadata) + `<slug>.md` (Markdown content) — matching the established `data/{slug}/{slug}.yml + {slug}.md` pattern for items.
+- Each document is a _pair_: `<slug>.yml` (sidecar metadata) + `<slug>.md` (Markdown content) — matching the established `data/{slug}/{slug}.yml + {slug}.md` pattern for items.
 - A document slug may be nested under further folders for organization, e.g. `research/2026-q2/mckinsey-market-sizing.{yml,md}`.
 - Image / asset extracts from a document go in a sibling `<slug>.assets/` folder.
 - Embedded-app outputs (HTML dashboards, generated decks) are folders containing the assets plus a single `<slug>.yml` sidecar at the folder level.
@@ -515,7 +521,7 @@ Two notes:
 
 ```yaml
 # .content/kb/brand/voice.yml
-id: 0193e6b8-1a2b-7a0c-9c4f-1d2e3f4a5b6c   # uuid, mirrors DB id
+id: 0193e6b8-1a2b-7a0c-9c4f-1d2e3f4a5b6c # uuid, mirrors DB id
 slug: voice
 title: Brand voice guidelines
 description: Tone, register, banned phrases, sentence rhythm.
@@ -523,11 +529,11 @@ class: brand
 status: active
 language: en
 tags:
-  - brand
-  - voice
-  - tone
+    - brand
+    - voice
+    - tone
 categories:
-  - marketing
+    - marketing
 locked: false
 lock_mode: null
 source: user
@@ -561,35 +567,35 @@ generated_at: 2026-05-21T14:35:12Z
 generator: ever-works-platform/kb-indexer
 version: 1
 documents:
-  - id: 0193e6b8-…
-    path: brand/voice.md
-    title: Brand voice guidelines
-    class: brand
-    tags: [brand, voice, tone]
-    status: active
-    locked: false
-    word_count: 1842
-    checksum: sha256:9f3c…
-    updated_at: 2026-05-21T14:32:00Z
-  - id: 0193e6b9-…
-    path: legal/privacy.md
-    title: Privacy policy
-    class: legal
-    tags: [legal, privacy, gdpr]
-    status: active
-    locked: true
-    lock_mode: full
-    word_count: 4012
-    checksum: sha256:7c4a…
-    updated_at: 2026-05-19T09:11:00Z
-  - …
+    - id: 0193e6b8-…
+      path: brand/voice.md
+      title: Brand voice guidelines
+      class: brand
+      tags: [brand, voice, tone]
+      status: active
+      locked: false
+      word_count: 1842
+      checksum: sha256:9f3c…
+      updated_at: 2026-05-21T14:32:00Z
+    - id: 0193e6b9-…
+      path: legal/privacy.md
+      title: Privacy policy
+      class: legal
+      tags: [legal, privacy, gdpr]
+      status: active
+      locked: true
+      lock_mode: full
+      word_count: 4012
+      checksum: sha256:7c4a…
+      updated_at: 2026-05-19T09:11:00Z
+    - …
 ```
 
 This file is regenerated on every KB mutation by `KnowledgeBaseService.rebuildIndex(workId)` and committed in the same Git commit as the mutation.
 
 ### 7.6 Org-level overlay
 
-Org-level documents (classes `legal`, `style`, `seo`) live in the Workspace's platform DB but are *materialized* into each Work's Git repo at extraction-time as **read-only references** under `.content/kb/.org/{class}/...` so the agent reading from Git can see them. The Work's own `{class}/` overrides any same-`path` entry under `.org/{class}/`. Resolution is done by `KnowledgeBaseService.resolveInheritableDocuments(workId, classes?)` at read time.
+Org-level documents (classes `legal`, `style`, `seo`) live in the Workspace's platform DB but are _materialized_ into each Work's Git repo at extraction-time as **read-only references** under `.content/kb/.org/{class}/...` so the agent reading from Git can see them. The Work's own `{class}/` overrides any same-`path` entry under `.org/{class}/`. Resolution is done by `KnowledgeBaseService.resolveInheritableDocuments(workId, classes?)` at read time.
 
 The `.org/` subtree is regenerated whenever the org's inheritable docs change; the regeneration is fanned out to every Work in the org that has the corresponding `Work.kbConfig.inheritance.<class>` set to `inherit` (the default).
 
@@ -605,9 +611,9 @@ Each Work has a `storageProvider` field on its entity (already present). The KB 
 
 Original uploads are namespaced by Work:
 
-- `github-storage` (Git-based): `kb-originals/{class}/{optional-subpath}/{filename}` *inside the Work's Git data repo*. Commit messages: `[kb] upload: {class}/{filename}`.
-- `aws-s3` / `minio`: `works/{workId}/kb-originals/{class}/{optional-subpath}/{filename}` *within the configured bucket*.
-- `local-fs`: `{root}/works/{workId}/kb-originals/{class}/{optional-subpath}/{filename}` *within the configured root*.
+- `github-storage` (Git-based): `kb-originals/{class}/{optional-subpath}/{filename}` _inside the Work's Git data repo_. Commit messages: `[kb] upload: {class}/{filename}`.
+- `aws-s3` / `minio`: `works/{workId}/kb-originals/{class}/{optional-subpath}/{filename}` _within the configured bucket_.
+- `local-fs`: `{root}/works/{workId}/kb-originals/{class}/{optional-subpath}/{filename}` _within the configured root_.
 
 Path templates are configurable per-Work via `Work.kbConfig.originalsBasePath` if a customer needs a different layout.
 
@@ -676,11 +682,11 @@ Extractors return `ContentExtractionResult` (existing contract): `markdown`, opt
 ### 9.4 Phase 4 — materialize KB document
 
 1. A `WorkKnowledgeDocument` row is created. Defaults:
-   - `kbDocumentClass`: from the user's upload form, or auto-classified using the configured AI provider with a class-classifier prompt (cheap LLM call) if the user didn't specify.
-   - `path`: derived as `{class}/{slugified-filename}.md`. Collision: append `-2`, `-3`, etc. (or insert under a subfolder).
-   - `tags` and `categories`: from the upload form, plus AI-suggested tags from the extractor's metadata if the user opted in.
-   - `title`: from extractor's metadata title, falling back to humanized filename.
-   - `source='imported'`, `sourceUploadId=<upload row id>`.
+    - `kbDocumentClass`: from the user's upload form, or auto-classified using the configured AI provider with a class-classifier prompt (cheap LLM call) if the user didn't specify.
+    - `path`: derived as `{class}/{slugified-filename}.md`. Collision: append `-2`, `-3`, etc. (or insert under a subfolder).
+    - `tags` and `categories`: from the upload form, plus AI-suggested tags from the extractor's metadata if the user opted in.
+    - `title`: from extractor's metadata title, falling back to humanized filename.
+    - `source='imported'`, `sourceUploadId=<upload row id>`.
 2. The Markdown body and sidecar YAML are written to the Git data repo at `.content/kb/<class>/<slug>.md` and `<slug>.yml`.
 3. Image extracts are written under `<slug>.assets/`.
 4. `.index.yml` is regenerated.
@@ -712,34 +718,35 @@ The full-text search index is updated. (See §13 for retrieval architecture.)
 
 Each class has documented agent-runtime semantics. This drives how the agent retrieval and generation pipelines treat each document.
 
-| Class | Agent-runtime semantics |
-| --- | --- |
-| `brand` | Soft guidance. Injected into system prompts as "follow these brand guidelines:". Per-Work only. |
-| `legal` | Verbatim-or-omitted. The agent is instructed to copy text exactly from `legal` docs into legal sections, never to paraphrase. Supports org-level inheritance with Work override. |
-| `seo` | Constraints — "target these keywords for this page type", "use these structured-data patterns". Per-Work. |
-| `glossary` | Term substitution. Agent is told "always use these terms with these meanings; never invent synonyms". Per-Work. |
-| `competitors` | Inclusion / exclusion list. Drives the comparison-generator pipeline and the do-not-mention rule. Per-Work. |
-| `personas` | Audience definitions. Agent is told to write for these personas. Per-Work. |
-| `style` | Editorial style guide (grammar rules, banned words, voice, tense). Per-Work. |
-| `research` | Reference material. Retrieved opportunistically; agent cites it when used. Per-Work. |
-| `output` | Agent-authored outputs (reports, summaries, decks). Not re-injected as context unless explicitly mentioned. Per-Work. |
-| `freeform` | User notes. Retrieved by similarity / explicit mention only. Per-Work. |
+| Class         | Agent-runtime semantics                                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brand`       | Soft guidance. Injected into system prompts as "follow these brand guidelines:". Per-Work only.                                                                                  |
+| `legal`       | Verbatim-or-omitted. The agent is instructed to copy text exactly from `legal` docs into legal sections, never to paraphrase. Supports org-level inheritance with Work override. |
+| `seo`         | Constraints — "target these keywords for this page type", "use these structured-data patterns". Per-Work.                                                                        |
+| `glossary`    | Term substitution. Agent is told "always use these terms with these meanings; never invent synonyms". Per-Work.                                                                  |
+| `competitors` | Inclusion / exclusion list. Drives the comparison-generator pipeline and the do-not-mention rule. Per-Work.                                                                      |
+| `personas`    | Audience definitions. Agent is told to write for these personas. Per-Work.                                                                                                       |
+| `style`       | Editorial style guide (grammar rules, banned words, voice, tense). Per-Work.                                                                                                     |
+| `research`    | Reference material. Retrieved opportunistically; agent cites it when used. Per-Work.                                                                                             |
+| `output`      | Agent-authored outputs (reports, summaries, decks). Not re-injected as context unless explicitly mentioned. Per-Work.                                                            |
+| `freeform`    | User notes. Retrieved by similarity / explicit mention only. Per-Work.                                                                                                           |
 
 ### 10.2 Org-level inheritance for `legal`, `style`, `seo`
 
 - An `Organization` may publish 0+ `WorkKnowledgeDocument` rows with `organizationId=<org>` and `workId=NULL`, restricted to `kbDocumentClass IN ('legal', 'style', 'seo')`.
 - Resolution for a Work: `KnowledgeBaseService.resolveInheritableDocuments(workId, classes?)` returns the union of (org docs ∪ Work docs) for each inheritable class, with Work docs overriding org docs for the same `path`.
 - Configurable per-Work via `Work.kbConfig.inheritance`:
-  ```ts
-  inheritance?: {
-    legal?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
-    style?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
-    seo?:   'inherit' | 'override' | 'disabled';  // default 'inherit'
-  };
-  ```
-  - `inherit` (default): merge org + Work, Work overrides.
-  - `override`: Work docs only, org docs ignored.
-  - `disabled`: no docs of this class participate in agent context for this Work.
+    ```ts
+    inheritance?: {
+      legal?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
+      style?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
+      seo?:   'inherit' | 'override' | 'disabled';  // default 'inherit'
+    };
+    ```
+
+    - `inherit` (default): merge org + Work, Work overrides.
+    - `override`: Work docs only, org docs ignored.
+    - `disabled`: no docs of this class participate in agent context for this Work.
 
 ### 10.3 Per-Work override semantics
 
@@ -763,7 +770,7 @@ If the user does not explicitly pick a color for a tag, the platform **auto-deri
 ### 11.2 Categories
 
 - Categories are an optional secondary grouping. Stored as `categories: string[]`.
-- We do *not* introduce a `WorkKnowledgeCategory` table — categories reuse the existing Work-level category catalog if the Work has one (the same `categories.yml` used by items), or are free-form strings if the Work doesn't.
+- We do _not_ introduce a `WorkKnowledgeCategory` table — categories reuse the existing Work-level category catalog if the Work has one (the same `categories.yml` used by items), or are free-form strings if the Work doesn't.
 - Categories overlap with `kbDocumentClass` in spirit but are user-defined and freeform; `kbDocumentClass` is the platform-defined enum that drives agent semantics. Both coexist.
 
 ### 11.3 Search / filter
@@ -946,7 +953,7 @@ The combined budget is capped by `Work.kbConfig.retrievalConfig.maxContextTokens
 For these classes, retrieval is similarity-based:
 
 - The platform computes embeddings for each KB document (chunked at ~512 tokens with 64-token overlap).
-- Embeddings live in a Postgres `pgvector` column on a `WorkKnowledgeChunk` table — *not* specced in detail here; see §15.
+- Embeddings live in a Postgres `pgvector` column on a `WorkKnowledgeChunk` table — _not_ specced in detail here; see §15.
 - On retrieval, the query (the user message, the agent task, the page being generated) is embedded; top-K chunks (default 6) are pulled and added to context, with their parent document recorded in `WorkKnowledgeCitation`.
 
 ### 13.3 `@mention`-pinned context
@@ -1004,13 +1011,13 @@ The three panes are individually collapsible. State (which pane open, which fold
 ### 14.4 Center pane — editor
 
 - For `.md` documents: **Tiptap WYSIWYG editor** with:
-  - Bold, italic, link, blockquote, code (inline + block), heading levels, lists (bullet, numbered, task), tables, horizontal rule, image, embedded video.
-  - Markdown round-trip: on save, the editor's ProseMirror state serializes through `turndown` to Markdown, then YAML frontmatter is *not* embedded (we use sidecar `.yml` instead), so the body file is pure Markdown.
-  - Wikilink autocomplete: typing `[[` opens a picker against KB document titles.
-  - `@mention` autocomplete: typing `@` opens a picker with two tabs — KB documents and agents/skills.
-  - Slash commands for inserting tables, code blocks, images.
-  - Auto-save debounced at 800ms; "saving / saved" indicator.
-  - Side panel for metadata: class chip, tags editor (multi-select + create-on-the-fly), description, status, lock controls, language, source, "view in Git history".
+    - Bold, italic, link, blockquote, code (inline + block), heading levels, lists (bullet, numbered, task), tables, horizontal rule, image, embedded video.
+    - Markdown round-trip: on save, the editor's ProseMirror state serializes through `turndown` to Markdown, then YAML frontmatter is _not_ embedded (we use sidecar `.yml` instead), so the body file is pure Markdown.
+    - Wikilink autocomplete: typing `[[` opens a picker against KB document titles.
+    - `@mention` autocomplete: typing `@` opens a picker with two tabs — KB documents and agents/skills.
+    - Slash commands for inserting tables, code blocks, images.
+    - Auto-save debounced at 800ms; "saving / saved" indicator.
+    - Side panel for metadata: class chip, tags editor (multi-select + create-on-the-fly), description, status, lock controls, language, source, "view in Git history".
 
 ### 14.5 Center pane — viewers (non-Markdown)
 
@@ -1029,13 +1036,13 @@ All viewers carry a top-bar action: "Open extracted KB doc →" linking to the c
 
 **Per-format size thresholds.** In-browser rendering is capped per format based on the underlying renderer's real capabilities. Above the cap, the viewer falls back to a download button with an explanation banner ("this file is too large to preview in-browser; download to view"):
 
-| Format | In-browser cap |
-| --- | --- |
-| PDF | 50 MB |
-| XLSX / XLSM | 15 MB |
-| DOCX / PPTX | 10 MB |
-| CSV / TSV | 25 MB |
-| Image | 50 MB |
+| Format        | In-browser cap      |
+| ------------- | ------------------- |
+| PDF           | 50 MB               |
+| XLSX / XLSM   | 15 MB               |
+| DOCX / PPTX   | 10 MB               |
+| CSV / TSV     | 25 MB               |
+| Image         | 50 MB               |
 | Video / audio | uncapped (streamed) |
 
 Thresholds are configurable per-tenant via subscription plan settings.
@@ -1076,21 +1083,22 @@ A Postgres `tsvector` column on `WorkKnowledgeDocument` (computed from `title` +
 
 A new table `WorkKnowledgeChunk` (file: `work-knowledge-chunk.entity.ts`, table: `work_knowledge_chunks`):
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid | Composite PK part. |
-| `workId` | uuid, FK NOT NULL | Composite PK part — `workId` is leftmost in the PK to enable Postgres declarative partitioning later without a table rewrite. |
-| `documentId` | uuid, FK NOT NULL | |
-| `chunkIndex` | int | |
-| `content` | text | |
-| `embedding` | vector(1536) (pgvector) | Dimension depends on chosen embedding model. |
-| `tokenCount` | int | |
-| `metadata` | simple-json | Chunk boundaries (headingPath, charRange) for citation. |
-| `createdAt` | timestamptz | |
+| Column       | Type                    | Notes                                                                                                                         |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | uuid                    | Composite PK part.                                                                                                            |
+| `workId`     | uuid, FK NOT NULL       | Composite PK part — `workId` is leftmost in the PK to enable Postgres declarative partitioning later without a table rewrite. |
+| `documentId` | uuid, FK NOT NULL       |                                                                                                                               |
+| `chunkIndex` | int                     |                                                                                                                               |
+| `content`    | text                    |                                                                                                                               |
+| `embedding`  | vector(1536) (pgvector) | Dimension depends on chosen embedding model.                                                                                  |
+| `tokenCount` | int                     |                                                                                                                               |
+| `metadata`   | simple-json             | Chunk boundaries (headingPath, charRange) for citation.                                                                       |
+| `createdAt`  | timestamptz             |                                                                                                                               |
 
 Primary key: `PRIMARY KEY (workId, id)`. This is deliberate: it puts `workId` first so that a future migration to `PARTITION BY HASH (workId)` does not require rewriting the table. Single-table-with-strict-filter is the v1 deployment shape; partitioning is the planned scale-up path once retrieval latency or recall degrades.
 
 Indexes:
+
 - `@Index(['workId', 'documentId'])` — fast doc-level lookup for delete cascade.
 - `@Index(['workId', 'embedding'], { type: 'ivfflat' })` — ANN index with `workId` as a filter column. Every retrieval query must include `WHERE workId = $1` (enforced by the service layer).
 
@@ -1144,16 +1152,16 @@ Every generation pipeline (`standard-pipeline`, `agent-pipeline`, `claude-code`,
 
 ```ts
 interface KbContextBundle {
-  alwaysInjected: {
-    brand: KbDocumentSummary[];
-    legal: KbDocumentSummary[];   // org + work merged
-    glossary: KbDocumentSummary[];
-    style: KbDocumentSummary[];
-    personas: KbDocumentSummary[];
-    seo: KbDocumentSummary[];
-  };
-  queryRetrieved: KbChunkSummary[];   // optional, depends on call site
-  budget: { totalTokens: number; remaining: number };
+	alwaysInjected: {
+		brand: KbDocumentSummary[];
+		legal: KbDocumentSummary[]; // org + work merged
+		glossary: KbDocumentSummary[];
+		style: KbDocumentSummary[];
+		personas: KbDocumentSummary[];
+		seo: KbDocumentSummary[];
+	};
+	queryRetrieved: KbChunkSummary[]; // optional, depends on call site
+	budget: { totalTokens: number; remaining: number };
 }
 ```
 
@@ -1290,18 +1298,18 @@ All KB endpoints route through the existing `WorkMemberGuard` and `OrganizationA
 
 Default per-tenant quotas (configurable via subscription plan):
 
-| Resource | Default limit |
-| --- | --- |
-| KB documents per Work | 5,000 |
-| KB uploads per Work | 2,500 |
-| Original-file size per upload | 200 MB |
-| Total original storage per Work | 10 GB |
-| Total KB body content per Work | 200 MB |
-| Tags per Work | 1,000 |
-| Embedding chunks per Work | 200,000 |
-| Concurrent ingests per Work | 4 |
-| Per-document retrieval context cap (tokens) | 8,000 |
-| Per-Work retrieval-context-tokens-per-day | 50M (subscription-tier dependent) |
+| Resource                                    | Default limit                     |
+| ------------------------------------------- | --------------------------------- |
+| KB documents per Work                       | 5,000                             |
+| KB uploads per Work                         | 2,500                             |
+| Original-file size per upload               | 200 MB                            |
+| Total original storage per Work             | 10 GB                             |
+| Total KB body content per Work              | 200 MB                            |
+| Tags per Work                               | 1,000                             |
+| Embedding chunks per Work                   | 200,000                           |
+| Concurrent ingests per Work                 | 4                                 |
+| Per-document retrieval context cap (tokens) | 8,000                             |
+| Per-Work retrieval-context-tokens-per-day   | 50M (subscription-tier dependent) |
 
 Limits surface in `SubscriptionPlan` and are enforced in `KnowledgeBaseService` before persisting. Hitting a limit returns 402 (Payment Required) with the relevant plan upgrade hint.
 
@@ -1359,6 +1367,7 @@ The feature is shippable when all of the following pass:
 To keep scope tractable, the feature ships in three phases.
 
 ### Phase 1 — foundation
+
 - Entities + migrations.
 - `KnowledgeBaseService` + REST endpoints (documents + uploads + tree + search lexical-only).
 - Workbench MVP: tree, Tiptap editor, original viewers (PDF, image, native video).
@@ -1368,6 +1377,7 @@ To keep scope tractable, the feature ships in three phases.
 - Backfill job for existing Works.
 
 ### Phase 2 — agent integration + retrieval
+
 - Embedding generation + `WorkKnowledgeChunk` + semantic retrieval.
 - Pipeline integration (`KbPromptFormatter`, `KbContextBundle` plumbed through every pipeline).
 - AI conversation `@kb` mentions + citations.
@@ -1376,6 +1386,7 @@ To keep scope tractable, the feature ships in three phases.
 - Community-PR + scheduled-regen lock respect.
 
 ### Phase 3 — polish
+
 - Video / audio normalization + transcription extractors.
 - Embedded-app outputs (HTML deck / dashboard hosting).
 - `output`-class agent writes back.
@@ -1390,18 +1401,18 @@ To keep scope tractable, the feature ships in three phases.
 
 All ten v1 open questions were resolved on 2026-05-21. The body sections of this PRD reflect these decisions inline; this section is the canonical decision log for review purposes.
 
-| # | Topic | Decision | Body section |
-| --- | --- | --- | --- |
-| D1 | Embedding provider | **Platform-managed embedding lane, configurable per-organization, distinct from the Work's generation provider.** Default `text-embedding-3-small` (1536-dim). Cost flows through `UsageLedgerEntry` as a separate line item (`category='kb-embedding'`), not mixed with generation budget. If embeddings are unavailable, KB falls back to lexical-only retrieval. | §15.2, §19.3 |
-| D2 | Inheritable classes | **`legal`, `style`, `seo`** support org-level default with Work-level override. `brand`, `glossary`, `competitors`, `personas`, `research`, `output`, `freeform` are always per-Work. Per-class inheritance mode (`inherit` / `override` / `disabled`) configurable on each Work via `kbConfig.inheritance`. | §10.2, §10.3, §6.1, §7.6, §12.6 |
-| D3 | On-disk format | **Sidecar `.yml + .md`** mirroring the existing `data/{slug}/{slug}.yml + .md` items convention. No YAML frontmatter inside the Markdown body. | §7.2, §7.3, §7.4 |
-| D4 | Lock enforcement on direct Git push | **Reconcile + flag in workbench.** No per-Git-provider pre-receive hook in v1. On platform read, DB-vs-Git checksum diff surfaces a banner with "accept incoming (unlocks)" / "revert to locked version" actions. Pre-receive hooks deferred to v2. | §22 (security), §7.6 |
-| D5 | Chunking strategy | **Hybrid: heading-aware (H2/H3) + fixed-size fallback** for sections longer than ~512 tokens with 64-token overlap. Documents without headings degrade to pure fixed-size. headingPath stored in chunk metadata for citation rendering. | §15.2 |
-| D6 | Tag color taxonomy | **Fixed palette of ~16 design-system tokens** stored as a token name (varchar), not hex. Dark/light mode handled by the design system. If user does not pick a color, the platform **auto-derives** by hashing the tag slug into the palette deterministically. | §11.1, §6.3 |
-| D7 | Viewer caps | **Per-format thresholds.** PDF 50 MB, XLSX/XLSM 15 MB, DOCX/PPTX 10 MB, CSV/TSV 25 MB, image 50 MB, video/audio uncapped (streamed). Above cap → download button + explanation banner. Thresholds configurable per subscription plan. | §14.5 |
-| D8 | Vector isolation | **Single `work_knowledge_chunks` table** with composite PK `(workId, id)` so `workId` is the leftmost partition key. Every retrieval query enforces `WHERE workId = $1` at the service layer. ivfflat index on `(workId, embedding)`. **Designed for future migration to Postgres declarative `PARTITION BY HASH (workId)`** without table rewrite. | §15.2 |
-| D9 | KB body cap | **1 MB Markdown per document** (~250k tokens). Configurable per-org if a customer has genuine need to lift it. Oversized documents are nudged to split. | §21 |
-| D10 | Orphan-storage cleanup | **Daily sweeper job with 7-day grace period.** Detected orphans are tombstoned and physically removed only after 7 days; re-importing the same SHA-256 within the grace period revives the row and clears the tombstone. | §9.6 |
+| #   | Topic                               | Decision                                                                                                                                                                                                                                                                                                                                                            | Body section                    |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| D1  | Embedding provider                  | **Platform-managed embedding lane, configurable per-organization, distinct from the Work's generation provider.** Default `text-embedding-3-small` (1536-dim). Cost flows through `UsageLedgerEntry` as a separate line item (`category='kb-embedding'`), not mixed with generation budget. If embeddings are unavailable, KB falls back to lexical-only retrieval. | §15.2, §19.3                    |
+| D2  | Inheritable classes                 | **`legal`, `style`, `seo`** support org-level default with Work-level override. `brand`, `glossary`, `competitors`, `personas`, `research`, `output`, `freeform` are always per-Work. Per-class inheritance mode (`inherit` / `override` / `disabled`) configurable on each Work via `kbConfig.inheritance`.                                                        | §10.2, §10.3, §6.1, §7.6, §12.6 |
+| D3  | On-disk format                      | **Sidecar `.yml + .md`** mirroring the existing `data/{slug}/{slug}.yml + .md` items convention. No YAML frontmatter inside the Markdown body.                                                                                                                                                                                                                      | §7.2, §7.3, §7.4                |
+| D4  | Lock enforcement on direct Git push | **Reconcile + flag in workbench.** No per-Git-provider pre-receive hook in v1. On platform read, DB-vs-Git checksum diff surfaces a banner with "accept incoming (unlocks)" / "revert to locked version" actions. Pre-receive hooks deferred to v2.                                                                                                                 | §22 (security), §7.6            |
+| D5  | Chunking strategy                   | **Hybrid: heading-aware (H2/H3) + fixed-size fallback** for sections longer than ~512 tokens with 64-token overlap. Documents without headings degrade to pure fixed-size. headingPath stored in chunk metadata for citation rendering.                                                                                                                             | §15.2                           |
+| D6  | Tag color taxonomy                  | **Fixed palette of ~16 design-system tokens** stored as a token name (varchar), not hex. Dark/light mode handled by the design system. If user does not pick a color, the platform **auto-derives** by hashing the tag slug into the palette deterministically.                                                                                                     | §11.1, §6.3                     |
+| D7  | Viewer caps                         | **Per-format thresholds.** PDF 50 MB, XLSX/XLSM 15 MB, DOCX/PPTX 10 MB, CSV/TSV 25 MB, image 50 MB, video/audio uncapped (streamed). Above cap → download button + explanation banner. Thresholds configurable per subscription plan.                                                                                                                               | §14.5                           |
+| D8  | Vector isolation                    | **Single `work_knowledge_chunks` table** with composite PK `(workId, id)` so `workId` is the leftmost partition key. Every retrieval query enforces `WHERE workId = $1` at the service layer. ivfflat index on `(workId, embedding)`. **Designed for future migration to Postgres declarative `PARTITION BY HASH (workId)`** without table rewrite.                 | §15.2                           |
+| D9  | KB body cap                         | **1 MB Markdown per document** (~250k tokens). Configurable per-org if a customer has genuine need to lift it. Oversized documents are nudged to split.                                                                                                                                                                                                             | §21                             |
+| D10 | Orphan-storage cleanup              | **Daily sweeper job with 7-day grace period.** Detected orphans are tombstoned and physically removed only after 7 days; re-importing the same SHA-256 within the grace period revives the row and clears the tombstone.                                                                                                                                            | §9.6                            |
 
 ### Decisions deferred to v2 or later
 
@@ -1420,103 +1431,103 @@ All ten v1 open questions were resolved on 2026-05-21. The body sections of this
 ```ts
 // packages/contracts/src/kb/kb-document.dto.ts
 export interface KbDocumentDto {
-  id: string;
-  workId: string | null;
-  organizationId: string | null;
-  path: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  class: KbDocumentClass;
-  tags: string[];
-  categories: string[];
-  status: 'draft' | 'active' | 'archived';
-  locked: boolean;
-  lockMode: 'full' | 'additions-only' | null;
-  language: string;
-  wordCount: number | null;
-  tokenCount: number | null;
-  source: 'user' | 'agent' | 'imported' | 'seeded';
-  sourceUploadId: string | null;
-  sourceUrl: string | null;
-  generatedByAgentRunId: string | null;
-  createdById: string | null;
-  updatedById: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastCommitSha: string | null;
-  lastIndexedAt: string | null;
+	id: string;
+	workId: string | null;
+	organizationId: string | null;
+	path: string;
+	slug: string;
+	title: string;
+	description: string | null;
+	class: KbDocumentClass;
+	tags: string[];
+	categories: string[];
+	status: 'draft' | 'active' | 'archived';
+	locked: boolean;
+	lockMode: 'full' | 'additions-only' | null;
+	language: string;
+	wordCount: number | null;
+	tokenCount: number | null;
+	source: 'user' | 'agent' | 'imported' | 'seeded';
+	sourceUploadId: string | null;
+	sourceUrl: string | null;
+	generatedByAgentRunId: string | null;
+	createdById: string | null;
+	updatedById: string | null;
+	createdAt: string;
+	updatedAt: string;
+	lastCommitSha: string | null;
+	lastIndexedAt: string | null;
 }
 
 export interface KbDocumentBodyDto extends KbDocumentDto {
-  body: string; // Markdown
-  assets: KbAssetSummary[];
+	body: string; // Markdown
+	assets: KbAssetSummary[];
 }
 
 export interface KbUploadDto {
-  id: string;
-  workId: string;
-  storageProvider: string;
-  storagePath: string;
-  originalFilename: string;
-  mimeType: string;
-  fileSize: number;
-  sha256: string;
-  normalizedFormat: string | null;
-  extractionStatus: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
-  extractionPluginId: string | null;
-  extractionError: string | null;
-  extractedDocumentId: string | null;
-  uploadedById: string | null;
-  tags: string[];
-  categories: string[];
-  createdAt: string;
-  updatedAt: string;
+	id: string;
+	workId: string;
+	storageProvider: string;
+	storagePath: string;
+	originalFilename: string;
+	mimeType: string;
+	fileSize: number;
+	sha256: string;
+	normalizedFormat: string | null;
+	extractionStatus: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+	extractionPluginId: string | null;
+	extractionError: string | null;
+	extractedDocumentId: string | null;
+	uploadedById: string | null;
+	tags: string[];
+	categories: string[];
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface KbSearchHit {
-  documentId: string;
-  path: string;
-  title: string;
-  class: KbDocumentClass;
-  snippet: string;
-  score: number;
-  chunkIndex?: number;
-  chunkRange?: { start: number; end: number };
+	documentId: string;
+	path: string;
+	title: string;
+	class: KbDocumentClass;
+	snippet: string;
+	score: number;
+	chunkIndex?: number;
+	chunkRange?: { start: number; end: number };
 }
 
 export interface KbTreeNode {
-  type: 'folder' | 'document';
-  path: string;
-  name: string;
-  documentId?: string;
-  class?: KbDocumentClass;
-  status?: 'draft' | 'active' | 'archived';
-  locked?: boolean;
-  children?: KbTreeNode[];
+	type: 'folder' | 'document';
+	path: string;
+	name: string;
+	documentId?: string;
+	class?: KbDocumentClass;
+	status?: 'draft' | 'active' | 'archived';
+	locked?: boolean;
+	children?: KbTreeNode[];
 }
 
 export interface CitationDto {
-  id: string;
-  documentId: string;
-  consumerType: 'agent-run' | 'generation-history' | 'conversation-message' | 'community-pr' | 'comparison';
-  consumerId: string;
-  chunkRange: { start: number; end: number } | null;
-  relevanceScore: number | null;
-  createdAt: string;
+	id: string;
+	documentId: string;
+	consumerType: 'agent-run' | 'generation-history' | 'conversation-message' | 'community-pr' | 'comparison';
+	consumerId: string;
+	chunkRange: { start: number; end: number } | null;
+	relevanceScore: number | null;
+	createdAt: string;
 }
 
 export type KbDocumentClass =
-  | 'brand'
-  | 'legal'
-  | 'seo'
-  | 'glossary'
-  | 'competitors'
-  | 'personas'
-  | 'style'
-  | 'research'
-  | 'output'
-  | 'freeform';
+	| 'brand'
+	| 'legal'
+	| 'seo'
+	| 'glossary'
+	| 'competitors'
+	| 'personas'
+	| 'style'
+	| 'research'
+	| 'output'
+	| 'freeform';
 ```
 
 ---
@@ -1528,9 +1539,9 @@ A concrete end-to-end trace of "AI generates a new page; what does it see?"
 1. `ScheduledUpdateService` fires for Work `W`.
 2. The pipeline calls `KnowledgeBaseService.resolveContext(W, { task: 'regenerate-listing', pageType: 'category' })`.
 3. The service queries DB:
-   - All `WorkKnowledgeDocument` with `workId=W` and `kbDocumentClass IN ('brand', 'glossary', 'style', 'personas')` and `status='active'`.
-   - All `legal` docs: union of `(organizationId=W.organizationId, workId=NULL)` and `(workId=W)`, with the latter overriding by `path`.
-   - `seo` docs filtered by `metadata.pageTypes` containing `'category'`.
+    - All `WorkKnowledgeDocument` with `workId=W` and `kbDocumentClass IN ('brand', 'glossary', 'style', 'personas')` and `status='active'`.
+    - All `legal` docs: union of `(organizationId=W.organizationId, workId=NULL)` and `(workId=W)`, with the latter overriding by `path`.
+    - `seo` docs filtered by `metadata.pageTypes` containing `'category'`.
 4. Total token cost across these is summed. If over `Work.kbConfig.retrievalConfig.maxContextTokens`, truncate by class precedence and emit `kb.context.truncated`.
 5. The pipeline builds the system prompt via `KbPromptFormatter`:
 
@@ -1567,4 +1578,4 @@ This trace is the canonical example for documentation and tests.
 
 ---
 
-*End of PRD v1.*
+_End of PRD v1._

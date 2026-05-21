@@ -9,6 +9,7 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 ## Phase 1A — data model + service skeleton + REST CRUD (one PR)
 
 ### Entities
+
 - [ ] `packages/agent/src/entities/work-knowledge-document.entity.ts` — full column set per spec §6.1
 - [ ] `packages/agent/src/entities/work-knowledge-upload.entity.ts` — per spec §6.2
 - [ ] `packages/agent/src/entities/work-knowledge-tag.entity.ts` — per spec §6.3
@@ -18,6 +19,7 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] Add `kbConfig` simple-json column to `Work` entity per spec §6.5
 
 ### Migrations (`apps/api/src/migrations/`)
+
 - [ ] `<ts>-EnablePgvectorExtension.ts` — idempotent `CREATE EXTENSION IF NOT EXISTS vector;`
 - [ ] `<ts>-CreateWorkKnowledgeDocuments.ts` — table + `workId XOR organizationId` CHECK constraint + indexes
 - [ ] `<ts>-CreateWorkKnowledgeUploads.ts` — table + sha256 dedup index
@@ -29,6 +31,7 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] Generate migrations via `pnpm typeorm migration:generate` from `apps/api/`, **read the SQL** before committing (per workspace NN #16)
 
 ### DTOs (`packages/contracts/src/kb/`)
+
 - [ ] `kb-document.dto.ts` — `KbDocumentDto`, `KbDocumentBodyDto`
 - [ ] `kb-upload.dto.ts` — `KbUploadDto`
 - [ ] `kb-search.dto.ts` — `KbSearchHit`
@@ -38,25 +41,27 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] Barrel export from `packages/contracts/src/index.ts`
 
 ### Service skeleton (`packages/agent/src/services/knowledge-base.service.ts`)
+
 - [ ] NestJS `@Injectable()` class
 - [ ] Repository injection for all five entities
 - [ ] Method stubs with JSDoc only (no bodies):
-  - [ ] `resolveDocuments(workId, filter): Promise<KbDocumentDto[]>`
-  - [ ] `getDocument(workId, idOrPath): Promise<KbDocumentBodyDto>`
-  - [ ] `createDocument(workId, input): Promise<KbDocumentBodyDto>`
-  - [ ] `updateDocument(workId, docId, patch): Promise<KbDocumentBodyDto>`
-  - [ ] `deleteDocument(workId, docId): Promise<void>`
-  - [ ] `lockDocument(workId, docId, mode): Promise<KbDocumentBodyDto>`
-  - [ ] `unlockDocument(workId, docId): Promise<KbDocumentBodyDto>`
-  - [ ] `restoreDocument(workId, docId, commitSha): Promise<KbDocumentBodyDto>`
-  - [ ] `ingestUpload(workId, file, opts): Promise<KbUploadDto>` (placeholder)
-  - [ ] `search(workId, query, filter): Promise<KbSearchHit[]>` (lexical only in Phase 1)
-  - [ ] `resolveContext(workId, opts): Promise<KbContextBundle>` (stub — populated in Phase 2)
-  - [ ] `rebuildIndex(workId): Promise<void>`
-  - [ ] `resolveInheritableDocuments(workId, classes?)` — for org overlay
+    - [ ] `resolveDocuments(workId, filter): Promise<KbDocumentDto[]>`
+    - [ ] `getDocument(workId, idOrPath): Promise<KbDocumentBodyDto>`
+    - [ ] `createDocument(workId, input): Promise<KbDocumentBodyDto>`
+    - [ ] `updateDocument(workId, docId, patch): Promise<KbDocumentBodyDto>`
+    - [ ] `deleteDocument(workId, docId): Promise<void>`
+    - [ ] `lockDocument(workId, docId, mode): Promise<KbDocumentBodyDto>`
+    - [ ] `unlockDocument(workId, docId): Promise<KbDocumentBodyDto>`
+    - [ ] `restoreDocument(workId, docId, commitSha): Promise<KbDocumentBodyDto>`
+    - [ ] `ingestUpload(workId, file, opts): Promise<KbUploadDto>` (placeholder)
+    - [ ] `search(workId, query, filter): Promise<KbSearchHit[]>` (lexical only in Phase 1)
+    - [ ] `resolveContext(workId, opts): Promise<KbContextBundle>` (stub — populated in Phase 2)
+    - [ ] `rebuildIndex(workId): Promise<void>`
+    - [ ] `resolveInheritableDocuments(workId, classes?)` — for org overlay
 - [ ] Module wiring in `packages/agent/src/services/services.module.ts` (or whatever the existing convention is)
 
 ### REST endpoints (`apps/api/src/works/`)
+
 - [ ] Extend `WorksController` with the KB route set per spec §12
 - [ ] Validation pipes (class-validator on input DTOs)
 - [ ] `WorkMemberGuard` for read endpoints (Viewer+), Editor+ for writes, Owner for lock/unlock/restore
@@ -64,29 +69,33 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] Map service errors → HTTP responses via existing exception filter
 
 ### Org-level admin endpoints
+
 - [ ] `apps/api/src/organizations/` controller additions:
-  - [ ] `GET /api/organizations/:orgId/kb/documents?class=…`
-  - [ ] `POST /api/organizations/:orgId/kb/documents`
-  - [ ] `PATCH /api/organizations/:orgId/kb/documents/:docId`
-  - [ ] `DELETE /api/organizations/:orgId/kb/documents/:docId`
+    - [ ] `GET /api/organizations/:orgId/kb/documents?class=…`
+    - [ ] `POST /api/organizations/:orgId/kb/documents`
+    - [ ] `PATCH /api/organizations/:orgId/kb/documents/:docId`
+    - [ ] `DELETE /api/organizations/:orgId/kb/documents/:docId`
 - [ ] Restrict POST/PATCH `class` to `legal | style | seo` with 400 on violation
 - [ ] OrganizationAdminGuard for all four
 - [ ] Service stub for `resolveInheritableDocuments` — actual fan-out lands in Phase 2
 
 ### Tests (Phase 1A scope)
+
 - [ ] Entity unit tests in `packages/agent/test/entities/` — one file per new entity:
-  - [ ] CHECK constraint behavior (insert both workId + organizationId → reject; insert neither → reject)
-  - [ ] Cascade-delete behavior on parent removal
-  - [ ] simple-json column round-trip
+    - [ ] CHECK constraint behavior (insert both workId + organizationId → reject; insert neither → reject)
+    - [ ] Cascade-delete behavior on parent removal
+    - [ ] simple-json column round-trip
 - [ ] Service unit tests for `resolveContext` budget truncation logic with mocked repos
 - [ ] API e2e test (`apps/api/test/`) for the document CRUD lifecycle
 
 ### Backfill (Trigger.dev or one-time CLI task)
+
 - [ ] `packages/tasks/` job that iterates existing Works and writes an empty `.content/kb/` skeleton via the configured `github-storage` plugin
 - [ ] Idempotent; safe to re-run
 - [ ] Sets `Work.kbConfig` to platform defaults if absent
 
 ### Documentation
+
 - [ ] New section in `docs/specs/architecture/database.md`: "## N. Knowledge Base Entities" describing the five entities + the inheritance pattern + pgvector dependency
 - [ ] Link the new section back from the spec
 - [ ] Update `docs/specs/architecture/database-migrations.md` if it has an examples list (mention the pgvector enable migration as the canonical "extension enable" pattern)
@@ -102,11 +111,11 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] DOCX/PPTX/XLSX viewers behind dynamic imports + per-format size caps from spec §14.5
 - [ ] Drag-and-drop upload with classification modal
 - [ ] Ingest pipeline (Trigger.dev jobs in `packages/tasks/`):
-  - [ ] Receive job (already partially covered by upload API)
-  - [ ] Normalize job (skip when format is "kept as-is"; only video/audio normalize)
-  - [ ] Extract job (calls configured content-extractor plugins)
-  - [ ] Materialize job (writes sidecar `.yml` + `.md` to Git data repo via configured Git provider)
-  - [ ] Index job (rebuild `.index.yml` + Postgres `tsvector` for FTS)
+    - [ ] Receive job (already partially covered by upload API)
+    - [ ] Normalize job (skip when format is "kept as-is"; only video/audio normalize)
+    - [ ] Extract job (calls configured content-extractor plugins)
+    - [ ] Materialize job (writes sidecar `.yml` + `.md` to Git data repo via configured Git provider)
+    - [ ] Index job (rebuild `.index.yml` + Postgres `tsvector` for FTS)
 - [ ] Activity log emits the kinds listed in spec §19.1
 - [ ] Per-document lock UI (file menu in tree + lock state chip in document header)
 - [ ] Search palette wired to lexical-only `/api/works/:id/kb/search`
@@ -125,9 +134,9 @@ See [spec.md](spec.md) for the technical contract, [plan.md](plan.md) for the ph
 - [ ] Citation hover-card component (workbench-side)
 - [ ] Agent tools: `kb_search`, `kb_read`, `kb_write`, `kb_lock`, `kb_unlock` registered to agent-pipelines
 - [ ] Org-level inheritance fan-out:
-  - [ ] Trigger.dev job that materializes `.org/{class}/` overlay into every Work in the org
-  - [ ] Triggered on POST/PATCH/DELETE of org-level inheritable docs
-  - [ ] Workbench surfaces inherited docs as read-only with an "override locally" affordance
+    - [ ] Trigger.dev job that materializes `.org/{class}/` overlay into every Work in the org
+    - [ ] Triggered on POST/PATCH/DELETE of org-level inheritable docs
+    - [ ] Workbench surfaces inherited docs as read-only with an "override locally" affordance
 - [ ] Community PR + scheduled regen consult `locked` and `lockMode` before mutating any KB doc
 - [ ] Comparison generator reads `competitors` and `research` classes automatically
 - [ ] LLM eval suite (`vitest.eval.config.ts` style) for retrieval-quality regression

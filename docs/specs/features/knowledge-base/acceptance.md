@@ -10,7 +10,7 @@ The criteria here mirror [spec.md §24](spec.md#24-acceptance-criteria-v1) and a
 
 ## Phase 1 — foundation
 
-- **A1.** A newly-created Work has an initialized empty `.content/kb/` structure in its data repo, including all class folders and a valid `.index.yml`. *(Backfill job also produces this for pre-existing Works.)*
+- **A1.** A newly-created Work has an initialized empty `.content/kb/` structure in its data repo, including all class folders and a valid `.index.yml`. _(Backfill job also produces this for pre-existing Works.)_
 - **A2.** A user can `POST /api/works/:id/kb/documents` with a class + body and see the document persisted in both DB (row) and Git (sidecar `.yml` + `.md` pair at `.content/kb/<class>/<slug>.{yml,md}`).
 - **A3.** `GET /api/works/:id/kb/documents` returns the created document with all spec §6.1 fields populated.
 - **A4.** Lock semantics: `POST /api/works/:id/kb/documents/:docId/lock` with `mode='full'` sets the `locked` + `lockMode` columns and (in Phase 2) prevents the scheduled regeneration pipeline from mutating the doc.

@@ -4,7 +4,7 @@
 **Last updated**: 2026-05-21
 **Audience**: Engineers planning or executing the Knowledge Base build.
 
-This plan is the engineering-execution complement to [spec.md](spec.md). The spec is the *what*; this is the *how* and *when*. Phasing matches the canonical "phased delivery" section of the spec.
+This plan is the engineering-execution complement to [spec.md](spec.md). The spec is the _what_; this is the _how_ and _when_. Phasing matches the canonical "phased delivery" section of the spec.
 
 ## Tracking
 
@@ -20,40 +20,40 @@ The smallest credible vertical slice that proves the data model, the storage abs
 ### Deliverables
 
 1. **Entities** in `packages/agent/src/entities/`:
-   - `work-knowledge-document.entity.ts`
-   - `work-knowledge-upload.entity.ts`
-   - `work-knowledge-tag.entity.ts`
-   - `work-knowledge-citation.entity.ts`
-   - `work-knowledge-chunk.entity.ts` (composite PK on `(workId, id)` — see spec §15.2)
+    - `work-knowledge-document.entity.ts`
+    - `work-knowledge-upload.entity.ts`
+    - `work-knowledge-tag.entity.ts`
+    - `work-knowledge-citation.entity.ts`
+    - `work-knowledge-chunk.entity.ts` (composite PK on `(workId, id)` — see spec §15.2)
 2. **Migrations** under `apps/api/src/migrations/` (`{unix-millis}-{PascalCase}.ts`):
-   - `EnablePgvectorExtension` — `CREATE EXTENSION IF NOT EXISTS vector;`
-   - `CreateWorkKnowledgeDocuments` — including the `work_id XOR organization_id` CHECK constraint
-   - `CreateWorkKnowledgeUploads`
-   - `CreateWorkKnowledgeTags`
-   - `CreateWorkKnowledgeCitations`
-   - `CreateWorkKnowledgeChunks` — composite PK + ivfflat index on `(workId, embedding)`
-   - `AddWorkKbConfigColumn` — `kb_config` simple-json on `works`
+    - `EnablePgvectorExtension` — `CREATE EXTENSION IF NOT EXISTS vector;`
+    - `CreateWorkKnowledgeDocuments` — including the `work_id XOR organization_id` CHECK constraint
+    - `CreateWorkKnowledgeUploads`
+    - `CreateWorkKnowledgeTags`
+    - `CreateWorkKnowledgeCitations`
+    - `CreateWorkKnowledgeChunks` — composite PK + ivfflat index on `(workId, embedding)`
+    - `AddWorkKbConfigColumn` — `kb_config` simple-json on `works`
 3. **DTOs** in `packages/contracts/src/kb/` — `KbDocumentDto`, `KbDocumentBodyDto`, `KbUploadDto`, `KbSearchHit`, `KbTreeNode`, `CitationDto`, `KbDocumentClass` union.
 4. **Service skeleton** `packages/agent/src/services/knowledge-base.service.ts`:
-   - Constructor wiring (repositories, storage plugin resolver, content-extractor resolver, Git provider).
-   - Method stubs with JSDoc: `resolveDocuments`, `createDocument`, `updateDocument`, `deleteDocument`, `ingestUpload`, `search`, `rebuildIndex`, `resolveContext`.
-   - No method bodies beyond `throw new NotImplementedException()` — bodies land in subsequent PRs.
+    - Constructor wiring (repositories, storage plugin resolver, content-extractor resolver, Git provider).
+    - Method stubs with JSDoc: `resolveDocuments`, `createDocument`, `updateDocument`, `deleteDocument`, `ingestUpload`, `search`, `rebuildIndex`, `resolveContext`.
+    - No method bodies beyond `throw new NotImplementedException()` — bodies land in subsequent PRs.
 5. **REST endpoints** in `apps/api/src/works/` (the existing `WorksController` per the spec §12 routing convention):
-   - `GET /api/works/:id/kb/documents` + `POST /api/works/:id/kb/documents`
-   - `GET/PATCH/DELETE /api/works/:id/kb/documents/:docId`
-   - Lock / unlock / restore endpoints
-   - Upload endpoints (placeholder — accept multipart but persist only the row, not yet extract)
-   - Tree, search (lexical-only), tags
-   - All wired with the existing `WorkMemberGuard` and `@ApiBearerAuth` decorators
+    - `GET /api/works/:id/kb/documents` + `POST /api/works/:id/kb/documents`
+    - `GET/PATCH/DELETE /api/works/:id/kb/documents/:docId`
+    - Lock / unlock / restore endpoints
+    - Upload endpoints (placeholder — accept multipart but persist only the row, not yet extract)
+    - Tree, search (lexical-only), tags
+    - All wired with the existing `WorkMemberGuard` and `@ApiBearerAuth` decorators
 6. **Tests**:
-   - Entity unit tests covering the `workId XOR organizationId` CHECK constraint, the indexed columns, the cascade rules.
-   - Service unit tests for `resolveContext` budget truncation logic (mocking the repositories).
-   - One API e2e test covering create → list → update → delete on a document.
+    - Entity unit tests covering the `workId XOR organizationId` CHECK constraint, the indexed columns, the cascade rules.
+    - Service unit tests for `resolveContext` budget truncation logic (mocking the repositories).
+    - One API e2e test covering create → list → update → delete on a document.
 7. **Backfill job** in `packages/tasks/`:
-   - Iterates existing Works, initializes empty `.content/kb/` structure in each data repo (idempotent).
+    - Iterates existing Works, initializes empty `.content/kb/` structure in each data repo (idempotent).
 8. **Documentation**:
-   - Append a "Knowledge Base entities" section to `docs/specs/architecture/database.md` listing the new entities + the inheritance pattern + the pgvector dependency.
-   - Append a dated entry to whatever the platform's change-log convention is (mirror existing PR entries in `docs/`).
+    - Append a "Knowledge Base entities" section to `docs/specs/architecture/database.md` listing the new entities + the inheritance pattern + the pgvector dependency.
+    - Append a dated entry to whatever the platform's change-log convention is (mirror existing PR entries in `docs/`).
 
 ### Out of Phase 1
 
@@ -77,10 +77,10 @@ Builds on Phase 1's data model.
 ### Deliverables
 
 1. **Embedding generation** via platform-managed embedding lane.
-   - Add `embed(input)` to AI provider plugin contract in `packages/plugin/`.
-   - Implement for `openai` plugin (default `text-embedding-3-small`).
-   - Trigger.dev job in `packages/tasks/` to chunk + embed on document insert / update.
-   - Hybrid chunker (heading-aware + fixed-size fallback).
+    - Add `embed(input)` to AI provider plugin contract in `packages/plugin/`.
+    - Implement for `openai` plugin (default `text-embedding-3-small`).
+    - Trigger.dev job in `packages/tasks/` to chunk + embed on document insert / update.
+    - Hybrid chunker (heading-aware + fixed-size fallback).
 2. **Semantic retrieval** wired into `KnowledgeBaseService.search` (RRF blend of lexical + semantic).
 3. **`KbPromptFormatter`** in `packages/agent/src/services/kb-prompt-formatter.ts` — produces the standardized context block injected into every pipeline.
 4. **Pipeline integration** — every pipeline in `packages/plugins/{standard-pipeline,agent-pipeline,claude-code,…}` consumes `KbContextBundle` via the orchestrator.
@@ -89,9 +89,9 @@ Builds on Phase 1's data model.
 7. **Org-level legal / style / seo inheritance** — entity-level support exists in Phase 1; this phase implements the fan-out Trigger.dev job + `.org/{class}/` materialization in the Work's data repo + admin endpoints.
 8. **Community-PR and scheduled-regen lock respect** — `CommunityPrService` and `ScheduledUpdateService` consult `WorkKnowledgeDocument.locked` and `lockMode` before mutating any KB doc.
 9. **Tests**:
-   - Service tests for hybrid chunking against fixture documents.
-   - Eval suite for retrieval-quality regression (lexical-only baseline vs. blended).
-   - E2E test for an org-level legal doc being inherited and overridden by a Work.
+    - Service tests for hybrid chunking against fixture documents.
+    - Eval suite for retrieval-quality regression (lexical-only baseline vs. blended).
+    - E2E test for an org-level legal doc being inherited and overridden by a Work.
 
 ## Phase 3 — polish
 
@@ -115,6 +115,7 @@ Builds on Phase 1's data model.
 ## Definition of done per phase
 
 Each phase ends with:
+
 - All deliverables landed in `develop`.
 - PR review loop completed per workspace NN #14 / #18.
 - CI green per NN #19.
