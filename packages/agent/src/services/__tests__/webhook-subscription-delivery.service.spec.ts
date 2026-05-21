@@ -63,8 +63,12 @@ function setup(opts: { sub?: SubRow; deliverResult: DeliveryResult; initialFailu
 describe('WebhookSubscriptionDeliveryService.dispatch', () => {
     afterEach(() => delete process.env.WEBHOOK_MAX_CONSECUTIVE_FAILURES);
 
-    it('returns subscription_not_found when the row is missing', async () => {
-        const { svc, subscriptionsRepo } = setup({
+    it('returns subscription_not_found AND marks the orphaned delivery row failed', async () => {
+        // Codex P1 follow-up: previously the dispatcher bailed without
+        // touching the pre-allocated `webhook_deliveries` row, which left
+        // it forever-pending. Now we always record a terminal attempt
+        // when the producer supplied a deliveryId.
+        const { svc, subscriptionsRepo, deliveriesRepo } = setup({
             deliverResult: { ok: true, outcome: 'success', deliveryId: 'd' },
         });
         subscriptionsRepo.findById.mockResolvedValueOnce(null);
@@ -77,9 +81,33 @@ describe('WebhookSubscriptionDeliveryService.dispatch', () => {
         expect(out.result.outcome).toBe('client_error');
         expect(out.result.error).toBe('subscription_not_found');
         expect(out.shouldRetry).toBe(false);
+        expect(deliveriesRepo.recordAttempt).toHaveBeenCalledWith(
+            'd-1',
+            expect.objectContaining({
+                status: 'failed',
+                lastOutcome: 'subscription_not_found',
+                lastError: 'subscription_not_found',
+            }),
+        );
     });
 
-    it('skips dispatch when subscription is paused', async () => {
+    it('does NOT touch the deliveries repo when subscription_not_found AND no deliveryId was supplied', async () => {
+        const { svc, subscriptionsRepo, deliveriesRepo } = setup({
+            deliverResult: { ok: true, outcome: 'success', deliveryId: 'd' },
+        });
+        subscriptionsRepo.findById.mockResolvedValueOnce(null);
+        const out = await svc.dispatch({
+            subscriptionId: 'missing',
+            event: 'x',
+            payload: {},
+        });
+        expect(out.result.outcome).toBe('client_error');
+        expect(deliveriesRepo.recordAttempt).not.toHaveBeenCalled();
+    });
+
+    it('skips dispatch when subscription is paused AND marks the orphaned delivery row failed', async () => {
+        // Same Codex P1 fix as above — pause-during-flight should not
+        // leave the pre-allocated row in `pending`.
         const { svc, deliveryService, deliveriesRepo } = setup({
             sub: makeSub({ status: 'paused' }),
             deliverResult: { ok: true, outcome: 'success', deliveryId: 'd' },
@@ -93,7 +121,14 @@ describe('WebhookSubscriptionDeliveryService.dispatch', () => {
         expect(out.result.outcome).toBe('client_error');
         expect(out.result.error).toBe('subscription_paused');
         expect(deliveryService.deliver).not.toHaveBeenCalled();
-        expect(deliveriesRepo.recordAttempt).not.toHaveBeenCalled();
+        expect(deliveriesRepo.recordAttempt).toHaveBeenCalledWith(
+            'd-1',
+            expect.objectContaining({
+                status: 'failed',
+                lastOutcome: 'subscription_paused',
+                lastError: 'subscription_paused',
+            }),
+        );
     });
 
     it('marks success + resets the counter on 2xx', async () => {

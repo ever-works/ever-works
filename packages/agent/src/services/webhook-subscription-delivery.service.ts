@@ -90,6 +90,17 @@ export class WebhookSubscriptionDeliveryService {
     async dispatch(input: DispatchWebhookInput): Promise<DispatchedWebhookResult> {
         const sub = await this.subscriptions.findById(input.subscriptionId);
         if (!sub) {
+            // Codex P1 follow-up to EW-634 / PR #886: the producer-side
+            // dispatcher inserted a `webhook_deliveries` row with
+            // `status='pending'` before calling us. If we bail without
+            // recording a terminal attempt, the row sits forever-pending
+            // and the deliveries API misreports it as still in flight.
+            // Happens in races where the subscription is deleted between
+            // enqueue and dispatch (or redelivery against a removed sub).
+            await this.recordTerminalSkip(input, {
+                outcome: 'subscription_not_found',
+                error: 'subscription_not_found',
+            });
             return {
                 result: {
                     ok: false,
@@ -107,6 +118,14 @@ export class WebhookSubscriptionDeliveryService {
             this.logger.log(
                 `webhook.dispatch_skipped sub=${sub.id} status=${sub.status} event=${input.event}`,
             );
+            // Same Codex P1 fix — if the producer pre-allocated a delivery
+            // row, record a terminal `failed` attempt so it doesn't sit
+            // in `pending` after the subscription got paused or
+            // dead-lettered between enqueue and dispatch.
+            await this.recordTerminalSkip(input, {
+                outcome: `subscription_${sub.status}`,
+                error: `subscription_${sub.status}`,
+            });
             return {
                 result: {
                     ok: false,
@@ -249,5 +268,31 @@ export class WebhookSubscriptionDeliveryService {
             shouldRetry: retryable && !shouldDeadLetter,
             consecutiveFailures: failures,
         };
+    }
+
+    /**
+     * Mark a pre-allocated `webhook_deliveries` row as terminally failed
+     * when we never actually POST anything (subscription missing / paused /
+     * dead-lettered between enqueue and dispatch). No-op if the producer
+     * didn't pre-allocate a row.
+     */
+    private async recordTerminalSkip(
+        input: DispatchWebhookInput,
+        info: { outcome: string; error: string },
+    ): Promise<void> {
+        if (!input.deliveryId) return;
+        await this.deliveries
+            .recordAttempt(input.deliveryId, {
+                status: 'failed',
+                lastOutcome: info.outcome,
+                lastError: info.error,
+                triggerRunId: input.triggerRunId ?? null,
+            })
+            .catch((err) =>
+                this.logger.error(
+                    `webhook.delivery_record_failed delivery=${input.deliveryId} reason=${(err as Error).message}`,
+                    err as Error,
+                ),
+            );
     }
 }
