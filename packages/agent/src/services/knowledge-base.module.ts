@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
+import { FacadesModule } from '../facades/facades.module';
 import {
     WorkKnowledgeChunk,
     WorkKnowledgeCitation,
@@ -26,10 +27,16 @@ import { WorkOwnershipService } from './work-ownership.service';
  * provide WorkOwnershipService via a parent module.
  *
  * EW-641 Phase 1B/a — `KnowledgeBaseGitMirrorService` is also exported.
- * It depends on `GitFacadeService`, which is provided by the API-side
- * `FacadesModule`. Importers that need the mirror service (the
- * Trigger.dev `kb-mirror-document` task) must ensure `FacadesModule` is
- * available in their dependency graph.
+ * It depends on `GitFacadeService`, which is provided by `FacadesModule`.
+ * The original Phase 1B/a docstring asked importers to add `FacadesModule`
+ * themselves; that didn't actually work because NestJS DI only walks a
+ * module's *own* `imports`, not its consumers' imports. Result: the API
+ * boot died with `UnknownDependenciesException: KnowledgeBaseGitMirrorService
+ * (?, WorkRepository, ...)` and develop E2E went red on `652d1a4d`.
+ *
+ * Fix: import `FacadesModule` directly. No circular dep — `FacadesModule`
+ * imports only `DatabaseModule + UsageModule + BudgetsModule`, none of
+ * which depend on KB.
  *
  * Entities registered:
  *  - WorkKnowledgeDocument
@@ -41,6 +48,7 @@ import { WorkOwnershipService } from './work-ownership.service';
 @Module({
     imports: [
         DatabaseModule,
+        FacadesModule,
         TypeOrmModule.forFeature([
             WorkKnowledgeDocument,
             WorkKnowledgeUpload,
