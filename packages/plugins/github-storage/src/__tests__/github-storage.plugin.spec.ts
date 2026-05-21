@@ -347,7 +347,110 @@ describe('GitHubStoragePlugin — data-repo mode', () => {
 		// Octokit never called when transport is clone-and-push and LFS is off.
 		expect(octokitMockState.createOrUpdateFileContents).not.toHaveBeenCalled();
 		expect(fetchCalls).toHaveLength(0);
-		expect(result.key).toMatch(/^uploads\/user1\/[0-9a-f]{64}\.txt$/);
+		// EW-644 (Codex P1 fix #2): data-repo keys carry their workId
+		// so a later read/delete can recover the Work coordinates
+		// without an external lookup.
+		expect(result.key).toMatch(/^dr:work-1:uploads\/user1\/[0-9a-f]{64}\.txt$/);
+		expect(result.url).toMatch(/^\/api\/uploads\/user1\/[0-9a-f]{64}\.txt\?workId=work-1$/);
+	});
+});
+
+describe('GitHubStoragePlugin — data-repo read/delete round-trip (EW-644 Codex P1 fix)', () => {
+	beforeEach(() => {
+		process.env.GITHUB_STORAGE_MODE = 'data-repo';
+		process.env.GITHUB_STORAGE_LFS_ENABLED = 'false';
+		process.env.GITHUB_STORAGE_TRANSPORT = 'contents-api';
+	});
+
+	it('encodes workId into the storage key + URL on put', async () => {
+		const resolver = {
+			resolve: vi.fn().mockResolvedValue({
+				owner: 'workowner',
+				repo: 'workdata',
+				branch: 'main',
+				token: 'oauth-tok'
+			})
+		};
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx({ workRepoResolver: resolver }));
+		octokitMockState.getContent.mockRejectedValueOnce(new RequestErrorMock(404));
+		octokitMockState.createOrUpdateFileContents.mockResolvedValueOnce({});
+
+		const result = await plugin.putObject({
+			buffer: Buffer.from('hi'),
+			filename: 'n.txt',
+			mimeType: 'text/plain',
+			size: 2,
+			ownerId: 'user1',
+			workId: 'work-1'
+		});
+
+		expect(result.key.startsWith('dr:work-1:')).toBe(true);
+		expect(result.url).toContain('workId=work-1');
+	});
+
+	it('getObject(dr-key) re-resolves the Work and fetches from its repo', async () => {
+		const resolver = {
+			resolve: vi.fn().mockResolvedValue({
+				owner: 'workowner',
+				repo: 'workdata',
+				branch: 'main',
+				token: 'oauth-tok'
+			})
+		};
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx({ workRepoResolver: resolver }));
+		// Octokit returns a non-LFS direct blob.
+		octokitMockState.getContent.mockResolvedValueOnce({
+			data: {
+				type: 'file',
+				content: Buffer.from('hello').toString('base64'),
+				sha: 'blob-sha'
+			}
+		});
+
+		const out = await plugin.getObject('dr:work-1:uploads/user1/abc.txt');
+		expect(resolver.resolve).toHaveBeenCalledWith('work-1');
+		// Octokit was asked for the path WITHOUT the dr: prefix, and
+		// targeted the resolved owner/repo (not any env-configured one).
+		expect(octokitMockState.getContent.mock.calls[0][0]).toMatchObject({
+			owner: 'workowner',
+			repo: 'workdata',
+			path: 'uploads/user1/abc.txt',
+			ref: 'main'
+		});
+		expect(out.buffer.toString('utf8')).toBe('hello');
+	});
+
+	it('deleteObject(dr-key) re-resolves the Work and deletes from its repo', async () => {
+		const resolver = {
+			resolve: vi.fn().mockResolvedValue({
+				owner: 'workowner',
+				repo: 'workdata',
+				branch: 'main',
+				token: 'oauth-tok'
+			})
+		};
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx({ workRepoResolver: resolver }));
+		octokitMockState.getContent.mockResolvedValueOnce({
+			data: { type: 'file', content: '', sha: 'blob-sha' }
+		});
+		octokitMockState.deleteFile.mockResolvedValueOnce({});
+
+		await plugin.deleteObject('dr:work-1:uploads/user1/abc.txt');
+		expect(resolver.resolve).toHaveBeenCalledWith('work-1');
+		expect(octokitMockState.deleteFile.mock.calls[0][0]).toMatchObject({
+			owner: 'workowner',
+			repo: 'workdata',
+			path: 'uploads/user1/abc.txt'
+		});
+	});
+
+	it('deriveKey(ownerId, filename, workId) returns the dr:-prefixed key in data-repo mode', async () => {
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx({ workRepoResolver: { resolve: vi.fn() } }));
+		expect(plugin.deriveKey('user1', 'abc.txt', 'work-7')).toBe('dr:work-7:uploads/user1/abc.txt');
 	});
 });
 

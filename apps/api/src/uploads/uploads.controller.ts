@@ -2,13 +2,16 @@ import {
     BadRequestException,
     Body,
     Controller,
+    ForbiddenException,
     Get,
     Header,
     Headers,
     HttpCode,
     HttpStatus,
     Inject,
+    NotFoundException,
     NotImplementedException,
+    Optional,
     Param,
     Post,
     Query,
@@ -17,6 +20,7 @@ import {
     UploadedFile,
     UseInterceptors,
 } from '@nestjs/common';
+import { WorkRepository } from '@ever-works/agent/database';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -63,6 +67,15 @@ export class UploadsController {
         // provider the guard would have called, so an authenticated
         // session is honored on public-by-default upload routes.
         @Inject(AUTH_PROVIDER) private readonly authProvider: AuthProvider,
+        // EW-644 (Codex P1): when `?workId=` is supplied, we must verify
+        // the authenticated caller actually owns / has access to the
+        // referenced Work before passing it to the storage backend.
+        // Without this check, a user who knows another user's workId
+        // could write uploads into the victim's data repo using the
+        // victim's GitHub credentials. WorkRepository is `@Optional()`
+        // for unit tests that don't exercise the workId path; the
+        // module provides it in production.
+        @Optional() private readonly workRepository?: WorkRepository,
     ) {}
 
     /**
@@ -107,6 +120,9 @@ export class UploadsController {
                 message: "Multipart field 'file' is required",
             });
         }
+        if (workId) {
+            await this.assertWorkAccess(auth.userId, workId);
+        }
         return this.uploads.saveImage(auth.userId, file, workId ? { workId } : undefined);
     }
 
@@ -121,6 +137,41 @@ export class UploadsController {
         @Query('workId') workId?: string,
     ) {
         return this.upload(auth, file, workId);
+    }
+
+    /**
+     * EW-644 (Codex P1) — verify the authenticated caller actually has
+     * access to the Work referenced by `workId` before any storage
+     * backend uses it to resolve repo coordinates / a token.
+     *
+     * Today the check is strict: only the Work creator (`work.userId`)
+     * can upload to it. Extending to org members + write-permission
+     * roles is a follow-up alongside the broader Work-access service —
+     * for now we mirror the same `work.userId !== auth.userId` rule the
+     * data-sync controller uses (see `apps/api/src/data-sync/data-sync.controller.ts:73`).
+     *
+     * Throws NotFound (not Forbidden) when the Work either doesn't
+     * exist or belongs to someone else, so an attacker probing for
+     * valid Work UUIDs can't enumerate ownership via the response code.
+     */
+    private async assertWorkAccess(userId: string, workId: string): Promise<void> {
+        if (!this.workRepository) {
+            // No work-access plumbing in this NestJS context (e.g. an
+            // older harness that didn't bind `DatabaseModule`). Refuse
+            // the upload rather than silently bypassing the check.
+            throw new ForbiddenException({
+                status: 'error',
+                code: 'WorkAccessUnchecked',
+                message: 'Work access checks are not configured on this server',
+            });
+        }
+        const work = await this.workRepository.findById(workId);
+        if (!work || work.userId !== userId) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Work not found',
+            });
+        }
     }
 
     /**
@@ -274,6 +325,11 @@ export class UploadsController {
         @Param('userId') userId: string,
         @Param('filename') filename: string,
         @Res() res: ServeResponse,
+        // EW-644: optional `?workId=` — for backends that store keys
+        // per-Work (`github-storage` in `data-repo` mode). The value
+        // was emitted by `putObject` into the upload's URL; we just
+        // round-trip it back into `readFile`.
+        @Query('workId') workId?: string,
     ) {
         if (auth.userId !== userId) {
             // Don't 403 vs 404 — leaking "this file exists but isn't
@@ -281,7 +337,18 @@ export class UploadsController {
             res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
             return;
         }
-        const { buffer, mimeType } = await this.uploads.readFile(userId, filename);
+        // EW-644 (Codex P1): when the caller passes a workId, verify
+        // ownership before forwarding it to the backend — same gate as
+        // the upload path, so a stranger can't enumerate or read another
+        // user's data-repo uploads by guessing workIds.
+        if (workId) {
+            await this.assertWorkAccess(auth.userId, workId);
+        }
+        const { buffer, mimeType } = await this.uploads.readFile(
+            userId,
+            filename,
+            workId ? { workId } : undefined,
+        );
         res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Length', buffer.length);
         // `inline` is safe here because we (a) pinned a strict CSP that

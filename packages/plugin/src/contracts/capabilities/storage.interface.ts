@@ -136,8 +136,16 @@ export interface IStoragePlugin extends IPlugin {
 	 * to that shape — but any backend with a prefix MUST implement it,
 	 * otherwise owner-gated reads will 404 for files it successfully
 	 * wrote (Codex P1 finding on PR #890).
+	 *
+	 * EW-644 — the optional third argument is the `workId` the caller
+	 * received as a `?workId=` query param on the serve route. Backends
+	 * that resolve their destination per-Work (e.g. github-storage in
+	 * mode `data-repo`) encode it into the returned key so a subsequent
+	 * `getObject`/`deleteObject` can recover the Work's coordinates
+	 * without an external lookup. Backends that ignore `workId` (local-fs,
+	 * S3, MinIO) just emit the same shape as before.
 	 */
-	deriveKey?(ownerId: string, filename: string): string;
+	deriveKey?(ownerId: string, filename: string, workId?: string): string;
 
 	/** Whether the backend is healthy / configured. Used by the
 	 *  uploads service at startup to fail loudly when the operator

@@ -155,27 +155,40 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			await this.putRaw(cfg, path, buffer, hash, ownerId, ext);
 		}
 
+		// EW-644 — in `data-repo` mode, encode the resolved workId in
+		// the returned key (and URL query string) so a subsequent
+		// `getObject`/`deleteObject` can recover the Work coordinates
+		// without an external lookup. `separate-repo` mode keeps the
+		// flat `<prefix>/<ownerId>/<file>` key shape for backwards
+		// compatibility (Codex P1 finding: reads/deletes round-trip in
+		// data-repo mode).
+		const isDataRepo = cfg.mode === 'data-repo' && input.workId;
+		const key = isDataRepo ? encodeDataRepoKey(input.workId!, path) : path;
 		const url = cfg.publicRawUrl
 			? `${cfg.publicRawUrl.replace(/\/$/, '')}/${path}`
-			: `/api/uploads/${ownerId}/${hash}${ext}`;
-		return { key: path, url };
+			: isDataRepo
+				? `/api/uploads/${ownerId}/${hash}${ext}?workId=${encodeURIComponent(input.workId!)}`
+				: `/api/uploads/${ownerId}/${hash}${ext}`;
+		return { key, url };
 	}
 
 	async getObject(key: string): Promise<StorageGetResult> {
-		// `getObject` runs without a workId, so we can only honour
-		// `separate-repo` here. `data-repo` reads route through the
-		// higher-level upload resolver in the API which has the Work
-		// context. Treat absent env vars as 'not configured'.
-		const cfg = this.cfgForRead();
+		// EW-644 — a `dr:<workId>:<path>` key (data-repo mode) carries
+		// its workId; resolve the repo via the WorkRepoResolver and
+		// fetch from there. Otherwise fall back to the configured
+		// `separate-repo` global env vars.
+		const dr = decodeDataRepoKey(key);
+		const cfg = dr ? await this.cfgForReadFromWork(dr.workId) : this.cfgForRead();
+		const actualPath = dr ? dr.path : key;
 		const octokit = this.client(cfg.token);
 		const { data } = await octokit.rest.repos.getContent({
 			owner: cfg.owner,
 			repo: cfg.repo,
-			path: key,
+			path: actualPath,
 			ref: cfg.branch
 		});
 		if (Array.isArray(data) || data.type !== 'file') {
-			throw new Error(`GitHub storage key is not a file: ${key}`);
+			throw new Error(`GitHub storage key is not a file: ${actualPath}`);
 		}
 		const decoded = Buffer.from(data.content.replace(/\n/g, ''), 'base64');
 		const pointer = parsePointer(decoded.toString('utf8'));
@@ -193,19 +206,21 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			if (!dl.ok) {
 				throw new Error(`LFS object download failed: HTTP ${dl.status}: ${dl.message}`);
 			}
-			return { buffer: dl.buffer, mimeType: guessMime(key) };
+			return { buffer: dl.buffer, mimeType: guessMime(actualPath) };
 		}
-		return { buffer: decoded, mimeType: guessMime(key) };
+		return { buffer: decoded, mimeType: guessMime(actualPath) };
 	}
 
 	async deleteObject(key: string): Promise<void> {
-		const cfg = this.cfgForRead();
+		const dr = decodeDataRepoKey(key);
+		const cfg = dr ? await this.cfgForReadFromWork(dr.workId) : this.cfgForRead();
+		const actualPath = dr ? dr.path : key;
 		const octokit = this.client(cfg.token);
 		try {
 			const { data } = await octokit.rest.repos.getContent({
 				owner: cfg.owner,
 				repo: cfg.repo,
-				path: key,
+				path: actualPath,
 				ref: cfg.branch
 			});
 			if (Array.isArray(data) || data.type !== 'file') return;
@@ -217,8 +232,8 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			await octokit.rest.repos.deleteFile({
 				owner: cfg.owner,
 				repo: cfg.repo,
-				path: key,
-				message: `delete-upload: ${key}`,
+				path: actualPath,
+				message: `delete-upload: ${actualPath}`,
 				sha: data.sha,
 				branch: cfg.branch
 			});
@@ -247,8 +262,16 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		}
 	}
 
-	deriveKey(ownerId: string, filename: string): string {
-		return `${readPathPrefix()}/${ownerId}/${filename}`;
+	deriveKey(ownerId: string, filename: string, workId?: string): string {
+		const base = `${readPathPrefix()}/${ownerId}/${filename}`;
+		// EW-644 — in data-repo mode the read-side caller is expected to
+		// supply the workId (from the `?workId=` query string the serve
+		// route propagates). Encode it the same way `putObject` did so
+		// `getObject` / `deleteObject` can recover the Work's coordinates.
+		if (workId && readMode() === 'data-repo') {
+			return encodeDataRepoKey(workId, base);
+		}
+		return base;
 	}
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -459,6 +482,34 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		return ctx?.workRepoResolver;
 	}
 
+	/**
+	 * EW-644 — resolve read-side coordinates for a `data-repo` mode
+	 * key. The key was minted by `putObject` with `dr:<workId>:<path>`
+	 * (or by `deriveKey` with a `workId` arg), so we just look the Work
+	 * up via the resolver and use the same credentials the writer used.
+	 *
+	 * Throws if the resolver isn't wired (misconfigured deployment) or
+	 * if the resolver can't satisfy the lookup (e.g. Work deleted since
+	 * the upload was written — that's a stable 404 from the caller's
+	 * perspective).
+	 */
+	private async cfgForReadFromWork(workId: string): Promise<ResolvedConfig> {
+		const resolver = this.workRepoResolver();
+		if (!resolver) {
+			throw new Error(
+				'github-storage: data-repo key encountered but no WorkRepoResolver is wired into PluginContext.'
+			);
+		}
+		const resolved: ResolvedWorkRepo = await resolver.resolve(workId);
+		return {
+			mode: 'data-repo',
+			lfsEnabled: readLfsEnabled(),
+			pathPrefix: readPathPrefix(),
+			publicRawUrl: process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined,
+			...resolved
+		};
+	}
+
 	private cfgForRead(): ResolvedConfig {
 		const mode = readMode();
 		const lfsEnabled = readLfsEnabled();
@@ -546,6 +597,39 @@ function resolveTransport(cfg: ResolvedConfig): 'contents-api' | 'clone-and-push
 	if (raw === 'contents-api') return 'contents-api';
 	if (raw === 'clone-and-push') return 'clone-and-push';
 	return cfg.mode === 'data-repo' ? 'clone-and-push' : 'contents-api';
+}
+
+/**
+ * EW-644 — opaque key encoding for `data-repo` mode.
+ *
+ * In `data-repo` mode the plugin needs to remember which Work a key
+ * belongs to so a later `getObject`/`deleteObject` can resolve the right
+ * repo + token via `WorkRepoResolver`. We encode it directly into the
+ * storage key as a `dr:<workId>:<path>` prefix.
+ *
+ * - `<workId>` is a UUID (validated upstream by UploadsService). The
+ *   resolver re-validates it via `WorkRepository.findById(...)`.
+ * - `<path>` is the same `<pathPrefix>/<ownerId>/<hash><ext>` shape
+ *   `separate-repo` mode uses.
+ *
+ * Why a prefix instead of a side table: keeps the plugin stateless,
+ * survives restarts, and round-trips through every storage-key consumer
+ * (the API serve route, the read-by-key flow, future GC tasks) with no
+ * extra plumbing.
+ */
+export function encodeDataRepoKey(workId: string, path: string): string {
+	return `dr:${workId}:${path}`;
+}
+
+export function decodeDataRepoKey(key: string): { workId: string; path: string } | null {
+	if (!key.startsWith('dr:')) return null;
+	const rest = key.slice(3);
+	const sep = rest.indexOf(':');
+	if (sep < 0) return null;
+	const workId = rest.slice(0, sep);
+	const path = rest.slice(sep + 1);
+	if (!workId || !path) return null;
+	return { workId, path };
 }
 
 function sanitizeExt(filename: string): string {

@@ -259,9 +259,12 @@ export class UploadsService {
     async readFile(
         userId: string,
         filename: string,
+        opts?: { workId?: string },
     ): Promise<{ buffer: Buffer; mimeType: string }> {
         this.assertValidUserId(userId);
         this.assertValidFilename(filename);
+        const workId = opts?.workId;
+        if (workId !== undefined) this.assertValidWorkId(workId);
         const backend = await this.getBackend();
 
         // Codex P1 finding on PR #890: don't hardcode the storage key
@@ -272,8 +275,13 @@ export class UploadsService {
         // the plugin doesn't implement `deriveKey` (older third-party
         // backends, in-test mocks), fall back to the legacy shape so
         // existing local-fs setups keep working unchanged.
+        //
+        // EW-644: the optional `workId` arg is for backends that store
+        // per-Work — `github-storage` in `data-repo` mode encodes it
+        // into the key so `getObject` knows which Work's repo to read
+        // from. Backends that don't care ignore it.
         const key = backend.deriveKey
-            ? backend.deriveKey(userId, filename)
+            ? backend.deriveKey(userId, filename, workId)
             : `${userId}/${filename}`;
 
         let result: { buffer: Buffer; mimeType: string };
