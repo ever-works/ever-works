@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { KnowledgeBaseService } from '@ever-works/agent/services';
 import { CreateKbDocumentDto, KbDocumentQueryDto } from '@ever-works/agent/dto';
+import type { KbDocumentClass, KbDocumentStatus } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 
@@ -44,7 +45,9 @@ export class OrgKbController {
         @Param('orgId') orgId: string,
         @Query() query: KbDocumentQueryDto,
     ) {
-        return this.kb.listOrgDocuments(orgId, { class: query.class });
+        return this.kb.listOrgDocuments(orgId, {
+            class: query.class as KbDocumentClass | undefined,
+        });
     }
 
     @Post('organizations/:orgId/kb/documents')
@@ -64,13 +67,13 @@ export class OrgKbController {
         return this.kb.createOrgDocument(orgId, auth.userId, {
             path: body.path,
             title: body.title,
-            class: body.class,
+            class: body.class as KbDocumentClass,
             body: body.body,
             description: body.description ?? null,
             tags: body.tags,
             categories: body.categories,
             language: body.language,
-            status: body.status,
+            status: body.status as KbDocumentStatus | undefined,
         });
     }
 

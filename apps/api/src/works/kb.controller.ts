@@ -24,6 +24,7 @@ import {
 } from '@ever-works/agent/dto';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
+import type { KbDocumentClass, KbDocumentStatus, KbLockMode } from '@ever-works/agent/entities';
 
 /**
  * Knowledge Base REST surface — per-Work routes.
@@ -61,8 +62,8 @@ export class KbController {
         @Query() query: KbDocumentQueryDto,
     ) {
         return this.kb.listDocuments(workId, auth.userId, {
-            class: query.class,
-            status: query.status,
+            class: query.class as KbDocumentClass | undefined,
+            status: query.status as KbDocumentStatus | undefined,
             tag: query.tag,
             locked: query.locked,
             language: query.language,
@@ -86,13 +87,13 @@ export class KbController {
             userId: auth.userId,
             path: body.path,
             title: body.title,
-            class: body.class,
+            class: body.class as KbDocumentClass,
             body: body.body,
             description: body.description ?? null,
             tags: body.tags,
             categories: body.categories,
             language: body.language,
-            status: body.status,
+            status: body.status as KbDocumentStatus | undefined,
         });
     }
 
@@ -118,7 +119,10 @@ export class KbController {
         @Param('docId') docId: string,
         @Body() body: UpdateKbDocumentDto,
     ) {
-        return this.kb.updateDocument(workId, docId, auth.userId, body);
+        return this.kb.updateDocument(workId, docId, auth.userId, {
+            ...body,
+            status: body.status as KbDocumentStatus | undefined,
+        });
     }
 
     @Delete('works/:id/kb/documents/:docId')
@@ -143,7 +147,7 @@ export class KbController {
         @Param('docId') docId: string,
         @Body() body: LockKbDocumentDto,
     ) {
-        return this.kb.lockDocument(workId, docId, auth.userId, body.mode);
+        return this.kb.lockDocument(workId, docId, auth.userId, body.mode as KbLockMode);
     }
 
     @Post('works/:id/kb/documents/:docId/unlock')
