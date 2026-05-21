@@ -194,7 +194,12 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		const pointer = parsePointer(decoded.toString('utf8'));
 		if (pointer) {
 			// LFS pointer file — fetch the actual bytes from the LFS host.
-			const target: LfsBatchTarget = { owner: cfg.owner, repo: cfg.repo, token: cfg.token };
+			const target: LfsBatchTarget = {
+				owner: cfg.owner,
+				repo: cfg.repo,
+				token: cfg.token,
+				hostBase: process.env.GITHUB_STORAGE_API_HOST || undefined
+			};
 			const batch = await lfsBatch(target, pointer, 'download');
 			if (batch.kind === 'error') {
 				throw new Error(`LFS batch (download) failed: HTTP ${batch.status}: ${batch.message}`);
@@ -334,7 +339,12 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		ownerId: string,
 		ext: string
 	): Promise<void> {
-		const target: LfsBatchTarget = { owner: cfg.owner, repo: cfg.repo, token: cfg.token };
+		const target: LfsBatchTarget = {
+			owner: cfg.owner,
+			repo: cfg.repo,
+			token: cfg.token,
+			hostBase: process.env.GITHUB_STORAGE_API_HOST || undefined
+		};
 		const batch = await lfsBatch(target, { oid: hash, size: buffer.length }, 'upload');
 		if (batch.kind === 'error') {
 			throw new Error(
@@ -350,18 +360,33 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		}
 		// batch.kind === 'already-exists' → blob already present, skip upload, still commit pointer.
 
-		await this.ensureGitattributes(cfg);
-
+		// EW-644 (Greptile P1 fix): write `.gitattributes` and the pointer
+		// file via the SAME transport in a single transaction. The
+		// previous flow committed `.gitattributes` via Contents API and
+		// the pointer via the configured transport — under
+		// `clone-and-push` that produced two commits via two different
+		// mechanisms on the same branch, racing each other's HEAD.
 		const pointer = formatPointer(hash, buffer.length);
 		const message = `upload(${ownerId}): ${hash}${ext} (lfs)`;
-		await this.commitFile(cfg, path, Buffer.from(pointer, 'utf8'), message);
+		const gitattributesPatch = await this.resolveGitattributesPatch(cfg);
+		const files: TransportFile[] = [];
+		if (gitattributesPatch) files.push(gitattributesPatch);
+		files.push({ path, content: Buffer.from(pointer, 'utf8') });
+		await this.commitFiles(cfg, files, message);
 	}
 
-	private async ensureGitattributes(cfg: ResolvedConfig): Promise<void> {
+	/**
+	 * EW-644 — read the repo's current `.gitattributes` and compute the
+	 * patch that adds the LFS tracking line for the configured path
+	 * prefix, idempotently. Returns `null` when the line is already
+	 * present (no .gitattributes commit needed). Separated from the
+	 * actual write so we can hand the file shape to whichever transport
+	 * is in use — avoids the non-ff race Greptile flagged.
+	 */
+	private async resolveGitattributesPatch(cfg: ResolvedConfig): Promise<TransportFile | null> {
 		const octokit = this.client(cfg.token);
 		const path = '.gitattributes';
 		let existingContent: string | null = null;
-		let existingSha: string | undefined;
 		try {
 			const { data } = await octokit.rest.repos.getContent({
 				owner: cfg.owner,
@@ -371,7 +396,6 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			});
 			if (!Array.isArray(data) && data.type === 'file') {
 				existingContent = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
-				existingSha = data.sha;
 			}
 		} catch (err) {
 			if (!(err instanceof RequestError) || err.status !== 404) {
@@ -379,69 +403,71 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			}
 		}
 		const updated = ensureGitattributes(existingContent, cfg.pathPrefix);
-		if (updated === null) {
-			return; // line already present, idempotent skip
+		if (updated === null) return null;
+		return { path, content: Buffer.from(updated, 'utf8') };
+	}
+
+	/**
+	 * Commit one or more files through the configured transport, in a
+	 * single atomic operation. For `clone-and-push` that's one clone +
+	 * one commit + one push (avoids the non-ff race Greptile flagged
+	 * when LFS adds `.gitattributes` alongside a pointer). For
+	 * `contents-api` it's per-file `createOrUpdateFileContents` calls
+	 * because the API has no multi-file commit endpoint that surfaces
+	 * sha-based optimistic concurrency the way we need — but each
+	 * Contents API call IS sha-guarded, so per-file is safe enough.
+	 */
+	private async commitFiles(cfg: ResolvedConfig, files: TransportFile[], message: string): Promise<void> {
+		if (files.length === 0) return;
+		const transport = resolveTransport(cfg);
+		if (transport === 'clone-and-push') {
+			await this.commitViaCloneAndPush(cfg, files, message);
+			return;
 		}
-		await octokit.rest.repos.createOrUpdateFileContents({
-			owner: cfg.owner,
-			repo: cfg.repo,
-			path,
-			message: 'chore(lfs): track uploads via git lfs',
-			content: Buffer.from(updated, 'utf8').toString('base64'),
-			branch: cfg.branch,
-			...(existingSha ? { sha: existingSha } : {})
-		});
+		await this.commitViaContentsApi(cfg, files, message);
 	}
 
 	private async commitFile(cfg: ResolvedConfig, path: string, bytes: Buffer, message: string): Promise<void> {
-		const transport = resolveTransport(cfg);
-		if (transport === 'clone-and-push') {
-			await this.commitViaCloneAndPush(cfg, path, bytes, message);
-			return;
-		}
-		await this.commitViaContentsApi(cfg, path, bytes.toString('base64'), message);
+		await this.commitFiles(cfg, [{ path, content: bytes }], message);
 	}
 
-	private async commitViaContentsApi(
-		cfg: ResolvedConfig,
-		path: string,
-		base64Content: string,
-		message: string
-	): Promise<void> {
+	private async commitViaContentsApi(cfg: ResolvedConfig, files: TransportFile[], message: string): Promise<void> {
 		const octokit = this.client(cfg.token);
-		let existingSha: string | undefined;
-		try {
-			const { data } = await octokit.rest.repos.getContent({
+		// Contents API doesn't expose multi-file commits, so we issue
+		// per-file PUTs. Each looks up the current sha first so concurrent
+		// writers race correctly (the 422 from a sha mismatch surfaces as
+		// an upstream error the caller can retry).
+		for (const file of files) {
+			let existingSha: string | undefined;
+			try {
+				const { data } = await octokit.rest.repos.getContent({
+					owner: cfg.owner,
+					repo: cfg.repo,
+					path: file.path,
+					ref: cfg.branch
+				});
+				if (!Array.isArray(data) && data.type === 'file') {
+					existingSha = data.sha;
+				}
+			} catch (err) {
+				if (!(err instanceof RequestError) || err.status !== 404) {
+					throw err;
+				}
+			}
+			const fileMessage = file.path === '.gitattributes' ? 'chore(lfs): track uploads via git lfs' : message;
+			await octokit.rest.repos.createOrUpdateFileContents({
 				owner: cfg.owner,
 				repo: cfg.repo,
-				path,
-				ref: cfg.branch
+				path: file.path,
+				message: fileMessage,
+				content: file.content.toString('base64'),
+				branch: cfg.branch,
+				...(existingSha ? { sha: existingSha } : {})
 			});
-			if (!Array.isArray(data) && data.type === 'file') {
-				existingSha = data.sha;
-			}
-		} catch (err) {
-			if (!(err instanceof RequestError) || err.status !== 404) {
-				throw err;
-			}
 		}
-		await octokit.rest.repos.createOrUpdateFileContents({
-			owner: cfg.owner,
-			repo: cfg.repo,
-			path,
-			message,
-			content: base64Content,
-			branch: cfg.branch,
-			...(existingSha ? { sha: existingSha } : {})
-		});
 	}
 
-	private async commitViaCloneAndPush(
-		cfg: ResolvedConfig,
-		path: string,
-		bytes: Buffer,
-		message: string
-	): Promise<void> {
+	private async commitViaCloneAndPush(cfg: ResolvedConfig, files: TransportFile[], message: string): Promise<void> {
 		const ops = this.gitOperations();
 		const dir = await ops.cloneOrPull({
 			owner: cfg.owner,
@@ -452,10 +478,16 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		});
 		const fs = await import('node:fs');
 		const nodePath = await import('node:path');
-		const full = nodePath.join(dir, path);
-		await fs.promises.mkdir(nodePath.dirname(full), { recursive: true });
-		await fs.promises.writeFile(full, bytes);
-		await ops.add(dir, path);
+		// EW-644 (Greptile P1 fix) — write every file in the working tree
+		// BEFORE staging/committing so a single commit + single push
+		// covers .gitattributes + the pointer/blob. Avoids the non-ff
+		// race where two sequential pushes hit the same branch.
+		for (const file of files) {
+			const full = nodePath.join(dir, file.path);
+			await fs.promises.mkdir(nodePath.dirname(full), { recursive: true });
+			await fs.promises.writeFile(full, file.content);
+			await ops.add(dir, file.path);
+		}
 		await ops.commit(dir, message);
 		await ops.push({ dir, token: cfg.token });
 	}
@@ -567,6 +599,12 @@ interface ResolvedConfig extends ResolvedWorkRepo {
 	lfsEnabled: boolean;
 	pathPrefix: string;
 	publicRawUrl?: string;
+}
+
+/** A single file inside a transport-level commit. */
+interface TransportFile {
+	readonly path: string;
+	readonly content: Buffer;
 }
 
 function readMode(): 'separate-repo' | 'data-repo' {

@@ -26,7 +26,18 @@ export interface LfsBatchTarget {
 	readonly owner: string;
 	readonly repo: string;
 	readonly token: string;
+	/**
+	 * EW-644 (Greptile P2 fix) — host base for the LFS Batch endpoint.
+	 * Defaults to `https://github.com`. GitHub Enterprise Server
+	 * deployments override this to e.g. `https://ghe.example.com` via
+	 * the `GITHUB_STORAGE_API_HOST` env var (resolved by the plugin
+	 * before calling `lfsBatch`). Keep just the scheme + host; the
+	 * `/<owner>/<repo>.git/info/lfs/objects/batch` suffix is appended.
+	 */
+	readonly hostBase?: string;
 }
+
+const DEFAULT_LFS_HOST_BASE = 'https://github.com';
 
 export interface LfsObjectIdentifier {
 	readonly oid: string;
@@ -69,7 +80,8 @@ export async function lfsBatch(
 	operation: LfsBatchOperation,
 	fetchImpl: typeof fetch = fetch
 ): Promise<LfsBatchResult> {
-	const url = `https://github.com/${encodePath(target.owner)}/${encodePath(target.repo)}.git/info/lfs/objects/batch`;
+	const hostBase = (target.hostBase || DEFAULT_LFS_HOST_BASE).replace(/\/$/, '');
+	const url = `${hostBase}/${encodePath(target.owner)}/${encodePath(target.repo)}.git/info/lfs/objects/batch`;
 	const body = JSON.stringify({
 		operation,
 		transfers: ['basic'],

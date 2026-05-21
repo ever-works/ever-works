@@ -108,6 +108,18 @@
 					"required": false,
 					"secret": false,
 					"description": "`auto` (default — picks per mode), `contents-api`, or `clone-and-push`. Controls how the pointer or blob is committed."
+				},
+				{
+					"name": "GITHUB_STORAGE_API_HOST",
+					"required": false,
+					"secret": false,
+					"description": "LFS Batch API host base. Defaults to `https://github.com`. GitHub Enterprise Server deployments set this to their host (e.g. `https://ghe.example.com`)."
+				},
+				{
+					"name": "GITHUB_STORAGE_DATA_REPO_BRANCH",
+					"required": false,
+					"secret": false,
+					"description": "Branch the `data-repo` mode resolver uses for every Work's data repo. Defaults to `main`. Set to `master` (or a custom branch) for repos that don't follow the modern default."
 				}
 			]
 		}

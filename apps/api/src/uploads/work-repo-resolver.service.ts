@@ -30,8 +30,18 @@ import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-stor
 @Injectable()
 export class WorkRepoResolverService implements WorkRepoResolver {
     private readonly logger = new Logger(WorkRepoResolverService.name);
-    private readonly DEFAULT_BRANCH = 'main';
     private readonly PROVIDER_ID = 'github';
+
+    /**
+     * EW-644 (Greptile P2 fix) — branch defaults to `main`, the same
+     * default `GitOperations.cloneOrPull` uses for fresh clones. Repos
+     * that use `master` (or any other custom default) should set
+     * `GITHUB_STORAGE_DATA_REPO_BRANCH` until per-Work `default_branch`
+     * probing is added in a follow-up. Documented in the plugin README.
+     */
+    private get defaultBranch(): string {
+        return process.env.GITHUB_STORAGE_DATA_REPO_BRANCH || 'main';
+    }
 
     constructor(
         private readonly workRepository: WorkRepository,
@@ -71,7 +81,7 @@ export class WorkRepoResolverService implements WorkRepoResolver {
         return {
             owner,
             repo,
-            branch: this.DEFAULT_BRANCH,
+            branch: this.defaultBranch,
             token,
         };
     }

@@ -178,11 +178,15 @@ describe('GitHubStoragePlugin — separate-repo mode', () => {
 		);
 		// LFS blob PUT.
 		fetchQueue.push(async () => new Response('', { status: 200 }));
-		// .gitattributes lookup → 404 (file doesn't exist yet).
+		// resolveGitattributesPatch — read .gitattributes (404 = file doesn't exist).
 		octokitMockState.getContent.mockRejectedValueOnce(new RequestErrorMock(404));
-		// .gitattributes commit.
+		// commitFiles via Contents API loops over [.gitattributes, pointer]:
+		//   .gitattributes pre-check (404) → create
+		//   pointer pre-check (404) → create
+		// EW-644 Greptile P1 fix: both files now go through commitFiles
+		// so the assert covers the merged single-transport path.
+		octokitMockState.getContent.mockRejectedValueOnce(new RequestErrorMock(404));
 		octokitMockState.createOrUpdateFileContents.mockResolvedValueOnce({});
-		// pointer file lookup → 404, then commit.
 		octokitMockState.getContent.mockRejectedValueOnce(new RequestErrorMock(404));
 		octokitMockState.createOrUpdateFileContents.mockResolvedValueOnce({});
 
