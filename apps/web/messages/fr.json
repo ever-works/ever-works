@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "Mot de passe réinitialisé avec succès !",
                 "canLogin": "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe."
+            },
+            "tabs": {
+                "password": "Mot de passe",
+                "magicLink": "Recevoir un lien par e-mail"
+            },
+            "magicLink": {
+                "subtitle": "Nous vous enverrons un lien unique pour vous connecter. Aucun mot de passe requis.",
+                "form": {
+                    "submit": "Envoyer le lien",
+                    "submitting": "Envoi en cours..."
+                },
+                "success": {
+                    "title": "Vérifiez votre boîte de réception",
+                    "message": "Si un compte existe pour {email}, nous venons d'envoyer un lien de connexion. Il expire dans 15 minutes.",
+                    "resend": "Envoyer un autre lien"
+                },
+                "errors": {
+                    "failed": "Impossible d'envoyer le lien. Veuillez réessayer."
+                },
+                "redeem": {
+                    "title": "Connexion en cours",
+                    "loading": "Vérification de votre lien...",
+                    "errorTitle": "Ce lien ne peut pas être utilisé",
+                    "errorBody": "Votre lien est invalide ou expiré. Les liens magiques sont à usage unique et restent valides pendant 15 minutes.",
+                    "requestNewLink": "Envoyer un nouveau lien",
+                    "missingToken": "Ce lien ne contient pas de jeton. Demandez-en un nouveau pour continuer."
+                }
             }
         },
         "forgotPassword": {
@@ -3375,7 +3402,9 @@
             "unsupportedProvider": "Fournisseur non pris en charge",
             "providerConnectFailed": "Échec de la connexion du fournisseur",
             "forgotPasswordFailed": "Échec de l'envoi de l'e-mail de réinitialisation du mot de passe",
-            "resetPasswordFailed": "Échec de la réinitialisation du mot de passe"
+            "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
+            "magicLinkFailed": "Échec de l'envoi du lien magique",
+            "magicLinkInvalid": "Lien magique invalide ou expiré"
         }
     },
     "actions": {
@@ -3507,6 +3536,9 @@
             },
             "username": {
                 "minLength": "Le nom d'utilisateur doit comporter au moins {length} caractères"
+            },
+            "token": {
+                "required": "Le jeton ne peut pas être vide"
             }
         }
     },

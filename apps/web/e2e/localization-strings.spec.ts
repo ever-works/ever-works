@@ -59,7 +59,7 @@ test.describe('Localization — locale JSON files have parity', () => {
         if (files.length < 2) test.skip(true, `only ${files.length} locale files found`);
         const enFile = files.find((f) => f === 'en.json' || f === 'en-US.json');
         if (!enFile) test.skip(true, 'no en.json baseline');
-        const enKeys = new Set(flattenKeys(JSON.parse(readFileSync(join(dir!, enFile), 'utf-8'))));
+        const enKeys = new Set(flattenKeys(JSON.parse(readFileSync(join(dir!, enFile!), 'utf-8'))));
         const missingPerLocale: Record<string, number> = {};
         for (const f of files) {
             if (f === enFile) continue;
@@ -91,7 +91,7 @@ test.describe('Localization — locale JSON files have parity', () => {
         const files = readdirSync(dir!).filter((f) => f.endsWith('.json'));
         const enFile = files.find((f) => f === 'en.json' || f === 'en-US.json');
         if (!enFile) test.skip(true, 'no en baseline');
-        const enKeys = flattenKeys(JSON.parse(readFileSync(join(dir!, enFile), 'utf-8')));
+        const enKeys = flattenKeys(JSON.parse(readFileSync(join(dir!, enFile!), 'utf-8')));
         const enKeyCount = enKeys.length;
         if (enKeyCount === 0) test.skip(true, 'en baseline is empty');
         const enSet = new Set(enKeys);
@@ -131,7 +131,7 @@ test.describe('Localization — locale JSON files have parity', () => {
         const files = readdirSync(dir!);
         const enFile = files.find((f) => f === 'en.json' || f === 'en-US.json');
         if (!enFile) test.skip(true, 'no en baseline');
-        const keys = flattenKeys(JSON.parse(readFileSync(join(dir!, enFile), 'utf-8')));
+        const keys = flattenKeys(JSON.parse(readFileSync(join(dir!, enFile!), 'utf-8')));
         // A real app has hundreds of strings. A regression that drops
         // half the dictionary would surface here.
         expect(keys.length, `en locale has only ${keys.length} keys`).toBeGreaterThan(20);

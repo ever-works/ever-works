@@ -45,6 +45,16 @@ export interface ResetPasswordDto {
     newPassword: string;
 }
 
+// 1f — Magic-link / passwordless login. See `EW-633`.
+export interface RequestMagicLinkDto {
+    email: string;
+    magicLinkCallbackUrl?: string;
+}
+
+export interface RedeemMagicLinkDto {
+    token: string;
+}
+
 // Response Types
 export interface AuthResponse {
     access_token: string;
@@ -236,5 +246,25 @@ export const authAPI = {
         return serverFetch<TokenValidationResponse>(
             `/auth/validate-reset-token?token=${encodeURIComponent(token)}`,
         );
+    },
+
+    // Magic link — issuance response is intentionally uniform regardless
+    // of whether the email exists, see `auth.service.ts#requestMagicLink`.
+    requestMagicLink: async (data: RequestMagicLinkDto) => {
+        return serverMutation<MessageResponse>({
+            endpoint: '/auth/magic-link',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    redeemMagicLink: async (data: RedeemMagicLinkDto) => {
+        return serverMutation<AuthResponse>({
+            endpoint: '/auth/magic-link/redeem',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 };

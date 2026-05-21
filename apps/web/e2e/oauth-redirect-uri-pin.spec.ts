@@ -27,9 +27,9 @@ test.describe('OAuth redirect_uri — strict allowlist + callback path pinning',
         const url: string | undefined =
             body?.url ?? body?.authorize_url ?? body?.authorizeUrl ?? body?.redirect_url;
         if (!url) test.skip(true, 'no URL field in connect/url body');
-        const ru = new URL(url).searchParams.get('redirect_uri');
+        const ru = new URL(url!).searchParams.get('redirect_uri');
         if (!ru) test.skip(true, 'no redirect_uri on authorize URL');
-        const parsed = new URL(ru);
+        const parsed = new URL(ru!);
         const apiHost = new URL(API_BASE).hostname;
         // redirect_uri hostname should match the API host OR be a
         // matching ever.works subdomain in production.
@@ -58,9 +58,9 @@ test.describe('OAuth redirect_uri — strict allowlist + callback path pinning',
         const url: string | undefined =
             body?.url ?? body?.authorize_url ?? body?.authorizeUrl ?? body?.redirect_url;
         if (!url) test.skip(true, 'no URL field');
-        const ru = new URL(url).searchParams.get('redirect_uri');
+        const ru = new URL(url!).searchParams.get('redirect_uri');
         if (!ru) test.skip(true, 'no redirect_uri');
-        const parsed = new URL(ru);
+        const parsed = new URL(ru!);
         // Localhost http is fine in dev; *.ever.works MUST be https.
         if (/\.ever\.works$/.test(parsed.hostname)) {
             expect(

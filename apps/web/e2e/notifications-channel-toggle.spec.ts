@@ -40,17 +40,18 @@ test.describe('Notifications — channel toggle reflects on next GET', () => {
         // Find a boolean-shaped channel key.
         const channelKey = pickBooleanKey(beforeBody);
         if (!channelKey) test.skip(true, 'no boolean channel key in preferences body');
-        const originalValue = readBool(beforeBody, channelKey);
+        const key = channelKey!;
+        const originalValue = readBool(beforeBody, key);
         const newValue = !originalValue;
         const patch = await request.patch(`${API_BASE}${path}`, {
             headers: authedHeaders(u.access_token),
-            data: { [channelKey]: newValue },
+            data: { [key]: newValue },
         });
         if (!patch.ok() && patch.status() !== 204) {
             // Try PUT instead.
             const put = await request.put(`${API_BASE}${path}`, {
                 headers: authedHeaders(u.access_token),
-                data: { [channelKey]: newValue },
+                data: { [key]: newValue },
             });
             if (!put.ok() && put.status() !== 204) {
                 test.skip(
@@ -63,10 +64,10 @@ test.describe('Notifications — channel toggle reflects on next GET', () => {
             headers: authedHeaders(u.access_token),
         });
         const afterBody = await after.json();
-        const afterValue = readBool(afterBody, channelKey);
+        const afterValue = readBool(afterBody, key);
         expect(
             afterValue,
-            `channel ${channelKey} did not round-trip: was=${originalValue}, set=${newValue}, read=${afterValue}`,
+            `channel ${key} did not round-trip: was=${originalValue}, set=${newValue}, read=${afterValue}`,
         ).toBe(newValue);
     });
 
