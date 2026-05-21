@@ -87,14 +87,14 @@ export class WorkKnowledgeUpload {
     extractionFinishedAt?: Date | null;
 
     /** The KB document this upload was extracted into, if any. */
-    @Column({ nullable: true, name: 'extracted_document_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'extracted_document_id' })
     extractedDocumentId?: string | null;
 
     @OneToOne(() => WorkKnowledgeDocument, { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'extracted_document_id' })
     extractedDocument?: ClassToObject<WorkKnowledgeDocument> | null;
 
-    @Column({ nullable: true, name: 'uploaded_by_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'uploaded_by_id' })
     uploadedById?: string | null;
 
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })

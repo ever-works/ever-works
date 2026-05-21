@@ -51,7 +51,7 @@ export class WorkKnowledgeDocument {
      * is set instead. Enforced by the `work_knowledge_documents_scope_xor`
      * CHECK constraint.
      */
-    @Column({ nullable: true })
+    @Column({ type: 'uuid', nullable: true })
     workId?: string | null;
 
     @ManyToOne(() => Work, { onDelete: 'CASCADE', nullable: true })
@@ -63,7 +63,7 @@ export class WorkKnowledgeDocument {
      * `kbDocumentClass IN ('legal', 'style', 'seo')` in v1 — see
      * `KB_ORG_INHERITABLE_CLASSES` in `kb-types.ts`.
      */
-    @Column({ nullable: true })
+    @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
     /** Forward-slash separated, relative to `.content/kb/`. e.g. `brand/voice.md`. */
@@ -117,7 +117,7 @@ export class WorkKnowledgeDocument {
     source: KbDocumentSource;
 
     /** Set when this document was derived from an upload. */
-    @Column({ nullable: true, name: 'source_upload_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'source_upload_id' })
     sourceUploadId?: string | null;
 
     @ManyToOne(() => WorkKnowledgeUpload, { onDelete: 'SET NULL', nullable: true })
@@ -129,21 +129,21 @@ export class WorkKnowledgeDocument {
     sourceUrl?: string | null;
 
     /** Provenance for `source='agent'`. */
-    @Column({ nullable: true, name: 'generated_by_agent_run_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'generated_by_agent_run_id' })
     generatedByAgentRunId?: string | null;
 
     @ManyToOne(() => WorkAgentRun, { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'generated_by_agent_run_id' })
     generatedByAgentRun?: ClassToObject<WorkAgentRun> | null;
 
-    @Column({ nullable: true, name: 'created_by_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'created_by_id' })
     createdById?: string | null;
 
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'created_by_id' })
     createdBy?: ClassToObject<User> | null;
 
-    @Column({ nullable: true, name: 'updated_by_id' })
+    @Column({ type: 'uuid', nullable: true, name: 'updated_by_id' })
     updatedById?: string | null;
 
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
