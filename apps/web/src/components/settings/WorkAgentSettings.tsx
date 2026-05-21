@@ -33,6 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
     researching: 'bg-info/10 text-info border-info/20',
     generating: 'bg-info/10 text-info border-info/20',
     writing: 'bg-info/10 text-info border-info/20',
+    'waiting-for-approval': 'bg-warning/10 text-warning border-warning/20',
     completed: 'bg-success/10 text-success border-success/20',
     canceled: 'bg-surface-secondary text-text-muted border-border/70',
     failed: 'bg-danger/10 text-danger border-danger/20',
@@ -235,7 +236,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                                 }
                             >
                                 <Play className="w-3.5 h-3.5" />
-                                {t('actions.queueGoal')}
+                                {t('actions.preparePlan')}
                             </Button>
                         </div>
                     </div>

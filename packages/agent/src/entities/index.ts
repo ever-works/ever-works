@@ -33,6 +33,7 @@ export * from './template.entity';
 export * from './template-customization.entity';
 export * from './user-template-preference.entity';
 export * from './webhook-subscription.entity';
+export * from './webhook-delivery.entity';
 export * from './work-proposal.entity';
 export * from './work-agent-preference.entity';
 export * from './work-agent-goal.entity';

@@ -5,7 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
-import { login as loginAction } from '@/app/actions/auth';
+import { login as loginAction, issueMagicLink } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,10 @@ import { OAuthProvider } from '@/lib/api/enums';
 
 interface LoginClientProps {
     availableSocialProviders: OAuthProvider[];
+    magicLinkEnabled: boolean;
 }
+
+type LoginTab = 'password' | 'magic-link';
 
 function PasswordResetSuccessMessage() {
     const t = useTranslations('auth.login');
@@ -51,26 +54,52 @@ function PasswordResetSuccessMessage() {
     );
 }
 
-export function LoginClient({ availableSocialProviders }: LoginClientProps) {
+function MagicLinkSuccessMessage({ email, onResend }: { email: string; onResend: () => void }) {
+    const t = useTranslations('auth.login.magicLink.success');
+
+    return (
+        <div
+            data-testid="magic-link-success"
+            className="bg-success/10 border border-success/20 px-4 py-3 rounded-lg space-y-2"
+        >
+            <p className="text-sm font-medium text-text dark:text-text-dark">{t('title')}</p>
+            <p className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70">
+                {t('message', { email })}
+            </p>
+            <button
+                type="button"
+                onClick={onResend}
+                className="text-xs text-primary hover:text-primary-hover transition-colors"
+            >
+                {t('resend')}
+            </button>
+        </div>
+    );
+}
+
+export function LoginClient({ availableSocialProviders, magicLinkEnabled }: LoginClientProps) {
     const searchParams = useSearchParams();
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
 
     const isPasswordReset = searchParams.get('reset') === 'true';
     const redirectUrl = searchParams.get(REDIRECT_SEARCH_PARAM);
+    const initialTab: LoginTab =
+        magicLinkEnabled && searchParams.get('tab') === 'magic-link' ? 'magic-link' : 'password';
 
+    const [tab, setTab] = useState<LoginTab>(initialTab);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
     });
+    const [magicLinkEmail, setMagicLinkEmail] = useState('');
+    const [magicLinkSentTo, setMagicLinkSentTo] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [showResetSuccess, setShowResetSuccess] = useState(isPasswordReset);
 
     useEffect(() => {
         if (isPasswordReset) {
             const TIMEOUT = 10 * 1000;
-
-            // Hide the success message after 10 seconds
             const timer = setTimeout(() => {
                 setShowResetSuccess(false);
             }, TIMEOUT);
@@ -93,102 +122,234 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
         });
     };
 
+    const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        setError('');
+        setShowResetSuccess(false);
+        setMagicLinkSentTo(null);
+
+        startTransition(async () => {
+            const response = await issueMagicLink(magicLinkEmail);
+            if (response.success) {
+                setMagicLinkSentTo(magicLinkEmail);
+            } else {
+                setError(response.error || t('magicLink.errors.failed'));
+            }
+        });
+    };
+
+    const switchTab = (next: LoginTab) => {
+        if (next === tab) return;
+        setTab(next);
+        setError('');
+        setMagicLinkSentTo(null);
+    };
+
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle variant="fixed" />
-            <form method="post" onSubmit={handleSubmit} className="space-y-4">
-                {showResetSuccess && <PasswordResetSuccessMessage />}
 
-                {error && (
-                    <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
-                        {error}
-                    </div>
-                )}
+            {magicLinkEnabled && (
+                <div
+                    role="tablist"
+                    aria-label={t('title')}
+                    className="grid grid-cols-2 mb-4 p-1 bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg"
+                >
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === 'password'}
+                        data-testid="login-tab-password"
+                        onClick={() => switchTab('password')}
+                        className={`text-sm font-medium px-3 py-2 rounded-md transition-colors ${
+                            tab === 'password'
+                                ? 'bg-background dark:bg-background-dark text-text dark:text-text-dark shadow-sm'
+                                : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark'
+                        }`}
+                    >
+                        {t('tabs.password')}
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === 'magic-link'}
+                        data-testid="login-tab-magic-link"
+                        onClick={() => switchTab('magic-link')}
+                        className={`text-sm font-medium px-3 py-2 rounded-md transition-colors ${
+                            tab === 'magic-link'
+                                ? 'bg-background dark:bg-background-dark text-text dark:text-text-dark shadow-sm'
+                                : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark'
+                        }`}
+                    >
+                        {t('tabs.magicLink')}
+                    </button>
+                </div>
+            )}
 
-                <Input
-                    type="email"
-                    label={t('form.email.label')}
-                    name="email"
-                    placeholder={t('form.email.placeholder')}
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    disabled={isPending}
-                    className="text-sm shadow-sm"
-                />
+            {tab === 'password' ? (
+                <form method="post" onSubmit={handleSubmit} className="space-y-4">
+                    {showResetSuccess && <PasswordResetSuccessMessage />}
 
-                <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="block text-xs font-medium text-text dark:text-text-dark">
-                            {t('form.password.label')}
-                        </label>
-                        <Link
-                            href={ROUTES.AUTH_FORGOT_PASSWORD}
-                            className="text-sm text-primary hover:text-primary-hover transition-colors"
-                        >
-                            {t('form.forgotPassword')}
-                        </Link>
-                    </div>
+                    {error && (
+                        <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
+                            {error}
+                        </div>
+                    )}
+
                     <Input
-                        type="password"
-                        name="password"
-                        placeholder={t('form.password.placeholder')}
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        type="email"
+                        label={t('form.email.label')}
+                        name="email"
+                        placeholder={t('form.email.placeholder')}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required
                         disabled={isPending}
                         className="text-sm shadow-sm"
                     />
-                </div>
 
-                {/* <div className="flex items-center">
-                    <input
-                        id="remember"
-                        type="checkbox"
-                        className="w-4 h-4 bg-surface-secondary border-border rounded text-primary focus:ring-primary"
-                    />
-                    <label htmlFor="remember" className="ml-2 text-sm text-text-secondary">
-                        {t('form.rememberMe')}
-                    </label>
-                </div> */}
-
-                <Button
-                    type="submit"
-                    disabled={isPending}
-                    loading={isPending}
-                    fullWidth
-                    className="bg-primary hover:bg-primary-hover"
-                >
-                    {isPending ? t('form.submitting') : t('form.submit')}
-                </Button>
-
-                {availableSocialProviders.length > 0 && (
-                    <>
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-border dark:border-border-dark" />
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
-                                    {t('socialLogin.divider')}
-                                </span>
-                            </div>
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-xs font-medium text-text dark:text-text-dark">
+                                {t('form.password.label')}
+                            </label>
+                            <Link
+                                href={ROUTES.AUTH_FORGOT_PASSWORD}
+                                className="text-sm text-primary hover:text-primary-hover transition-colors"
+                            >
+                                {t('form.forgotPassword')}
+                            </Link>
                         </div>
+                        <Input
+                            type="password"
+                            name="password"
+                            placeholder={t('form.password.placeholder')}
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            required
+                            disabled={isPending}
+                            className="text-sm shadow-sm"
+                        />
+                    </div>
 
-                        <SocialLoginButtons providers={availableSocialProviders} />
-                    </>
-                )}
-
-                <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('signUp.text')}{' '}
-                    <Link
-                        href={ROUTES.AUTH_REGISTER}
-                        className="text-primary hover:text-primary-hover font-medium transition-colors"
+                    <Button
+                        type="submit"
+                        disabled={isPending}
+                        loading={isPending}
+                        fullWidth
+                        className="bg-primary hover:bg-primary-hover"
                     >
-                        {t('signUp.link')}
-                    </Link>
-                </p>
-            </form>
+                        {isPending ? t('form.submitting') : t('form.submit')}
+                    </Button>
+
+                    {availableSocialProviders.length > 0 && (
+                        <>
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-border dark:border-border-dark" />
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
+                                        {t('socialLogin.divider')}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <SocialLoginButtons providers={availableSocialProviders} />
+                        </>
+                    )}
+
+                    <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('signUp.text')}{' '}
+                        <Link
+                            href={ROUTES.AUTH_REGISTER}
+                            className="text-primary hover:text-primary-hover font-medium transition-colors"
+                        >
+                            {t('signUp.link')}
+                        </Link>
+                    </p>
+                </form>
+            ) : (
+                <form
+                    method="post"
+                    onSubmit={handleMagicLinkSubmit}
+                    data-testid="magic-link-form"
+                    className="space-y-4"
+                >
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('magicLink.subtitle')}
+                    </p>
+
+                    {magicLinkSentTo ? (
+                        <MagicLinkSuccessMessage
+                            email={magicLinkSentTo}
+                            onResend={() => setMagicLinkSentTo(null)}
+                        />
+                    ) : (
+                        <>
+                            {error && (
+                                <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <Input
+                                type="email"
+                                label={t('form.email.label')}
+                                name="email"
+                                placeholder={t('form.email.placeholder')}
+                                value={magicLinkEmail}
+                                onChange={(e) => setMagicLinkEmail(e.target.value)}
+                                required
+                                disabled={isPending}
+                                data-testid="magic-link-email"
+                                className="text-sm shadow-sm"
+                            />
+
+                            <Button
+                                type="submit"
+                                disabled={isPending}
+                                loading={isPending}
+                                fullWidth
+                                data-testid="magic-link-submit"
+                                className="bg-primary hover:bg-primary-hover"
+                            >
+                                {isPending
+                                    ? t('magicLink.form.submitting')
+                                    : t('magicLink.form.submit')}
+                            </Button>
+                        </>
+                    )}
+
+                    {availableSocialProviders.length > 0 && (
+                        <>
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-border dark:border-border-dark" />
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
+                                        {t('socialLogin.divider')}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <SocialLoginButtons providers={availableSocialProviders} />
+                        </>
+                    )}
+
+                    <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('signUp.text')}{' '}
+                        <Link
+                            href={ROUTES.AUTH_REGISTER}
+                            className="text-primary hover:text-primary-hover font-medium transition-colors"
+                        >
+                            {t('signUp.link')}
+                        </Link>
+                    </p>
+                </form>
+            )}
         </AuthLayout>
     );
 }

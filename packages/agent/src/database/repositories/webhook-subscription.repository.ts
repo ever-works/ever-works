@@ -61,6 +61,14 @@ export class WebhookSubscriptionRepository {
         await this.repository.update(id, { status: 'paused' });
     }
 
+    async updateSecret(id: string, secretEncrypted: string): Promise<void> {
+        await this.repository.update(id, { secretEncrypted });
+    }
+
+    async delete(id: string): Promise<void> {
+        await this.repository.delete(id);
+    }
+
     async findById(id: string): Promise<WebhookSubscription | null> {
         return this.repository.findOne({ where: { id } });
     }

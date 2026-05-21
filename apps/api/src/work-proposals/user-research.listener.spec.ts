@@ -26,6 +26,7 @@ jest.mock('../events', () => ({
     UserConfirmedEvent: { EVENT_NAME: 'user.confirmed' },
 }));
 
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserResearchListener } from './user-research.listener';
 
@@ -34,14 +35,26 @@ function makeEvent(userId = 'u1'): { user: { id: string } } {
 }
 
 describe('UserResearchListener', () => {
+    let logSpy: jest.SpyInstance;
+    let debugSpy: jest.SpyInstance;
+    let warnSpy: jest.SpyInstance;
     let proposals: { refresh: jest.Mock };
     let config: { get: jest.Mock };
     let listener: UserResearchListener;
 
     beforeEach(() => {
+        logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+        debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation();
+        warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
         proposals = { refresh: jest.fn().mockResolvedValue({ status: 'queued' }) };
         config = { get: jest.fn().mockReturnValue(true) };
         listener = new UserResearchListener(proposals as never, config as unknown as ConfigService);
+    });
+
+    afterEach(() => {
+        logSpy.mockRestore();
+        debugSpy.mockRestore();
+        warnSpy.mockRestore();
     });
 
     it('dispatches research with source=auto-signup when enabled', async () => {

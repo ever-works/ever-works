@@ -12,6 +12,7 @@ import {
     Puzzle,
     Wrench,
     Palette,
+    HardDrive,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -33,6 +34,8 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     integration: Puzzle,
     utility: Wrench,
     theme: Palette,
+    // EW-637 — object storage backends (local-fs, S3, MinIO, GitHub blob)
+    storage: HardDrive,
 };
 
 /**
@@ -52,6 +55,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     integration: 'Integrations',
     utility: 'Utilities',
     theme: 'Themes',
+    storage: 'Storage',
 };
 
 // Type-safe assertion that all categories are covered
@@ -107,6 +111,11 @@ export const CAPABILITY_LABELS: Record<string, string> = {
     'oauth-provider': 'OAuth',
     pipeline: 'Pipeline',
     form: 'Form',
+    // EW-637 — storage capabilities
+    storage: 'Storage',
+    'put-object': 'Put Object',
+    'get-object': 'Get Object',
+    'presigned-put': 'Presigned Upload',
 };
 
 /**
@@ -136,6 +145,7 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'git-provider',
     'deployment',
     'data-source',
+    'storage',
     'form',
     'integration',
     'utility',

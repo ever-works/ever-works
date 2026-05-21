@@ -70,8 +70,8 @@ test.describe('Magic link — issuance', () => {
             }
         }
         if (!firstPath) test.skip(true, 'no magic-link issuance endpoint');
-        const ta = await measure(a.email, firstPath);
-        const tb = await measure(b.email, firstPath);
+        const ta = await measure(a.email, firstPath!);
+        const tb = await measure(b.email, firstPath!);
         if (ta < 50 && tb < 50) test.skip(true, 'timings too small to compare');
         const ratio = Math.max(ta, tb) / Math.max(1, Math.min(ta, tb));
         expect(

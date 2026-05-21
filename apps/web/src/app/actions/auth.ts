@@ -273,5 +273,90 @@ export async function resetPassword(token: string, newPassword: string) {
     };
 }
 
+// =================
+// Magic Link (EW-633)
+// =================
+
+/**
+ * Issue a magic-link email. The API response is intentionally uniform
+ * regardless of whether the email is registered (anti-enumeration), so
+ * a successful call here only proves the request was accepted — not
+ * that an email is on its way.
+ */
+export async function issueMagicLink(email: string) {
+    const t = await getTranslations('validation.auth');
+
+    const emailSchema = z.string().email(t('email.invalid'));
+    const validation = emailSchema.safeParse(email);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
+    }
+
+    try {
+        await authAPI.requestMagicLink({
+            email: validation.data,
+            magicLinkCallbackUrl: withAppUrl('/login/magic-link'),
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        const errorT = await getTranslations('api.errors');
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : errorT('magicLinkFailed'),
+        };
+    }
+}
+
+/**
+ * Redeem a magic-link token. On success the session cookie is set and
+ * the caller is redirected to the dashboard (or the requested
+ * `redirectUrl`, when valid). On failure returns an error string so
+ * the UI can render a "Send a new link" recovery path.
+ */
+export async function redeemMagicLink(token: string, redirectUrl: string | null) {
+    const t = await getTranslations('validation.auth');
+
+    const tokenSchema = z.string().min(1, t('token.required'));
+    const validation = tokenSchema.safeParse(token);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
+    }
+
+    let authResponse: AuthResponse | null = null;
+    let href: string = ROUTES.DASHBOARD;
+
+    try {
+        authResponse = await authAPI.redeemMagicLink({ token: validation.data });
+        await setAuthCookies(authResponse.access_token);
+    } catch (error) {
+        console.error(error);
+        const errorT = await getTranslations('api.errors');
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : errorT('magicLinkInvalid'),
+        };
+    }
+
+    if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+        href = redirectUrl;
+    } else if (authResponse) {
+        href = await getRedirectUrl(authResponse, href);
+    }
+
+    redirect({ locale: await getLocale(), href });
+
+    return { success: true };
+}
+
 // For oAuth connection check file:
 // Check apps/web/src/app/auth/[provider]/callback/route.ts

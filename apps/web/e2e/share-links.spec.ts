@@ -38,11 +38,11 @@ test.describe('Share links — owner creates a share link', () => {
         if (!foundBody) test.skip(true, 'no share-link create endpoint');
         // The response should expose either a URL, a token, or an id.
         const ref =
-            foundBody.url ??
-            foundBody.shareUrl ??
-            foundBody.token ??
-            foundBody.share_token ??
-            foundBody.id;
+            foundBody!.url ??
+            foundBody!.shareUrl ??
+            foundBody!.token ??
+            foundBody!.share_token ??
+            foundBody!.id;
         expect(
             typeof ref,
             `share response missing url/token/id field: ${JSON.stringify(foundBody).slice(0, 200)}`,

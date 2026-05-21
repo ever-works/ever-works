@@ -1,4 +1,14 @@
-import '@testing-library/jest-dom/vitest';
+import { expect } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+
+// Register jest-dom matchers (toBeInTheDocument, toBeDisabled, toHaveAttribute, …)
+// against vitest's `expect`. The `@testing-library/jest-dom/vitest` side-effect
+// import is the documented shortcut, but in this workspace its module-level
+// `expect.extend(...)` call doesn't reliably attach the matchers — likely a
+// dual-package / ESM resolution mismatch between the `vitest` instance the
+// jest-dom entry sees and the one our tests pull in. Doing it explicitly is
+// equivalent and works.
+expect.extend(matchers);
 
 // jsdom doesn't ship `matchMedia`, `IntersectionObserver`, or `ResizeObserver`,
 // but several components (lucide icons, animations, tooltips) call them on mount.

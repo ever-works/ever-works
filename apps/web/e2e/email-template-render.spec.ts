@@ -66,7 +66,7 @@ test.describe('Email templates — preview endpoint', () => {
         if (!body) test.skip(true, 'no email-preview accessible to regular user');
         // Unresolved Handlebars / Mustache markers would surface as
         // {{var}} in the body — that's a template-engine bug.
-        const unresolved = body.match(/\{\{[^}]+\}\}/g) || [];
+        const unresolved = body!.match(/\{\{[^}]+\}\}/g) || [];
         expect(unresolved.length, `unresolved template vars: ${unresolved.join(', ')}`).toBe(0);
     });
 });

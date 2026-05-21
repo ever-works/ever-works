@@ -644,6 +644,39 @@ describe('WorkGenerationService', () => {
             expect(askJsonContext).toEqual({ userId: 'caller-1' });
         });
 
+        it('validates edit access and forwards workId when provided for usage attribution', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork() } as any);
+            contentExtractorFacade.extractContent.mockResolvedValue({ rawContent: 'page' });
+            aiFacade.askJson.mockResolvedValue({
+                result: {
+                    name: 'Item A',
+                    description: 'desc',
+                    category: 'tools',
+                    tags: ['t1'],
+                    brand: null,
+                    brand_logo_url: null,
+                    images: [],
+                },
+            });
+
+            const service = buildService();
+            await service.extractItemDetails(
+                { source_url: 'https://example.com', workId: 'work-1' },
+                buildUser({ id: 'caller-1' }),
+            );
+
+            expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('work-1', 'caller-1');
+            expect(contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+                'https://example.com',
+                undefined,
+                { userId: 'caller-1', workId: 'work-1' },
+            );
+            expect(aiFacade.askJson.mock.calls[0][3]).toEqual({
+                userId: 'caller-1',
+                workId: 'work-1',
+            });
+        });
+
         it('omits the categoriesHint segment when existing_categories is undefined or empty', async () => {
             contentExtractorFacade.extractContent.mockResolvedValue({ rawContent: 'page' });
             aiFacade.askJson.mockResolvedValue({

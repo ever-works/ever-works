@@ -51,6 +51,14 @@ export class WorkProposalRepository {
             .getMany();
     }
 
+    async findRecentByUser(userId: string, take = 50): Promise<WorkProposal[]> {
+        return this.repository.find({
+            where: { userId },
+            order: { generatedAt: 'DESC' },
+            take,
+        });
+    }
+
     async findById(id: string): Promise<WorkProposal | null> {
         return this.repository.findOne({ where: { id } });
     }

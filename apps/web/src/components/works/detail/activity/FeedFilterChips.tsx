@@ -23,7 +23,7 @@ export function FeedFilterChips({ value, onChange, directorySiteDisabled }: Feed
     const t = useTranslations('dashboard.workDetail.activity.filters');
 
     return (
-        <div role="tablist" aria-label={t('label')} className="flex flex-wrap gap-1.5 mb-4">
+        <div role="group" aria-label={t('label')} className="flex flex-wrap gap-1.5 mb-4">
             {FEED_CATEGORIES.map((cat) => {
                 const isActive = cat === value;
                 const isDimmed = Boolean(directorySiteDisabled && DIRECTORY_CATEGORIES.has(cat));
@@ -31,16 +31,16 @@ export function FeedFilterChips({ value, onChange, directorySiteDisabled }: Feed
                     <button
                         key={cat}
                         type="button"
-                        role="tab"
-                        aria-selected={isActive}
+                        aria-pressed={isActive}
+                        disabled={isDimmed}
                         onClick={() => onChange(cat)}
                         className={cn(
                             'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                            'border',
+                            'border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                             isActive
                                 ? 'bg-primary text-primary-foreground border-primary'
                                 : 'bg-card dark:bg-card-primary-dark/30 text-text-secondary dark:text-text-secondary-dark border-border dark:border-border-dark hover:bg-muted/30 dark:hover:bg-muted/10',
-                            isDimmed && 'opacity-50',
+                            isDimmed && 'opacity-50 cursor-not-allowed',
                         )}
                     >
                         {t(cat)}

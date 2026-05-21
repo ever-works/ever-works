@@ -4,6 +4,7 @@ import {
     WORK_GENERATION_DISPATCHER,
     WORK_IMPORT_DISPATCHER,
     TEMPLATE_CUSTOMIZATION_DISPATCHER,
+    WEBHOOK_DELIVERY_DISPATCHER,
 } from '@ever-works/agent/tasks';
 
 @Global()
@@ -22,12 +23,17 @@ import {
             provide: TEMPLATE_CUSTOMIZATION_DISPATCHER,
             useExisting: TriggerService,
         },
+        {
+            provide: WEBHOOK_DELIVERY_DISPATCHER,
+            useExisting: TriggerService,
+        },
     ],
     exports: [
         TriggerService,
         WORK_GENERATION_DISPATCHER,
         WORK_IMPORT_DISPATCHER,
         TEMPLATE_CUSTOMIZATION_DISPATCHER,
+        WEBHOOK_DELIVERY_DISPATCHER,
     ],
 })
 export class TriggerModule {}

@@ -1,0 +1,92 @@
+{
+	"name": "@ever-works/aws-s3-plugin",
+	"version": "1.0.0",
+	"description": "AWS S3 storage backend for Ever Works — stores uploaded objects in an S3 bucket and supports browser-direct presigned PUT.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@aws-sdk/client-s3": "^3.700.0",
+		"@aws-sdk/s3-request-presigner": "^3.700.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "aws-s3",
+			"name": "AWS S3",
+			"version": "1.0.0",
+			"category": "storage",
+			"capabilities": [
+				"storage",
+				"put-object",
+				"get-object",
+				"presigned-put"
+			],
+			"description": "Stores uploaded objects in an AWS S3 bucket. Supports direct browser uploads via presigned PUT URLs for large files.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"systemPlugin": false,
+			"builtIn": false,
+			"envVars": [
+				{
+					"name": "AWS_S3_REGION",
+					"required": false,
+					"secret": false,
+					"description": "AWS region of the S3 bucket (e.g. us-east-1)."
+				},
+				{
+					"name": "AWS_S3_BUCKET",
+					"required": false,
+					"secret": false,
+					"description": "S3 bucket name."
+				},
+				{
+					"name": "AWS_ACCESS_KEY_ID",
+					"required": false,
+					"secret": true,
+					"description": "AWS access key id (or use IAM role / instance profile)."
+				},
+				{
+					"name": "AWS_SECRET_ACCESS_KEY",
+					"required": false,
+					"secret": true,
+					"description": "AWS secret access key (or use IAM role / instance profile)."
+				}
+			]
+		}
+	}
+}

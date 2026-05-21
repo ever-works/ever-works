@@ -1,8 +1,26 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
+import type { PluginContext } from '@ever-works/plugin';
 import { UploadsService } from './uploads.service';
+
+// Minimal stub matching what the storage-backend factory hands plugins
+// at boot — only the logger is read by LocalFsStoragePlugin.onLoad().
+const stubContext = (id: string): PluginContext => {
+    const log = new Logger(`StoragePlugin/${id}`);
+    return {
+        pluginId: id,
+        logger: {
+            log: (m: string) => log.log(m),
+            error: (m: string) => log.error(m),
+            warn: (m: string) => log.warn(m),
+            debug: (m: string) => log.debug(m),
+        },
+    } as unknown as PluginContext;
+};
 
 const TINY_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAarVyFEAAAAASUVORK5CYII=',
@@ -41,7 +59,13 @@ describe('UploadsService', () => {
         );
         process.env.UPLOADS_DIR = root;
         delete process.env.UPLOADS_MAX_BYTES;
-        service = new UploadsService();
+        // EW-637 — inject a fresh local-fs storage plugin so each test
+        // sees the new UPLOADS_DIR. Plugins are lazy in production via
+        // getActiveStorageBackend(); tests skip the env-resolution cache
+        // by passing the plugin directly to the service constructor.
+        const backend = new LocalFsStoragePlugin();
+        await backend.onLoad(stubContext('local-fs'));
+        service = new UploadsService(backend);
     });
 
     afterEach(async () => {
@@ -168,7 +192,9 @@ describe('UploadsService', () => {
 
         it('rejects oversized files', async () => {
             process.env.UPLOADS_MAX_BYTES = '100';
-            const s = new UploadsService();
+            const localBackend = new LocalFsStoragePlugin();
+            await localBackend.onLoad(stubContext('local-fs'));
+            const s = new UploadsService(localBackend);
             const big = Buffer.concat([TINY_PNG, Buffer.alloc(200)]);
             await expect(
                 s.saveImage(userId, {
@@ -241,6 +267,86 @@ describe('UploadsService', () => {
             // Sanity: it IS readable under the actual owner.
             const { buffer } = await service.readFile(otherUser, r.filename);
             expect(buffer.equals(TINY_PNG)).toBe(true);
+        });
+
+        // Codex P1 follow-up to PR #890: prove that readFile asks the active
+        // backend to derive its own canonical key instead of hardcoding the
+        // legacy `<ownerId>/<filename>` shape. Without deriveKey, S3-prefixed
+        // backends would 404 every read for a file they successfully wrote.
+        it('uses backend.deriveKey() when present, not the legacy <user>/<file> shape', async () => {
+            const calls: { put: string[]; get: string[]; derive: Array<[string, string]> } = {
+                put: [],
+                get: [],
+                derive: [],
+            };
+            const fakeBackend = {
+                providerName: 'fake-prefixed',
+                async putObject(input: { ownerId?: string; filename: string; buffer: Buffer }) {
+                    // Mirrors the AWS S3 plugin: prefix every key with `uploads/`.
+                    const key = `uploads/${input.ownerId}/${input.filename}`;
+                    calls.put.push(key);
+                    return { key, url: 's3://ignored-by-service' };
+                },
+                async getObject(key: string) {
+                    calls.get.push(key);
+                    // Only the prefixed shape exists on this backend.
+                    if (!key.startsWith('uploads/')) {
+                        throw new Error('not found');
+                    }
+                    return { buffer: TINY_PNG, mimeType: 'image/png' };
+                },
+                async deleteObject() {},
+                async isAvailable() {
+                    return true;
+                },
+                deriveKey(ownerId: string, filename: string) {
+                    calls.derive.push([ownerId, filename]);
+                    return `uploads/${ownerId}/${filename}`;
+                },
+            };
+            const svc = new UploadsService(fakeBackend as never);
+            const r = await svc.saveImage(userId, fakeFile({}));
+
+            // Codex P1 #2: response URL is the API-routed path regardless of
+            // what the backend's putObject returned. Private buckets and
+            // owner-gated reads depend on this.
+            expect(r.url).toBe(`/api/uploads/${userId}/${r.filename}`);
+            expect(r.url).not.toContain('s3://');
+
+            // Round-trip the read; without deriveKey() the service would
+            // hand `<user>/<file>` to getObject and the backend would 404.
+            const { buffer } = await svc.readFile(userId, r.filename);
+            expect(buffer.equals(TINY_PNG)).toBe(true);
+            expect(calls.derive).toEqual([[userId, r.filename]]);
+            expect(calls.get).toEqual([`uploads/${userId}/${r.filename}`]);
+        });
+
+        // Codex P1 #1 fallback path: a backend without deriveKey (older
+        // third-party plugins, ad-hoc test doubles) keeps working via the
+        // legacy `<ownerId>/<filename>` shape. local-fs uses exactly that
+        // key, so removing its deriveKey override should not change reads.
+        it('falls back to <user>/<file> when backend does not implement deriveKey', async () => {
+            const lastSeenKey: string[] = [];
+            const backendNoDerive = {
+                providerName: 'fake-bare',
+                async putObject(input: { ownerId?: string; filename: string }) {
+                    const key = `${input.ownerId}/${input.filename}`;
+                    return { key, url: '/api/uploads/whatever' };
+                },
+                async getObject(key: string) {
+                    lastSeenKey.push(key);
+                    return { buffer: TINY_PNG, mimeType: 'image/png' };
+                },
+                async deleteObject() {},
+                async isAvailable() {
+                    return true;
+                },
+                // intentionally NO deriveKey
+            };
+            const svc = new UploadsService(backendNoDerive as never);
+            const r = await svc.saveImage(userId, fakeFile({}));
+            await svc.readFile(userId, r.filename);
+            expect(lastSeenKey).toEqual([`${userId}/${r.filename}`]);
         });
     });
 });

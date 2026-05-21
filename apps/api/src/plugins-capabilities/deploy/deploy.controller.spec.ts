@@ -417,6 +417,7 @@ describe('DeployController', () => {
                 slug: 'my-site',
                 owner: 'acme',
                 repository: 'acme/acme-site',
+                deploymentId: 'dep-1',
                 message: 'Deployment started',
             });
         });
@@ -899,6 +900,7 @@ describe('DeployController', () => {
                 expect.anything(),
                 'caller-1',
                 'team-x',
+                undefined,
             );
         });
 

@@ -46,6 +46,14 @@ module.exports = {
         '^@ever-works/agent/(.*)$': '<rootDir>/../../../packages/agent/src/$1/index.ts',
         '^@ever-works/agent$': '<rootDir>/../../../packages/agent/src/index.ts',
         '^@ever-works/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
+        // EW-637 — storage plugins source-mapped for tests.
+        '^@ever-works/local-fs-plugin$':
+            '<rootDir>/../../../packages/plugins/local-fs/src/index.ts',
+        '^@ever-works/aws-s3-plugin$':
+            '<rootDir>/../../../packages/plugins/aws-s3/src/index.ts',
+        '^@ever-works/minio-plugin$': '<rootDir>/../../../packages/plugins/minio/src/index.ts',
+        '^@ever-works/github-storage-plugin$':
+            '<rootDir>/../../../packages/plugins/github-storage/src/index.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

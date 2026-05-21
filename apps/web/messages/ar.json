@@ -1580,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "تحميل المزيد",
+                    "loadingMore": "جاري التحميل..."
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1607,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "أعد نشر موقع الدليل باستخدام نقطة نهاية موجز النشاط الأحدث.",
+                        "disabled": "قم بتشغيل مزامنة النشاط في الإعدادات لجمع أحداث الموقع.",
+                        "timeout": "أعد محاولة التحديث أو تحقق من الموقع المُنشر إذا استمر هذا الأمر.",
+                        "unauthorized": "أدخل سر مزامنة النشاط، ثم أعد نشر موقع الدليل.",
+                        "upstream_5xx": "تحقق من سجلات الموقع المُنشر وحاول مرة أخرى بعد تعافيه.",
+                        "network": "تحقق من URL الموقع المُنشر وقابلية الوصول إلى الشبكة.",
+                        "parse_error": "أعد نشر موقع الدليل ليعيد الحمولة النشوية المتوقعة."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"

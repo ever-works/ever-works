@@ -19,6 +19,7 @@ import { AuthSessionGuard } from '../auth/guards/auth-session.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WebhooksService, WebhookSubscriptionView } from './webhooks.service';
+import { WebhooksDeliveriesService, WebhookDeliveryView } from './webhooks-deliveries.service';
 
 class CreateWebhookSubscriptionDto {
     @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
@@ -59,7 +60,45 @@ class UpdateWebhookSubscriptionDto {
 @Controller('api/webhooks')
 @UseGuards(AuthSessionGuard)
 export class WebhooksController {
-    constructor(private readonly webhooks: WebhooksService) {}
+    constructor(
+        private readonly webhooks: WebhooksService,
+        private readonly deliveries: WebhooksDeliveriesService,
+    ) {}
+
+    /**
+     * Deliveries listing comes BEFORE `/:id` routes so the literal
+     * `/api/webhooks/deliveries` doesn't get caught by `ParseUUIDPipe`
+     * on the subscription routes below.
+     */
+    @Get('deliveries')
+    @ApiOperation({
+        summary: "List recent outbound deliveries against this account's subscriptions",
+    })
+    @ApiResponse({ status: 200, description: 'Array of delivery views (most-recent first)' })
+    async listDeliveries(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<{ deliveries: WebhookDeliveryView[] }> {
+        const deliveries = await this.deliveries.list(auth.userId);
+        return { deliveries };
+    }
+
+    @Post('deliveries/:deliveryId/redeliver')
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Re-enqueue a previous delivery by id',
+        description:
+            'Creates a fresh delivery row reusing the original payload + subscription. Returns the new delivery id and (when Trigger.dev is configured) the run id.',
+    })
+    @ApiParam({ name: 'deliveryId', description: 'Original webhook delivery id' })
+    @ApiResponse({ status: 202, description: 'Redelivery enqueued' })
+    @ApiResponse({ status: 404, description: 'Delivery not found (or not yours)' })
+    async redeliver(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('deliveryId', ParseUUIDPipe) deliveryId: string,
+    ) {
+        return this.deliveries.redeliver(auth.userId, deliveryId);
+    }
 
     @Get()
     @ApiOperation({ summary: "List my account's active webhook subscriptions" })
@@ -116,6 +155,21 @@ export class WebhooksController {
             );
         }
         throw new BadRequestException('status must be one of: paused');
+    }
+
+    @Post(':id/test')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Synchronously fire a test webhook to verify the URL',
+        description:
+            "POSTs a `webhook.test` event with the signed-body shape the customer's receiver will see in production. Returns the delivery outcome inline so the customer can verify before plugging into CI. Records the attempt in the deliveries log.",
+    })
+    @ApiParam({ name: 'id', description: 'Subscription ID' })
+    @ApiResponse({ status: 200, description: 'Inline delivery result' })
+    @ApiResponse({ status: 404, description: 'Subscription not found (or not yours)' })
+    async testFire(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+        return this.deliveries.testFire(auth.userId, id);
     }
 
     @Post(':id/rotate-secret')

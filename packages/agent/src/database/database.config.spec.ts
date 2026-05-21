@@ -35,6 +35,13 @@ jest.mock('../entities', () => ({
     TemplateCustomization: class TemplateCustomization {},
     UserTemplatePreference: class UserTemplatePreference {},
     WebhookSubscription: class WebhookSubscription {},
+    // EW-634 follow-up: `WebhookDelivery` was added to the real entities
+    // barrel + `ENTITIES` array in PR #886. Without an explicit mock
+    // here the parent `jest.mock('../entities', ...)` above shadows
+    // the real barrel and `database.config.ts` resolves the import
+    // to `undefined`, breaking the "every entry is a function"
+    // assertion below.
+    WebhookDelivery: class WebhookDelivery {},
     WorkProposal: class WorkProposal {},
     // Work Agent control-plane entities (introduced in #868). Without
     // these mocks the database.config import resolves them to undefined

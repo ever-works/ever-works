@@ -29,7 +29,7 @@ test.describe('OAuth PKCE — authorize URL carries code_challenge', () => {
         if (!url || typeof url !== 'string') {
             test.skip(true, 'connect/url body did not include a URL field');
         }
-        const parsed = new URL(url);
+        const parsed = new URL(url!);
         const cc = parsed.searchParams.get('code_challenge');
         const ccm = parsed.searchParams.get('code_challenge_method');
         if (!cc) {
