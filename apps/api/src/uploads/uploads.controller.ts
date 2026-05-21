@@ -7,6 +7,7 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
+    Inject,
     NotImplementedException,
     Param,
     Post,
@@ -22,6 +23,9 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
+import { AUTH_PROVIDER } from '../auth/providers/auth-provider.constants';
+import { AuthProvider } from '../auth/providers/auth-provider.abstract';
+import { toHeaders } from '../auth/providers/request-headers';
 import { UploadsService } from './uploads.service';
 import { PresignUploadDto } from './dto/presign-upload.dto';
 
@@ -50,6 +54,14 @@ export class UploadsController {
     constructor(
         private readonly uploads: UploadsService,
         private readonly anonymousAuthService: AnonymousAuthService,
+        // Codex P2 finding on PR #890: `AuthSessionGuard` returns early
+        // when `@Public()` is set without populating `request.user`, so
+        // the old `req.user?.userId` check below was dead code and every
+        // authenticated caller hitting /anonymous or /presign got
+        // re-anon-minted. We resolve the bearer ourselves via the same
+        // provider the guard would have called, so an authenticated
+        // session is honored on public-by-default upload routes.
+        @Inject(AUTH_PROVIDER) private readonly authProvider: AuthProvider,
     ) {}
 
     /**
@@ -284,10 +296,19 @@ export class UploadsController {
         anonAccessToken: string | undefined;
         anonymousExpiresAt: string | null | undefined;
     }> {
-        const existing = req.user?.userId;
+        // Codex P2 finding on PR #890: `@Public()` routes never have
+        // `req.user` populated (the guard short-circuits before it
+        // gets to bearer parsing), so the old `req.user?.userId`
+        // check was dead and every authenticated caller hitting
+        // /anonymous or /presign was getting re-anon-minted. Resolve
+        // the bearer here directly — same `authProvider.authenticate`
+        // path the guard would have taken. We swallow the error case:
+        // an unauthenticated request shouldn't fail the upload, it
+        // should fall through to the anon-mint branch.
+        const existing = await this.tryAuthenticate(req);
         if (existing) {
             return {
-                userId: existing,
+                userId: existing.userId,
                 anonAccessToken: undefined,
                 anonymousExpiresAt: undefined,
             };
@@ -312,5 +333,22 @@ export class UploadsController {
             anonAccessToken: anon.access_token,
             anonymousExpiresAt: anon.user.anonymousExpiresAt ?? null,
         };
+    }
+
+    /**
+     * Best-effort bearer resolution for `@Public()` upload routes.
+     * Returns the authenticated user when a valid session token is
+     * present, otherwise `null`. Never throws — an invalid/missing
+     * token falls through to anon-mint instead of 401-ing a route
+     * that's documented as accepting anonymous traffic.
+     */
+    private async tryAuthenticate(req: AnonRequest): Promise<AuthenticatedUser | null> {
+        const auth = req.headers?.authorization;
+        if (!auth) return null;
+        try {
+            return await this.authProvider.authenticate(toHeaders(req.headers || {}));
+        } catch {
+            return null;
+        }
     }
 }

@@ -131,6 +131,16 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 		return true;
 	}
 
+	/**
+	 * Local-fs keys are bare `<ownerId>/<filename>` with no path prefix —
+	 * the legacy default. Implementing this explicitly (instead of leaving
+	 * the interface fallback to do it) makes the contract obvious and
+	 * keeps the read path symmetric with the prefixed backends.
+	 */
+	deriveKey(ownerId: string, filename: string): string {
+		return `${ownerId}/${filename}`;
+	}
+
 	// ============================================================================
 	// IPlugin lifecycle
 	// ============================================================================

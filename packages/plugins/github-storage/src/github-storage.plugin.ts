@@ -197,6 +197,20 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		}
 	}
 
+	/**
+	 * GitHub-storage keys are `<pathPrefix>/<ownerId>/<filename>`. The
+	 * pathPrefix is config-controlled (default `uploads`), so even the
+	 * "bare" case still differs from the legacy `<ownerId>/<filename>`
+	 * shape used by local-fs. Implementing this lets the owner-gated
+	 * read route reach the right path on the GitHub Contents API
+	 * regardless of how the operator configured the prefix
+	 * (Codex P1 finding on PR #890).
+	 */
+	deriveKey(ownerId: string, filename: string): string {
+		const cfg = this.config();
+		return `${cfg.pathPrefix}/${ownerId}/${filename}`;
+	}
+
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		context.logger.log('GitHub storage plugin loaded');
