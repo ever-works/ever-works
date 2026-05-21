@@ -138,6 +138,7 @@ export class UploadsService {
     async saveImage(
         userId: string,
         file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,
+        opts?: { workId?: string },
     ): Promise<UploadResult> {
         this.assertValidUserId(userId);
 
@@ -184,12 +185,18 @@ export class UploadsService {
         const filename = `${hash}.${sniffed.ext}`;
 
         const backend = await this.getBackend();
+        // EW-644: workId is threaded through to the backend so the
+        // github-storage plugin in mode='data-repo' can resolve the
+        // Work's data repo per upload. Other backends ignore it.
+        const workId = opts?.workId;
+        if (workId !== undefined) this.assertValidWorkId(workId);
         const { key } = await backend.putObject({
             buffer: file.buffer,
             filename,
             mimeType: sniffed.mime,
             size: file.size,
             ownerId: userId,
+            ...(workId ? { workId } : {}),
         });
 
         // Codex P1 finding on PR #890: returning the plugin's backend-native
@@ -278,6 +285,23 @@ export class UploadsService {
             if (ok) return { mime: sig.mime, ext: sig.ext };
         }
         return null;
+    }
+
+    private assertValidWorkId(workId: string): void {
+        // Works use UUIDv4 — accept any UUID shape. Belt-and-suspenders
+        // check: refuse anything with path separators or control chars
+        // so a malicious caller can't smuggle a non-UUID through into
+        // the backend layer.
+        if (
+            !workId ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workId)
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'InvalidWorkId',
+                message: 'Invalid workId',
+            });
+        }
     }
 
     private assertValidUserId(userId: string): void {

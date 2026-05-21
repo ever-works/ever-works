@@ -11,6 +11,7 @@ import {
     NotImplementedException,
     Param,
     Post,
+    Query,
     Req,
     Res,
     UploadedFile,
@@ -94,6 +95,11 @@ export class UploadsController {
     async upload(
         @CurrentUser() auth: AuthenticatedUser,
         @UploadedFile() file: Express.Multer.File | undefined,
+        // EW-644: optional workId — required for backends that resolve
+        // their destination per Work (currently only `github-storage`
+        // in mode `data-repo`). Other backends ignore it. Validation
+        // (UUID shape) happens in UploadsService.
+        @Query('workId') workId?: string,
     ) {
         if (!file) {
             throw new BadRequestException({
@@ -101,7 +107,7 @@ export class UploadsController {
                 message: "Multipart field 'file' is required",
             });
         }
-        return this.uploads.saveImage(auth.userId, file);
+        return this.uploads.saveImage(auth.userId, file, workId ? { workId } : undefined);
     }
 
     @Post('image')
@@ -112,8 +118,9 @@ export class UploadsController {
     async uploadImage(
         @CurrentUser() auth: AuthenticatedUser,
         @UploadedFile() file: Express.Multer.File | undefined,
+        @Query('workId') workId?: string,
     ) {
-        return this.upload(auth, file);
+        return this.upload(auth, file, workId);
     }
 
     /**
