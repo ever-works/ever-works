@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -9,13 +10,25 @@ import {
     Patch,
     Post,
     Query,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+    ApiBearerAuth,
+    ApiBody,
+    ApiConsumes,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { KnowledgeBaseService } from '@ever-works/agent/services';
 import {
     CreateKbDocumentDto,
     CreateKbTagDto,
+    CreateKbUploadDto,
     KbDocumentQueryDto,
     LockKbDocumentDto,
     RestoreKbDocumentDto,
@@ -24,7 +37,15 @@ import {
 } from '@ever-works/agent/dto';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import type { KbDocumentClass, KbDocumentStatus, KbLockMode } from '@ever-works/agent/entities';
+import type {
+    KbDocumentClass,
+    KbDocumentStatus,
+    KbLockMode,
+    KbUploadExtractionStatus,
+} from '@ever-works/agent/entities';
+
+/** Per-upload byte cap — spec §9.1 default is 200 MB, tunable per tenant. */
+const KB_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
 
 /**
  * Knowledge Base REST surface — per-Work routes.
@@ -237,5 +258,120 @@ export class KbController {
         @Param('tagId') tagId: string,
     ) {
         await this.kb.deleteTag(workId, tagId, auth.userId);
+    }
+
+    // ─── Uploads (EW-641 1B/b) ────────────────────────────────────────
+
+    @Post('works/:id/kb/uploads')
+    @HttpCode(HttpStatus.CREATED)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: KB_UPLOAD_MAX_BYTES } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({
+        summary: 'Upload a source file to the Knowledge Base',
+        description:
+            'Multipart upload of a file destined for the KB. Server computes SHA-256, dedups against existing uploads in the same Work, persists bytes via the configured storage plugin, and synchronously creates a KB document for text-passthrough MIME types (markdown / plain). Non-text MIMEs are stored with extractionStatus=skipped pending Phase 1B/c extractor routing.',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['file'],
+            properties: {
+                file: { type: 'string', format: 'binary' },
+                targetClass: {
+                    type: 'string',
+                    description: 'Optional kbDocumentClass for the resulting document',
+                },
+                title: { type: 'string' },
+                description: { type: 'string' },
+                tags: { type: 'array', items: { type: 'string' } },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Upload accepted; returns the upload row + the created KB doc (if any)',
+    })
+    @ApiResponse({ status: 400, description: 'Missing file or invalid metadata' })
+    @ApiResponse({ status: 413, description: 'File exceeds the configured size cap' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async createUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body() body: CreateKbUploadDto,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        return this.kb.createUpload({
+            workId,
+            userId: auth.userId,
+            file: {
+                buffer: file.buffer,
+                originalFilename: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+            },
+            targetClass: body.targetClass,
+            tags: body.tags,
+            description: body.description ?? null,
+            title: body.title,
+        });
+    }
+
+    @Get('works/:id/kb/uploads')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List KB uploads for a Work' })
+    @ApiQuery({ name: 'status', required: false })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiQuery({ name: 'offset', required: false, type: Number })
+    @ApiResponse({ status: 200, description: 'Paginated list of upload rows' })
+    async listUploads(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Query('status') status?: KbUploadExtractionStatus,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        return this.kb.listUploads(workId, auth.userId, {
+            status,
+            limit: limit !== undefined ? Number(limit) : undefined,
+            offset: offset !== undefined ? Number(offset) : undefined,
+        });
+    }
+
+    @Get('works/:id/kb/uploads/:uploadId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get a single KB upload row' })
+    @ApiResponse({ status: 200, description: 'Upload row' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    async getUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+    ) {
+        return this.kb.getUpload(workId, uploadId, auth.userId);
+    }
+
+    @Post('works/:id/kb/uploads/:uploadId/retry-extraction')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Re-run extraction for a failed or skipped KB upload',
+        description:
+            'Owner / manager only. Reads the persisted bytes from storage and runs extract+materialize again. If the MIME type still has no extractor route (Phase 1B/b text passthrough only), the upload stays skipped with an updated reason.',
+    })
+    @ApiResponse({ status: 200, description: 'Re-extraction kicked off / completed' })
+    @ApiResponse({ status: 403, description: 'Manager+ role required' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    @ApiResponse({ status: 409, description: 'Upload already produced a KB document' })
+    async retryUploadExtraction(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+    ) {
+        return this.kb.retryUploadExtraction(workId, uploadId, auth.userId);
     }
 }

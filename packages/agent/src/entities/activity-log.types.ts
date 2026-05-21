@@ -77,6 +77,20 @@ export enum ActivityActionType {
     DATA_SYNC_SUCCESS = 'data_sync_success',
     DATA_SYNC_SKIPPED = 'data_sync_skipped',
     DATA_SYNC_FAILED = 'data_sync_failed',
+
+    // EW-641 — Knowledge Base lifecycle. See
+    // `docs/specs/features/knowledge-base/spec.md` §19.1 for the full
+    // list of kinds; this PR adds the upload + document subset needed by
+    // the Phase 1B/b ingest pipeline. Lock/restore/index/tag kinds will
+    // land when those flows are wired.
+    KB_UPLOAD_CREATED = 'kb_upload_created',
+    KB_UPLOAD_DEDUPED = 'kb_upload_deduped',
+    KB_UPLOAD_EXTRACTED = 'kb_upload_extracted',
+    KB_UPLOAD_EXTRACTION_FAILED = 'kb_upload_extraction_failed',
+    KB_UPLOAD_EXTRACTION_SKIPPED = 'kb_upload_extraction_skipped',
+    KB_DOCUMENT_CREATED = 'kb_document_created',
+    KB_DOCUMENT_UPDATED = 'kb_document_updated',
+    KB_DOCUMENT_DELETED = 'kb_document_deleted',
 }
 
 export enum ActivityStatus {

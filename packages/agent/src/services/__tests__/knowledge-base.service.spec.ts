@@ -5,18 +5,22 @@ import {
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { KnowledgeBaseService } from '../knowledge-base.service';
+import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../../database/repositories/work-knowledge-citation.repository';
 import { WorkOwnershipService } from '../work-ownership.service';
+import { ActivityLogService } from '../../activity-log/activity-log.service';
+import { ActivityActionType } from '../../entities/activity-log.types';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
+import { WorkKnowledgeUpload } from '../../entities/work-knowledge-upload.entity';
 import {
     KbDocumentClass,
     KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbUploadExtractionStatus,
 } from '../../entities/kb-types';
 
 const WORK_ID = '00000000-0000-0000-0000-000000000001';
@@ -59,8 +63,17 @@ function buildDocument(overrides: Partial<WorkKnowledgeDocument> = {}): WorkKnow
 describe('KnowledgeBaseService', () => {
     let service: KnowledgeBaseService;
     let docRepo: jest.Mocked<WorkKnowledgeDocumentRepository>;
+    let uploadRepo: jest.Mocked<WorkKnowledgeUploadRepository>;
     let tagRepo: jest.Mocked<WorkKnowledgeTagRepository>;
     let ownership: jest.Mocked<WorkOwnershipService>;
+    let storage: jest.Mocked<{
+        providerName: string;
+        putObject: jest.Mock;
+        getObject: jest.Mock;
+        deleteObject: jest.Mock;
+        isAvailable: jest.Mock;
+    }>;
+    let activityLog: jest.Mocked<{ log: jest.Mock }>;
 
     beforeEach(async () => {
         const docRepoMock: Partial<jest.Mocked<WorkKnowledgeDocumentRepository>> = {
@@ -78,6 +91,16 @@ describe('KnowledgeBaseService', () => {
             setLock: jest.fn(),
         };
 
+        const uploadRepoMock: Partial<jest.Mocked<WorkKnowledgeUploadRepository>> = {
+            findById: jest.fn(),
+            findBySha256: jest.fn().mockResolvedValue(null),
+            list: jest.fn().mockResolvedValue([]),
+            listPaged: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+        };
+
         const tagRepoMock: Partial<jest.Mocked<WorkKnowledgeTagRepository>> = {
             list: jest.fn().mockResolvedValue([]),
             findBySlug: jest.fn(),
@@ -93,24 +116,39 @@ describe('KnowledgeBaseService', () => {
             ensureCanEdit: jest.fn().mockResolvedValue({ role: 'editor' } as any),
         };
 
+        const storageMock = {
+            providerName: 'local-fs',
+            putObject: jest.fn(),
+            getObject: jest.fn(),
+            deleteObject: jest.fn(),
+            isAvailable: jest.fn().mockResolvedValue(true),
+        };
+
+        const activityLogMock = { log: jest.fn() };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 KnowledgeBaseService,
                 { provide: WorkKnowledgeDocumentRepository, useValue: docRepoMock },
-                { provide: WorkKnowledgeUploadRepository, useValue: {} },
+                { provide: WorkKnowledgeUploadRepository, useValue: uploadRepoMock },
                 { provide: WorkKnowledgeTagRepository, useValue: tagRepoMock },
                 {
                     provide: WorkKnowledgeCitationRepository,
                     useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
                 },
                 { provide: WorkOwnershipService, useValue: ownershipMock },
+                { provide: KB_STORAGE_PLUGIN, useValue: storageMock },
+                { provide: ActivityLogService, useValue: activityLogMock },
             ],
         }).compile();
 
         service = module.get(KnowledgeBaseService);
         docRepo = module.get(WorkKnowledgeDocumentRepository);
+        uploadRepo = module.get(WorkKnowledgeUploadRepository);
         tagRepo = module.get(WorkKnowledgeTagRepository);
         ownership = module.get(WorkOwnershipService);
+        storage = module.get(KB_STORAGE_PLUGIN);
+        activityLog = module.get(ActivityLogService);
     });
 
     describe('listDocuments', () => {
@@ -367,6 +405,162 @@ describe('KnowledgeBaseService', () => {
                 'brand' as KbDocumentClass,
             ]);
             expect(result).toEqual([]);
+        });
+    });
+
+    describe('createUpload', () => {
+        function buildUploadInput(
+            overrides: Partial<{ buffer: Buffer; mimeType: string; originalFilename: string }> = {},
+        ) {
+            return {
+                workId: WORK_ID,
+                userId: USER_ID,
+                file: {
+                    buffer: Buffer.from('# brand voice\n\nbody'),
+                    originalFilename: 'voice.md',
+                    mimeType: 'text/markdown',
+                    size: 18,
+                    ...overrides,
+                },
+                targetClass: 'brand' as KbDocumentClass,
+                tags: ['brand'],
+            };
+        }
+
+        function buildUpload(overrides: Partial<WorkKnowledgeUpload> = {}): WorkKnowledgeUpload {
+            return {
+                id: '00000000-0000-0000-0000-000000000020',
+                workId: WORK_ID,
+                storageProvider: 'local-fs',
+                storagePath: 'kb-originals/brand/abc.md',
+                originalFilename: 'voice.md',
+                mimeType: 'text/markdown',
+                fileSize: 18,
+                sha256: 'abc',
+                extractionStatus: 'pending' as KbUploadExtractionStatus,
+                extractionStartedAt: null,
+                extractionFinishedAt: null,
+                extractionError: null,
+                extractedDocumentId: null,
+                normalizedFormat: null,
+                extractionPluginId: null,
+                uploadedById: USER_ID,
+                tags: ['brand'],
+                categories: null,
+                metadata: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            } as WorkKnowledgeUpload;
+        }
+
+        it('text-passthrough: persists bytes, creates upload + doc, emits activity log events', async () => {
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/brand/abc.md', url: '' });
+            const uploadRow = buildUpload();
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            uploadRepo.update.mockResolvedValue({
+                ...uploadRow,
+                extractionStatus: 'succeeded' as KbUploadExtractionStatus,
+            });
+            const docRow = buildDocument({
+                id: '00000000-0000-0000-0000-000000000030',
+                path: 'brand/voice.md',
+            });
+            docRepo.create.mockResolvedValue(docRow);
+            docRepo.findById.mockResolvedValue(docRow);
+
+            const result = await service.createUpload(buildUploadInput());
+
+            expect(storage.putObject).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    filename: expect.stringContaining('kb-originals/brand/'),
+                    mimeType: 'text/markdown',
+                }),
+            );
+            expect(uploadRepo.create).toHaveBeenCalled();
+            expect(docRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: 'brand/voice.md',
+                    kbDocumentClass: 'brand',
+                    source: 'imported',
+                    sourceUploadId: uploadRow.id,
+                }),
+            );
+            expect(result.document?.id).toBe(docRow.id);
+
+            const kinds = activityLog.log.mock.calls.map(
+                (c) => (c[0] as { actionType: string }).actionType,
+            );
+            expect(kinds).toEqual(
+                expect.arrayContaining([
+                    ActivityActionType.KB_UPLOAD_CREATED,
+                    ActivityActionType.KB_UPLOAD_EXTRACTED,
+                    ActivityActionType.KB_DOCUMENT_CREATED,
+                ]),
+            );
+        });
+
+        it('dedup: returns existing row + emits kb_upload_deduped, no storage write', async () => {
+            const existing = buildUpload({ sha256: 'reuse-sha' });
+            uploadRepo.findBySha256.mockResolvedValueOnce(existing);
+
+            const result = await service.createUpload(buildUploadInput());
+
+            expect(storage.putObject).not.toHaveBeenCalled();
+            expect(uploadRepo.create).not.toHaveBeenCalled();
+            expect(docRepo.create).not.toHaveBeenCalled();
+            expect(result.upload).toBe(existing);
+            expect(result.document).toBeNull();
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({ actionType: ActivityActionType.KB_UPLOAD_DEDUPED }),
+            );
+        });
+
+        it('unsupported MIME: marks upload skipped + emits kb_upload_extraction_skipped', async () => {
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.bin', url: '' });
+            const uploadRow = buildUpload({ mimeType: 'application/pdf' });
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            uploadRepo.update.mockResolvedValue({
+                ...uploadRow,
+                extractionStatus: 'skipped' as KbUploadExtractionStatus,
+            });
+
+            const result = await service.createUpload({
+                ...buildUploadInput({ mimeType: 'application/pdf', originalFilename: 'spec.pdf' }),
+                targetClass: undefined,
+            });
+
+            expect(result.document).toBeNull();
+            expect(uploadRepo.update).toHaveBeenCalledWith(
+                uploadRow.id,
+                expect.objectContaining({ extractionStatus: 'skipped' }),
+            );
+            const kinds = activityLog.log.mock.calls.map(
+                (c) => (c[0] as { actionType: string }).actionType,
+            );
+            expect(kinds).toContain(ActivityActionType.KB_UPLOAD_EXTRACTION_SKIPPED);
+            expect(kinds).not.toContain(ActivityActionType.KB_DOCUMENT_CREATED);
+        });
+
+        it('rejects when storage plugin is not configured', async () => {
+            // Re-build the service without the storage provider.
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    // No KB_STORAGE_PLUGIN provided.
+                ],
+            }).compile();
+            const bare = module.get(KnowledgeBaseService);
+            await expect(bare.createUpload(buildUploadInput())).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
         });
     });
 
