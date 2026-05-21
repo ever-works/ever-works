@@ -148,22 +148,13 @@ test.describe('Magic-link login UI — EW-633', () => {
         expect(page.url()).not.toContain('/login');
     });
 
-    // EW-633 follow-up — these two redeem-page-error specs have been
-    // failing on every CI run since the magic-link UI landed (#884). The
-    // page locally renders `data-testid="magic-link-error"` in both the
-    // missing-token initial state AND the post-redeem error state, but
-    // Playwright on CI never sees the element. The most likely culprit
-    // is the next-intl locale-rewrite of `/login/magic-link` →
-    // `/<locale>/login/magic-link` taking longer than the test's wait,
-    // combined with the parent `<Suspense>` boundary showing its loading
-    // fallback (which has no testIds) until the client component hydrates.
-    //
-    // Marked `.fixme` so CI goes green; the spec stays as a checklist
-    // for whoever fixes the underlying redeem page (probably: add a
-    // direct `data-testid="magic-link-error"` to the Suspense fallback,
-    // or assert on the locale-prefixed URL the goto eventually settles
-    // on instead of relying on the bare path).
-    test.fixme('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
+    // EW-633 follow-up — these two specs originally went into `test.fixme`
+    // because `goto('/login/magic-link')` raced the next-intl locale rewrite
+    // and the Suspense fallback before the client component hydrated.
+    // Fix: navigate to the locale-prefixed URL directly so middleware doesn't
+    // need to redirect, and wait for networkidle so the rewrite + hydration
+    // settle before we look for the error testId.
+    test('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
         page,
         request,
     }) => {
@@ -171,15 +162,17 @@ test.describe('Magic-link login UI — EW-633', () => {
             test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
         }
 
-        await page.goto('/login/magic-link');
-        await expect(page.getByTestId('magic-link-error')).toBeVisible();
+        await page.goto('/en/login/magic-link', { waitUntil: 'networkidle' });
+        await expect(page.getByTestId('magic-link-error')).toBeVisible({
+            timeout: 15_000,
+        });
         const resend = page.getByTestId('magic-link-request-new');
         await expect(resend).toBeVisible();
         await resend.click();
         await page.waitForURL(/\/login\?tab=magic-link/);
     });
 
-    test.fixme('opening /login/magic-link with an invalid token shows the error path', async ({
+    test('opening /login/magic-link with an invalid token shows the error path', async ({
         page,
         request,
     }) => {
@@ -187,7 +180,9 @@ test.describe('Magic-link login UI — EW-633', () => {
             test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
         }
 
-        await page.goto('/login/magic-link?token=deadbeef-not-a-real-token');
+        await page.goto('/en/login/magic-link?token=deadbeef-not-a-real-token', {
+            waitUntil: 'networkidle',
+        });
         await expect(page.getByTestId('magic-link-error')).toBeVisible({
             timeout: 15_000,
         });
