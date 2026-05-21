@@ -5,6 +5,8 @@ import {
 	PutObjectCommand,
 	GetObjectCommand,
 	DeleteObjectCommand,
+	DeleteObjectsCommand,
+	ListObjectsV2Command,
 	HeadBucketCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -197,6 +199,59 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 	 */
 	deriveKey(ownerId: string, filename: string): string {
 		return `uploads/${ownerId}/${filename}`;
+	}
+
+	/**
+	 * Delete every object under `uploads/<ownerId>/` — called by the
+	 * anon cleanup schedule when an anon user TTL expires. S3's
+	 * `DeleteObjects` accepts up to 1000 keys per call; we paginate
+	 * via `ListObjectsV2` with `ContinuationToken` until the prefix
+	 * is empty, deleting in batches.
+	 *
+	 * The MinIO plugin inherits this method via `extends`.
+	 */
+	async deleteAllByOwner(ownerId: string): Promise<{ deleted: number }> {
+		const cfg = this.config();
+		const client = this.client(cfg);
+		const prefix = `uploads/${sanitizeOwner(ownerId)}/`;
+		let deleted = 0;
+		let continuationToken: string | undefined;
+
+		do {
+			const listOut = await client.send(
+				new ListObjectsV2Command({
+					Bucket: cfg.bucket,
+					Prefix: prefix,
+					ContinuationToken: continuationToken,
+					MaxKeys: 1000
+				})
+			);
+			const objects = listOut.Contents ?? [];
+			if (objects.length > 0) {
+				const out = await client.send(
+					new DeleteObjectsCommand({
+						Bucket: cfg.bucket,
+						Delete: {
+							Objects: objects
+								.filter((o): o is { Key: string } => typeof o.Key === 'string')
+								.map((o) => ({ Key: o.Key })),
+							Quiet: true
+						}
+					})
+				);
+				// `out.Errors` lists per-key failures; we log + count what we did delete.
+				const errors = out.Errors ?? [];
+				deleted += objects.length - errors.length;
+				if (errors.length > 0) {
+					this.context?.logger.warn?.(
+						`${this.id} deleteAllByOwner: ${errors.length} of ${objects.length} keys failed for ${ownerId}`
+					);
+				}
+			}
+			continuationToken = listOut.IsTruncated ? listOut.NextContinuationToken : undefined;
+		} while (continuationToken);
+
+		return { deleted };
 	}
 
 	async onLoad(context: PluginContext): Promise<void> {

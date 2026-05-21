@@ -129,17 +129,13 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		});
 
 		const key = repoPath;
-		// IMPORTANT: do NOT return raw.githubusercontent.com here. That host
-		// returns 404 (no token, no auth) for private repos, which is the
-		// recommended setup for landing-page uploads. Callers should
-		// stream through the API's owner-scoped `GET /api/uploads/:owner/:filename`
-		// route, which delegates back to this plugin's `getObject(key)` over
-		// the authenticated GitHub Contents API.
-		// For public repos the operator can override via `cfg.publicRawUrl`
-		// (env: `GITHUB_STORAGE_PUBLIC_URL_BASE`); see config().
-		const url = cfg.publicRawUrl
-			? `${cfg.publicRawUrl.replace(/\/$/, '')}/${repoPath}`
-			: `/api/uploads/${owner}/${hash}${ext}`;
+		// Always return the owner-gated API route. `UploadsService.saveImage`
+		// rewrites this to the same shape anyway (Codex P1 fix in PR #894),
+		// so the plugin no longer tries to hand back a public CDN URL.
+		// Public-repo operators who want raw URLs can read the storage key
+		// off the upload response and build their own URL — there is no
+		// internal consumer for the old `publicRawUrl` path.
+		const url = `/api/uploads/${owner}/${hash}${ext}`;
 		return { key, url };
 	}
 
@@ -211,6 +207,74 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		return `${cfg.pathPrefix}/${ownerId}/${filename}`;
 	}
 
+	/**
+	 * Delete every file under `<pathPrefix>/<ownerId>/` — called by the
+	 * anon cleanup schedule. GitHub Contents API doesn't have a bulk
+	 * delete: we list the directory, then iterate `deleteFile` per
+	 * entry. Each delete creates a commit, so cleanup of N files takes
+	 * N commits — acceptable since this runs once a day off-peak.
+	 *
+	 * Idempotent: a missing directory returns 0 deletes, errors per
+	 * file are logged + counted but don't abort the batch.
+	 */
+	async deleteAllByOwner(ownerId: string): Promise<{ deleted: number }> {
+		const cfg = this.config();
+		const octokit = this.client(cfg);
+		const ownerPath = `${cfg.pathPrefix}/${sanitizeOwner(ownerId)}`;
+
+		let entries: Array<{ path: string; sha: string; type: string }>;
+		try {
+			const { data } = await octokit.rest.repos.getContent({
+				owner: cfg.owner,
+				repo: cfg.repo,
+				path: ownerPath,
+				ref: cfg.branch
+			});
+			if (!Array.isArray(data)) {
+				// Single file at exactly the owner path — unusual, but treat as the only entry.
+				if (data.type === 'file') {
+					entries = [{ path: data.path, sha: data.sha, type: 'file' }];
+				} else {
+					entries = [];
+				}
+			} else {
+				entries = data
+					.filter((d): d is typeof d & { sha: string } => typeof d.sha === 'string')
+					.map((d) => ({ path: d.path, sha: d.sha, type: d.type }));
+			}
+		} catch (err) {
+			// Missing owner dir → idempotent no-op.
+			if (err instanceof RequestError && err.status === 404) {
+				return { deleted: 0 };
+			}
+			throw err;
+		}
+
+		let deleted = 0;
+		for (const entry of entries) {
+			if (entry.type !== 'file') continue;
+			try {
+				await octokit.rest.repos.deleteFile({
+					owner: cfg.owner,
+					repo: cfg.repo,
+					path: entry.path,
+					message: `gc(anon-cleanup): ${entry.path}`,
+					sha: entry.sha,
+					branch: cfg.branch
+				});
+				deleted += 1;
+			} catch (err) {
+				if (err instanceof RequestError && err.status === 404) continue;
+				this.context?.logger.warn?.(
+					`github-storage deleteAllByOwner: failed to delete ${entry.path}: ${
+						err instanceof Error ? err.message : String(err)
+					}`
+				);
+			}
+		}
+		return { deleted };
+	}
+
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		context.logger.log('GitHub storage plugin loaded');
@@ -255,18 +319,12 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		const repo = process.env.GITHUB_STORAGE_REPO || '';
 		const branch = process.env.GITHUB_STORAGE_BRANCH || 'main';
 		const pathPrefix = (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(/(^\/+|\/+$)/g, '');
-		// Optional public URL base for cases where the configured repo IS
-		// public and operators want raw.githubusercontent.com URLs (or a
-		// CDN in front of it). When unset, putObject returns an internal
-		// API-routed URL; getObject streams the blob via the GitHub Contents
-		// API regardless, so private-repo + no-public-url is still correct.
-		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
 		if (!token || !owner || !repo) {
 			throw new Error(
 				'github-storage plugin not configured: GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO required'
 			);
 		}
-		return { token, owner, repo, branch, pathPrefix, publicRawUrl };
+		return { token, owner, repo, branch, pathPrefix };
 	}
 
 	private client(cfg: GitHubStorageConfig): Octokit {
@@ -280,15 +338,6 @@ interface GitHubStorageConfig {
 	repo: string;
 	branch: string;
 	pathPrefix: string;
-	/**
-	 * Optional public URL base for the repo's raw content (e.g.
-	 * `https://raw.githubusercontent.com/foo/bar/main`). When set,
-	 * `putObject` returns `${publicRawUrl}/${repoPath}`. When unset
-	 * (the recommended setup for private repos), `putObject` returns
-	 * an internal API-routed URL — `getObject` always reads through
-	 * the authenticated Contents API.
-	 */
-	publicRawUrl?: string;
 }
 
 function sanitizeExt(filename: string): string {

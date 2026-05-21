@@ -33,6 +33,7 @@ import { WorkSchedule } from './work-schedule.entity';
 import { WorkCustomDomain } from './work-custom-domain.entity';
 import { WorkDeployment } from './work-deployment.entity';
 import { WorkMember } from './work-member.entity';
+import type { WorkKbConfig } from './kb-types';
 
 @Entity({ name: 'works' })
 export class Work {
@@ -298,6 +299,13 @@ export class Work {
 
     @Column({ type: 'text', nullable: true })
     platformSyncLastErrorMessage?: string | null;
+
+    // Knowledge Base configuration (see kb-types.ts -> WorkKbConfig).
+    // Folded into a single simple-json column because none of these
+    // fields are query-driven; everything that is queried lives on
+    // dedicated KB entities.
+    @Column('simple-json', { nullable: true })
+    kbConfig?: WorkKbConfig | null;
 
     // Timestamps
     @CreateDateColumn()
