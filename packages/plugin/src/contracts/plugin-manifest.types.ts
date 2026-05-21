@@ -14,7 +14,10 @@ export const PLUGIN_CATEGORIES = [
 	'form',
 	'integration',
 	'utility',
-	'theme'
+	'theme',
+	// EW-637 — pluggable object storage backends (local-fs, S3, MinIO, GitHub).
+	// See packages/plugin/src/contracts/capabilities/storage.interface.ts.
+	'storage'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
