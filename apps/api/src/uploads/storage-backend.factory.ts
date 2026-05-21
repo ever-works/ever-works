@@ -75,6 +75,24 @@ export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
     const plugin = await instantiate(wanted);
     await plugin.onLoad(makeStubContext(plugin.id));
 
+    // Probe `isAvailable()` at boot so misconfigured backends fail loudly
+    // here instead of on the first upload with a confusing SDK error
+    // (e.g. "Region is missing"). local-fs always returns true after
+    // ensuring its data dir; S3/MinIO test bucket reachability;
+    // github-storage validates the configured token + repo.
+    if (typeof plugin.isAvailable === 'function') {
+        const available = await plugin.isAvailable().catch(() => false);
+        if (!available) {
+            throw new Error(
+                `STORAGE_BACKEND="${wanted}" loaded but isAvailable() returned false. ` +
+                    `Check the backend-specific env vars (see .env.compose). ` +
+                    `For aws-s3/minio: bucket must exist + credentials must allow HeadBucket. ` +
+                    `For github-storage: GITHUB_STORAGE_TOKEN must have repo write to ` +
+                    `GITHUB_STORAGE_OWNER/GITHUB_STORAGE_REPO.`,
+            );
+        }
+    }
+
     cached = plugin;
     cachedId = wanted;
     return plugin;

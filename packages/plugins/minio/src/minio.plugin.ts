@@ -82,6 +82,10 @@ export class MinioStoragePlugin extends AwsS3StoragePlugin {
 	}
 
 	override async onLoad(context: PluginContext): Promise<void> {
+		// Chain to the parent so `this.context` (and the S3Client cache
+		// state managed there) is initialized. The previous override
+		// skipped super and left context undefined.
+		await super.onLoad(context);
 		context.logger.log('MinIO storage plugin loaded');
 	}
 

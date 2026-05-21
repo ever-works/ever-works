@@ -129,7 +129,17 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		});
 
 		const key = repoPath;
-		const url = `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${repoPath}`;
+		// IMPORTANT: do NOT return raw.githubusercontent.com here. That host
+		// returns 404 (no token, no auth) for private repos, which is the
+		// recommended setup for landing-page uploads. Callers should
+		// stream through the API's owner-scoped `GET /api/uploads/:owner/:filename`
+		// route, which delegates back to this plugin's `getObject(key)` over
+		// the authenticated GitHub Contents API.
+		// For public repos the operator can override via `cfg.publicRawUrl`
+		// (env: `GITHUB_STORAGE_PUBLIC_URL_BASE`); see config().
+		const url = cfg.publicRawUrl
+			? `${cfg.publicRawUrl.replace(/\/$/, '')}/${repoPath}`
+			: `/api/uploads/${owner}/${hash}${ext}`;
 		return { key, url };
 	}
 
@@ -231,12 +241,18 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		const repo = process.env.GITHUB_STORAGE_REPO || '';
 		const branch = process.env.GITHUB_STORAGE_BRANCH || 'main';
 		const pathPrefix = (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(/(^\/+|\/+$)/g, '');
+		// Optional public URL base for cases where the configured repo IS
+		// public and operators want raw.githubusercontent.com URLs (or a
+		// CDN in front of it). When unset, putObject returns an internal
+		// API-routed URL; getObject streams the blob via the GitHub Contents
+		// API regardless, so private-repo + no-public-url is still correct.
+		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
 		if (!token || !owner || !repo) {
 			throw new Error(
 				'github-storage plugin not configured: GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO required'
 			);
 		}
-		return { token, owner, repo, branch, pathPrefix };
+		return { token, owner, repo, branch, pathPrefix, publicRawUrl };
 	}
 
 	private client(cfg: GitHubStorageConfig): Octokit {
@@ -250,6 +266,15 @@ interface GitHubStorageConfig {
 	repo: string;
 	branch: string;
 	pathPrefix: string;
+	/**
+	 * Optional public URL base for the repo's raw content (e.g.
+	 * `https://raw.githubusercontent.com/foo/bar/main`). When set,
+	 * `putObject` returns `${publicRawUrl}/${repoPath}`. When unset
+	 * (the recommended setup for private repos), `putObject` returns
+	 * an internal API-routed URL — `getObject` always reads through
+	 * the authenticated Contents API.
+	 */
+	publicRawUrl?: string;
 }
 
 function sanitizeExt(filename: string): string {

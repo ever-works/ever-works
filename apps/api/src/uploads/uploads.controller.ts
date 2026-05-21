@@ -150,34 +150,11 @@ export class UploadsController {
             });
         }
 
-        // Honor an existing session if one happened through — the
-        // AuthSessionGuard is set as APP_GUARD with @Public() bypass, so
-        // anon callers reach this point with `req.user` unset; an
-        // authenticated caller would normally never hit /anonymous, but
-        // we accept that case for the no-branch convenience.
-        let userId = req.user?.userId;
-        let anonAccessToken: string | undefined;
-        let anonymousExpiresAt: string | null | undefined;
-
-        if (!userId) {
-            const ipAddress =
-                (typeof req.ip === 'string' && req.ip) ||
-                (typeof req.headers['x-forwarded-for'] === 'string'
-                    ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
-                    : null);
-            const userAgent =
-                typeof req.headers['user-agent'] === 'string'
-                    ? (req.headers['user-agent'] as string)
-                    : null;
-
-            const anon = await this.anonymousAuthService.createAnonymousUser({
-                ipAddress,
-                userAgent,
-            });
-            userId = anon.user.id;
-            anonAccessToken = anon.access_token;
-            anonymousExpiresAt = anon.user.anonymousExpiresAt ?? null;
-        }
+        // Honor an existing session if one happened through — anon callers
+        // reach this point with `req.user` unset (because @Public() bypasses
+        // AuthSessionGuard), an authenticated caller is supported as a
+        // no-branch convenience.
+        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
 
         const result = await this.uploads.saveImage(userId, file);
 
@@ -237,29 +214,7 @@ export class UploadsController {
 
         // Mint an anon user when no session is present, same as the anon
         // upload route — direct-to-cloud uploads need an owner segment.
-        let userId = req.user?.userId;
-        let anonAccessToken: string | undefined;
-        let anonymousExpiresAt: string | null | undefined;
-
-        if (!userId) {
-            const ipAddress =
-                (typeof req.ip === 'string' && req.ip) ||
-                (typeof req.headers['x-forwarded-for'] === 'string'
-                    ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
-                    : null);
-            const userAgent =
-                typeof req.headers['user-agent'] === 'string'
-                    ? (req.headers['user-agent'] as string)
-                    : null;
-
-            const anon = await this.anonymousAuthService.createAnonymousUser({
-                ipAddress,
-                userAgent,
-            });
-            userId = anon.user.id;
-            anonAccessToken = anon.access_token;
-            anonymousExpiresAt = anon.user.anonymousExpiresAt ?? null;
-        }
+        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
 
         const presign = await backend.presignPut({
             filename: body.filename,
@@ -316,5 +271,46 @@ export class UploadsController {
         // Type is somehow wrong.
         res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
         res.send(buffer);
+    }
+
+    /**
+     * Resolve who's doing the upload: honor an existing session if a bearer
+     * token came through; otherwise mint an anonymous user inline. Both
+     * /anonymous and /presign route through here so the IP / user-agent
+     * extraction strategy stays in one place.
+     */
+    private async resolveActingUser(req: AnonRequest): Promise<{
+        userId: string;
+        anonAccessToken: string | undefined;
+        anonymousExpiresAt: string | null | undefined;
+    }> {
+        const existing = req.user?.userId;
+        if (existing) {
+            return {
+                userId: existing,
+                anonAccessToken: undefined,
+                anonymousExpiresAt: undefined,
+            };
+        }
+
+        const ipAddress =
+            (typeof req.ip === 'string' && req.ip) ||
+            (typeof req.headers['x-forwarded-for'] === 'string'
+                ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+                : null);
+        const userAgent =
+            typeof req.headers['user-agent'] === 'string'
+                ? (req.headers['user-agent'] as string)
+                : null;
+
+        const anon = await this.anonymousAuthService.createAnonymousUser({
+            ipAddress,
+            userAgent,
+        });
+        return {
+            userId: anon.user.id,
+            anonAccessToken: anon.access_token,
+            anonymousExpiresAt: anon.user.anonymousExpiresAt ?? null,
+        };
     }
 }

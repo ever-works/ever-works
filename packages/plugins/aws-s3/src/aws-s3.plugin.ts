@@ -101,6 +101,14 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 
 	private context?: PluginContext;
 
+	// Cache the S3Client so we don't construct a new one (and a new HTTPS
+	// agent / connection pool) per upload. The cache key is a tuple of the
+	// fields the client constructor cares about; if any of them change
+	// (e.g. credentials get rotated via env, or a test resets MINIO_*) we
+	// build a fresh client.
+	private cachedClient?: S3Client;
+	private cachedClientKey?: string;
+
 	async putObject(input: StoragePutInput): Promise<StoragePutResult> {
 		const cfg = this.config();
 		const client = this.client(cfg);
@@ -184,6 +192,15 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
+		if (this.cachedClient) {
+			try {
+				this.cachedClient.destroy();
+			} catch {
+				/* best-effort */
+			}
+			this.cachedClient = undefined;
+			this.cachedClientKey = undefined;
+		}
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -248,6 +265,10 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 	}
 
 	private client(cfg: S3Config): S3Client {
+		// Cache the client across calls. AWS SDK v3 S3Client maintains its
+		// own HTTPS agent / connection pool, so constructing one per request
+		// (the previous behavior) prevented TCP reuse and risked FD
+		// exhaustion under sustained upload load.
 		const credentials =
 			cfg.accessKeyId && cfg.secretAccessKey
 				? {
@@ -256,12 +277,37 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 					}
 				: undefined;
 
-		return new S3Client({
+		// Stable signature of every input that affects S3Client construction.
+		// Credentials are deliberately included (rotation should yield a new
+		// client) but only via presence/length — never via the raw secret.
+		const credKey = credentials
+			? `${credentials.accessKeyId}:${credentials.secretAccessKey.length}`
+			: '<default-chain>';
+		const key = `${cfg.region}|${cfg.endpoint || ''}|${cfg.forcePathStyle ? '1' : '0'}|${credKey}`;
+
+		if (this.cachedClient && this.cachedClientKey === key) {
+			return this.cachedClient;
+		}
+
+		// Destroy the previous client (releases sockets) before swapping it
+		// out. Older client is unreachable from here onwards.
+		if (this.cachedClient) {
+			try {
+				this.cachedClient.destroy();
+			} catch {
+				/* best-effort */
+			}
+		}
+
+		const client = new S3Client({
 			region: cfg.region,
 			credentials,
 			endpoint: cfg.endpoint,
 			forcePathStyle: cfg.forcePathStyle
 		});
+		this.cachedClient = client;
+		this.cachedClientKey = key;
+		return client;
 	}
 
 	private buildKey(buffer: Buffer, filename: string, ownerId?: string): string {
