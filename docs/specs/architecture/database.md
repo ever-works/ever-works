@@ -419,7 +419,26 @@ work in `synchronize` mode but are discovered late in production.
 | IX — Behaviour-first        | This spec describes observable DB behaviour.                                    |
 | X — Backwards-compat        | Forward-only migrations + driver-agnostic queries keep schema stable.           |
 
-## 14. References
+## 14. Knowledge Base Entities
+
+Knowledge Base is the per-Work institutional-context subsystem (see [feature spec](../features/knowledge-base/spec.md)). It introduces five new entities + one new column on `Work`:
+
+| Entity                  | Table                      | Purpose                                                                                                                                                                                                                                                                            |
+| ----------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkKnowledgeDocument` | `work_knowledge_documents` | Typed knowledge document (brand / legal / seo / style / glossary / competitors / personas / research / output / freeform). Per-Work for most classes; `legal` / `style` / `seo` also support org-scope (one of `workId` / `organizationId` is set, never both — CHECK constraint). |
+| `WorkKnowledgeUpload`   | `work_knowledge_uploads`   | Original uploaded source files; metadata + extraction status. SHA-256 dedup index. File bytes live in the Work's configured Storage plugin (`github-storage` / `aws-s3` / `minio` / `local-fs`).                                                                                   |
+| `WorkKnowledgeTag`      | `work_knowledge_tags`      | Normalized per-Work tag catalog (slug, name, color token, description).                                                                                                                                                                                                            |
+| `WorkKnowledgeCitation` | `work_knowledge_citations` | Append-only audit row: which KB document was cited by which consumer (agent run / generation / conversation / community PR / comparison).                                                                                                                                          |
+| `WorkKnowledgeChunk`    | `work_knowledge_chunks`    | Embedding chunks (pgvector). Composite PK `(workId, id)` so future migration to `PARTITION BY HASH (workId)` doesn't require a table rewrite. ivfflat index on `(workId, embedding)`.                                                                                              |
+| _(`Work` column)_       | `works.kb_config`          | `simple-json` per-Work KB configuration: storage plugin override, retrieval budget, per-class inheritance mode (`inherit` / `override` / `disabled`).                                                                                                                              |
+
+**Extension dependency:** the chunks table requires the `pgvector` extension. A dedicated migration (`<ts>-EnablePgvectorExtension.ts`) runs `CREATE EXTENSION IF NOT EXISTS vector;` before the chunks-table migration.
+
+**Inheritance pattern:** org-level documents (`legal` / `style` / `seo` only in v1) are stored in the same `work_knowledge_documents` table with `organizationId` set instead of `workId`. Resolution at read time merges org + Work documents per class, with Work overriding org for the same `path`. The merged effective set is also materialized into each Work's Git data repo under `.content/kb/.org/{class}/` for direct-Git consumers (pipelines reading from disk).
+
+**Two-layer persistence:** the DB is the source of truth for metadata + indexes + locks; the Work's Git data repository is the source of truth for content (sidecar `.yml` + `.md` per document at `.content/kb/<class>/<slug>.{yml,md}`). The `KnowledgeBaseService` orchestrator keeps the two in sync via a two-phase write (DB → Git; rollback DB on Git failure).
+
+## 15. References
 
 - Source:
     - `packages/agent/src/database/`
@@ -432,4 +451,5 @@ work in `synchronize` mode but are discovered late in production.
     - [`subscriptions`](./subscriptions.md)
     - [`auth`](./auth.md) (token storage)
     - [`agent-services/distributed-task-lock`](../../agent-services/distributed-task-lock.md)
+    - [`features/knowledge-base`](../features/knowledge-base/spec.md)
 - User docs: [`docs/database/`](../../database/)
