@@ -6,29 +6,29 @@ function makeRepo<T extends { id?: string }>() {
     let nextId = 1;
     const rows: T[] = [];
 
+    const saveOne = async (input: T): Promise<T> => {
+        const now = new Date('2026-05-19T00:00:00.000Z');
+        const row = {
+            ...(input as any),
+            id: input.id ?? `id-${nextId++}`,
+            createdAt: (input as any).createdAt ?? now,
+            updatedAt: now,
+        } as T;
+        const index = rows.findIndex((existing) => existing.id === row.id);
+        if (index >= 0) rows[index] = row;
+        else rows.push(row);
+        return row;
+    };
+
     const repo = {
         rows,
         manager: undefined as any,
         create: jest.fn((input: Partial<T>) => input as T),
         save: jest.fn(async (input: T | T[]) => {
             if (Array.isArray(input)) {
-                const saved = [] as T[];
-                for (const item of input) {
-                    saved.push(await repo.save(item));
-                }
-                return saved;
+                return Promise.all(input.map((item) => saveOne(item)));
             }
-            const now = new Date('2026-05-19T00:00:00.000Z');
-            const row = {
-                ...(input as any),
-                id: input.id ?? `id-${nextId++}`,
-                createdAt: (input as any).createdAt ?? now,
-                updatedAt: now,
-            } as T;
-            const index = rows.findIndex((existing) => existing.id === row.id);
-            if (index >= 0) rows[index] = row;
-            else rows.push(row);
-            return row;
+            return saveOne(input);
         }),
         findOne: jest.fn(async ({ where }: any) => {
             return (
