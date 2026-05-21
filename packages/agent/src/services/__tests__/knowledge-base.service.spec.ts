@@ -519,8 +519,6 @@ describe('KnowledgeBaseService', () => {
         it('HTML upload: routes through KnowledgeBaseBufferExtractorService and creates a doc', async () => {
             // Build a fresh service WITH the buffer extractor wired so
             // we exercise the new Phase 1B/c routing branch.
-            const { KnowledgeBaseBufferExtractorService: BufferExtractor } =
-                await import('../knowledge-base-buffer-extractor.service');
             const module2: TestingModule = await Test.createTestingModule({
                 providers: [
                     KnowledgeBaseService,
