@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
+import { KB_STORAGE_PLUGIN, KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
+import { getActiveStorageBackend } from '../uploads/storage-backend.factory';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
 import { CacheEntryRepository } from '@ever-works/agent/cache';
@@ -53,6 +54,16 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkCacheWarmupService,
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
+        // EW-641 1B/b — bind the active object-storage plugin (env-
+        // selected via STORAGE_BACKEND) to the KB ingest pipeline's
+        // injection token. The agent-side `KnowledgeBaseService` reads
+        // bytes via this plugin's `getObject` and persists uploads via
+        // `putObject`. Same backend the platform's general-purpose
+        // upload route uses; one storage plugin per deployment.
+        {
+            provide: KB_STORAGE_PLUGIN,
+            useFactory: () => getActiveStorageBackend(),
+        },
     ],
     controllers: [
         WorksController,

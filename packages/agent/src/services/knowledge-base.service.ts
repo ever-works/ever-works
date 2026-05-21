@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Inject,
     Injectable,
@@ -8,8 +10,13 @@ import {
     Optional,
     ServiceUnavailableException,
 } from '@nestjs/common';
+import type { IStoragePlugin } from '@ever-works/plugin';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { WorkOwnershipService } from './work-ownership.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
+import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
+import { KbUploadExtractionStatus } from '../entities/kb-types';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
@@ -31,6 +38,17 @@ import type {
     KbDocumentDto,
     KbTagDto,
 } from '@ever-works/contracts';
+
+/**
+ * DI token for the storage plugin used by the KB upload + ingest
+ * pipeline. The API-side `KnowledgeBaseModule` binds it via
+ * `getActiveStorageBackend()` — the same factory `UploadsService` uses
+ * for the platform's general-purpose upload route. Declared as a string
+ * token because `IStoragePlugin` is an interface (erased at runtime).
+ *
+ * Spec: docs/specs/features/knowledge-base/spec.md §8 (storage).
+ */
+export const KB_STORAGE_PLUGIN = 'KB_STORAGE_PLUGIN';
 
 interface CreateDocumentInput {
     workId: string;
@@ -112,6 +130,14 @@ export class KnowledgeBaseService {
         private readonly mirrorDispatcher?: KbMirrorDocumentDispatcher,
         @Optional()
         private readonly mirrorService?: KnowledgeBaseGitMirrorService,
+        // EW-641 1B/b — storage plugin used by the KB upload pipeline.
+        // Wired by the API-side module to the same `IStoragePlugin`
+        // selected via `STORAGE_BACKEND` env. Optional so deployments
+        // and tests that don't exercise upload still construct.
+        @Optional()
+        @Inject(KB_STORAGE_PLUGIN)
+        private readonly storage?: IStoragePlugin,
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -582,6 +608,403 @@ export class KnowledgeBaseService {
             relevanceScore: c.relevanceScore ?? null,
             createdAt: c.createdAt.toISOString(),
         }));
+    }
+
+    // ─── UPLOADS (EW-641 1B/b ingest) ────────────────────────────────────────
+
+    async listUploads(
+        workId: string,
+        userId: string,
+        opts: { status?: KbUploadExtractionStatus; limit?: number; offset?: number } = {},
+    ): Promise<{ items: WorkKnowledgeUpload[]; total: number }> {
+        await this.ownershipService.ensureCanView(workId, userId);
+        return this.uploadRepository.listPaged({ workId, ...opts });
+    }
+
+    async getUpload(
+        workId: string,
+        uploadId: string,
+        userId: string,
+    ): Promise<WorkKnowledgeUpload> {
+        await this.ownershipService.ensureCanView(workId, userId);
+        const upload = await this.uploadRepository.findById(workId, uploadId);
+        if (!upload) {
+            throw new NotFoundException(`KB upload not found: ${uploadId}`);
+        }
+        return upload;
+    }
+
+    /**
+     * Receive a multipart upload and run the synchronous slice of the
+     * ingest pipeline (spec §9.1–§9.4). The file bytes are already in
+     * memory from `FileInterceptor` so the API handler can extract +
+     * materialize without a Trigger.dev round-trip.
+     *
+     * Flow:
+     *  1. Permission check (editor+).
+     *  2. SHA-256 dedup against `(workId, sha256)`. On a hit, no
+     *     storage write, no new KB doc — re-classification of an
+     *     existing upload comes via a separate dedicated endpoint.
+     *  3. Persist bytes via `IStoragePlugin.putObject` under
+     *     `kb-originals/{class}/{sha256}.{ext}`.
+     *  4. Create the `WorkKnowledgeUpload` row.
+     *  5. If MIME is text-passthrough (markdown/plain): build the KB
+     *     document body directly from the bytes and create a doc via
+     *     `createDocument` (which already enqueues the Git mirror).
+     *  6. Otherwise: mark `extractionStatus='skipped'` — the per-MIME
+     *     extractor routing (PDF/DOCX/HTML/etc.) lands in Phase 1B/c.
+     *  7. Emit the activity-log kinds per spec §19.1.
+     */
+    async createUpload(input: {
+        workId: string;
+        userId: string;
+        file: { buffer: Buffer; originalFilename: string; mimeType: string; size: number };
+        targetClass?: KbDocumentClass;
+        tags?: string[];
+        description?: string | null;
+        title?: string;
+    }): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
+        await this.ownershipService.ensureCanEdit(input.workId, input.userId);
+
+        if (!this.storage) {
+            throw new ServiceUnavailableException(
+                'KB uploads require a storage plugin — not configured in this deployment',
+            );
+        }
+
+        const sha256 = createHash('sha256').update(input.file.buffer).digest('hex');
+
+        const existing = await this.uploadRepository.findBySha256(input.workId, sha256);
+        if (existing) {
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_UPLOAD_DEDUPED,
+                `Skipped duplicate upload ${input.file.originalFilename}`,
+                {
+                    uploadId: existing.id,
+                    originalFilename: input.file.originalFilename,
+                    sha256,
+                },
+            );
+            return { upload: existing, document: null };
+        }
+
+        const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
+        const storageKey = await this.persistUploadToStorage(
+            input.workId,
+            input.userId,
+            input.file,
+            sha256,
+            klass,
+        );
+
+        const upload = await this.uploadRepository.create({
+            workId: input.workId,
+            storageProvider: this.storage.providerName,
+            storagePath: storageKey,
+            originalFilename: input.file.originalFilename,
+            mimeType: input.file.mimeType,
+            fileSize: input.file.size,
+            sha256,
+            extractionStatus: KbUploadExtractionStatus.RUNNING,
+            extractionStartedAt: new Date(),
+            uploadedById: input.userId,
+            tags: input.tags ?? null,
+        });
+
+        await this.recordUploadActivity(
+            input.workId,
+            input.userId,
+            ActivityActionType.KB_UPLOAD_CREATED,
+            `Uploaded ${input.file.originalFilename}`,
+            {
+                uploadId: upload.id,
+                originalFilename: input.file.originalFilename,
+                mimeType: input.file.mimeType,
+                fileSize: input.file.size,
+                sha256,
+            },
+        );
+
+        const document = await this.extractAndMaterialize(upload, input);
+        return { upload, document };
+    }
+
+    /**
+     * Re-run the extract+materialize step for a previously-failed or
+     * previously-skipped upload. Owner / manager only. Returns the
+     * (re-)created document or null if the upload's MIME still falls
+     * into the "skipped — pending extractor routing" bucket.
+     */
+    async retryUploadExtraction(
+        workId: string,
+        uploadId: string,
+        userId: string,
+    ): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
+        const access = await this.ownershipService.ensureCanEdit(workId, userId);
+        if (access.role !== 'owner' && access.role !== 'manager') {
+            throw new ForbiddenException('Retrying KB extraction requires manager+ role');
+        }
+        if (!this.storage) {
+            throw new ServiceUnavailableException(
+                'KB uploads require a storage plugin — not configured in this deployment',
+            );
+        }
+
+        const upload = await this.uploadRepository.findById(workId, uploadId);
+        if (!upload) {
+            throw new NotFoundException(`KB upload not found: ${uploadId}`);
+        }
+        if (upload.extractedDocumentId) {
+            throw new ConflictException(
+                `Upload ${uploadId} already produced a KB document (${upload.extractedDocumentId})`,
+            );
+        }
+
+        const fetched = await this.storage.getObject(upload.storagePath);
+
+        const refreshed = await this.uploadRepository.update(upload.id, {
+            extractionStatus: KbUploadExtractionStatus.RUNNING,
+            extractionStartedAt: new Date(),
+            extractionError: null,
+        });
+        const current = refreshed ?? upload;
+
+        const document = await this.extractAndMaterialize(current, {
+            workId,
+            userId,
+            file: {
+                buffer: fetched.buffer,
+                originalFilename: upload.originalFilename,
+                mimeType: fetched.mimeType ?? upload.mimeType,
+            },
+            targetClass: undefined,
+            tags: upload.tags ?? undefined,
+            description: null,
+            title: undefined,
+        });
+        return { upload: current, document };
+    }
+
+    /**
+     * Pick a deterministic storage key under the `kb-originals/` prefix
+     * (spec §8.2). Avoids storage backends that haven't implemented
+     * `deriveKey` by hard-coding the `<class>/<sha256>.<ext>` layout
+     * here — the platform owns the convention, not the plugin.
+     */
+    private async persistUploadToStorage(
+        workId: string,
+        userId: string,
+        file: { buffer: Buffer; originalFilename: string; mimeType: string; size: number },
+        sha256: string,
+        klass: KbDocumentClass,
+    ): Promise<string> {
+        if (!this.storage) {
+            throw new ServiceUnavailableException('KB storage plugin not configured');
+        }
+        const ext = this.fileExtension(file.originalFilename);
+        const filename = `${sha256}${ext ? `.${ext}` : ''}`;
+        const { key } = await this.storage.putObject({
+            buffer: file.buffer,
+            filename: `kb-originals/${klass}/${filename}`,
+            mimeType: file.mimeType,
+            size: file.size,
+            ownerId: workId,
+        });
+        return key;
+    }
+
+    /**
+     * Synchronous extract + materialize. Text-passthrough MIMEs only in
+     * Phase 1B/b — PDF/DOCX/HTML extractor routing lands in Phase 1B/c.
+     */
+    private async extractAndMaterialize(
+        upload: WorkKnowledgeUpload,
+        input: {
+            workId: string;
+            userId: string;
+            file: { buffer: Buffer; mimeType: string; originalFilename: string };
+            targetClass?: KbDocumentClass;
+            tags?: string[];
+            description?: string | null;
+            title?: string;
+        },
+    ): Promise<WorkKnowledgeDocument | null> {
+        const body = this.bodyForTextMimeType(input.file.buffer, input.file.mimeType);
+        if (body === null) {
+            await this.uploadRepository.update(upload.id, {
+                extractionStatus: KbUploadExtractionStatus.SKIPPED,
+                extractionFinishedAt: new Date(),
+                extractionError: `Extractor routing for ${input.file.mimeType} not yet implemented (Phase 1B/c)`,
+            });
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_UPLOAD_EXTRACTION_SKIPPED,
+                `Extraction skipped for ${input.file.originalFilename}`,
+                { uploadId: upload.id, mimeType: input.file.mimeType },
+            );
+            return null;
+        }
+
+        const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
+        const baseName = this.slugFromFilename(input.file.originalFilename);
+        const slug = baseName || 'document';
+        const path = `${klass}/${slug}.md`;
+        const title = input.title?.trim() || this.humanizeFilename(input.file.originalFilename);
+
+        try {
+            const doc = await this.createDocument({
+                workId: input.workId,
+                userId: input.userId,
+                path,
+                title,
+                class: klass,
+                body,
+                description: input.description ?? null,
+                tags: input.tags,
+                source: 'imported' as KbDocumentSource,
+                sourceUploadId: upload.id,
+            });
+
+            const docRow = await this.documentRepository.findById(input.workId, doc.id);
+            if (!docRow) {
+                throw new NotFoundException(`KB document vanished mid-ingest: ${doc.id}`);
+            }
+
+            await this.uploadRepository.update(upload.id, {
+                extractionStatus: KbUploadExtractionStatus.SUCCEEDED,
+                extractionFinishedAt: new Date(),
+                extractedDocumentId: docRow.id,
+            });
+
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_UPLOAD_EXTRACTED,
+                `Extracted ${input.file.originalFilename}`,
+                {
+                    uploadId: upload.id,
+                    documentId: docRow.id,
+                    mimeType: input.file.mimeType,
+                },
+            );
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_DOCUMENT_CREATED,
+                `Created KB document ${path}`,
+                {
+                    documentId: docRow.id,
+                    path,
+                    class: klass,
+                    source: 'imported',
+                },
+            );
+            return docRow;
+        } catch (error) {
+            const reason = (error as Error).message;
+            await this.uploadRepository.update(upload.id, {
+                extractionStatus: KbUploadExtractionStatus.FAILED,
+                extractionFinishedAt: new Date(),
+                extractionError: reason,
+            });
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_UPLOAD_EXTRACTION_FAILED,
+                `Extraction failed for ${input.file.originalFilename}`,
+                { uploadId: upload.id, mimeType: input.file.mimeType, error: reason },
+                ActivityStatus.FAILED,
+            );
+            throw error;
+        }
+    }
+
+    /**
+     * Returns the Markdown body for upload bytes whose MIME type the
+     * platform passes through directly (text/markdown, text/plain,
+     * text/x-markdown, application/x-markdown). Anything else returns
+     * `null` and the caller marks the upload as skipped.
+     *
+     * Per spec §22 we hard-cap inline body extraction at 1 MiB — over
+     * the cap, the bytes still live in storage but the row only carries
+     * a truncation marker; full extraction comes in Phase 1B/c.
+     */
+    private bodyForTextMimeType(buffer: Buffer, mimeType: string): string | null {
+        const TEXT_PASSTHROUGH = new Set([
+            'text/markdown',
+            'text/x-markdown',
+            'application/x-markdown',
+            'text/plain',
+        ]);
+        const normalized = mimeType.split(';')[0].trim().toLowerCase();
+        if (!TEXT_PASSTHROUGH.has(normalized)) {
+            return null;
+        }
+        const MAX_INLINE_BYTES = 1_048_576;
+        if (buffer.length > MAX_INLINE_BYTES) {
+            return (
+                buffer.slice(0, MAX_INLINE_BYTES).toString('utf-8') +
+                '\n\n<!-- truncated: original exceeded 1 MiB -->'
+            );
+        }
+        return buffer.toString('utf-8');
+    }
+
+    private async recordUploadActivity(
+        workId: string,
+        userId: string,
+        actionType: ActivityActionType,
+        summary: string,
+        details: Record<string, unknown>,
+        status: ActivityStatus = ActivityStatus.COMPLETED,
+    ): Promise<void> {
+        if (!this.activityLog) {
+            return;
+        }
+        try {
+            await this.activityLog.log({
+                userId,
+                workId,
+                actionType,
+                action: actionType,
+                status,
+                summary,
+                details: details as Record<string, unknown> as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record activity ${actionType} for work=${workId}: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    private slugFromFilename(filename: string): string {
+        const base = filename.replace(/\.[^.]+$/, '');
+        return base
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 96);
+    }
+
+    private humanizeFilename(filename: string): string {
+        return (
+            filename
+                .replace(/\.[^.]+$/, '')
+                .replace(/[-_]+/g, ' ')
+                .trim() || filename
+        );
+    }
+
+    private fileExtension(filename: string): string {
+        const idx = filename.lastIndexOf('.');
+        if (idx <= 0 || idx === filename.length - 1) {
+            return '';
+        }
+        return filename.slice(idx + 1).toLowerCase();
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────

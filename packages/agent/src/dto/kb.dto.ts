@@ -204,6 +204,37 @@ export class RestoreKbDocumentDto {
     commitSha: string;
 }
 
+/**
+ * Optional metadata sent alongside a `POST /api/works/:id/kb/uploads`
+ * multipart request. The file itself is in the multipart `file` field;
+ * these fields control how the resulting `WorkKnowledgeDocument` is
+ * classified once extraction completes.
+ *
+ * Spec: docs/specs/features/knowledge-base/spec.md §9.7 (drag-and-drop UX).
+ */
+export class CreateKbUploadDto {
+    @IsOptional()
+    @IsIn(KB_DOCUMENT_CLASSES as unknown as readonly string[])
+    targetClass?: KbDocumentClass;
+
+    @IsOptional()
+    @IsString()
+    @Length(1, KB_TITLE_MAX)
+    title?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(KB_DESCRIPTION_MAX)
+    description?: string | null;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(KB_TAGS_MAX)
+    @IsString({ each: true })
+    @MaxLength(KB_TAG_SLUG_MAX, { each: true })
+    tags?: string[];
+}
+
 export class OrgKbDocumentScopeDto {
     @IsUUID()
     organizationId: string;
