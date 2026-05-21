@@ -74,11 +74,12 @@ describe('activity-log.types', () => {
         });
 
         it('has the expected total number of literal values (catch silent additions)', () => {
-            // 43 documented literals — pinned so any silent addition is a
-            // deliberate change. Last bumped by EW-628 G3 (3 DATA_SYNC_*
-            // values for the data-repo instant-sync activity rows).
+            // 51 documented literals — pinned so any silent addition is a
+            // deliberate change. Last bumped by EW-641 Phase 1B/b (5
+            // KB_UPLOAD_* + 3 KB_DOCUMENT_* values for the Knowledge
+            // Base ingest pipeline + document lifecycle events).
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(43);
+            expect(literals).toHaveLength(51);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
