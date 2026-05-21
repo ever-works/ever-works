@@ -44,7 +44,7 @@ export class CreateWorkKnowledgeDocuments1779971000000 implements MigrationInter
                 "generated_by_agent_run_id" uuid NULL,
                 "created_by_id" uuid NULL,
                 "updated_by_id" uuid NULL,
-                "last_indexed_at" ${tsType} NULL,
+                "last_indexed_at" bigint NULL,
                 "last_commit_sha" varchar(40) NULL,
                 "metadata" text NULL,
                 "createdAt" ${tsType} NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -14,6 +14,7 @@ import { Work } from './work.entity';
 import { ClassToObject } from './types';
 import { KbUploadExtractionStatus } from './kb-types';
 import { WorkKnowledgeDocument } from './work-knowledge-document.entity';
+import { TimestampColumn } from './_types';
 
 /**
  * An original uploaded source file backing a KB document.
@@ -79,10 +80,10 @@ export class WorkKnowledgeUpload {
     @Column({ type: 'text', nullable: true, name: 'extraction_error' })
     extractionError?: string | null;
 
-    @Column({ type: 'timestamptz', nullable: true, name: 'extraction_started_at' })
+    @TimestampColumn({ nullable: true })
     extractionStartedAt?: Date | null;
 
-    @Column({ type: 'timestamptz', nullable: true, name: 'extraction_finished_at' })
+    @TimestampColumn({ nullable: true })
     extractionFinishedAt?: Date | null;
 
     /** The KB document this upload was extracted into, if any. */

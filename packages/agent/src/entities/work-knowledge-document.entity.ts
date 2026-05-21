@@ -15,6 +15,7 @@ import { WorkAgentRun } from './work-agent-run.entity';
 import { ClassToObject } from './types';
 import { KbDocumentClass, KbDocumentSource, KbDocumentStatus, KbLockMode } from './kb-types';
 import { WorkKnowledgeUpload } from './work-knowledge-upload.entity';
+import { TimestampColumn } from './_types';
 
 /**
  * A typed Knowledge Base document.
@@ -149,7 +150,7 @@ export class WorkKnowledgeDocument {
     @JoinColumn({ name: 'updated_by_id' })
     updatedBy?: ClassToObject<User> | null;
 
-    @Column({ type: 'timestamptz', nullable: true, name: 'last_indexed_at' })
+    @TimestampColumn({ nullable: true })
     lastIndexedAt?: Date | null;
 
     @Column({ type: 'varchar', length: 40, nullable: true, name: 'last_commit_sha' })
