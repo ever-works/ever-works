@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.service';
+import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../../database/repositories/work-knowledge-tag.repository';
@@ -533,7 +534,7 @@ describe('KnowledgeBaseService', () => {
                     { provide: WorkOwnershipService, useValue: ownership },
                     { provide: KB_STORAGE_PLUGIN, useValue: storage },
                     { provide: ActivityLogService, useValue: activityLog },
-                    BufferExtractor,
+                    KnowledgeBaseBufferExtractorService,
                 ],
             }).compile();
             const wired = module2.get(KnowledgeBaseService);
