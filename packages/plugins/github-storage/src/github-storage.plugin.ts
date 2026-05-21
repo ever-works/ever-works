@@ -207,6 +207,74 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		return `${cfg.pathPrefix}/${ownerId}/${filename}`;
 	}
 
+	/**
+	 * Delete every file under `<pathPrefix>/<ownerId>/` — called by the
+	 * anon cleanup schedule. GitHub Contents API doesn't have a bulk
+	 * delete: we list the directory, then iterate `deleteFile` per
+	 * entry. Each delete creates a commit, so cleanup of N files takes
+	 * N commits — acceptable since this runs once a day off-peak.
+	 *
+	 * Idempotent: a missing directory returns 0 deletes, errors per
+	 * file are logged + counted but don't abort the batch.
+	 */
+	async deleteAllByOwner(ownerId: string): Promise<{ deleted: number }> {
+		const cfg = this.config();
+		const octokit = this.client(cfg);
+		const ownerPath = `${cfg.pathPrefix}/${sanitizeOwner(ownerId)}`;
+
+		let entries: Array<{ path: string; sha: string; type: string }>;
+		try {
+			const { data } = await octokit.rest.repos.getContent({
+				owner: cfg.owner,
+				repo: cfg.repo,
+				path: ownerPath,
+				ref: cfg.branch
+			});
+			if (!Array.isArray(data)) {
+				// Single file at exactly the owner path — unusual, but treat as the only entry.
+				if (data.type === 'file') {
+					entries = [{ path: data.path, sha: data.sha, type: 'file' }];
+				} else {
+					entries = [];
+				}
+			} else {
+				entries = data
+					.filter((d): d is typeof d & { sha: string } => typeof d.sha === 'string')
+					.map((d) => ({ path: d.path, sha: d.sha, type: d.type }));
+			}
+		} catch (err) {
+			// Missing owner dir → idempotent no-op.
+			if (err instanceof RequestError && err.status === 404) {
+				return { deleted: 0 };
+			}
+			throw err;
+		}
+
+		let deleted = 0;
+		for (const entry of entries) {
+			if (entry.type !== 'file') continue;
+			try {
+				await octokit.rest.repos.deleteFile({
+					owner: cfg.owner,
+					repo: cfg.repo,
+					path: entry.path,
+					message: `gc(anon-cleanup): ${entry.path}`,
+					sha: entry.sha,
+					branch: cfg.branch
+				});
+				deleted += 1;
+			} catch (err) {
+				if (err instanceof RequestError && err.status === 404) continue;
+				this.context?.logger.warn?.(
+					`github-storage deleteAllByOwner: failed to delete ${entry.path}: ${
+						err instanceof Error ? err.message : String(err)
+					}`
+				);
+			}
+		}
+		return { deleted };
+	}
+
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		context.logger.log('GitHub storage plugin loaded');

@@ -141,6 +141,56 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 		return `${ownerId}/${filename}`;
 	}
 
+	/**
+	 * Delete every object owned by the given user — called by the anon
+	 * cleanup schedule before deleting the user row. Implementation is
+	 * an `rm -rf` of the owner directory: idempotent (missing dir →
+	 * no-op), resilient (per-file errors are logged but don't abort),
+	 * and bounded (no files outside `<storageRoot>/<ownerId>/` can
+	 * possibly be reached via `assertValidOwnerId`).
+	 */
+	async deleteAllByOwner(ownerId: string): Promise<{ deleted: number }> {
+		this.assertValidOwnerId(ownerId);
+		const userDir = this.ownerDir(ownerId);
+
+		let entries: string[];
+		try {
+			entries = await fs.readdir(userDir);
+		} catch (err) {
+			const code = (err as NodeJS.ErrnoException).code;
+			if (code === 'ENOENT' || code === 'ENOTDIR') return { deleted: 0 };
+			throw err;
+		}
+
+		let deleted = 0;
+		for (const filename of entries) {
+			try {
+				const absPath = this.resolveSafe(userDir, filename);
+				await fs.unlink(absPath);
+				deleted += 1;
+			} catch (err) {
+				const code = (err as NodeJS.ErrnoException).code;
+				if (code === 'ENOENT') continue;
+				this.context?.logger.warn?.(
+					`local-fs deleteAllByOwner: failed to delete ${ownerId}/${filename}: ${
+						err instanceof Error ? err.message : String(err)
+					}`
+				);
+			}
+		}
+
+		// Best-effort rmdir on the now-empty owner directory; if anything
+		// was left behind (concurrent writer, permissions) the dir simply
+		// stays and the next sweep tries again.
+		try {
+			await fs.rmdir(userDir);
+		} catch {
+			/* tolerate */
+		}
+
+		return { deleted };
+	}
+
 	// ============================================================================
 	// IPlugin lifecycle
 	// ============================================================================
