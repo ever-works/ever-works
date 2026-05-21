@@ -398,7 +398,42 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             settings,
         };
 
-        yield* plugin.createStreamingChatCompletion(mergedOptions);
+        let chunkCount = 0;
+        let contentChars = 0;
+        let streamedModel = mergedOptions.model ?? model;
+
+        try {
+            for await (const chunk of plugin.createStreamingChatCompletion(mergedOptions)) {
+                chunkCount += 1;
+                streamedModel = chunk.model || streamedModel;
+
+                for (const choice of chunk.choices) {
+                    const content = choice.delta.content;
+                    if (typeof content === 'string') {
+                        contentChars += content.length;
+                    }
+                }
+
+                yield chunk;
+            }
+        } finally {
+            if (chunkCount > 0) {
+                await this.pluginUsageService?.record({
+                    workId: facadeOptions.workId,
+                    userId: facadeOptions.userId,
+                    pluginId: plugin.id,
+                    capability: PluginUsageCapability.AI,
+                    units: chunkCount,
+                    costCents: 0,
+                    modelId: streamedModel,
+                    metadata: {
+                        operation: 'createStreamingChatCompletion',
+                        chunkCount,
+                        contentChars,
+                    },
+                });
+            }
+        }
     }
 
     async testConnection(facadeOptions: FacadeOptions): Promise<{

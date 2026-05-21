@@ -53,10 +53,11 @@ export class SearchController {
      */
     private async resolveConfiguredProvider(
         userId: string,
+        workId?: string,
     ): Promise<{ id: string; name: string } | null> {
         const enabledPlugins = await this.pluginRegistry.getEnabledPluginsScoped(
             PLUGIN_CAPABILITIES.SEARCH,
-            undefined,
+            workId,
             userId,
         );
 
@@ -74,10 +75,16 @@ export class SearchController {
         });
 
         for (const registered of sorted) {
-            const settings = await this.pluginSettings.getSettings(registered.plugin.id, {
+            const settingsScope: { userId: string; workId?: string; includeSecrets: true } = {
                 userId,
                 includeSecrets: true,
-            });
+            };
+            if (workId) settingsScope.workId = workId;
+
+            const settings = await this.pluginSettings.getSettings(
+                registered.plugin.id,
+                settingsScope,
+            );
 
             if (this.hasAllRequiredSettings(registered.plugin.settingsSchema, settings)) {
                 return {
@@ -143,7 +150,7 @@ export class SearchController {
     @ApiResponse({ status: 200, description: 'Search results' })
     @ApiResponse({ status: 400, description: 'Search failed or no provider configured' })
     async search(@CurrentUser() auth: AuthenticatedUser, @Body() dto: SearchDto) {
-        const provider = await this.resolveConfiguredProvider(auth.userId);
+        const provider = await this.resolveConfiguredProvider(auth.userId, dto.workId);
 
         if (!provider) {
             throw new BadRequestException({
@@ -162,6 +169,7 @@ export class SearchController {
                 },
                 {
                     userId: auth.userId,
+                    ...(dto.workId && { workId: dto.workId }),
                     providerOverride: provider.id,
                 },
             );

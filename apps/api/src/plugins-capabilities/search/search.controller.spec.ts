@@ -327,6 +327,34 @@ describe('SearchController', () => {
             );
         });
 
+        it('uses dto.workId for scoped provider resolution and usage attribution', async () => {
+            pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([registered('tavily')]);
+            pluginSettings.getSettings.mockResolvedValue({});
+            searchFacade.search.mockResolvedValue([]);
+
+            await controller.search(auth, { query: 'q', workId: 'work-1' } as any);
+
+            expect(pluginRegistry.getEnabledPluginsScoped).toHaveBeenCalledWith(
+                'search',
+                'work-1',
+                'user-1',
+            );
+            expect(pluginSettings.getSettings).toHaveBeenCalledWith('tavily', {
+                userId: 'user-1',
+                workId: 'work-1',
+                includeSecrets: true,
+            });
+            expect(searchFacade.search).toHaveBeenCalledWith(
+                'q',
+                expect.any(Object),
+                {
+                    userId: 'user-1',
+                    workId: 'work-1',
+                    providerOverride: 'tavily',
+                },
+            );
+        });
+
         it('wraps NoProviderError in BadRequestException with "Enable a search plugin" message', async () => {
             pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([registered('tavily')]);
             pluginSettings.getSettings.mockResolvedValue({});
