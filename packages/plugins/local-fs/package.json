@@ -1,0 +1,82 @@
+{
+	"name": "@ever-works/local-fs-plugin",
+	"version": "1.0.0",
+	"description": "Local-filesystem storage backend for Ever Works — writes uploaded objects under UPLOADS_DIR. Default storage backend.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "local-fs",
+			"name": "Local Filesystem",
+			"version": "1.0.0",
+			"category": "storage",
+			"capabilities": [
+				"storage",
+				"put-object",
+				"get-object"
+			],
+			"description": "Stores uploaded objects on the API server's local disk under UPLOADS_DIR. Default backend for self-hosted / single-node deployments.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": true,
+			"systemPlugin": true,
+			"builtIn": true,
+			"visibility": "hidden",
+			"defaultForCapabilities": [
+				"storage",
+				"put-object",
+				"get-object"
+			],
+			"envVars": [
+				{
+					"name": "UPLOADS_DIR",
+					"required": false,
+					"secret": false,
+					"description": "Absolute path where uploaded objects are written. Defaults to <tmpdir>/ever-works-uploads."
+				},
+				{
+					"name": "UPLOADS_MAX_BYTES",
+					"required": false,
+					"secret": false,
+					"description": "Per-object size cap in bytes. Default 5242880 (5 MiB)."
+				}
+			]
+		}
+	}
+}
