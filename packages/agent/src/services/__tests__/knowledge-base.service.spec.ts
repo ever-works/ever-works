@@ -366,10 +366,22 @@ describe('KnowledgeBaseService', () => {
     });
 
     describe('restoreDocumentFromHistory', () => {
-        it('throws — feature deferred to Phase 1B', async () => {
-            await expect(service.restoreDocumentFromHistory()).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
+        it('rejects editor-role callers (manager+ required)', async () => {
+            // Default ownership mock returns 'editor' — restore needs
+            // owner/manager per spec §20.
+            await expect(
+                service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it('fails fast when the KB Git mirror service is not wired', async () => {
+            // Default test module bootstraps without
+            // `KnowledgeBaseGitMirrorService`, so callers with sufficient
+            // role get a 400 explaining the deployment is incomplete.
+            ownership.ensureCanEdit.mockResolvedValueOnce({ role: 'owner' } as any);
+            await expect(
+                service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
+            ).rejects.toBeInstanceOf(BadRequestException);
         });
     });
 });

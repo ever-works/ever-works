@@ -78,6 +78,7 @@ describe('TriggerInternalController', () => {
     let templateCustomizationRepository: any;
     let userTemplatePreferenceRepository: any;
     let userRepository: any;
+    let workKnowledgeDocumentRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -100,6 +101,7 @@ describe('TriggerInternalController', () => {
             userRepository,
             undefined, // dataSyncDispatcher
             undefined, // deployReadyPoller
+            workKnowledgeDocumentRepository,
             undefined, // workProposalsApiService
         );
         c.onModuleInit();
@@ -124,6 +126,7 @@ describe('TriggerInternalController', () => {
         authAccountRepository = { name: 'AuthAccountRepository' };
         templateRepository = { name: 'TemplateRepository' };
         userTemplatePreferenceRepository = { name: 'UserTemplatePreferenceRepository' };
+        workKnowledgeDocumentRepository = { name: 'WorkKnowledgeDocumentRepository' };
 
         controller = buildController();
     });

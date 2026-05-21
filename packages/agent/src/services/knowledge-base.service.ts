@@ -1,11 +1,14 @@
 import {
     BadRequestException,
     ForbiddenException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { WorkOwnershipService } from './work-ownership.service';
+import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
@@ -19,6 +22,10 @@ import {
     KbDocumentStatus,
     KbLockMode,
 } from '../entities/kb-types';
+import {
+    KB_MIRROR_DOCUMENT_DISPATCHER,
+    type KbMirrorDocumentDispatcher,
+} from '../tasks';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -102,7 +109,46 @@ export class KnowledgeBaseService {
         private readonly tagRepository: WorkKnowledgeTagRepository,
         private readonly citationRepository: WorkKnowledgeCitationRepository,
         private readonly ownershipService: WorkOwnershipService,
+        @Optional()
+        @Inject(KB_MIRROR_DOCUMENT_DISPATCHER)
+        private readonly mirrorDispatcher?: KbMirrorDocumentDispatcher,
+        @Optional()
+        private readonly mirrorService?: KnowledgeBaseGitMirrorService,
     ) {}
+
+    /**
+     * Enqueue a Trigger.dev `kb-mirror-document` run for one document
+     * mutation. When the Trigger.dev dispatcher is not registered (older
+     * deployments, isolated unit tests), the call is skipped — the DB
+     * row still persists and the Phase 3 reconciliation job catches the
+     * drift. Errors from the dispatcher are logged but do not bubble up:
+     * the user-facing API write must succeed even if the background
+     * sync queue is offline.
+     */
+    private async enqueueMirror(
+        workId: string,
+        documentId: string,
+        operation: 'upsert' | 'delete',
+        docPath: string,
+        docClass: string,
+    ): Promise<void> {
+        if (!this.mirrorDispatcher) {
+            return;
+        }
+        try {
+            await this.mirrorDispatcher.dispatchKbMirrorDocument({
+                workId,
+                documentId,
+                operation,
+                path: docPath,
+                class: docClass,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enqueue KB mirror for ${operation} ${docPath} (work=${workId}): ${(error as Error).message}`,
+            );
+        }
+    }
 
     // ─── DOCUMENTS — Work scope ───────────────────────────────────────────────
 
@@ -179,6 +225,8 @@ export class KnowledgeBaseService {
             await this.ensureTagsExist(input.workId, input.tags);
         }
 
+        await this.enqueueMirror(input.workId, doc.id, 'upsert', doc.path, doc.kbDocumentClass);
+
         return this.toBodyDto(doc);
     }
 
@@ -222,6 +270,14 @@ export class KnowledgeBaseService {
             await this.ensureTagsExist(workId, input.tags);
         }
 
+        await this.enqueueMirror(
+            workId,
+            updated.id,
+            'upsert',
+            updated.path,
+            updated.kbDocumentClass,
+        );
+
         return this.toBodyDto(updated);
     }
 
@@ -235,6 +291,17 @@ export class KnowledgeBaseService {
         this.assertNotLockedFull(existing);
 
         await this.documentRepository.delete(docId);
+
+        // After the hard delete, the row is gone but the Git mirror task
+        // still needs the path + class to remove the right files — pass
+        // them through the payload.
+        await this.enqueueMirror(
+            workId,
+            existing.id,
+            'delete',
+            existing.path,
+            existing.kbDocumentClass,
+        );
     }
 
     async lockDocument(
@@ -284,15 +351,64 @@ export class KnowledgeBaseService {
     }
 
     /**
-     * Phase 1A stub. The Git integration that surfaces prior commits
-     * lands alongside the Storage plugin bridge in Phase 1B; this
-     * endpoint exists in the API surface so the contract is fixed but
-     * returns a 501-like error until the Git side is ready.
+     * Restore a document body from a prior Git commit. Reads the body
+     * `.md` at the supplied commit SHA via the configured Git provider's
+     * `getFileContent` capability, applies it back to the DB row, and
+     * enqueues a fresh mirror so the head commit moves forward with the
+     * restored content.
+     *
+     * Requires `KnowledgeBaseGitMirrorService` to be wired into the
+     * module graph (it is in `apps/api`); deployments without the
+     * mirror service get a clear 503 rather than a 500.
      */
-    async restoreDocumentFromHistory(): Promise<KbDocumentBodyDto> {
-        throw new BadRequestException(
-            'restore-from-history is not yet available — Git integration lands in Phase 1B (EW-641)',
+    async restoreDocumentFromHistory(
+        workId: string,
+        docId: string,
+        userId: string,
+        commitSha: string,
+    ): Promise<KbDocumentBodyDto> {
+        const access = await this.ownershipService.ensureCanEdit(workId, userId);
+        if (access.role !== 'owner' && access.role !== 'manager') {
+            throw new ForbiddenException('Restoring KB history requires manager+ role');
+        }
+
+        if (!this.mirrorService) {
+            throw new BadRequestException(
+                'restore-from-history requires the KB Git mirror service — not configured in this deployment',
+            );
+        }
+
+        const existing = await this.documentRepository.findById(workId, docId);
+        if (!existing) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+        this.assertNotLockedFull(existing);
+
+        const result = await this.mirrorService.restoreDocumentFromGit(
+            workId,
+            docId,
+            commitSha,
         );
+        if (!result.restored) {
+            throw new NotFoundException(
+                `KB document body not found at commit ${commitSha} for ${existing.path}`,
+            );
+        }
+
+        const updated = await this.documentRepository.findById(workId, docId);
+        if (!updated) {
+            throw new NotFoundException(`KB document vanished mid-restore: ${docId}`);
+        }
+
+        await this.enqueueMirror(
+            workId,
+            updated.id,
+            'upsert',
+            updated.path,
+            updated.kbDocumentClass,
+        );
+
+        return this.toBodyDto(updated);
     }
 
     // ─── DOCUMENTS — Organization scope (inheritable: legal/style/seo) ───────

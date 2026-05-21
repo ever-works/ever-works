@@ -27,4 +27,8 @@ export * from './repositories/template-customization.repository';
 export * from './repositories/user-template-preference.repository';
 export * from './repositories/webhook-subscription.repository';
 export * from './repositories/webhook-delivery.repository';
+export * from './repositories/work-knowledge-document.repository';
+export * from './repositories/work-knowledge-upload.repository';
+export * from './repositories/work-knowledge-tag.repository';
+export * from './repositories/work-knowledge-citation.repository';
 export * from './database-init.service';
