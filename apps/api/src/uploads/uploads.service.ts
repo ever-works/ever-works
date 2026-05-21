@@ -1,4 +1,5 @@
 import {
+    Inject,
     Injectable,
     Logger,
     BadRequestException,
@@ -8,7 +9,22 @@ import {
 import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import type { IStoragePlugin } from '@ever-works/plugin';
+import type { WorkRepoResolver } from '@ever-works/github-storage-plugin';
 import { getActiveStorageBackend } from './storage-backend.factory';
+
+/**
+ * DI token for the optional `WorkRepoResolver` (EW-644).
+ *
+ * We inject via a token + `type`-only import rather than a direct class
+ * import to keep `uploads.service.ts` from transitively pulling
+ * `@ever-works/agent/database` + `@ever-works/agent/facades` into the
+ * import graph — those modules use the `@src/*` path alias that
+ * resolves only inside the agent package, and importing them from the
+ * api's jest test runtime explodes on `@src/config`. The module
+ * (`uploads.module.ts`) wires the concrete `WorkRepoResolverService` to
+ * this token via `{ provide: WORK_REPO_RESOLVER, useExisting: ... }`.
+ */
+export const WORK_REPO_RESOLVER = Symbol.for('ever-works:upload-work-repo-resolver');
 
 export interface UploadResult {
     id: string;
@@ -101,7 +117,16 @@ export class UploadsService {
     // `@Optional()` Nest passes `undefined` when no provider matches and
     // the service falls back to `getActiveStorageBackend()` lazily on
     // the first call. Tests still inject the backend via the constructor.
-    constructor(@Optional() backend?: IStoragePlugin) {
+    constructor(
+        @Optional() backend?: IStoragePlugin,
+        // EW-644: when present, threaded into the storage backend's
+        // `PluginContext` so `github-storage` in `mode: 'data-repo'` can
+        // resolve per-Work repo coordinates + token. Optional so unit
+        // tests that don't exercise github-storage don't need it.
+        @Optional()
+        @Inject(WORK_REPO_RESOLVER)
+        private readonly workRepoResolver?: WorkRepoResolver,
+    ) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
             this.backendPromise = Promise.resolve(backend);
@@ -115,7 +140,9 @@ export class UploadsService {
      */
     async getBackend(): Promise<IStoragePlugin> {
         if (!this.backendPromise) {
-            this.backendPromise = getActiveStorageBackend();
+            this.backendPromise = getActiveStorageBackend(
+                this.workRepoResolver ? { workRepoResolver: this.workRepoResolver } : undefined,
+            );
         }
         return this.backendPromise;
     }
