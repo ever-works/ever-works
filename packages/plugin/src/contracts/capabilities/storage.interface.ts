@@ -36,6 +36,16 @@ export interface StoragePutInput {
 	 * derive the key prefix for the chosen layout.
 	 */
 	readonly ownerId?: string;
+	/**
+	 * Optional Work ID. Backends that resolve their destination per-Work
+	 * require this — e.g. `@ever-works/github-storage-plugin` in mode
+	 * `data-repo` uses it to look up the Work's data repo coordinates
+	 * (`Work.owner`, branch, OAuth token) at upload time. Backends that
+	 * don't care (local-fs, aws-s3, minio, github-storage in mode
+	 * `separate-repo`) ignore it. Anonymous uploads leave this undefined.
+	 * Added in EW-644.
+	 */
+	readonly workId?: string;
 }
 
 /**
