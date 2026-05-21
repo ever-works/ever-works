@@ -3290,7 +3290,13 @@
                 "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
                 "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
                 "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually."
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually.",
+                "githubConnectHint": "Connect a GitHub account from the dashboard before configuring this plugin.",
+                "personalAccount": "(personal)",
+                "organizations": "Organizations",
+                "pickOwnerFirst": "Pick an owner first.",
+                "loadingRepos": "Loading repositories…",
+                "selectRepo": "Select a repository"
             },
             "oauth": {
                 "title": "Account Connection",

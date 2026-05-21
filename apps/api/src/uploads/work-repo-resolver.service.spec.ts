@@ -5,6 +5,14 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
 
+// Mock octokit so the branch-probing path doesn't hit github.com.
+const octokitReposGet = jest.fn();
+jest.mock('octokit', () => ({
+    Octokit: jest.fn().mockImplementation(() => ({
+        rest: { repos: { get: octokitReposGet } },
+    })),
+}));
+
 import { WorkRepoResolverService } from './work-repo-resolver.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { GitFacadeService } from '@ever-works/agent/facades';
@@ -38,27 +46,59 @@ describe('WorkRepoResolverService (EW-644)', () => {
     beforeEach(() => {
         workRepo = { findById: jest.fn() } as MockWorkRepository;
         gitFacade = { getAccessToken: jest.fn() } as MockGitFacade;
+        octokitReposGet.mockReset();
+        delete process.env.GITHUB_STORAGE_DATA_REPO_BRANCH;
         resolver = new WorkRepoResolverService(
             workRepo as unknown as WorkRepository,
             gitFacade as unknown as GitFacadeService,
         );
     });
 
-    it('returns owner/repo/branch/token for a Work with a connected GitHub account', async () => {
+    it('probes the repo default branch via octokit when no env override is set', async () => {
         workRepo.findById.mockResolvedValueOnce(makeWork() as never);
         gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
+        octokitReposGet.mockResolvedValueOnce({ data: { default_branch: 'master' } });
         const out = await resolver.resolve(workId);
         expect(out).toEqual({
             owner: 'acme',
             repo: 'docs-site-data',
-            branch: 'main',
+            branch: 'master',
             token: 'ghp_token_123',
         });
-        expect(gitFacade.getAccessToken).toHaveBeenCalledWith({
-            userId: 'user-42',
-            providerId: 'github',
-            workId,
+        expect(octokitReposGet).toHaveBeenCalledWith({
+            owner: 'acme',
+            repo: 'docs-site-data',
         });
+    });
+
+    it('skips the probe and uses the env override when GITHUB_STORAGE_DATA_REPO_BRANCH is set', async () => {
+        process.env.GITHUB_STORAGE_DATA_REPO_BRANCH = 'release';
+        workRepo.findById.mockResolvedValueOnce(makeWork() as never);
+        gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
+        const out = await resolver.resolve(workId);
+        expect(out.branch).toBe('release');
+        expect(octokitReposGet).not.toHaveBeenCalled();
+    });
+
+    it('falls back to main and logs a warning when the probe fails', async () => {
+        workRepo.findById.mockResolvedValueOnce(makeWork() as never);
+        gitFacade.getAccessToken.mockResolvedValueOnce('ghp_token_123');
+        octokitReposGet.mockRejectedValueOnce(new Error('502 from upstream'));
+        const out = await resolver.resolve(workId);
+        expect(out.branch).toBe('main');
+    });
+
+    it('caches the probed branch per <owner>/<repo>', async () => {
+        // Two consecutive resolves on the same Work should call octokit
+        // exactly once. The second hit reads the cache.
+        workRepo.findById.mockResolvedValue(makeWork() as never);
+        gitFacade.getAccessToken.mockResolvedValue('ghp_token_123');
+        octokitReposGet.mockResolvedValueOnce({ data: { default_branch: 'master' } });
+        const a = await resolver.resolve(workId);
+        const b = await resolver.resolve(workId);
+        expect(a.branch).toBe('master');
+        expect(b.branch).toBe('master');
+        expect(octokitReposGet).toHaveBeenCalledTimes(1);
     });
 
     it('throws a clear error when the Work is not found', async () => {

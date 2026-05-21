@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Octokit } from 'octokit';
 import { WorkRepository } from '@ever-works/agent/database';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-storage-plugin';
@@ -21,11 +22,13 @@ import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-stor
  * by `storage-backend.factory.ts` so the plugin can call `resolve(workId)`
  * lazily on each upload without binding to NestJS / TypeORM directly.
  *
- * The branch defaults to `'main'` — modern data repos created by the
- * platform are initialised on `main`. If a customer's repo uses
- * `master` we'd need to probe `octokit.repos.get` for `default_branch`;
- * that's a follow-up if anyone hits it in practice (currently no
- * data-repo writer in the codebase relies on a non-default branch).
+ * EW-644 (Greptile P2 follow-up) — the default branch is probed from
+ * `octokit.repos.get(default_branch)` on first contact and cached
+ * per-Work for `BRANCH_CACHE_TTL_MS`. Probing once per Work covers the
+ * common `main`/`master` divergence without paying an Octokit round
+ * trip on every upload. The probe can be skipped entirely by setting
+ * `GITHUB_STORAGE_DATA_REPO_BRANCH` (e.g. for deployments that pin a
+ * non-default branch).
  */
 @Injectable()
 export class WorkRepoResolverService implements WorkRepoResolver {
@@ -33,15 +36,13 @@ export class WorkRepoResolverService implements WorkRepoResolver {
     private readonly PROVIDER_ID = 'github';
 
     /**
-     * EW-644 (Greptile P2 fix) — branch defaults to `main`, the same
-     * default `GitOperations.cloneOrPull` uses for fresh clones. Repos
-     * that use `master` (or any other custom default) should set
-     * `GITHUB_STORAGE_DATA_REPO_BRANCH` until per-Work `default_branch`
-     * probing is added in a follow-up. Documented in the plugin README.
+     * In-memory cache of `<owner>/<repo>` → `{ branch, expiresAtMs }`.
+     * Module-scoped (single Node process); each replica reprobes on its
+     * own. TTL keeps stale entries from outlasting a default-branch
+     * rename on GitHub's side.
      */
-    private get defaultBranch(): string {
-        return process.env.GITHUB_STORAGE_DATA_REPO_BRANCH || 'main';
-    }
+    private readonly branchCache = new Map<string, { branch: string; expiresAtMs: number }>();
+    private readonly BRANCH_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
     constructor(
         private readonly workRepository: WorkRepository,
@@ -78,11 +79,50 @@ export class WorkRepoResolverService implements WorkRepoResolver {
             );
         }
 
-        return {
-            owner,
-            repo,
-            branch: this.defaultBranch,
-            token,
-        };
+        const branch = await this.resolveBranch(owner, repo, token);
+
+        return { owner, repo, branch, token };
+    }
+
+    /**
+     * Resolve the branch for a given `<owner>/<repo>` data repo.
+     *
+     * Priority:
+     *   1. `GITHUB_STORAGE_DATA_REPO_BRANCH` env override — pinned for
+     *      the whole deployment.
+     *   2. Cached probe result, if not expired.
+     *   3. Fresh `octokit.repos.get(default_branch)` probe, cached.
+     *   4. `'main'` fallback if the probe fails for any reason — the
+     *      worst case is a non-ff push that the operator can fix by
+     *      setting the env var. We don't throw on probe failure so a
+     *      transient GitHub blip doesn't break uploads.
+     */
+    private async resolveBranch(owner: string, repo: string, token: string): Promise<string> {
+        const pinned = process.env.GITHUB_STORAGE_DATA_REPO_BRANCH;
+        if (pinned) return pinned;
+
+        const cacheKey = `${owner}/${repo}`;
+        const cached = this.branchCache.get(cacheKey);
+        if (cached && cached.expiresAtMs > Date.now()) {
+            return cached.branch;
+        }
+
+        try {
+            const octokit = new Octokit({ auth: token });
+            const { data } = await octokit.rest.repos.get({ owner, repo });
+            const branch = data.default_branch || 'main';
+            this.branchCache.set(cacheKey, {
+                branch,
+                expiresAtMs: Date.now() + this.BRANCH_CACHE_TTL_MS,
+            });
+            return branch;
+        } catch (err) {
+            this.logger.warn(
+                `Failed to probe default branch for ${cacheKey}; falling back to 'main'. ` +
+                    `Set GITHUB_STORAGE_DATA_REPO_BRANCH if this Work uses a different default. ` +
+                    `Cause: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return 'main';
+        }
     }
 }
