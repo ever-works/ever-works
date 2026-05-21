@@ -843,7 +843,7 @@ export class KnowledgeBaseService {
 
         if (this.bufferExtractor) {
             try {
-                const extracted = this.bufferExtractor.extract(
+                const extracted = await this.bufferExtractor.extract(
                     input.file.buffer,
                     input.file.mimeType,
                 );
