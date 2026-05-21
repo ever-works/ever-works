@@ -52,8 +52,18 @@ export class WebhookDelivery {
      *
      * x-secret-adjacent: payloads may carry user-scoped business data; the
      * deliveries list endpoint redacts the body before returning it.
+     *
+     * Column type is `simple-json` (portable across Postgres + SQLite)
+     * rather than `jsonb` (Postgres-only). The migration creates the
+     * physical column as `jsonb` on Postgres production; TypeORM's
+     * `simple-json` driver reads/writes JSON via JSON.stringify/parse
+     * which works equally well against a `jsonb` (prod) or `text`
+     * (test/SQLite synchronize) column. Using `jsonb` here would break
+     * the better-sqlite3 test path with
+     * `DataTypeNotSupportedError: Data type "jsonb" ... is not supported
+     * by "better-sqlite3" database.` (caught on CI for PR #888).
      */
-    @Column({ type: 'jsonb' })
+    @Column({ type: 'simple-json' })
     payload: Record<string, unknown>;
 
     @Column({ type: 'varchar', length: 32, default: 'pending' })
