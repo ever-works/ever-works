@@ -1,34 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 /**
- * Webhook signing-secret encryption helper.
+ * AES-256-GCM envelope helper for the outbound webhook subscription
+ * signing secret (the per-subscription HMAC key returned ONCE to the
+ * customer on create / rotate, then encrypted at rest).
  *
- * AES-256-GCM envelope encryption, mirroring `PluginSecretEncService`
- * but keyed on `PLATFORM_ENCRYPTION_KEY` so webhooks share the same
- * KMS surface as the rest of the platform's at-rest secrets.
+ * Distinct from {@link WebhookSecretService} in this same `services/`
+ * folder, which manages the per-Work GitHub-incoming `WEBHOOK_SECRET`
+ * baked into a deployed site's runtime env. Different concern, different
+ * lifecycle — and crucially, this one is needed by the Trigger.dev
+ * webhook-delivery task that lives in `packages/tasks` (which cannot
+ * import from `apps/api`), hence why the helper lives in `packages/agent`.
  *
- * Storage shape: `enc::v1::base64(IV(12) || authTag(16) || ciphertext)`.
- * Legacy plaintext values (no prefix) are returned as-is from decrypt
- * — the read path treats them as plaintext until the next write
- * re-encrypts.
- *
- * The Trigger.dev `webhook-delivery` task lives in `packages/tasks` and
- * cannot import from `apps/api`. To share the exact same envelope
- * layout, the agent package carries an identically-shaped sibling at
- * `packages/agent/src/services/webhook-subscription-secret.service.ts`.
- * They must stay byte-compatible — any change here MUST be mirrored
- * there (and vice versa).
+ * Storage shape: `enc::v1::base64(IV(12) || authTag(16) || ciphertext)`,
+ * matching what the `apps/api` controller has been writing since the
+ * webhook subscriptions surface shipped (commit `60741b9d`). Legacy
+ * plaintext values (no `enc::v1::` prefix) decrypt to themselves — that
+ * keeps the dev / test path working when `PLATFORM_ENCRYPTION_KEY` is
+ * unset.
  *
  * Security notes:
- *  - The key MUST be 32 bytes. We accept hex (64 chars), base64 (44
- *    chars), or raw utf-8 (32 chars) and surface a clear error
- *    otherwise.
- *  - With no key set we passthrough — fine for dev / tests, never in
- *    production. The controller surface refuses to create a
- *    subscription when this happens in production (see WebhooksService).
+ *  - The key MUST be 32 bytes. Hex (64 chars), base64 (44), and raw utf-8
+ *    (32) are all accepted; anything else is a clear error.
  *  - The IV is random per-record so the same plaintext encrypts to a
  *    different ciphertext each call.
+ *  - We never log the decrypted secret. The webhook-delivery service
+ *    receives the plaintext, signs the body with it, and discards it.
  */
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH_BYTES = 32;
@@ -37,8 +35,8 @@ const AUTH_TAG_LENGTH_BYTES = 16;
 const ENVELOPE_PREFIX = 'enc::v1::';
 
 @Injectable()
-export class WebhookSecretService {
-    private readonly logger = new Logger(WebhookSecretService.name);
+export class WebhookSubscriptionSecretService {
+    private readonly logger = new Logger(WebhookSubscriptionSecretService.name);
     private cachedKey: Buffer | null = null;
 
     isEnabled(): boolean {
@@ -46,14 +44,9 @@ export class WebhookSecretService {
     }
 
     /**
-     * Generate a fresh webhook signing secret. Returns the raw secret
-     * (caller must NOT log this) plus the encrypted envelope ready
-     * for at-rest storage.
-     *
-     * The raw secret is base64url of 32 random bytes (~43 chars,
-     * URL-safe). The webhook delivery worker computes HMAC-SHA256 of
-     * the JSON payload using this secret and sends it as
-     * `X-Ever-Works-Signature-256: sha256=<hex>`.
+     * Generate a fresh subscription signing secret. The raw value goes
+     * back to the customer ONCE; the encrypted envelope is what we
+     * persist on `webhook_subscriptions.secretEncrypted`.
      */
     generateSecret(): { raw: string; encrypted: string } {
         const raw = randomBytes(32).toString('base64url');
@@ -75,13 +68,15 @@ export class WebhookSecretService {
     }
 
     decrypt(envelope: string): string {
-        if (!envelope || !envelope.startsWith(ENVELOPE_PREFIX)) {
-            return envelope ?? '';
+        if (!envelope) return '';
+        if (!envelope.startsWith(ENVELOPE_PREFIX)) {
+            // Legacy plaintext value — return as-is so dev fixtures keep working.
+            return envelope;
         }
         const key = this.tryGetKey();
         if (!key) {
             this.logger.warn(
-                'Tried to decrypt webhook secret but PLATFORM_ENCRYPTION_KEY is not set',
+                'Tried to decrypt webhook subscription secret but PLATFORM_ENCRYPTION_KEY is not set',
             );
             return '';
         }
@@ -95,7 +90,7 @@ export class WebhookSecretService {
             const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
             return plaintext.toString('utf8');
         } catch (err) {
-            this.logger.error('Webhook secret decrypt failed', err as Error);
+            this.logger.error('Webhook subscription secret decrypt failed', err as Error);
             return '';
         }
     }
@@ -116,7 +111,6 @@ export class WebhookSecretService {
     }
 
     private decodeKey(raw: string): Buffer | null {
-        // Try hex (64), base64 (44, with optional '='), then utf-8 (32).
         if (/^[0-9a-f]{64}$/i.test(raw)) {
             return Buffer.from(raw, 'hex');
         }

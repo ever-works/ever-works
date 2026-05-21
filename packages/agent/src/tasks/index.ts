@@ -4,3 +4,5 @@ export * from './work-import.types';
 export * from './work-import-dispatcher';
 export * from './template-customization.types';
 export * from './template-customization-dispatcher';
+export * from './webhook-delivery.types';
+export * from './webhook-delivery-dispatcher';

@@ -2,100 +2,108 @@ import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 
 /**
- * Webhook delivery / retry — pass 9. Outbound webhook deliveries are
- * fire-and-forget but they must be observable: each delivery should
- * appear in a deliveries list (or events log) and failed deliveries
- * should be retried with backoff.
+ * Webhook delivery — retry semantics + deliveries listing — EW-634.
  *
- * We don't have a real receiver to verify backoff timing, but we can
- * pin: subscription CRUD + delivery list endpoints respond sanely.
+ * After the delivery worker landed (EW-634), `/api/webhooks/deliveries`
+ * is the canonical listing endpoint and `POST /api/webhooks/:id/test`
+ * synchronously fires a probe delivery. These checks exercise the
+ * full producer-side path without depending on a real receiver:
+ *
+ *  - Subscription CRUD is gated by URL validation (no SSRF, no bogus URLs).
+ *  - The deliveries listing endpoint is reachable + auth-gated + JSON.
+ *  - The test-fire endpoint records a delivery row whose outcome bucket
+ *    is one of the documented non-2xx values when the URL is unreachable.
  */
 
-const SUBSCRIPTION_PATHS = [
-    '/api/webhooks',
-    '/api/webhook-subscriptions',
-    '/api/integrations/webhooks',
-];
+const WEBHOOKS_BASE = '/api/webhooks';
+const DELIVERIES_PATH = `${WEBHOOKS_BASE}/deliveries`;
 
-const DELIVERIES_SUFFIXES = ['/deliveries', '/events', '/logs', '/history'];
+const VALID_OUTCOMES = new Set([
+    'success',
+    'client_error',
+    'server_error',
+    'timeout',
+    'redirect_refused',
+    'payload_too_large',
+    'ssrf_blocked',
+]);
 
 test.describe('Webhook subscriptions — CRUD probe', () => {
     test('POST subscription with bogus URL is rejected with 4xx', async ({ request }) => {
         const u = await registerUserViaAPI(request);
-        let found = false;
-        for (const path of SUBSCRIPTION_PATHS) {
-            const res = await request.post(`${API_BASE}${path}`, {
-                headers: authedHeaders(u.access_token),
-                data: {
-                    url: 'not-a-url',
-                    events: ['*'],
-                },
-            });
-            if (res.status() === 404) continue;
-            found = true;
-            // Codex P2: previous `< 500` check would let a 2xx accept of
-            // "not-a-url" silently pass — the EXACT validation regression
-            // this test is meant to catch. URL validation MUST reject
-            // with 4xx (typically 400/422). Never 2xx, never 5xx.
-            expect(res.status()).toBeGreaterThanOrEqual(400);
-            expect(res.status()).toBeLessThan(500);
-            return;
-        }
-        if (!found) test.skip(true, 'no webhook subscription endpoint exposed');
+        const res = await request.post(`${API_BASE}${WEBHOOKS_BASE}`, {
+            headers: authedHeaders(u.access_token),
+            data: { url: 'not-a-url' },
+        });
+        expect(res.status()).toBeGreaterThanOrEqual(400);
+        expect(res.status()).toBeLessThan(500);
     });
 
     test('POST subscription with javascript: URL is rejected (SSRF guard)', async ({ request }) => {
         const u = await registerUserViaAPI(request);
-        let found = false;
-        for (const path of SUBSCRIPTION_PATHS) {
-            const res = await request.post(`${API_BASE}${path}`, {
-                headers: authedHeaders(u.access_token),
-                data: {
-                    url: 'javascript:alert(1)',
-                    events: ['work.created'],
-                },
-            });
-            if (res.status() === 404) continue;
-            found = true;
-            // MUST be 4xx — accepting javascript: as a destination is a
-            // catastrophic protocol guard failure.
-            expect(res.status()).toBeGreaterThanOrEqual(400);
-            expect(res.status()).toBeLessThan(500);
-            return;
-        }
-        if (!found) test.skip(true, 'no webhook subscription endpoint exposed');
+        const res = await request.post(`${API_BASE}${WEBHOOKS_BASE}`, {
+            headers: authedHeaders(u.access_token),
+            data: { url: 'javascript:alert(1)' },
+        });
+        expect(res.status()).toBeGreaterThanOrEqual(400);
+        expect(res.status()).toBeLessThan(500);
     });
 });
 
 test.describe('Webhook deliveries — list + status', () => {
-    test('GET /<subscription>/deliveries responds < 500 for owner', async ({ request }) => {
-        const u = await registerUserViaAPI(request);
-        let found = false;
-        for (const base of SUBSCRIPTION_PATHS) {
-            for (const suffix of DELIVERIES_SUFFIXES) {
-                const res = await request.get(`${API_BASE}${base}${suffix}`, {
-                    headers: authedHeaders(u.access_token),
-                });
-                if (res.status() === 404) continue;
-                found = true;
-                expect(res.status()).toBeLessThan(500);
-                return;
-            }
-        }
-        if (!found) test.skip(true, 'no deliveries endpoint exposed');
-    });
+    test('GET /api/webhooks/deliveries is auth-gated and returns a JSON object', async ({
+        request,
+    }) => {
+        const unauth = await request.get(`${API_BASE}${DELIVERIES_PATH}`);
+        expect([401, 403]).toContain(unauth.status());
 
-    test('GET deliveries from an unauthenticated request → 401/403', async ({ request }) => {
-        let found = false;
-        for (const base of SUBSCRIPTION_PATHS) {
-            for (const suffix of DELIVERIES_SUFFIXES) {
-                const res = await request.get(`${API_BASE}${base}${suffix}`);
-                if (res.status() === 404) continue;
-                found = true;
-                expect([401, 403]).toContain(res.status());
-                return;
-            }
-        }
-        if (!found) test.skip(true, 'no deliveries endpoint exposed');
+        const u = await registerUserViaAPI(request);
+        const authed = await request.get(`${API_BASE}${DELIVERIES_PATH}`, {
+            headers: authedHeaders(u.access_token),
+        });
+        expect(authed.status()).toBe(200);
+        const ct = authed.headers()['content-type'] || '';
+        expect(ct).toMatch(/json/i);
+        const body = await authed.json();
+        expect(Array.isArray(body.deliveries)).toBe(true);
+    });
+});
+
+test.describe('Webhook test-fire — exercises the worker end-to-end', () => {
+    test('POST /api/webhooks/:id/test records a delivery with a documented outcome', async ({
+        request,
+    }) => {
+        const u = await registerUserViaAPI(request);
+
+        // Register a subscription pointed at a URL that will never accept the
+        // POST. We don't care what the outcome bucket is exactly — we care
+        // that ONE of the documented buckets shows up and that the row
+        // appears in the deliveries listing.
+        const created = await request.post(`${API_BASE}${WEBHOOKS_BASE}`, {
+            headers: authedHeaders(u.access_token),
+            data: { url: 'https://webhook.invalid.ever.works/never-resolves' },
+        });
+        expect(created.status()).toBe(201);
+        const { subscription } = await created.json();
+
+        const fired = await request.post(`${API_BASE}${WEBHOOKS_BASE}/${subscription.id}/test`, {
+            headers: authedHeaders(u.access_token),
+        });
+        expect(fired.status()).toBe(200);
+        const fireBody = await fired.json();
+        expect(VALID_OUTCOMES.has(fireBody.outcome)).toBe(true);
+        expect(typeof fireBody.deliveryId).toBe('string');
+
+        // Same delivery shows up in the listing, scoped to the caller.
+        const list = await request.get(`${API_BASE}${DELIVERIES_PATH}`, {
+            headers: authedHeaders(u.access_token),
+        });
+        expect(list.status()).toBe(200);
+        const { deliveries } = await list.json();
+        const hit = (deliveries as Array<{ id: string; subscriptionId: string }>).find(
+            (d) => d.id === fireBody.deliveryId,
+        );
+        expect(hit, 'test-fire delivery missing from deliveries listing').toBeTruthy();
+        expect(hit!.subscriptionId).toBe(subscription.id);
     });
 });
