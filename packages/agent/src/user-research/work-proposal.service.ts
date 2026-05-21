@@ -179,7 +179,10 @@ export class WorkProposalService {
         );
         const seenKeys = new Set<string>();
         const uniqueInputs = inputs.filter((proposal) => {
-            const keys = [this.proposalKey(proposal.slugSuggestion), this.proposalKey(proposal.title)];
+            const keys = [
+                this.proposalKey(proposal.slugSuggestion),
+                this.proposalKey(proposal.title),
+            ];
             if (keys.some((key) => existingKeys.has(key) || seenKeys.has(key))) {
                 return false;
             }
@@ -207,7 +210,11 @@ export class WorkProposalService {
     }
 
     private proposalKey(value: string): string {
-        return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
     }
 
     async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
