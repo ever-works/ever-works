@@ -31,6 +31,7 @@ import { TemplateRepository } from './repositories/template.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
+import { WebhookDeliveryRepository } from './repositories/webhook-delivery.repository';
 
 @Module({
     imports: [
@@ -77,6 +78,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
+        WebhookDeliveryRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -109,6 +111,7 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         TemplateCustomizationRepository,
         UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
+        WebhookDeliveryRepository,
     ],
 })
 export class DatabaseModule {}

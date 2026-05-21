@@ -8,14 +8,21 @@ import {
     WorkImportDispatcher,
     TemplateCustomizationPayload,
     TemplateCustomizationDispatcher,
+    WebhookDeliveryPayload,
+    WebhookDeliveryDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
+import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
 
 @Injectable()
 export class TriggerService
-    implements WorkGenerationDispatcher, WorkImportDispatcher, TemplateCustomizationDispatcher
+    implements
+        WorkGenerationDispatcher,
+        WorkImportDispatcher,
+        TemplateCustomizationDispatcher,
+        WebhookDeliveryDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -126,6 +133,35 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch template-customization task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-634 — enqueue one webhook delivery. Returns the Trigger.dev run id
+     * so the producer can record it on the corresponding `webhook_deliveries`
+     * row, or null if Trigger.dev is disabled (`shouldUseTrigger()` false)
+     * or the dispatch threw. The caller's in-process fallback handles both
+     * cases identically so single-instance dev environments still deliver.
+     */
+    async dispatchWebhookDelivery(payload: WebhookDeliveryPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await webhookDeliveryTask.trigger(payload, {
+                tags: [
+                    'webhook-delivery',
+                    `event:${payload.eventName}`,
+                    `subscription:${payload.subscriptionId}`,
+                ],
+                machine: this.machine() as any,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch webhook-delivery task', error as Error);
             return null;
         }
     }
