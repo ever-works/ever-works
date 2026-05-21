@@ -369,10 +369,11 @@ export class DeployService {
                 };
             }
 
-            const { dispatched } = await this.deploy(workId, userId, { teamScope });
+            const { dispatched, deploymentId } = await this.deploy(workId, userId, { teamScope });
 
             return {
                 workId,
+                deploymentId,
                 slug: work.slug,
                 status: dispatched ? 'pending' : 'error',
                 message: dispatched ? 'Deployment started' : 'Failed to initiate deployment',

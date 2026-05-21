@@ -160,6 +160,7 @@ export interface DeleteWorkResponse {
 
 export interface DeployWebsiteResponse {
     status: 'success' | 'error' | 'pending';
+    deploymentId?: string;
     slug: string;
     owner: string;
     repository: string;
