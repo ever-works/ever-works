@@ -1,10 +1,20 @@
+import { Logger } from '@nestjs/common';
 import { WebhookSecretService } from './webhook-secret.service';
 
 describe('WebhookSecretService', () => {
     const SAVED = process.env.PLATFORM_ENCRYPTION_KEY;
     let service: WebhookSecretService;
+    let errorSpy: jest.SpyInstance;
+    let warnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
 
     afterEach(() => {
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
         if (SAVED === undefined) delete process.env.PLATFORM_ENCRYPTION_KEY;
         else process.env.PLATFORM_ENCRYPTION_KEY = SAVED;
     });

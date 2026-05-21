@@ -1580,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Mehr laden",
+                    "loadingMore": "Laden..."
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1607,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Das Verzeichnissite mit dem neuesten Activity-Feed-Endpunkt erneut bereitstellen.",
+                        "disabled": "Aktivieren Sie die Aktivitätssynchronisierung in den Einstellungen, um Website-Ereignisse zu sammeln.",
+                        "timeout": "Erneut versuchen zu aktualisieren oder die bereitgestellte Site prüfen, wenn dies weiterhin auftritt.",
+                        "unauthorized": "Das Aktivitätssynchronisierungsgeheimnis rotieren, dann das Verzeichnissite erneut bereitstellen.",
+                        "upstream_5xx": "Die Protokolle der bereitgestellten Site prüfen und erneut versuchen, nachdem sie wiederhergestellt wurde.",
+                        "network": "Die URL der bereitgestellten Site und die Netzwerkverfügbarkeit prüfen.",
+                        "parse_error": "Das Verzeichnissite erneut bereitstellen, damit es die erwartete Aktivitätsnutzlast zurückgibt."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"

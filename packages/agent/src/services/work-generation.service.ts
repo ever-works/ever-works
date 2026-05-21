@@ -597,8 +597,12 @@ export class WorkGenerationService {
         dto: ExtractItemDetailsDto,
         user: User,
     ): Promise<ExtractItemDetailsResponseDto> {
-        const { source_url, existing_categories } = dto;
-        const facadeOptions = { userId: user.id };
+        const { source_url, existing_categories, workId } = dto;
+        const facadeOptions = { userId: user.id, ...(workId && { workId }) };
+
+        if (workId) {
+            await this.ownershipService.ensureCanEdit(workId, user.id);
+        }
 
         try {
             // 1. Extract page content

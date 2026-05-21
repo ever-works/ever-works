@@ -350,6 +350,12 @@ async function executeDeploy(
         }
 
         console.log(chalk.green('\n✓ Deployment request accepted!'));
+        if (response.deploymentId) {
+            console.log(chalk.gray('Deployment ID:'), chalk.white(response.deploymentId));
+        }
+        if (response.repository) {
+            console.log(chalk.gray('Repository:'), chalk.white(response.repository));
+        }
         if (teamScope) {
             const teamLabel =
                 deploymentTeams.find((team) => team.slug === teamScope)?.name || teamScope;

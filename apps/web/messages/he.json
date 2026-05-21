@@ -463,6 +463,37 @@
                 "description": "לא הצלחנו לחבר את חשבון {provider} שלך. נא נסה שוב."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "רעיונות עבורך",
+                "titleWithName": "רעיונות עבורך, {username}"
+            },
+            "actions": {
+                "accept": "השתמש ברעיון זה",
+                "dismiss": "דחה",
+                "dismissAria": "דחה רעיון זה",
+                "refresh": "הצע עוד רעיונות"
+            },
+            "researching": {
+                "title": "מכין רעיונות מהפרופיל שלך...",
+                "subtitle": "זה בדרך כלל לוקח פחות מדקה."
+            },
+            "empty": {
+                "title": "אין רעיונות כרגע.",
+                "subtitle": "הצעות חדשות יופיעו כאן כשהן מוכנות."
+            },
+            "errors": {
+                "rateLimited": "הגעת למגבלה היומית. נסה שוב מחר.",
+                "generic": "לא ניתן לרענן רעיונות. אנא נסה שוב."
+            },
+            "plugins": {
+                "label": "תוספים מוצעים"
+            }
+        },
+        "discover": {
+            "title": "גלה",
+            "subtitle": "רעיונות עבודה שנבחרו על ידי AI ומותאמים אישית עבורך."
+        },
         "header": {
             "welcome": "ברוך שובך, {username}!",
             "subtitle": "נהל את עבודות ה-AI שלך ועקוב אחר הביצועים שלהן",
@@ -677,6 +708,7 @@
                 "apiKeys": "מפתחות API",
                 "data": "נתונים",
                 "githubApp": "GitHub App",
+                "workAgent": "סוכן עבודה",
                 "gitProviders": "ספקי Git",
                 "dangerZone": "אזור סכנה"
             },
@@ -703,6 +735,72 @@
                 "branchUnknown": "ענף ברירת מחדל לא זמין",
                 "private": "פרטי",
                 "public": "ציבורי"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "סוכן עבודה אוטונומי",
+                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מיעדים כלליים."
+                    },
+                    "guardrails": {
+                        "title": "מגבלות",
+                        "description": "קבע מגבלות קשות לפני שהסוכן יכול ליצור עבודות, להוסיף פריטים או להוציא תקציב."
+                    },
+                    "queue": {
+                        "title": "תור ליעד",
+                        "description": "תן לסוכן הוראה רחבה. הוא מתחיל כממתין ופועל בתוך המגבלות שלך."
+                    },
+                    "liveRun": {
+                        "title": "הפעלה חיה",
+                        "description": "מצב נוכחי ופעילות אחרונה של הסוכן."
+                    },
+                    "recentGoals": {
+                        "title": "יעדים אחרונים",
+                        "description": "הוראות סוכן עבודה ממתינות, פעילות והושלמות."
+                    }
+                },
+                "fields": {
+                    "enabled": "אפשר סוכן עבודה",
+                    "autoApproveLowImpact": "אישור אוטומטי לשינויים בעלי השפעה נמוכה",
+                    "dailySuggestions": "הצעות יומיות",
+                    "dryRunByDefault": "הפעלת ניסיון כבררת מחדל",
+                    "maxWorksPerRun": "מקסימום עבודות להפעלה",
+                    "maxItemsPerWork": "מקסימום פריטים לעבודה",
+                    "maxBudgetPerRun": "מקסימום תקציב להפעלה",
+                    "approvalThreshold": "סף אישור",
+                    "confirmBeforeCreate": "אשר לפני יצירת עבודות",
+                    "confirmBeforeDelete": "אשר לפני מחיקת פריטים",
+                    "dryRunThisGoal": "הפעלת ניסיון עבור יעד זה"
+                },
+                "actions": {
+                    "saveSettings": "שמור הגדרות",
+                    "queueGoal": "הוסף לתור יעד",
+                    "stop": "עצור"
+                },
+                "queue": {
+                    "placeholder": "צור עבודה עם 50 הסטארטאפים המובילים בתחום הבריאות"
+                },
+                "metrics": {
+                    "works": "עבודות",
+                    "items": "פריטים"
+                },
+                "labels": {
+                    "dryRun": "הפעלת ניסיון",
+                    "liveRun": "הפעלה חיה"
+                },
+                "empty": {
+                    "noActiveRun": "אין הפעלה פעילה של סוכן עבודה.",
+                    "noGoals": "עדיין אין יעדים לסוכן עבודה.",
+                    "waitingForUpdate": "ממתין לעדכון הפעלה ראשון."
+                },
+                "toasts": {
+                    "settingsSaved": "הגדרות סוכן עבודה נשמרו",
+                    "settingsError": "שמירת הגדרות נכשלה",
+                    "goalQueued": "יעד סוכן עבודה התווסף לתור",
+                    "goalError": "הוספת יעד לתור נכשלה",
+                    "goalCanceled": "יעד סוכן עבודה בוטל",
+                    "cancelError": "ביטול יעד נכשל"
+                }
             },
             "data": {
                 "exportTitle": "ייצוא נתונים",
@@ -811,6 +909,11 @@
             "profile": {
                 "title": "הגדרות פרופיל",
                 "subtitle": "עדכן מידע פרופיל ואווטאר",
+                "budgetAlerts": {
+                    "title": "התראות תקציב בדואר",
+                    "description": "קבל התראת דואר כאשר ההוצאה החודשית של תיקייה עוברת 75%, 90%, 100% או חורגת מהמגבלה. ההתראה באפליקציה תמיד מופעלת ללא תלות בהגדרה זו.",
+                    "toggleLabel": "שלח לי התראות תקציב בדואר"
+                },
                 "fields": {
                     "name": "שם",
                     "username": "שם משתמש",
@@ -953,6 +1056,30 @@
             "totalItems": "סה\"ס פריטים",
             "activeWebsites": "אתרים פעילים",
             "fromLastMonth": "מהחודש שעבר"
+        },
+        "adminUsage": {
+            "title": "שימוש בפלטפורמה",
+            "description": "הוצאה משותפת בין משתמשים ובין תיקיות לתקופה הנוכחית. למפעילים מרוחקים בלבד.",
+            "periodLabel": "{period}",
+            "totalSpend": "סך ההוצאה: {amount}",
+            "empty": "לא נרשם שימוש בתקופה זו.",
+            "columnUser": "משתמש",
+            "columnEmail": "דואר אלקטרוני",
+            "columnWork": "תיקיה",
+            "columnUnits": "יחידות",
+            "columnCost": "עלות",
+            "loadFailed": "לא ניתן לטעון את נתוני השימוש של המנהל. ייתכן שאין לך הרשאות מנהל פלטפורמה."
+        },
+        "budgets": {
+            "overviewTitle": "הוצאות ב{period}",
+            "overviewProgressLabel": "{percent}% מתוך מגבלת {cap}",
+            "overviewOverageSuffix": " (מתיר חריגה)",
+            "overviewEmpty": "לא נקבעה מגבלה חודשית. הוסף אחת בתקציבים ושימוש כדי לאפשר התראות.",
+            "topPluginsTitle": "תוספים מובילים לפי הוצאה",
+            "topPluginsEmpty": "לא נרשם שימוש עדיין בתקופה זו.",
+            "trendTitle": "הוצאות יומיות — {period}",
+            "trendEmpty": "לא נרשם שימוש עדיין בתקופה זו.",
+            "trendDayLabel": "יום {day}"
         },
         "workCard": {
             "status": {
@@ -1453,7 +1580,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "טען עוד",
+                    "loadingMore": "טוען…"
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1480,7 +1609,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "הפעל מחדש את אתר התיקיה עם נקודת הקצה העדכנית ביותר של זרם הפעילות.",
+                        "disabled": "הפעל סנכרון פעילות בהגדרות כדי לאסוף אירועי אתר.",
+                        "timeout": "נסה לרענן שוב או בדוק את האתר המופעל אם זה ממשיך לקרות.",
+                        "unauthorized": "סובב את סוד סנכרון הפעילות, ואז הפעל מחדש את אתר התיקיה.",
+                        "upstream_5xx": "בדוק את יומני האתר המופעל ונסה שוב לאחר שהוא יתאושש.",
+                        "network": "בדוק את כתובת האתר המופעל והנגישות הרשתית.",
+                        "parse_error": "הפעל מחדש את אתר התיקיה כך שהוא יחזיר את מטען הפעילות הצפוי."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
@@ -1553,6 +1691,11 @@
                     "screenshotError": "אירעה שגיאה במהלך לכידת צילום המסך",
                     "featured": "פריט מומלץ",
                     "featuredHelp": "סמן פריט זה כמומלץ בעבודה",
+                    "markdown": "תוכן (Markdown, רשות)",
+                    "markdownPlaceholder": "# כותרת\n\nתיאור מפורט. תומך ב-Markdown בסגנון GitHub.",
+                    "markdownHelp": "גוף מפורט לדף הפרטים של הפריט. כשריק, משתמש בטיוטה שנבנית משם + תיאור + כתובת URL. תומך ב-Markdown בסגנון GitHub.",
+                    "showPreview": "הצגת תצוגה מקדימה",
+                    "hidePreview": "הסתר תצוגה מקדימה",
                     "updateWithPR": "צור בקשת משיכה",
                     "updateWithPRHelp": "שלח שינויים כבקשת משיכה במקום מחויב ישיר",
                     "cancel": "בטל",
@@ -1571,6 +1714,11 @@
                 },
                 "editDisplay": "ערוך תצוגה",
                 "editDisplayDescription": "שנה סטטוס מומלץ וקבע סדר תצוגה.",
+                "editContent": "עריכת תוכן",
+                "editContentDescription": "ערוך את הגוף המפורט ב-Markdown עבור פריט זה. נכתב ל-<slug>.md במאגר הנתונים.",
+                "editContentSuccess": "התוכן של הפריט עודכן.",
+                "editContentFailed": "עדכון תוכן הפריט נכשל.",
+                "editContentError": "אירעה שגיאה בעת עדכון תוכן הפריט.",
                 "orderLabel": "סדר תצוגה (לא חובה)",
                 "orderHelp": "מספרים נמוכים יותר מופיעים מוקדם יותר בקבוצות מומלץ/לא מומלץ.",
                 "deleteDialogTitle": "מחק פריט",
@@ -1939,7 +2087,72 @@
                 "tabs": {
                     "general": "כללי",
                     "members": "חברים",
+                    "budgets": "תקציבים",
                     "navigationLabel": "כרטיסיות הגדרות"
+                },
+                "budgets": {
+                    "title": "תקציבים ושימוש",
+                    "description": "קבע מגבלות הוצאה חודשיות עבור תיקיה זו. ההתראות מופעלות ב-75%, 90%, 100%; ב-100% קריאות לתוספים חדשות חסומות אלא אם מתיר חריגה.",
+                    "periodLabel": "{period} · הוצא {spent}",
+                    "globalCap": {
+                        "heading": "מגבלה גלובלית",
+                        "capLabel": "מגבלה חודשית ({currency})",
+                        "allowOverageLabel": "אפשר חריגה (הזהר אבל לא חסום ב-100%)",
+                        "createButton": "צור מגבלה גלובלית",
+                        "saveButton": "שמור",
+                        "removeButton": "הסר",
+                        "rowSpend": "הוצא {spent} מתוך {cap} ({percent}%)",
+                        "overageSuffix": " · מתיר חריגה",
+                        "errorPositive": "הזן ערך מגבלה חיובי (למשל 50.00).",
+                        "createSuccess": "יצירת תקציב גלובלי הצליחה",
+                        "createError": "יצירת תקציב גלובלי נכשלה",
+                        "updateSuccess": "עדכון תקציב גלובלי הצליח",
+                        "updateError": "עדכון תקציב גלובלי נכשל",
+                        "deleteSuccess": "מחיקת תקציב גלובלי הצליחה",
+                        "deleteError": "מחיקת תקציב גלובלי נכשלה"
+                    },
+                    "pluginCaps": {
+                        "heading": "מגבלות לפי תוסף",
+                        "subheading": "רשות. מגביל תוסף בודד לצד המגבלה הגלובלית.",
+                        "empty": "אין מגבלות לפי תוסף. הוסף אחת למטה.",
+                        "rowSpend": "הוצא {spent} מתוך {cap} ({percent}%)",
+                        "overageSuffix": " · מתיר חריגה",
+                        "addHeading": "הוסף מגבלת תוסף",
+                        "pluginIdLabel": "תוסף",
+                        "pluginIdPlaceholder": "למשל openai",
+                        "pluginSelectPlaceholder": "בחר תוסף…",
+                        "noEligiblePlugins": "אפשר תוסף AI, חיפוש, צילום מסך או מחלץ תוכן עבור תיקיה זו כדי לקבע מגבלה לפי תוסף.",
+                        "allPluginsCapped": "כל התוספים הזכאים כבר יש להם מגבלה.",
+                        "noMatchingPlugins": "אין תוספים שתואמים לחיפוש זה.",
+                        "capLabel": "מגבלה חודשית ({currency})",
+                        "allowOverageLabel": "אפשר חריגה",
+                        "addButton": "הוסף מגבלה",
+                        "saveButton": "שמור",
+                        "deleteAria": "מחיקת תקציב",
+                        "errorPluginRequired": "נדרש מזהה תוסף.",
+                        "errorPluginDuplicate": "כבר קיים תקציב עבור תוסף זה.",
+                        "errorPositive": "הזן ערך מגבלה חיובי.",
+                        "createSuccess": "יצירת תקציב תוסף הצליחה",
+                        "createError": "יצירת תקציב תוסף נכשלה",
+                        "updateSuccess": "עדכון תקציב תוסף הצליח",
+                        "updateError": "עדכון תקציב תוסף נכשל",
+                        "deleteSuccess": "מחיקת תקציב תוסף הצליחה",
+                        "deleteError": "מחיקת תקציב תוסף נכשלה"
+                    },
+                    "spendByPlugin": {
+                        "heading": "הוצאה לפי תוסף",
+                        "subheading": "{period} — פירוט קריאה בלבד ממקור PluginUsageEvent.",
+                        "empty": "לא נרשם שימוש בתקופה זו.",
+                        "columnPlugin": "תוסף",
+                        "columnCapability": "יכולת",
+                        "columnUnits": "יחידות",
+                        "columnCost": "עלות"
+                    },
+                    "export": {
+                        "downloadCsv": "הורד CSV",
+                        "downloadingCsv": "מכין CSV…",
+                        "csvFailed": "ייצוא CSV נכשל"
+                    }
                 },
                 "sourceSettings": "מאגר מקור",
                 "originalSource": "מקור מקורי",
@@ -2247,6 +2460,10 @@
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "טוען מצב הפעלה...",
+                    "openWebsite": "פתח אתר"
+                },
                 "noProviderAlert": {
                     "title": "אין ספק פריסה",
                     "description": "בחר ספק פריסה כדי לפרוס את אתר העבודה שלך.",
@@ -2488,6 +2705,10 @@
                 "configureNow": "הגדר עכשיו",
                 "formTitle": "צור עבודה ידנית",
                 "formSubtitle": "הגדר את העבודה שלך עם שליטה מלאה בכל הגדרה",
+                "proposalBanner": {
+                    "title": "מולא מראש מהצעת AI.",
+                    "subtitle": "תיקן כלום לפני יצירה."
+                },
                 "basicInfo": "מידע בסיסי",
                 "nameLabel": "שם עבודה *",
                 "namePlaceholder": "למשל, כלי AI מדהימים",
@@ -2969,6 +3190,11 @@
             "disable": "כבה",
             "settings": "הגדרות",
             "saveSettings": "שמור הגדרות",
+            "saveAndVerify": "שמור ואמת",
+            "verifiesOnSaveHint": "שמירת תוסף זה בודקת את החיבור ומדווחת על פרטי הקלאסטר/חשבון.",
+            "verifyClusterHeader": "מחובר לקלאסטר '{name}' ({version}).",
+            "verifySuccessHeader": "החיבור אומת.",
+            "verifyNoIngressClasses": "לא נמצא IngressClass בקלאסטר זה. התקן ingress-nginx או Traefik, ואז שמור מחדש כדי לרענן.",
             "settingsTitle": "הגדרות תוסף",
             "settingsSaved": "ההגדרות נשמרו בהצלחה",
             "noSettings": "לתוסף זה אין הגדרות ניתנות להגדרה",
@@ -3028,7 +3254,15 @@
                 "addItem": "הוסף",
                 "modify": "שנה",
                 "cancel": "ביטול",
-                "enterNewValue": "הזן ערך חדש..."
+                "enterNewValue": "הזן ערך חדש...",
+                "clusterIngressClassPlaceholder": "למשל nginx",
+                "clusterIngressClassUseDefault": "בררת המחדל של הקלאסטר",
+                "clusterIngressClassDefault": "בררת מחדל",
+                "clusterIngressClassUnknown": "בקרלר לא ידוע",
+                "clusterIngressClassPreVerify": "שמור ואמת כדי לזהות את רשימת IngressClass של הקלאסטר הזה. השאר ריק לבררת המחדל של הקלאסטר.",
+                "clusterIngressClassEmpty": "לא זוהה בקר קלאסטר. התקן ingress-nginx, Traefik או בקר אחר בקלאסטר שלך, ואז שמור מחדש כדי לרענן רשימה זו.",
+                "githubPackagesOAuthConnect": "הרשה עם GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "ההרשמה ל-GitHub נכשלה. נסה שוב או הדבק PAT ידנית."
             },
             "oauth": {
                 "title": "חיבור חשבון",
@@ -3081,6 +3315,7 @@
             "subtitle": "עיין בתבניות אתרים מובנות, נהל את הקטלוג המותאם שלך, וקבע איזו תבנית יתחילו ממנה עבודות חדשות.",
             "actions": {
                 "addTemplate": "הוסף תבנית מותאמת",
+                "customizeTemplate": "יצירה באמצעות בינה מלאכותית",
                 "refreshTemplates": "רענן תבניות"
             },
             "hero": {
@@ -3117,6 +3352,8 @@
                 "fork": "פיצול",
                 "edit": "עריכה",
                 "archive": "ארכיון",
+                "customizeAgain": "התאמה אישית שוב",
+                "viewStatus": "הצגת מצב ההתאמה האישית",
                 "catalogOnly": "פריט בקטלוג בלבד",
                 "openRepository": "פתח מאגר",
                 "previewAlt": "{name} תצוגה מקדימה",
@@ -3124,7 +3361,15 @@
                 "branch": "ענף: {branch}",
                 "syncBranches": "{count} ענפים מסונכרנים",
                 "betaBranch": "בטא: {branch}",
-                "noDescription": "עדיין אין תיאור."
+                "noDescription": "עדיין אין תיאור.",
+                "status": {
+                    "pending": "בתור",
+                    "forking": "מפצל",
+                    "customizing": "מתאים אישית",
+                    "pushing": "דוחף",
+                    "succeeded": "התאמה אישית הושלמה",
+                    "failed": "הריצה האחרונה נכשלה"
+                }
             },
             "dialog": {
                 "title": "הוסף תבנית מותאמת",
@@ -3198,7 +3443,70 @@
                 "refreshSuccess": "קטלוג התבניות רענן.",
                 "refreshFailed": "הרענון של התבניות נכשל.",
                 "defaultUpdated": "ברירת המחדל של התבנית עודכנה.",
-                "defaultFailed": "העדכון של ברירת המחדל של התבנית נכשל."
+                "defaultFailed": "העדכון של ברירת המחדל של התבנית נכשל.",
+                "customizeFailed": "התחלת התאמת התבנית נכשלה.",
+                "customizationSucceeded": "התאמת התבנית הושלמה.",
+                "customizationFailed": "התאמת התבנית נכשלה."
+            },
+            "customizeDialog": {
+                "title": "יצירת תבנית מותאמת אישית עם בינה מלאכותית",
+                "titleIterate": "התאמת {name} שוב",
+                "titleStatus": "מצב ההתאמה האישית - {name}",
+                "description": "אנחנו משכפלים תבנית בסיסית למאגר חדש בחשבון ה-GitHub שלך, ואז מריצים את סוכן הבינה המלאכותית שבחרת עליו כדי להחיל שינויים בממשק בלבד. הפונקציונליות נשארת ללא שינוי.",
+                "descriptionIterate": "הפעלת סבב נוסף של עריכות סוכן באותו מאגר. כל פעם נדחף התחייבות חדשה.",
+                "descriptionStatus": "מצב חי של הריצה האחרונה של ההתאמה האישית עבור תבנית זו.",
+                "templateLabel": "תבנית",
+                "templateIterateHelp": "הפעלה מחדש על מאגר התבנית המותאמת אישית הקיימת.",
+                "nameLabel": "שם התבנית",
+                "namePlaceholder": "למשל, עיצוב סגנון סגול כהה",
+                "nameHelp": "מופיע בקטלוג שלך ומשמש לקריאת המאגר החדש ב-GitHub.",
+                "baseLabel": "תבנית בסיס",
+                "baseHelp": "רק תבניות בסיס שסומנו כניתנות להתאמה עם בינה מלאכותית מופיעות ברשימה.",
+                "providerLabel": "סוכן עריכת קוד",
+                "providerHelp": "בחר אחד מן תוספי עריכת הקוד המותקנים שלך. ברירת המחדל נבחרה מראש.",
+                "aiProviderLabel": "ספק בינה מלאכותית",
+                "aiProviderHelp": "{plugin} פועל נגד מודל שפה חיצוני — בחר איזה להשתמש בו.",
+                "targetLabel": "יעד GitHub",
+                "targetHelp": "איפה ליצור את המאגר החדש. חשבון אישי או ארגון שאתה שייך אליו.",
+                "personalTarget": "חשבון אישי ({login})",
+                "organizationTarget": "ארגון ({login})",
+                "promptLabel": "תאר את הממשק שברצונך",
+                "promptPlaceholder": "דוגמה: עבור לעיצוב כהה עם גווני סגול עדינים, פינות מעוגלות, וגופן כותרת סריף מודרני יותר.",
+                "promptIteratePlaceholder": "דוגמה: הגבר את ניגודיות הסרגל הצדדי והחלף את גופן הכותרת ל-Inter.",
+                "promptHelp": "הי ספציפי לגבי סגנון. תכונות חדשות אינן בטווח — ממשק בלבד.",
+                "submit": "יצירת תבנית מותאמת אישית",
+                "submitIterate": "הפעלת התאמה אישית",
+                "retry": "ניסיון נוסף",
+                "cancel": "ביטול",
+                "done": "בוצע",
+                "successHelp": "התבנית המותאמת אישית שלך מוכנה. היא מופיעה כעת בקטלוג שלך.",
+                "status": {
+                    "pending": "בתור...",
+                    "forking": "מספק את המאגר החדש...",
+                    "customizing": "הסוכן מיישם את השינויים שלך...",
+                    "pushing": "דוחף שינויים...",
+                    "succeeded": "ההתאמה האישית הושלמה בהצלחה.",
+                    "failed": "ההתאמה האישית נכשלה."
+                },
+                "toast": {
+                    "started": "ההתאמה האישית החלה — בדרך כלל זה לוקח כמה דקות.",
+                    "success": "התבנית הותאמה אישית בהצלחה.",
+                    "failed": "התאמת התבנית נכשלה.",
+                    "startFailed": "לא היתה אפשרות להתחיל את ההתאמה האישית."
+                },
+                "messages": {
+                    "nameRequired": "שם התבנית נדרש.",
+                    "baseRequired": "בחר תבנית בסיס.",
+                    "providerRequired": "בחר סוכן עריכת קוד.",
+                    "aiProviderRequired": "בחר ספק בינה מלאכותית עבור הסוכן הנבחר.",
+                    "promptTooShort": "תאר את השינויים בלפחות מספר מילים.",
+                    "noCustomizableBases": "אין תבניות בסיס ניתנות להתאמה זמינות.",
+                    "noProviders": "אין תוספי סוכני עריכת קוד מותקנים או מופעלים. התקן אחד מקטלוג התוספים (למשל claude-code, codex, gemini, opencode).",
+                    "noAiProviders": "ל-{plugin} נדרש ספק בינה מלאכותית, אך אף אחד לא מותקן או מופעל. התקן אחד (למשל openai, anthropic, google) מקטלוג התוספים.",
+                    "noTargets": "חבר חשבון GitHub כדי לבחור יעד.",
+                    "browsePlugins": "עיון בקטלוג תוספים",
+                    "noRuns": "עדיין אין ריצות התאמה אישית עבור תבנית זו."
+                }
             }
         },
         "templateSelector": {
@@ -3343,6 +3651,7 @@
             "dashboard": "לוח בקרה",
             "activity": "יומן פעילות",
             "works": "עבודות",
+            "discover": "גלה",
             "newWork": "עבודה חדשה",
             "work": "עבודה",
             "overview": "סקירה כללית",

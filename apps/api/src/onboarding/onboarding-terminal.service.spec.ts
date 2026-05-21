@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { OnboardingTerminalService } from './onboarding-terminal.service';
 
 jest.mock('@ever-works/agent/database', () => ({}));
@@ -7,6 +8,16 @@ jest.mock('@ever-works/agent/entities', () => ({
 }));
 
 describe('OnboardingTerminalService', () => {
+    let warnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
+
+    afterEach(() => {
+        warnSpy.mockRestore();
+    });
+
     const baseInput = {
         onboardingId: 'ob-1',
         workId: 'w-1',

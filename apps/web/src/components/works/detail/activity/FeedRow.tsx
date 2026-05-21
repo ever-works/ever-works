@@ -5,7 +5,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import type { FeedEntry } from '@/lib/api/works/activity-feed.types';
+import type { FeedEntry, PlatformActivityLogEntry } from '@/lib/api/works/activity-feed.types';
+import { SyncEventRow } from './SyncEventRow';
+import type { SyncEvent } from './SyncEvent.types';
 
 interface FeedRowProps {
     entry: FeedEntry;
@@ -36,7 +38,26 @@ function IconForSource({ source }: { source: FeedEntry['source'] }) {
     );
 }
 
+function isSyncEventDetails(details: unknown): details is SyncEvent {
+    if (!details || typeof details !== 'object') return false;
+    const kind = (details as { kind?: unknown }).kind;
+    return kind === 'success' || kind === 'skipped' || kind === 'failed';
+}
+
+function isSyncActivity(entry: FeedEntry): entry is PlatformActivityLogEntry {
+    return entry.source === 'platform-activity-log' && entry.category === 'sync';
+}
+
+function formatRelativeTime(timestamp: string): string {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return formatDistanceToNow(date, { addSuffix: true });
+}
+
 function entryHref(entry: FeedEntry, workId: string): { href: string; external: boolean } {
+    if (entry.source === 'directory-site') {
+        return { href: entry.target.adminUrl, external: true };
+    }
     if (entry.source === 'generation-history') {
         return {
             href: `${ROUTES.DASHBOARD_WORK_HISTORY(workId)}?run=${entry.runId}`,
@@ -51,7 +72,11 @@ function entryHref(entry: FeedEntry, workId: string): { href: string; external: 
 export function FeedRow({ entry, workId }: FeedRowProps) {
     const t = useTranslations('dashboard.workDetail.activity');
     const { href, external } = entryHref(entry, workId);
-    const relative = formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true });
+    const relative = formatRelativeTime(entry.timestamp);
+
+    if (isSyncActivity(entry) && isSyncEventDetails(entry.details)) {
+        return <SyncEventRow event={entry.details} />;
+    }
 
     const content = (
         <div
@@ -68,11 +93,13 @@ export function FeedRow({ entry, workId }: FeedRowProps) {
                     <span className="text-sm font-medium text-text dark:text-text-dark truncate">
                         {entry.summary}
                     </span>
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
-                        {relative}
-                    </span>
+                    {relative && (
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
+                            {relative}
+                        </span>
+                    )}
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary dark:text-text-secondary-dark min-w-0">
                     <span className="rounded-full bg-muted/40 dark:bg-muted/20 px-2 py-0.5 font-medium">
                         {t(`filters.${entry.category}`)}
                     </span>
@@ -95,7 +122,7 @@ export function FeedRow({ entry, workId }: FeedRowProps) {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
+                className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
                 {content}
             </a>
@@ -105,7 +132,7 @@ export function FeedRow({ entry, workId }: FeedRowProps) {
     return (
         <Link
             href={href}
-            className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
+            className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
             {content}
         </Link>

@@ -43,7 +43,7 @@ export class BudgetsController {
     ) {}
 
     @Get()
-    @ApiOperation({ summary: 'EW-602: list all budgets configured for a Work' })
+    @ApiOperation({ summary: 'List all budgets configured for a Work' })
     async list(@CurrentUser() auth: AuthenticatedUser, @Param('workId') workId: string) {
         await this.assertReadAccess(workId, auth.userId);
         const budgets = await this.budgetRepository.findAllForWork(workId);
@@ -51,7 +51,7 @@ export class BudgetsController {
     }
 
     @Post()
-    @ApiOperation({ summary: 'EW-602: create a global or plugin-scoped budget' })
+    @ApiOperation({ summary: 'Create a global or plugin-scoped budget' })
     async create(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('workId') workId: string,
@@ -90,7 +90,7 @@ export class BudgetsController {
     }
 
     @Patch(':budgetId')
-    @ApiOperation({ summary: 'EW-602: update an existing budget cap or overage flag' })
+    @ApiOperation({ summary: 'Update an existing budget cap or overage flag' })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('workId') workId: string,
@@ -118,7 +118,7 @@ export class BudgetsController {
     }
 
     @Delete(':budgetId')
-    @ApiOperation({ summary: 'EW-602: delete a budget — removes its cap and any future alerts' })
+    @ApiOperation({ summary: 'Delete a budget and remove its cap and future alerts' })
     async delete(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('workId') workId: string,
