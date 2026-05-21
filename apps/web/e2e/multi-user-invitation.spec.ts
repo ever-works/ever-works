@@ -26,11 +26,11 @@ test.describe('Multi-user invitations — owner happy path', () => {
             headers: authedHeaders(owner.access_token),
             data: INVITE_PAYLOAD(invitee.email),
         });
-        if ([400, 402, 403, 404, 409].includes(create.status())) {
-            test.skip(true, `invitation flow unavailable in env (${create.status()})`);
-        }
-        expect(create.status()).toBeGreaterThanOrEqual(200);
-        expect(create.status()).toBeLessThan(300);
+        // EW-600 invitation flow is now baseline behaviour — owner POSTing a
+        // well-formed payload to their own work must succeed. Pinned to the
+        // exact 201 the controller returns (matches work-members.spec.ts so
+        // both specs catch any accidental status-code regression). Greptile P2.
+        expect(create.status(), `expected 201 Created, got ${create.status()}`).toBe(201);
 
         const list = await request.get(`${API_BASE}/api/works/${w.id}/invitations`, {
             headers: authedHeaders(owner.access_token),
@@ -84,7 +84,7 @@ test.describe('Multi-user invitations — members CRUD smoke', () => {
         expect(res.status()).toBeLessThan(500);
     });
 
-    test('owner can read their own membership row (returns OWNER)', async ({ request }) => {
+    test('owner appears in the separate "owner" field, not in "members"', async ({ request }) => {
         const owner = await registerUserViaAPI(request);
         const w = await createWorkViaAPI(request, owner.access_token, {
             name: `member-self-${Date.now().toString(36)}`,
@@ -92,24 +92,25 @@ test.describe('Multi-user invitations — members CRUD smoke', () => {
         const res = await request.get(`${API_BASE}/api/works/${w.id}/members`, {
             headers: authedHeaders(owner.access_token),
         });
-        if (res.status() !== 200) test.skip(true, `members list unavailable (${res.status()})`);
+        // Endpoint is known to exist — owner reading own work must return 200.
+        // Earlier revision skipped here; tightened post EW-632 close-out.
+        expect(res.status(), `expected 200 OK on own /members, got ${res.status()}`).toBe(200);
+
         const body = await res.json();
-        const arr = Array.isArray(body) ? body : (body?.members ?? body?.data ?? []);
-        // Owner should appear in the members list with role=OWNER (or
-        // equivalent). Field naming varies — accept any of role/userRole.
-        const self = arr.find(
+        // FR-2 / FR-10 (docs/specs/features/work-members/spec.md): the owner
+        // is returned in a SEPARATE `owner` field, never folded into the
+        // `members` array. A fresh work has zero collaborator members.
+        expect(body?.owner, 'no owner field in response').toBeTruthy();
+        expect(body.owner.userId ?? body.owner.user?.id ?? body.owner.id).toBe(owner.user.id);
+
+        const members = Array.isArray(body) ? body : (body?.members ?? body?.data ?? []);
+        const ownerInMembersArray = members.find(
             (m: { userId?: string; user?: { id?: string } }) =>
                 m?.userId === owner.user.id || m?.user?.id === owner.user.id,
         );
-        if (!self) test.skip(true, 'owner not in /members list — may use a separate self endpoint');
-        const role = String(self?.role ?? self?.userRole ?? '').toLowerCase();
-        // Owner-level only. "manager" is a distinct lower-privilege role
-        // in the WorkMemberRole enum (owner > manager > editor > viewer);
-        // accepting it here would let a member-promotion regression pass.
-        // Greptile P2 callout.
         expect(
-            role.includes('owner') || role === 'admin',
-            `owner row reported as "${role}" — should be owner/admin`,
-        ).toBe(true);
+            ownerInMembersArray,
+            'owner must NOT appear in members[] — only in the separate owner field',
+        ).toBeFalsy();
     });
 });

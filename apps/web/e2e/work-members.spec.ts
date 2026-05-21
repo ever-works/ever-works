@@ -72,7 +72,7 @@ test.describe('Work invitations — API contract', () => {
         expect(Array.isArray(arr)).toBe(true);
     });
 
-    test('POST /api/works/:id/invitations for own work accepts well-formed body', async ({
+    test('POST /api/works/:id/invitations for own work creates a pending invitation', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -83,10 +83,17 @@ test.describe('Work invitations — API contract', () => {
             headers: authedHeaders(u.access_token),
             data: { email: `invitee-${Date.now()}@test.local`, role: 'editor' },
         });
-        // 200/201 = created; 400 = body schema differs; 409 = duplicate. All "endpoint exists" cases.
-        // Reject 5xx and 401/403 (unexpected).
-        expect(res.status(), `status was ${res.status()}`).toBeLessThan(500);
-        expect([401, 403]).not.toContain(res.status());
+        // EW-600 (PR #687) shipped tokenised invitations — owner POSTing a
+        // well-formed payload to their own work must succeed (201 Created).
+        // Tightened from the original "anything < 500 and not 401/403" guard
+        // now that the endpoint is known to exist.
+        expect(res.status(), `expected 201 Created, got ${res.status()}`).toBe(201);
+        const body = await res.json();
+        expect(body?.id ?? body?.invitation?.id, 'no invitation id in response').toBeTruthy();
+        expect(
+            body?.claimUrl ?? body?.invitation?.claimUrl,
+            'claim URL must be returned ONCE at creation',
+        ).toBeTruthy();
     });
 
     test('DELETE /api/works/:id/invitations/:inv without auth → 401', async ({ request }) => {
