@@ -1,16 +1,16 @@
 jest.mock('pdf-parse/lib/pdf-parse.js', () => jest.fn());
 jest.mock('mammoth', () => ({
     __esModule: true,
-    default: { convertToMarkdown: jest.fn() },
-    convertToMarkdown: jest.fn(),
+    default: { convertToHtml: jest.fn() },
+    convertToHtml: jest.fn(),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParseMock = require('pdf-parse/lib/pdf-parse.js') as jest.Mock;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mammothMock = require('mammoth') as {
-    default: { convertToMarkdown: jest.Mock };
-    convertToMarkdown: jest.Mock;
+    default: { convertToHtml: jest.Mock };
+    convertToHtml: jest.Mock;
 };
 
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
@@ -28,8 +28,8 @@ describe('KnowledgeBaseBufferExtractorService', () => {
 
     beforeEach(() => {
         pdfParseMock.mockReset();
-        mammothMock.default.convertToMarkdown.mockReset();
-        mammothMock.convertToMarkdown.mockReset();
+        mammothMock.default.convertToHtml.mockReset();
+        mammothMock.convertToHtml.mockReset();
         service = new KnowledgeBaseBufferExtractorService();
     });
 
@@ -133,9 +133,9 @@ describe('KnowledgeBaseBufferExtractorService', () => {
     });
 
     describe('DOCX extraction', () => {
-        it('calls mammoth.convertToMarkdown and returns the value', async () => {
-            mammothMock.default.convertToMarkdown.mockResolvedValueOnce({
-                value: '# Heading\n\nbody',
+        it('calls mammoth.convertToHtml then Turndown and returns Markdown', async () => {
+            mammothMock.default.convertToHtml.mockResolvedValueOnce({
+                value: '<h1>Heading</h1><p>body</p>',
             });
 
             const result = await service.extract(
@@ -145,26 +145,25 @@ describe('KnowledgeBaseBufferExtractorService', () => {
 
             expect(result).not.toBeNull();
             expect(result!.via).toBe('docx-mammoth');
-            expect(result!.markdown).toBe('# Heading\n\nbody');
-            expect(mammothMock.default.convertToMarkdown).toHaveBeenCalledWith({
+            expect(result!.markdown).toMatch(/^#\s+Heading/m);
+            expect(result!.markdown).toContain('body');
+            expect(mammothMock.default.convertToHtml).toHaveBeenCalledWith({
                 buffer: expect.any(Buffer),
             });
         });
 
         it('throws on empty mammoth output', async () => {
-            mammothMock.default.convertToMarkdown.mockResolvedValueOnce({ value: '   ' });
+            mammothMock.default.convertToHtml.mockResolvedValueOnce({ value: '   ' });
             await expect(
                 service.extract(
                     Buffer.from('PK-fake-docx'),
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 ),
-            ).rejects.toThrow(/empty Markdown/);
+            ).rejects.toThrow(/empty HTML/);
         });
 
         it('rethrows mammoth errors with a clear label', async () => {
-            mammothMock.default.convertToMarkdown.mockRejectedValueOnce(
-                new Error('not a zip file'),
-            );
+            mammothMock.default.convertToHtml.mockRejectedValueOnce(new Error('not a zip file'));
             await expect(
                 service.extract(
                     Buffer.from('PK-fake-docx'),

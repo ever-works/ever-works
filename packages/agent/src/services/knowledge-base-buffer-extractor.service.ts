@@ -29,7 +29,7 @@ const pdfParse: (
  *  - text/html, application/xhtml+xml → Turndown-based HTML → Markdown
  *  - application/pdf → `pdf-parse`, text wrapped as a fenced Markdown body
  *  - application/vnd.openxmlformats-officedocument.wordprocessingml.document
- *    (DOCX) → `mammoth.convertToMarkdown`
+ *    (DOCX) → `mammoth.convertToHtml` → Turndown
  *  - everything else → `null` (caller marks `extractionStatus='skipped'`
  *    with a "no extractor route" reason)
  *
@@ -198,15 +198,30 @@ export class KnowledgeBaseBufferExtractorService {
     }
 
     private async extractDocx(buffer: Buffer): Promise<string> {
+        // Mammoth's typed surface exposes `convertToHtml` but not the
+        // (runtime-available) `convertToMarkdown`. Going HTML → Turndown
+        // gives us the same destination via the typed path and reuses
+        // the Turndown configuration already set up for HTML uploads.
         let result: { value: string };
         try {
-            result = await mammoth.convertToMarkdown({ buffer });
+            result = await mammoth.convertToHtml({ buffer });
         } catch (error) {
             throw new Error(`KB DOCX extraction failed: ${(error as Error).message}`);
         }
-        const markdown = (result.value ?? '').trim();
+        const html = (result.value ?? '').trim();
+        if (!html) {
+            throw new Error('KB DOCX extraction produced empty HTML');
+        }
+        let markdown: string;
+        try {
+            markdown = this.turndown.turndown(html).trim();
+        } catch (error) {
+            throw new Error(
+                `KB DOCX HTML→Markdown conversion failed: ${(error as Error).message}`,
+            );
+        }
         if (!markdown) {
-            throw new Error('KB DOCX extraction produced empty Markdown');
+            throw new Error('KB DOCX extraction produced empty Markdown after Turndown pass');
         }
         return this.capInlineBody(markdown);
     }
