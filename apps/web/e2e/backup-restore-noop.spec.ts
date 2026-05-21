@@ -32,7 +32,7 @@ test.describe('Backup posture — /api/health surfaces backup metadata if manage
             });
             test.skip(true, 'no backup field exposed');
         }
-        const t = Date.parse(backupTimestamp);
+        const t = Date.parse(backupTimestamp!);
         expect(Number.isFinite(t), `backup timestamp not parseable: "${backupTimestamp}"`).toBe(
             true,
         );

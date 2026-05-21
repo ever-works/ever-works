@@ -43,16 +43,17 @@ test.describe('OAuth state rotation — old state is invalidated by a new connec
         const aUrl = extractAuthorizeUrl(await a.json().catch(() => null));
         const bUrl = extractAuthorizeUrl(await b.json().catch(() => null));
         if (!aUrl || !bUrl) test.skip(true, 'no URL field in /connect/url body');
-        const aState = new URL(aUrl).searchParams.get('state');
-        const bState = new URL(bUrl).searchParams.get('state');
+        const aState = new URL(aUrl!).searchParams.get('state');
+        const bState = new URL(bUrl!).searchParams.get('state');
         if (!aState || !bState) test.skip(true, 'no state param on authorize URL');
         expect(aState, 'state did not rotate between consecutive /connect/url calls').not.toBe(
             bState,
         );
         // State should be high-entropy (≥ 16 chars).
-        expect(aState.length, `state suspiciously short: ${aState.length}`).toBeGreaterThanOrEqual(
-            16,
-        );
+        expect(
+            aState!.length,
+            `state suspiciously short: ${aState!.length}`,
+        ).toBeGreaterThanOrEqual(16);
     });
 
     test('previously-issued state from an earlier /connect/url is rejected at callback', async ({
@@ -66,7 +67,7 @@ test.describe('OAuth state rotation — old state is invalidated by a new connec
         if (!first.ok()) test.skip(true, '/connect/url not available');
         const firstUrl = extractAuthorizeUrl(await first.json().catch(() => null));
         if (!firstUrl) test.skip(true, 'no URL in connect/url body');
-        const oldState = new URL(firstUrl).searchParams.get('state');
+        const oldState = new URL(firstUrl!).searchParams.get('state');
         if (!oldState) test.skip(true, 'no state on authorize URL');
         // Issue state #2 — this rotates the server-side state binding.
         const second = await request.get(`${API_BASE}/api/oauth/github/connect/url`, {
@@ -77,7 +78,7 @@ test.describe('OAuth state rotation — old state is invalidated by a new connec
         // round 1. A correctly-rotating server must reject it (4xx).
         // Acceptable: 400 (invalid state), 401, 403, 404 (route guard).
         const res = await request.get(
-            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(oldState)}`,
+            `${API_BASE}/api/oauth/github/callback?code=fake-code&state=${encodeURIComponent(oldState!)}`,
             { headers: authedHeaders(u.access_token) },
         );
         expect(

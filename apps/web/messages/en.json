@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "Password reset successful!",
                 "canLogin": "You can now sign in with your new password."
+            },
+            "tabs": {
+                "password": "Password",
+                "magicLink": "Email me a link"
+            },
+            "magicLink": {
+                "subtitle": "We'll email you a one-time link to sign in. No password needed.",
+                "form": {
+                    "submit": "Send magic link",
+                    "submitting": "Sending..."
+                },
+                "success": {
+                    "title": "Check your inbox",
+                    "message": "If an account exists for {email}, we just sent a sign-in link. It expires in 15 minutes.",
+                    "resend": "Send another link"
+                },
+                "errors": {
+                    "failed": "We couldn't send the magic link. Please try again."
+                },
+                "redeem": {
+                    "title": "Signing you in",
+                    "loading": "Verifying your magic link...",
+                    "errorTitle": "This link can't be used",
+                    "errorBody": "Your magic link is invalid or has expired. Magic links can only be used once and stay valid for 15 minutes.",
+                    "requestNewLink": "Send a new link",
+                    "missingToken": "This magic link is missing a token. Request a new one to continue."
+                }
             }
         },
         "forgotPassword": {
@@ -3673,7 +3700,9 @@
             "unsupportedProvider": "Unsupported provider",
             "providerConnectFailed": "Failed to connect provider",
             "forgotPasswordFailed": "Failed to send password reset email",
-            "resetPasswordFailed": "Failed to reset password"
+            "resetPasswordFailed": "Failed to reset password",
+            "magicLinkFailed": "Failed to send magic link",
+            "magicLinkInvalid": "Invalid or expired magic link"
         }
     },
     "actions": {
@@ -3805,6 +3834,9 @@
             },
             "username": {
                 "minLength": "Username must contain at least {length} characters"
+            },
+            "token": {
+                "required": "Token cannot be empty"
             }
         }
     },

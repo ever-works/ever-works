@@ -5,7 +5,7 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
-import { getConfiguredAuthProviders } from '@/lib/auth/providers';
+import { getAuthProvidersConfig } from '@/lib/auth/providers';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function LoginPage() {
     const locale = await getLocale();
-    const availableSocialProviders = await getConfiguredAuthProviders();
+    const { socialProviders, magicLinkEnabled } = await getAuthProvidersConfig();
     const user = await getAuthFromCookie();
     if (user) {
         return redirect({ locale, href: ROUTES.DASHBOARD });
@@ -30,7 +30,10 @@ export default async function LoginPage() {
                 </div>
             }
         >
-            <LoginClient availableSocialProviders={availableSocialProviders} />
+            <LoginClient
+                availableSocialProviders={socialProviders}
+                magicLinkEnabled={magicLinkEnabled}
+            />
         </Suspense>
     );
 }

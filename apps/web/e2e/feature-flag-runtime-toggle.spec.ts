@@ -79,7 +79,7 @@ test.describe('Feature flags — change-detection surface (ETag / Cache-Control)
             test.skip(true, 'no flags endpoint exposes ETag');
         }
         const cond = await request.get(`${API_BASE}${foundPath}`, {
-            headers: { ...authedHeaders(u.access_token), 'If-None-Match': etag },
+            headers: { ...authedHeaders(u.access_token), 'If-None-Match': etag! },
         });
         // 304 is the desirable outcome (cheap revalidation). 200 is
         // acceptable (server doesn't honour conditional requests yet
