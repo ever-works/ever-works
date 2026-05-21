@@ -148,21 +148,27 @@ test.describe('Magic-link login UI — EW-633', () => {
         expect(page.url()).not.toContain('/login');
     });
 
-    // EW-633 follow-up — these two redeem-page-error specs have been
-    // failing on every CI run since the magic-link UI landed (#884). The
-    // page locally renders `data-testid="magic-link-error"` in both the
-    // missing-token initial state AND the post-redeem error state, but
-    // Playwright on CI never sees the element. The most likely culprit
-    // is the next-intl locale-rewrite of `/login/magic-link` →
-    // `/<locale>/login/magic-link` taking longer than the test's wait,
-    // combined with the parent `<Suspense>` boundary showing its loading
-    // fallback (which has no testIds) until the client component hydrates.
+    // EW-633 follow-up — re-fixme'd after PR #906 attempted a fix that
+    // didn't work. We tried:
+    //   1. `goto('/login/magic-link')` (PR #884) — fail
+    //   2. `goto('/en/login/magic-link', { waitUntil: 'networkidle' })`
+    //      (PR #906) — also fail
     //
-    // Marked `.fixme` so CI goes green; the spec stays as a checklist
-    // for whoever fixes the underlying redeem page (probably: add a
-    // direct `data-testid="magic-link-error"` to the Suspense fallback,
-    // or assert on the locale-prefixed URL the goto eventually settles
-    // on instead of relying on the bare path).
+    // The error testId still doesn't render on CI even with the locale-
+    // prefixed URL and networkidle. Need deeper investigation: open the
+    // CI Playwright trace.zip artifact and confirm whether the page is
+    // 404, stuck in Suspense fallback, or rendering but with a different
+    // DOM than local. Tracked separately so we stop wasting cascade
+    // cycles on this.
+    //
+    // Real follow-ups for the next pickup:
+    //  - Add `data-testid="magic-link-loading"` already exists on the
+    //    Suspense fallback (page.tsx line 16-22) — assert THAT shows up
+    //    first, then the error swaps in. If the loading testid also
+    //    never appears, the route is the problem, not the rendering.
+    //  - Check if `MAGIC_LINK_ENABLED` is true in CI (the spec skips when
+    //    false). The fact that they REACH the assertion means the env is
+    //    set, but worth confirming via the trace.
     test.fixme('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
         page,
         request,
@@ -171,8 +177,10 @@ test.describe('Magic-link login UI — EW-633', () => {
             test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
         }
 
-        await page.goto('/login/magic-link');
-        await expect(page.getByTestId('magic-link-error')).toBeVisible();
+        await page.goto('/en/login/magic-link', { waitUntil: 'networkidle' });
+        await expect(page.getByTestId('magic-link-error')).toBeVisible({
+            timeout: 15_000,
+        });
         const resend = page.getByTestId('magic-link-request-new');
         await expect(resend).toBeVisible();
         await resend.click();
@@ -187,7 +195,9 @@ test.describe('Magic-link login UI — EW-633', () => {
             test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
         }
 
-        await page.goto('/login/magic-link?token=deadbeef-not-a-real-token');
+        await page.goto('/en/login/magic-link?token=deadbeef-not-a-real-token', {
+            waitUntil: 'networkidle',
+        });
         await expect(page.getByTestId('magic-link-error')).toBeVisible({
             timeout: 15_000,
         });

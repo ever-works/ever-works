@@ -147,6 +147,21 @@ export interface IStoragePlugin extends IPlugin {
 	 */
 	deriveKey?(ownerId: string, filename: string, workId?: string): string;
 
+	/**
+	 * Optional: delete every object stored under a given owner. Called
+	 * by the `anonymous-user-cleanup` schedule when an anon user TTL
+	 * expires — without it, the user row goes away but their uploaded
+	 * files leak forever on disk / S3 / GitHub. Implementations should
+	 * be idempotent (missing owner directory or empty prefix is a no-op)
+	 * and resilient (one failed delete shouldn't abort the rest of the
+	 * batch). Returns the number of objects deleted.
+	 *
+	 * Plugins that can't enumerate by owner cheaply may leave this unset;
+	 * the cleanup service then skips storage GC for that backend (logged
+	 * once at boot via the plugin manifest, not on every cleanup tick).
+	 */
+	deleteAllByOwner?(ownerId: string): Promise<{ deleted: number }>;
+
 	/** Whether the backend is healthy / configured. Used by the
 	 *  uploads service at startup to fail loudly when the operator
 	 *  selected an unconfigured backend. */

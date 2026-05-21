@@ -10,11 +10,17 @@ import {
     TemplateCustomizationDispatcher,
     WebhookDeliveryPayload,
     WebhookDeliveryDispatcher,
+    KbMirrorDocumentPayload,
+    KbMirrorDocumentDispatcher,
+    KbBackfillSkeletonPayload,
+    KbBackfillSkeletonDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
 import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
+import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
+import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
 
 @Injectable()
 export class TriggerService
@@ -22,7 +28,9 @@ export class TriggerService
         WorkGenerationDispatcher,
         WorkImportDispatcher,
         TemplateCustomizationDispatcher,
-        WebhookDeliveryDispatcher
+        WebhookDeliveryDispatcher,
+        KbMirrorDocumentDispatcher,
+        KbBackfillSkeletonDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -162,6 +170,68 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch webhook-delivery task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 — enqueue one KB document mirror to Trigger.dev. The KB
+     * service calls this after every create / update / delete so the
+     * sidecar `.yml` + body `.md` in the Work's data repo stays in sync
+     * with the DB. Returns the Trigger.dev run id (or `null` when
+     * Trigger.dev is disabled / disposed).
+     */
+    async dispatchKbMirrorDocument(payload: KbMirrorDocumentPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            // Greptile P2: serialize mirror runs per Work so rapid
+            // successive create/update/delete mutations don't race on
+            // `git push`. Trigger.dev's `concurrencyKey` queues
+            // subsequent runs behind any in-flight one with the same
+            // key — keyed on `workId`, two Works run in parallel but
+            // two mutations on the same Work run sequentially.
+            const handle = await kbMirrorDocumentTask.trigger(payload, {
+                tags: [
+                    'kb-mirror-document',
+                    `op:${payload.operation}`,
+                    `work:${payload.workId}`,
+                    `doc:${payload.documentId}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-mirror:${payload.workId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-mirror-document task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 — enqueue an idempotent KB skeleton backfill for the
+     * supplied Works. Used from admin scripts / one-off bootstrap
+     * tasks; the per-document mirror task already lazy-creates the
+     * skeleton, so this is only needed when the operator wants to
+     * pre-populate it without an outbound mutation.
+     */
+    async dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbBackfillSkeletonTask.trigger(payload, {
+                tags: ['kb-backfill-skeleton', `count:${payload.workIds?.length ?? 0}`],
+                machine: this.machine() as any,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-backfill-skeleton task', error as Error);
             return null;
         }
     }

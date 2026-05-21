@@ -173,13 +173,17 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		// flat `<prefix>/<ownerId>/<file>` key shape for backwards
 		// compatibility (Codex P1 finding: reads/deletes round-trip in
 		// data-repo mode).
+		//
+		// PR #907 removed `GITHUB_STORAGE_PUBLIC_URL_BASE` — the plugin
+		// always returns the owner-gated API route now. `UploadsService.saveImage`
+		// rewrites this shape uniformly (Codex P1 fix in PR #894) and
+		// public-repo operators can build their own URLs from the storage
+		// key if they want a CDN passthrough.
 		const isDataRepo = cfg.mode === 'data-repo' && input.workId;
 		const key = isDataRepo ? encodeDataRepoKey(input.workId!, path) : path;
-		const url = cfg.publicRawUrl
-			? `${cfg.publicRawUrl.replace(/\/$/, '')}/${path}`
-			: isDataRepo
-				? `/api/uploads/${ownerId}/${hash}${ext}?workId=${encodeURIComponent(input.workId!)}`
-				: `/api/uploads/${ownerId}/${hash}${ext}`;
+		const url = isDataRepo
+			? `/api/uploads/${ownerId}/${hash}${ext}?workId=${encodeURIComponent(input.workId!)}`
+			: `/api/uploads/${ownerId}/${hash}${ext}`;
 		return { key, url };
 	}
 
@@ -288,6 +292,87 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			return encodeDataRepoKey(workId, base);
 		}
 		return base;
+	}
+
+	/**
+	 * Delete every file under `<pathPrefix>/<ownerId>/` — called by the
+	 * anon cleanup schedule. GitHub Contents API doesn't have a bulk
+	 * delete: we list the directory, then iterate `deleteFile` per
+	 * entry. Each delete creates a commit, so cleanup of N files takes
+	 * N commits — acceptable since this runs once a day off-peak.
+	 *
+	 * Idempotent: a missing directory returns 0 deletes, errors per
+	 * file are logged + counted but don't abort the batch.
+	 *
+	 * EW-644 — only runs in `separate-repo` mode. In `data-repo` mode
+	 * uploads are scattered across N Work-owned repos and the anon-
+	 * cleanup schedule has no way to enumerate them from an ownerId
+	 * alone. Returns `{ deleted: 0 }` with a warning in that case;
+	 * per-Work GC belongs alongside the Work deletion flow, not in the
+	 * platform-wide anon cleanup.
+	 */
+	async deleteAllByOwner(ownerId: string): Promise<{ deleted: number }> {
+		if (readMode() === 'data-repo') {
+			this.context?.logger.warn?.(
+				`github-storage deleteAllByOwner: skipping in data-repo mode (uploads are per-Work; ownerId=${ownerId})`
+			);
+			return { deleted: 0 };
+		}
+		const cfg = this.cfgForRead();
+		const octokit = this.client(cfg.token);
+		const ownerPath = `${cfg.pathPrefix}/${sanitizeOwner(ownerId)}`;
+
+		let entries: Array<{ path: string; sha: string; type: string }>;
+		try {
+			const { data } = await octokit.rest.repos.getContent({
+				owner: cfg.owner,
+				repo: cfg.repo,
+				path: ownerPath,
+				ref: cfg.branch
+			});
+			if (!Array.isArray(data)) {
+				// Single file at exactly the owner path — unusual, but treat as the only entry.
+				if (data.type === 'file') {
+					entries = [{ path: data.path, sha: data.sha, type: 'file' }];
+				} else {
+					entries = [];
+				}
+			} else {
+				entries = data
+					.filter((d): d is typeof d & { sha: string } => typeof d.sha === 'string')
+					.map((d) => ({ path: d.path, sha: d.sha, type: d.type }));
+			}
+		} catch (err) {
+			// Missing owner dir → idempotent no-op.
+			if (err instanceof RequestError && err.status === 404) {
+				return { deleted: 0 };
+			}
+			throw err;
+		}
+
+		let deleted = 0;
+		for (const entry of entries) {
+			if (entry.type !== 'file') continue;
+			try {
+				await octokit.rest.repos.deleteFile({
+					owner: cfg.owner,
+					repo: cfg.repo,
+					path: entry.path,
+					message: `gc(anon-cleanup): ${entry.path}`,
+					sha: entry.sha,
+					branch: cfg.branch
+				});
+				deleted += 1;
+			} catch (err) {
+				if (err instanceof RequestError && err.status === 404) continue;
+				this.context?.logger.warn?.(
+					`github-storage deleteAllByOwner: failed to delete ${entry.path}: ${
+						err instanceof Error ? err.message : String(err)
+					}`
+				);
+			}
+		}
+		return { deleted };
 	}
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -594,7 +679,6 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 			lfsEnabled: readLfsEnabled(),
 			lfsTransport: readLfsTransport(),
 			pathPrefix: readPathPrefix(),
-			publicRawUrl: process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined,
 			...resolved
 		};
 	}
@@ -615,8 +699,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 					: 'github-storage plugin not configured: GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO required'
 			);
 		}
-		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
-		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token, publicRawUrl };
+		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token };
 	}
 
 	private async resolveCfg(input: StoragePutInput): Promise<ResolvedConfig> {
@@ -624,7 +707,6 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		const lfsEnabled = readLfsEnabled();
 		const lfsTransport = readLfsTransport();
 		const pathPrefix = readPathPrefix();
-		const publicRawUrl = process.env.GITHUB_STORAGE_PUBLIC_URL_BASE || undefined;
 		if (mode === 'data-repo') {
 			if (!input.workId) {
 				throw new Error(
@@ -638,7 +720,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 				);
 			}
 			const resolved: ResolvedWorkRepo = await resolver.resolve(input.workId);
-			return { mode, lfsEnabled, lfsTransport, ...resolved, pathPrefix, publicRawUrl };
+			return { mode, lfsEnabled, lfsTransport, ...resolved, pathPrefix };
 		}
 		const owner = process.env.GITHUB_STORAGE_OWNER || '';
 		const repo = process.env.GITHUB_STORAGE_REPO || '';
@@ -649,7 +731,7 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 				'github-storage mode `separate-repo` requires GITHUB_STORAGE_TOKEN / GITHUB_STORAGE_OWNER / GITHUB_STORAGE_REPO.'
 			);
 		}
-		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token, publicRawUrl };
+		return { mode, lfsEnabled, lfsTransport, owner, repo, branch, pathPrefix, token };
 	}
 }
 
@@ -658,7 +740,6 @@ interface ResolvedConfig extends ResolvedWorkRepo {
 	lfsEnabled: boolean;
 	lfsTransport: 'api' | 'git-cli';
 	pathPrefix: string;
-	publicRawUrl?: string;
 }
 
 /** A single file inside a transport-level commit. */
