@@ -16,25 +16,25 @@
  * + §7.2 (folder layout).
  */
 export interface KbMirrorDocumentPayload {
-	readonly workId: string;
-	readonly operation: 'upsert' | 'delete';
+    readonly workId: string;
+    readonly operation: 'upsert' | 'delete';
 
-	/**
-	 * UUID of the `work_knowledge_documents` row. Always set; on delete
-	 * the row no longer exists but the id is preserved for traceability
-	 * in logs / activity events.
-	 */
-	readonly documentId: string;
+    /**
+     * UUID of the `work_knowledge_documents` row. Always set; on delete
+     * the row no longer exists but the id is preserved for traceability
+     * in logs / activity events.
+     */
+    readonly documentId: string;
 
-	/**
-	 * Path within `.content/kb/` (e.g. `brand/voice.md`) — required on
-	 * delete (the DB row is gone) and supplied on upsert for sanity.
-	 */
-	readonly path: string;
+    /**
+     * Path within `.content/kb/` (e.g. `brand/voice.md`) — required on
+     * delete (the DB row is gone) and supplied on upsert for sanity.
+     */
+    readonly path: string;
 
-	/**
-	 * `kbDocumentClass` value (`brand`, `legal`, ...). Required on delete
-	 * for symmetry with `path`; the task does not re-query the DB.
-	 */
-	readonly class: string;
+    /**
+     * `kbDocumentClass` value (`brand`, `legal`, ...). Required on delete
+     * for symmetry with `path`; the task does not re-query the DB.
+     */
+    readonly class: string;
 }

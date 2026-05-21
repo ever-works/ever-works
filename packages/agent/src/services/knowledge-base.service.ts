@@ -22,10 +22,7 @@ import {
     KbDocumentStatus,
     KbLockMode,
 } from '../entities/kb-types';
-import {
-    KB_MIRROR_DOCUMENT_DISPATCHER,
-    type KbMirrorDocumentDispatcher,
-} from '../tasks';
+import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '../tasks';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -384,11 +381,7 @@ export class KnowledgeBaseService {
         }
         this.assertNotLockedFull(existing);
 
-        const result = await this.mirrorService.restoreDocumentFromGit(
-            workId,
-            docId,
-            commitSha,
-        );
+        const result = await this.mirrorService.restoreDocumentFromGit(workId, docId, commitSha);
         if (!result.restored) {
             throw new NotFoundException(
                 `KB document body not found at commit ${commitSha} for ${existing.path}`,

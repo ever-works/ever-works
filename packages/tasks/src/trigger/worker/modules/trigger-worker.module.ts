@@ -19,10 +19,7 @@ import {
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
-import {
-    CategoryIconService,
-    KnowledgeBaseGitMirrorService,
-} from '@ever-works/agent/services';
+import { CategoryIconService, KnowledgeBaseGitMirrorService } from '@ever-works/agent/services';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';

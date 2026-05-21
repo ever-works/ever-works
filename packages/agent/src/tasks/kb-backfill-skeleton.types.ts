@@ -11,11 +11,11 @@
  * existing Works) + acceptance criterion A1.
  */
 export interface KbBackfillSkeletonPayload {
-	/**
-	 * Optional whitelist of Work IDs to backfill. When omitted the task
-	 * iterates every Work the platform owns. Useful for re-running the
-	 * backfill against a single failed Work without redoing the whole
-	 * fleet.
-	 */
-	readonly workIds?: readonly string[];
+    /**
+     * Optional whitelist of Work IDs to backfill. When omitted the task
+     * iterates every Work the platform owns. Useful for re-running the
+     * backfill against a single failed Work without redoing the whole
+     * fleet.
+     */
+    readonly workIds?: readonly string[];
 }

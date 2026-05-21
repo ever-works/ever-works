@@ -12,7 +12,7 @@ import type { KbBackfillSkeletonPayload } from './kb-backfill-skeleton.types';
  * service synchronously).
  */
 export interface KbBackfillSkeletonDispatcher {
-	dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null>;
+    dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null>;
 }
 
 export const KB_BACKFILL_SKELETON_DISPATCHER = Symbol('KB_BACKFILL_SKELETON_DISPATCHER');

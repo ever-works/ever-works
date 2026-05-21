@@ -20,29 +20,29 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * interim; `lastCommitSha` stays stale until a successful run.
  */
 export const kbMirrorDocumentTask = task<'kb-mirror-document', KbMirrorDocumentPayload>({
-	id: 'kb-mirror-document',
-	maxDuration: 600, // 10 minutes — large repos with hundreds of docs still finish well under
-	run: async (payload) => {
-		return withWorkerContext('KbMirrorDocument', async (appContext) => {
-			await appContext.get(TriggerPluginHydratorService).initialize();
-			const mirror = appContext.get(KnowledgeBaseGitMirrorService);
+    id: 'kb-mirror-document',
+    maxDuration: 600, // 10 minutes — large repos with hundreds of docs still finish well under
+    run: async (payload) => {
+        return withWorkerContext('KbMirrorDocument', async (appContext) => {
+            await appContext.get(TriggerPluginHydratorService).initialize();
+            const mirror = appContext.get(KnowledgeBaseGitMirrorService);
 
-			if (payload.operation === 'delete') {
-				await mirror.removeDocument(payload.workId, {
-					documentId: payload.documentId,
-					path: payload.path,
-					class: payload.class,
-				});
-			} else {
-				await mirror.materializeDocument(payload.workId, payload.documentId);
-			}
+            if (payload.operation === 'delete') {
+                await mirror.removeDocument(payload.workId, {
+                    documentId: payload.documentId,
+                    path: payload.path,
+                    class: payload.class,
+                });
+            } else {
+                await mirror.materializeDocument(payload.workId, payload.documentId);
+            }
 
-			return {
-				status: 'completed',
-				operation: payload.operation,
-				workId: payload.workId,
-				documentId: payload.documentId,
-			};
-		});
-	},
+            return {
+                status: 'completed',
+                operation: payload.operation,
+                workId: payload.workId,
+                documentId: payload.documentId,
+            };
+        });
+    },
 });

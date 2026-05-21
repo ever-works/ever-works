@@ -17,7 +17,7 @@ import type { KbMirrorDocumentPayload } from './kb-mirror-document.types';
  * §9.6) is what eventually catches Works that drift permanently.
  */
 export interface KbMirrorDocumentDispatcher {
-	dispatchKbMirrorDocument(payload: KbMirrorDocumentPayload): Promise<string | null>;
+    dispatchKbMirrorDocument(payload: KbMirrorDocumentPayload): Promise<string | null>;
 }
 
 export const KB_MIRROR_DOCUMENT_DISPATCHER = Symbol('KB_MIRROR_DOCUMENT_DISPATCHER');

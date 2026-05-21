@@ -5,11 +5,7 @@ import * as yaml from 'yaml';
 import { NotFoundException } from '@nestjs/common';
 import { KnowledgeBaseGitMirrorService } from '../knowledge-base-git-mirror.service';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
-import {
-    KbDocumentClass,
-    KbDocumentSource,
-    KbDocumentStatus,
-} from '../../entities/kb-types';
+import { KbDocumentClass, KbDocumentSource, KbDocumentStatus } from '../../entities/kb-types';
 
 /**
  * EW-641 Phase 1B/a — focused unit coverage for the KB Git mirror.
@@ -101,11 +97,7 @@ describe('KnowledgeBaseGitMirrorService', () => {
             update: jest.fn().mockResolvedValue(buildDoc()),
         };
 
-        service = new KnowledgeBaseGitMirrorService(
-            gitFacade,
-            workRepository,
-            documentRepository,
-        );
+        service = new KnowledgeBaseGitMirrorService(gitFacade, workRepository, documentRepository);
     });
 
     afterEach(async () => {
@@ -185,12 +177,7 @@ describe('KnowledgeBaseGitMirrorService', () => {
             await service.materializeDocument(WORK_ID, DOC_ID);
 
             for (const folder of Object.values(KbDocumentClass)) {
-                const gitkeep = path.join(
-                    tempDir,
-                    '.content/kb',
-                    folder as string,
-                    '.gitkeep',
-                );
+                const gitkeep = path.join(tempDir, '.content/kb', folder as string, '.gitkeep');
                 await expect(fs.access(gitkeep)).resolves.toBeUndefined();
             }
         });
@@ -235,7 +222,9 @@ describe('KnowledgeBaseGitMirrorService', () => {
             // No files on disk to begin with — the call should still
             // refresh the index and produce a commit message that
             // marks the absent state.
-            gitFacade.getStatus.mockResolvedValueOnce([{ path: '.content/kb/.index.yml', status: 'modified' }]);
+            gitFacade.getStatus.mockResolvedValueOnce([
+                { path: '.content/kb/.index.yml', status: 'modified' },
+            ]);
 
             await service.removeDocument(WORK_ID, {
                 documentId: DOC_ID,

@@ -211,9 +211,7 @@ export class TriggerService
      * skeleton, so this is only needed when the operator wants to
      * pre-populate it without an outbound mutation.
      */
-    async dispatchKbBackfillSkeleton(
-        payload: KbBackfillSkeletonPayload,
-    ): Promise<string | null> {
+    async dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
         }

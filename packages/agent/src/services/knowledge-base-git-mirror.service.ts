@@ -34,443 +34,435 @@ import { KbDocumentClass } from '../entities/kb-types';
  */
 @Injectable()
 export class KnowledgeBaseGitMirrorService {
-	private static readonly KB_ROOT = '.content/kb';
-	private static readonly INDEX_FILE = '.index.yml';
-	private static readonly INDEX_GENERATOR = 'ever-works-platform/kb-indexer';
-	private static readonly INDEX_VERSION = 1;
+    private static readonly KB_ROOT = '.content/kb';
+    private static readonly INDEX_FILE = '.index.yml';
+    private static readonly INDEX_GENERATOR = 'ever-works-platform/kb-indexer';
+    private static readonly INDEX_VERSION = 1;
 
-	/**
-	 * Class folders the platform ensures exist on every backfill /
-	 * lazy-init. Drawn directly from `KbDocumentClass`; the enum is the
-	 * canonical source of truth.
-	 */
-	private static readonly CLASS_FOLDERS: ReadonlyArray<string> = Object.values(
-		KbDocumentClass,
-	) as ReadonlyArray<string>;
+    /**
+     * Class folders the platform ensures exist on every backfill /
+     * lazy-init. Drawn directly from `KbDocumentClass`; the enum is the
+     * canonical source of truth.
+     */
+    private static readonly CLASS_FOLDERS: ReadonlyArray<string> = Object.values(
+        KbDocumentClass,
+    ) as ReadonlyArray<string>;
 
-	private readonly logger = new Logger(KnowledgeBaseGitMirrorService.name);
+    private readonly logger = new Logger(KnowledgeBaseGitMirrorService.name);
 
-	constructor(
-		private readonly gitFacade: GitFacadeService,
-		private readonly workRepository: WorkRepository,
-		private readonly documentRepository: WorkKnowledgeDocumentRepository,
-	) {}
+    constructor(
+        private readonly gitFacade: GitFacadeService,
+        private readonly workRepository: WorkRepository,
+        private readonly documentRepository: WorkKnowledgeDocumentRepository,
+    ) {}
 
-	/**
-	 * Upsert a single document into the Work's data repo. Looks up the
-	 * doc row, writes the sidecar + body, refreshes `.index.yml`, and
-	 * commits + pushes in a single Git operation. Updates `lastCommitSha`
-	 * on the DB row when the commit returns a SHA.
-	 *
-	 * Idempotent — running twice with no DB change is a no-op commit
-	 * (Git returns `null` for an empty commit and the SHA stays put).
-	 */
-	async materializeDocument(workId: string, documentId: string): Promise<void> {
-		const doc = await this.documentRepository.findById(workId, documentId);
-		if (!doc) {
-			throw new NotFoundException(`KB document not found for mirror: ${documentId}`);
-		}
+    /**
+     * Upsert a single document into the Work's data repo. Looks up the
+     * doc row, writes the sidecar + body, refreshes `.index.yml`, and
+     * commits + pushes in a single Git operation. Updates `lastCommitSha`
+     * on the DB row when the commit returns a SHA.
+     *
+     * Idempotent — running twice with no DB change is a no-op commit
+     * (Git returns `null` for an empty commit and the SHA stays put).
+     */
+    async materializeDocument(workId: string, documentId: string): Promise<void> {
+        const doc = await this.documentRepository.findById(workId, documentId);
+        if (!doc) {
+            throw new NotFoundException(`KB document not found for mirror: ${documentId}`);
+        }
 
-		await this.runInRepo(workId, async ({ dir, work, committer }) => {
-			await this.ensureSkeletonOnDisk(dir);
-			await this.writeDocumentFiles(dir, doc);
-			await this.writeIndex(dir, workId);
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            await this.ensureSkeletonOnDisk(dir);
+            await this.writeDocumentFiles(dir, doc);
+            await this.writeIndex(dir, workId);
 
-			const commitSha = await this.commitAndPush(
-				work,
-				dir,
-				`[kb] upsert ${doc.kbDocumentClass}/${doc.slug}`,
-				committer,
-			);
+            const commitSha = await this.commitAndPush(
+                work,
+                dir,
+                `[kb] upsert ${doc.kbDocumentClass}/${doc.slug}`,
+                committer,
+            );
 
-			if (commitSha) {
-				await this.documentRepository.update(doc.id, { lastCommitSha: commitSha });
-			}
-		});
-	}
+            if (commitSha) {
+                await this.documentRepository.update(doc.id, { lastCommitSha: commitSha });
+            }
+        });
+    }
 
-	/**
-	 * Remove a single document's sidecar + body from the Work's data
-	 * repo. `path` is required because the DB row is hard-deleted before
-	 * the task runs.
-	 */
-	async removeDocument(
-		workId: string,
-		options: { documentId: string; path: string; class: string },
-	): Promise<void> {
-		await this.runInRepo(workId, async ({ dir, work, committer }) => {
-			await this.ensureSkeletonOnDisk(dir);
+    /**
+     * Remove a single document's sidecar + body from the Work's data
+     * repo. `path` is required because the DB row is hard-deleted before
+     * the task runs.
+     */
+    async removeDocument(
+        workId: string,
+        options: { documentId: string; path: string; class: string },
+    ): Promise<void> {
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            await this.ensureSkeletonOnDisk(dir);
 
-			const removed = await this.removeDocumentFiles(dir, options.path);
-			await this.writeIndex(dir, workId);
+            const removed = await this.removeDocumentFiles(dir, options.path);
+            await this.writeIndex(dir, workId);
 
-			const message = removed
-				? `[kb] delete ${options.class}/${this.slugFromPath(options.path)}`
-				: `[kb] index refresh after ${options.class}/${this.slugFromPath(options.path)} (already absent)`;
+            const message = removed
+                ? `[kb] delete ${options.class}/${this.slugFromPath(options.path)}`
+                : `[kb] index refresh after ${options.class}/${this.slugFromPath(options.path)} (already absent)`;
 
-			await this.commitAndPush(work, dir, message, committer);
-		});
-	}
+            await this.commitAndPush(work, dir, message, committer);
+        });
+    }
 
-	/**
-	 * Idempotently create the `.content/kb/` skeleton in a Work's data
-	 * repo: every class folder with a `.gitkeep` placeholder + an empty
-	 * `.index.yml`. Skips already-initialized repos (no-op commit).
-	 */
-	async initializeSkeleton(workId: string): Promise<void> {
-		await this.runInRepo(workId, async ({ dir, work, committer }) => {
-			const created = await this.ensureSkeletonOnDisk(dir);
-			await this.writeIndex(dir, workId);
+    /**
+     * Idempotently create the `.content/kb/` skeleton in a Work's data
+     * repo: every class folder with a `.gitkeep` placeholder + an empty
+     * `.index.yml`. Skips already-initialized repos (no-op commit).
+     */
+    async initializeSkeleton(workId: string): Promise<void> {
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            const created = await this.ensureSkeletonOnDisk(dir);
+            await this.writeIndex(dir, workId);
 
-			if (!created) {
-				// .index.yml may still have drifted — let commitAndPush decide.
-				this.logger.debug(`KB skeleton already exists for work ${workId}`);
-			}
+            if (!created) {
+                // .index.yml may still have drifted — let commitAndPush decide.
+                this.logger.debug(`KB skeleton already exists for work ${workId}`);
+            }
 
-			await this.commitAndPush(
-				work,
-				dir,
-				'[kb] initialize knowledge-base skeleton',
-				committer,
-			);
-		});
-	}
+            await this.commitAndPush(
+                work,
+                dir,
+                '[kb] initialize knowledge-base skeleton',
+                committer,
+            );
+        });
+    }
 
-	/**
-	 * Regenerate the `.index.yml` for a Work without touching individual
-	 * documents. Used by reconciliation paths (Phase 3) and by tests.
-	 */
-	async rebuildIndex(workId: string): Promise<void> {
-		await this.runInRepo(workId, async ({ dir, work, committer }) => {
-			await this.ensureSkeletonOnDisk(dir);
-			await this.writeIndex(dir, workId);
+    /**
+     * Regenerate the `.index.yml` for a Work without touching individual
+     * documents. Used by reconciliation paths (Phase 3) and by tests.
+     */
+    async rebuildIndex(workId: string): Promise<void> {
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            await this.ensureSkeletonOnDisk(dir);
+            await this.writeIndex(dir, workId);
 
-			await this.commitAndPush(work, dir, '[kb] rebuild .index.yml', committer);
-		});
-	}
+            await this.commitAndPush(work, dir, '[kb] rebuild .index.yml', committer);
+        });
+    }
 
-	/**
-	 * Restore a document body from a prior Git commit. Reads the sidecar
-	 * `.yml` + body `.md` at `commitSha` via the Git provider plugin's
-	 * `getFileContent` capability, applies the body to the DB row, and
-	 * enqueues a fresh mirror so the head commit moves forward with the
-	 * restored content. Returns the updated doc.
-	 *
-	 * Falls back gracefully when the provider does not implement
-	 * `getFileContent` (very old plugins) — the caller sees a 400 from
-	 * the service layer.
-	 */
-	async restoreDocumentFromGit(
-		workId: string,
-		documentId: string,
-		commitSha: string,
-	): Promise<{ restored: boolean; body: string | null }> {
-		const doc = await this.documentRepository.findById(workId, documentId);
-		if (!doc) {
-			throw new NotFoundException(`KB document not found for restore: ${documentId}`);
-		}
+    /**
+     * Restore a document body from a prior Git commit. Reads the sidecar
+     * `.yml` + body `.md` at `commitSha` via the Git provider plugin's
+     * `getFileContent` capability, applies the body to the DB row, and
+     * enqueues a fresh mirror so the head commit moves forward with the
+     * restored content. Returns the updated doc.
+     *
+     * Falls back gracefully when the provider does not implement
+     * `getFileContent` (very old plugins) — the caller sees a 400 from
+     * the service layer.
+     */
+    async restoreDocumentFromGit(
+        workId: string,
+        documentId: string,
+        commitSha: string,
+    ): Promise<{ restored: boolean; body: string | null }> {
+        const doc = await this.documentRepository.findById(workId, documentId);
+        if (!doc) {
+            throw new NotFoundException(`KB document not found for restore: ${documentId}`);
+        }
 
-		const work = await this.workRepository.findById(workId);
-		if (!work) {
-			throw new NotFoundException(`Work not found for restore: ${workId}`);
-		}
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work not found for restore: ${workId}`);
+        }
 
-		const workOwner = work.user as User | undefined;
-		if (!workOwner?.id) {
-			throw new NotFoundException(`Work owner missing for restore: ${workId}`);
-		}
+        const workOwner = work.user as User | undefined;
+        if (!workOwner?.id) {
+            throw new NotFoundException(`Work owner missing for restore: ${workId}`);
+        }
 
-		const owner = work.getRepoOwner('data');
-		const repo = work.getDataRepo();
-		const relPath = path.posix.join(KnowledgeBaseGitMirrorService.KB_ROOT, doc.path);
+        const owner = work.getRepoOwner('data');
+        const repo = work.getDataRepo();
+        const relPath = path.posix.join(KnowledgeBaseGitMirrorService.KB_ROOT, doc.path);
 
-		const file = await this.gitFacade.getFileContent(
-			owner,
-			repo,
-			relPath,
-			{
-				providerId: work.gitProvider,
-				userId: workOwner.id,
-				workId: work.id,
-			},
-			commitSha,
-		);
+        const file = await this.gitFacade.getFileContent(
+            owner,
+            repo,
+            relPath,
+            {
+                providerId: work.gitProvider,
+                userId: workOwner.id,
+                workId: work.id,
+            },
+            commitSha,
+        );
 
-		if (!file) {
-			return { restored: false, body: null };
-		}
+        if (!file) {
+            return { restored: false, body: null };
+        }
 
-		const body = this.decodeFileContent(file);
-		const metadata = { ...(doc.metadata ?? {}), body };
-		await this.documentRepository.update(doc.id, {
-			metadata: metadata as Record<string, unknown>,
-			wordCount: this.countWords(body),
-			tokenCount: Math.ceil(body.length / 4),
-		});
+        const body = this.decodeFileContent(file);
+        const metadata = { ...(doc.metadata ?? {}), body };
+        await this.documentRepository.update(doc.id, {
+            metadata: metadata as Record<string, unknown>,
+            wordCount: this.countWords(body),
+            tokenCount: Math.ceil(body.length / 4),
+        });
 
-		return { restored: true, body };
-	}
+        return { restored: true, body };
+    }
 
-	// ─── INTERNAL ─────────────────────────────────────────────────────────────
+    // ─── INTERNAL ─────────────────────────────────────────────────────────────
 
-	/**
-	 * Wrap a callback that needs the local clone + the resolved Work +
-	 * committer. Centralizes credential lookup and dir resolution so the
-	 * public methods read top-to-bottom.
-	 */
-	private async runInRepo(
-		workId: string,
-		callback: (ctx: {
-			dir: string;
-			work: Work;
-			committer: { name: string; email: string };
-		}) => Promise<void>,
-	): Promise<void> {
-		const work = await this.workRepository.findById(workId);
-		if (!work) {
-			throw new NotFoundException(`Work not found for KB mirror: ${workId}`);
-		}
+    /**
+     * Wrap a callback that needs the local clone + the resolved Work +
+     * committer. Centralizes credential lookup and dir resolution so the
+     * public methods read top-to-bottom.
+     */
+    private async runInRepo(
+        workId: string,
+        callback: (ctx: {
+            dir: string;
+            work: Work;
+            committer: { name: string; email: string };
+        }) => Promise<void>,
+    ): Promise<void> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work not found for KB mirror: ${workId}`);
+        }
 
-		const workOwner = work.user as User | undefined;
-		if (!workOwner?.id) {
-			throw new NotFoundException(
-				`Work owner missing — cannot resolve git credentials for ${workId}`,
-			);
-		}
+        const workOwner = work.user as User | undefined;
+        if (!workOwner?.id) {
+            throw new NotFoundException(
+                `Work owner missing — cannot resolve git credentials for ${workId}`,
+            );
+        }
 
-		const committer = work.resolveCommitter(workOwner);
+        const committer = work.resolveCommitter(workOwner);
 
-		const dir = await this.gitFacade.cloneOrPull(
-			{
-				owner: work.getRepoOwner('data'),
-				repo: work.getDataRepo(),
-				committer,
-			},
-			{
-				providerId: work.gitProvider,
-				userId: workOwner.id,
-				workId: work.id,
-			},
-		);
+        const dir = await this.gitFacade.cloneOrPull(
+            {
+                owner: work.getRepoOwner('data'),
+                repo: work.getDataRepo(),
+                committer,
+            },
+            {
+                providerId: work.gitProvider,
+                userId: workOwner.id,
+                workId: work.id,
+            },
+        );
 
-		await callback({ dir, work, committer });
-	}
+        await callback({ dir, work, committer });
+    }
 
-	/**
-	 * Ensure every class folder + `.index.yml` exists under
-	 * `.content/kb/`. Returns `true` when any folder/file was created
-	 * (caller can decide whether to log).
-	 */
-	private async ensureSkeletonOnDisk(repoDir: string): Promise<boolean> {
-		const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
+    /**
+     * Ensure every class folder + `.index.yml` exists under
+     * `.content/kb/`. Returns `true` when any folder/file was created
+     * (caller can decide whether to log).
+     */
+    private async ensureSkeletonOnDisk(repoDir: string): Promise<boolean> {
+        const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
 
-		let createdAny = false;
-		await fs.mkdir(kbRoot, { recursive: true });
+        let createdAny = false;
+        await fs.mkdir(kbRoot, { recursive: true });
 
-		for (const folder of KnowledgeBaseGitMirrorService.CLASS_FOLDERS) {
-			const folderPath = path.join(kbRoot, folder);
-			const gitkeepPath = path.join(folderPath, '.gitkeep');
+        for (const folder of KnowledgeBaseGitMirrorService.CLASS_FOLDERS) {
+            const folderPath = path.join(kbRoot, folder);
+            const gitkeepPath = path.join(folderPath, '.gitkeep');
 
-			try {
-				await fs.access(gitkeepPath);
-			} catch {
-				await fs.mkdir(folderPath, { recursive: true });
-				await fs.writeFile(gitkeepPath, '', 'utf-8');
-				createdAny = true;
-			}
-		}
+            try {
+                await fs.access(gitkeepPath);
+            } catch {
+                await fs.mkdir(folderPath, { recursive: true });
+                await fs.writeFile(gitkeepPath, '', 'utf-8');
+                createdAny = true;
+            }
+        }
 
-		// Always materialize an .index.yml file so the agent runtime can
-		// rely on its presence; content is overwritten by writeIndex().
-		const indexPath = path.join(kbRoot, KnowledgeBaseGitMirrorService.INDEX_FILE);
-		try {
-			await fs.access(indexPath);
-		} catch {
-			await fs.writeFile(indexPath, this.emptyIndex(), 'utf-8');
-			createdAny = true;
-		}
+        // Always materialize an .index.yml file so the agent runtime can
+        // rely on its presence; content is overwritten by writeIndex().
+        const indexPath = path.join(kbRoot, KnowledgeBaseGitMirrorService.INDEX_FILE);
+        try {
+            await fs.access(indexPath);
+        } catch {
+            await fs.writeFile(indexPath, this.emptyIndex(), 'utf-8');
+            createdAny = true;
+        }
 
-		return createdAny;
-	}
+        return createdAny;
+    }
 
-	private async writeDocumentFiles(repoDir: string, doc: WorkKnowledgeDocument): Promise<void> {
-		const sidecarPath = path.join(
-			repoDir,
-			KnowledgeBaseGitMirrorService.KB_ROOT,
-			this.sidecarPath(doc.path),
-		);
-		const bodyPath = path.join(
-			repoDir,
-			KnowledgeBaseGitMirrorService.KB_ROOT,
-			doc.path,
-		);
+    private async writeDocumentFiles(repoDir: string, doc: WorkKnowledgeDocument): Promise<void> {
+        const sidecarPath = path.join(
+            repoDir,
+            KnowledgeBaseGitMirrorService.KB_ROOT,
+            this.sidecarPath(doc.path),
+        );
+        const bodyPath = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT, doc.path);
 
-		await fs.mkdir(path.dirname(sidecarPath), { recursive: true });
+        await fs.mkdir(path.dirname(sidecarPath), { recursive: true });
 
-		const sidecar = this.buildSidecar(doc);
-		await fs.writeFile(sidecarPath, yaml.stringify(sidecar), 'utf-8');
+        const sidecar = this.buildSidecar(doc);
+        await fs.writeFile(sidecarPath, yaml.stringify(sidecar), 'utf-8');
 
-		const body = this.readBody(doc);
-		await fs.writeFile(bodyPath, body, 'utf-8');
-	}
+        const body = this.readBody(doc);
+        await fs.writeFile(bodyPath, body, 'utf-8');
+    }
 
-	private async removeDocumentFiles(repoDir: string, relativePath: string): Promise<boolean> {
-		const sidecarPath = path.join(
-			repoDir,
-			KnowledgeBaseGitMirrorService.KB_ROOT,
-			this.sidecarPath(relativePath),
-		);
-		const bodyPath = path.join(
-			repoDir,
-			KnowledgeBaseGitMirrorService.KB_ROOT,
-			relativePath,
-		);
+    private async removeDocumentFiles(repoDir: string, relativePath: string): Promise<boolean> {
+        const sidecarPath = path.join(
+            repoDir,
+            KnowledgeBaseGitMirrorService.KB_ROOT,
+            this.sidecarPath(relativePath),
+        );
+        const bodyPath = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT, relativePath);
 
-		let removed = false;
-		for (const target of [bodyPath, sidecarPath]) {
-			try {
-				await fs.unlink(target);
-				removed = true;
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-					throw error;
-				}
-			}
-		}
-		return removed;
-	}
+        let removed = false;
+        for (const target of [bodyPath, sidecarPath]) {
+            try {
+                await fs.unlink(target);
+                removed = true;
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+        }
+        return removed;
+    }
 
-	private async writeIndex(repoDir: string, workId: string): Promise<void> {
-		const { items } = await this.documentRepository.list({ workId, limit: 10_000 });
+    private async writeIndex(repoDir: string, workId: string): Promise<void> {
+        const { items } = await this.documentRepository.list({ workId, limit: 10_000 });
 
-		const documents = items.map((d) => ({
-			id: d.id,
-			path: d.path,
-			title: d.title,
-			class: d.kbDocumentClass,
-			tags: d.tags ?? [],
-			status: d.status,
-			locked: d.locked,
-			lock_mode: d.lockMode ?? null,
-			word_count: d.wordCount ?? null,
-			updated_at: d.updatedAt.toISOString(),
-		}));
+        const documents = items.map((d) => ({
+            id: d.id,
+            path: d.path,
+            title: d.title,
+            class: d.kbDocumentClass,
+            tags: d.tags ?? [],
+            status: d.status,
+            locked: d.locked,
+            lock_mode: d.lockMode ?? null,
+            word_count: d.wordCount ?? null,
+            updated_at: d.updatedAt.toISOString(),
+        }));
 
-		const payload = {
-			generated_at: new Date().toISOString(),
-			generator: KnowledgeBaseGitMirrorService.INDEX_GENERATOR,
-			version: KnowledgeBaseGitMirrorService.INDEX_VERSION,
-			documents,
-		};
+        const payload = {
+            generated_at: new Date().toISOString(),
+            generator: KnowledgeBaseGitMirrorService.INDEX_GENERATOR,
+            version: KnowledgeBaseGitMirrorService.INDEX_VERSION,
+            documents,
+        };
 
-		const indexPath = path.join(
-			repoDir,
-			KnowledgeBaseGitMirrorService.KB_ROOT,
-			KnowledgeBaseGitMirrorService.INDEX_FILE,
-		);
-		await fs.writeFile(indexPath, yaml.stringify(payload), 'utf-8');
-	}
+        const indexPath = path.join(
+            repoDir,
+            KnowledgeBaseGitMirrorService.KB_ROOT,
+            KnowledgeBaseGitMirrorService.INDEX_FILE,
+        );
+        await fs.writeFile(indexPath, yaml.stringify(payload), 'utf-8');
+    }
 
-	private async commitAndPush(
-		work: Work,
-		dir: string,
-		message: string,
-		committer: { name: string; email: string },
-	): Promise<string | null> {
-		const providerId = work.gitProvider;
+    private async commitAndPush(
+        work: Work,
+        dir: string,
+        message: string,
+        committer: { name: string; email: string },
+    ): Promise<string | null> {
+        const providerId = work.gitProvider;
 
-		await this.gitFacade.addAll(providerId, dir);
+        await this.gitFacade.addAll(providerId, dir);
 
-		const status = await this.gitFacade.getStatus(providerId, dir);
-		if (status.length === 0) {
-			return null;
-		}
+        const status = await this.gitFacade.getStatus(providerId, dir);
+        if (status.length === 0) {
+            return null;
+        }
 
-		const sha = await this.gitFacade.commit(providerId, dir, message, committer);
-		if (!sha) {
-			return null;
-		}
+        const sha = await this.gitFacade.commit(providerId, dir, message, committer);
+        if (!sha) {
+            return null;
+        }
 
-		const workOwner = work.user as User | undefined;
-		if (!workOwner?.id) {
-			throw new NotFoundException(
-				`Work owner missing — cannot push KB commit for ${work.id}`,
-			);
-		}
+        const workOwner = work.user as User | undefined;
+        if (!workOwner?.id) {
+            throw new NotFoundException(
+                `Work owner missing — cannot push KB commit for ${work.id}`,
+            );
+        }
 
-		await this.gitFacade.push(
-			{ dir },
-			{
-				providerId,
-				userId: workOwner.id,
-				workId: work.id,
-			},
-		);
+        await this.gitFacade.push(
+            { dir },
+            {
+                providerId,
+                userId: workOwner.id,
+                workId: work.id,
+            },
+        );
 
-		return sha;
-	}
+        return sha;
+    }
 
-	private buildSidecar(doc: WorkKnowledgeDocument): Record<string, unknown> {
-		// snake_case keys per spec §7.3 (matches works.yml convention).
-		return {
-			id: doc.id,
-			slug: doc.slug,
-			title: doc.title,
-			description: doc.description ?? null,
-			class: doc.kbDocumentClass,
-			status: doc.status,
-			language: doc.language,
-			tags: doc.tags ?? [],
-			categories: doc.categories ?? [],
-			locked: doc.locked,
-			lock_mode: doc.lockMode ?? null,
-			source: doc.source,
-			source_upload_id: doc.sourceUploadId ?? null,
-			source_url: doc.sourceUrl ?? null,
-			generated_by_agent_run_id: doc.generatedByAgentRunId ?? null,
-			created_at: doc.createdAt.toISOString(),
-			updated_at: doc.updatedAt.toISOString(),
-			word_count: doc.wordCount ?? null,
-			token_count: doc.tokenCount ?? null,
-		};
-	}
+    private buildSidecar(doc: WorkKnowledgeDocument): Record<string, unknown> {
+        // snake_case keys per spec §7.3 (matches works.yml convention).
+        return {
+            id: doc.id,
+            slug: doc.slug,
+            title: doc.title,
+            description: doc.description ?? null,
+            class: doc.kbDocumentClass,
+            status: doc.status,
+            language: doc.language,
+            tags: doc.tags ?? [],
+            categories: doc.categories ?? [],
+            locked: doc.locked,
+            lock_mode: doc.lockMode ?? null,
+            source: doc.source,
+            source_upload_id: doc.sourceUploadId ?? null,
+            source_url: doc.sourceUrl ?? null,
+            generated_by_agent_run_id: doc.generatedByAgentRunId ?? null,
+            created_at: doc.createdAt.toISOString(),
+            updated_at: doc.updatedAt.toISOString(),
+            word_count: doc.wordCount ?? null,
+            token_count: doc.tokenCount ?? null,
+        };
+    }
 
-	private readBody(doc: WorkKnowledgeDocument): string {
-		const meta = (doc.metadata ?? {}) as { body?: unknown };
-		return typeof meta.body === 'string' ? meta.body : '';
-	}
+    private readBody(doc: WorkKnowledgeDocument): string {
+        const meta = (doc.metadata ?? {}) as { body?: unknown };
+        return typeof meta.body === 'string' ? meta.body : '';
+    }
 
-	private sidecarPath(bodyPath: string): string {
-		// `brand/voice.md` -> `brand/voice.yml`
-		const ext = path.extname(bodyPath);
-		const stem = ext ? bodyPath.slice(0, -ext.length) : bodyPath;
-		return `${stem}.yml`;
-	}
+    private sidecarPath(bodyPath: string): string {
+        // `brand/voice.md` -> `brand/voice.yml`
+        const ext = path.extname(bodyPath);
+        const stem = ext ? bodyPath.slice(0, -ext.length) : bodyPath;
+        return `${stem}.yml`;
+    }
 
-	private slugFromPath(bodyPath: string): string {
-		const last = bodyPath.split('/').pop() ?? bodyPath;
-		const ext = path.extname(last);
-		return ext ? last.slice(0, -ext.length) : last;
-	}
+    private slugFromPath(bodyPath: string): string {
+        const last = bodyPath.split('/').pop() ?? bodyPath;
+        const ext = path.extname(last);
+        return ext ? last.slice(0, -ext.length) : last;
+    }
 
-	private emptyIndex(): string {
-		return yaml.stringify({
-			generated_at: new Date(0).toISOString(),
-			generator: KnowledgeBaseGitMirrorService.INDEX_GENERATOR,
-			version: KnowledgeBaseGitMirrorService.INDEX_VERSION,
-			documents: [],
-		});
-	}
+    private emptyIndex(): string {
+        return yaml.stringify({
+            generated_at: new Date(0).toISOString(),
+            generator: KnowledgeBaseGitMirrorService.INDEX_GENERATOR,
+            version: KnowledgeBaseGitMirrorService.INDEX_VERSION,
+            documents: [],
+        });
+    }
 
-	private decodeFileContent(file: { content: string; encoding: string }): string {
-		if (file.encoding === 'base64') {
-			return Buffer.from(file.content, 'base64').toString('utf-8');
-		}
-		return file.content;
-	}
+    private decodeFileContent(file: { content: string; encoding: string }): string {
+        if (file.encoding === 'base64') {
+            return Buffer.from(file.content, 'base64').toString('utf-8');
+        }
+        return file.content;
+    }
 
-	private countWords(body: string): number {
-		if (!body) return 0;
-		return body.split(/\s+/).filter(Boolean).length;
-	}
+    private countWords(body: string): number {
+        if (!body) return 0;
+        return body.split(/\s+/).filter(Boolean).length;
+    }
 }

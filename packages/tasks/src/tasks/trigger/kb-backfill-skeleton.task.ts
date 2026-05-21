@@ -21,45 +21,45 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * remaining backfill.
  */
 export const kbBackfillSkeletonTask = task<'kb-backfill-skeleton', KbBackfillSkeletonPayload>({
-	id: 'kb-backfill-skeleton',
-	maxDuration: 7200, // 2 hours — bulk backfills can take a while
-	run: async (payload) => {
-		const workIds = payload.workIds ?? [];
-		if (workIds.length === 0) {
-			return {
-				status: 'no-op',
-				total: 0,
-				succeeded: 0,
-				failed: 0,
-				failures: [] as Array<{ workId: string; reason: string }>,
-			};
-		}
+    id: 'kb-backfill-skeleton',
+    maxDuration: 7200, // 2 hours — bulk backfills can take a while
+    run: async (payload) => {
+        const workIds = payload.workIds ?? [];
+        if (workIds.length === 0) {
+            return {
+                status: 'no-op',
+                total: 0,
+                succeeded: 0,
+                failed: 0,
+                failures: [] as Array<{ workId: string; reason: string }>,
+            };
+        }
 
-		return withWorkerContext('KbBackfillSkeleton', async (appContext) => {
-			await appContext.get(TriggerPluginHydratorService).initialize();
-			const mirror = appContext.get(KnowledgeBaseGitMirrorService);
+        return withWorkerContext('KbBackfillSkeleton', async (appContext) => {
+            await appContext.get(TriggerPluginHydratorService).initialize();
+            const mirror = appContext.get(KnowledgeBaseGitMirrorService);
 
-			let succeeded = 0;
-			let failed = 0;
-			const failures: Array<{ workId: string; reason: string }> = [];
+            let succeeded = 0;
+            let failed = 0;
+            const failures: Array<{ workId: string; reason: string }> = [];
 
-			for (const workId of workIds) {
-				try {
-					await mirror.initializeSkeleton(workId);
-					succeeded += 1;
-				} catch (error) {
-					failed += 1;
-					failures.push({ workId, reason: (error as Error).message });
-				}
-			}
+            for (const workId of workIds) {
+                try {
+                    await mirror.initializeSkeleton(workId);
+                    succeeded += 1;
+                } catch (error) {
+                    failed += 1;
+                    failures.push({ workId, reason: (error as Error).message });
+                }
+            }
 
-			return {
-				status: 'completed',
-				total: workIds.length,
-				succeeded,
-				failed,
-				failures: failures.slice(0, 50), // cap to avoid blowing up the run record
-			};
-		});
-	},
+            return {
+                status: 'completed',
+                total: workIds.length,
+                succeeded,
+                failed,
+                failures: failures.slice(0, 50), // cap to avoid blowing up the run record
+            };
+        });
+    },
 });
