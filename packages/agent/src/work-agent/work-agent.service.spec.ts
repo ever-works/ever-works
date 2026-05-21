@@ -10,7 +10,14 @@ function makeRepo<T extends { id?: string }>() {
         rows,
         manager: undefined as any,
         create: jest.fn((input: Partial<T>) => input as T),
-        save: jest.fn(async (input: T) => {
+        save: jest.fn(async (input: T | T[]) => {
+            if (Array.isArray(input)) {
+                const saved = [] as T[];
+                for (const item of input) {
+                    saved.push(await repo.save(item));
+                }
+                return saved;
+            }
             const now = new Date('2026-05-19T00:00:00.000Z');
             const row = {
                 ...(input as any),
@@ -130,7 +137,7 @@ describe('WorkAgentService', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('queues a goal, run, and audit log when enabled', async () => {
+    it('creates an approval-ready goal, run, and audit log when enabled', async () => {
         const { service, goals, runs, logs, transaction } = makeService();
         await service.updatePreferences('u1', {
             enabled: true,
@@ -143,15 +150,17 @@ describe('WorkAgentService', () => {
             maxWorksPerRun: 2,
         });
 
-        expect(result.goal.status).toBe(WorkAgentGoalStatus.PENDING);
+        expect(result.goal.status).toBe(WorkAgentGoalStatus.WAITING_FOR_APPROVAL);
         expect(result.goal.dryRun).toBe(false);
         expect(result.goal.guardrailsOverride).toEqual({ maxWorksPerRun: 2 });
-        expect(result.run.status).toBe(WorkAgentRunStatus.QUEUED);
-        expect(result.run.summary.approvalsRequired).toBe(0);
+        expect(result.run.status).toBe(WorkAgentRunStatus.WAITING_FOR_APPROVAL);
+        expect(result.run.summary.approvalsRequired).toBe(1);
+        expect(result.run.summary.worksPlanned).toBe(1);
+        expect(result.run.summary.itemsPlanned).toBe(DEFAULT_WORK_AGENT_GUARDRAILS.maxItemsPerWork);
         expect(goals.rows).toHaveLength(1);
         expect(runs.rows).toHaveLength(1);
-        expect(logs.rows).toHaveLength(1);
-        expect(logs.rows[0].message).toBe('Goal queued for the Work agent.');
+        expect(logs.rows).toHaveLength(2);
+        expect(logs.rows.map((row) => row.step)).toEqual(['plan-prepared', 'approval-required']);
         expect(transaction).toHaveBeenCalledTimes(1);
     });
 

@@ -170,13 +170,44 @@ export class WorkProposalService {
             generationRunId: opts.generationRunId,
         }));
 
-        const saved = await this.repo.bulkInsert(inputs);
+        const existingProposals = await this.repo.findRecentByUser(userId).catch(() => []);
+        const existingKeys = new Set(
+            existingProposals.flatMap((proposal) => [
+                this.proposalKey(proposal.slugSuggestion),
+                this.proposalKey(proposal.title),
+            ]),
+        );
+        const seenKeys = new Set<string>();
+        const uniqueInputs = inputs.filter((proposal) => {
+            const keys = [this.proposalKey(proposal.slugSuggestion), this.proposalKey(proposal.title)];
+            if (keys.some((key) => existingKeys.has(key) || seenKeys.has(key))) {
+                return false;
+            }
+            keys.forEach((key) => seenKeys.add(key));
+            return true;
+        });
+
+        if (uniqueInputs.length < inputs.length) {
+            this.logger.log(
+                `Proposal generation for ${userId}: skipped ${inputs.length - uniqueInputs.length} duplicate proposal(s)`,
+            );
+        }
+
+        if (uniqueInputs.length === 0) {
+            return { status: 'generated', proposals: [], tokensUsed };
+        }
+
+        const saved = await this.repo.bulkInsert(uniqueInputs);
 
         this.logger.log(
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
         );
 
         return { status: 'generated', proposals: saved, tokensUsed };
+    }
+
+    private proposalKey(value: string): string {
+        return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     }
 
     async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {

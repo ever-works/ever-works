@@ -739,16 +739,16 @@
             "workAgent": {
                 "sections": {
                     "agent": {
-                        "title": "Autonomous Work agent",
-                        "description": "Let the agent plan, research, and prepare Works from high-level goals."
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
-                        "description": "Set hard limits before the agent can create Works, add items, or spend budget."
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
                         "title": "Queue a goal",
-                        "description": "Give the agent a broad instruction. It starts as pending and runs inside your guardrails."
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
                         "title": "Live run",
@@ -775,6 +775,7 @@
                 "actions": {
                     "saveSettings": "Save settings",
                     "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
                 "queue": {
@@ -796,7 +797,7 @@
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
-                    "goalQueued": "Work agent goal queued",
+                    "goalQueued": "Work agent plan prepared",
                     "goalError": "Failed to queue goal",
                     "goalCanceled": "Work agent goal canceled",
                     "cancelError": "Failed to cancel goal"
