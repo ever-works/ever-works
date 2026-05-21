@@ -2,55 +2,24 @@
 // transitively pulls in TypeORM. TypeORM's CJS init hits a known
 // `path-scurry` initialization bug under Jest. Mock the entity barrels
 // to empty class shells so the JIT never loads TypeORM at all.
-jest.mock('../entities', () => ({
-    ApiKey: class ApiKey {},
-    RefreshToken: class RefreshToken {},
-    User: class User {},
-    Work: class Work {},
-    WorkAdvancedPrompts: class WorkAdvancedPrompts {},
-    WorkCustomDomain: class WorkCustomDomain {},
-    WorkDeployment: class WorkDeployment {},
-    WorkMember: class WorkMember {},
-    WorkInvitation: class WorkInvitation {},
-    WorkGenerationHistory: class WorkGenerationHistory {},
-    SubscriptionPlan: class SubscriptionPlan {},
-    UserSubscription: class UserSubscription {},
-    WorkSchedule: class WorkSchedule {},
-    UsageLedgerEntry: class UsageLedgerEntry {},
-    PluginUsageEvent: class PluginUsageEvent {},
-    WorkBudget: class WorkBudget {},
-    WorkBudgetAlertState: class WorkBudgetAlertState {},
-    Notification: class Notification {},
-    ActivityLog: class ActivityLog {},
-    Conversation: class Conversation {},
-    ConversationMessage: class ConversationMessage {},
-    AuthAccount: class AuthAccount {},
-    AuthSession: class AuthSession {},
-    AuthVerification: class AuthVerification {},
-    GitHubAppInstallation: class GitHubAppInstallation {},
-    GitHubAppInstallationRepository: class GitHubAppInstallationRepository {},
-    GitHubAppUserLink: class GitHubAppUserLink {},
-    OnboardingRequest: class OnboardingRequest {},
-    Template: class Template {},
-    TemplateCustomization: class TemplateCustomization {},
-    UserTemplatePreference: class UserTemplatePreference {},
-    WebhookSubscription: class WebhookSubscription {},
-    // EW-634 follow-up: `WebhookDelivery` was added to the real entities
-    // barrel + `ENTITIES` array in PR #886. Without an explicit mock
-    // here the parent `jest.mock('../entities', ...)` above shadows
-    // the real barrel and `database.config.ts` resolves the import
-    // to `undefined`, breaking the "every entry is a function"
-    // assertion below.
-    WebhookDelivery: class WebhookDelivery {},
-    WorkProposal: class WorkProposal {},
-    // Work Agent control-plane entities (introduced in #868). Without
-    // these mocks the database.config import resolves them to undefined
-    // because the parent jest.mock() above shadows the real barrel.
-    WorkAgentPreference: class WorkAgentPreference {},
-    WorkAgentGoal: class WorkAgentGoal {},
-    WorkAgentRun: class WorkAgentRun {},
-    WorkAgentRunLog: class WorkAgentRunLog {},
-}));
+//
+// EW-638 — the per-entity mock entries used to be hand-maintained here
+// (and forgetting to update them broke CI one merge late — e.g. EW-634
+// added `WebhookDelivery` and PR #891 had to retroactively add the mock).
+// The list now lives in `_entity-names.ts` (string-only — safe to load
+// under Jest without pulling in TypeORM). We `requireActual` it inside
+// the mock factory and synthesize `{ Name: class Name {} }` for each
+// entry, so adding a new entity is a single edit in one file.
+//
+// Drift between the inventory and the real `../entities` barrel is
+// asserted by a dedicated drift-check in `database.module.spec.ts` (that
+// spec is allowed to load the real barrel, so the path-scurry constraint
+// doesn't apply there).
+jest.mock('../entities', () => {
+    const { AGENT_ENTITY_NAMES } =
+        jest.requireActual<typeof import('./_entity-names')>('./_entity-names');
+    return Object.fromEntries(AGENT_ENTITY_NAMES.map((name) => [name, class {}]));
+});
 jest.mock('../entities/cache.entity', () => ({
     CacheEntry: class CacheEntry {},
 }));

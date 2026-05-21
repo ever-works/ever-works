@@ -1,4 +1,5 @@
 import * as tasksBarrel from './index';
+import { TASKS_BARREL_RUNTIME_SYMBOLS } from './_tasks-symbols';
 import {
     WORK_GENERATION_DISPATCHER,
     type WorkGenerationDispatcher,
@@ -299,21 +300,13 @@ describe('agent/tasks submodule', () => {
             expect(tasksBarrel.WorkImportErrorCode).toBe(WorkImportErrorCode);
         });
 
-        it('exposes the documented runtime symbols (no extras silently appearing)', () => {
+        it('exposes the documented runtime symbols (no extras silently appearing) — sourced from `_tasks-symbols.ts` (EW-638)', () => {
             // Type-only exports (interfaces / types) erase at runtime so they
             // do not appear here. Anyone adding a new runtime export should
-            // update this allow-list deliberately.
+            // add it to `_tasks-symbols.ts` (single source of truth — see
+            // EW-638 for the rationale).
             const runtimeKeys = Object.keys(tasksBarrel).sort();
-            expect(runtimeKeys).toEqual(
-                [
-                    'TEMPLATE_CUSTOMIZATION_DISPATCHER',
-                    'WEBHOOK_DELIVERY_DISPATCHER',
-                    'WORK_GENERATION_DISPATCHER',
-                    'WORK_GENERATION_MODE',
-                    'WORK_IMPORT_DISPATCHER',
-                    'WorkImportErrorCode',
-                ].sort(),
-            );
+            expect(runtimeKeys).toEqual([...TASKS_BARREL_RUNTIME_SYMBOLS].sort());
         });
     });
 });
