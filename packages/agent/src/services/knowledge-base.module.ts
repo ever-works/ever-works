@@ -13,6 +13,7 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
+import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { WorkOwnershipService } from './work-ownership.service';
 
 /**
@@ -22,6 +23,12 @@ import { WorkOwnershipService } from './work-ownership.service';
  * is provided by `WorkModule` in the application graph, so consumers
  * should make sure WorkModule is imported alongside this module or
  * provide WorkOwnershipService via a parent module.
+ *
+ * EW-641 Phase 1B/a — `KnowledgeBaseGitMirrorService` is also exported.
+ * It depends on `GitFacadeService`, which is provided by the API-side
+ * `FacadesModule`. Importers that need the mirror service (the
+ * Trigger.dev `kb-mirror-document` task) must ensure `FacadesModule` is
+ * available in their dependency graph.
  *
  * Entities registered:
  *  - WorkKnowledgeDocument
@@ -48,6 +55,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
         KnowledgeBaseService,
+        KnowledgeBaseGitMirrorService,
     ],
     exports: [
         WorkKnowledgeDocumentRepository,
@@ -55,6 +63,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
         KnowledgeBaseService,
+        KnowledgeBaseGitMirrorService,
     ],
 })
 export class KnowledgeBaseModule {}

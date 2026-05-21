@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { KnowledgeBaseService } from '../knowledge-base.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
@@ -366,10 +371,25 @@ describe('KnowledgeBaseService', () => {
     });
 
     describe('restoreDocumentFromHistory', () => {
-        it('throws — feature deferred to Phase 1B', async () => {
-            await expect(service.restoreDocumentFromHistory()).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
+        it('rejects editor-role callers (manager+ required)', async () => {
+            // Default ownership mock returns 'editor' — restore needs
+            // owner/manager per spec §20.
+            await expect(
+                service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it('returns 503 when the KB Git mirror service is not wired', async () => {
+            // Default test module bootstraps without
+            // `KnowledgeBaseGitMirrorService`. A missing server-side
+            // dependency is a server problem, not a client error, so
+            // the call should surface as ServiceUnavailableException
+            // (503) — clients can retry-on-503 rather than treating a
+            // valid request as malformed.
+            ownership.ensureCanEdit.mockResolvedValueOnce({ role: 'owner' } as any);
+            await expect(
+                service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
+            ).rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 });

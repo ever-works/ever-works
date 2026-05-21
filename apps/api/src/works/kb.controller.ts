@@ -166,17 +166,18 @@ export class KbController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Restore a KB document to a prior Git commit',
-        description: 'Stub in Phase 1A; full Git integration lands in Phase 1B (EW-641).',
+        description:
+            'Reads the body at the supplied commit SHA from the Work data repo, applies it to the document row, and enqueues a fresh Git mirror so the head commit moves forward with the restored content.',
     })
     @ApiResponse({ status: 200, description: 'KB document restored' })
-    @ApiResponse({ status: 400, description: 'Restore not yet available in Phase 1A' })
+    @ApiResponse({ status: 404, description: 'Document or commit not found' })
     async restoreDocument(
-        @CurrentUser() _auth: AuthenticatedUser,
-        @Param('id') _workId: string,
-        @Param('docId') _docId: string,
-        @Body() _body: RestoreKbDocumentDto,
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('docId') docId: string,
+        @Body() body: RestoreKbDocumentDto,
     ) {
-        return this.kb.restoreDocumentFromHistory();
+        return this.kb.restoreDocumentFromHistory(workId, docId, auth.userId, body.commitSha);
     }
 
     @Get('works/:id/kb/documents/:docId/citations')
