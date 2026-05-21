@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { KnowledgeBaseGitMirrorService } from '../knowledge-base-git-mirror.service';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
 import { KbDocumentClass, KbDocumentSource, KbDocumentStatus } from '../../entities/kb-types';
@@ -155,6 +155,48 @@ describe('KnowledgeBaseGitMirrorService', () => {
             });
         });
 
+        it('paginates the .index.yml rebuild across multiple pages', async () => {
+            // Spread the work over three pages: 500 + 500 + 7 = 1007 docs.
+            // The repo mock returns enough on each call to force the loop
+            // through all three pages — no silent truncation at page 1.
+            const pageOne = Array.from({ length: 500 }, (_, i) =>
+                buildDoc({
+                    id: `00000000-0000-0000-0000-${(1000 + i).toString().padStart(12, '0')}`,
+                    path: `brand/doc-${1000 + i}.md`,
+                    slug: `doc-${1000 + i}`,
+                }),
+            );
+            const pageTwo = Array.from({ length: 500 }, (_, i) =>
+                buildDoc({
+                    id: `00000000-0000-0000-0000-${(2000 + i).toString().padStart(12, '0')}`,
+                    path: `brand/doc-${2000 + i}.md`,
+                    slug: `doc-${2000 + i}`,
+                }),
+            );
+            const pageThree = Array.from({ length: 7 }, (_, i) =>
+                buildDoc({
+                    id: `00000000-0000-0000-0000-${(3000 + i).toString().padStart(12, '0')}`,
+                    path: `brand/doc-${3000 + i}.md`,
+                    slug: `doc-${3000 + i}`,
+                }),
+            );
+            const total = pageOne.length + pageTwo.length + pageThree.length;
+            documentRepository.list
+                .mockResolvedValueOnce({ items: pageOne, total })
+                .mockResolvedValueOnce({ items: pageTwo, total })
+                .mockResolvedValueOnce({ items: pageThree, total });
+
+            await service.materializeDocument(WORK_ID, DOC_ID);
+
+            const indexRaw = await fs.readFile(
+                path.join(tempDir, '.content/kb/.index.yml'),
+                'utf-8',
+            );
+            const indexed = yaml.parse(indexRaw);
+            expect(indexed.documents).toHaveLength(total);
+            expect(documentRepository.list).toHaveBeenCalledTimes(3);
+        });
+
         it('skips the commit + lastCommitSha update when the worktree is clean', async () => {
             gitFacade.getStatus.mockResolvedValueOnce([]);
 
@@ -180,6 +222,26 @@ describe('KnowledgeBaseGitMirrorService', () => {
                 const gitkeep = path.join(tempDir, '.content/kb', folder as string, '.gitkeep');
                 await expect(fs.access(gitkeep)).resolves.toBeUndefined();
             }
+        });
+
+        it.each([
+            '../../.git/config',
+            'brand/../../../etc/passwd',
+            '/absolute/voice.md',
+            'brand\\voice.md',
+            'C:/Windows/voice.md',
+            'unknown-class/voice.md',
+            '',
+        ])('rejects traversal/absolute/unknown-class path %s', async (badPath) => {
+            documentRepository.findById.mockResolvedValueOnce(buildDoc({ path: badPath }));
+
+            await expect(service.materializeDocument(WORK_ID, DOC_ID)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+
+            // The Git side must not have been touched — no clone, no commit.
+            expect(gitFacade.commit).not.toHaveBeenCalled();
+            expect(gitFacade.push).not.toHaveBeenCalled();
         });
     });
 
@@ -238,6 +300,18 @@ describe('KnowledgeBaseGitMirrorService', () => {
                 expect.stringContaining('already absent'),
                 expect.any(Object),
             );
+        });
+
+        it('rejects traversal paths before unlinking anything', async () => {
+            await expect(
+                service.removeDocument(WORK_ID, {
+                    documentId: DOC_ID,
+                    path: '../../.git/config',
+                    class: 'brand',
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(gitFacade.commit).not.toHaveBeenCalled();
         });
     });
 

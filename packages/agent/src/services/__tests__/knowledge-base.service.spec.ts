@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { KnowledgeBaseService } from '../knowledge-base.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
@@ -374,14 +379,17 @@ describe('KnowledgeBaseService', () => {
             ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
-        it('fails fast when the KB Git mirror service is not wired', async () => {
+        it('returns 503 when the KB Git mirror service is not wired', async () => {
             // Default test module bootstraps without
-            // `KnowledgeBaseGitMirrorService`, so callers with sufficient
-            // role get a 400 explaining the deployment is incomplete.
+            // `KnowledgeBaseGitMirrorService`. A missing server-side
+            // dependency is a server problem, not a client error, so
+            // the call should surface as ServiceUnavailableException
+            // (503) — clients can retry-on-503 rather than treating a
+            // valid request as malformed.
             ownership.ensureCanEdit.mockResolvedValueOnce({ role: 'owner' } as any);
             await expect(
                 service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
-            ).rejects.toBeInstanceOf(BadRequestException);
+            ).rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 });

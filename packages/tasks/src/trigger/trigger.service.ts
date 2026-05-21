@@ -187,6 +187,12 @@ export class TriggerService
         }
 
         try {
+            // Greptile P2: serialize mirror runs per Work so rapid
+            // successive create/update/delete mutations don't race on
+            // `git push`. Trigger.dev's `concurrencyKey` queues
+            // subsequent runs behind any in-flight one with the same
+            // key — keyed on `workId`, two Works run in parallel but
+            // two mutations on the same Work run sequentially.
             const handle = await kbMirrorDocumentTask.trigger(payload, {
                 tags: [
                     'kb-mirror-document',
@@ -195,6 +201,7 @@ export class TriggerService
                     `doc:${payload.documentId}`,
                 ],
                 machine: this.machine() as any,
+                concurrencyKey: `kb-mirror:${payload.workId}`,
             });
 
             return handle.id;

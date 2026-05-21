@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as yaml from 'yaml';
 
 import { GitFacadeService } from '../facades/git.facade';
@@ -47,6 +47,62 @@ export class KnowledgeBaseGitMirrorService {
     private static readonly CLASS_FOLDERS: ReadonlyArray<string> = Object.values(
         KbDocumentClass,
     ) as ReadonlyArray<string>;
+
+    /**
+     * Rejects anything that, after normalization, would escape `.content/kb/`
+     * or look like an absolute/Windows path. Greptile P1 + Codex P1 both
+     * flagged `path.join(repoDir, KB_ROOT, doc.path)` as a traversal vector
+     * — a doc created with `path: '../../.git/config'` would unlink the
+     * clone's `.git/config`. Defense in depth: `KnowledgeBaseService`
+     * validates at the input boundary; this method validates again before
+     * any fs write/unlink so a manually-inserted DB row can't bypass it.
+     */
+    static validateRelativeKbPath(relativePath: string): void {
+        if (typeof relativePath !== 'string' || relativePath.length === 0) {
+            throw new BadRequestException('KB document path must be a non-empty string');
+        }
+        if (relativePath.length > 512) {
+            throw new BadRequestException('KB document path exceeds 512 characters');
+        }
+        // Reject Windows-style separators and null bytes outright — the spec
+        // canonicalises forward slashes (§7.2) and anything else is suspect.
+        if (relativePath.includes('\\') || relativePath.includes('\0')) {
+            throw new BadRequestException(
+                `KB document path contains illegal characters: ${relativePath}`,
+            );
+        }
+        // Absolute paths (POSIX or Windows drive letter) are always wrong
+        // for a Work-relative KB entry.
+        if (relativePath.startsWith('/') || /^[A-Za-z]:/.test(relativePath)) {
+            throw new BadRequestException(
+                `KB document path must be relative to .content/kb/: ${relativePath}`,
+            );
+        }
+        // Use POSIX semantics so the normalize step doesn't accidentally
+        // resolve `..` differently on Windows.
+        const normalized = path.posix.normalize(relativePath);
+        if (
+            normalized.startsWith('..') ||
+            normalized === '..' ||
+            normalized.split('/').some((seg) => seg === '..')
+        ) {
+            throw new BadRequestException(
+                `KB document path must not traverse parent directories: ${relativePath}`,
+            );
+        }
+        // First segment must be a known class folder — same as the on-disk
+        // skeleton — so a stray top-level write is rejected.
+        const firstSegment = normalized.split('/')[0];
+        if (
+            !(KnowledgeBaseGitMirrorService.CLASS_FOLDERS as ReadonlyArray<string>).includes(
+                firstSegment,
+            )
+        ) {
+            throw new BadRequestException(
+                `KB document path must start with a known class folder: ${relativePath}`,
+            );
+        }
+    }
 
     private readonly logger = new Logger(KnowledgeBaseGitMirrorService.name);
 
@@ -294,12 +350,11 @@ export class KnowledgeBaseGitMirrorService {
     }
 
     private async writeDocumentFiles(repoDir: string, doc: WorkKnowledgeDocument): Promise<void> {
-        const sidecarPath = path.join(
-            repoDir,
-            KnowledgeBaseGitMirrorService.KB_ROOT,
-            this.sidecarPath(doc.path),
-        );
-        const bodyPath = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT, doc.path);
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(doc.path);
+
+        const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
+        const sidecarPath = this.resolveInsideKbRoot(kbRoot, this.sidecarPath(doc.path));
+        const bodyPath = this.resolveInsideKbRoot(kbRoot, doc.path);
 
         await fs.mkdir(path.dirname(sidecarPath), { recursive: true });
 
@@ -311,12 +366,11 @@ export class KnowledgeBaseGitMirrorService {
     }
 
     private async removeDocumentFiles(repoDir: string, relativePath: string): Promise<boolean> {
-        const sidecarPath = path.join(
-            repoDir,
-            KnowledgeBaseGitMirrorService.KB_ROOT,
-            this.sidecarPath(relativePath),
-        );
-        const bodyPath = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT, relativePath);
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(relativePath);
+
+        const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
+        const sidecarPath = this.resolveInsideKbRoot(kbRoot, this.sidecarPath(relativePath));
+        const bodyPath = this.resolveInsideKbRoot(kbRoot, relativePath);
 
         let removed = false;
         for (const target of [bodyPath, sidecarPath]) {
@@ -332,21 +386,79 @@ export class KnowledgeBaseGitMirrorService {
         return removed;
     }
 
-    private async writeIndex(repoDir: string, workId: string): Promise<void> {
-        const { items } = await this.documentRepository.list({ workId, limit: 10_000 });
+    /**
+     * Final safety net: after the relative-path validator has run, build the
+     * absolute path and confirm it still lives under `kbRoot`. Catches any
+     * symlink shenanigans or edge cases the textual check missed.
+     */
+    private resolveInsideKbRoot(kbRoot: string, relativePath: string): string {
+        const resolved = path.resolve(kbRoot, relativePath);
+        const rootWithSep = kbRoot.endsWith(path.sep) ? kbRoot : kbRoot + path.sep;
+        if (resolved !== kbRoot && !resolved.startsWith(rootWithSep)) {
+            throw new BadRequestException(`KB document path escapes .content/kb/: ${relativePath}`);
+        }
+        return resolved;
+    }
 
-        const documents = items.map((d) => ({
-            id: d.id,
-            path: d.path,
-            title: d.title,
-            class: d.kbDocumentClass,
-            tags: d.tags ?? [],
-            status: d.status,
-            locked: d.locked,
-            lock_mode: d.lockMode ?? null,
-            word_count: d.wordCount ?? null,
-            updated_at: d.updatedAt.toISOString(),
-        }));
+    /** Page size for the `.index.yml` rebuild scan. */
+    private static readonly INDEX_PAGE_SIZE = 500;
+    /**
+     * Hard ceiling so a runaway loop can never balloon memory or commit
+     * size. Per spec §21 a single Work is not expected to approach this;
+     * crossing it is itself an event that needs operator attention.
+     */
+    private static readonly INDEX_MAX_DOCS = 100_000;
+
+    private async writeIndex(repoDir: string, workId: string): Promise<void> {
+        const documents: Array<Record<string, unknown>> = [];
+        let offset = 0;
+        let expectedTotal: number | null = null;
+
+        while (true) {
+            const { items, total } = await this.documentRepository.list({
+                workId,
+                limit: KnowledgeBaseGitMirrorService.INDEX_PAGE_SIZE,
+                offset,
+            });
+            if (expectedTotal === null) {
+                expectedTotal = total;
+            }
+
+            for (const d of items) {
+                documents.push({
+                    id: d.id,
+                    path: d.path,
+                    title: d.title,
+                    class: d.kbDocumentClass,
+                    tags: d.tags ?? [],
+                    status: d.status,
+                    locked: d.locked,
+                    lock_mode: d.lockMode ?? null,
+                    word_count: d.wordCount ?? null,
+                    updated_at: d.updatedAt.toISOString(),
+                });
+                if (documents.length >= KnowledgeBaseGitMirrorService.INDEX_MAX_DOCS) {
+                    break;
+                }
+            }
+
+            if (
+                items.length < KnowledgeBaseGitMirrorService.INDEX_PAGE_SIZE ||
+                documents.length >= KnowledgeBaseGitMirrorService.INDEX_MAX_DOCS
+            ) {
+                break;
+            }
+            offset += items.length;
+        }
+
+        if (expectedTotal !== null && documents.length < expectedTotal) {
+            // The cap fired before we drained the result set — log loudly so
+            // operators can see a Work has crossed the hard ceiling instead
+            // of silently writing a stale catalogue (Greptile / Codex P2).
+            this.logger.warn(
+                `KB index for work ${workId} truncated at ${documents.length} of ${expectedTotal} documents (cap ${KnowledgeBaseGitMirrorService.INDEX_MAX_DOCS})`,
+            );
+        }
 
         const payload = {
             generated_at: new Date().toISOString(),

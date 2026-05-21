@@ -6,6 +6,7 @@ import {
     Logger,
     NotFoundException,
     Optional,
+    ServiceUnavailableException,
 } from '@nestjs/common';
 import { WorkOwnershipService } from './work-ownership.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
@@ -184,6 +185,11 @@ export class KnowledgeBaseService {
 
     async createDocument(input: CreateDocumentInput): Promise<KbDocumentBodyDto> {
         await this.ownershipService.ensureCanEdit(input.workId, input.userId);
+
+        // EW-641 — reject traversal / absolute / unknown-class paths at the
+        // input boundary so a bad row never lands in the DB. The mirror
+        // service repeats the check defense-in-depth.
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(input.path);
 
         const slug = this.slugFromPath(input.path);
         const path = await this.resolvePathCollision(input.workId, input.path);
@@ -370,7 +376,11 @@ export class KnowledgeBaseService {
         }
 
         if (!this.mirrorService) {
-            throw new BadRequestException(
+            // Greptile P1: a missing server-side dependency is a server
+            // problem, not a client error. 503 is the right code so
+            // clients implementing retry-on-503 know to back off and
+            // retry rather than treating a valid request as malformed.
+            throw new ServiceUnavailableException(
                 'restore-from-history requires the KB Git mirror service — not configured in this deployment',
             );
         }
