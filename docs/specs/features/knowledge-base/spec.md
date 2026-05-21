@@ -736,6 +736,7 @@ Each class has documented agent-runtime semantics. This drives how the agent ret
 - An `Organization` may publish 0+ `WorkKnowledgeDocument` rows with `organizationId=<org>` and `workId=NULL`, restricted to `kbDocumentClass IN ('legal', 'style', 'seo')`.
 - Resolution for a Work: `KnowledgeBaseService.resolveInheritableDocuments(workId, classes?)` returns the union of (org docs ∪ Work docs) for each inheritable class, with Work docs overriding org docs for the same `path`.
 - Configurable per-Work via `Work.kbConfig.inheritance`:
+
     ```ts
     inheritance?: {
       legal?: 'inherit' | 'override' | 'disabled';  // default 'inherit'
