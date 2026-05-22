@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 
 vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string, args?: Record<string, string | number>) => {
@@ -9,6 +10,37 @@ vi.mock('next-intl/server', () => ({
             .join(' ');
         return `${key} ${interpolated}`;
     },
+}));
+
+// KbLockControls is a client component nested inside the server-rendered
+// side panel — it pulls in next-intl, next/navigation, and the lock
+// server actions. Mock those so the side-panel spec stays focused on the
+// outer structure (the controls have their own spec).
+vi.mock('next-intl', () => ({
+    useTranslations: () => (key: string) => key,
+}));
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ refresh: () => undefined }),
+}));
+vi.mock('@/components/ui/button', () => ({
+    Button: ({
+        children,
+        onClick,
+        disabled,
+        ...rest
+    }: {
+        children: ReactNode;
+        onClick?: () => void;
+        disabled?: boolean;
+    } & Record<string, unknown>) => (
+        <button type="button" onClick={onClick} disabled={disabled} {...rest}>
+            {children}
+        </button>
+    ),
+}));
+vi.mock('@/app/actions/works/kb-lock', () => ({
+    lockKbDocumentAction: vi.fn(),
+    unlockKbDocumentAction: vi.fn(),
 }));
 
 import { KbSidePanel } from './KbSidePanel';

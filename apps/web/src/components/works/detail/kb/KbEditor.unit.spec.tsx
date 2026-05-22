@@ -145,6 +145,30 @@ describe('KbEditor', () => {
         expect(updateListeners.size).toBe(1);
     });
 
+    it('renders the additions-only banner only when locked && lockMode === additions-only', () => {
+        // Unlocked → no banner.
+        const { unmount } = render(<KbEditor workId="work-1" doc={doc()} />);
+        expect(screen.queryByTestId('kb-editor-lock-banner')).toBeNull();
+        unmount();
+
+        // Locked in `full` mode → also no banner (the route already swaps
+        // KbEditor for KbDocumentView in that case; the guard is belt + braces).
+        const { unmount: u2 } = render(
+            <KbEditor workId="work-1" doc={doc({ locked: true, lockMode: 'full' })} readOnly />,
+        );
+        expect(screen.queryByTestId('kb-editor-lock-banner')).toBeNull();
+        u2();
+
+        // Locked in additions-only → banner appears.
+        render(
+            <KbEditor workId="work-1" doc={doc({ locked: true, lockMode: 'additions-only' })} />,
+        );
+        const banner = screen.getByTestId('kb-editor-lock-banner');
+        expect(banner.getAttribute('data-mode')).toBe('additions-only');
+        expect(banner.getAttribute('role')).toBe('status');
+        expect(banner.textContent).toContain('editor.additionsOnlyBanner');
+    });
+
     it('disables the save button when readOnly is set + skips the update listener', () => {
         render(<KbEditor workId="work-1" doc={doc({ locked: true, lockMode: 'full' })} readOnly />);
         const save = screen.getByTestId('kb-editor-save') as HTMLButtonElement;

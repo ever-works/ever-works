@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils/cn';
+import { KbLockControls } from './KbLockControls';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbSidePanelProps {
@@ -90,21 +91,7 @@ export async function KbSidePanel({ doc }: KbSidePanelProps) {
             </Section>
 
             <Section title={t('sidePanel.sections.lock')}>
-                <span
-                    data-testid="kb-side-panel-lock"
-                    data-locked={doc.locked ? 'true' : 'false'}
-                    data-kb-lock-mode={doc.lockMode ?? undefined}
-                    className={cn(
-                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
-                        doc.locked
-                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                            : 'bg-card-hover dark:bg-card-primary-dark/40 text-text-muted dark:text-text-muted-dark/70',
-                    )}
-                >
-                    {doc.locked
-                        ? `🔒 ${t(`lock.${doc.lockMode ?? 'full'}`)}`
-                        : t('sidePanel.unlocked')}
-                </span>
+                <KbLockControls doc={doc} />
             </Section>
 
             <Section title={t('sidePanel.sections.tags')}>

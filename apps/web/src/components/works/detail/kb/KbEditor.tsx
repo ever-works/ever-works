@@ -240,6 +240,21 @@ export function KbEditor({
                 </span>
             </header>
 
+            {doc.locked && doc.lockMode === 'additions-only' ? (
+                <div
+                    data-testid="kb-editor-lock-banner"
+                    data-mode="additions-only"
+                    role="status"
+                    className={cn(
+                        'rounded-md border px-3 py-2 text-xs',
+                        'border-amber-500/30 bg-amber-500/10',
+                        'text-amber-800 dark:text-amber-200',
+                    )}
+                >
+                    🔒 {t('editor.additionsOnlyBanner')}
+                </div>
+            ) : null}
+
             <EditorSurface
                 editor={editor}
                 readOnly={readOnly}

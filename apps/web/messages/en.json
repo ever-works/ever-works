@@ -2684,7 +2684,13 @@
                     "error": "Save failed",
                     "idle": "Idle",
                     "dirty": "Unsaved changes…",
-                    "placeholder": "Start typing to add content…"
+                    "placeholder": "Start typing to add content…",
+                    "additionsOnlyBanner": "Additions-only lock — appending new content is OK, but edits or deletions to existing lines will be rejected by the server."
+                },
+                "lockControls": {
+                    "lock": "Lock",
+                    "unlock": "Unlock",
+                    "modeLabel": "Lock mode"
                 },
                 "upload": {
                     "title": "Upload to Knowledge Base",
