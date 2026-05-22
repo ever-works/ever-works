@@ -65,6 +65,18 @@ describe('OpenAiPlugin', () => {
 			expect(props).toHaveProperty('complexModel');
 		});
 
+		it('should expose embeddingModel with text-embedding-3-small default for Phase 2 KB retrieval', () => {
+			const props = plugin.settingsSchema.properties!;
+			expect(props).toHaveProperty('embeddingModel');
+			const schema = props.embeddingModel as Record<string, unknown>;
+			expect(schema.type).toBe('string');
+			expect(schema.default).toBe('text-embedding-3-small');
+			// Global scope (not user) so a fresh sign-up inherits the
+			// operator-pinned model without configuring it themselves —
+			// matches the other model selectors.
+			expect(schema['x-scope']).toBe('global');
+		});
+
 		it('should have temperature and maxTokens settings', () => {
 			const props = plugin.settingsSchema.properties!;
 			expect(props).toHaveProperty('temperature');
@@ -164,6 +176,95 @@ describe('OpenAiPlugin', () => {
 
 		it('should throw when plugin not loaded', async () => {
 			await expect(plugin.askJson('test')).rejects.toThrow('Plugin not loaded');
+		});
+	});
+
+	describe('createEmbedding', () => {
+		const createMockContext = (): PluginContext =>
+			({
+				pluginId: 'openai',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		it('should throw when plugin not loaded', async () => {
+			await expect(plugin.createEmbedding({ input: 'hello' })).rejects.toThrow('OpenAI plugin not loaded');
+		});
+
+		it('should delegate to aiOps.createEmbedding with options + resolved config', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+			aiOpsInstance.createEmbedding.mockResolvedValue({
+				model: 'text-embedding-3-small',
+				embeddings: [[0.1, 0.2]]
+			});
+
+			await plugin.createEmbedding({ input: 'hello' });
+
+			expect(aiOpsInstance.createEmbedding).toHaveBeenCalledWith(
+				expect.objectContaining({ input: 'hello' }),
+				expect.objectContaining({ embeddingModel: 'text-embedding-3-small' })
+			);
+		});
+
+		it('should preserve options.input array shape and forward dimensions', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+			aiOpsInstance.createEmbedding.mockResolvedValue({
+				model: 'text-embedding-3-small',
+				embeddings: [
+					[0.1, 0.2],
+					[0.3, 0.4]
+				]
+			});
+
+			await plugin.createEmbedding({
+				input: ['first', 'second'],
+				dimensions: 512
+			});
+
+			const [firstArg] = aiOpsInstance.createEmbedding.mock.calls[0] as [{ input: unknown; dimensions: unknown }];
+			expect(firstArg.input).toEqual(['first', 'second']);
+			expect(firstArg.dimensions).toBe(512);
+		});
+
+		it('should honor a user-provided embeddingModel setting over the text-embedding-3-small default', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+			aiOpsInstance.createEmbedding.mockResolvedValue({
+				model: 'text-embedding-3-large',
+				embeddings: [[0.1]]
+			});
+
+			await plugin.createEmbedding({
+				input: 'hello',
+				settings: { embeddingModel: 'text-embedding-3-large' }
+			});
+
+			expect(aiOpsInstance.createEmbedding).toHaveBeenCalledWith(
+				expect.any(Object),
+				expect.objectContaining({ embeddingModel: 'text-embedding-3-large' })
+			);
+		});
+
+		it('should NOT inject the default when options.model is explicitly set', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+			aiOpsInstance.createEmbedding.mockResolvedValue({
+				model: 'text-embedding-ada-002',
+				embeddings: [[0.1]]
+			});
+
+			await plugin.createEmbedding({
+				input: 'hello',
+				model: 'text-embedding-ada-002'
+			});
+
+			// options.model takes precedence inside AiOperations.createEmbedding —
+			// the resolved config should NOT carry a fallback embeddingModel, so
+			// the caller's explicit choice wins.
+			const [, configArg] = aiOpsInstance.createEmbedding.mock.calls[0] as [unknown, { embeddingModel?: string }];
+			expect(configArg.embeddingModel).toBeUndefined();
 		});
 	});
 

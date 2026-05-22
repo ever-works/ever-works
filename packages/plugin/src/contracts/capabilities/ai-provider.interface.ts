@@ -229,6 +229,17 @@ export interface EmbeddingOptions {
 	readonly input: string | readonly string[];
 	/** Embedding dimensions (if model supports) */
 	readonly dimensions?: number;
+	/**
+	 * Resolved settings for this operation. Mirrors
+	 * `ChatCompletionOptions.settings` so the facade can thread
+	 * user/work-scoped values (`apiKey`, `embeddingModel`, `baseUrl`)
+	 * through to the embedding call without a separate plumbing
+	 * surface. Plugins should prefer these over their stored defaults
+	 * — `BaseAiProvider.resolveConfig` handles the merge.
+	 *
+	 * Added by EW-641 Phase 2/a row 27 (PR following #957).
+	 */
+	readonly settings?: PluginSettings;
 }
 
 /**

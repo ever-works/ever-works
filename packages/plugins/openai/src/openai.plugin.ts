@@ -72,6 +72,15 @@ export class OpenAiPlugin extends BaseAiProvider {
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
+			embeddingModel: {
+				type: 'string',
+				title: 'Embedding Model',
+				description:
+					"Used by the Knowledge Base's semantic search to turn documents into vectors. text-embedding-3-small is the cheapest (1c/1M tokens) and a strong default for English-heavy KBs.",
+				default: 'text-embedding-3-small',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
 			temperature: {
 				type: 'number',
 				title: 'Temperature',
@@ -137,7 +146,20 @@ export class OpenAiPlugin extends BaseAiProvider {
 		if (!this.aiOps) {
 			throw new Error('OpenAI plugin not loaded');
 		}
-		return this.aiOps.createEmbedding(options);
+		// EW-641 Phase 2/a row 27 — thread per-call `options.settings`
+		// through `BaseAiProvider.resolveConfig` so `apiKey` +
+		// `embeddingModel` from user/work-scoped settings reach the
+		// underlying LangChain `OpenAIEmbeddings` call. Final fallback to
+		// `text-embedding-3-small` (OpenAI's default KB-workload embedding
+		// model, 1536-dim, cheapest in the embedding tier) so callers that
+		// supply neither `options.model` nor a settings override still get
+		// a working call instead of the "Embedding model must be specified"
+		// throw from `AiOperations.createEmbedding`.
+		const resolvedConfig = this.resolveConfig(options.settings);
+		if (!options.model && !resolvedConfig.embeddingModel) {
+			resolvedConfig.embeddingModel = 'text-embedding-3-small';
+		}
+		return this.aiOps.createEmbedding(options, resolvedConfig);
 	}
 
 	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
