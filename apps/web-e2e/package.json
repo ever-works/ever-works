@@ -1,0 +1,19 @@
+{
+	"name": "@ever-works/web-e2e",
+	"version": "0.1.0",
+	"private": true,
+	"description": "End-to-end Playwright acceptance suite for apps/web. Bootstrapped in EW-641 Phase 1B/d row 19a; KB acceptance tests A12-A17 land in rows 19-24.",
+	"license": "MIT",
+	"scripts": {
+		"test": "playwright test",
+		"test:smoke": "playwright test smoke.spec.ts",
+		"test:install": "playwright install --with-deps chromium",
+		"test:ui": "playwright test --ui",
+		"test:report": "playwright show-report"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.50.0",
+		"@types/node": "^22.10.0",
+		"typescript": "^5.9.3"
+	}
+}
