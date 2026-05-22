@@ -2716,6 +2716,14 @@
                     "tooLargeTitle": "PDF too large to preview inline",
                     "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and view in your local PDF reader.",
                     "download": "Download PDF"
+                },
+                "docx": {
+                    "label": "DOCX viewer",
+                    "loading": "Rendering Word document…",
+                    "renderFailed": "Could not render this DOCX inline ({error}).",
+                    "tooLargeTitle": "DOCX too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Word.",
+                    "download": "Download DOCX"
                 }
             }
         },
