@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
 import { WorksModule } from './works/works.module';
+import { KbStorageModule } from './uploads/kb-storage.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
@@ -69,6 +70,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
             },
         }),
         AuthModule,
+        // KbStorageModule MUST be listed before WorksModule so the
+        // @Global() KB_STORAGE_PLUGIN provider is registered before
+        // KnowledgeBaseService's DI graph is resolved (WorksModule
+        // imports KnowledgeBaseModule, which depends on the token).
+        KbStorageModule,
         WorksModule,
         MailModule,
         TriggerInternalModule,
