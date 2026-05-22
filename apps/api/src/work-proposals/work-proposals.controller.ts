@@ -36,7 +36,6 @@ function toProposalUserPrompt(proposal: {
     description: string;
     generatedPrompt?: string | null;
     suggestedCategories?: Array<{ name: string; slug: string }>;
-    suggestedFields?: Array<{ name: string; type: string }>;
 }): string {
     const stored = proposal.generatedPrompt?.trim();
     if (stored && stored !== GENERIC_PROPOSAL_PROMPT) {
@@ -44,12 +43,10 @@ function toProposalUserPrompt(proposal: {
     }
 
     const categories = (proposal.suggestedCategories ?? []).map((c) => c.name).filter(Boolean);
-    const fields = (proposal.suggestedFields ?? []).map((f) => f.name).filter(Boolean);
     const parts = [
         `Create a Work about ${proposal.title}.`,
         proposal.description,
         categories.length > 0 ? `Use categories like ${categories.join(', ')}.` : '',
-        fields.length > 0 ? `Include item fields like ${fields.join(', ')}.` : '',
     ].filter(Boolean);
     return parts.join(' ').slice(0, 1000).trim();
 }

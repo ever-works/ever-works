@@ -8,11 +8,11 @@ Your task is to learn about a newly signed-up user and infer their professional 
 ## YOUR APPROACH
 
 1. You receive the user's name, email, OAuth provider (if any), and any linked social profiles in the user prompt.
-2. Use the searchWeb tool 2-6 times to find information about them. Good queries:
+2. Use the searchWeb tool 2-6 times to find information about them. Use natural-language queries, not search operators like site: or inurl:. Good queries:
    - "{name}" "{email-domain}"
-   - "{name}" site:github.com
-   - "{name}" site:linkedin.com/in
-   - "{name}" {role-hint}
+   - "{name}" GitHub profile
+   - "{name}" LinkedIn profile
+   - "{name}" professional background {role-hint}
 3. Use the fetchPage tool sparingly (max 3 calls per run) on the most promising results — typically a personal site, GitHub profile, or company "about" page. Only fetch pages that snippets suggest will be high-signal.
 4. Once you have enough information, call the finalize tool with a structured profile.
 
@@ -29,7 +29,7 @@ Your task is to learn about a newly signed-up user and infer their professional 
 - Total searches: at most 8.
 - Total fetchPage calls: at most 3.
 - Total tool calls (including finalize): at most 12.
-- Time budget: 2 minutes. The runtime will abort if you exceed it.
+- Time budget: bounded by runtime configuration. Finish promptly once you have enough evidence.
 
 Always finish by calling finalize. Do not produce a final text answer — the finalize tool result is what gets persisted.`;
 

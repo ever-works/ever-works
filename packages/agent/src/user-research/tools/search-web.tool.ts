@@ -10,9 +10,10 @@ interface CreateSearchWebToolOptions {
     limits: UserResearchLimitsService;
     userId: string;
     /**
-     * Ordered list of search plugin IDs to try. Empty / undefined means
-     * "let the facade pick its default". The tool walks the chain on
-     * transient errors so a flapping provider doesn't drop the whole run.
+     * Ordered list of configured search plugin IDs to try. Empty means no
+     * configured search provider is available for this user. The tool walks
+     * the chain on transient errors so a flapping provider doesn't drop the
+     * whole run.
      */
     providerChain?: string[];
     logger?: Logger;
@@ -26,19 +27,15 @@ const inputSchema = z.object({
 
 export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
     const log = opts.logger ?? new Logger('UserResearch:searchWeb');
-    const chain =
-        opts.providerChain && opts.providerChain.length > 0 ? opts.providerChain : [undefined];
+    const chain = opts.providerChain ?? [];
 
     return tool({
         description:
             'Search the web for information about a person. Use 2-6 times with varied queries. Returns title, url, and published date for each result.',
         inputSchema,
         execute: async (input) => {
-            try {
-                await opts.limits.assertSearchAllowed(opts.userId);
-            } catch (err) {
-                log.warn(`searchWeb blocked by rate limit: ${(err as Error).message}`);
-                return { results: [], error: 'rate_limited' as const };
+            if (chain.length === 0) {
+                return { results: [], error: 'no_search_provider_configured' as const };
             }
 
             let lastErr: unknown;
@@ -49,8 +46,6 @@ export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
                         { maxResults: input.limit ?? 5 },
                         { userId: opts.userId, providerOverride },
                     );
-
-                    await opts.limits.incrementSearches(opts.userId);
 
                     const compact = results.slice(0, input.limit ?? 5).map((r) => ({
                         title: r.title,

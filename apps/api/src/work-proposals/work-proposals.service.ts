@@ -22,6 +22,9 @@ export interface ScheduledBatchSummary {
     staleDays: number;
 }
 
+const SCHEDULED_RERUN_BATCH_SIZE = 20;
+const SCHEDULED_RERUN_STALE_DAYS = 30;
+
 @Injectable()
 export class WorkProposalsApiService {
     private readonly logger = new Logger(WorkProposalsApiService.name);
@@ -132,12 +135,8 @@ export class WorkProposalsApiService {
 
     /** Pick stale candidate users and queue a refresh for each. */
     async runScheduledBatch(): Promise<ScheduledBatchSummary> {
-        const batchSize = Number(
-            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_BATCH', 20),
-        );
-        const staleDays = Number(
-            this.config.get<string | number>('USER_RESEARCH_SCHEDULED_RERUN_STALE_DAYS', 30),
-        );
+        const batchSize = SCHEDULED_RERUN_BATCH_SIZE;
+        const staleDays = SCHEDULED_RERUN_STALE_DAYS;
         const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
 
         const candidates = await this.userOrmRepo.find({
@@ -189,9 +188,19 @@ export class WorkProposalsApiService {
         return summary;
     }
 
+    private getPositiveNumberConfig(key: string, fallback: number): number {
+        const raw = this.config.get<string | number>(key, fallback);
+        const value = Number(raw);
+        return Number.isFinite(value) && value > 0 ? value : fallback;
+    }
+
     private async runPipeline(userId: string, source: WorkProposalSource): Promise<void> {
         try {
-            const researched = await this.research.research(userId);
+            const researched = await this.research.research(userId, {
+                timeoutMs: this.getPositiveNumberConfig('USER_RESEARCH_TIMEOUT_MS', 1_800_000),
+                maxSteps: 14,
+            });
+
             if (researched.status !== 'completed') {
                 this.logger.log(
                     `User research for ${userId} did not complete (status=${researched.status}); skipping proposals`,

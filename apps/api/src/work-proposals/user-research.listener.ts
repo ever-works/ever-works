@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
-import { WorkProposalSource } from '@ever-works/agent/user-research';
+import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
 import { UserConfirmedEvent } from '../events';
 import { WorkProposalsApiService } from './work-proposals.service';
 
@@ -24,6 +24,18 @@ export class UserResearchListener {
         }
 
         try {
+            const existing = await this.proposals.list(event.user.id, [
+                WorkProposalStatus.PENDING,
+                WorkProposalStatus.ACCEPTED,
+                WorkProposalStatus.DISMISSED,
+            ]);
+            if (existing.length > 0) {
+                this.logger.debug(
+                    `Skipping auto-signup user research for ${event.user.id}; proposals already exist`,
+                );
+                return;
+            }
+
             const result = await this.proposals.refresh(
                 event.user.id,
                 WorkProposalSource.AUTO_SIGNUP,
