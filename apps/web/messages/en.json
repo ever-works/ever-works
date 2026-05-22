@@ -2724,6 +2724,17 @@
                     "tooLargeTitle": "DOCX too large to preview inline",
                     "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Word.",
                     "download": "Download DOCX"
+                },
+                "xlsx": {
+                    "label": "Spreadsheet viewer",
+                    "loading": "Rendering spreadsheet…",
+                    "renderFailed": "Could not render this XLSX inline ({error}).",
+                    "tooLargeTitle": "Spreadsheet too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Excel.",
+                    "download": "Download XLSX",
+                    "sheetTabsLabel": "Worksheet tabs",
+                    "truncated": "Showing first {cap} of {total} rows. Download the file to see the rest.",
+                    "emptyWorkbook": "Workbook has no worksheets"
                 }
             }
         },
