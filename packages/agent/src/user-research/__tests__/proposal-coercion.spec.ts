@@ -164,7 +164,7 @@ describe('coerceWorkProposal', () => {
         ]);
         expect(result!.suggestedFields).toEqual([{ name: 'Website', type: 'url' }]);
         expect(result!.recommendedPlugins).toEqual([{ pluginId: '7', reason: 'false' }]);
-        expect(result!.generatedPrompt).toContain('Create a Work named "123456789"');
+        expect(result!.generatedPrompt).toContain('Create a Work about 123456789');
         expect(result!.reasoning).toBe('99');
     });
 });

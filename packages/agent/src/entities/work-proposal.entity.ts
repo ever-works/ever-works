@@ -72,8 +72,8 @@ export class WorkProposal {
     @Column('simple-json')
     recommendedPlugins: WorkProposalRecommendedPlugin[];
 
-    @Column({ type: 'text' })
-    generatedPrompt: string;
+    @Column({ type: 'text', nullable: true })
+    generatedPrompt?: string | null;
 
     @Column({ type: 'text' })
     reasoning: string;
