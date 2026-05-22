@@ -19,6 +19,13 @@ import {
     WikiLinkSuggestionList,
     type WikiLinkSuggestionListHandle,
 } from './WikiLinkSuggestionList';
+import {
+    MentionExtension,
+    type MentionItem,
+    type MentionRenderProps,
+    type MentionRenderer,
+} from './extensions/MentionExtension';
+import { MentionSuggestionList, type MentionSuggestionListHandle } from './MentionSuggestionList';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbEditorProps {
@@ -86,6 +93,7 @@ export function KbEditor({
         // per editor lifecycle.
         [],
     );
+    const mentionRenderFactory = useMemo(() => createMentionRenderFactory(), []);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -108,6 +116,10 @@ export function KbEditor({
             WikiLinkExtension.configure({
                 workId,
                 render: wikilinkRenderFactory,
+            }),
+            MentionExtension.configure({
+                workId,
+                render: mentionRenderFactory,
             }),
         ],
         content: doc.body ?? '',
@@ -494,6 +506,78 @@ function createWikiLinkRenderFactory(): () => WikiLinkRenderer {
                     // the suggestion plugin sees Escape and tears down.
                     return false;
                 }
+                return renderer?.ref?.onKeyDown(event) ?? false;
+            },
+            onExit: () => {
+                renderer?.destroy();
+                renderer = null;
+                popoverEl?.remove();
+                popoverEl = null;
+            },
+        };
+    };
+}
+
+/**
+ * Row-17 sibling of {@link createWikiLinkRenderFactory}. Identical
+ * lifecycle — mounts a `ReactRenderer<MentionSuggestionListHandle>`
+ * inside a `position: fixed` popover `<div>` and tears it down on
+ * exit. Test-id on the wrapper diverges so the two pickers can be
+ * distinguished by Playwright (`kb-mention-popover`).
+ */
+function createMentionRenderFactory(): () => MentionRenderer {
+    return () => {
+        let renderer: ReactRenderer<MentionSuggestionListHandle> | null = null;
+        let popoverEl: HTMLDivElement | null = null;
+
+        function positionFrom(clientRect: (() => DOMRect | null) | null) {
+            if (!popoverEl) return;
+            const rect = clientRect?.();
+            if (!rect) {
+                popoverEl.style.visibility = 'hidden';
+                return;
+            }
+            popoverEl.style.visibility = 'visible';
+            popoverEl.style.top = `${rect.bottom + 4}px`;
+            popoverEl.style.left = `${rect.left}px`;
+        }
+
+        function mount(props: MentionRenderProps) {
+            popoverEl = document.createElement('div');
+            popoverEl.setAttribute('data-testid', 'kb-mention-popover');
+            popoverEl.style.position = 'fixed';
+            popoverEl.style.zIndex = '60';
+            document.body.appendChild(popoverEl);
+            renderer = new ReactRenderer(MentionSuggestionList, {
+                editor: undefined as unknown as Editor,
+                props: {
+                    items: props.items,
+                    query: props.query,
+                    onSelect: (item: MentionItem) => props.command(item),
+                } as Record<string, unknown>,
+            });
+            const element = renderer.element as unknown as HTMLElement | null;
+            if (element) {
+                popoverEl.appendChild(element);
+            }
+            positionFrom(props.clientRect);
+        }
+
+        return {
+            onStart: (props) => {
+                mount(props);
+            },
+            onUpdate: (props) => {
+                if (!renderer) return;
+                renderer.updateProps({
+                    items: props.items,
+                    query: props.query,
+                    onSelect: (item: MentionItem) => props.command(item),
+                });
+                positionFrom(props.clientRect);
+            },
+            onKeyDown: ({ event }) => {
+                if (event.key === 'Escape') return false;
                 return renderer?.ref?.onKeyDown(event) ?? false;
             },
             onExit: () => {
