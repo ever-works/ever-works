@@ -25,9 +25,11 @@ import { WorkKnowledgeCitationRepository } from '../database/repositories/work-k
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
 import { AiFacadeService } from '../facades/ai.facade';
 import { rrfBlend } from './kb-rrf';
+import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import {
+    KB_ALWAYS_INJECTED_CLASSES,
     KB_ORG_INHERITABLE_CLASSES,
     KbDocumentClass,
     KbDocumentSource,
@@ -372,6 +374,100 @@ export class KnowledgeBaseService {
         const doc = await this.documentRepository.findByWorkOrPath(workId, documentId);
         if (!doc) return null;
         return this.toBodyDto(doc);
+    }
+
+    /**
+     * EW-641 Phase 2/b row 32a — resolve the KB context bundle that
+     * Phase 2/b pipelines inject into agent runs.
+     *
+     * Spec §15.4 priority:
+     *   1. `alwaysInjected` — all `active` docs whose class is in the
+     *      default `KB_ALWAYS_INJECTED_CLASSES` whitelist (brand /
+     *      legal / style / glossary). Per-Work `classFilters` override
+     *      is a row 41 (budget gauge) concern; for now we use the
+     *      constant whitelist directly.
+     *   2. `queryRetrieved` — docs underlying the top RRF-fused chunks
+     *      from `semanticSearch(workId, query, limit)` when `opts.query`
+     *      is set. Chunks are deduped by `documentId` (first occurrence
+     *      = best-ranking chunk), then full docs are fetched by id to
+     *      populate body text for `formatKbContext`.
+     *
+     * This is a SYSTEM operation — the pipeline plugin caller is the
+     * trust boundary. No `ensureCanView`: row 32b's plugin invocation
+     * is system-context (the agent run is already authorized at the
+     * generation entry point). Mirrors `getDocumentBodyForEmbedding`'s
+     * no-gate pattern (row 29b2b) and `semanticSearch`'s SYSTEM op
+     * stance (row 30a).
+     *
+     * Graceful degradation:
+     *  - No `query` → `queryRetrieved` is `[]`; only always-injected
+     *    docs are returned. Pipelines still get useful grounding.
+     *  - `semanticSearch` returns `[]` (no embedder configured, no
+     *    chunks indexed yet, SQLite e2e env) → same outcome.
+     *
+     * The pipeline plumbing (row 32b) calls `bundle.format(opts)` to
+     * render the `<kb>...</kb>` block — `formatKbContext` (row 31)
+     * handles the truncation contract uniformly across consumers.
+     */
+    async resolveContext(
+        workId: string,
+        opts: { query?: string; limit?: number } = {},
+    ): Promise<KbContextBundle> {
+        const alwaysInjected = await this.fetchAlwaysInjectedDocs(workId);
+
+        const trimmedQuery = opts.query?.trim() ?? '';
+        const queryRetrieved =
+            trimmedQuery.length > 0
+                ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8)
+                : [];
+
+        return buildKbContextBundle(alwaysInjected, queryRetrieved);
+    }
+
+    /**
+     * Helper for `resolveContext` — fetch the default always-injected
+     * KB documents for a Work. Returns a materialized body DTO list so
+     * `formatKbContext` can render each entry directly.
+     */
+    private async fetchAlwaysInjectedDocs(workId: string): Promise<KbDocumentBodyDto[]> {
+        const { items } = await this.documentRepository.list({
+            workId,
+            classes: [...KB_ALWAYS_INJECTED_CLASSES],
+            statuses: [KbDocumentStatus.ACTIVE],
+        });
+        return items.map((d) => this.toBodyDto(d));
+    }
+
+    /**
+     * Helper for `resolveContext` — run semantic retrieval, dedupe to
+     * unique document IDs, and materialize each as a body DTO.
+     *
+     * Bounded N+1: callers cap `limit` (default 8); production hot-path
+     * metrics can move this to `findByIds(workId, docIds)` once
+     * `WorkKnowledgeDocumentRepository` grows that batch method.
+     */
+    private async fetchQueryRetrievedDocs(
+        workId: string,
+        query: string,
+        limit: number,
+    ): Promise<KbDocumentBodyDto[]> {
+        const chunks = await this.semanticSearch(workId, query, limit);
+        if (chunks.length === 0) return [];
+
+        const seen = new Set<string>();
+        const orderedDocIds: string[] = [];
+        for (const c of chunks) {
+            if (seen.has(c.documentId)) continue;
+            seen.add(c.documentId);
+            orderedDocIds.push(c.documentId);
+        }
+
+        const results: KbDocumentBodyDto[] = [];
+        for (const docId of orderedDocIds) {
+            const doc = await this.documentRepository.findById(workId, docId);
+            if (doc) results.push(this.toBodyDto(doc));
+        }
+        return results;
     }
 
     /**

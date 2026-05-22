@@ -298,6 +298,168 @@ describe('KnowledgeBaseService', () => {
         });
     });
 
+    describe('resolveContext', () => {
+        // EW-641 Phase 2/b row 32a — the bundle the pipeline plugin
+        // invocation reads (row 32b wires it in). The default test
+        // module doesn't wire `chunkRepository` / `aiFacade`, so
+        // `semanticSearch` returns []; the bundle therefore only ever
+        // contains the always-injected docs unless we reflect a stub
+        // in (mirror's the `mirrorService` pattern above).
+
+        it('returns alwaysInjected docs without query (semantic not consulted)', async () => {
+            const brandDoc = buildDocument({
+                id: 'b-1',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                path: 'brand/voice.md',
+                slug: 'voice',
+                title: 'Brand voice',
+                metadata: { body: 'Friendly.' },
+            });
+            const legalDoc = buildDocument({
+                id: 'l-1',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                path: 'legal/terms.md',
+                slug: 'terms',
+                title: 'Terms',
+                metadata: { body: 'Verbatim.' },
+            });
+            docRepo.list.mockResolvedValue({ items: [brandDoc, legalDoc], total: 2 });
+
+            const bundle = await service.resolveContext(WORK_ID);
+
+            // System op — must NOT call ensureCanView (pipeline plugin
+            // is the trust boundary).
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
+
+            expect(bundle.alwaysInjected.map((d) => d.id)).toEqual(['b-1', 'l-1']);
+            expect(bundle.queryRetrieved).toEqual([]);
+
+            // Always-injected whitelist + active-only filter is what the
+            // service forwards to the repo.
+            expect(docRepo.list).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: WORK_ID,
+                    classes: expect.arrayContaining(['brand', 'legal', 'style', 'glossary']),
+                    statuses: ['active'],
+                }),
+            );
+
+            const rendered = bundle.format();
+            expect(rendered).toContain('<kb>');
+            expect(rendered).toContain('## Brand voice (kb:brand/voice)');
+            expect(rendered).toContain('## Terms (kb:legal/terms)');
+            expect(rendered).toContain('</kb>');
+        });
+
+        it('returns alwaysInjected only when query is set but embedder is unavailable', async () => {
+            const brandDoc = buildDocument({
+                id: 'b-2',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                metadata: { body: 'B body' },
+            });
+            docRepo.list.mockResolvedValue({ items: [brandDoc], total: 1 });
+
+            const bundle = await service.resolveContext(WORK_ID, { query: 'hello world' });
+
+            // No embedder/chunkRepo wired in the default module ⇒
+            // semanticSearch returns []; queryRetrieved degrades to [].
+            expect(bundle.queryRetrieved).toEqual([]);
+            expect(bundle.alwaysInjected).toHaveLength(1);
+        });
+
+        it('treats whitespace-only query as no query (semantic skipped)', async () => {
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+            // Sentinel — if semantic were consulted we'd see a mocked
+            // call below. The default module has no `chunkRepository`,
+            // so reflect a strict stub in and assert it stays untouched.
+            const chunkRepoStub = { findNearestByEmbedding: jest.fn() };
+            (service as unknown as { chunkRepository: typeof chunkRepoStub }).chunkRepository =
+                chunkRepoStub;
+
+            await service.resolveContext(WORK_ID, { query: '   \n  ' });
+
+            expect(chunkRepoStub.findNearestByEmbedding).not.toHaveBeenCalled();
+        });
+
+        it('layers queryRetrieved (semantic hits) on top of alwaysInjected, dedup by id', async () => {
+            const sharedId = '00000000-0000-0000-0000-0000000000aa';
+            const sharedAlways = buildDocument({
+                id: sharedId,
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                path: 'brand/voice.md',
+                slug: 'voice',
+                title: 'Brand voice',
+                metadata: { body: 'Always copy' },
+            });
+            const semanticOnly = buildDocument({
+                id: 'semantic-only',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                path: 'research/note.md',
+                slug: 'note',
+                title: 'Research note',
+                metadata: { body: 'Semantic body' },
+            });
+
+            // Stub out semantic deps so semanticSearch returns chunks.
+            const aiFacadeStub = {
+                embed: jest.fn().mockResolvedValue({ embeddings: [[0.1, 0.2, 0.3]] }),
+            };
+            const chunkRepoStub = {
+                findNearestByEmbedding: jest.fn().mockResolvedValue([
+                    {
+                        id: 'c1',
+                        workId: WORK_ID,
+                        documentId: sharedId,
+                        chunkIndex: 0,
+                        content: 'chunk a',
+                        distance: 0.1,
+                    },
+                    {
+                        id: 'c2',
+                        workId: WORK_ID,
+                        documentId: 'semantic-only',
+                        chunkIndex: 0,
+                        content: 'chunk b',
+                        distance: 0.2,
+                    },
+                ]),
+            };
+            (service as unknown as { chunkRepository: typeof chunkRepoStub }).chunkRepository =
+                chunkRepoStub;
+            (service as unknown as { aiFacade: typeof aiFacadeStub }).aiFacade = aiFacadeStub;
+
+            // First call (alwaysInjected fetch) returns sharedAlways.
+            docRepo.list.mockResolvedValue({ items: [sharedAlways], total: 1 });
+            // For the per-id semantic materialization, findById serves
+            // both ids — including the dup we'll drop.
+            docRepo.findById.mockImplementation(async (_workId: string, docId: string) => {
+                if (docId === sharedId) return sharedAlways;
+                if (docId === 'semantic-only') return semanticOnly;
+                return null;
+            });
+
+            const bundle = await service.resolveContext(WORK_ID, {
+                query: 'voice tone',
+                limit: 5,
+            });
+
+            // alwaysInjected wins the dedup: only the semantic-only doc
+            // survives in queryRetrieved.
+            expect(bundle.alwaysInjected.map((d) => d.id)).toEqual([sharedId]);
+            expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['semantic-only']);
+
+            const rendered = bundle.format();
+            // Both docs rendered, in priority order.
+            const brandIdx = rendered.indexOf('## Brand voice (kb:brand/voice)');
+            const researchIdx = rendered.indexOf('## Research note (kb:research/note)');
+            expect(brandIdx).toBeGreaterThanOrEqual(0);
+            expect(researchIdx).toBeGreaterThan(brandIdx);
+            // The semantic body of the dup is NOT in the rendered output
+            // (alwaysInjected copy is what got emitted).
+            expect(rendered).toContain('Always copy');
+        });
+    });
+
     describe('getDocumentHistory', () => {
         it('returns an empty history when the mirror service is not wired', async () => {
             const doc = buildDocument();
