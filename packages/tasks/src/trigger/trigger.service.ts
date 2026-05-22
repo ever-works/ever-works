@@ -14,6 +14,8 @@ import {
     KbMirrorDocumentDispatcher,
     KbBackfillSkeletonPayload,
     KbBackfillSkeletonDispatcher,
+    KbEmbedDocumentPayload,
+    KbEmbedDocumentDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
@@ -21,6 +23,7 @@ import { templateCustomizationTask } from '../tasks/trigger/template-customizati
 import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
 import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
+import { kbEmbedDocumentTask } from '../tasks/trigger/kb-embed-document.task';
 
 @Injectable()
 export class TriggerService
@@ -30,7 +33,8 @@ export class TriggerService
         TemplateCustomizationDispatcher,
         WebhookDeliveryDispatcher,
         KbMirrorDocumentDispatcher,
-        KbBackfillSkeletonDispatcher
+        KbBackfillSkeletonDispatcher,
+        KbEmbedDocumentDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -232,6 +236,36 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch kb-backfill-skeleton task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/a row 29c — enqueue a chunk + embed run for a
+     * single KB document. Called by `KnowledgeBaseService.{create,update,
+     * restore}Document` immediately after the mirror enqueue. The
+     * `concurrencyKey` keyed on `workId` serializes per-Work runs so a
+     * paragraph edited + saved twice quickly produces sensible final
+     * state (the chunk table is overwritten via row 29a's
+     * delete-then-insert transaction). Returns the Trigger.dev run id
+     * (or `null` when Trigger.dev is disabled / disposed — KB retrieval
+     * falls back to lexical via row 30 RRF until the dispatch lands).
+     */
+    async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbEmbedDocumentTask.trigger(payload, {
+                tags: ['kb-embed-document', `work:${payload.workId}`, `doc:${payload.documentId}`],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-embed:${payload.workId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-embed-document task', error as Error);
             return null;
         }
     }
