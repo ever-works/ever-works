@@ -105,15 +105,12 @@ describe('resolveSearchProviderIds', () => {
             { id: 'local-search' },
         ]);
         const settings = {
-            getSettings: jest
-                .fn()
-                .mockResolvedValueOnce({ apiKey: '' })
-                .mockResolvedValueOnce({}),
+            getSettings: jest.fn().mockResolvedValueOnce({ apiKey: '' }).mockResolvedValueOnce({}),
         };
 
-        await expect(
-            resolveSearchProviderIds(registry, 'u-1', settings as never),
-        ).resolves.toEqual(['local-search']);
+        await expect(resolveSearchProviderIds(registry, 'u-1', settings as never)).resolves.toEqual(
+            ['local-search'],
+        );
         expect(settings.getSettings).toHaveBeenCalledWith('tavily', {
             userId: 'u-1',
             includeSecrets: true,
@@ -133,9 +130,9 @@ describe('resolveSearchProviderIds', () => {
         ]);
         const settings = { getSettings: jest.fn().mockResolvedValue({}) };
 
-        await expect(
-            resolveSearchProviderIds(registry, 'u-1', settings as never),
-        ).resolves.toEqual(['env-search']);
+        await expect(resolveSearchProviderIds(registry, 'u-1', settings as never)).resolves.toEqual(
+            ['env-search'],
+        );
     });
 });
 

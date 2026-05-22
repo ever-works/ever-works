@@ -68,5 +68,4 @@ describe('UserResearchLimitsService', () => {
         }
         await expect(svc.assertCanRun('u2')).resolves.toBeUndefined();
     });
-
 });
