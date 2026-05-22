@@ -818,27 +818,6 @@ export class GitFacadeService implements IGitFacade {
         return plugin.replaceRemote(dir, remote, url);
     }
 
-    async fetchRemote(
-        providerId: string,
-        dir: string,
-        token: string,
-        remote?: string,
-    ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
-        return plugin.fetch(dir, token, remote);
-    }
-
-    async merge(
-        providerId: string,
-        dir: string,
-        ours: string,
-        theirs: string,
-        committer?: GitCommitter,
-    ): Promise<string> {
-        const plugin = this.getPluginSync(providerId);
-        return plugin.merge(dir, ours, theirs, committer);
-    }
-
     async removeLocalDir(providerId: string, owner: string, repo: string): Promise<void> {
         const plugin = this.getPluginSync(providerId);
         return plugin.removeLocalDir(owner, repo);

@@ -288,7 +288,7 @@ export async function iterateCustomTemplate(
     }
 }
 
-export async function syncCustomTemplateWithBase(templateId: string, input: { force?: boolean }) {
+export async function syncCustomTemplateWithBase(templateId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -297,7 +297,7 @@ export async function syncCustomTemplateWithBase(templateId: string, input: { fo
     const t = await getTranslations('dashboard.templates');
 
     try {
-        const response = await templatesAPI.syncCustom(templateId, input);
+        const response = await templatesAPI.syncCustom(templateId);
 
         revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
         revalidatePath(ROUTES.DASHBOARD_WORKS_NEW);
@@ -305,7 +305,7 @@ export async function syncCustomTemplateWithBase(templateId: string, input: { fo
         return {
             success: response.status === 'success',
             template: response.template ?? null,
-            mode: response.mode ?? null,
+            method: response.method ?? null,
             changed: response.changed ?? false,
             message: response.message ?? null,
             error:
@@ -318,7 +318,7 @@ export async function syncCustomTemplateWithBase(templateId: string, input: { fo
         return {
             success: false,
             template: null,
-            mode: null,
+            method: null,
             changed: false,
             message: null,
             error: error instanceof Error ? error.message : t('messages.syncBaseFailed'),

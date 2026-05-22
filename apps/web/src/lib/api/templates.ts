@@ -133,7 +133,7 @@ export type IterateCustomTemplateResponse = APIResponse<{
 
 export type SyncCustomTemplateResponse = APIResponse<{
     template: TemplateCatalogItem;
-    mode: 'merge' | 'force';
+    method: 'duplicate';
     changed: boolean;
     message: string;
 }>;
@@ -186,7 +186,7 @@ export const templatesAPI = {
     }) => {
         return serverMutation<AddCustomTemplateResponse>({
             endpoint: '/templates/custom',
-            data,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });
@@ -277,10 +277,10 @@ export const templatesAPI = {
         });
     },
 
-    syncCustom: async (templateId: string, data: { force?: boolean }) => {
+    syncCustom: async (templateId: string) => {
         return serverMutation<SyncCustomTemplateResponse>({
             endpoint: `/templates/custom/${templateId}/sync-base`,
-            data,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

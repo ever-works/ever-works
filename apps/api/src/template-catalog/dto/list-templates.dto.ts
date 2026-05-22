@@ -1,13 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-    IsBoolean,
-    IsIn,
-    IsOptional,
-    IsString,
-    IsUrl,
-    MaxLength,
-    MinLength,
-} from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 const TEMPLATE_KINDS = ['website', 'work'] as const;
 
@@ -186,16 +178,6 @@ export class CustomizeTemplateFromBaseDto {
     @IsString()
     @MaxLength(500)
     description?: string;
-}
-
-export class SyncCustomTemplateFromBaseDto {
-    @ApiPropertyOptional({
-        description:
-            'When true, overwrite the custom template repository with the latest base template. Use only when merge sync fails or the user wants to discard custom code changes.',
-    })
-    @IsOptional()
-    @IsBoolean()
-    force?: boolean;
 }
 
 export class IterateCustomTemplateDto {

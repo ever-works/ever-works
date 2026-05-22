@@ -3738,13 +3738,11 @@
             },
             "syncDialog": {
                 "title": "Sync from base template",
-                "description": "Pull the latest code from the built-in base template into this custom template repository. Normal sync tries to merge and preserve your custom changes.",
+                "description": "Sync this custom template to the latest built-in base template code.",
                 "templateLabel": "Custom template",
-                "forceLabel": "Force sync and overwrite custom code",
-                "forceDescription": "Use this only when normal sync fails or you intentionally want to reset the repository to the latest base template. AI styling and manual code changes may be replaced.",
                 "cancel": "Cancel",
-                "submit": "Sync latest base",
-                "forceSubmit": "Force sync"
+                "submit": "Sync and replace",
+                "warning": "This replaces the custom template repository with the latest base template code, then pushes it to GitHub. AI styling and manual code changes in the template repo can be overwritten."
             }
         },
         "templateSelector": {

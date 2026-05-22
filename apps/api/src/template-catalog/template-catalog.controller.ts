@@ -27,7 +27,6 @@ import {
     ListTemplatesQueryDto,
     RefreshTemplatesDto,
     SetDefaultTemplateDto,
-    SyncCustomTemplateFromBaseDto,
     UpdateCustomTemplateDto,
 } from './dto/list-templates.dto';
 
@@ -351,20 +350,16 @@ export class TemplateCatalogController {
     @ApiOperation({
         summary: 'Sync a custom template repository from its built-in base',
         description:
-            'Merges latest base-template changes into the custom template. With force=true, overwrites the custom repository from the base template.',
+            'Overwrites the custom repository with the latest base template using the same duplicate update model used for website repositories.',
     })
     @ApiResponse({ status: 200, description: 'Template synced' })
     async syncCustomTemplateFromBase(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('templateId') templateId: string,
-        @Body() body: SyncCustomTemplateFromBaseDto,
     ) {
         const result = await this.templateCustomizationService.syncFromBase(
             auth.userId,
             templateId,
-            {
-                force: body.force === true,
-            },
         );
 
         this.activityLogService
@@ -376,7 +371,7 @@ export class TemplateCatalogController {
                 summary: `Synced template ${result.template.name} from base`,
                 metadata: {
                     templateId: result.template.id,
-                    mode: result.mode,
+                    method: result.method,
                     changed: result.changed,
                 },
             })
@@ -393,7 +388,7 @@ export class TemplateCatalogController {
         return {
             status: 'success',
             template,
-            mode: result.mode,
+            method: result.method,
             changed: result.changed,
             message: result.message,
         };

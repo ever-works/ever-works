@@ -219,8 +219,6 @@ export interface IGitOperations {
 	getLocalDir(owner: string, repo: string): string;
 	removeLocalDir(owner: string, repo: string): Promise<void>;
 	replaceRemote(dir: string, remote: string, url: string): Promise<void>;
-	fetch(dir: string, token: string, remote?: string): Promise<void>;
-	merge(dir: string, ours: string, theirs: string, committer?: GitCommitter): Promise<string>;
 	renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 }
 

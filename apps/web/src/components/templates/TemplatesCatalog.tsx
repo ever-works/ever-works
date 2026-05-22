@@ -19,6 +19,7 @@ import {
     Sparkles,
     Loader2,
     AlertCircle,
+    TriangleAlert,
     CheckCircle2,
     Wand2,
 } from 'lucide-react';
@@ -34,7 +35,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/common/EmptyState';
 import {
     Dialog,
@@ -425,7 +425,6 @@ export function TemplatesCatalog({
         null,
     );
     const [syncDialogTemplate, setSyncDialogTemplate] = useState<TemplateCatalogItem | null>(null);
-    const [forceSync, setForceSync] = useState(false);
     const [formState, setFormState] = useState<AddTemplateFormState>(EMPTY_FORM);
     const [forkTargetOwner, setForkTargetOwner] = useState(forkTargets[0]?.login || '');
     const [isSavingDefault, startSavingDefault] = useTransition();
@@ -642,7 +641,6 @@ export function TemplatesCatalog({
 
     const resetSyncDialog = () => {
         setSyncDialogTemplate(null);
-        setForceSync(false);
     };
 
     const handleSetDefault = (templateId: string) => {
@@ -810,9 +808,7 @@ export function TemplatesCatalog({
 
         startSyncingTemplate(() => {
             void (async () => {
-                const result = await syncCustomTemplateWithBase(syncDialogTemplate.id, {
-                    force: forceSync,
-                });
+                const result = await syncCustomTemplateWithBase(syncDialogTemplate.id);
 
                 if (!result.success || !result.template) {
                     toast.error(result.error || t('messages.syncBaseFailed'));
@@ -1276,14 +1272,9 @@ export function TemplatesCatalog({
                             </p>
                         </div>
 
-                        <div className="rounded-lg border border-border bg-surface px-4 py-3 dark:border-border-dark dark:bg-white/4">
-                            <Checkbox
-                                checked={forceSync}
-                                onChange={(event) => setForceSync(event.target.checked)}
-                                disabled={isSyncingTemplate}
-                                label={t('syncDialog.forceLabel')}
-                                description={t('syncDialog.forceDescription')}
-                            />
+                        <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-900 dark:text-amber-200">
+                            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p className="text-sm leading-5">{t('syncDialog.warning')}</p>
                         </div>
                     </div>
 
@@ -1296,11 +1287,11 @@ export function TemplatesCatalog({
                             {t('syncDialog.cancel')}
                         </Button>
                         <Button
-                            variant={forceSync ? 'danger' : 'primary'}
+                            variant="danger"
                             onClick={handleSyncTemplate}
                             loading={isSyncingTemplate}
                         >
-                            {forceSync ? t('syncDialog.forceSubmit') : t('syncDialog.submit')}
+                            {t('syncDialog.submit')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
