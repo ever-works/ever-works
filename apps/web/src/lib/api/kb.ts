@@ -4,6 +4,7 @@ import type {
     KbDocumentBodyDto,
     KbDocumentDto,
     KbDocumentListFilter,
+    KbLockMode,
     UpdateKbDocumentInput,
 } from '@ever-works/contracts';
 
@@ -75,6 +76,40 @@ export const kbAPI = {
             endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}`,
             data: input,
             method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/lock` — lock the document
+     * in the requested mode. `full` blocks all body mutations; the
+     * `additions-only` mode lets the API enforce diff-merge semantics
+     * (additions OK, deletions/edits rejected). Returns the updated
+     * document so the UI can reflect the new lock state without a
+     * separate fetch.
+     */
+    lockDocument: async (
+        workId: string,
+        docId: string,
+        mode: KbLockMode,
+    ): Promise<KbDocumentDto> => {
+        return serverMutation<KbDocumentDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/lock`,
+            data: { mode },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/unlock` — clear the
+     * lock. No-op + 200 if the doc is already unlocked.
+     */
+    unlockDocument: async (workId: string, docId: string): Promise<KbDocumentDto> => {
+        return serverMutation<KbDocumentDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/unlock`,
+            data: {},
+            method: 'POST',
             wrapInData: false,
         });
     },
