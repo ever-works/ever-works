@@ -47,6 +47,13 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		if (s.baseUrl) config.baseURL = s.baseUrl as string;
 		if (s.temperature !== undefined) config.temperature = s.temperature as number;
 		if (s.maxTokens !== undefined) config.maxTokens = s.maxTokens as number;
+		// EW-641 Phase 2/a row 27 — propagate the embedding-model setting so
+		// `aiOps.createEmbedding(options, resolvedConfig)` picks it up when
+		// `options.model` is unset. Without this, OpenAI-style configs that
+		// only declare `embeddingModel` in plugin settings (not in the
+		// per-call options) would throw "Embedding model must be specified"
+		// inside `AiOperations.createEmbedding`.
+		if (s.embeddingModel) config.embeddingModel = s.embeddingModel as string;
 		return config;
 	}
 
