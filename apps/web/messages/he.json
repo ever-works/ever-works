@@ -2749,6 +2749,14 @@
                     "empty": "No documents match \"{query}\".",
                     "listLabel": "Wikilink suggestions"
                 },
+                "mention": {
+                    "hint": "Type to search for a KB document or agent…",
+                    "empty": "Nothing matches \"{query}\".",
+                    "sections": {
+                        "docs": "Documents",
+                        "agents": "Agents"
+                    }
+                },
                 "sidePanel": {
                     "title": "Document details",
                     "subtitle": "Metadata, lock state, and history for this document.",
