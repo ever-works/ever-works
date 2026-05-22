@@ -1,6 +1,6 @@
 import 'server-only';
 import { serverFetch } from './server-api';
-import type { KbDocumentDto, KbDocumentListFilter } from '@ever-works/contracts';
+import type { KbDocumentBodyDto, KbDocumentDto, KbDocumentListFilter } from '@ever-works/contracts';
 
 /**
  * EW-641 Phase 1B/d row 3 — server-only fetch helpers for the Knowledge
@@ -37,5 +37,18 @@ export const kbAPI = {
         if (opts.cursor) params.append('offset', opts.cursor);
         const query = params.toString() ? `?${params.toString()}` : '';
         return serverFetch<KbDocumentListResponse>(`/works/${workId}/kb/documents${query}`);
+    },
+
+    /**
+     * `GET /api/works/:id/kb/documents/:idOrPath` — full document with
+     * Markdown body + asset summaries. The backend accepts either a
+     * UUID or the canonical `<class>/<slug>.md`-style path; we encode
+     * the path so embedded slashes survive the fetch (the API decodes
+     * the segment before lookup).
+     */
+    getDocument: async (workId: string, idOrPath: string): Promise<KbDocumentBodyDto> => {
+        return serverFetch<KbDocumentBodyDto>(
+            `/works/${workId}/kb/documents/${encodeURIComponent(idOrPath)}`,
+        );
     },
 };

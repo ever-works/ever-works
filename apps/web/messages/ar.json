@@ -2636,6 +2636,18 @@
                     "research": "Research",
                     "output": "Outputs",
                     "freeform": "Freeform"
+                },
+                "status": {
+                    "draft": "Draft",
+                    "active": "Active",
+                    "archived": "Archived"
+                },
+                "lock": {
+                    "full": "Locked",
+                    "additions-only": "Additions only"
+                },
+                "document": {
+                    "emptyBody": "This document has no body yet."
                 }
             }
         },
