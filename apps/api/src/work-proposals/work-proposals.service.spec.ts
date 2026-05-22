@@ -87,8 +87,29 @@ describe('WorkProposalsApiService', () => {
         expect(result.status).toBe('queued');
         await flushMicrotasks();
         await flushMicrotasks();
-        expect(research.research).toHaveBeenCalledWith('u1');
+        expect(research.research).toHaveBeenCalledWith('u1', {
+            timeoutMs: 1_800_000,
+            maxSteps: 14,
+        });
         expect(proposals.generate).toHaveBeenCalledWith('u1', { source: 'user-refresh' });
+    });
+
+    it('passes configured research timeout and step limits to the agent', async () => {
+        const { svc, research, config } = makeDeps();
+        config.get.mockImplementation((key: string, d: unknown) => {
+            if (key === 'USER_RESEARCH_TIMEOUT_MS') return '600000';
+            if (key === 'USER_RESEARCH_MAX_STEPS') return '20';
+            return d;
+        });
+
+        await svc.refresh('u1');
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(research.research).toHaveBeenCalledWith('u1', {
+            timeoutMs: 600_000,
+            maxSteps: 20,
+        });
     });
 
     it('returns rate-limited when cap is exceeded', async () => {

@@ -17,6 +17,34 @@ export const DEFAULT_USER_RESEARCH_LIMITS: UserResearchLimitsConfig = {
     maxTokensPerDay: 200_000,
 };
 
+function positiveIntegerFromEnv(key: string, fallback: number): number {
+    const raw = process.env[key];
+    if (raw === undefined || raw.trim() === '') return fallback;
+    const value = Number(raw);
+    return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+export function buildUserResearchLimitsConfig(): UserResearchLimitsConfig {
+    return {
+        maxRunsPerDay: positiveIntegerFromEnv(
+            'USER_RESEARCH_MAX_RUNS_PER_DAY',
+            DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay,
+        ),
+        maxSearchesPerDay: positiveIntegerFromEnv(
+            'USER_RESEARCH_MAX_SEARCHES_PER_DAY',
+            DEFAULT_USER_RESEARCH_LIMITS.maxSearchesPerDay,
+        ),
+        maxFetchesPerDay: positiveIntegerFromEnv(
+            'USER_RESEARCH_MAX_FETCHES_PER_DAY',
+            DEFAULT_USER_RESEARCH_LIMITS.maxFetchesPerDay,
+        ),
+        maxTokensPerDay: positiveIntegerFromEnv(
+            'USER_RESEARCH_MAX_TOKENS_PER_DAY',
+            DEFAULT_USER_RESEARCH_LIMITS.maxTokensPerDay,
+        ),
+    };
+}
+
 export class UserResearchRateLimitedError extends Error {
     constructor(
         public readonly bucket: keyof UserResearchLimitsConfig,

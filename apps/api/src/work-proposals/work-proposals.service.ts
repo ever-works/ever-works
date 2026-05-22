@@ -189,9 +189,19 @@ export class WorkProposalsApiService {
         return summary;
     }
 
+    private getPositiveNumberConfig(key: string, fallback: number): number {
+        const raw = this.config.get<string | number>(key, fallback);
+        const value = Number(raw);
+        return Number.isFinite(value) && value > 0 ? value : fallback;
+    }
+
     private async runPipeline(userId: string, source: WorkProposalSource): Promise<void> {
         try {
-            const researched = await this.research.research(userId);
+            const researched = await this.research.research(userId, {
+                timeoutMs: this.getPositiveNumberConfig('USER_RESEARCH_TIMEOUT_MS', 1_800_000),
+                maxSteps: this.getPositiveNumberConfig('USER_RESEARCH_MAX_STEPS', 14),
+            });
+
             if (researched.status !== 'completed') {
                 this.logger.log(
                     `User research for ${userId} did not complete (status=${researched.status}); skipping proposals`,
