@@ -195,6 +195,38 @@ describe('KnowledgeBaseService', () => {
                 }),
             );
         });
+
+        it('falls back to lexical-only when q is set but semantic returns nothing (no embedder configured)', async () => {
+            // Default test module doesn't wire `aiFacade` / `chunkRepository`,
+            // so semanticSearch returns []. The RRF blend short-circuits
+            // and the row-30c path delivers lexical-only with the
+            // requested limit/offset preserved.
+            const docs = [
+                buildDocument({ id: 'd1', title: 'first' }),
+                buildDocument({ id: 'd2', title: 'second' }),
+            ];
+            docRepo.list.mockResolvedValue({ items: docs, total: 2 });
+
+            const result = await service.listDocuments(WORK_ID, USER_ID, {
+                q: 'voice',
+                limit: 10,
+            });
+
+            // q was passed through to the repo (lexical leg).
+            expect(docRepo.list).toHaveBeenCalledWith(expect.objectContaining({ q: 'voice' }));
+            expect(result.items.map((d) => d.id)).toEqual(['d1', 'd2']);
+            expect(result.total).toBe(2);
+        });
+
+        it('treats whitespace-only q as no q (preserves existing list behavior)', async () => {
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+
+            await service.listDocuments(WORK_ID, USER_ID, { q: '   \t  ' });
+
+            // The repo call should receive q: undefined (not the whitespace string),
+            // matching the existing pre-row-30c contract.
+            expect(docRepo.list).toHaveBeenCalledWith(expect.objectContaining({ q: undefined }));
+        });
     });
 
     describe('getDocument', () => {
