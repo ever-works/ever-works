@@ -2734,6 +2734,26 @@
                     "sheetTabsLabel": "Worksheet tabs",
                     "truncated": "Showing first {cap} of {total} rows. Download the file to see the rest.",
                     "emptyWorkbook": "Workbook has no worksheets"
+                },
+                "image": {
+                    "label": "Image viewer",
+                    "tooLargeTitle": "Image too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download.",
+                    "download": "Download image"
+                },
+                "video": {
+                    "label": "Video viewer",
+                    "tooLargeTitle": "Video too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download video",
+                    "unsupported": "Your browser does not support inline video playback."
+                },
+                "audio": {
+                    "label": "Audio viewer",
+                    "tooLargeTitle": "Audio too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download audio",
+                    "unsupported": "Your browser does not support inline audio playback."
                 }
             }
         },
