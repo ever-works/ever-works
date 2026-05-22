@@ -3,6 +3,7 @@ import { serverFetch, serverMutation } from './server-api';
 import type {
     KbDocumentBodyDto,
     KbDocumentDto,
+    KbDocumentHistoryResult,
     KbDocumentListFilter,
     KbLockMode,
     UpdateKbDocumentInput,
@@ -109,6 +110,46 @@ export const kbAPI = {
         return serverMutation<KbDocumentDto>({
             endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/unlock`,
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `GET /api/works/:id/kb/documents/:docId/history?limit=N` — list
+     * Git commits that touched the doc's sidecar `.md`. Returns
+     * `{ items: KbDocumentCommitDto[] }`. Backend (row 18a, PR #943)
+     * stubs to `[]` until row 18b lands the real git-log walk; the
+     * dialog handles the empty case via its own empty-state copy.
+     */
+    getDocumentHistory: async (
+        workId: string,
+        docId: string,
+        opts: { limit?: number } = {},
+    ): Promise<KbDocumentHistoryResult> => {
+        const params = new URLSearchParams();
+        if (typeof opts.limit === 'number') params.set('limit', String(opts.limit));
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return serverFetch<KbDocumentHistoryResult>(
+            `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/history${query}`,
+        );
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/restore` — restore the
+     * doc body to the supplied commit SHA. Already wired in Phase 1A
+     * (controller endpoint exists since `restoreDocumentFromHistory`
+     * landed with the original mirror service); row 18c just exposes
+     * it via the same `kbAPI` surface the dialog uses.
+     */
+    restoreDocument: async (
+        workId: string,
+        docId: string,
+        commitSha: string,
+    ): Promise<KbDocumentBodyDto> => {
+        return serverMutation<KbDocumentBodyDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/restore`,
+            data: { commitSha },
             method: 'POST',
             wrapInData: false,
         });

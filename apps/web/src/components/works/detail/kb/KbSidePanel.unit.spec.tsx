@@ -42,6 +42,10 @@ vi.mock('@/app/actions/works/kb-lock', () => ({
     lockKbDocumentAction: vi.fn(),
     unlockKbDocumentAction: vi.fn(),
 }));
+vi.mock('@/app/actions/works/kb-history', () => ({
+    getKbDocumentHistoryAction: vi.fn(),
+    restoreKbDocumentAction: vi.fn(),
+}));
 
 import { KbSidePanel } from './KbSidePanel';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
@@ -207,8 +211,23 @@ describe('KbSidePanel', () => {
         expect(counts.textContent).toContain('sidePanel.wordCount count=100');
     });
 
-    it('renders the disabled "view history" placeholder button (row 18 will wire it)', async () => {
-        render(await KbSidePanel({ doc: doc() }));
+    it('renders the enabled "view history" button when doc.workId is set (row 18c)', async () => {
+        render(await KbSidePanel({ doc: doc({ workId: 'work-1' }) }));
+        const btn = screen.getByTestId('kb-side-panel-history') as HTMLButtonElement;
+        expect(btn.tagName).toBe('BUTTON');
+        expect(btn.disabled).toBe(false);
+        expect(btn.getAttribute('data-disabled')).toBe('false');
+        // KbHistoryButton scopes useTranslations to
+        // `dashboard.workDetail.kb.sidePanel`, so the key passed to the
+        // i18n mock is bare `viewHistory` (not the dotted form). The
+        // org-level placeholder above scopes to `dashboard.workDetail.kb`,
+        // so its key includes the `sidePanel.` prefix — same string in
+        // production but the mock surfaces the difference.
+        expect(btn.textContent).toBe('viewHistory');
+    });
+
+    it('falls back to the disabled placeholder for org-level docs (workId === null)', async () => {
+        render(await KbSidePanel({ doc: doc({ workId: null }) }));
         const btn = screen.getByTestId('kb-side-panel-history') as HTMLButtonElement;
         expect(btn.tagName).toBe('BUTTON');
         expect(btn.disabled).toBe(true);
