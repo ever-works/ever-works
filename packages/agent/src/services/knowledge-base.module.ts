@@ -13,6 +13,7 @@ import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-k
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
+import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
@@ -43,7 +44,8 @@ import { WorkOwnershipService } from './work-ownership.service';
  *  - WorkKnowledgeUpload
  *  - WorkKnowledgeTag
  *  - WorkKnowledgeCitation
- *  - WorkKnowledgeChunk (no repo yet — Phase 2 introduces embedding code)
+ *  - WorkKnowledgeChunk (repo added in Phase 2/a row 29a — embedding
+ *    write path wired in rows 29b/29c)
  */
 @Module({
     imports: [
@@ -63,6 +65,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeUploadRepository,
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
+        WorkKnowledgeChunkRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
@@ -72,6 +75,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeUploadRepository,
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
+        WorkKnowledgeChunkRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
