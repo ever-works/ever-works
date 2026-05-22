@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USER } from './helpers/test-user';
+import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
 
@@ -40,10 +40,14 @@ test.describe('Knowledge Base — A13 edit + autosave', () => {
         // compile cost, then autosave debounces + commits.
         test.setTimeout(180_000);
 
-        // 1. Mint a bearer token for the test user.
+        // 1. Mint a bearer token for the test user — read the
+        //    credentials global-setup wrote so this spec's worker uses
+        //    the SAME email it registered (the bare `TEST_USER` module
+        //    isn't shared across Node processes).
+        const testUser = loadSeededTestUser();
         const { access_token } = await loginViaAPI(request, {
-            email: TEST_USER.email,
-            password: TEST_USER.password,
+            email: testUser.email,
+            password: testUser.password,
         });
 
         // 2. Create a fresh Work and seed one markdown doc inside it via

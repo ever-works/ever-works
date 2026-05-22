@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USER } from './helpers/test-user';
+import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { seedKbBinaryDoc } from './helpers/kb-fixtures';
 
@@ -52,9 +52,10 @@ test.describe('Knowledge Base — A14 viewer size caps', () => {
     test('PDF under 30 MiB renders inline via KbPdfViewer', async ({ page, request }) => {
         test.setTimeout(180_000);
 
+        const testUser = loadSeededTestUser();
         const { access_token } = await loginViaAPI(request, {
-            email: TEST_USER.email,
-            password: TEST_USER.password,
+            email: testUser.email,
+            password: testUser.password,
         });
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -84,9 +85,10 @@ test.describe('Knowledge Base — A14 viewer size caps', () => {
     test('XLSX over 5 MiB shows download fallback via KbXlsxViewer', async ({ page, request }) => {
         test.setTimeout(180_000);
 
+        const testUser = loadSeededTestUser();
         const { access_token } = await loginViaAPI(request, {
-            email: TEST_USER.email,
-            password: TEST_USER.password,
+            email: testUser.email,
+            password: testUser.password,
         });
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
