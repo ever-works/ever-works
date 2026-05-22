@@ -537,10 +537,13 @@ describe('StepPipelineExecutorService', () => {
 
             await service.execute(standardPlugin, mockWork, requestWithProviders, mockExisting);
 
-            // Verify facade service was called with provider overrides
+            // Verify facade service was called with provider overrides.
+            // 5th arg is `kbContext` (EW-641 row 32c) — undefined when
+            // KnowledgeBaseService is not injected.
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
                 requestWithProviders.providers,
+                undefined,
                 undefined,
                 undefined,
             );
@@ -552,6 +555,7 @@ describe('StepPipelineExecutorService', () => {
             // Verify facade service was called without provider overrides
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
+                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -571,6 +575,59 @@ describe('StepPipelineExecutorService', () => {
                 mockWork,
                 undefined,
                 'openai/gpt-4.1',
+                undefined,
+                undefined,
+            );
+        });
+
+        // EW-641 Phase 2/b row 32c — orchestrator populates execContext.kbContext.
+        it('forwards the resolved KB bundle as the 5th arg when KnowledgeBaseService is wired', async () => {
+            const bundle = {
+                alwaysInjected: [{ id: 'b1' }],
+                queryRetrieved: [{ id: 'q1' }],
+            };
+            const kbStub = { resolveContext: jest.fn().mockResolvedValue(bundle) };
+            (service as any).knowledgeBaseService = kbStub;
+
+            const requestWithPrompt: GenerationRequest = {
+                prompt: 'voice tone',
+                config: {},
+            };
+
+            await service.execute(standardPlugin, mockWork, requestWithPrompt, mockExisting);
+
+            expect(kbStub.resolveContext).toHaveBeenCalledTimes(1);
+            expect(kbStub.resolveContext).toHaveBeenCalledWith(mockWork.id, {
+                query: 'voice tone',
+            });
+            // Bundle reaches the facade as the 5th positional arg of every
+            // per-step createStepExecutionContext call.
+            expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
+                mockWork,
+                undefined,
+                undefined,
+                undefined,
+                bundle,
+            );
+        });
+
+        it('degrades gracefully when resolveContext throws (kbContext stays undefined)', async () => {
+            const kbStub = {
+                resolveContext: jest.fn().mockRejectedValue(new Error('kb down')),
+            };
+            (service as any).knowledgeBaseService = kbStub;
+            // Silence the expected warn log.
+            jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
+
+            expect(kbStub.resolveContext).toHaveBeenCalled();
+            // 5th arg stays undefined even though resolveContext rejected.
+            expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
+                mockWork,
+                undefined,
+                undefined,
+                undefined,
                 undefined,
             );
         });

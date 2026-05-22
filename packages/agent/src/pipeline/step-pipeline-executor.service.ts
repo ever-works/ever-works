@@ -30,11 +30,13 @@ import {
     isPipelineModifierPlugin,
 } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
+import type { KbContextBundleData } from '@ever-works/contracts';
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
+import { KnowledgeBaseService } from '../services/knowledge-base.service';
 
 export interface CheckpointData {
     stepIndex: number;
@@ -100,7 +102,42 @@ export class StepPipelineExecutorService {
         private readonly facadeService: PipelineFacadeService,
         private readonly contextFactory: PluginContextFactoryService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+        // EW-641 Phase 2/b row 32c — resolve the KB context bundle once
+        // per pipeline run and thread it down to `createStepExecutionContext`.
+        // Optional so deployments without the KB module (OSS images,
+        // isolated unit tests, legacy bootstraps) keep constructing
+        // identically — `execContext.kbContext` stays `undefined` then.
+        @Optional() private readonly knowledgeBaseService?: KnowledgeBaseService,
     ) {}
+
+    /**
+     * EW-641 Phase 2/b row 32c — resolve the KB context bundle for a
+     * pipeline run, swallowing all errors so a KB hiccup never breaks
+     * generation. Returns `undefined` when the KB service isn't wired
+     * or `work.id` is empty (test fixtures), or when resolveContext
+     * throws.
+     *
+     * Called once at the entry point (`execute` / `executeWithContext`),
+     * then forwarded through `executePipeline` → `executeStep` →
+     * `createStepExecutionContext` so each step plugin reads the same
+     * bundle without re-querying.
+     */
+    private async resolveKbContextSafe(
+        work: WorkReference,
+        request: GenerationRequest,
+    ): Promise<KbContextBundleData | undefined> {
+        if (!this.knowledgeBaseService || !work.id) return undefined;
+        try {
+            return await this.knowledgeBaseService.resolveContext(work.id, {
+                query: request.prompt,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `KB context resolution failed for work=${work.id}: ${(err as Error).message}. Continuing without kbContext.`,
+            );
+            return undefined;
+        }
+    }
 
     async execute(
         plugin: IPipelinePlugin,
@@ -135,8 +172,11 @@ export class StepPipelineExecutorService {
             );
         }
 
+        // EW-641 Phase 2/b row 32c — resolve KB bundle once per run.
+        const kbContext = await this.resolveKbContextSafe(work, request);
+
         try {
-            return await this.executePipeline(plugin, context, options, onProgress);
+            return await this.executePipeline(plugin, context, options, onProgress, kbContext);
         } finally {
             removeInterceptor?.();
         }
@@ -147,6 +187,7 @@ export class StepPipelineExecutorService {
         context: IPipelineContext,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
+        kbContext?: KbContextBundleData,
     ): Promise<PipelineResult> {
         const startTime = Date.now();
         const work = context.work;
@@ -203,6 +244,7 @@ export class StepPipelineExecutorService {
                                 plugin.id,
                                 options,
                                 onProgress,
+                                kbContext,
                             ),
                         ),
                     );
@@ -220,6 +262,7 @@ export class StepPipelineExecutorService {
                                 plugin.id,
                                 options,
                                 onProgress,
+                                kbContext,
                             ),
                     );
                     await this.runWithConcurrencyLimit(stepThunks, concurrency);
@@ -284,6 +327,7 @@ export class StepPipelineExecutorService {
         pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
+        kbContext?: KbContextBundleData,
     ): Promise<void> {
         const onLogEntry = options?.onLogEntry;
 
@@ -355,7 +399,7 @@ export class StepPipelineExecutorService {
                 throw new Error(`No executor found for step "${step.id}"`);
             }
 
-            await this.executeStep(step, executor, plugin, context, options);
+            await this.executeStep(step, executor, plugin, context, options, kbContext);
 
             const durationMs = Date.now() - stepStartTime;
             const metrics = this.createStepMetrics(step, stepStartTime, true);
@@ -412,7 +456,11 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        return this.executePipeline(plugin, context, options, onProgress);
+        // EW-641 Phase 2/b row 32c — also resolve KB bundle on the
+        // resume-from-checkpoint path so a resumed pipeline gets the
+        // same KB grounding as a fresh run.
+        const kbContext = await this.resolveKbContextSafe(context.work, context.request);
+        return this.executePipeline(plugin, context, options, onProgress, kbContext);
     }
 
     async resumeFromCheckpoint(
@@ -467,12 +515,14 @@ export class StepPipelineExecutorService {
         plugin: IPipelinePlugin,
         context: IPipelineContext,
         options?: PipelineExecutionOptions,
+        kbContext?: KbContextBundleData,
     ): Promise<void> {
         const execContext = this.facadeService.createStepExecutionContext(
             context.work,
             context.request.providers,
             context.request.aiModel,
             options?.signal,
+            kbContext,
         );
 
         if (executor.type === 'builtin') {

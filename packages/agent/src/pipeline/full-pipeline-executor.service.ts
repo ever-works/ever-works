@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
     WorkReference,
@@ -13,11 +13,13 @@ import type {
     PipelineFailedPayload,
 } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
+import type { KbContextBundleData } from '@ever-works/contracts';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { validatePipelineResult } from './validators';
 import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
+import { KnowledgeBaseService } from '../services/knowledge-base.service';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -34,7 +36,34 @@ export class FullPipelineExecutorService {
         private readonly eventEmitter: EventEmitter2,
         private readonly facadeService: PipelineFacadeService,
         private readonly contextFactory: PluginContextFactoryService,
+        // EW-641 Phase 2/b row 32c — same KB resolver as the step-orchestrated
+        // executor. Optional so OSS images / isolated unit tests without
+        // KB wiring still construct (and `execContext.kbContext` stays
+        // undefined for those callers).
+        @Optional() private readonly knowledgeBaseService?: KnowledgeBaseService,
     ) {}
+
+    /**
+     * EW-641 Phase 2/b row 32c — same try/catch resolver as the step
+     * executor uses. A KB hiccup must never break generation; on failure
+     * we log + return undefined so the step plugin sees no kbContext.
+     */
+    private async resolveKbContextSafe(
+        work: WorkReference,
+        request: GenerationRequest,
+    ): Promise<KbContextBundleData | undefined> {
+        if (!this.knowledgeBaseService || !work.id) return undefined;
+        try {
+            return await this.knowledgeBaseService.resolveContext(work.id, {
+                query: request.prompt,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `KB context resolution failed for work=${work.id}: ${(err as Error).message}. Continuing without kbContext.`,
+            );
+            return undefined;
+        }
+    }
 
     /**
      * Execute using a pipeline plugin
@@ -77,6 +106,11 @@ export class FullPipelineExecutorService {
             );
         }
 
+        // EW-641 Phase 2/b row 32c — resolve KB bundle once before the
+        // plugin executes; the bundle rides on the same execContext that
+        // facades use.
+        const kbContext = await this.resolveKbContextSafe(work, request);
+
         try {
             // Create execContext for the plugin to use facades
             const execContext = this.facadeService.createStepExecutionContext(
@@ -84,6 +118,7 @@ export class FullPipelineExecutorService {
                 request.providers,
                 request.aiModel,
                 options?.signal,
+                kbContext,
             );
 
             // Delegate to the plugin's execute method with execContext
