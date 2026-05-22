@@ -267,6 +267,32 @@ export class KnowledgeBaseGitMirrorService {
         return { restored: true, body };
     }
 
+    /**
+     * EW-641 Phase 1B/d row 18 — list commits that touched a KB
+     * document's sidecar `.md` file.
+     *
+     * **Stub today (row 18a)**: returns `[]`. Row 18b lands the real
+     * git-log walk — likely via a new optional `listFileCommits`
+     * capability on the git-provider plugin contract (GitHub's
+     * `octokit.rest.repos.listCommits({ path })` is the natural impl)
+     * or, failing that, isomorphic-git's `git.log({ filepath })` over
+     * the local clone. Whichever path lands, the return shape is
+     * locked here so the controller + frontend don't have to budge.
+     *
+     * The doc's `path` is the relative key under `.content/kb/`. We
+     * resolve it the same way `restoreDocumentFromGit` does, then
+     * compose `${KB_ROOT}/${doc.path}` to scope the log query.
+     */
+    async listDocumentHistory(
+        _workId: string,
+        _documentId: string,
+        _limit: number,
+    ): Promise<
+        ReadonlyArray<{ sha: string; message: string; authorName: string; authoredAt: string }>
+    > {
+        return [];
+    }
+
     // ─── INTERNAL ─────────────────────────────────────────────────────────────
 
     /**

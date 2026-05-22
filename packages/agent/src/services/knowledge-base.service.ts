@@ -37,6 +37,7 @@ import type {
     KbDocumentBodyDto,
     KbDocumentClass as KbDocumentClassContract,
     KbDocumentDto,
+    KbDocumentHistoryResult,
     KbTagDto,
 } from '@ever-works/contracts';
 
@@ -214,6 +215,50 @@ export class KnowledgeBaseService {
         }
 
         return this.toBodyDto(doc);
+    }
+
+    /**
+     * EW-641 Phase 1B/d row 18 — list the Git commits that touched a
+     * KB document's sidecar `.md` body. Returns `{ items: [] }` when
+     * the mirror service isn't wired (test envs, OSS deployments
+     * without git-provider plugin), or when the file has no commits
+     * yet (newly-created doc whose first mirror is still queued).
+     *
+     * Same `ensureCanView` access pattern as `listDocuments` /
+     * `getDocument`: anyone who can read the doc can read its history.
+     * Restore (the destructive side) lives on the existing
+     * `restoreDocumentFromHistory` path and gates on `manager+`.
+     *
+     * **Stub today**: the real `listDocumentHistoryFromGit` impl on
+     * `KnowledgeBaseGitMirrorService` lands in row 18b — that PR
+     * walks the local clone with isomorphic-git or fans out to the
+     * git-provider plugin's commits endpoint. The contract + access
+     * gate are locked here so the frontend (row 18c) can build
+     * against the real wire format.
+     */
+    async getDocumentHistory(
+        workId: string,
+        docId: string,
+        userId: string,
+        opts: { limit?: number } = {},
+    ): Promise<KbDocumentHistoryResult> {
+        await this.ownershipService.ensureCanView(workId, userId);
+
+        const doc = await this.documentRepository.findByWorkOrPath(workId, docId);
+        if (!doc) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+
+        if (!this.mirrorService) {
+            return { items: [] };
+        }
+
+        const limit = typeof opts.limit === 'number' ? Math.min(Math.max(opts.limit, 1), 100) : 25;
+        const items = await this.mirrorService.listDocumentHistory(workId, doc.id, limit);
+        // `items` is a `ReadonlyArray<…>` on the mirror service to
+        // prevent accidental mutation of the upstream's cache; copy it
+        // into a mutable array for the contract's `items: T[]` shape.
+        return { items: [...items] };
     }
 
     async createDocument(input: CreateDocumentInput): Promise<KbDocumentBodyDto> {
