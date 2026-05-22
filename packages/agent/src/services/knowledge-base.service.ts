@@ -32,6 +32,7 @@ import {
     KbLockMode,
 } from '../entities/kb-types';
 import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '../tasks';
+import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '../tasks';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -146,6 +147,14 @@ export class KnowledgeBaseService {
         // construct; when absent, the service falls back to the
         // built-in text-passthrough check.
         @Optional() private readonly bufferExtractor?: KnowledgeBaseBufferExtractorService,
+        // EW-641 Phase 2/a row 29c — KB embedding dispatcher. Optional
+        // so deployments without Trigger.dev wired still construct.
+        // Fire-and-forget pattern mirrors `mirrorDispatcher` — chunks
+        // remain stale on dispatch failure but retrieval falls back to
+        // lexical via row 30's RRF blend.
+        @Optional()
+        @Inject(KB_EMBED_DOCUMENT_DISPATCHER)
+        private readonly embedDispatcher?: KbEmbedDocumentDispatcher,
     ) {}
 
     /**
@@ -178,6 +187,34 @@ export class KnowledgeBaseService {
         } catch (error) {
             this.logger.warn(
                 `Failed to enqueue KB mirror for ${operation} ${docPath} (work=${workId}): ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/a row 29c — enqueue the chunk + embed pipeline
+     * for a single document. Called from createDocument / updateDocument
+     * (only when body changes) / restoreDocumentFromHistory.
+     *
+     * Same fire-and-forget shape as `enqueueMirror`: failures are
+     * logged but never bubble to the API caller. If the dispatcher is
+     * absent (Trigger.dev not wired in this deployment) the embed is
+     * a no-op — row 30's RRF retrieval falls back to lexical, and the
+     * Phase 3 reconciliation job (spec §17.7) catches docs whose
+     * `lastEmbeddedAt` falls behind their `updatedAt`. No `delete`
+     * variant: the `onDelete: 'CASCADE'` FK on `work_knowledge_chunks`
+     * (work-knowledge-chunk.entity.ts) clears chunk rows when the
+     * parent document row is dropped — no separate enqueue needed.
+     */
+    private async enqueueEmbed(workId: string, documentId: string): Promise<void> {
+        if (!this.embedDispatcher) {
+            return;
+        }
+        try {
+            await this.embedDispatcher.dispatchKbEmbedDocument({ workId, documentId });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enqueue KB embed for doc ${documentId} (work=${workId}): ${(error as Error).message}`,
             );
         }
     }
@@ -339,6 +376,7 @@ export class KnowledgeBaseService {
         }
 
         await this.enqueueMirror(input.workId, doc.id, 'upsert', doc.path, doc.kbDocumentClass);
+        await this.enqueueEmbed(input.workId, doc.id);
 
         return this.toBodyDto(doc);
     }
@@ -390,6 +428,13 @@ export class KnowledgeBaseService {
             updated.path,
             updated.kbDocumentClass,
         );
+        // Row 29c — re-embed only when the body actually changed.
+        // Title/tags/description edits don't move chunks, so the prior
+        // embeddings stay valid; re-running the embed task would waste
+        // an API call + churn the chunk table for nothing.
+        if (input.body !== undefined) {
+            await this.enqueueEmbed(workId, updated.id);
+        }
 
         return this.toBodyDto(updated);
     }
@@ -520,6 +565,9 @@ export class KnowledgeBaseService {
             updated.path,
             updated.kbDocumentClass,
         );
+        // Row 29c — a restore changes the body to the historical
+        // version; chunks must re-embed to match.
+        await this.enqueueEmbed(workId, updated.id);
 
         return this.toBodyDto(updated);
     }

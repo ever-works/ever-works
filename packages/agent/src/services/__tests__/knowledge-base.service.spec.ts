@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.service';
+import { KB_EMBED_DOCUMENT_DISPATCHER } from '../../tasks/kb-embed-document-dispatcher';
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../../database/repositories/work-knowledge-upload.repository';
@@ -75,6 +76,7 @@ describe('KnowledgeBaseService', () => {
         isAvailable: jest.Mock;
     }>;
     let activityLog: jest.Mocked<{ log: jest.Mock }>;
+    let embedDispatcher: jest.Mocked<{ dispatchKbEmbedDocument: jest.Mock }>;
 
     beforeEach(async () => {
         const docRepoMock: Partial<jest.Mocked<WorkKnowledgeDocumentRepository>> = {
@@ -127,6 +129,10 @@ describe('KnowledgeBaseService', () => {
 
         const activityLogMock = { log: jest.fn() };
 
+        const embedDispatcherMock = {
+            dispatchKbEmbedDocument: jest.fn().mockResolvedValue('run-id'),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 KnowledgeBaseService,
@@ -140,6 +146,7 @@ describe('KnowledgeBaseService', () => {
                 { provide: WorkOwnershipService, useValue: ownershipMock },
                 { provide: KB_STORAGE_PLUGIN, useValue: storageMock },
                 { provide: ActivityLogService, useValue: activityLogMock },
+                { provide: KB_EMBED_DOCUMENT_DISPATCHER, useValue: embedDispatcherMock },
             ],
         }).compile();
 
@@ -150,6 +157,7 @@ describe('KnowledgeBaseService', () => {
         ownership = module.get(WorkOwnershipService);
         storage = module.get(KB_STORAGE_PLUGIN);
         activityLog = module.get(ActivityLogService);
+        embedDispatcher = module.get(KB_EMBED_DOCUMENT_DISPATCHER);
     });
 
     describe('listDocuments', () => {
@@ -362,6 +370,26 @@ describe('KnowledgeBaseService', () => {
             const call = docRepo.create.mock.calls[0]?.[0] as { path?: string };
             expect(call.path).toBe('brand/voice-3.md');
         });
+
+        it('enqueues the embed task with the new docId after create', async () => {
+            docRepo.pathExists.mockResolvedValue(false);
+            const persisted = buildDocument({ id: 'doc-99', metadata: { body: 'hi' } });
+            docRepo.create.mockResolvedValue(persisted);
+
+            await service.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/v.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            expect(embedDispatcher.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-99',
+            });
+        });
     });
 
     describe('updateDocument', () => {
@@ -391,6 +419,32 @@ describe('KnowledgeBaseService', () => {
 
             expect(docRepo.update).toHaveBeenCalled();
             expect(result.body).toBe('a new body with more words');
+        });
+
+        it('enqueues embed task when body changes', async () => {
+            const existing = buildDocument({ id: 'doc-50', metadata: { body: 'old' } });
+            docRepo.findById.mockResolvedValue(existing);
+            docRepo.update.mockResolvedValue({
+                ...existing,
+                metadata: { body: 'new body' },
+            });
+
+            await service.updateDocument(WORK_ID, existing.id, USER_ID, { body: 'new body' });
+
+            expect(embedDispatcher.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-50',
+            });
+        });
+
+        it('skips embed enqueue when only title/tags/etc change (body unchanged)', async () => {
+            const existing = buildDocument({ id: 'doc-50', metadata: { body: 'same' } });
+            docRepo.findById.mockResolvedValue(existing);
+            docRepo.update.mockResolvedValue({ ...existing, title: 'New title' });
+
+            await service.updateDocument(WORK_ID, existing.id, USER_ID, { title: 'New title' });
+
+            expect(embedDispatcher.dispatchKbEmbedDocument).not.toHaveBeenCalled();
         });
     });
 
