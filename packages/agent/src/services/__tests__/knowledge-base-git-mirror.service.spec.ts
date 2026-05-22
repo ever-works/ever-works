@@ -85,6 +85,7 @@ describe('KnowledgeBaseGitMirrorService', () => {
             commit: jest.fn().mockResolvedValue(COMMIT_SHA),
             push: jest.fn().mockResolvedValue(undefined),
             getFileContent: jest.fn(),
+            listFileCommits: jest.fn().mockResolvedValue([]),
         };
 
         workRepository = {
@@ -378,6 +379,82 @@ describe('KnowledgeBaseGitMirrorService', () => {
 
             expect(result.restored).toBe(false);
             expect(documentRepository.update).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('listDocumentHistory', () => {
+        it('fans out to gitFacade.listFileCommits with the resolved KB path', async () => {
+            const commits = [
+                {
+                    sha: 'abc1234',
+                    message: 'Edit brand voice',
+                    author: { name: 'Ada', email: 'ada@example.test' },
+                    date: '2026-05-20T10:00:00Z',
+                },
+                {
+                    sha: 'def5678',
+                    message: 'Initial brand seed',
+                    author: { name: 'Grace', email: 'grace@example.test' },
+                    date: '2026-05-19T08:30:00Z',
+                },
+            ];
+            gitFacade.listFileCommits.mockResolvedValueOnce(commits);
+
+            const result = await service.listDocumentHistory(WORK_ID, DOC_ID, 25);
+
+            // The path the facade gets is `.content/kb/` joined with the
+            // doc's relative path, scoping the log to just this doc's body.
+            expect(gitFacade.listFileCommits).toHaveBeenCalledWith(
+                'ever-works',
+                'demo-data',
+                '.content/kb/brand/voice.md',
+                expect.objectContaining({
+                    providerId: 'github',
+                    userId: USER_ID,
+                    workId: WORK_ID,
+                }),
+                25,
+            );
+            expect(result).toEqual([
+                {
+                    sha: 'abc1234',
+                    message: 'Edit brand voice',
+                    authorName: 'Ada',
+                    authoredAt: '2026-05-20T10:00:00Z',
+                },
+                {
+                    sha: 'def5678',
+                    message: 'Initial brand seed',
+                    authorName: 'Grace',
+                    authoredAt: '2026-05-19T08:30:00Z',
+                },
+            ]);
+        });
+
+        it('returns [] when the plugin returns nothing (capability not implemented)', async () => {
+            gitFacade.listFileCommits.mockResolvedValueOnce([]);
+            const result = await service.listDocumentHistory(WORK_ID, DOC_ID, 10);
+            expect(result).toEqual([]);
+        });
+
+        it('handles a missing author.name gracefully', async () => {
+            gitFacade.listFileCommits.mockResolvedValueOnce([
+                {
+                    sha: 'abc1234',
+                    message: 'Bot commit',
+                    author: { name: undefined, email: '' },
+                    date: '2026-05-20T10:00:00Z',
+                },
+            ]);
+            const result = await service.listDocumentHistory(WORK_ID, DOC_ID, 10);
+            expect(result[0].authorName).toBe('');
+        });
+
+        it('throws NotFoundException when the document does not exist', async () => {
+            documentRepository.findById.mockResolvedValueOnce(null);
+            await expect(service.listDocumentHistory(WORK_ID, DOC_ID, 25)).rejects.toThrow(
+                'KB document not found for history',
+            );
         });
     });
 
