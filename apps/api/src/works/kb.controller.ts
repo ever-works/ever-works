@@ -201,6 +201,32 @@ export class KbController {
         return this.kb.restoreDocumentFromHistory(workId, docId, auth.userId, body.commitSha);
     }
 
+    @Get('works/:id/kb/documents/:docId/history')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List Git commits that touched a KB document',
+        description:
+            'Returns the commit log for the sidecar `.md` body under `.content/kb/`, newest first. Powers the history dialog (row 18) — operators click a row to feed the SHA back into the existing `/restore` endpoint.',
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description: 'Max commits to return (1-100, default 25)',
+    })
+    @ApiResponse({ status: 200, description: 'Commit history' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async getDocumentHistory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('docId') docId: string,
+        @Query('limit') limit?: string,
+    ) {
+        const parsedLimit = limit && /^\d+$/.test(limit) ? Number(limit) : undefined;
+        return this.kb.getDocumentHistory(workId, docId, auth.userId, {
+            limit: parsedLimit,
+        });
+    }
+
     @Get('works/:id/kb/documents/:docId/citations')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'List citations referencing a KB document' })

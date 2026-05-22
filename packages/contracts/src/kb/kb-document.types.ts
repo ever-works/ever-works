@@ -99,3 +99,19 @@ export interface KbDocumentListResult {
 	nextCursor: string | null;
 	total: number;
 }
+
+/**
+ * A single commit touching a KB document, surfaced by the row-18 KB
+ * history endpoint. Backed by the Git provider plugin's commit log over
+ * the file path under `.content/kb/`.
+ */
+export interface KbDocumentCommitDto {
+	sha: string;
+	message: string;
+	authorName: string;
+	authoredAt: string;
+}
+
+export interface KbDocumentHistoryResult {
+	items: KbDocumentCommitDto[];
+}

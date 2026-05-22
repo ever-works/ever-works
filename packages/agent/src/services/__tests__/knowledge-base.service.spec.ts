@@ -211,6 +211,78 @@ describe('KnowledgeBaseService', () => {
         });
     });
 
+    describe('getDocumentHistory', () => {
+        it('returns an empty history when the mirror service is not wired', async () => {
+            const doc = buildDocument();
+            docRepo.findByWorkOrPath.mockResolvedValue(doc);
+            // The default test module doesn't wire `KnowledgeBaseGitMirrorService`,
+            // so the stub should short-circuit to `{ items: [] }` rather than
+            // throw — operators on OSS deployments without git-provider plugin
+            // still see the dialog, just empty.
+            const result = await service.getDocumentHistory(WORK_ID, doc.id, USER_ID);
+            expect(result).toEqual({ items: [] });
+        });
+
+        it('throws NotFoundException when the document is missing', async () => {
+            docRepo.findByWorkOrPath.mockResolvedValue(null);
+            await expect(
+                service.getDocumentHistory(WORK_ID, 'missing', USER_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('enforces canView (the same gate as listDocuments / getDocument)', async () => {
+            const doc = buildDocument();
+            docRepo.findByWorkOrPath.mockResolvedValue(doc);
+            ownership.ensureCanView.mockRejectedValueOnce(new ForbiddenException('nope'));
+            await expect(
+                service.getDocumentHistory(WORK_ID, doc.id, USER_ID),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it('clamps the limit to [1, 100] and forwards it to the mirror service', async () => {
+            const doc = buildDocument();
+            docRepo.findByWorkOrPath.mockResolvedValue(doc);
+            const mirror = { listDocumentHistory: jest.fn().mockResolvedValue([]) };
+            // Reflection-assign the mirror service onto the existing
+            // singleton — the NestJS testing module doesn't provide one
+            // (it's `@Optional()` in the constructor), and rebuilding a
+            // full module just to inject a 1-method stub would dwarf
+            // the test it's there to support.
+            (service as unknown as { mirrorService: typeof mirror }).mirrorService = mirror;
+
+            await service.getDocumentHistory(WORK_ID, doc.id, USER_ID, { limit: 999 });
+            expect(mirror.listDocumentHistory).toHaveBeenCalledWith(WORK_ID, doc.id, 100);
+
+            mirror.listDocumentHistory.mockClear();
+            await service.getDocumentHistory(WORK_ID, doc.id, USER_ID, { limit: 0 });
+            expect(mirror.listDocumentHistory).toHaveBeenCalledWith(WORK_ID, doc.id, 1);
+
+            mirror.listDocumentHistory.mockClear();
+            await service.getDocumentHistory(WORK_ID, doc.id, USER_ID);
+            expect(mirror.listDocumentHistory).toHaveBeenCalledWith(WORK_ID, doc.id, 25);
+        });
+
+        it('copies the mirror service result into a mutable items array', async () => {
+            const doc = buildDocument();
+            docRepo.findByWorkOrPath.mockResolvedValue(doc);
+            const commits = Object.freeze([
+                {
+                    sha: 'abc1234',
+                    message: 'edit voice',
+                    authorName: 'Ada',
+                    authoredAt: '2026-05-22T00:00:00Z',
+                },
+            ]);
+            const mirror = { listDocumentHistory: jest.fn().mockResolvedValue(commits) };
+            (service as unknown as { mirrorService: typeof mirror }).mirrorService = mirror;
+
+            const result = await service.getDocumentHistory(WORK_ID, doc.id, USER_ID);
+            expect(result.items).toEqual(commits);
+            // Should be a copy — pushing to it doesn't throw on a frozen source.
+            expect(() => result.items.push(commits[0])).not.toThrow();
+        });
+    });
+
     describe('createDocument', () => {
         it('persists with derived slug + word/token counts', async () => {
             docRepo.pathExists.mockResolvedValue(false);
