@@ -1,9 +1,0 @@
-# Playwright artifacts — never check in.
-playwright-report/
-test-results/
-.cache/
-blob-report/
-
-# Local-only Playwright config overrides.
-.env
-.env.local
