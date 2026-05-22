@@ -3,6 +3,7 @@ import {
     isAuthOrConfigError,
     isTransientProviderError,
     resolveAiProviderForResearch,
+    resolveAiProvidersForResearch,
     resolveProviderChain,
     resolveSearchProviderIds,
 } from '../provider-resolver';
@@ -229,6 +230,36 @@ describe('resolveAiProviderForResearch', () => {
             modelName: 'gpt-4o',
         });
         expect(getProviderConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns all usable provider configs for generation-time fallback', async () => {
+        const getProviderConfig = jest
+            .fn()
+            .mockResolvedValueOnce({
+                providerId: 'openai',
+                providerName: 'OpenAI',
+                baseUrl: 'https://api.openai.com/v1',
+                apiKey: 'sk-test',
+                defaultModel: 'gpt-4o',
+                routing: {},
+            })
+            .mockResolvedValueOnce({
+                providerId: 'anthropic',
+                providerName: 'Anthropic',
+                baseUrl: 'https://api.anthropic.com',
+                apiKey: 'sk-ant',
+                defaultModel: 'claude-haiku',
+                routing: {},
+            });
+
+        const result = await resolveAiProvidersForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result.map((provider) => provider.providerId)).toEqual(['openai', 'anthropic']);
+        expect(getProviderConfig).toHaveBeenCalledTimes(2);
     });
 
     it('skips providers with no apiKey/baseUrl and tries the next one', async () => {

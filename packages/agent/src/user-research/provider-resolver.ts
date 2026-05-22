@@ -138,12 +138,14 @@ export interface ResolvedAiProvider {
     modelName: string;
 }
 
-async function resolveAiProviderFromChain(
+async function resolveAiProvidersFromChain(
     aiFacade: AiFacadeService,
     chain: RegisteredPlugin[],
     userId: string | undefined,
     logger?: Logger,
-): Promise<ResolvedAiProvider | null> {
+): Promise<ResolvedAiProvider[]> {
+    const resolved: ResolvedAiProvider[] = [];
+
     for (const candidate of chain) {
         try {
             const cfg = await aiFacade.getProviderConfig({
@@ -160,28 +162,54 @@ async function resolveAiProviderFromChain(
                 baseURL: cfg.baseUrl,
                 apiKey: cfg.apiKey,
             });
-            return {
+            resolved.push({
                 model: provider(modelName),
                 providerId: cfg.providerId,
                 providerName: cfg.providerName ?? cfg.providerId,
                 modelName,
-            };
+            });
         } catch (err) {
             if (isAuthOrConfigError(err)) throw err;
             logger?.warn(`ai-provider ${candidate.plugin.id} unusable: ${(err as Error).message}`);
         }
+    }
+    return resolved;
+}
+
+async function resolveFirstAiProviderFromChain(
+    aiFacade: AiFacadeService,
+    chain: RegisteredPlugin[],
+    userId: string | undefined,
+    logger?: Logger,
+): Promise<ResolvedAiProvider | null> {
+    for (const candidate of chain) {
+        const resolved = await resolveAiProvidersFromChain(aiFacade, [candidate], userId, logger);
+        if (resolved[0]) return resolved[0];
     }
     return null;
 }
 
 /**
  * Walks the user's enabled ai-provider plugins in priority order and returns
- * the first one with a usable config (baseUrl + apiKey + model). Capped by
+ * the providers with usable config (baseUrl + apiKey + model). Capped by
  * the internal provider fallback limit so one bad provider chain can't burn
  * through every configured key. System plugins are included through the same
  * scoped enablement rules as user-installed plugins. Auth-shape errors re-throw
  * so misconfigured keys aren't silently masked by trying the next provider.
  */
+export async function resolveAiProvidersForResearch(
+    aiFacade: AiFacadeService,
+    registry: PluginRegistryService,
+    userId: string,
+    logger?: Logger,
+): Promise<ResolvedAiProvider[]> {
+    const chain = capChain(
+        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
+        DEFAULT_PROVIDER_FALLBACK_MAX,
+    );
+    return resolveAiProvidersFromChain(aiFacade, chain, userId, logger);
+}
+
 export async function resolveAiProviderForResearch(
     aiFacade: AiFacadeService,
     registry: PluginRegistryService,
@@ -192,5 +220,5 @@ export async function resolveAiProviderForResearch(
         await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
         DEFAULT_PROVIDER_FALLBACK_MAX,
     );
-    return resolveAiProviderFromChain(aiFacade, chain, userId, logger);
+    return resolveFirstAiProviderFromChain(aiFacade, chain, userId, logger);
 }
