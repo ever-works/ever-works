@@ -8,6 +8,7 @@ import { KbShell } from '@/components/works/detail/kb/KbShell';
 import { KbTreePanel } from '@/components/works/detail/kb/KbTreePanel';
 import { KbDocumentView } from '@/components/works/detail/kb/KbDocumentView';
 import { KbEditor } from '@/components/works/detail/kb/KbEditor';
+import { KbSidePanel } from '@/components/works/detail/kb/KbSidePanel';
 import { KbUploadZone } from '@/components/works/detail/kb/KbUploadZone';
 
 type Params = {
@@ -100,6 +101,7 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
                 editorSlot={
                     fullyLocked ? <KbDocumentView doc={doc} /> : <KbEditor workId={id} doc={doc} />
                 }
+                asideSlot={<KbSidePanel doc={doc} />}
             />
         </div>
     );

@@ -2755,6 +2755,34 @@
                     "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
                     "download": "Download audio",
                     "unsupported": "Your browser does not support inline audio playback."
+                },
+                "sidePanel": {
+                    "title": "Document details",
+                    "subtitle": "Metadata, lock state, and history for this document.",
+                    "sections": {
+                        "class": "Class",
+                        "status": "Status",
+                        "lock": "Lock",
+                        "tags": "Tags",
+                        "description": "Description",
+                        "language": "Language",
+                        "source": "Source",
+                        "counts": "Length",
+                        "history": "History"
+                    },
+                    "unlocked": "Unlocked",
+                    "emptyTags": "No tags",
+                    "emptyDescription": "No description",
+                    "wordCount": "{count, plural, one {# word} other {# words}}",
+                    "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+                    "sources": {
+                        "user": "User",
+                        "agent": "Agent",
+                        "imported": "Imported",
+                        "seeded": "Seeded"
+                    },
+                    "viewHistory": "View Git history",
+                    "historyComingSoon": "Git history view ships in the next KB drop."
                 }
             }
         },
