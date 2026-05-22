@@ -154,13 +154,9 @@ async function resolveAiProviderFromChain(
  * Walks the user's enabled ai-provider plugins in priority order and returns
  * the first one with a usable config (baseUrl + apiKey + model). Capped by
  * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
- * through every configured key.
- *
- * If the user-scoped chain has no usable config, falls back to globally ready
- * AI providers so env/admin configured platform defaults can power research
- * without requiring every new user to configure an AI plugin first. Auth-shape
- * errors re-throw so misconfigured keys aren't silently masked by trying the
- * next provider.
+ * through every configured key. System plugins are included through the same
+ * scoped enablement rules as user-installed plugins. Auth-shape errors re-throw
+ * so misconfigured keys aren't silently masked by trying the next provider.
  */
 export async function resolveAiProviderForResearch(
     aiFacade: AiFacadeService,
@@ -172,28 +168,5 @@ export async function resolveAiProviderForResearch(
         await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
         getProviderFallbackMax(),
     );
-    const scoped = await resolveAiProviderFromChain(aiFacade, chain, userId, logger);
-    if (scoped) return scoped;
-
-    const globalChain = capChain(
-        registry
-            .getReady()
-            .filter((p) => p.manifest.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER))
-            .sort((a, b) => {
-                const ad = a.manifest.defaultForCapabilities?.includes(
-                    PLUGIN_CAPABILITIES.AI_PROVIDER,
-                )
-                    ? 0
-                    : 1;
-                const bd = b.manifest.defaultForCapabilities?.includes(
-                    PLUGIN_CAPABILITIES.AI_PROVIDER,
-                )
-                    ? 0
-                    : 1;
-                return ad - bd;
-            }),
-        getProviderFallbackMax(),
-    );
-
-    return resolveAiProviderFromChain(aiFacade, globalChain, undefined, logger);
+    return resolveAiProviderFromChain(aiFacade, chain, userId, logger);
 }

@@ -301,7 +301,7 @@ export class ContentExtractorFacadeService
         // 2. Work's configured default
         if (workId) {
             const active = await this.findActivePluginForWork(workId);
-            if (active) {
+            if (active && (await this.isPluginEnabled(active.plugin.id, workId, userId))) {
                 const plugin = active.plugin as IContentExtractorPlugin;
                 if (await this.canExtractSafe(plugin, url, active.plugin.id)) {
                     addCandidate(active);
@@ -325,24 +325,14 @@ export class ContentExtractorFacadeService
             }
         }
 
-        // 4. System/default extractor (e.g., local-content-extractor)
-        const defaultExtractor = this.registry.getDefaultForCapability(this.CAPABILITY);
-        if (defaultExtractor) {
-            const plugin = defaultExtractor.plugin as IContentExtractorPlugin;
-            let canExtract = true;
-            if (typeof plugin.canExtract === 'function') {
-                try {
-                    canExtract = await plugin.canExtract(url);
-                } catch (err) {
-                    // canExtract itself threw — log and still attempt extraction
-                    this.logger.warn(
-                        `canExtract error on default extractor: ${(err as Error).message}`,
-                    );
-                }
-            }
+        // 4. Scoped default extractor (system plugins are included by enablement rules).
+        for (const registered of loadedPlugins) {
+            if (!registered.manifest.defaultForCapabilities?.includes(this.CAPABILITY)) continue;
+            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
 
-            if (canExtract) {
-                addCandidate(defaultExtractor);
+            const plugin = registered.plugin as IContentExtractorPlugin;
+            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
+                addCandidate(registered);
             }
         }
 

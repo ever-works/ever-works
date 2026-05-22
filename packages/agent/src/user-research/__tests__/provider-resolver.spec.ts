@@ -29,13 +29,9 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
     } as RegisteredPlugin;
 }
 
-function makeRegistry(
-    plugins: FakePlugin[],
-    readyPlugins: FakePlugin[] = plugins,
-): PluginRegistryService {
+function makeRegistry(plugins: FakePlugin[]): PluginRegistryService {
     return {
         getEnabledPluginsScoped: jest.fn().mockResolvedValue(plugins.map(makeRegistered)),
-        getReady: jest.fn().mockReturnValue(readyPlugins.map(makeRegistered)),
     } as unknown as PluginRegistryService;
 }
 
@@ -223,28 +219,15 @@ describe('resolveAiProviderForResearch', () => {
         expect(getProviderConfig).toHaveBeenCalledTimes(2);
     });
 
-    it('falls back to globally ready providers when user-scoped providers are not configured', async () => {
-        const registry = makeRegistry(
-            [{ id: 'user-openai' }],
-            [{ id: 'user-openai' }, { id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-        );
-        const getProviderConfig = jest
-            .fn()
-            .mockResolvedValueOnce({
-                providerId: 'user-openai',
-                baseUrl: 'https://api.openai.com/v1',
-                apiKey: '',
-                defaultModel: 'gpt-4o',
-                routing: {},
-            })
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: 'sk-or-test',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            });
+    it('does not fall back to globally ready providers outside scoped enablement', async () => {
+        const registry = makeRegistry([{ id: 'user-openai' }]);
+        const getProviderConfig = jest.fn().mockResolvedValueOnce({
+            providerId: 'user-openai',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: '',
+            defaultModel: 'gpt-4o',
+            routing: {},
+        });
 
         const result = await resolveAiProviderForResearch(
             makeAiFacade(getProviderConfig),
@@ -252,59 +235,11 @@ describe('resolveAiProviderForResearch', () => {
             'u',
         );
 
-        expect(result).toMatchObject({
-            providerId: 'openrouter',
-            providerName: 'OpenRouter',
-            modelName: 'openai/gpt-5-mini',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
+        expect(result).toBeNull();
+        expect(getProviderConfig).toHaveBeenCalledTimes(1);
+        expect(getProviderConfig).toHaveBeenCalledWith({
             userId: 'u',
             providerOverride: 'user-openai',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
-            userId: undefined,
-            providerOverride: 'openrouter',
-        });
-    });
-
-    it('retries the same provider globally when user settings shadow an env/admin config', async () => {
-        const registry = makeRegistry(
-            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-        );
-        const getProviderConfig = jest
-            .fn()
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: '',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            })
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: 'sk-or-env',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            });
-
-        const result = await resolveAiProviderForResearch(
-            makeAiFacade(getProviderConfig),
-            registry,
-            'u',
-        );
-
-        expect(result?.providerId).toBe('openrouter');
-        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
-            userId: 'u',
-            providerOverride: 'openrouter',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
-            userId: undefined,
-            providerOverride: 'openrouter',
         });
     });
 
