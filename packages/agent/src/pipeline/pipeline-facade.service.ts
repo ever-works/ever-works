@@ -32,6 +32,7 @@ import type {
     EnabledDataSource,
     FacadeOptions,
 } from '@ever-works/plugin';
+import type { KbContextBundleData } from '@ever-works/contracts';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ScreenshotFacadeService } from '../facades/screenshot.facade';
@@ -78,12 +79,19 @@ export class PipelineFacadeService {
     /**
      * Create a StepExecutionContext for step executors.
      * Provides access to bound facades that automatically include work context.
+     *
+     * EW-641 Phase 2/b row 32b — accepts an optional `kbContext` carrier.
+     * When provided (orchestrator wiring lands in a follow-up sub-chunk),
+     * step executors read the resolved KB documents from
+     * `execContext.kbContext.{alwaysInjected,queryRetrieved}` without
+     * re-calling `KnowledgeBaseService.resolveContext`.
      */
     createStepExecutionContext(
         work: WorkReference,
         providerOverrides?: GenerationRequest['providers'],
         aiModelOverride?: string,
         signal?: AbortSignal,
+        kbContext?: KbContextBundleData,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
@@ -122,6 +130,7 @@ export class PipelineFacadeService {
             work,
             user: work.user,
             signal,
+            kbContext,
         };
     }
 

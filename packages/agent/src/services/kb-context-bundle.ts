@@ -1,4 +1,4 @@
-import type { KbDocumentBodyDto } from '@ever-works/contracts';
+import type { KbContextBundleData, KbDocumentBodyDto } from '@ever-works/contracts';
 import { formatKbContext, type FormatKbContextOptions } from './kb-prompt-formatter';
 
 /**
@@ -25,7 +25,7 @@ import { formatKbContext, type FormatKbContextOptions } from './kb-prompt-format
  * **Pure.** No I/O, no module state. The factory only marshals; the
  * service layer (`resolveContext`) is the one that touches the DB.
  */
-export interface KbContextBundle {
+export interface KbContextBundle extends KbContextBundleData {
     readonly alwaysInjected: ReadonlyArray<KbDocumentBodyDto>;
     readonly queryRetrieved: ReadonlyArray<KbDocumentBodyDto>;
     format(options?: FormatKbContextOptions): string;
