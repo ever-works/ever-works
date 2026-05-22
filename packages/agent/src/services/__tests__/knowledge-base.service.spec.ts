@@ -211,6 +211,30 @@ describe('KnowledgeBaseService', () => {
         });
     });
 
+    describe('getDocumentBodyForEmbedding', () => {
+        it('returns the body DTO without invoking ensureCanView (system-op)', async () => {
+            const doc = buildDocument({
+                metadata: { body: '# Voice\n\nFriendly and direct.' },
+            });
+            docRepo.findByWorkOrPath.mockResolvedValue(doc);
+
+            const result = await service.getDocumentBodyForEmbedding(WORK_ID, doc.id);
+
+            expect(result?.body).toContain('Friendly and direct');
+            // Embed task is system-triggered — must NOT call ensureCanView.
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
+        });
+
+        it('returns null on missing doc (race-with-delete, not throw)', async () => {
+            docRepo.findByWorkOrPath.mockResolvedValue(null);
+
+            const result = await service.getDocumentBodyForEmbedding(WORK_ID, 'missing-id');
+
+            expect(result).toBeNull();
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
+        });
+    });
+
     describe('getDocumentHistory', () => {
         it('returns an empty history when the mirror service is not wired', async () => {
             const doc = buildDocument();
