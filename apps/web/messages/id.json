@@ -1018,7 +1018,8 @@
                 "plugins": "Plugin",
                 "deploy": "Penerapan",
                 "members": "Anggota",
-                "settings": "Pengaturan"
+                "settings": "Pengaturan",
+                "kb": "Knowledge Base"
             },
             "members": {
                 "title": "Anggota Tim",
@@ -2388,6 +2389,24 @@
                     "dnsName": "Nama:",
                     "dnsValue": "Nilai:",
                     "copyButton": "Salin"
+                }
+            },
+            "kb": {
+                "title": "Knowledge Base",
+                "subtitle": "Per-Work institutional context — documents that ground generation and conversations.",
+                "panes": {
+                    "tree": {
+                        "title": "Documents",
+                        "empty": "Document tree appears here once you upload or create a KB document."
+                    },
+                    "editor": {
+                        "title": "Editor",
+                        "empty": "Select a document on the left to view or edit it. Drag a file anywhere to upload."
+                    },
+                    "ai": {
+                        "title": "AI assistant",
+                        "empty": "Conversation with the workspace agent will appear here. Use @kb:path to ground replies."
+                    }
                 }
             }
         },
