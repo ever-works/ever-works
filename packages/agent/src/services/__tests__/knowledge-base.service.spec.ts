@@ -705,6 +705,120 @@ describe('KnowledgeBaseService', () => {
         });
     });
 
+    describe('getUploadBytes', () => {
+        function buildUpload(overrides: Partial<WorkKnowledgeUpload> = {}): WorkKnowledgeUpload {
+            return {
+                id: '00000000-0000-0000-0000-000000000020',
+                workId: WORK_ID,
+                storageProvider: 'local-fs',
+                storagePath: 'kb-originals/brand/abc.pdf',
+                originalFilename: 'voice.pdf',
+                mimeType: 'application/pdf',
+                fileSize: 4096,
+                sha256: 'abc',
+                extractionStatus: 'skipped' as KbUploadExtractionStatus,
+                extractionStartedAt: null,
+                extractionFinishedAt: null,
+                extractionError: null,
+                extractedDocumentId: null,
+                normalizedFormat: null,
+                extractionPluginId: null,
+                uploadedById: USER_ID,
+                tags: null,
+                categories: null,
+                metadata: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...overrides,
+            } as WorkKnowledgeUpload;
+        }
+
+        it('streams stored bytes for the caller with the recovered MIME type', async () => {
+            const upload = buildUpload();
+            uploadRepo.findById.mockResolvedValueOnce(upload);
+            const buffer = Buffer.from('%PDF-1.4 fake bytes');
+            storage.getObject.mockResolvedValueOnce({
+                buffer,
+                mimeType: 'application/pdf',
+            });
+
+            const result = await service.getUploadBytes(WORK_ID, upload.id, USER_ID);
+
+            expect(ownership.ensureCanView).toHaveBeenCalledWith(WORK_ID, USER_ID);
+            expect(storage.getObject).toHaveBeenCalledWith(upload.storagePath);
+            expect(result.buffer).toBe(buffer);
+            expect(result.mimeType).toBe('application/pdf');
+            expect(result.filename).toBe(upload.originalFilename);
+            expect(result.sizeBytes).toBe(upload.fileSize);
+        });
+
+        it('falls back to the upload row mime when storage does not surface one', async () => {
+            const upload = buildUpload({
+                mimeType: 'image/png',
+                storagePath: 'kb-originals/img.png',
+            });
+            uploadRepo.findById.mockResolvedValueOnce(upload);
+            storage.getObject.mockResolvedValueOnce({
+                buffer: Buffer.from(''),
+                mimeType: undefined as unknown as string,
+            });
+
+            const result = await service.getUploadBytes(WORK_ID, upload.id, USER_ID);
+            expect(result.mimeType).toBe('image/png');
+        });
+
+        it('throws NotFoundException when the upload row is missing', async () => {
+            uploadRepo.findById.mockResolvedValueOnce(null);
+            await expect(
+                service.getUploadBytes(WORK_ID, 'missing-id', USER_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(storage.getObject).not.toHaveBeenCalled();
+        });
+
+        it('throws ServiceUnavailableException when no storage plugin is wired', async () => {
+            // Re-instantiate without KB_STORAGE_PLUGIN — mirrors createUpload's bare-module test.
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    {
+                        provide: WorkKnowledgeDocumentRepository,
+                        useValue: { findById: jest.fn() },
+                    },
+                    {
+                        provide: WorkKnowledgeUploadRepository,
+                        useValue: { findById: jest.fn().mockResolvedValue(buildUpload()) },
+                    },
+                    { provide: WorkKnowledgeTagRepository, useValue: { list: jest.fn() } },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn() },
+                    },
+                    {
+                        provide: WorkOwnershipService,
+                        useValue: {
+                            ensureCanView: jest.fn().mockResolvedValue({ role: 'editor' } as any),
+                            ensureCanEdit: jest.fn(),
+                        },
+                    },
+                    { provide: ActivityLogService, useValue: { log: jest.fn() } },
+                ],
+            }).compile();
+            const bare = module.get(KnowledgeBaseService);
+            await expect(bare.getUploadBytes(WORK_ID, 'any-id', USER_ID)).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
+        });
+
+        it('enforces ensureCanView before touching storage', async () => {
+            ownership.ensureCanView.mockRejectedValueOnce(new ForbiddenException('nope'));
+            await expect(service.getUploadBytes(WORK_ID, 'any-id', USER_ID)).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(uploadRepo.findById).not.toHaveBeenCalled();
+            expect(storage.getObject).not.toHaveBeenCalled();
+        });
+    });
+
     describe('restoreDocumentFromHistory', () => {
         it('rejects editor-role callers (manager+ required)', async () => {
             // Default ownership mock returns 'editor' — restore needs
