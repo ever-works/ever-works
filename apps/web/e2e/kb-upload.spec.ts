@@ -86,13 +86,15 @@ test.describe('Knowledge Base — A12 drag-drop upload', () => {
             buffer: fileBuffer,
         });
 
-        // 5. Classify modal opens — default class is 'freeform'; pick
-        //    'knowledge' so we land in a predictable group in the tree.
-        //    Leave description blank and tags empty; row 20 (A13) covers
-        //    edit+autosave separately.
+        // 5. Classify modal opens — default class is 'freeform'; keep it
+        //    so we land in a predictable group in the tree. 'knowledge' is
+        //    NOT a valid KbDocumentClass enum value (the schema is brand |
+        //    legal | seo | style | glossary | competitors | personas |
+        //    research | output | freeform). Leave description blank and
+        //    tags empty; row 20 (A13) covers edit+autosave separately.
         const modal = page.getByTestId('kb-classify-modal');
         await expect(modal).toBeVisible({ timeout: 15_000 });
-        await page.getByTestId('kb-classify-class').selectOption('knowledge');
+        await page.getByTestId('kb-classify-class').selectOption('freeform');
         await page.getByTestId('kb-classify-confirm').click();
         // After confirm the modal unmounts.
         await expect(modal).not.toBeVisible({ timeout: 10_000 });
@@ -106,7 +108,7 @@ test.describe('Knowledge Base — A12 drag-drop upload', () => {
 
         // 7. router.refresh() (inside KbUploadZone's onSuccess) re-fetches
         //    the server-rendered tree panel. The new doc has a path under
-        //    `knowledge/<slug>.md` derived from the title (filename minus
+        //    `freeform/<slug>.md` derived from the title (filename minus
         //    extension), so we match by `data-doc-path*="<runId>"`.
         const treeItem = page.locator(`[data-testid="kb-tree-item"][data-doc-path*="${runId}"]`);
         await expect(treeItem).toBeVisible({ timeout: 30_000 });

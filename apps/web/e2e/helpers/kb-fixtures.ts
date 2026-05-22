@@ -16,7 +16,7 @@ export interface SeedKbMarkdownDocOptions {
     filename: string;
     /** Markdown body. */
     body: string;
-    /** Optional class override; defaults to `knowledge` so the doc lands in a predictable folder. */
+    /** Optional class override; defaults to `freeform` (a valid KbDocumentClass enum value). */
     targetClass?: string;
     /** Optional title — falls back to filename-minus-extension server-side. */
     title?: string;
@@ -51,7 +51,7 @@ export async function seedKbMarkdownDoc(
                 mimeType: 'text/markdown',
                 buffer: Buffer.from(opts.body, 'utf8'),
             },
-            targetClass: opts.targetClass ?? 'knowledge',
+            targetClass: opts.targetClass ?? 'freeform',
             ...(opts.title ? { title: opts.title } : {}),
         },
     });
@@ -79,7 +79,7 @@ export interface SeedKbBinaryDocOptions {
     mimeType: string;
     /** Raw bytes. For viewer-cap tests, `Buffer.alloc(6 * 1024 * 1024, 0)` is plenty for a 6 MiB stub. */
     body: Buffer;
-    /** Optional class override; defaults to `knowledge` so the doc lands in a predictable folder. */
+    /** Optional class override; defaults to `freeform` (a valid KbDocumentClass enum value). */
     targetClass?: string;
     /** Optional title — falls back to filename-minus-extension server-side. */
     title?: string;
@@ -119,7 +119,7 @@ export async function seedKbBinaryDoc(
                 mimeType: opts.mimeType,
                 buffer: opts.body,
             },
-            targetClass: opts.targetClass ?? 'knowledge',
+            targetClass: opts.targetClass ?? 'freeform',
             ...(opts.title ? { title: opts.title } : {}),
         },
     });
@@ -155,7 +155,7 @@ export interface SeedKbSkippedUploadOptions {
      * different content-type.
      */
     mimeType?: string;
-    /** Optional class override; defaults to `knowledge`. */
+    /** Optional class override; defaults to `freeform` (a valid KbDocumentClass enum value). */
     targetClass?: string;
 }
 
@@ -189,7 +189,7 @@ export async function seedKbSkippedUpload(
                 mimeType: opts.mimeType ?? 'application/octet-stream',
                 buffer: opts.body,
             },
-            targetClass: opts.targetClass ?? 'knowledge',
+            targetClass: opts.targetClass ?? 'freeform',
         },
     });
     if (!res.ok()) {
