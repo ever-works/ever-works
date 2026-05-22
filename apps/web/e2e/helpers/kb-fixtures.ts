@@ -141,3 +141,71 @@ export async function seedKbBinaryDoc(
     }
     return { uploadId, documentId, path };
 }
+
+export interface SeedKbSkippedUploadOptions {
+    /** Filename used in the multipart upload. */
+    filename: string;
+    /** Raw bytes. Tests can use `Buffer.from('opaque', 'utf8')` — content doesn't matter when extraction is skipped. */
+    body: Buffer;
+    /**
+     * Optional MIME override — defaults to `application/octet-stream` which
+     * has no extractor route, so the upload lands as `extractionStatus='skipped'`
+     * with `document: null`. Pass another off-list MIME (e.g.
+     * `application/x-zip-compressed`) to exercise the same branch with a
+     * different content-type.
+     */
+    mimeType?: string;
+    /** Optional class override; defaults to `knowledge`. */
+    targetClass?: string;
+}
+
+export interface SeededKbSkippedUpload {
+    uploadId: string;
+    /** Raw `extractionStatus` field as it appeared in the upload row on response. */
+    extractionStatus: string;
+}
+
+/**
+ * POST multipart with a MIME that has no extractor route, returning ONLY
+ * the upload id + its extractionStatus. Companion to `seedKbBinaryDoc` for
+ * the row 23 (A16) retry-extraction acceptance test: when the MIME is
+ * unrecognized, `KnowledgeBaseService.createUpload` short-circuits the
+ * extract+materialize path, persists the bytes, records
+ * `kb_upload_extraction_skipped`, and returns `{ upload, document: null }`.
+ * Throwing on the missing `document` field — like `seedKbBinaryDoc` does
+ * — would be wrong for this branch.
+ */
+export async function seedKbSkippedUpload(
+    request: APIRequestContext,
+    token: string,
+    workId: string,
+    opts: SeedKbSkippedUploadOptions,
+): Promise<SeededKbSkippedUpload> {
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/uploads`, {
+        headers: authedHeaders(token),
+        multipart: {
+            file: {
+                name: opts.filename,
+                mimeType: opts.mimeType ?? 'application/octet-stream',
+                buffer: opts.body,
+            },
+            targetClass: opts.targetClass ?? 'knowledge',
+        },
+    });
+    if (!res.ok()) {
+        const errBody = await res.text();
+        throw new Error(`seedKbSkippedUpload failed (${res.status()}): ${errBody}`);
+    }
+    const json = (await res.json()) as {
+        upload?: { id?: string; extractionStatus?: string } | null;
+        document?: { id?: string } | null;
+    };
+    const uploadId = json.upload?.id;
+    const extractionStatus = json.upload?.extractionStatus;
+    if (!uploadId || typeof extractionStatus !== 'string') {
+        throw new Error(
+            `seedKbSkippedUpload: upload accepted but response shape missing fields: ${JSON.stringify(json)}`,
+        );
+    }
+    return { uploadId, extractionStatus };
+}
