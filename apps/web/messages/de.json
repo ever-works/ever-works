@@ -2669,6 +2669,19 @@
                         "succeeded": "Uploaded",
                         "failed": "Failed"
                     }
+                },
+                "classify": {
+                    "title": "Classify upload",
+                    "subtitle": "Pick the document class, optional description, and tags. Per-file titles are editable below.",
+                    "classLabel": "Document class",
+                    "descriptionLabel": "Description (optional)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Type to search or add a tag, Enter to confirm",
+                    "tagsFetchFailed": "Could not load existing tags ({error}). You can still type new tags.",
+                    "titleLabel": "Title",
+                    "removeTag": "Remove tag {tag}",
+                    "cancel": "Cancel",
+                    "confirm": "Upload {count, plural, one {# file} other {# files}}"
                 }
             }
         },
