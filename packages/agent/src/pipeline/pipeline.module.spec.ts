@@ -1,6 +1,9 @@
 jest.mock('../facades/facades.module', () => ({
     FacadesModule: class FacadesModule {},
 }));
+jest.mock('../services/knowledge-base.module', () => ({
+    KnowledgeBaseModule: class KnowledgeBaseModule {},
+}));
 
 import { PipelineModule } from './pipeline.module';
 import { PipelineBuilderService } from './pipeline-builder.service';
@@ -44,16 +47,24 @@ describe('PipelineModule', () => {
         expect(exports).toHaveLength(5);
     });
 
-    it('imports FacadesModule ONLY (PluginsModule is registered globally via forRoot)', () => {
+    it('imports FacadesModule + KnowledgeBaseModule (PluginsModule stays globally-registered)', () => {
         const imports = meta('imports') as Array<{ name?: string }>;
         const names = imports.map((m) => m?.name);
-        // The pipeline module specifically does NOT import PluginsModule —
-        // the documentation comment in the source pins this contract.
+        // FacadesModule for AI/Search/Screenshot/etc. facades.
         expect(names).toContain('FacadesModule');
+        // EW-641 Phase 2/b row 32d — KnowledgeBaseModule must be in scope
+        // so the executors' @Optional() KnowledgeBaseService injection
+        // actually resolves at runtime (NestJS DI doesn't walk a
+        // consumer's imports — the receiving module needs the provider).
+        expect(names).toContain('KnowledgeBaseModule');
+        // PluginsModule stays globally-registered via forRoot() at the
+        // app root; the pipeline module specifically does NOT import
+        // it directly (documentation comment pins this contract).
         expect(names).not.toContain('PluginsModule');
     });
 
-    it('keeps the imports list at the documented 1-module shape', () => {
-        expect(meta('imports')).toHaveLength(1);
+    it('keeps the imports list at the documented 2-module shape', () => {
+        // Pin so a future silent extra-import is a deliberate change.
+        expect(meta('imports')).toHaveLength(2);
     });
 });
