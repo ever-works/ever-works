@@ -2651,6 +2651,18 @@
                         "title": "AI assistant",
                         "empty": "Conversation with the workspace agent will appear here. Use @kb:path to ground replies."
                     }
+                },
+                "classes": {
+                    "brand": "Brand",
+                    "legal": "Legal",
+                    "seo": "SEO",
+                    "style": "Style",
+                    "glossary": "Glossary",
+                    "competitors": "Competitors",
+                    "personas": "Personas",
+                    "research": "Research",
+                    "output": "Outputs",
+                    "freeform": "Freeform"
                 }
             }
         },

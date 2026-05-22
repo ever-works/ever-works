@@ -1,30 +1,41 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 
 /**
- * EW-641 Phase 1B/d row 2 — Knowledge Base page shell.
+ * EW-641 Phase 1B/d — Knowledge Base page shell.
  *
  * Three-pane layout (tree | editor | AI side panel) following the same
  * dashboard look-and-feel as the activity / items pages. Subsequent
  * tickets fill each pane in turn:
- *  - Row 3: tree panel reads `GET /api/works/:id/kb/documents`
- *  - Row 4-6: nested editor route + Tiptap + autosave
+ *  - Row 3: tree panel reads `GET /api/works/:id/kb/documents` (the
+ *    `treeSlot` prop accepts a server-rendered `<KbTreePanel>`)
+ *  - Row 4-6: nested editor route + Tiptap + autosave (`editorSlot`)
  *  - Row 7-8: drag-drop upload zone + classify modal
- *  - Row 13: per-document side panel (status / tags / lock controls)
+ *  - Row 13: per-document side panel (`asideSlot`)
  *
- * This component intentionally only renders placeholders so the route
- * is browsable on `develop` before any of the data-fetching panes land.
- * Each pane uses an `aria-label` derived from a translation key so the
- * follow-up tickets can replace the body without breaking selectors
- * used by the upcoming Playwright e2e suite (A12 / A13 / A14).
+ * Each pane is a server-component slot so the parent page can do
+ * RSC-level data fetching and hand the result down without converting
+ * this whole tree to RSC (we want the shell to host client-side state
+ * later: dirty/saved indicator, command palette, etc.). When a slot
+ * is unset we fall back to the placeholder copy, so the route is
+ * still browsable as new panes land incrementally.
+ *
+ * Selectors (`data-testid="kb-tree" / "kb-editor" / "kb-ai-panel"`)
+ * are stable across the placeholder + filled-in pane variants —
+ * the upcoming Playwright e2e suite (A12-A17) and the per-pane tests
+ * both rely on them.
  */
 interface KbShellProps {
     workId: string;
+    treeSlot?: ReactNode;
+    editorSlot?: ReactNode;
+    asideSlot?: ReactNode;
 }
 
-export function KbShell({ workId }: KbShellProps) {
+export function KbShell({ workId, treeSlot, editorSlot, asideSlot }: KbShellProps) {
     const t = useTranslations('dashboard.workDetail.kb');
 
     return (
@@ -45,24 +56,30 @@ export function KbShell({ workId }: KbShellProps) {
                     'grid-cols-1 md:grid-cols-[minmax(220px,260px)_minmax(0,1fr)_minmax(240px,300px)]',
                 )}
             >
-                <KbPanePlaceholder
-                    testId="kb-tree"
-                    title={t('panes.tree.title')}
-                    body={t('panes.tree.empty')}
-                />
+                {treeSlot ?? (
+                    <KbPanePlaceholder
+                        testId="kb-tree"
+                        title={t('panes.tree.title')}
+                        body={t('panes.tree.empty')}
+                    />
+                )}
 
-                <KbPanePlaceholder
-                    testId="kb-editor"
-                    title={t('panes.editor.title')}
-                    body={t('panes.editor.empty')}
-                    minHeightClass="min-h-[24rem]"
-                />
+                {editorSlot ?? (
+                    <KbPanePlaceholder
+                        testId="kb-editor"
+                        title={t('panes.editor.title')}
+                        body={t('panes.editor.empty')}
+                        minHeightClass="min-h-[24rem]"
+                    />
+                )}
 
-                <KbPanePlaceholder
-                    testId="kb-ai-panel"
-                    title={t('panes.ai.title')}
-                    body={t('panes.ai.empty')}
-                />
+                {asideSlot ?? (
+                    <KbPanePlaceholder
+                        testId="kb-ai-panel"
+                        title={t('panes.ai.title')}
+                        body={t('panes.ai.empty')}
+                    />
+                )}
             </div>
         </div>
     );

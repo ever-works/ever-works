@@ -1,0 +1,41 @@
+import 'server-only';
+import { serverFetch } from './server-api';
+import type { KbDocumentDto, KbDocumentListFilter } from '@ever-works/contracts';
+
+/**
+ * EW-641 Phase 1B/d row 3 — server-only fetch helpers for the Knowledge
+ * Base REST surface shipped in Phase 1A (`apps/api/src/works/kb.controller.ts`).
+ *
+ * The agent service returns `{ items, total }` — no cursor. We re-use
+ * the contracts' `KbDocumentDto` shape for the items; `total` is the
+ * full filtered count so the UI can show "N documents" headers.
+ */
+export interface KbDocumentListResponse {
+    items: KbDocumentDto[];
+    total: number;
+}
+
+export const kbAPI = {
+    /**
+     * `GET /api/works/:id/kb/documents` — paginated metadata list.
+     *
+     * Tree-panel callers can leave `opts` empty; filtering is applied
+     * server-side and the response is small (metadata-only, no body).
+     */
+    listDocuments: async (
+        workId: string,
+        opts: KbDocumentListFilter = {},
+    ): Promise<KbDocumentListResponse> => {
+        const params = new URLSearchParams();
+        if (opts.class && !Array.isArray(opts.class)) params.append('class', opts.class);
+        if (opts.status && !Array.isArray(opts.status)) params.append('status', opts.status);
+        if (opts.tag && !Array.isArray(opts.tag)) params.append('tag', opts.tag);
+        if (typeof opts.locked === 'boolean') params.append('locked', String(opts.locked));
+        if (opts.language) params.append('language', opts.language);
+        if (opts.q) params.append('q', opts.q);
+        if (typeof opts.limit === 'number') params.append('limit', String(opts.limit));
+        if (opts.cursor) params.append('offset', opts.cursor);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return serverFetch<KbDocumentListResponse>(`/works/${workId}/kb/documents${query}`);
+    },
+};
