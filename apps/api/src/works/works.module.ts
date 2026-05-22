@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import { KB_STORAGE_PLUGIN, KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
-import { getActiveStorageBackend } from '../uploads/storage-backend.factory';
+import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
 import { CacheEntryRepository } from '@ever-works/agent/cache';
@@ -54,16 +53,15 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkCacheWarmupService,
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
-        // EW-641 1B/b — bind the active object-storage plugin (env-
-        // selected via STORAGE_BACKEND) to the KB ingest pipeline's
-        // injection token. The agent-side `KnowledgeBaseService` reads
-        // bytes via this plugin's `getObject` and persists uploads via
-        // `putObject`. Same backend the platform's general-purpose
-        // upload route uses; one storage plugin per deployment.
-        {
-            provide: KB_STORAGE_PLUGIN,
-            useFactory: () => getActiveStorageBackend(),
-        },
+        // EW-641 1B/b — the KB upload pipeline's storage plugin token
+        // (`KB_STORAGE_PLUGIN`) is now provided by the `@Global()`
+        // `KbStorageModule` (apps/api/src/uploads/kb-storage.module.ts),
+        // imported once at the api.module.ts level. The original
+        // in-module provider here only bound the token within
+        // `WorksModule`'s scope, which `KnowledgeBaseModule` (imported,
+        // not consumer) couldn't see — so `KnowledgeBaseService.storage`
+        // silently injected `undefined` and every upload returned 503.
+        // See the docstring on `KbStorageModule` for the DI walk.
     ],
     controllers: [
         WorksController,
