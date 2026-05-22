@@ -117,4 +117,34 @@ describe('KbDocumentView', () => {
         render(await KbDocumentView({ doc: doc({ description: 'How we talk to customers' }) }));
         expect(screen.getByText('How we talk to customers')).toBeTruthy();
     });
+
+    it('rewrites [[Title|path]] wikilinks to /works/:id/kb/:path markdown links', async () => {
+        render(
+            await KbDocumentView({
+                doc: doc({
+                    workId: 'work-1',
+                    body: 'See [[Brand voice|brand/voice.md]] for tone.',
+                }),
+            }),
+        );
+        // The MarkdownPreview mock surfaces its `content` prop as
+        // textContent, so the rewrite is visible there.
+        expect(screen.getByTestId('markdown-preview-mock').textContent).toBe(
+            'See [Brand voice](/works/work-1/kb/brand/voice.md) for tone.',
+        );
+    });
+
+    it('leaves the body untouched when doc.workId is null (org-level docs)', async () => {
+        render(
+            await KbDocumentView({
+                doc: doc({
+                    workId: null,
+                    body: '[[brand/voice.md]] stays raw',
+                }),
+            }),
+        );
+        expect(screen.getByTestId('markdown-preview-mock').textContent).toBe(
+            '[[brand/voice.md]] stays raw',
+        );
+    });
 });
