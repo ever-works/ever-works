@@ -31,4 +31,5 @@ export * from './repositories/work-knowledge-document.repository';
 export * from './repositories/work-knowledge-upload.repository';
 export * from './repositories/work-knowledge-tag.repository';
 export * from './repositories/work-knowledge-citation.repository';
+export * from './repositories/work-knowledge-chunk.repository';
 export * from './database-init.service';

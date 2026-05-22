@@ -218,6 +218,38 @@ export class KnowledgeBaseService {
     }
 
     /**
+     * EW-641 Phase 2/a row 29b2b — system-op helper used by the
+     * `kb-embed-document` Trigger.dev task to fetch a document body
+     * without a user-bound `ensureCanView` gate.
+     *
+     * Why no gate? Chunk re-embedding is a SYSTEM operation triggered by
+     * `KnowledgeBaseService.{createDocument,updateDocument}` itself —
+     * not a user action. The user already passed `ensureCanEdit` at the
+     * mutation site; queueing the embed task only inherits that
+     * permission. Mirrors the pattern `KnowledgeBaseGitMirrorService.
+     * materializeDocument(workId, documentId)` already uses for the
+     * Git-mirror task (no userId required there either).
+     *
+     * Returns `null` rather than throwing on a missing row so the task
+     * can handle the race-with-delete cleanly: the document was deleted
+     * between enqueue and run (typical pattern with eventually-consistent
+     * Trigger.dev workers).
+     *
+     * NOT exposed via the REST controller — there is no @-anything-user
+     * endpoint, and the service surface keeps this method as the only
+     * unsanitised body-fetch path. Adding a controller hop would require
+     * a separate authz design.
+     */
+    async getDocumentBodyForEmbedding(
+        workId: string,
+        documentId: string,
+    ): Promise<KbDocumentBodyDto | null> {
+        const doc = await this.documentRepository.findByWorkOrPath(workId, documentId);
+        if (!doc) return null;
+        return this.toBodyDto(doc);
+    }
+
+    /**
      * EW-641 Phase 1B/d row 18 — list the Git commits that touched a
      * KB document's sidecar `.md` body. Returns `{ items: [] }` when
      * the mirror service isn't wired (test envs, OSS deployments
