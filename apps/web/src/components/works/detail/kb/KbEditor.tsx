@@ -120,6 +120,30 @@ export function KbEditor({
             MentionExtension.configure({
                 workId,
                 render: mentionRenderFactory,
+                // Row 17b — wires the agent side of the picker to the
+                // Next.js proxy that fans out to /api/plugins?category=
+                // pipeline. The list is small, so we filter
+                // client-side by `q` and slice to 8.
+                fetchAgents: async (id, query) => {
+                    try {
+                        const params = new URLSearchParams({ q: query, limit: '8' });
+                        const response = await fetch(
+                            `/api/works/${encodeURIComponent(id)}/agents?${params.toString()}`,
+                            { cache: 'no-store' },
+                        );
+                        if (!response.ok) return [];
+                        const json = (await response.json()) as {
+                            items?: Array<{ id: string; name: string }>;
+                        };
+                        return (json.items ?? []).map((row) => ({
+                            id: row.id,
+                            name: row.name,
+                            kind: 'agent' as const,
+                        }));
+                    } catch {
+                        return [];
+                    }
+                },
             }),
         ],
         content: doc.body ?? '',
