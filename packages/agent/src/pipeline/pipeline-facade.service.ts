@@ -16,6 +16,8 @@ import type {
     ChatCompletionOptions,
     ChatCompletionResponse,
     ChatCompletionChunk,
+    EmbeddingOptions,
+    EmbeddingResponse,
     SearchFacadeOptions,
     SearchFacadeResult,
     ScreenshotCaptureOptions,
@@ -171,6 +173,14 @@ export class PipelineFacadeService {
                     },
                     boundFacadeOptions,
                 ),
+            // EW-641 Phase 2/a row 29b2a — pipeline-bound shim that forwards
+            // to the real AiFacadeService.embed. Pipelines don't currently
+            // call embed (Phase 2/b will), but the IAiFacade contract
+            // requires the method so the binding shape stays complete.
+            embed: (
+                options: EmbeddingOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<EmbeddingResponse> => facade.embed(options, boundFacadeOptions),
             isConfigured: () => facade.isConfigured(),
             testConnection: (_facadeOptions: FacadeOptions) =>
                 facade.testConnection(boundFacadeOptions),
