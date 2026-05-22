@@ -12,16 +12,21 @@ import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
+import {
+    KbClassifyModal,
+    type KbClassifyFileEntry,
+    type KbClassifyResult,
+} from './KbClassifyModal';
+import type { KbDocumentClass } from '@ever-works/contracts';
 
 interface KbUploadZoneProps {
     workId: string;
     /**
-     * Optional pre-selected document class — when the operator drops
-     * a file directly into a class folder in the tree (row 8 wires
-     * this), the upload zone forwards the value so the backend
-     * skips heuristics-based classification.
+     * Optional pre-selected document class — when the operator is
+     * viewing a doc in a class folder, the upload zone passes it to
+     * the classify modal as the default selection.
      */
-    targetClass?: string;
+    targetClass?: KbDocumentClass;
 }
 
 type UploadEntryStatus = 'queued' | 'uploading' | 'succeeded' | 'failed';
@@ -39,33 +44,33 @@ interface UploadEntry {
 }
 
 /**
- * EW-641 Phase 1B/d row 7 — drag-drop upload zone.
+ * EW-641 Phase 1B/d row 7 + 8 — drag-drop upload zone + classify modal.
  *
- * Renders a dashed drop target that accepts file drops + clicks for
- * the hidden `<input type=file>` fallback. Each file becomes an
- * `UploadEntry` that streams progress through `XMLHttpRequest.upload`
- * (`fetch` doesn't expose progress in Next.js client runtimes today).
+ * Files picked by drop or browse open the `KbClassifyModal` so the
+ * operator can confirm the target class, set a description, and add
+ * tags before the multipart POST. Cancelling the modal discards the
+ * batch; confirming kicks off the per-file `XMLHttpRequest`s with the
+ * chosen metadata. Each upload streams progress through `xhr.upload`
+ * (`fetch` doesn't expose request progress in Next.js client runtimes
+ * today).
  *
- * On the first successful upload the component calls
- * `router.refresh()` so the server-rendered tree panel
- * (`KbTreePanel`) re-fetches and the new document appears in the
- * left pane. Errors stay on the entry until the operator either
- * dismisses or replaces them — the form never silently swallows a
- * 413 / 503 / 400 from the backend.
+ * On the first successful upload per batch the component calls
+ * `router.refresh()` so the server-rendered tree panel re-fetches and
+ * the new document appears in the left pane.
  *
- * Selectors locked for the Playwright A12 (drag-drop upload → KB
- * doc) suite:
- *  - `data-testid="kb-upload-zone"` (drop target)
- *  - `data-testid="kb-upload-input"` (hidden file input)
- *  - `data-testid="kb-upload-entries"` (entries list)
- *  - `data-testid="kb-upload-entry"` (one per file) +
- *    `data-status` attribute that mirrors `UploadEntryStatus`
+ * Selectors locked for Playwright A12:
+ *  - `data-testid="kb-upload-zone"` + `data-drag-active`
+ *  - `data-testid="kb-upload-input"`
+ *  - `data-testid="kb-upload-entries"` / `kb-upload-entry`
+ *    (with `data-status` mirroring `UploadEntryStatus`)
+ *  - The modal's own selectors live in `KbClassifyModal.tsx`.
  */
 export function KbUploadZone({ workId, targetClass }: KbUploadZoneProps) {
     const t = useTranslations('dashboard.workDetail.kb.upload');
     const router = useRouter();
     const [entries, setEntries] = useState<UploadEntry[]>([]);
     const [dragActive, setDragActive] = useState(false);
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const refreshScheduled = useRef(false);
 
@@ -75,46 +80,19 @@ export function KbUploadZone({ workId, targetClass }: KbUploadZoneProps) {
         );
     }, []);
 
+    const openClassifyFor = useCallback((files: File[]) => {
+        if (files.length === 0) return;
+        setPendingFiles(files);
+    }, []);
+
     const onFiles = useCallback(
         (files: FileList | File[] | null) => {
             if (!files) return;
             const fileArray = Array.from(files);
             if (fileArray.length === 0) return;
-
-            const queued: UploadEntry[] = fileArray.map((file) => ({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-                name: file.name,
-                size: file.size,
-                status: 'queued',
-                progress: 0,
-                error: null,
-                documentId: null,
-            }));
-
-            setEntries((prev) => [...queued, ...prev]);
-
-            for (const [index, file] of fileArray.entries()) {
-                const entryId = queued[index].id;
-                void uploadOne({
-                    workId,
-                    targetClass,
-                    file,
-                    entryId,
-                    updateEntry,
-                    onSuccess: () => {
-                        // Batch refreshes — N parallel uploads should
-                        // only kick a single revalidation pass.
-                        if (refreshScheduled.current) return;
-                        refreshScheduled.current = true;
-                        Promise.resolve().then(() => {
-                            refreshScheduled.current = false;
-                            router.refresh();
-                        });
-                    },
-                });
-            }
+            openClassifyFor(fileArray);
         },
-        [workId, targetClass, updateEntry, router],
+        [openClassifyFor],
     );
 
     const onDrop = useCallback(
@@ -158,6 +136,52 @@ export function KbUploadZone({ workId, targetClass }: KbUploadZoneProps) {
         setEntries((prev) => prev.filter((entry) => entry.id !== id));
     }, []);
 
+    const onClassifyCancel = useCallback(() => {
+        setPendingFiles([]);
+    }, []);
+
+    const onClassifyConfirm = useCallback(
+        (result: KbClassifyResult) => {
+            const fileArray = pendingFiles;
+            setPendingFiles([]);
+
+            const queued: UploadEntry[] = fileArray.map((file) => ({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                name: file.name,
+                size: file.size,
+                status: 'queued',
+                progress: 0,
+                error: null,
+                documentId: null,
+            }));
+            setEntries((prev) => [...queued, ...prev]);
+
+            for (const [index, file] of fileArray.entries()) {
+                const entryId = queued[index].id;
+                const title = result.titles[index]?.trim() || titleFromFilename(file.name);
+                void uploadOne({
+                    workId,
+                    targetClass: result.targetClass,
+                    title,
+                    description: result.description,
+                    tags: result.tags,
+                    file,
+                    entryId,
+                    updateEntry,
+                    onSuccess: () => {
+                        if (refreshScheduled.current) return;
+                        refreshScheduled.current = true;
+                        Promise.resolve().then(() => {
+                            refreshScheduled.current = false;
+                            router.refresh();
+                        });
+                    },
+                });
+            }
+        },
+        [pendingFiles, workId, updateEntry, router],
+    );
+
     return (
         <section aria-label={t('title')} className="flex flex-col gap-3">
             <DropTarget
@@ -199,8 +223,33 @@ export function KbUploadZone({ workId, targetClass }: KbUploadZoneProps) {
                     ))}
                 </ul>
             ) : null}
+
+            {pendingFiles.length > 0 ? (
+                <KbClassifyModal
+                    workId={workId}
+                    files={pendingFiles.map<KbClassifyFileEntry>((file, index) => ({
+                        index,
+                        name: file.name,
+                        title: titleFromFilename(file.name),
+                    }))}
+                    initialClass={targetClass}
+                    onConfirm={onClassifyConfirm}
+                    onCancel={onClassifyCancel}
+                />
+            ) : null}
         </section>
     );
+}
+
+/**
+ * Strip the extension off `voice.md` → `voice`. Falls back to the
+ * whole filename when there's no `.`, and trims trailing whitespace
+ * so users can edit the value without weird leading spaces.
+ */
+function titleFromFilename(filename: string): string {
+    const lastDot = filename.lastIndexOf('.');
+    const base = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+    return base.trim();
 }
 
 interface DropTargetProps {
@@ -328,17 +377,30 @@ function UploadEntryRow({ entry, labels, onDismiss }: UploadEntryRowProps) {
  */
 function uploadOne(args: {
     workId: string;
-    targetClass?: string;
+    targetClass?: KbDocumentClass;
+    title?: string;
+    description?: string;
+    tags?: string[];
     file: File;
     entryId: string;
     updateEntry: (id: string, patch: Partial<UploadEntry>) => void;
     onSuccess: (documentId: string | null) => void;
 }): Promise<void> {
-    const { workId, targetClass, file, entryId, updateEntry, onSuccess } = args;
+    const { workId, targetClass, title, description, tags, file, entryId, updateEntry, onSuccess } =
+        args;
     return new Promise<void>((resolve) => {
         const form = new FormData();
         form.append('file', file);
         if (targetClass) form.append('targetClass', targetClass);
+        if (title) form.append('title', title);
+        if (description && description.length > 0) form.append('description', description);
+        if (tags && tags.length > 0) {
+            // NestJS `class-transformer` accepts repeated `tags[]` form
+            // fields or a single comma-separated string — repeat is the
+            // unambiguous shape because tags may legitimately contain
+            // commas (e.g. "Tier 1, US").
+            for (const tag of tags) form.append('tags', tag);
+        }
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/api/works/${workId}/kb/uploads`);

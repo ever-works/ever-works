@@ -29,6 +29,53 @@ vi.mock('@/components/ui/button', () => ({
     ),
 }));
 
+// Stub the classify modal so the upload-zone spec stays focused on the
+// upload path. The modal exposes Confirm / Cancel buttons that drive the
+// `onConfirm` / `onCancel` callbacks; capture the latest `onConfirm` so
+// tests can fire it with any KbClassifyResult.
+//
+// `KbClassifyModal` proper has its own dedicated spec in
+// `./KbClassifyModal.unit.spec.tsx`.
+let latestOnConfirm: ((result: unknown) => void) | null = null;
+let latestOnCancel: (() => void) | null = null;
+let latestInitialClass: string | undefined;
+vi.mock('./KbClassifyModal', () => ({
+    KbClassifyModal: ({
+        onConfirm,
+        onCancel,
+        initialClass,
+    }: {
+        onConfirm: (result: unknown) => void;
+        onCancel: () => void;
+        initialClass?: string;
+    }) => {
+        latestOnConfirm = onConfirm;
+        latestOnCancel = onCancel;
+        latestInitialClass = initialClass;
+        return (
+            <div data-testid="kb-classify-modal">
+                <button
+                    type="button"
+                    data-testid="kb-classify-confirm"
+                    onClick={() =>
+                        onConfirm({
+                            targetClass: initialClass ?? 'freeform',
+                            description: '',
+                            tags: [],
+                            titles: {},
+                        })
+                    }
+                >
+                    confirm
+                </button>
+                <button type="button" data-testid="kb-classify-cancel" onClick={onCancel}>
+                    cancel
+                </button>
+            </div>
+        );
+    },
+}));
+
 import { KbUploadZone } from './KbUploadZone';
 
 /**
@@ -91,10 +138,9 @@ const xhrInstances: FakeXHR[] = [];
 beforeEach(() => {
     refreshMock.mockReset();
     xhrInstances.length = 0;
-    // Replace the global XMLHttpRequest with our stub for the duration
-    // of the test. `globalThis` is the right surface — jsdom's
-    // `window.XMLHttpRequest` and `globalThis.XMLHttpRequest` point at
-    // the same constructor.
+    latestOnConfirm = null;
+    latestOnCancel = null;
+    latestInitialClass = undefined;
     vi.stubGlobal('XMLHttpRequest', function FakeXHRCtor() {
         const x = new FakeXHR();
         xhrInstances.push(x);
@@ -111,15 +157,37 @@ function fileLike(name: string, contents = 'hello'): File {
 }
 
 /**
- * EW-641 Phase 1B/d row 7 — KbUploadZone tests cover the wiring that
- * the Playwright A12 (drag-drop → KB doc) acceptance suite leans on:
+ * After picking files, the zone opens the classify modal. Helper that
+ * resolves both the synthetic file pick + the modal confirm so each
+ * test's assertions read top-to-bottom.
+ */
+async function pickAndConfirm(file: File, classify?: Record<string, unknown>) {
+    await act(async () => {
+        fireEvent.change(screen.getByTestId('kb-upload-input'), {
+            target: { files: [file] },
+        });
+    });
+    await waitFor(() => expect(screen.getByTestId('kb-classify-modal')).toBeTruthy());
+    await act(async () => {
+        if (classify) {
+            latestOnConfirm?.(classify);
+        } else {
+            fireEvent.click(screen.getByTestId('kb-classify-confirm'));
+        }
+    });
+}
+
+/**
+ * EW-641 Phase 1B/d row 7 + 8 — KbUploadZone tests cover the wiring
+ * that Playwright A12 (drag-drop → KB doc) leans on:
  *  - selectors stay stable (`kb-upload-zone`, `kb-upload-input`,
  *    `kb-upload-entries`, `kb-upload-entry` with `data-status`)
- *  - file pick + drop both kick off a POST to `/api/works/.../kb/uploads`
- *  - `data-status` on the entry cycles `uploading → succeeded` (or `failed`)
- *  - on success the page revalidates via `router.refresh` so the
- *    server-rendered `<KbTreePanel>` sees the new document
- *  - drag-over flips the `data-drag-active` flag for styling cues
+ *  - file pick opens the classify modal first; confirming kicks off
+ *    the POST with the chosen metadata
+ *  - cancelling the modal discards the batch (no XHR fires)
+ *  - `data-status` cycles `uploading → succeeded` (or `failed`)
+ *  - on success the page revalidates via `router.refresh`
+ *  - drag-over flips `data-drag-active`
  */
 describe('KbUploadZone', () => {
     it('renders the drop target + hidden file input', () => {
@@ -128,32 +196,56 @@ describe('KbUploadZone', () => {
         const input = screen.getByTestId('kb-upload-input') as HTMLInputElement;
         expect(input.type).toBe('file');
         expect(input.multiple).toBe(true);
-        // No entries yet.
+        // No entries yet + no modal open.
         expect(screen.queryByTestId('kb-upload-entries')).toBeNull();
+        expect(screen.queryByTestId('kb-classify-modal')).toBeNull();
     });
 
-    it('starts an upload when files are selected via the input', async () => {
+    it('opens the classify modal when files are picked, then uploads on confirm', async () => {
         render(<KbUploadZone workId="work-1" />);
-        const input = screen.getByTestId('kb-upload-input') as HTMLInputElement;
 
         await act(async () => {
-            fireEvent.change(input, { target: { files: [fileLike('voice.md')] } });
+            fireEvent.change(screen.getByTestId('kb-upload-input'), {
+                target: { files: [fileLike('voice.md')] },
+            });
         });
 
-        // XHR opened against the proxied Next.js route.
+        // Modal opened, no XHR yet.
+        expect(screen.getByTestId('kb-classify-modal')).toBeTruthy();
+        expect(xhrInstances.length).toBe(0);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('kb-classify-confirm'));
+        });
+
         await waitFor(() => expect(xhrInstances.length).toBe(1));
         expect(xhrInstances[0].method).toBe('POST');
         expect(xhrInstances[0].url).toBe('/api/works/work-1/kb/uploads');
 
-        // Entry rendered with status="uploading".
         const entry = screen.getByTestId('kb-upload-entry');
         expect(entry.getAttribute('data-status')).toBe('uploading');
         expect(entry.textContent).toContain('voice.md');
     });
 
-    it('forwards targetClass as a form field when the prop is set', async () => {
-        // We can't read the FormData out of `send` easily without
-        // exposing it on the stub — extend the stub on the fly.
+    it('discards the batch when the classify modal is cancelled', async () => {
+        render(<KbUploadZone workId="work-1" />);
+        await act(async () => {
+            fireEvent.change(screen.getByTestId('kb-upload-input'), {
+                target: { files: [fileLike('voice.md')] },
+            });
+        });
+        expect(screen.getByTestId('kb-classify-modal')).toBeTruthy();
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('kb-classify-cancel'));
+        });
+
+        expect(xhrInstances.length).toBe(0);
+        expect(screen.queryByTestId('kb-classify-modal')).toBeNull();
+        expect(screen.queryByTestId('kb-upload-entries')).toBeNull();
+    });
+
+    it('forwards class + description + tags from the modal as form fields', async () => {
         let capturedBody: FormData | null = null;
         const origSend = FakeXHR.prototype.send;
         FakeXHR.prototype.send = function patched(body: FormData) {
@@ -162,27 +254,37 @@ describe('KbUploadZone', () => {
         };
         try {
             render(<KbUploadZone workId="work-1" targetClass="brand" />);
-            await act(async () => {
-                fireEvent.change(screen.getByTestId('kb-upload-input'), {
-                    target: { files: [fileLike('voice.md')] },
-                });
+            await pickAndConfirm(fileLike('voice.md'), {
+                targetClass: 'brand',
+                description: 'Brand voice doc',
+                tags: ['tier-1', 'audience-us'],
+                titles: { 0: 'Voice' },
             });
             await waitFor(() => expect(xhrInstances.length).toBe(1));
             expect(capturedBody).not.toBeNull();
             expect(capturedBody!.get('targetClass')).toBe('brand');
+            expect(capturedBody!.get('title')).toBe('Voice');
+            expect(capturedBody!.get('description')).toBe('Brand voice doc');
+            expect(capturedBody!.getAll('tags')).toEqual(['tier-1', 'audience-us']);
             expect((capturedBody!.get('file') as File).name).toBe('voice.md');
         } finally {
             FakeXHR.prototype.send = origSend;
         }
     });
 
-    it('flips entry to succeeded + calls router.refresh on 201', async () => {
-        render(<KbUploadZone workId="work-1" />);
+    it('passes targetClass through to the modal as initialClass', async () => {
+        render(<KbUploadZone workId="work-1" targetClass="legal" />);
         await act(async () => {
             fireEvent.change(screen.getByTestId('kb-upload-input'), {
-                target: { files: [fileLike('voice.md')] },
+                target: { files: [fileLike('privacy.md')] },
             });
         });
+        expect(latestInitialClass).toBe('legal');
+    });
+
+    it('flips entry to succeeded + calls router.refresh on 201', async () => {
+        render(<KbUploadZone workId="work-1" />);
+        await pickAndConfirm(fileLike('voice.md'));
         await waitFor(() => expect(xhrInstances.length).toBe(1));
 
         await act(async () => {
@@ -194,18 +296,13 @@ describe('KbUploadZone', () => {
                 'succeeded',
             );
         });
-        // Refresh runs in a microtask — flush once.
         await Promise.resolve();
         expect(refreshMock).toHaveBeenCalledTimes(1);
     });
 
     it('shows the backend error message on failure', async () => {
         render(<KbUploadZone workId="work-1" />);
-        await act(async () => {
-            fireEvent.change(screen.getByTestId('kb-upload-input'), {
-                target: { files: [fileLike('big.bin')] },
-            });
-        });
+        await pickAndConfirm(fileLike('big.bin'));
         await waitFor(() => expect(xhrInstances.length).toBe(1));
 
         await act(async () => {
@@ -222,11 +319,7 @@ describe('KbUploadZone', () => {
 
     it('handles network errors with a generic message', async () => {
         render(<KbUploadZone workId="work-1" />);
-        await act(async () => {
-            fireEvent.change(screen.getByTestId('kb-upload-input'), {
-                target: { files: [fileLike('voice.md')] },
-            });
-        });
+        await pickAndConfirm(fileLike('voice.md'));
         await waitFor(() => expect(xhrInstances.length).toBe(1));
 
         await act(async () => {
@@ -242,11 +335,7 @@ describe('KbUploadZone', () => {
 
     it('reflects upload progress on the status pill', async () => {
         render(<KbUploadZone workId="work-1" />);
-        await act(async () => {
-            fireEvent.change(screen.getByTestId('kb-upload-input'), {
-                target: { files: [fileLike('voice.md')] },
-            });
-        });
+        await pickAndConfirm(fileLike('voice.md'));
         await waitFor(() => expect(xhrInstances.length).toBe(1));
 
         await act(async () => {
