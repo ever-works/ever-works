@@ -4,12 +4,14 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     Param,
     Patch,
     Post,
     Query,
+    Res,
     UploadedFile,
     UseGuards,
     UseInterceptors,
@@ -46,6 +48,19 @@ import type {
 
 /** Per-upload byte cap — spec §9.1 default is 200 MB, tunable per tenant. */
 const KB_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
+
+/**
+ * Minimal Express response surface for `@Res()`-streamed routes. Mirrors
+ * the local pattern in `uploads.controller.ts` to avoid pulling the full
+ * express type-graph into this module (it conflicts with the global
+ * `Express.Response` namespace used elsewhere in the build).
+ */
+type ServeResponse = {
+    status(code: number): ServeResponse;
+    setHeader(name: string, value: string | number): void;
+    json(body: unknown): void;
+    send(body: string | Buffer): void;
+};
 
 /**
  * Knowledge Base REST surface — per-Work routes.
@@ -384,6 +399,60 @@ export class KbController {
         @Param('uploadId') uploadId: string,
     ) {
         return this.kb.getUpload(workId, uploadId, auth.userId);
+    }
+
+    /**
+     * EW-641 Phase 1B/d row 21a — stream KB upload bytes back to the
+     * caller so per-MIME viewers (`KbPdfViewer`, `KbXlsxViewer`,
+     * `KbDocxViewer`, image/video/audio) can mount. Gated by
+     * `ensureCanView` (same gate as `GET /works/:id/kb/uploads/:uploadId`),
+     * pinned with a strict CSP + nosniff so the browser cannot
+     * reinterpret the bytes as executable HTML even when the MIME is
+     * application/xml-ish.
+     *
+     * Returns the raw buffer with the storage-recovered (or upload-row)
+     * MIME type. Cache-Control is `private, max-age=300` — same as the
+     * generic `uploads.controller.ts` `serve()` route. Content-Disposition
+     * is `inline` because the viewers iframe / `<img>` / `<video>` the
+     * URL directly; the download fallbacks attach their own `download`
+     * attribute on the anchor (KbPdfViewer / KbXlsxViewer / KbDocxViewer).
+     */
+    @Get('works/:id/kb/uploads/:uploadId/download')
+    @Header(
+        'Content-Security-Policy',
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    )
+    @Header('X-Content-Type-Options', 'nosniff')
+    @Header('Cache-Control', 'private, max-age=300')
+    @ApiOperation({
+        summary: 'Stream the persisted bytes for a KB upload',
+        description:
+            'Owner / viewer+ only. Hands the raw upload bytes back so the per-MIME viewers (KbPdfViewer, KbXlsxViewer, KbDocxViewer, image / video / audio) can render inline. CSP-pinned to default-src none + nosniff so the response is safe to embed inside an iframe or media tag.',
+    })
+    @ApiResponse({ status: 200, description: 'Raw upload bytes' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async downloadUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+        @Res() res: ServeResponse,
+    ) {
+        const { buffer, mimeType, filename } = await this.kb.getUploadBytes(
+            workId,
+            uploadId,
+            auth.userId,
+        );
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', buffer.length);
+        // `inline` is safe because we (a) pinned CSP `default-src 'none';
+        // frame-ancestors 'none'` so neither script execution nor
+        // top-frame nesting can fire, and (b) set nosniff so the browser
+        // won't reinterpret the bytes as HTML even if the recorded MIME
+        // is wrong. The viewers expect inline so `<iframe src>` /
+        // `<video src>` / `<img src>` Just Work.
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.send(buffer);
     }
 
     @Post('works/:id/kb/uploads/:uploadId/retry-extraction')

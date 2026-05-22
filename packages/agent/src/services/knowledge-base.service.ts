@@ -687,6 +687,51 @@ export class KnowledgeBaseService {
     }
 
     /**
+     * EW-641 Phase 1B/d row 21a — serve the persisted upload bytes back
+     * to the browser so the per-MIME viewers (`KbPdfViewer`,
+     * `KbXlsxViewer`, `KbDocxViewer`, image / video / audio) can mount.
+     *
+     * Reuses `ensureCanView` (same gate as `getUpload`) so anyone with
+     * read access to the Work can fetch upload bytes the same way they
+     * can fetch the JSON DTO. The companion controller route attaches
+     * `Content-Security-Policy: default-src 'none'; frame-ancestors
+     * 'none'; base-uri 'none'` + `X-Content-Type-Options: nosniff` so
+     * the bytes are safe to render inline even when the MIME is HTML or
+     * SVG.
+     *
+     * Throws `NotFoundException` when the upload row is missing,
+     * `ServiceUnavailableException` when no storage plugin is wired
+     * (mirrors `createUpload` / `retryUploadExtraction`).
+     */
+    async getUploadBytes(
+        workId: string,
+        uploadId: string,
+        userId: string,
+    ): Promise<{ buffer: Buffer; mimeType: string; filename: string; sizeBytes: number }> {
+        await this.ownershipService.ensureCanView(workId, userId);
+        if (!this.storage) {
+            throw new ServiceUnavailableException(
+                'KB uploads require a storage plugin — not configured in this deployment',
+            );
+        }
+        const upload = await this.uploadRepository.findById(workId, uploadId);
+        if (!upload) {
+            throw new NotFoundException(`KB upload not found: ${uploadId}`);
+        }
+        const fetched = await this.storage.getObject(upload.storagePath);
+        return {
+            buffer: fetched.buffer,
+            // Prefer the plugin's recovered MIME (S3 returns Content-Type
+            // metadata; local-fs sniffs again); fall back to whatever the
+            // upload row recorded at create time so the response always
+            // carries a Content-Type the viewer can dispatch on.
+            mimeType: fetched.mimeType ?? upload.mimeType,
+            filename: upload.originalFilename,
+            sizeBytes: upload.fileSize,
+        };
+    }
+
+    /**
      * Receive a multipart upload and run the synchronous slice of the
      * ingest pipeline (spec §9.1–§9.4). The file bytes are already in
      * memory from `FileInterceptor` so the API handler can extract +
