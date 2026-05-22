@@ -84,17 +84,10 @@ describe('resolveSearchProviderIds', () => {
             { id: 'exa' },
         ]);
 
-        const prev = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-        process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = '2';
-        try {
-            await expect(resolveSearchProviderIds(registry, 'u-1')).resolves.toEqual([
-                'tavily',
-                'brave',
-            ]);
-        } finally {
-            if (prev === undefined) delete process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-            else process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = prev;
-        }
+        await expect(resolveSearchProviderIds(registry, 'u-1')).resolves.toEqual([
+            'tavily',
+            'brave',
+        ]);
     });
 
     it('skips enabled search providers missing required settings', async () => {

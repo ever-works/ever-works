@@ -19,25 +19,17 @@ describe('UserResearchLimitsService', () => {
         process.env = originalEnv;
     });
 
-    it('builds limits config from environment variables', () => {
+    it('builds max runs config from environment variables', () => {
         process.env.USER_RESEARCH_MAX_RUNS_PER_DAY = '8';
-        process.env.USER_RESEARCH_MAX_SEARCHES_PER_DAY = '80';
-        process.env.USER_RESEARCH_MAX_FETCHES_PER_DAY = '24';
-        process.env.USER_RESEARCH_MAX_TOKENS_PER_DAY = '500000';
 
         expect(buildUserResearchLimitsConfig()).toEqual({
+            ...DEFAULT_USER_RESEARCH_LIMITS,
             maxRunsPerDay: 8,
-            maxSearchesPerDay: 80,
-            maxFetchesPerDay: 24,
-            maxTokensPerDay: 500_000,
         });
     });
 
-    it('falls back to defaults for invalid environment values', () => {
+    it('falls back to defaults for invalid max runs values', () => {
         process.env.USER_RESEARCH_MAX_RUNS_PER_DAY = '0';
-        process.env.USER_RESEARCH_MAX_SEARCHES_PER_DAY = '-1';
-        process.env.USER_RESEARCH_MAX_FETCHES_PER_DAY = 'abc';
-        process.env.USER_RESEARCH_MAX_TOKENS_PER_DAY = '1.5';
 
         expect(buildUserResearchLimitsConfig()).toEqual(DEFAULT_USER_RESEARCH_LIMITS);
     });

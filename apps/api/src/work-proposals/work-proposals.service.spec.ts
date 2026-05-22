@@ -98,7 +98,6 @@ describe('WorkProposalsApiService', () => {
         const { svc, research, config } = makeDeps();
         config.get.mockImplementation((key: string, d: unknown) => {
             if (key === 'USER_RESEARCH_TIMEOUT_MS') return '600000';
-            if (key === 'USER_RESEARCH_MAX_STEPS') return '20';
             return d;
         });
 
@@ -108,7 +107,7 @@ describe('WorkProposalsApiService', () => {
 
         expect(research.research).toHaveBeenCalledWith('u1', {
             timeoutMs: 600_000,
-            maxSteps: 20,
+            maxSteps: 14,
         });
     });
 

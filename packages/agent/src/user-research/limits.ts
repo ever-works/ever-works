@@ -30,18 +30,9 @@ export function buildUserResearchLimitsConfig(): UserResearchLimitsConfig {
             'USER_RESEARCH_MAX_RUNS_PER_DAY',
             DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay,
         ),
-        maxSearchesPerDay: positiveIntegerFromEnv(
-            'USER_RESEARCH_MAX_SEARCHES_PER_DAY',
-            DEFAULT_USER_RESEARCH_LIMITS.maxSearchesPerDay,
-        ),
-        maxFetchesPerDay: positiveIntegerFromEnv(
-            'USER_RESEARCH_MAX_FETCHES_PER_DAY',
-            DEFAULT_USER_RESEARCH_LIMITS.maxFetchesPerDay,
-        ),
-        maxTokensPerDay: positiveIntegerFromEnv(
-            'USER_RESEARCH_MAX_TOKENS_PER_DAY',
-            DEFAULT_USER_RESEARCH_LIMITS.maxTokensPerDay,
-        ),
+        maxSearchesPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxSearchesPerDay,
+        maxFetchesPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxFetchesPerDay,
+        maxTokensPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxTokensPerDay,
     };
 }
 

@@ -11,13 +11,6 @@ import type { PluginSettingsService } from '../plugins/services/plugin-settings.
 
 const DEFAULT_PROVIDER_FALLBACK_MAX = 2;
 
-function getProviderFallbackMax(): number {
-    const raw = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-    if (!raw) return DEFAULT_PROVIDER_FALLBACK_MAX;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_PROVIDER_FALLBACK_MAX;
-}
-
 /**
  * Returns the user's enabled plugins for a capability, ordered with
  * `defaultForCapabilities`-first (same convention as BaseFacadeService).
@@ -62,7 +55,7 @@ function hasAllRequiredSettings(
 
 /**
  * Returns ordered plugin IDs of the user's enabled AND configured search providers, capped
- * by USER_RESEARCH_PROVIDER_FALLBACK_MAX. System plugins are included through scoped
+ * by the internal provider fallback limit. System plugins are included through scoped
  * enablement; plugins missing required user/work settings are skipped.
  */
 export async function resolveSearchProviderIds(
@@ -84,7 +77,7 @@ export async function resolveSearchProviderIds(
         configured.push(candidate);
     }
 
-    return capChain(configured, getProviderFallbackMax()).map((p) => p.plugin.id);
+    return capChain(configured, DEFAULT_PROVIDER_FALLBACK_MAX).map((p) => p.plugin.id);
 }
 
 /**
@@ -184,7 +177,7 @@ async function resolveAiProviderFromChain(
 /**
  * Walks the user's enabled ai-provider plugins in priority order and returns
  * the first one with a usable config (baseUrl + apiKey + model). Capped by
- * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
+ * the internal provider fallback limit so one bad provider chain can't burn
  * through every configured key. System plugins are included through the same
  * scoped enablement rules as user-installed plugins. Auth-shape errors re-throw
  * so misconfigured keys aren't silently masked by trying the next provider.
@@ -197,7 +190,7 @@ export async function resolveAiProviderForResearch(
 ): Promise<ResolvedAiProvider | null> {
     const chain = capChain(
         await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
-        getProviderFallbackMax(),
+        DEFAULT_PROVIDER_FALLBACK_MAX,
     );
     return resolveAiProviderFromChain(aiFacade, chain, userId, logger);
 }
