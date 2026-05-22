@@ -22,6 +22,8 @@ import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-k
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
+import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
+import { AiFacadeService } from '../facades/ai.facade';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import {
@@ -155,6 +157,14 @@ export class KnowledgeBaseService {
         @Optional()
         @Inject(KB_EMBED_DOCUMENT_DISPATCHER)
         private readonly embedDispatcher?: KbEmbedDocumentDispatcher,
+        // EW-641 Phase 2/a row 30a — semantic search dependencies.
+        // Both `@Optional()` so unit tests that don't exercise
+        // semanticSearch still construct (the existing test module
+        // doesn't wire them). When either is missing,
+        // `semanticSearch` returns `[]` so callers degrade to
+        // lexical-only ranking.
+        @Optional() private readonly chunkRepository?: WorkKnowledgeChunkRepository,
+        @Optional() private readonly aiFacade?: AiFacadeService,
     ) {}
 
     /**
@@ -570,6 +580,76 @@ export class KnowledgeBaseService {
         await this.enqueueEmbed(workId, updated.id);
 
         return this.toBodyDto(updated);
+    }
+
+    // ─── SEMANTIC SEARCH (Phase 2/a row 30a) ────────────────────────────────
+
+    /**
+     * Embed the query string and run a pgvector k-NN against the
+     * Work's chunk rows. Caller-friendly wrapper for the row-30c RRF
+     * blend (lexical + semantic): returns `[]` instead of throwing on
+     * any of the "graceful degrade to lexical-only" conditions:
+     *
+     *  - No AI provider wired (`aiFacade` is undefined or its
+     *    `embed()` throws `AiFacadeError` because no plugin implements
+     *    `createEmbedding`). Operator hasn't configured embeddings →
+     *    lexical-only ranking is the documented spec §15.5 fallback.
+     *  - No chunk repository wired (some unit tests don't provide it).
+     *  - Empty query string (defensive — embedders shouldn't be called
+     *    on whitespace).
+     *  - Underlying DB isn't Postgres (chunk repo's
+     *    `findNearestByEmbedding` already returns `[]` on SQLite, so
+     *    e2e on the in-memory backend transparently runs lexical-only).
+     *
+     * This is a SYSTEM operation — `KbSearchPalette` (row 15) calls
+     * `KnowledgeBaseService.search` (row 30c), which calls this
+     * helper internally; the user's `ensureCanView` check happens at
+     * the search entry point, not here.
+     */
+    async semanticSearch(
+        workId: string,
+        query: string,
+        limit: number,
+    ): Promise<
+        Array<{
+            id: string;
+            workId: string;
+            documentId: string;
+            chunkIndex: number;
+            content: string;
+            distance: number;
+        }>
+    > {
+        if (!this.chunkRepository || !this.aiFacade) return [];
+        const trimmed = query.trim();
+        if (trimmed.length === 0 || limit <= 0) return [];
+
+        let embedding: readonly number[];
+        try {
+            const response = await this.aiFacade.embed(
+                { input: trimmed },
+                {
+                    workId,
+                    // Search is a SYSTEM operation — same `'kb-…-system'`
+                    // sentinel pattern the row 29b2 embed task uses for
+                    // null-creator docs. Keeps usage attribution to a
+                    // single visible bucket and keeps `FacadeOptions.userId`
+                    // satisfied (it's required by the IAiFacade contract).
+                    userId: 'kb-search-system',
+                },
+            );
+            if (response.embeddings.length === 0) return [];
+            embedding = response.embeddings[0];
+        } catch (error) {
+            // AiFacadeError → no embedder configured. Lexical-only is
+            // the documented degraded path; just log + fall back.
+            this.logger.debug(
+                `semanticSearch: embedder unavailable for work=${workId}: ${(error as Error).message}`,
+            );
+            return [];
+        }
+
+        return this.chunkRepository.findNearestByEmbedding(workId, embedding, limit);
     }
 
     // ─── DOCUMENTS — Organization scope (inheritable: legal/style/seo) ───────

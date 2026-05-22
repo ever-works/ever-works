@@ -7,6 +7,8 @@ describe('WorkKnowledgeChunkRepository', () => {
         count: jest.Mock;
         manager: {
             transaction: jest.Mock;
+            connection: { options: { type: string } };
+            query: jest.Mock;
         };
     };
     let txManager: {
@@ -31,6 +33,11 @@ describe('WorkKnowledgeChunkRepository', () => {
                 transaction: jest.fn(async (callback: (m: unknown) => unknown) =>
                     callback(txManager),
                 ),
+                // Row 30a: `findNearestByEmbedding` reads the driver
+                // type to decide pgvector-vs-fallback, and uses
+                // `manager.query(...)` for the raw SQL when on Postgres.
+                connection: { options: { type: 'sqlite' } },
+                query: jest.fn(),
             },
         };
         chunkRepo = new WorkKnowledgeChunkRepository(repository as never);
@@ -183,6 +190,84 @@ describe('WorkKnowledgeChunkRepository', () => {
 
             expect(repository.count).toHaveBeenCalledWith({ where: { workId: 'work-1' } });
             expect(out).toBe(7);
+        });
+    });
+
+    describe('findNearestByEmbedding', () => {
+        it('returns [] on empty embedding (defensive — no query fired)', async () => {
+            const out = await chunkRepo.findNearestByEmbedding('work-1', [], 10);
+            expect(out).toEqual([]);
+            expect(repository.manager.query).not.toHaveBeenCalled();
+        });
+
+        it('returns [] for limit <= 0 (defensive — no query fired)', async () => {
+            const out = await chunkRepo.findNearestByEmbedding('work-1', [0.1, 0.2], 0);
+            expect(out).toEqual([]);
+            expect(repository.manager.query).not.toHaveBeenCalled();
+        });
+
+        it('returns [] on non-Postgres drivers (SQLite test/e2e fallback)', async () => {
+            // Default mock has driver type 'sqlite' — caller falls
+            // back to lexical-only via row 30c's RRF blend.
+            const out = await chunkRepo.findNearestByEmbedding('work-1', [0.1, 0.2, 0.3], 10);
+            expect(out).toEqual([]);
+            expect(repository.manager.query).not.toHaveBeenCalled();
+        });
+
+        it('runs the pgvector k-NN with the right vector literal + WHERE on workId', async () => {
+            (repository.manager as { connection: { options: { type: string } } }).connection = {
+                options: { type: 'postgres' },
+            };
+            (repository.manager.query as jest.Mock).mockResolvedValue([
+                {
+                    id: 'chunk-1',
+                    workId: 'work-1',
+                    documentId: 'doc-1',
+                    chunkIndex: 0,
+                    content: 'hello',
+                    distance: 0.12,
+                },
+            ]);
+
+            const out = await chunkRepo.findNearestByEmbedding('work-1', [0.1, 0.2, 0.3], 5);
+
+            expect(out).toEqual([
+                expect.objectContaining({
+                    id: 'chunk-1',
+                    documentId: 'doc-1',
+                    chunkIndex: 0,
+                    content: 'hello',
+                    distance: 0.12,
+                }),
+            ]);
+            const call = (repository.manager.query as jest.Mock).mock.calls[0] as [
+                string,
+                unknown[],
+            ];
+            expect(call[1]).toEqual(['[0.1,0.2,0.3]', 'work-1', 5]);
+            expect(call[0]).toContain('embedding <=> $1::vector');
+            expect(call[0]).toContain('WHERE work_id = $2');
+            expect(call[0]).toContain('LIMIT $3');
+        });
+
+        it('coerces string distances to numbers (node-postgres numeric→string default)', async () => {
+            (repository.manager as { connection: { options: { type: string } } }).connection = {
+                options: { type: 'postgres' },
+            };
+            (repository.manager.query as jest.Mock).mockResolvedValue([
+                {
+                    id: 'chunk-1',
+                    workId: 'work-1',
+                    documentId: 'doc-1',
+                    chunkIndex: 0,
+                    content: 'x',
+                    distance: '0.5',
+                },
+            ]);
+
+            const out = await chunkRepo.findNearestByEmbedding('work-1', [0.1], 1);
+            expect(out[0].distance).toBe(0.5);
+            expect(typeof out[0].distance).toBe('number');
         });
     });
 });
