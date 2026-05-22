@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    InternalServerErrorException,
     Param,
     Post,
     Put,
@@ -365,7 +366,7 @@ export class TemplateCatalogController {
         this.activityLogService
             .log({
                 userId: auth.userId,
-                actionType: ActivityActionType.TEMPLATE_ADDED,
+                actionType: ActivityActionType.TEMPLATE_UPDATED,
                 action: 'template.synced',
                 status: ActivityStatus.COMPLETED,
                 summary: `Synced template ${result.template.name} from base`,
@@ -383,7 +384,17 @@ export class TemplateCatalogController {
         );
         const template =
             refreshed.templates.find((candidate) => candidate.id === result.template.id) ??
-            refreshed.templates[0];
+            (await this.templateCatalogService.getVisibleTemplateForUser(
+                result.template.kind,
+                result.template.id,
+                auth.userId,
+            ));
+        if (!template) {
+            throw new InternalServerErrorException({
+                status: 'error',
+                message: 'Template was synced but could not be loaded from the catalog.',
+            });
+        }
 
         return {
             status: 'success',
