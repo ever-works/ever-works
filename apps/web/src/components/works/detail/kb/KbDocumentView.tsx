@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils/cn';
 import { MarkdownPreview } from '@/components/works/detail/items/MarkdownPreview';
+import { rewriteWikilinks } from './wikilink-md';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbDocumentViewProps {
@@ -98,7 +99,9 @@ export async function KbDocumentView({ doc }: KbDocumentViewProps) {
                 )}
             >
                 {doc.body && doc.body.trim().length > 0 ? (
-                    <MarkdownPreview content={doc.body} />
+                    <MarkdownPreview
+                        content={doc.workId ? rewriteWikilinks(doc.body, doc.workId) : doc.body}
+                    />
                 ) : (
                     <p className="text-sm italic text-text-muted dark:text-text-muted-dark/60">
                         {t('document.emptyBody')}
