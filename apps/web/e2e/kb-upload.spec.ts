@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USER } from './helpers/test-user';
+import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createWorkViaAPI, loginViaAPI } from './helpers/api';
 
 /**
@@ -41,13 +41,19 @@ test.describe('Knowledge Base — A12 drag-drop upload', () => {
         // suite uses for navigation-heavy authenticated flows.
         test.setTimeout(180_000);
 
-        // 1. Mint a bearer token for the same TEST_USER the storageState
-        //    was signed in as. We can't pull it out of cookies here — the
-        //    web's session cookie is opaque — so re-login via /api/auth
-        //    is the standard pattern (other specs do the same).
+        // 1. Mint a bearer token for the same user the storageState
+        //    was signed in as. We can't pull it out of cookies here —
+        //    the web's session cookie is opaque — so re-login via
+        //    /api/auth. Importing `TEST_USER` directly from
+        //    `helpers/test-user.ts` is unsafe across spec workers
+        //    because each Node process re-evaluates the module's
+        //    `Date.now()` suffix; the global-setup project writes the
+        //    real credentials to disk and `loadSeededTestUser()` reads
+        //    them back.
+        const testUser = loadSeededTestUser();
         const { access_token } = await loginViaAPI(request, {
-            email: TEST_USER.email,
-            password: TEST_USER.password,
+            email: testUser.email,
+            password: testUser.password,
         });
 
         // 2. Create a fresh Work for this run so the KB tree starts

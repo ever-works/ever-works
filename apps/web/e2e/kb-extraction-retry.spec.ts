@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helpers/api';
-import { TEST_USER } from './helpers/test-user';
+import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { seedKbSkippedUpload } from './helpers/kb-fixtures';
 
 /**
@@ -55,9 +55,10 @@ test.describe('Knowledge Base — A16 retry-extraction', () => {
     }) => {
         test.setTimeout(120_000);
 
+        const testUser = loadSeededTestUser();
         const { access_token } = await loginViaAPI(request, {
-            email: TEST_USER.email,
-            password: TEST_USER.password,
+            email: testUser.email,
+            password: testUser.password,
         });
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

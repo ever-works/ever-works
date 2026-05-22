@@ -1,8 +1,11 @@
 import { test as setup, expect } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { TEST_USER } from './helpers/test-user';
 import { registerViaAPI } from './helpers/auth';
 
 const authFile = 'e2e/.auth/user.json';
+const credentialsFile = 'e2e/.auth/test-user.json';
 
 /**
  * Global setup: create a test user and save authenticated browser state.
@@ -115,4 +118,20 @@ setup('authenticate', async ({ page, baseURL }) => {
 
     // 5. Save the browser state (cookies, localStorage)
     await page.context().storageState({ path: authFile });
+
+    // 6. Persist the TEST_USER credentials so OTHER spec processes can
+    //    log in via API with the SAME email/password the setup project
+    //    just registered. Without this, every spec that imports
+    //    `helpers/test-user.ts` runs a fresh `const suffix =
+    //    Date.now().toString(36)` at module load (each worker is its own
+    //    Node process), producing a different email — `loginViaAPI`
+    //    then 401s with "Invalid email or password". Specs needing a
+    //    bearer token import `loadSeededTestUser()` from
+    //    `helpers/seeded-test-user.ts` to read this file instead.
+    mkdirSync(dirname(credentialsFile), { recursive: true });
+    writeFileSync(
+        credentialsFile,
+        JSON.stringify({ ...TEST_USER, generatedAt: new Date().toISOString() }, null, 2),
+        'utf8',
+    );
 });
