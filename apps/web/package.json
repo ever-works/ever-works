@@ -37,6 +37,7 @@
         "@tiptap/pm": "^2.10.4",
         "@tiptap/react": "^2.10.4",
         "@tiptap/starter-kit": "^2.10.4",
+        "@tiptap/suggestion": "^2.10.4",
         "ai": "^6.0.154",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",

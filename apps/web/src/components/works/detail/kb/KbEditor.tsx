@@ -1,14 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import { useEditor, EditorContent, ReactRenderer, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Markdown } from 'tiptap-markdown';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { updateKbDocumentAction } from '@/app/actions/works/kb-document';
+import {
+    WikiLinkExtension,
+    type WikiLinkRenderProps,
+    type WikiLinkRenderer,
+    type WikiLinkSuggestionItem,
+} from './extensions/WikiLinkExtension';
+import {
+    WikiLinkSuggestionList,
+    type WikiLinkSuggestionListHandle,
+} from './WikiLinkSuggestionList';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbEditorProps {
@@ -69,6 +79,14 @@ export function KbEditor({
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const savingRef = useRef(false);
 
+    const wikilinkRenderFactory = useMemo(
+        () => createWikiLinkRenderFactory(),
+        // The factory itself is workId-agnostic — `WikiLinkExtension`
+        // closes over `workId` via its own options. Only one factory
+        // per editor lifecycle.
+        [],
+    );
+
     const editor = useEditor({
         immediatelyRender: false,
         editable: !readOnly,
@@ -86,6 +104,10 @@ export function KbEditor({
                 html: false, // raw HTML in markdown body would break the round-trip
                 breaks: true,
                 transformPastedText: true,
+            }),
+            WikiLinkExtension.configure({
+                workId,
+                render: wikilinkRenderFactory,
             }),
         ],
         content: doc.body ?? '',
@@ -399,4 +421,87 @@ function SaveStatusPill({ status, error, labels }: SaveStatusPillProps) {
                       : labels.idle}
         </span>
     );
+}
+
+/**
+ * Build a renderer factory for `WikiLinkExtension`. The factory owns a
+ * single `ReactRenderer` instance + floating popover `<div>` over the
+ * lifetime of the editor — `onStart` creates them, `onUpdate` reuses,
+ * `onExit` tears down. Positioning is `position: fixed` keyed off the
+ * `clientRect()` callback the suggestion plugin gives us (no `tippy`
+ * dep — the popover is intentionally small).
+ *
+ * `findSuggestionMatch` in the extension only fires when the cursor is
+ * inside a `[[…` chunk, so we don't need our own outside-click logic
+ * (the plugin emits `onExit` once the match falls out of scope).
+ */
+function createWikiLinkRenderFactory(): () => WikiLinkRenderer {
+    return () => {
+        let renderer: ReactRenderer<WikiLinkSuggestionListHandle> | null = null;
+        let popoverEl: HTMLDivElement | null = null;
+
+        function positionFrom(clientRect: (() => DOMRect | null) | null) {
+            if (!popoverEl) return;
+            const rect = clientRect?.();
+            if (!rect) {
+                popoverEl.style.visibility = 'hidden';
+                return;
+            }
+            popoverEl.style.visibility = 'visible';
+            popoverEl.style.top = `${rect.bottom + 4}px`;
+            popoverEl.style.left = `${rect.left}px`;
+        }
+
+        function mount(props: WikiLinkRenderProps) {
+            popoverEl = document.createElement('div');
+            popoverEl.setAttribute('data-testid', 'kb-wikilink-popover');
+            popoverEl.style.position = 'fixed';
+            popoverEl.style.zIndex = '60';
+            document.body.appendChild(popoverEl);
+            renderer = new ReactRenderer(WikiLinkSuggestionList, {
+                editor: undefined as unknown as Editor, // satisfies the type; the list doesn't read it
+                props: {
+                    items: props.items,
+                    query: props.query,
+                    onSelect: (item: WikiLinkSuggestionItem) => props.command(item),
+                } as Record<string, unknown>,
+            });
+            // `ReactRenderer.element` is an HTMLElement the renderer
+            // mounted into. We move it under our positioned popoverEl.
+            const element = renderer.element as unknown as HTMLElement | null;
+            if (element) {
+                popoverEl.appendChild(element);
+            }
+            positionFrom(props.clientRect);
+        }
+
+        return {
+            onStart: (props) => {
+                mount(props);
+            },
+            onUpdate: (props) => {
+                if (!renderer) return;
+                renderer.updateProps({
+                    items: props.items,
+                    query: props.query,
+                    onSelect: (item: WikiLinkSuggestionItem) => props.command(item),
+                });
+                positionFrom(props.clientRect);
+            },
+            onKeyDown: ({ event }) => {
+                if (event.key === 'Escape') {
+                    // Let the upstream `onExit` fire by returning true;
+                    // the suggestion plugin sees Escape and tears down.
+                    return false;
+                }
+                return renderer?.ref?.onKeyDown(event) ?? false;
+            },
+            onExit: () => {
+                renderer?.destroy();
+                renderer = null;
+                popoverEl?.remove();
+                popoverEl = null;
+            },
+        };
+    };
 }

@@ -37,12 +37,34 @@ vi.mock('@tiptap/react', () => ({
     EditorContent: ({ editor: _editor }: { editor: unknown }) => (
         <div data-testid="kb-editor-body" contentEditable />
     ),
+    // WikiLinkExtension (row 16b) imports `Extension` from
+    // `@tiptap/react` (which re-exports `@tiptap/core`). Provide a
+    // minimal shape so the spec doesn't drag in the real Tiptap
+    // create-time helpers.
+    Extension: { create: () => ({ configure: () => ({}) }) },
+    ReactRenderer: class {
+        element = null;
+        ref = null;
+        updateProps() {}
+        destroy() {}
+    },
 }));
 vi.mock('@tiptap/starter-kit', () => ({
     default: { configure: () => ({}) },
 }));
 vi.mock('@tiptap/extension-link', () => ({
     default: { configure: () => ({}) },
+}));
+vi.mock('@tiptap/suggestion', () => ({
+    default: () => ({}),
+}));
+vi.mock('@tiptap/pm/state', () => ({
+    PluginKey: class {
+        constructor(name?: string) {
+            this.name = name;
+        }
+        name?: string;
+    },
 }));
 vi.mock('tiptap-markdown', () => ({
     Markdown: { configure: () => ({}) },
