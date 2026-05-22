@@ -16,11 +16,12 @@ type FakePlugin = {
     id: string;
     defaultForCapabilities?: string[];
     capabilities?: string[];
+    settingsSchema?: RegisteredPlugin['plugin']['settingsSchema'];
 };
 
 function makeRegistered(p: FakePlugin): RegisteredPlugin {
     return {
-        plugin: { id: p.id } as RegisteredPlugin['plugin'],
+        plugin: { id: p.id, settingsSchema: p.settingsSchema } as RegisteredPlugin['plugin'],
         manifest: {
             defaultForCapabilities: p.defaultForCapabilities,
             capabilities: p.capabilities ?? ['ai-provider', 'search'],
@@ -94,6 +95,53 @@ describe('resolveSearchProviderIds', () => {
             if (prev === undefined) delete process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
             else process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = prev;
         }
+    });
+
+    it('skips enabled search providers missing required settings', async () => {
+        const registry = makeRegistry([
+            {
+                id: 'tavily',
+                defaultForCapabilities: ['search'],
+                settingsSchema: {
+                    type: 'object',
+                    required: ['apiKey'],
+                    properties: { apiKey: { type: 'string' } },
+                } as RegisteredPlugin['plugin']['settingsSchema'],
+            },
+            { id: 'local-search' },
+        ]);
+        const settings = {
+            getSettings: jest
+                .fn()
+                .mockResolvedValueOnce({ apiKey: '' })
+                .mockResolvedValueOnce({}),
+        };
+
+        await expect(
+            resolveSearchProviderIds(registry, 'u-1', settings as never),
+        ).resolves.toEqual(['local-search']);
+        expect(settings.getSettings).toHaveBeenCalledWith('tavily', {
+            userId: 'u-1',
+            includeSecrets: true,
+        });
+    });
+
+    it('allows settings satisfied by env/admin-only fields', async () => {
+        const registry = makeRegistry([
+            {
+                id: 'env-search',
+                settingsSchema: {
+                    type: 'object',
+                    required: ['apiKey'],
+                    properties: { apiKey: { type: 'string', 'x-envVar': 'SEARCH_API_KEY' } },
+                } as RegisteredPlugin['plugin']['settingsSchema'],
+            },
+        ]);
+        const settings = { getSettings: jest.fn().mockResolvedValue({}) };
+
+        await expect(
+            resolveSearchProviderIds(registry, 'u-1', settings as never),
+        ).resolves.toEqual(['env-search']);
     });
 });
 

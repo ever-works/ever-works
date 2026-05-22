@@ -29,6 +29,7 @@ describe('ContentExtractorFacadeService', () => {
             systemPlugin?: boolean;
             defaultForCapabilities?: string[];
             canExtractImpl?: (url: string) => Promise<boolean>;
+            settingsSchema?: IContentExtractorPlugin['settingsSchema'];
         },
     ): IContentExtractorPlugin => ({
         id,
@@ -36,7 +37,7 @@ describe('ContentExtractorFacadeService', () => {
         version: '1.0.0',
         category: 'content-extractor',
         capabilities: ['content-extractor'],
-        settingsSchema: { type: 'object', properties: {} },
+        settingsSchema: options?.settingsSchema ?? { type: 'object', properties: {} },
         configurationMode: 'hybrid',
         providerName,
         onLoad: jest.fn(),
@@ -421,6 +422,45 @@ describe('ContentExtractorFacadeService', () => {
             expect(githubExtractor.extract).not.toHaveBeenCalled();
             expect(notionExtractor.canExtract).toHaveBeenCalled();
             expect(notionExtractor.extract).toHaveBeenCalled();
+        });
+
+        it('should skip enabled extractors missing required settings', async () => {
+            const firecrawlExtractor = createMockExtractorPlugin('firecrawl', 'Firecrawl', {
+                settingsSchema: {
+                    type: 'object',
+                    required: ['apiKey'],
+                    properties: { apiKey: { type: 'string' } },
+                },
+            });
+            const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
+                systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
+            });
+
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(firecrawlExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+                createRegisteredPlugin(localExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: true,
+                    defaultForCapabilities: ['content-extractor'],
+                }),
+            ]);
+            settingsService.getSettings
+                .mockResolvedValueOnce({ apiKey: '' })
+                .mockResolvedValueOnce({});
+
+            const result = await service.extractContent(
+                'https://example.com',
+                undefined,
+                defaultFacadeOptions,
+            );
+
+            expect(firecrawlExtractor.extract).not.toHaveBeenCalled();
+            expect(localExtractor.extract).toHaveBeenCalled();
+            expect(result?.extraction?.providerId).toBe('local-content-extractor');
         });
 
         it('should fall back when the preferred extractor returns a failure result', async () => {

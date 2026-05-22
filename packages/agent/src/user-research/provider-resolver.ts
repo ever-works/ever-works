@@ -1,12 +1,13 @@
 import { Logger } from '@nestjs/common';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, type JsonSchema } from '@ever-works/plugin';
 import type {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
 import type { AiFacadeService } from '../facades/ai.facade';
+import type { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
 const DEFAULT_PROVIDER_FALLBACK_MAX = 2;
 
@@ -40,20 +41,50 @@ export function capChain<T>(chain: T[], max: number): T[] {
     return chain.slice(0, Math.max(1, max));
 }
 
+function hasAllRequiredSettings(
+    schema: JsonSchema | undefined,
+    resolvedSettings: Record<string, unknown>,
+): boolean {
+    if (!schema?.required || !schema.properties) return true;
+
+    for (const field of schema.required) {
+        const propSchema = schema.properties[field];
+        if (!propSchema) continue;
+        if (propSchema['x-envVar']) continue;
+        if (propSchema['x-adminOnly']) continue;
+
+        const value = resolvedSettings[field];
+        if (value === undefined || value === null || value === '') return false;
+    }
+
+    return true;
+}
+
 /**
- * Returns ordered plugin IDs of the user's enabled search providers, capped
- * by USER_RESEARCH_PROVIDER_FALLBACK_MAX. Convenience over
- * resolveProviderChain + capChain + .map(p.plugin.id) at the call site.
+ * Returns ordered plugin IDs of the user's enabled AND configured search providers, capped
+ * by USER_RESEARCH_PROVIDER_FALLBACK_MAX. System plugins are included through scoped
+ * enablement; plugins missing required user/work settings are skipped.
  */
 export async function resolveSearchProviderIds(
     registry: PluginRegistryService,
     userId: string,
+    settingsService?: PluginSettingsService,
 ): Promise<string[]> {
-    const chain = capChain(
-        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.SEARCH, userId),
-        getProviderFallbackMax(),
-    );
-    return chain.map((p) => p.plugin.id);
+    const chain = await resolveProviderChain(registry, PLUGIN_CAPABILITIES.SEARCH, userId);
+    const configured: RegisteredPlugin[] = [];
+
+    for (const candidate of chain) {
+        if (settingsService) {
+            const settings = await settingsService.getSettings(candidate.plugin.id, {
+                userId,
+                includeSecrets: true,
+            });
+            if (!hasAllRequiredSettings(candidate.plugin.settingsSchema, settings)) continue;
+        }
+        configured.push(candidate);
+    }
+
+    return capChain(configured, getProviderFallbackMax()).map((p) => p.plugin.id);
 }
 
 /**

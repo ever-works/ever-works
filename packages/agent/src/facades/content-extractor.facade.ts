@@ -7,6 +7,7 @@ import type {
     FacadeExtractionOptions,
     IContentExtractorFacade,
     FacadeOptions,
+    JsonSchema,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import {
@@ -241,8 +242,8 @@ export class ContentExtractorFacadeService
      *   1. Explicit providerOverride (user's selected provider)
      *   2. Work's configured default provider
      *   3. General non-system extractors (Jina, Firecrawl, Tavily, …)
-     *   4. System/default extractor (local-content-extractor)
-     *   5. Last resort: any enabled extractor that accepts the URL
+     *   4. Scoped default extractor (system plugins included via scoped enablement)
+     *   5. Last resort: any enabled + configured extractor that accepts the URL
      */
     private async resolveExtractorCandidates(
         url: string,
@@ -270,7 +271,7 @@ export class ContentExtractorFacadeService
         //    Checked before the user's chosen provider so they can intercept their URL types.
         for (const registered of loadedPlugins) {
             if (!registered.manifest.supplementary) continue;
-            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
+            if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -289,7 +290,7 @@ export class ContentExtractorFacadeService
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
 
-            if (!(await this.isPluginEnabled(providerOverride, workId, userId))) {
+            if (!(await this.isPluginUsableForScope(registered, userId, workId))) {
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
 
@@ -301,7 +302,7 @@ export class ContentExtractorFacadeService
         // 2. Work's configured default
         if (workId) {
             const active = await this.findActivePluginForWork(workId);
-            if (active && (await this.isPluginEnabled(active.plugin.id, workId, userId))) {
+            if (active && (await this.isPluginUsableForScope(active, userId, workId))) {
                 const plugin = active.plugin as IContentExtractorPlugin;
                 if (await this.canExtractSafe(plugin, url, active.plugin.id)) {
                     addCandidate(active);
@@ -317,7 +318,7 @@ export class ContentExtractorFacadeService
                 !p.manifest.defaultForCapabilities?.includes(this.CAPABILITY),
         );
         for (const registered of general) {
-            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
+            if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -328,7 +329,7 @@ export class ContentExtractorFacadeService
         // 4. Scoped default extractor (system plugins are included by enablement rules).
         for (const registered of loadedPlugins) {
             if (!registered.manifest.defaultForCapabilities?.includes(this.CAPABILITY)) continue;
-            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
+            if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -338,7 +339,7 @@ export class ContentExtractorFacadeService
 
         // 5. Last resort
         for (const registered of loadedPlugins) {
-            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
+            if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -347,6 +348,39 @@ export class ContentExtractorFacadeService
         }
 
         return candidates;
+    }
+
+    private hasAllRequiredSettings(
+        schema: JsonSchema | undefined,
+        resolvedSettings: Record<string, unknown>,
+    ): boolean {
+        if (!schema?.required || !schema.properties) return true;
+
+        for (const field of schema.required) {
+            const propSchema = schema.properties[field];
+            if (!propSchema) continue;
+            if (propSchema['x-envVar']) continue;
+            if (propSchema['x-adminOnly']) continue;
+
+            const value = resolvedSettings[field];
+            if (value === undefined || value === null || value === '') return false;
+        }
+
+        return true;
+    }
+
+    private async isPluginUsableForScope(
+        registered: RegisteredPlugin,
+        userId?: string,
+        workId?: string,
+    ): Promise<boolean> {
+        if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) return false;
+
+        const settings = await this.getResolvedSettings(registered.plugin.id, {
+            userId,
+            workId,
+        });
+        return this.hasAllRequiredSettings(registered.plugin.settingsSchema, settings);
     }
 
     /**

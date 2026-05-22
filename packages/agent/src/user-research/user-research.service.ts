@@ -7,6 +7,7 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { UserRepository } from '../database/repositories/user.repository';
 import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import type { InferredUserProfile } from '../entities';
 import { UserResearchCompletedEvent, UserResearchFailedEvent } from './events';
 import { USER_RESEARCH_AGENT_PROMPT, buildSeedPrompt, deriveVerticals } from './prompts';
@@ -53,6 +54,7 @@ export class UserResearchService {
         private readonly contentExtractor: ContentExtractorFacadeService,
         private readonly registry: PluginRegistryService,
         private readonly limits: UserResearchLimitsService,
+        private readonly pluginSettings: PluginSettingsService,
         @Optional() private readonly events?: EventEmitter2,
     ) {}
 
@@ -128,7 +130,11 @@ export class UserResearchService {
             }
             resolvedModel = resolved.model;
             providerName = resolved.providerName;
-            searchChain = await resolveSearchProviderIds(this.registry, userId);
+            searchChain = await resolveSearchProviderIds(
+                this.registry,
+                userId,
+                this.pluginSettings,
+            );
         } catch (err) {
             const message = (err as Error).message;
             this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
