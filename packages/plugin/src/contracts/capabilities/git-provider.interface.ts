@@ -325,6 +325,19 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		ref?: string,
 		token?: string
 	): Promise<{ content: string; encoding: string } | null>;
+
+	/**
+	 * EW-641 Phase 1B/d row 18b — list commits that touched the given
+	 * file path, newest first. Powers the KB "View Git history" dialog
+	 * (`KnowledgeBaseService.getDocumentHistory` →
+	 * `KnowledgeBaseGitMirrorService.listDocumentHistory` → here).
+	 *
+	 * Optional — providers that don't implement it surface as
+	 * `{ items: [] }` to the dialog, which already handles the empty
+	 * state. Default `limit` is 25; implementations should cap at 100.
+	 */
+	listFileCommits?(owner: string, repo: string, path: string, token: string, limit?: number): Promise<GitCommit[]>;
+
 	getReadme?(
 		owner: string,
 		repo: string,

@@ -548,6 +548,26 @@ export class GitFacadeService implements IGitFacade {
         return null;
     }
 
+    /**
+     * EW-641 Phase 1B/d row 18b — list commits touching `path`, newest
+     * first. Optional capability; providers that don't implement it
+     * (the contract's `listFileCommits?` is `?`-marked) return `[]`
+     * here so the KB history dialog renders its empty state gracefully.
+     */
+    async listFileCommits(
+        owner: string,
+        repo: string,
+        path: string,
+        options: GitFacadeOptions,
+        limit?: number,
+    ): Promise<GitCommit[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.listFileCommits) {
+            return plugin.listFileCommits(owner, repo, path, token, limit);
+        }
+        return [];
+    }
+
     async getReadme(
         owner: string,
         repo: string,

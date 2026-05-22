@@ -268,29 +268,60 @@ export class KnowledgeBaseGitMirrorService {
     }
 
     /**
-     * EW-641 Phase 1B/d row 18 — list commits that touched a KB
-     * document's sidecar `.md` file.
+     * EW-641 Phase 1B/d row 18b — list commits that touched a KB
+     * document's sidecar `.md` file, newest first.
      *
-     * **Stub today (row 18a)**: returns `[]`. Row 18b lands the real
-     * git-log walk — likely via a new optional `listFileCommits`
-     * capability on the git-provider plugin contract (GitHub's
-     * `octokit.rest.repos.listCommits({ path })` is the natural impl)
-     * or, failing that, isomorphic-git's `git.log({ filepath })` over
-     * the local clone. Whichever path lands, the return shape is
-     * locked here so the controller + frontend don't have to budge.
-     *
-     * The doc's `path` is the relative key under `.content/kb/`. We
-     * resolve it the same way `restoreDocumentFromGit` does, then
-     * compose `${KB_ROOT}/${doc.path}` to scope the log query.
+     * Resolves the doc the same way `restoreDocumentFromGit` does
+     * (DB row → Work → repo owner/name + relative KB path), then fans
+     * out to the Git provider plugin's optional `listFileCommits`
+     * capability via the facade. Providers that don't implement the
+     * capability surface as `[]` — the KB history dialog already
+     * renders an empty state for that case (row 18c).
      */
     async listDocumentHistory(
-        _workId: string,
-        _documentId: string,
-        _limit: number,
+        workId: string,
+        documentId: string,
+        limit: number,
     ): Promise<
         ReadonlyArray<{ sha: string; message: string; authorName: string; authoredAt: string }>
     > {
-        return [];
+        const doc = await this.documentRepository.findById(workId, documentId);
+        if (!doc) {
+            throw new NotFoundException(`KB document not found for history: ${documentId}`);
+        }
+
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work not found for history: ${workId}`);
+        }
+
+        const workOwner = work.user as User | undefined;
+        if (!workOwner?.id) {
+            return [];
+        }
+
+        const owner = work.getRepoOwner('data');
+        const repo = work.getDataRepo();
+        const relPath = path.posix.join(KnowledgeBaseGitMirrorService.KB_ROOT, doc.path);
+
+        const commits = await this.gitFacade.listFileCommits(
+            owner,
+            repo,
+            relPath,
+            {
+                providerId: work.gitProvider,
+                userId: workOwner.id,
+                workId: work.id,
+            },
+            limit,
+        );
+
+        return commits.map((commit) => ({
+            sha: commit.sha,
+            message: commit.message,
+            authorName: commit.author?.name ?? '',
+            authoredAt: commit.date,
+        }));
     }
 
     // ─── INTERNAL ─────────────────────────────────────────────────────────────
