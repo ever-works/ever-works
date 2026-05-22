@@ -27,6 +27,7 @@ import {
     ListTemplatesQueryDto,
     RefreshTemplatesDto,
     SetDefaultTemplateDto,
+    SyncCustomTemplateFromBaseDto,
     UpdateCustomTemplateDto,
 } from './dto/list-templates.dto';
 
@@ -342,6 +343,59 @@ export class TemplateCatalogController {
             status: 'success',
             customizationId: result.customization.id,
             customization: this.serializeCustomization(result.customization),
+        };
+    }
+
+    @Post('templates/custom/:templateId/sync-base')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Sync a custom template repository from its built-in base',
+        description:
+            'Merges latest base-template changes into the custom template. With force=true, overwrites the custom repository from the base template.',
+    })
+    @ApiResponse({ status: 200, description: 'Template synced' })
+    async syncCustomTemplateFromBase(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+        @Body() body: SyncCustomTemplateFromBaseDto,
+    ) {
+        const result = await this.templateCustomizationService.syncFromBase(
+            auth.userId,
+            templateId,
+            {
+                force: body.force === true,
+            },
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_ADDED,
+                action: 'template.synced',
+                status: ActivityStatus.COMPLETED,
+                summary: `Synced template ${result.template.name} from base`,
+                metadata: {
+                    templateId: result.template.id,
+                    mode: result.mode,
+                    changed: result.changed,
+                },
+            })
+            .catch(() => {});
+
+        const refreshed = await this.templateCatalogService.refreshTemplatesForUser(
+            result.template.kind,
+            auth.userId,
+        );
+        const template =
+            refreshed.templates.find((candidate) => candidate.id === result.template.id) ??
+            refreshed.templates[0];
+
+        return {
+            status: 'success',
+            template,
+            mode: result.mode,
+            changed: result.changed,
+            message: result.message,
         };
     }
 

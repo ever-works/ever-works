@@ -51,14 +51,19 @@ interface Mocks {
     gitFacade: {
         getUser: AnyMock;
         getCommitter: AnyMock;
+        getAccessToken: AnyMock;
         cloneOrPull: AnyMock;
         createRepository: AnyMock;
         getCloneUrl: AnyMock;
         getWebUrl: AnyMock;
         replaceRemote: AnyMock;
+        fetchRemote: AnyMock;
+        merge: AnyMock;
+        switchBranch: AnyMock;
         addAll: AnyMock;
         commit: AnyMock;
         push: AnyMock;
+        removeLocalDir: AnyMock;
     };
     codeEditFacade: {
         listProviders: AnyMock;
@@ -96,6 +101,7 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
         gitFacade: {
             getUser: jest.fn().mockResolvedValue({ login: 'evereq' }),
             getCommitter: jest.fn().mockResolvedValue({ name: 'evereq', email: 'e@v.co' }),
+            getAccessToken: jest.fn().mockResolvedValue('gh-token'),
             cloneOrPull: jest.fn().mockResolvedValue('/tmp/base-repo'),
             createRepository: jest.fn().mockResolvedValue({
                 owner: 'evereq',
@@ -105,14 +111,20 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
             }),
             getCloneUrl: jest
                 .fn()
-                .mockReturnValue('https://github.com/evereq/tpl-minimal-mytheme-abc123.git'),
+                .mockImplementation(
+                    (_providerId, owner, repo) => `https://github.com/${owner}/${repo}.git`,
+                ),
             getWebUrl: jest
                 .fn()
                 .mockReturnValue('https://github.com/evereq/tpl-minimal-mytheme-abc123'),
             replaceRemote: jest.fn().mockResolvedValue(undefined),
+            fetchRemote: jest.fn().mockResolvedValue(undefined),
+            merge: jest.fn().mockResolvedValue('merge-sha'),
+            switchBranch: jest.fn().mockResolvedValue('main'),
             addAll: jest.fn().mockResolvedValue(undefined),
             commit: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
+            removeLocalDir: jest.fn().mockResolvedValue(undefined),
         },
         codeEditFacade: {
             listProviders: jest.fn().mockResolvedValue([
@@ -528,5 +540,97 @@ describe('TemplateCustomizationService.execute', () => {
         });
         await service.execute('cust-1');
         expect(mocks.gitFacade.cloneOrPull).not.toHaveBeenCalled();
+    });
+});
+
+describe('TemplateCustomizationService.syncFromBase', () => {
+    function seedTemplate(mocks: Mocks) {
+        mocks.templateRepository.findById.mockResolvedValue({
+            id: 'custom-abc',
+            kind: 'website',
+            sourceType: 'custom',
+            ownerUserId: 'user-1',
+            name: 'Custom Minimal',
+            repositoryOwner: 'evereq',
+            repositoryName: 'tpl-minimal-x',
+            repositoryUrl: 'https://github.com/evereq/tpl-minimal-x',
+            branch: 'main',
+            syncBranches: ['main'],
+            isActive: true,
+            metadata: { baseTemplateId: 'minimal' },
+        });
+    }
+
+    it('merges the latest base template into the custom repository by default', async () => {
+        const { service, mocks } = makeService();
+        seedTemplate(mocks);
+        mocks.templateRepository.updateById.mockImplementation(async (_id, patch) => ({
+            ...(await mocks.templateRepository.findById()),
+            ...patch,
+        }));
+
+        const result = await service.syncFromBase('user-1', 'custom-abc');
+
+        expect(mocks.gitFacade.cloneOrPull).toHaveBeenCalledWith(
+            expect.objectContaining({ owner: 'evereq', repo: 'tpl-minimal-x', branch: 'main' }),
+            expect.objectContaining({ userId: 'user-1', providerId: 'github' }),
+        );
+        expect(mocks.gitFacade.replaceRemote).toHaveBeenCalledWith(
+            'github',
+            '/tmp/base-repo',
+            'base-template',
+            expect.stringContaining('directory-web-minimal-template'),
+        );
+        expect(mocks.gitFacade.fetchRemote).toHaveBeenCalledWith(
+            'github',
+            '/tmp/base-repo',
+            'gh-token',
+            'base-template',
+        );
+        expect(mocks.gitFacade.merge).toHaveBeenCalledWith(
+            'github',
+            '/tmp/base-repo',
+            'main',
+            'base-template/main',
+            expect.any(Object),
+        );
+        expect(mocks.gitFacade.push).toHaveBeenCalledWith(
+            { dir: '/tmp/base-repo' },
+            expect.objectContaining({ userId: 'user-1' }),
+        );
+        expect(result.mode).toBe('merge');
+        expect(result.changed).toBe(true);
+    });
+
+    it('force sync overwrites the custom repository from a fresh base clone', async () => {
+        const { service, mocks } = makeService();
+        seedTemplate(mocks);
+        mocks.templateRepository.updateById.mockImplementation(async (_id, patch) => ({
+            ...(await mocks.templateRepository.findById()),
+            ...patch,
+        }));
+
+        const result = await service.syncFromBase('user-1', 'custom-abc', { force: true });
+
+        expect(mocks.gitFacade.cloneOrPull).toHaveBeenCalledWith(
+            expect.objectContaining({
+                owner: 'ever-works',
+                repo: 'directory-web-minimal-template',
+                branch: 'main',
+            }),
+            expect.objectContaining({ userId: 'user-1', providerId: 'github' }),
+        );
+        expect(mocks.gitFacade.replaceRemote).toHaveBeenCalledWith(
+            'github',
+            '/tmp/base-repo',
+            'origin',
+            expect.stringContaining('tpl-minimal-x'),
+        );
+        expect(mocks.gitFacade.push).toHaveBeenCalledWith(
+            { dir: '/tmp/base-repo', force: true },
+            expect.objectContaining({ userId: 'user-1' }),
+        );
+        expect(result.mode).toBe('force');
+        expect(result.changed).toBe(true);
     });
 });

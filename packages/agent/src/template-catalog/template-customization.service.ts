@@ -82,6 +82,17 @@ export interface IterateCustomizationInput {
     aiProviderId?: string;
 }
 
+export interface SyncTemplateFromBaseInput {
+    force?: boolean;
+}
+
+export interface SyncTemplateFromBaseResult {
+    template: Template;
+    mode: 'merge' | 'force';
+    changed: boolean;
+    message: string;
+}
+
 /**
  * Provision a brand-new repo for each customization (clone base → push to new
  * repo → run agent → push). NOT a GitHub fork — fork API is 1-per-account,
@@ -246,6 +257,59 @@ export class TemplateCustomizationService {
         return { customization, template };
     }
 
+    async syncFromBase(
+        userId: string,
+        templateId: string,
+        input: SyncTemplateFromBaseInput = {},
+    ): Promise<SyncTemplateFromBaseResult> {
+        const template = await this.templateRepository.findById(templateId);
+        if (!template || template.ownerUserId !== userId || template.sourceType !== 'custom') {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found.',
+            });
+        }
+
+        const baseTemplateId =
+            typeof template.metadata?.baseTemplateId === 'string'
+                ? template.metadata.baseTemplateId
+                : null;
+        if (!baseTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Template is not linked to a customizable base.',
+            });
+        }
+
+        const baseConfig = this.resolveCustomizableBase(baseTemplateId);
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new NotFoundException({ status: 'error', message: 'User not found.' });
+        }
+
+        const committer = await this.resolveCommitter(userId, user);
+        const gitOptions: GitFacadeOptions = { userId, providerId: GIT_PROVIDER_ID };
+
+        const result = input.force
+            ? await this.forceSyncFromBase(template, baseConfig, committer, gitOptions)
+            : await this.mergeSyncFromBase(template, baseConfig, committer, gitOptions);
+
+        const syncedAt = new Date().toISOString();
+        const metadata = {
+            ...(template.metadata ?? {}),
+            lastBaseSyncedAt: syncedAt,
+            lastBaseSyncMode: result.mode,
+            lastBaseSyncBase: `${baseConfig.owner}/${baseConfig.repo}@${baseConfig.branch}`,
+        };
+        const updated = await this.templateRepository.updateById(template.id, { metadata });
+
+        return {
+            template: updated ?? { ...template, metadata },
+            mode: result.mode,
+            changed: result.changed,
+            message: result.message,
+        };
+    }
     private async start(customizationId: string): Promise<void> {
         const dispatchedId = this.dispatcher
             ? await this.dispatcher.dispatchTemplateCustomization({ customizationId })
@@ -503,6 +567,126 @@ export class TemplateCustomizationService {
             );
         }
         return removed;
+    }
+
+    private async mergeSyncFromBase(
+        template: Template,
+        baseConfig: WebsiteTemplateConfig,
+        committer: GitCommitter,
+        gitOptions: GitFacadeOptions,
+    ): Promise<{ mode: 'merge'; changed: boolean; message: string }> {
+        const branch = template.branch || baseConfig.branch || 'main';
+        const workspaceDir = await this.gitFacade.cloneOrPull(
+            {
+                owner: template.repositoryOwner,
+                repo: template.repositoryName,
+                branch,
+                committer,
+            },
+            gitOptions,
+        );
+
+        await this.gitFacade.switchBranch(GIT_PROVIDER_ID, workspaceDir, branch);
+        const token = await this.gitFacade.getAccessToken(gitOptions);
+        if (!token) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'GitHub credentials are required to sync this template.',
+            });
+        }
+
+        const remote = 'base-template';
+        const baseUrl = this.gitFacade.getCloneUrl(
+            GIT_PROVIDER_ID,
+            baseConfig.owner,
+            baseConfig.repo,
+        );
+
+        await this.gitFacade.replaceRemote(GIT_PROVIDER_ID, workspaceDir, remote, baseUrl);
+        await this.gitFacade.fetchRemote(GIT_PROVIDER_ID, workspaceDir, token, remote);
+
+        let mergeOid: string | null = null;
+        try {
+            mergeOid = await this.gitFacade.merge(
+                GIT_PROVIDER_ID,
+                workspaceDir,
+                branch,
+                `${remote}/${baseConfig.branch}`,
+                committer,
+            );
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'Base template sync could not merge cleanly. Review the repository manually or retry with force sync to overwrite custom code with the latest base.',
+                details: this.errorMessage(error),
+            });
+        }
+
+        const stripped = await this.stripProvisionedDir(workspaceDir, baseConfig);
+        if (stripped.length > 0) {
+            await this.gitFacade.addAll(GIT_PROVIDER_ID, workspaceDir);
+            await this.gitFacade.commit(
+                GIT_PROVIDER_ID,
+                workspaceDir,
+                `chore(template): strip upstream reference apps after base sync\n\n${stripped.map((p) => `- ${p}`).join('\n')}`,
+                committer,
+            );
+        }
+
+        const changed = !!mergeOid || stripped.length > 0;
+        await this.gitFacade.push({ dir: workspaceDir }, gitOptions);
+
+        return {
+            mode: 'merge',
+            changed,
+            message: changed
+                ? 'Merged latest base template changes into the custom template repository.'
+                : 'Custom template was already up to date with its base.',
+        };
+    }
+
+    private async forceSyncFromBase(
+        template: Template,
+        baseConfig: WebsiteTemplateConfig,
+        committer: GitCommitter,
+        gitOptions: GitFacadeOptions,
+    ): Promise<{ mode: 'force'; changed: boolean; message: string }> {
+        await this.gitFacade.removeLocalDir(GIT_PROVIDER_ID, baseConfig.owner, baseConfig.repo);
+        const baseDir = await this.gitFacade.cloneOrPull(
+            {
+                owner: baseConfig.owner,
+                repo: baseConfig.repo,
+                branch: baseConfig.branch,
+                committer,
+            },
+            gitOptions,
+        );
+
+        await this.stripProvisionedDir(baseDir, baseConfig);
+        await this.gitFacade.addAll(GIT_PROVIDER_ID, baseDir);
+        await this.gitFacade.commit(
+            GIT_PROVIDER_ID,
+            baseDir,
+            'chore(template): sync from latest base template',
+            committer,
+        );
+
+        const targetRepoUrl = this.gitFacade.getCloneUrl(
+            GIT_PROVIDER_ID,
+            template.repositoryOwner,
+            template.repositoryName,
+        );
+        await this.gitFacade.replaceRemote(GIT_PROVIDER_ID, baseDir, 'origin', targetRepoUrl);
+        await this.gitFacade.push({ dir: baseDir, force: true }, gitOptions);
+        await this.gitFacade.removeLocalDir(GIT_PROVIDER_ID, baseConfig.owner, baseConfig.repo);
+
+        return {
+            mode: 'force',
+            changed: true,
+            message:
+                'Force-synced the custom template by overwriting it with the latest base template code.',
+        };
     }
 
     private async resolveTargetOwner(userId: string, override?: string): Promise<string> {

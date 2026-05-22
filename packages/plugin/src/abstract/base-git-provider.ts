@@ -122,6 +122,8 @@ export abstract class BaseGitProvider extends BasePlugin implements IGitOperatio
 	abstract getLocalDir(owner: string, repo: string): string;
 	abstract removeLocalDir(owner: string, repo: string): Promise<void>;
 	abstract replaceRemote(dir: string, remote: string, url: string): Promise<void>;
+	abstract fetch(dir: string, token: string, remote?: string): Promise<void>;
+	abstract merge(dir: string, ours: string, theirs: string, committer?: GitCommitter): Promise<string>;
 	abstract renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 
 	// ========================================

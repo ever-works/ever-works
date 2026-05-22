@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/common/EmptyState';
 import {
     Dialog,
@@ -51,6 +52,7 @@ import {
     getTemplateCustomization,
     refreshTemplates,
     setDefaultTemplate,
+    syncCustomTemplateWithBase,
     updateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
@@ -199,10 +201,12 @@ function TemplateCard({
     onEdit,
     onArchive,
     onCustomizeAgain,
+    onSyncBase,
     onViewStatus,
     loading,
     forkLoading,
     archiveLoading,
+    syncLoading,
 }: {
     template: TemplateCatalogItem;
     isDefault: boolean;
@@ -211,10 +215,12 @@ function TemplateCard({
     onEdit: (template: TemplateCatalogItem) => void;
     onArchive: (template: TemplateCatalogItem) => void;
     onCustomizeAgain: (template: TemplateCatalogItem) => void;
+    onSyncBase: (template: TemplateCatalogItem) => void;
     onViewStatus: (template: TemplateCatalogItem) => void;
     loading: boolean;
     forkLoading: boolean;
     archiveLoading: boolean;
+    syncLoading: boolean;
 }) {
     const t = useTranslations('dashboard.templates');
     const [previewFailed, setPreviewFailed] = useState(false);
@@ -335,16 +341,29 @@ function TemplateCard({
                         ) : (
                             <>
                                 {template.customizable && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={loading || archiveLoading}
-                                        onClick={() => onCustomizeAgain(template)}
-                                        title={t('card.customizeAgain')}
-                                        className="text-xs"
-                                    >
-                                        <Wand2 className="h-3.5 w-3.5" />
-                                    </Button>
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            loading={syncLoading}
+                                            disabled={loading || archiveLoading || syncLoading}
+                                            onClick={() => onSyncBase(template)}
+                                            title={t('card.syncBase')}
+                                            className="text-xs"
+                                        >
+                                            <RefreshCw className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={loading || archiveLoading || syncLoading}
+                                            onClick={() => onCustomizeAgain(template)}
+                                            title={t('card.customizeAgain')}
+                                            className="text-xs"
+                                        >
+                                            <Wand2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </>
                                 )}
                                 <Button
                                     variant="ghost"
@@ -405,12 +424,15 @@ export function TemplatesCatalog({
     const [archiveDialogTemplate, setArchiveDialogTemplate] = useState<TemplateCatalogItem | null>(
         null,
     );
+    const [syncDialogTemplate, setSyncDialogTemplate] = useState<TemplateCatalogItem | null>(null);
+    const [forceSync, setForceSync] = useState(false);
     const [formState, setFormState] = useState<AddTemplateFormState>(EMPTY_FORM);
     const [forkTargetOwner, setForkTargetOwner] = useState(forkTargets[0]?.login || '');
     const [isSavingDefault, startSavingDefault] = useTransition();
     const [isAddingTemplate, startAddingTemplate] = useTransition();
     const [isForkingTemplate, startForkingTemplate] = useTransition();
     const [isArchivingTemplate, startArchivingTemplate] = useTransition();
+    const [isSyncingTemplate, startSyncingTemplate] = useTransition();
     const [isRefreshingTemplates, startRefreshingTemplates] = useTransition();
     const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
     const [customizeMode, setCustomizeMode] = useState<CustomizeDialogMode>('new');
@@ -618,6 +640,11 @@ export function TemplatesCatalog({
         setArchiveDialogTemplate(null);
     };
 
+    const resetSyncDialog = () => {
+        setSyncDialogTemplate(null);
+        setForceSync(false);
+    };
+
     const handleSetDefault = (templateId: string) => {
         startSavingDefault(() => {
             void (async () => {
@@ -774,6 +801,34 @@ export function TemplatesCatalog({
                 }
                 toast.success(t('messages.archiveSuccess'));
                 resetArchiveDialog();
+            })();
+        });
+    };
+
+    const handleSyncTemplate = () => {
+        if (!syncDialogTemplate) return;
+
+        startSyncingTemplate(() => {
+            void (async () => {
+                const result = await syncCustomTemplateWithBase(syncDialogTemplate.id, {
+                    force: forceSync,
+                });
+
+                if (!result.success || !result.template) {
+                    toast.error(result.error || t('messages.syncBaseFailed'));
+                    return;
+                }
+
+                setTemplates((current) => {
+                    const next = current
+                        .filter((template) => template.id !== result.template?.id)
+                        .concat(result.template);
+                    return next.sort(compareTemplates);
+                });
+                toast.success(
+                    result.changed ? t('messages.syncBaseSuccess') : t('messages.syncBaseUpToDate'),
+                );
+                resetSyncDialog();
             })();
         });
     };
@@ -954,6 +1009,9 @@ export function TemplatesCatalog({
                                 setArchiveDialogTemplate(selectedTemplate)
                             }
                             onCustomizeAgain={openCustomizeIterate}
+                            onSyncBase={(selectedTemplate) =>
+                                setSyncDialogTemplate(selectedTemplate)
+                            }
                             onViewStatus={openCustomizeStatus}
                             loading={isSavingDefault}
                             forkLoading={
@@ -961,6 +1019,9 @@ export function TemplatesCatalog({
                             }
                             archiveLoading={
                                 isArchivingTemplate && archiveDialogTemplate?.id === template.id
+                            }
+                            syncLoading={
+                                isSyncingTemplate && syncDialogTemplate?.id === template.id
                             }
                         />
                     ))}
@@ -1186,6 +1247,60 @@ export function TemplatesCatalog({
                             disabled={forkTargets.length === 0}
                         >
                             {t('forkDialog.submit')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!syncDialogTemplate} onOpenChange={(open) => !open && resetSyncDialog()}>
+                <DialogContent className="max-w-xl">
+                    <DialogClose onClose={resetSyncDialog} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            {t('syncDialog.title')}
+                        </DialogTitle>
+                        <DialogDescription>{t('syncDialog.description')}</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="rounded-lg border border-border bg-surface px-4 py-3 dark:border-border-dark dark:bg-white/4">
+                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                {t('syncDialog.templateLabel')}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-text dark:text-text-dark">
+                                {syncDialogTemplate?.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {syncDialogTemplate?.repositoryOwner}/
+                                {syncDialogTemplate?.repositoryName}
+                            </p>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-surface px-4 py-3 dark:border-border-dark dark:bg-white/4">
+                            <Checkbox
+                                checked={forceSync}
+                                onChange={(event) => setForceSync(event.target.checked)}
+                                disabled={isSyncingTemplate}
+                                label={t('syncDialog.forceLabel')}
+                                description={t('syncDialog.forceDescription')}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={resetSyncDialog}
+                            disabled={isSyncingTemplate}
+                        >
+                            {t('syncDialog.cancel')}
+                        </Button>
+                        <Button
+                            variant={forceSync ? 'danger' : 'primary'}
+                            onClick={handleSyncTemplate}
+                            loading={isSyncingTemplate}
+                        >
+                            {forceSync ? t('syncDialog.forceSubmit') : t('syncDialog.submit')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -288,6 +288,44 @@ export async function iterateCustomTemplate(
     }
 }
 
+export async function syncCustomTemplateWithBase(templateId: string, input: { force?: boolean }) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.syncCustom(templateId, input);
+
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+        revalidatePath(ROUTES.DASHBOARD_WORKS_NEW);
+
+        return {
+            success: response.status === 'success',
+            template: response.template ?? null,
+            mode: response.mode ?? null,
+            changed: response.changed ?? false,
+            message: response.message ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.syncBaseFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Sync custom template error:', error);
+        return {
+            success: false,
+            template: null,
+            mode: null,
+            changed: false,
+            message: null,
+            error: error instanceof Error ? error.message : t('messages.syncBaseFailed'),
+        };
+    }
+}
+
 export async function listCustomizationProviders() {
     const user = await getAuthFromCookie();
     if (!user) {

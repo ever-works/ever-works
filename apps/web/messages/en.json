@@ -3593,7 +3593,8 @@
                     "pushing": "Pushing",
                     "succeeded": "Customized",
                     "failed": "Last run failed"
-                }
+                },
+                "syncBase": "Sync from base"
             },
             "dialog": {
                 "title": "Add custom template",
@@ -3670,7 +3671,10 @@
                 "defaultFailed": "Failed to update default template.",
                 "customizeFailed": "Failed to start template customization.",
                 "customizationSucceeded": "Template customization completed.",
-                "customizationFailed": "Template customization failed."
+                "customizationFailed": "Template customization failed.",
+                "syncBaseSuccess": "Template synced from its base.",
+                "syncBaseUpToDate": "Template is already up to date with its base.",
+                "syncBaseFailed": "Failed to sync template from base."
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -3731,6 +3735,16 @@
                     "browsePlugins": "Browse plugin catalog",
                     "noRuns": "No customization runs yet for this template."
                 }
+            },
+            "syncDialog": {
+                "title": "Sync from base template",
+                "description": "Pull the latest code from the built-in base template into this custom template repository. Normal sync tries to merge and preserve your custom changes.",
+                "templateLabel": "Custom template",
+                "forceLabel": "Force sync and overwrite custom code",
+                "forceDescription": "Use this only when normal sync fails or you intentionally want to reset the repository to the latest base template. AI styling and manual code changes may be replaced.",
+                "cancel": "Cancel",
+                "submit": "Sync latest base",
+                "forceSubmit": "Force sync"
             }
         },
         "templateSelector": {
