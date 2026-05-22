@@ -1,3 +1,4 @@
+import type { KbContextBundleData } from '@ever-works/contracts';
 import type { IAiFacade } from '../facades/ai-facade.interface.js';
 import type { ISearchFacade } from '../facades/search-facade.interface.js';
 import type { IScreenshotFacade } from '../facades/screenshot-facade.interface.js';
@@ -83,4 +84,22 @@ export interface StepExecutionContext {
 	 * Abort signal for cancellation support.
 	 */
 	readonly signal?: AbortSignal;
+
+	/**
+	 * EW-641 Phase 2/b row 32b — resolved KB context bundle for this
+	 * execution, when the agent-side orchestrator has wired the agent's
+	 * `KnowledgeBaseService.resolveContext(workId, { query? })` through
+	 * `PipelineFacadeService.createStepExecutionContext`.
+	 *
+	 * Optional so deployments that haven't wired the KB resolver yet
+	 * (older builds, isolated unit tests, OSS images without the agent
+	 * package) keep constructing identically — the carrier is here, but
+	 * the row 32c orchestrator call site is what actually populates it.
+	 *
+	 * Step plugins read `kbContext.alwaysInjected` / `.queryRetrieved`
+	 * and feed those documents into their prompts via the row 31
+	 * `formatKbContext` helper (rendered by an agent-side wrapper that
+	 * exposes `format()` on its bundle).
+	 */
+	readonly kbContext?: KbContextBundleData;
 }

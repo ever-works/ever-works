@@ -1,5 +1,5 @@
 import { buildKbContextBundle } from '../kb-context-bundle';
-import type { KbDocumentBodyDto } from '@ever-works/contracts';
+import type { KbContextBundleData, KbDocumentBodyDto } from '@ever-works/contracts';
 
 /**
  * Test helper — same shape as the `kb-prompt-formatter` helper so the
@@ -180,6 +180,23 @@ describe('buildKbContextBundle', () => {
             buildKbContextBundle(always, query);
             expect(always.length).toBe(alwaysLenBefore);
             expect(query.length).toBe(queryLenBefore);
+        });
+    });
+
+    describe('public contract', () => {
+        // EW-641 Phase 2/b row 32b — the agent-side bundle MUST satisfy
+        // the wire-format `KbContextBundleData` carrier in
+        // `@ever-works/contracts`. Without this, plumbing the bundle
+        // through `StepExecutionContext.kbContext` would require an
+        // unsafe widen at the call site.
+        it('is assignable to KbContextBundleData (public data carrier)', () => {
+            const doc = buildDoc({ id: 'a' });
+            const bundle = buildKbContextBundle([doc], []);
+            // Compile-time + runtime check: the bundle's data-bearing
+            // fields satisfy the public KbContextBundleData type.
+            const asData: KbContextBundleData = bundle;
+            expect(asData.alwaysInjected).toHaveLength(1);
+            expect(asData.queryRetrieved).toHaveLength(0);
         });
     });
 
