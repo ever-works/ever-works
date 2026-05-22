@@ -2517,6 +2517,16 @@
                     "download": "Download audio",
                     "unsupported": "Your browser does not support inline audio playback."
                 },
+                "search": {
+                    "triggerLabel": "Search KB…",
+                    "dialogLabel": "Knowledge Base search",
+                    "inputLabel": "Search query",
+                    "placeholder": "Type to search documents…",
+                    "hint": "Type at least {min} characters to search.",
+                    "loading": "Searching…",
+                    "empty": "No documents match \"{query}\".",
+                    "error": "Search failed ({error})."
+                },
                 "sidePanel": {
                     "title": "Document details",
                     "subtitle": "Metadata, lock state, and history for this document.",

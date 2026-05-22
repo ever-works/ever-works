@@ -8,6 +8,7 @@ import { KbShell } from '@/components/works/detail/kb/KbShell';
 import { KbTreePanel } from '@/components/works/detail/kb/KbTreePanel';
 import { KbDocumentView } from '@/components/works/detail/kb/KbDocumentView';
 import { KbEditor } from '@/components/works/detail/kb/KbEditor';
+import { KbSearchPalette } from '@/components/works/detail/kb/KbSearchPalette';
 import { KbSidePanel } from '@/components/works/detail/kb/KbSidePanel';
 import { KbUploadZone } from '@/components/works/detail/kb/KbUploadZone';
 
@@ -94,6 +95,9 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
 
     return (
         <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-end">
+                <KbSearchPalette workId={id} />
+            </div>
             <KbUploadZone workId={id} targetClass={doc.class} />
             <KbShell
                 workId={id}
