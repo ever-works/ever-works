@@ -6,6 +6,7 @@ import type {
     KbDocumentHistoryResult,
     KbDocumentListFilter,
     KbLockMode,
+    KbUploadDto,
     UpdateKbDocumentInput,
 } from '@ever-works/contracts';
 
@@ -113,6 +114,24 @@ export const kbAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    /**
+     * `GET /api/works/:id/kb/uploads/:uploadId` — read a single upload
+     * row (metadata only; the persisted bytes live behind the row-21a
+     * `/download` route). The doc detail page calls this when the doc
+     * has a `sourceUploadId` so the viewer dispatcher (row 21b) can
+     * decide whether to mount `KbPdfViewer` / `KbXlsxViewer` /
+     * `KbDocxViewer` / image / video / audio based on `upload.mimeType`.
+     *
+     * Errors propagate as `ApiResponseError` — callers may catch 404 to
+     * fall back to the markdown viewer when the upload reference is
+     * orphaned.
+     */
+    getUpload: async (workId: string, uploadId: string): Promise<KbUploadDto> => {
+        return serverFetch<KbUploadDto>(
+            `/works/${workId}/kb/uploads/${encodeURIComponent(uploadId)}`,
+        );
     },
 
     /**
