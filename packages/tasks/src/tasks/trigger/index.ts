@@ -2,6 +2,7 @@ export * from './anonymous-user-cleanup.task';
 export * from './data-repo-sync-dispatcher.task';
 export * from './deploy-ready-poller.task';
 export * from './kb-backfill-skeleton.task';
+export * from './kb-embed-document.task';
 export * from './kb-mirror-document.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './template-customization.task';
