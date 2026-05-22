@@ -1225,4 +1225,150 @@ describe('AiFacadeService', () => {
             );
         });
     });
+
+    describe('embed', () => {
+        it('resolves the active plugin and forwards options + resolved settings to createEmbedding', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const createEmbeddingMock = jest.fn().mockResolvedValue({
+                model: 'text-embedding-3-small',
+                embeddings: [[0.1, 0.2, 0.3]],
+                usage: { promptTokens: 4, completionTokens: 0, totalTokens: 4 },
+            });
+            (aiPlugin as unknown as { createEmbedding: jest.Mock }).createEmbedding =
+                createEmbeddingMock;
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({
+                apiKey: 'sk-test',
+                embeddingModel: 'text-embedding-3-small',
+            });
+
+            const result = await service.embed({ input: 'hello world' }, defaultFacadeOptions);
+
+            expect(result.embeddings).toEqual([[0.1, 0.2, 0.3]]);
+            expect(createEmbeddingMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    input: 'hello world',
+                    settings: expect.objectContaining({
+                        apiKey: 'sk-test',
+                        embeddingModel: 'text-embedding-3-small',
+                    }),
+                }),
+            );
+        });
+
+        it('records PluginUsage with operation=embed and totalTokens as units', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin as unknown as { createEmbedding: jest.Mock }).createEmbedding = jest
+                .fn()
+                .mockResolvedValue({
+                    model: 'text-embedding-3-small',
+                    embeddings: [
+                        [0.1, 0.2],
+                        [0.3, 0.4],
+                    ],
+                    usage: { promptTokens: 7, completionTokens: 0, totalTokens: 7 },
+                });
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.embed(
+                { input: ['hello', 'world'] },
+                { userId: 'user-1', workId: 'work-1' },
+            );
+
+            expect(pluginUsageService.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: 'work-1',
+                    userId: 'user-1',
+                    pluginId: 'openai-provider',
+                    units: 7,
+                    modelId: 'text-embedding-3-small',
+                    metadata: expect.objectContaining({
+                        operation: 'embed',
+                        inputCount: 2,
+                        embeddingsLength: 2,
+                    }),
+                }),
+            );
+        });
+
+        it('falls back to input-count units when the plugin omits usage (local-model branch)', async () => {
+            const aiPlugin = createMockAiPlugin('ollama-provider', 'Ollama', {
+                providerType: 'ollama',
+            });
+            (aiPlugin as unknown as { createEmbedding: jest.Mock }).createEmbedding = jest
+                .fn()
+                .mockResolvedValue({
+                    model: 'nomic-embed-text',
+                    embeddings: [[0.5, 0.6, 0.7]],
+                });
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.embed({ input: ['only-one'] }, defaultFacadeOptions);
+
+            expect(pluginUsageService.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    units: 1, // input-count fallback
+                    metadata: expect.objectContaining({
+                        operation: 'embed',
+                        inputCount: 1,
+                    }),
+                }),
+            );
+        });
+
+        it('throws AiFacadeError when the resolved plugin lacks createEmbedding', async () => {
+            const aiPlugin = createMockAiPlugin('legacy-provider', 'Legacy');
+            // Plugin without createEmbedding (interface declares it optional).
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await expect(service.embed({ input: 'hello' }, defaultFacadeOptions)).rejects.toThrow(
+                AiFacadeError,
+            );
+        });
+
+        it('rewraps plugin errors as AiFacadeError preserving the original cause', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const boom = new Error('rate limited');
+            (aiPlugin as unknown as { createEmbedding: jest.Mock }).createEmbedding = jest
+                .fn()
+                .mockRejectedValue(boom);
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await expect(
+                service.embed({ input: 'hello' }, defaultFacadeOptions),
+            ).rejects.toMatchObject({
+                name: 'AiFacadeError',
+                operation: 'embed',
+                provider: 'openai-provider',
+                cause: boom,
+            });
+        });
+
+        it('throws NoProviderError when no AI provider is configured', async () => {
+            registry.getByCapability.mockReturnValue([]);
+
+            await expect(service.embed({ input: 'hello' }, defaultFacadeOptions)).rejects.toThrow(
+                NoProviderError,
+            );
+        });
+    });
 });
