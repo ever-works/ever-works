@@ -2683,6 +2683,7 @@
                     "saved": "Saved",
                     "error": "Save failed",
                     "idle": "Idle",
+                    "dirty": "Unsaved changes…",
                     "placeholder": "Start typing to add content…"
                 }
             }

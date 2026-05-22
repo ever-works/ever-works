@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -21,38 +21,53 @@ interface KbEditorProps {
      * watching the save bounce off the server with a 403.
      */
     readOnly?: boolean;
+    /**
+     * Override the autosave debounce. Tests pass a smaller value so the
+     * debounced path is exercisable inside `vi.useFakeTimers`; product
+     * code leaves it at the default 800ms (spec §14 acceptance A13).
+     */
+    autosaveDebounceMs?: number;
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+
+const DEFAULT_AUTOSAVE_DEBOUNCE_MS = 800;
 
 /**
- * EW-641 Phase 1B/d row 5 — basic Tiptap editor for KB documents.
+ * EW-641 Phase 1B/d row 6 — Tiptap editor with 800ms debounced autosave
+ * + dirty/saved indicator.
  *
- * Wraps `@tiptap/react` + StarterKit + Link + `tiptap-markdown` so the
- * round-trip between the editor model and the API's Markdown body is
- * lossless for the basics (headings, lists, code blocks, links, etc.).
- * Autosave + dirty/saved indicator come in row 6 — this PR ships a
- * manual save button so the upload → edit → save loop is testable end
- * to end before the debounce + activity-log wiring lands.
+ * Builds on row 5's manual-save editor:
+ *  - `editor.on('update')` flips status `idle → dirty` and arms a
+ *    `setTimeout` that fires the same save path the manual button uses.
+ *    Successive edits within the window reset the timer (debounce).
+ *  - The manual "Save" button stays around as a "save now" affordance:
+ *    it clears the pending timer and runs the save immediately.
+ *  - The status pill cycles `idle → dirty → saving → saved → idle`
+ *    (with `error` short-circuiting). The `data-status` attribute is
+ *    the canonical Playwright assertion target (A13).
+ *  - When the in-flight save resolves we read the freshly returned
+ *    body so the dirty comparison resets to the server-confirmed
+ *    state — typing during the save still re-arms the timer afterwards.
  *
- * Selectors locked for the upcoming Playwright suite (A12-A17):
- *  - `data-testid="kb-editor"` (root, same as the row #4 read-only
- *    view so tests that pre-date this PR keep working)
- *  - `data-testid="kb-editor-body"` (the contenteditable surface)
- *  - `data-testid="kb-editor-save"` (the save button)
- *  - `data-testid="kb-editor-status"` (the saving/saved/error pill;
- *    autosave in row 6 keeps the same selector)
- *
- * Tiptap on React 19 strict mode needs `immediatelyRender: false` —
- * the editor's initial commit happens after mount instead of during
- * render, which avoids the "useSyncExternalStore inside render"
- * warning + double-mount content duplication.
+ * Tiptap on React 19 strict mode needs `immediatelyRender: false`.
  */
-export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
+export function KbEditor({
+    workId,
+    doc,
+    readOnly = false,
+    autosaveDebounceMs = DEFAULT_AUTOSAVE_DEBOUNCE_MS,
+}: KbEditorProps) {
     const t = useTranslations('dashboard.workDetail.kb');
     const [status, setStatus] = useState<SaveStatus>('idle');
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+
+    // Track the last body confirmed by the server so the autosave
+    // debounce can short-circuit when nothing has actually changed.
+    const lastSavedBodyRef = useRef<string>(doc.body ?? '');
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const savingRef = useRef(false);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -85,22 +100,26 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
         },
     });
 
-    const onSave = useCallback(() => {
+    const flush = useCallback(() => {
         if (!editor) return;
-        setError(null);
-        setStatus('saving');
-        // Tiptap's markdown extension exposes a `getMarkdown()` helper
-        // through the editor storage. Round-trip through that so the
-        // saved payload matches what `tiptap-markdown` would parse back
-        // on the next mount.
-        const body = (
-            editor.storage as Record<string, { getMarkdown?: () => string }>
-        ).markdown?.getMarkdown?.();
+        if (savingRef.current) return; // already saving; the next edit re-arms
+
+        const body = readMarkdown(editor);
         if (typeof body !== 'string') {
             setStatus('error');
             setError('Could not serialize editor content as Markdown.');
             return;
         }
+        if (body === lastSavedBodyRef.current) {
+            // Nothing meaningful changed (e.g. focus toggled); skip the
+            // network round-trip and settle back to `idle`.
+            setStatus('idle');
+            return;
+        }
+
+        savingRef.current = true;
+        setError(null);
+        setStatus('saving');
 
         startTransition(async () => {
             const result = await updateKbDocumentAction({
@@ -108,7 +127,9 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
                 docId: doc.id,
                 body: { body },
             });
+            savingRef.current = false;
             if (result.success) {
+                lastSavedBodyRef.current = result.data?.body ?? body;
                 setStatus('saved');
             } else {
                 setStatus('error');
@@ -116,6 +137,50 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
             }
         });
     }, [editor, doc.id, workId]);
+
+    // Subscribe to editor updates → arm the autosave debounce.
+    useEffect(() => {
+        if (!editor) return;
+        if (readOnly) return;
+        const onUpdate = () => {
+            // Don't downgrade an in-flight save to dirty — the next
+            // settled state (`saved` / `error`) will reflect the latest
+            // server response. We still re-arm the timer so the typing
+            // that happened mid-save flushes once the request returns.
+            if (!savingRef.current) {
+                setStatus('dirty');
+            }
+            if (debounceRef.current !== null) {
+                clearTimeout(debounceRef.current);
+            }
+            debounceRef.current = setTimeout(() => {
+                debounceRef.current = null;
+                flush();
+            }, autosaveDebounceMs);
+        };
+        editor.on('update', onUpdate);
+        return () => {
+            editor.off('update', onUpdate);
+        };
+    }, [editor, readOnly, autosaveDebounceMs, flush]);
+
+    // Clean up any pending debounce on unmount.
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current !== null) {
+                clearTimeout(debounceRef.current);
+                debounceRef.current = null;
+            }
+        };
+    }, []);
+
+    const onSaveNow = useCallback(() => {
+        if (debounceRef.current !== null) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+        }
+        flush();
+    }, [flush]);
 
     return (
         <section
@@ -184,7 +249,7 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
             <footer className="flex items-center gap-3">
                 <SaveButton
                     disabled={readOnly || !editor || status === 'saving'}
-                    onClick={onSave}
+                    onClick={onSaveNow}
                     saving={status === 'saving'}
                     label={t('editor.save')}
                     savingLabel={t('editor.saving')}
@@ -194,6 +259,7 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
                     error={error}
                     labels={{
                         idle: t('editor.idle'),
+                        dirty: t('editor.dirty'),
                         saving: t('editor.saving'),
                         saved: t('editor.saved'),
                         error: t('editor.error'),
@@ -202,6 +268,18 @@ export function KbEditor({ workId, doc, readOnly = false }: KbEditorProps) {
             </footer>
         </section>
     );
+}
+
+/**
+ * Pull the Markdown body out of Tiptap's storage. The `tiptap-markdown`
+ * extension installs a `markdown.getMarkdown()` helper on the editor
+ * storage — that's the lossless round-trip path. We narrow the storage
+ * type defensively because Tiptap's storage map is typed as
+ * `Record<string, any>` upstream.
+ */
+function readMarkdown(editor: Editor): string | undefined {
+    const storage = editor.storage as Record<string, { getMarkdown?: () => string }>;
+    return storage.markdown?.getMarkdown?.();
 }
 
 interface EditorSurfaceProps {
@@ -265,6 +343,7 @@ function SaveButton({ disabled, onClick, saving, label, savingLabel }: SaveButto
 
 interface SaveStatusPillLabels {
     idle: string;
+    dirty: string;
     saving: string;
     saved: string;
     error: string;
@@ -289,16 +368,20 @@ function SaveStatusPill({ status, error, labels }: SaveStatusPillProps) {
                       ? 'text-red-600 dark:text-red-400'
                       : status === 'saving'
                         ? 'text-text-muted dark:text-text-muted-dark/70'
-                        : 'sr-only',
+                        : status === 'dirty'
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'sr-only',
             )}
         >
             {status === 'saved'
                 ? labels.saved
                 : status === 'saving'
                   ? labels.saving
-                  : status === 'error'
-                    ? (error ?? labels.error)
-                    : labels.idle}
+                  : status === 'dirty'
+                    ? labels.dirty
+                    : status === 'error'
+                      ? (error ?? labels.error)
+                      : labels.idle}
         </span>
     );
 }
