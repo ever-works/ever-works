@@ -71,3 +71,73 @@ export async function seedKbMarkdownDoc(
     }
     return { documentId, path };
 }
+
+export interface SeedKbBinaryDocOptions {
+    /** Filename used in the multipart upload; controls the resulting doc slug. */
+    filename: string;
+    /** Storage MIME type — drives both the upload row's `mimeType` and the viewer dispatcher (row 21b). */
+    mimeType: string;
+    /** Raw bytes. For viewer-cap tests, `Buffer.alloc(6 * 1024 * 1024, 0)` is plenty for a 6 MiB stub. */
+    body: Buffer;
+    /** Optional class override; defaults to `knowledge` so the doc lands in a predictable folder. */
+    targetClass?: string;
+    /** Optional title — falls back to filename-minus-extension server-side. */
+    title?: string;
+}
+
+export interface SeededKbBinaryDoc extends SeededKbDoc {
+    uploadId: string;
+}
+
+/**
+ * POST multipart with an arbitrary MIME + buffer, returning the upload id
+ * AND the resulting doc id/path. Mirrors `seedKbMarkdownDoc` but accepts
+ * binary uploads — for non-text MIMEs the API stores the bytes with
+ * `extractionStatus='skipped'`, creates a stub `WorkKnowledgeDocument`
+ * row whose `sourceUploadId` points at the upload, and the row-21b viewer
+ * dispatcher (`pickKbViewer`) mounts the matching `Kb{Pdf,Xlsx,Docx,Image,
+ * Video,Audio}Viewer`.
+ *
+ * Watch-out: the upload endpoint's per-file cap is `KB_UPLOAD_MAX_BYTES`
+ * (default 200 MiB). The 5 MiB-XLSX / 30 MiB-PDF / 10 MiB-image / etc.
+ * thresholds tested by A14 are enforced VIEWER-SIDE (each viewer's
+ * `KB_*_INLINE_MAX_BYTES`), so a 6 MiB upload here is accepted and the
+ * viewer renders the download fallback purely from the doc's
+ * `fileSize`-driven decision.
+ */
+export async function seedKbBinaryDoc(
+    request: APIRequestContext,
+    token: string,
+    workId: string,
+    opts: SeedKbBinaryDocOptions,
+): Promise<SeededKbBinaryDoc> {
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/uploads`, {
+        headers: authedHeaders(token),
+        multipart: {
+            file: {
+                name: opts.filename,
+                mimeType: opts.mimeType,
+                buffer: opts.body,
+            },
+            targetClass: opts.targetClass ?? 'knowledge',
+            ...(opts.title ? { title: opts.title } : {}),
+        },
+    });
+    if (!res.ok()) {
+        const errBody = await res.text();
+        throw new Error(`seedKbBinaryDoc failed (${res.status()}): ${errBody}`);
+    }
+    const json = (await res.json()) as {
+        upload?: { id?: string } | null;
+        document?: { id?: string; path?: string } | null;
+    };
+    const uploadId = json.upload?.id;
+    const documentId = json.document?.id;
+    const path = json.document?.path;
+    if (!uploadId || !documentId || !path) {
+        throw new Error(
+            `seedKbBinaryDoc: upload accepted but response shape missing ids: ${JSON.stringify(json)}`,
+        );
+    }
+    return { uploadId, documentId, path };
+}
