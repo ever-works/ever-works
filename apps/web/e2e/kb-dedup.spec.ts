@@ -99,7 +99,7 @@ test.describe('Knowledge Base — A17 SHA-256 dedup', () => {
                     mimeType: 'text/markdown',
                     buffer: Buffer.from(bodyText, 'utf8'),
                 },
-                targetClass: 'knowledge',
+                targetClass: 'freeform',
             },
         });
         expect(secondRes.status(), 'POST second upload (dedup)').toBe(201);
