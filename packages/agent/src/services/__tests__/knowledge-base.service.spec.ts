@@ -243,6 +243,29 @@ describe('KnowledgeBaseService', () => {
         });
     });
 
+    describe('semanticSearch', () => {
+        // The default test module doesn't wire `chunkRepository` or
+        // `aiFacade` — same shape as an OSS deployment with no
+        // embedding configured. These tests pin the lexical-only
+        // graceful-fallback paths. End-to-end semantic + RRF blend is
+        // covered by row 47's A22 e2e (embedding within 60s).
+
+        it('returns [] when chunk repo / AI facade are not wired', async () => {
+            const result = await service.semanticSearch(WORK_ID, 'hello', 5);
+            expect(result).toEqual([]);
+        });
+
+        it('returns [] for empty/whitespace query (embedder not called)', async () => {
+            const result = await service.semanticSearch(WORK_ID, '   \n  ', 5);
+            expect(result).toEqual([]);
+        });
+
+        it('returns [] for limit <= 0', async () => {
+            const result = await service.semanticSearch(WORK_ID, 'hi', 0);
+            expect(result).toEqual([]);
+        });
+    });
+
     describe('getDocumentHistory', () => {
         it('returns an empty history when the mirror service is not wired', async () => {
             const doc = buildDocument();

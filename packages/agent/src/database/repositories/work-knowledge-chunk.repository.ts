@@ -116,4 +116,97 @@ export class WorkKnowledgeChunkRepository {
     async countByWork(workId: string): Promise<number> {
         return this.repository.count({ where: { workId } });
     }
+
+    /**
+     * EW-641 Phase 2/a row 30a — k-nearest-neighbor over the
+     * `embedding` column using pgvector's cosine-distance operator
+     * (`<=>`), matching the `vector_cosine_ops` ivfflat index from
+     * migration `1779975000000-CreateWorkKnowledgeChunks`. Always
+     * filters `WHERE work_id = $1` so the partition-ready PK + the
+     * row-30c RRF retrieval never cross tenant boundaries.
+     *
+     * Returns `[]` when:
+     *  - the underlying driver isn't Postgres (e.g. SQLite in unit
+     *    tests or e2e). pgvector is a Postgres-only extension; callers
+     *    (`KnowledgeBaseService.semanticSearch` + row 30c's RRF blend)
+     *    treat empty semantic results as "no semantic signal" and
+     *    fall through to lexical-only ordering.
+     *  - the input embedding is empty or `limit <= 0` (defensive
+     *    short-circuit so a malformed call can't fire a query).
+     *
+     * Implementation note: pgvector expects the `vector` literal as a
+     * string like `'[0.1,0.2,...]'`. `JSON.stringify` on a plain
+     * `number[]` produces exactly that bracketed form. The `::vector`
+     * cast in the SQL coerces to the column type so the ivfflat index
+     * can be used.
+     *
+     * Returned shape mirrors the chunk row minus the embedding (no
+     * need to ship the vector back to the service layer) plus the raw
+     * `distance` float for downstream ranking. Order: distance ASC
+     * (nearest first).
+     */
+    async findNearestByEmbedding(
+        workId: string,
+        embedding: readonly number[],
+        limit: number,
+    ): Promise<
+        Array<{
+            id: string;
+            workId: string;
+            documentId: string;
+            chunkIndex: number;
+            content: string;
+            distance: number;
+        }>
+    > {
+        if (embedding.length === 0 || limit <= 0) return [];
+
+        const driverType = this.repository.manager.connection.options.type;
+        if (driverType !== 'postgres') {
+            // SQLite in tests / OSS e2e has no pgvector. Caller will
+            // RRF-blend with lexical-only — returning [] here is the
+            // documented "no semantic signal" fallback.
+            return [];
+        }
+
+        // pgvector vector literal: `'[a,b,c,...]'`. `JSON.stringify`
+        // on a plain `number[]` produces exactly that bracket form.
+        const vectorLiteral = JSON.stringify(embedding);
+
+        const rows = (await this.repository.manager.query(
+            `SELECT id,
+                    work_id AS "workId",
+                    document_id AS "documentId",
+                    chunk_index AS "chunkIndex",
+                    content,
+                    embedding <=> $1::vector AS distance
+             FROM work_knowledge_chunks
+             WHERE work_id = $2
+               AND embedding IS NOT NULL
+             ORDER BY embedding <=> $1::vector ASC
+             LIMIT $3`,
+            [vectorLiteral, workId, limit],
+        )) as Array<{
+            id: string;
+            workId: string;
+            documentId: string;
+            chunkIndex: number;
+            content: string;
+            distance: number | string;
+        }>;
+
+        // Some node-postgres versions surface numeric columns as
+        // strings (`parseFloat` is only applied to a subset of OIDs by
+        // default). Coerce here so the row-30b RRF blend can compute
+        // on a number directly without spreading the cast through
+        // every consumer.
+        return rows.map((r) => ({
+            id: r.id,
+            workId: r.workId,
+            documentId: r.documentId,
+            chunkIndex: r.chunkIndex,
+            content: r.content,
+            distance: typeof r.distance === 'string' ? Number(r.distance) : r.distance,
+        }));
+    }
 }
