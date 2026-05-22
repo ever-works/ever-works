@@ -5,6 +5,7 @@ import { workAPI } from '@/lib/api';
 import { kbAPI } from '@/lib/api/kb';
 import { KbShell } from '@/components/works/detail/kb/KbShell';
 import { KbTreePanel } from '@/components/works/detail/kb/KbTreePanel';
+import { KbUploadZone } from '@/components/works/detail/kb/KbUploadZone';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.workDetail.kb');
@@ -42,5 +43,10 @@ export default async function WorkKnowledgeBasePage({ params }: Params) {
         return { items: [], total: 0 };
     });
 
-    return <KbShell workId={id} treeSlot={<KbTreePanel workId={id} documents={docs.items} />} />;
+    return (
+        <div className="flex flex-col gap-4">
+            <KbUploadZone workId={id} />
+            <KbShell workId={id} treeSlot={<KbTreePanel workId={id} documents={docs.items} />} />
+        </div>
+    );
 }

@@ -8,6 +8,7 @@ import { KbShell } from '@/components/works/detail/kb/KbShell';
 import { KbTreePanel } from '@/components/works/detail/kb/KbTreePanel';
 import { KbDocumentView } from '@/components/works/detail/kb/KbDocumentView';
 import { KbEditor } from '@/components/works/detail/kb/KbEditor';
+import { KbUploadZone } from '@/components/works/detail/kb/KbUploadZone';
 
 type Params = {
     params: Promise<{ id: string; path: string[] }>;
@@ -91,12 +92,15 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
     const fullyLocked = doc.locked && doc.lockMode === 'full';
 
     return (
-        <KbShell
-            workId={id}
-            treeSlot={<KbTreePanel workId={id} documents={list.items} activePath={doc.path} />}
-            editorSlot={
-                fullyLocked ? <KbDocumentView doc={doc} /> : <KbEditor workId={id} doc={doc} />
-            }
-        />
+        <div className="flex flex-col gap-4">
+            <KbUploadZone workId={id} targetClass={doc.class} />
+            <KbShell
+                workId={id}
+                treeSlot={<KbTreePanel workId={id} documents={list.items} activePath={doc.path} />}
+                editorSlot={
+                    fullyLocked ? <KbDocumentView doc={doc} /> : <KbEditor workId={id} doc={doc} />
+                }
+            />
+        </div>
     );
 }

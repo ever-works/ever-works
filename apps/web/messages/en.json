@@ -2685,6 +2685,18 @@
                     "idle": "Idle",
                     "dirty": "Unsaved changes…",
                     "placeholder": "Start typing to add content…"
+                },
+                "upload": {
+                    "title": "Upload to Knowledge Base",
+                    "hint": "Drag & drop files here, or click Browse. Markdown, HTML, PDF, DOCX, XLSX, CSV/TSV, and PPTX are extracted automatically.",
+                    "browse": "Browse files",
+                    "dismiss": "Dismiss",
+                    "status": {
+                        "queued": "Queued",
+                        "uploading": "Uploading",
+                        "succeeded": "Uploaded",
+                        "failed": "Failed"
+                    }
                 }
             }
         },
