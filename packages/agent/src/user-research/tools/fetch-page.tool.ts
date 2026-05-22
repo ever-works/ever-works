@@ -26,20 +26,11 @@ export function createFetchPageTool(opts: CreateFetchPageToolOptions) {
         inputSchema,
         execute: async (input) => {
             try {
-                await opts.limits.assertFetchAllowed(opts.userId);
-            } catch (err) {
-                log.warn(`fetchPage blocked by rate limit: ${(err as Error).message}`);
-                return { content: null, error: 'rate_limited' as const };
-            }
-
-            try {
                 const result = await opts.contentExtractor.extractContentWithDiagnostics(
                     input.url,
                     { includeImages: false, includeLinks: false },
                     { userId: opts.userId },
                 );
-
-                await opts.limits.incrementFetches(opts.userId);
 
                 if (!result.content) {
                     return { content: null, error: result.error ?? 'no content extracted' };

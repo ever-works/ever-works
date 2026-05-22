@@ -34,13 +34,6 @@ export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
             'Search the web for information about a person. Use 2-6 times with varied queries. Returns title, url, and published date for each result.',
         inputSchema,
         execute: async (input) => {
-            try {
-                await opts.limits.assertSearchAllowed(opts.userId);
-            } catch (err) {
-                log.warn(`searchWeb blocked by rate limit: ${(err as Error).message}`);
-                return { results: [], error: 'rate_limited' as const };
-            }
-
             let lastErr: unknown;
             for (const providerOverride of chain) {
                 try {
@@ -49,8 +42,6 @@ export function createSearchWebTool(opts: CreateSearchWebToolOptions) {
                         { maxResults: input.limit ?? 5 },
                         { userId: opts.userId, providerOverride },
                     );
-
-                    await opts.limits.incrementSearches(opts.userId);
 
                     const compact = results.slice(0, input.limit ?? 5).map((r) => ({
                         title: r.title,

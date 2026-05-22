@@ -3,18 +3,12 @@ import { CACHE_MANAGER, type Cache } from '../cache';
 
 export interface UserResearchLimitsConfig {
     maxRunsPerDay: number;
-    maxSearchesPerDay: number;
-    maxFetchesPerDay: number;
-    maxTokensPerDay: number;
 }
 
 export const USER_RESEARCH_LIMITS_CONFIG = 'USER_RESEARCH_LIMITS_CONFIG';
 
 export const DEFAULT_USER_RESEARCH_LIMITS: UserResearchLimitsConfig = {
     maxRunsPerDay: 3,
-    maxSearchesPerDay: 30,
-    maxFetchesPerDay: 9,
-    maxTokensPerDay: 200_000,
 };
 
 function positiveIntegerFromEnv(key: string, fallback: number): number {
@@ -30,9 +24,6 @@ export function buildUserResearchLimitsConfig(): UserResearchLimitsConfig {
             'USER_RESEARCH_MAX_RUNS_PER_DAY',
             DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay,
         ),
-        maxSearchesPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxSearchesPerDay,
-        maxFetchesPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxFetchesPerDay,
-        maxTokensPerDay: DEFAULT_USER_RESEARCH_LIMITS.maxTokensPerDay,
     };
 }
 
@@ -92,44 +83,6 @@ export class UserResearchLimitsService {
 
     async incrementRuns(userId: string): Promise<number> {
         return this.increment('runs', userId);
-    }
-
-    async assertSearchAllowed(userId: string): Promise<void> {
-        const used = await this.read('searches', userId);
-        if (used >= this.config.maxSearchesPerDay) {
-            throw new UserResearchRateLimitedError(
-                'maxSearchesPerDay',
-                used,
-                this.config.maxSearchesPerDay,
-            );
-        }
-    }
-
-    async incrementSearches(userId: string): Promise<number> {
-        return this.increment('searches', userId);
-    }
-
-    async assertFetchAllowed(userId: string): Promise<void> {
-        const used = await this.read('fetches', userId);
-        if (used >= this.config.maxFetchesPerDay) {
-            throw new UserResearchRateLimitedError(
-                'maxFetchesPerDay',
-                used,
-                this.config.maxFetchesPerDay,
-            );
-        }
-    }
-
-    async incrementFetches(userId: string): Promise<number> {
-        return this.increment('fetches', userId);
-    }
-
-    async addTokens(userId: string, delta: number): Promise<number> {
-        return this.increment('tokens', userId, delta);
-    }
-
-    getConfig(): Readonly<UserResearchLimitsConfig> {
-        return this.config;
     }
 
     private dayKey(): string {

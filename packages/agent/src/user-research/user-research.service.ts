@@ -190,21 +190,18 @@ export class UserResearchService {
                 stopWhen: stepCountIs(maxSteps),
                 abortSignal: signals,
                 maxRetries: 1,
-                // Increment tokens per step so aborted/timed-out runs still
-                // count against the daily cap (tokens were already spent).
+                // Track usage for observability even when runs abort or time out.
                 onStepFinish: (step) => {
                     const t = step.usage?.totalTokens ?? 0;
                     if (t > 0) {
                         tokensUsed += t;
-                        this.limits.addTokens(userId, t).catch(() => undefined);
                     }
                     toolCallsCount += step.toolCalls?.length ?? 0;
                 },
             });
 
             // Reconcile with the SDK's final totals so we don't undercount if
-            // onStepFinish didn't see every step's usage. The delta is committed
-            // to the daily cap; per-step calls already covered the rest.
+            // onStepFinish didn't see every step's usage.
             const sdkToolCalls = result.steps.reduce(
                 (sum, step) => sum + (step.toolCalls?.length ?? 0),
                 0,
@@ -212,7 +209,6 @@ export class UserResearchService {
             toolCallsCount = Math.max(toolCallsCount, sdkToolCalls);
             const sdkTotal = result.totalUsage?.totalTokens ?? 0;
             if (sdkTotal > tokensUsed) {
-                await this.limits.addTokens(userId, sdkTotal - tokensUsed);
                 tokensUsed = sdkTotal;
             }
         } catch (err) {
