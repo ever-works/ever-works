@@ -24,6 +24,7 @@ import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowle
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
 import { AiFacadeService } from '../facades/ai.facade';
+import { rrfBlend } from './kb-rrf';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import {
@@ -234,19 +235,96 @@ export class KnowledgeBaseService {
     async listDocuments(workId: string, userId: string, opts: ListOptions = {}) {
         await this.ownershipService.ensureCanView(workId, userId);
 
-        const { items, total } = await this.documentRepository.list({
-            workId,
-            classes: opts.class ? [opts.class] : undefined,
-            statuses: opts.status ? [opts.status] : undefined,
-            tag: opts.tag,
-            locked: opts.locked,
-            language: opts.language,
-            q: opts.q,
-            limit: opts.limit,
-            offset: opts.offset,
-        });
+        const trimmedQ = opts.q?.trim() ?? '';
 
-        return { items: items.map((d) => this.toDto(d)), total };
+        // No query → pure list (existing behavior). The KB tree panel
+        // (row 14), the inheritable-docs API, and any non-search caller
+        // hits this branch unchanged.
+        if (trimmedQ.length === 0) {
+            const { items, total } = await this.documentRepository.list({
+                workId,
+                classes: opts.class ? [opts.class] : undefined,
+                statuses: opts.status ? [opts.status] : undefined,
+                tag: opts.tag,
+                locked: opts.locked,
+                language: opts.language,
+                q: undefined,
+                limit: opts.limit,
+                offset: opts.offset,
+            });
+            return { items: items.map((d) => this.toDto(d)), total };
+        }
+
+        // EW-641 Phase 2/a row 30c — RRF blend of lexical (LIKE filter
+        // in v1, Postgres FTS in a follow-up) + semantic (pgvector
+        // k-NN). Fetch 2× the requested limit from each leg so the
+        // blend has enough candidates to merge before clipping.
+        const requestedLimit = opts.limit ?? 20;
+        const requestedOffset = opts.offset ?? 0;
+        const fusionLimit = Math.max(requestedLimit * 2, 20);
+
+        const [lexicalRes, semanticChunks] = await Promise.all([
+            this.documentRepository.list({
+                workId,
+                classes: opts.class ? [opts.class] : undefined,
+                statuses: opts.status ? [opts.status] : undefined,
+                tag: opts.tag,
+                locked: opts.locked,
+                language: opts.language,
+                q: trimmedQ,
+                limit: fusionLimit,
+                offset: 0,
+            }),
+            this.semanticSearch(workId, trimmedQ, fusionLimit),
+        ]);
+
+        // No semantic signal (no embedder configured, no chunks yet,
+        // SQLite e2e env, etc.) — fall back to lexical-only ordering
+        // with the originally requested offset + limit, preserving the
+        // pre-row-30c contract.
+        if (semanticChunks.length === 0) {
+            const sliced = lexicalRes.items.slice(
+                requestedOffset,
+                requestedOffset + requestedLimit,
+            );
+            return { items: sliced.map((d) => this.toDto(d)), total: lexicalRes.total };
+        }
+
+        // Build the per-list rankings for `rrfBlend`. Semantic returns
+        // chunk rows, so dedupe by `documentId` keeping the FIRST
+        // occurrence (best-ranking chunk for each doc).
+        const lexicalRanking = lexicalRes.items.map((d) => ({ documentId: d.id }));
+        const semanticRanking: { documentId: string }[] = [];
+        const seenSem = new Set<string>();
+        for (const c of semanticChunks) {
+            if (seenSem.has(c.documentId)) continue;
+            seenSem.add(c.documentId);
+            semanticRanking.push({ documentId: c.documentId });
+        }
+
+        const blended = rrfBlend([lexicalRanking, semanticRanking]);
+
+        // Materialize the blended order. Lexical items already have
+        // full doc objects — reuse them; for docs that only appear in
+        // semantic, fetch by id (N+1 here is bounded by `fusionLimit`
+        // ≤ ~40 in practice; row 30d can batch via a `findByIds` if
+        // hot-path metrics show it).
+        const lexicalById = new Map<string, WorkKnowledgeDocument>();
+        for (const d of lexicalRes.items) lexicalById.set(d.id, d);
+
+        const materialized: WorkKnowledgeDocument[] = [];
+        for (const { documentId } of blended) {
+            const cached = lexicalById.get(documentId);
+            if (cached) {
+                materialized.push(cached);
+                continue;
+            }
+            const fetched = await this.documentRepository.findById(workId, documentId);
+            if (fetched) materialized.push(fetched);
+        }
+
+        const sliced = materialized.slice(requestedOffset, requestedOffset + requestedLimit);
+        return { items: sliced.map((d) => this.toDto(d)), total: materialized.length };
     }
 
     async getDocument(
