@@ -32,6 +32,7 @@ export * from './knowledge-base-buffer-extractor.service';
 export * from './knowledge-base.module';
 export * from './kb-chunker';
 export * from './kb-rrf';
+export * from './kb-prompt-formatter';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';
