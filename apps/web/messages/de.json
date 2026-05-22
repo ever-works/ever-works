@@ -2757,6 +2757,17 @@
                         "agents": "Agents"
                     }
                 },
+                "history": {
+                    "title": "Document history",
+                    "dialogLabel": "Knowledge Base document history",
+                    "close": "Close",
+                    "loading": "Loading history…",
+                    "error": "Failed to load history ({error}).",
+                    "empty": "No prior versions yet. Edits will appear here once the doc has been mirrored to Git.",
+                    "cancel": "Cancel",
+                    "restore": "Restore to {sha}",
+                    "restoring": "Restoring…"
+                },
                 "sidePanel": {
                     "title": "Document details",
                     "subtitle": "Metadata, lock state, and history for this document.",

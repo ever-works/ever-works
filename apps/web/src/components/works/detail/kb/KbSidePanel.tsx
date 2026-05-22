@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils/cn';
+import { KbHistoryButton } from './KbHistoryButton';
 import { KbLockControls } from './KbLockControls';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
@@ -186,23 +187,30 @@ export async function KbSidePanel({ doc }: KbSidePanelProps) {
             ) : null}
 
             <Section title={t('sidePanel.sections.history')}>
-                <button
-                    type="button"
-                    data-testid="kb-side-panel-history"
-                    data-disabled="true"
-                    disabled
-                    aria-disabled="true"
-                    title={t('sidePanel.historyComingSoon')}
-                    className={cn(
-                        'inline-flex items-center gap-1 px-2 py-1 rounded text-xs',
-                        'border border-border dark:border-border-dark',
-                        'bg-card-hover/50 dark:bg-card-primary-dark/40',
-                        'text-text-muted dark:text-text-muted-dark/70',
-                        'cursor-not-allowed opacity-70',
-                    )}
-                >
-                    {t('sidePanel.viewHistory')}
-                </button>
+                {doc.workId ? (
+                    <KbHistoryButton workId={doc.workId} docId={doc.id} path={doc.path} />
+                ) : (
+                    // Org-level docs don't have a per-Work git mirror;
+                    // keep the disabled placeholder for them until row
+                    // 18d wires the org-namespace history endpoint.
+                    <button
+                        type="button"
+                        data-testid="kb-side-panel-history"
+                        data-disabled="true"
+                        disabled
+                        aria-disabled="true"
+                        title={t('sidePanel.historyComingSoon')}
+                        className={cn(
+                            'inline-flex items-center gap-1 rounded border px-2 py-1 text-xs',
+                            'border-border dark:border-border-dark',
+                            'bg-card-hover/50 dark:bg-card-primary-dark/40',
+                            'text-text-muted dark:text-text-muted-dark/70',
+                            'cursor-not-allowed opacity-70',
+                        )}
+                    >
+                        {t('sidePanel.viewHistory')}
+                    </button>
+                )}
             </Section>
         </aside>
     );
