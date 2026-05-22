@@ -2710,6 +2710,12 @@
                     "removeTag": "Remove tag {tag}",
                     "cancel": "Cancel",
                     "confirm": "Upload {count, plural, one {# file} other {# files}}"
+                },
+                "pdf": {
+                    "label": "PDF viewer",
+                    "tooLargeTitle": "PDF too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and view in your local PDF reader.",
+                    "download": "Download PDF"
                 }
             }
         },
