@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import TurndownService from 'turndown';
 import mammoth from 'mammoth';
 import * as ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import Papa from 'papaparse';
 // `pdf-parse`'s index.js runs a debug self-test against a bundled PDF
 // when imported as the default. Import the lib entry directly so we
@@ -25,7 +26,7 @@ const pdfParse: (
  *
  * Spec: docs/specs/features/knowledge-base/spec.md §9.3 (extract phase).
  *
- * MIME routing as of EW-641 Phase 1B/c.3:
+ * MIME routing as of EW-641 Phase 1B/c.4:
  *  - text/markdown, text/x-markdown, application/x-markdown, text/plain →
  *    passthrough (utf-8 decode + truncation cap)
  *  - text/html, application/xhtml+xml → Turndown-based HTML → Markdown
@@ -37,12 +38,15 @@ const pdfParse: (
  *    sheet name as an `## h2` heading
  *  - text/csv → `papaparse`, rendered as a single Markdown table
  *  - text/tab-separated-values + text/tsv → `papaparse` with `delimiter: '\t'`
+ *  - application/vnd.openxmlformats-officedocument.presentationml.presentation
+ *    (PPTX) → `jszip` unpack → regex-extract `<a:t>` text per slide →
+ *    one `## Slide N` section per slide
  *  - everything else → `null` (caller marks `extractionStatus='skipped'`
  *    with a "no extractor route" reason)
  *
- * PPTX / Notion arrive in follow-up commits — each needs its own native
- * Node library or extractor-plugin bridge. The routing table below
- * makes the additions one-line edits.
+ * Notion + URL ingestion arrive in follow-up commits — each needs its
+ * own native Node library or extractor-plugin bridge. The routing
+ * table below makes the additions one-line edits.
  */
 @Injectable()
 export class KnowledgeBaseBufferExtractorService {
@@ -95,6 +99,28 @@ export class KnowledgeBaseBufferExtractorService {
      */
     private static readonly CSV_MIMES = new Set(['text/csv']);
     private static readonly TSV_MIMES = new Set(['text/tab-separated-values', 'text/tsv']);
+
+    /**
+     * PowerPoint OOXML format (`.pptx`). Legacy `.ppt` (BIFF binary,
+     * `application/vnd.ms-powerpoint`) is intentionally excluded —
+     * jszip can't read it, same convention as legacy `.doc`/`.xls`.
+     */
+    private static readonly PPTX_MIMES = new Set([
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ]);
+
+    /** Slide XML file path regex inside a PPTX zip. */
+    private static readonly PPTX_SLIDE_PATH_RE = /^ppt\/slides\/slide(\d+)\.xml$/;
+
+    /** Regex to extract `<a:t>...</a:t>` text nodes from slide XML. */
+    private static readonly PPTX_TEXT_RE = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+
+    /**
+     * Cap on slides processed per PPTX. Same spirit as `TABLE_ROW_CAP`
+     * for spreadsheets: keep the resulting Markdown body under the
+     * spec §22 1 MiB ceiling even for very large decks.
+     */
+    private static readonly PPTX_SLIDE_CAP = 1_000;
 
     /**
      * Row cap mirrors `items-generator`'s `PARSER_HARD_ROW_CAP` so
@@ -172,6 +198,10 @@ export class KnowledgeBaseBufferExtractorService {
             return { markdown: this.extractDelimitedText(buffer, '\t'), via: 'tsv-papaparse' };
         }
 
+        if (KnowledgeBaseBufferExtractorService.PPTX_MIMES.has(normalized)) {
+            return { markdown: await this.extractPptx(buffer), via: 'pptx-jszip' };
+        }
+
         this.logger.debug(
             `KB buffer extractor: no route for ${mimeType} (normalized=${normalized})`,
         );
@@ -193,7 +223,8 @@ export class KnowledgeBaseBufferExtractorService {
             KnowledgeBaseBufferExtractorService.DOCX_MIMES.has(normalized) ||
             KnowledgeBaseBufferExtractorService.XLSX_MIMES.has(normalized) ||
             KnowledgeBaseBufferExtractorService.CSV_MIMES.has(normalized) ||
-            KnowledgeBaseBufferExtractorService.TSV_MIMES.has(normalized)
+            KnowledgeBaseBufferExtractorService.TSV_MIMES.has(normalized) ||
+            KnowledgeBaseBufferExtractorService.PPTX_MIMES.has(normalized)
         );
     }
 
@@ -369,6 +400,94 @@ export class KnowledgeBaseBufferExtractorService {
 
         const markdown = `${this.renderMarkdownTable(header, truncated)}${truncationNote}`;
         return this.capInlineBody(markdown);
+    }
+
+    /**
+     * Extract slide text from a `.pptx` deck.
+     *
+     * PPTX files are zipped OOXML: each slide lives at
+     * `ppt/slides/slideN.xml`, with the visible text inside `<a:t>`
+     * elements (the `a:` prefix is the DrawingML namespace). We avoid
+     * pulling in an XML parser dependency — a regex over `<a:t>...</a:t>`
+     * is sufficient because the contents are XML-escaped plain text by
+     * design (no nested tags). HTML entities (`&amp;`, `&lt;`, etc.)
+     * are decoded back so the resulting Markdown reads naturally.
+     */
+    private async extractPptx(buffer: Buffer): Promise<string> {
+        let zip: JSZip;
+        try {
+            zip = await JSZip.loadAsync(buffer);
+        } catch (error) {
+            throw new Error(`KB PPTX extraction failed: ${(error as Error).message}`);
+        }
+
+        // Collect slide entries with their numeric index for stable ordering.
+        const slides: Array<{ index: number; entry: JSZip.JSZipObject }> = [];
+        zip.forEach((path, entry) => {
+            if (entry.dir) {
+                return;
+            }
+            const match = KnowledgeBaseBufferExtractorService.PPTX_SLIDE_PATH_RE.exec(path);
+            if (match) {
+                slides.push({ index: Number(match[1]), entry });
+            }
+        });
+
+        if (slides.length === 0) {
+            throw new Error('KB PPTX extraction found no slides');
+        }
+
+        slides.sort((a, b) => a.index - b.index);
+        const capped = slides.slice(0, KnowledgeBaseBufferExtractorService.PPTX_SLIDE_CAP);
+
+        const sections: string[] = [];
+        for (const { index, entry } of capped) {
+            let xml: string;
+            try {
+                xml = await entry.async('string');
+            } catch (error) {
+                throw new Error(`KB PPTX slide ${index} read failed: ${(error as Error).message}`);
+            }
+            const texts: string[] = [];
+            // Reset lastIndex on the shared static regex before each use —
+            // /g regexes preserve state across calls and would skip matches
+            // otherwise.
+            KnowledgeBaseBufferExtractorService.PPTX_TEXT_RE.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = KnowledgeBaseBufferExtractorService.PPTX_TEXT_RE.exec(xml)) !== null) {
+                const decoded = this.decodeXmlEntities(m[1]);
+                if (decoded.length > 0) {
+                    texts.push(decoded);
+                }
+            }
+            const body = texts.join(' ').trim();
+            sections.push(`## Slide ${index}\n\n${body || '_(no text)_'}`);
+        }
+
+        const truncationNote =
+            slides.length > KnowledgeBaseBufferExtractorService.PPTX_SLIDE_CAP
+                ? `\n\n_(truncated at ${KnowledgeBaseBufferExtractorService.PPTX_SLIDE_CAP} of ${slides.length} slides)_`
+                : '';
+
+        const markdown = `${sections.join('\n\n')}${truncationNote}`.trim();
+        if (!markdown) {
+            throw new Error('KB PPTX extraction produced empty Markdown');
+        }
+        return this.capInlineBody(markdown);
+    }
+
+    /**
+     * Decode the five XML predefined entities. PPTX slide XML only uses
+     * these — the file format does not permit arbitrary HTML entities —
+     * so a tiny lookup beats pulling in an entity-decoder dependency.
+     */
+    private decodeXmlEntities(value: string): string {
+        return value
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'")
+            .replace(/&amp;/g, '&');
     }
 
     /**

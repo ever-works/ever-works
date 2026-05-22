@@ -16,12 +16,14 @@ const mammothMock = require('mammoth') as {
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 
 /**
- * EW-641 Phase 1B/c.2 — covers the per-MIME routing decisions taken by
- * `KnowledgeBaseBufferExtractorService` including the HTML / PDF / DOCX
- * routes. XLSX / CSV / PPTX / Notion routes arrive in follow-up commits.
+ * EW-641 Phase 1B/c — covers the per-MIME routing decisions taken by
+ * `KnowledgeBaseBufferExtractorService` including HTML / PDF / DOCX /
+ * XLSX / CSV / TSV / PPTX routes. Notion + URL routes arrive later.
  *
  * PDF + DOCX rely on third-party libs (`pdf-parse`, `mammoth`) — those
  * are mocked at module level so the unit test stays hermetic + fast.
+ * XLSX + PPTX use the real `exceljs` / `jszip` libs to build fixtures
+ * in-memory; both are pure Node and have no I/O side effects.
  */
 describe('KnowledgeBaseBufferExtractorService', () => {
     let service: KnowledgeBaseBufferExtractorService;
@@ -284,13 +286,117 @@ describe('KnowledgeBaseBufferExtractorService', () => {
         });
     });
 
+    describe('PPTX extraction', () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const JSZip = require('jszip');
+        const PPTX_MIME =
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+        function slideXml(...phrases: string[]): string {
+            const paragraphs = phrases
+                .map(
+                    (p) =>
+                        `<a:p><a:r><a:t>${p
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')}</a:t></a:r></a:p>`,
+                )
+                .join('');
+            return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree>${paragraphs}</p:spTree></p:cSld></p:sld>`;
+        }
+
+        async function buildPptxBuffer(
+            slides: Array<{ index: number; text: string[] }>,
+            extraEntries: Record<string, string> = {},
+        ): Promise<Buffer> {
+            const zip = new JSZip();
+            for (const { index, text } of slides) {
+                zip.file(`ppt/slides/slide${index}.xml`, slideXml(...text));
+            }
+            for (const [path, body] of Object.entries(extraEntries)) {
+                zip.file(path, body);
+            }
+            return (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer;
+        }
+
+        it('extracts text from each slide and labels them in numeric order', async () => {
+            const buffer = await buildPptxBuffer(
+                [
+                    // Intentionally out of order — extractor must sort numerically.
+                    { index: 2, text: ['Second deck title', 'with subtitle'] },
+                    { index: 1, text: ['Welcome to the deck'] },
+                ],
+                {
+                    // Non-slide entries should be ignored.
+                    'ppt/presentation.xml': '<?xml version="1.0"?><p:presentation/>',
+                    '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
+                },
+            );
+
+            const result = await service.extract(buffer, PPTX_MIME);
+
+            expect(result).not.toBeNull();
+            expect(result!.via).toBe('pptx-jszip');
+            expect(result!.markdown).toMatch(/^##\s+Slide 1/m);
+            expect(result!.markdown).toContain('Welcome to the deck');
+            expect(result!.markdown).toMatch(/^##\s+Slide 2/m);
+            expect(result!.markdown).toContain('Second deck title with subtitle');
+            // Slide 1 heading must come before Slide 2 heading (ordering check).
+            const idx1 = result!.markdown.indexOf('## Slide 1');
+            const idx2 = result!.markdown.indexOf('## Slide 2');
+            expect(idx1).toBeGreaterThanOrEqual(0);
+            expect(idx2).toBeGreaterThan(idx1);
+        });
+
+        it('decodes XML entities back to literal characters', async () => {
+            const buffer = await buildPptxBuffer([
+                { index: 1, text: ['Smith & Jones <Co>', 'price > 100'] },
+            ]);
+            const result = await service.extract(buffer, PPTX_MIME);
+            expect(result!.markdown).toContain('Smith & Jones <Co>');
+            expect(result!.markdown).toContain('price > 100');
+            expect(result!.markdown).not.toContain('&amp;');
+            expect(result!.markdown).not.toContain('&lt;');
+        });
+
+        it('emits a `(no text)` marker for slides without `<a:t>` nodes', async () => {
+            const zip = new JSZip();
+            // Slide with no <a:t> — e.g. an image-only slide.
+            zip.file(
+                'ppt/slides/slide1.xml',
+                '<?xml version="1.0"?><p:sld><p:cSld><p:spTree></p:spTree></p:cSld></p:sld>',
+            );
+            const buffer = (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer;
+
+            const result = await service.extract(buffer, PPTX_MIME);
+            expect(result!.markdown).toMatch(/## Slide 1[\s\S]*\(no text\)/);
+        });
+
+        it('throws when the deck contains no slides', async () => {
+            const zip = new JSZip();
+            zip.file('ppt/presentation.xml', '<?xml version="1.0"?><p:presentation/>');
+            const buffer = (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer;
+
+            await expect(service.extract(buffer, PPTX_MIME)).rejects.toThrow(
+                /KB PPTX extraction found no slides/,
+            );
+        });
+
+        it('throws on a corrupt buffer with a clear label', async () => {
+            await expect(service.extract(Buffer.from('not-a-zip-file'), PPTX_MIME)).rejects.toThrow(
+                /KB PPTX extraction failed:/,
+            );
+        });
+    });
+
     describe('unsupported MIME types', () => {
         it.each([
             // Legacy .doc binary format — mammoth doesn't support it.
             'application/msword',
             // Legacy .xls binary format — exceljs only reads OOXML.
             'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            // Legacy .ppt binary format — jszip can't read OLE/BIFF.
+            'application/vnd.ms-powerpoint',
             'image/png',
             'video/mp4',
             'application/octet-stream',
@@ -318,13 +424,14 @@ describe('KnowledgeBaseBufferExtractorService', () => {
             expect(service.supports('text/csv')).toBe(true);
             expect(service.supports('text/tab-separated-values')).toBe(true);
             expect(service.supports('text/tsv')).toBe(true);
-            expect(service.supports('application/msword')).toBe(false);
-            expect(service.supports('application/vnd.ms-excel')).toBe(false);
             expect(
                 service.supports(
                     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
                 ),
-            ).toBe(false);
+            ).toBe(true);
+            expect(service.supports('application/msword')).toBe(false);
+            expect(service.supports('application/vnd.ms-excel')).toBe(false);
+            expect(service.supports('application/vnd.ms-powerpoint')).toBe(false);
             expect(service.supports('image/png')).toBe(false);
         });
     });

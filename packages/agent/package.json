@@ -221,6 +221,7 @@
         "date-fns": "^4.1.0",
         "exceljs": "^4.4.0",
         "github-slugger": "^2.0.0",
+        "jszip": "^3.10.1",
         "lodash": "^4.18.1",
         "mammoth": "^1.8.0",
         "p-map": "^7.0.4",
