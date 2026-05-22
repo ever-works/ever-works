@@ -2431,6 +2431,14 @@
                 },
                 "document": {
                     "emptyBody": "This document has no body yet."
+                },
+                "editor": {
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "saved": "Saved",
+                    "error": "Save failed",
+                    "idle": "Idle",
+                    "placeholder": "Start typing to add content…"
                 }
             }
         },

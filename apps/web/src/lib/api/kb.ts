@@ -1,6 +1,11 @@
 import 'server-only';
-import { serverFetch } from './server-api';
-import type { KbDocumentBodyDto, KbDocumentDto, KbDocumentListFilter } from '@ever-works/contracts';
+import { serverFetch, serverMutation } from './server-api';
+import type {
+    KbDocumentBodyDto,
+    KbDocumentDto,
+    KbDocumentListFilter,
+    UpdateKbDocumentInput,
+} from '@ever-works/contracts';
 
 /**
  * EW-641 Phase 1B/d row 3 — server-only fetch helpers for the Knowledge
@@ -50,5 +55,27 @@ export const kbAPI = {
         return serverFetch<KbDocumentBodyDto>(
             `/works/${workId}/kb/documents/${encodeURIComponent(idOrPath)}`,
         );
+    },
+
+    /**
+     * `PATCH /api/works/:id/kb/documents/:docId` — partial update.
+     *
+     * The backend accepts `{ title?, description?, body?, tags?,
+     * categories?, language?, status? }`. The editor in row 5 only
+     * sends `body`, but the helper is shaped for the broader
+     * `UpdateKbDocumentInput` surface so the side-panel (row 13) can
+     * reuse it.
+     */
+    updateDocument: async (
+        workId: string,
+        docId: string,
+        input: UpdateKbDocumentInput,
+    ): Promise<KbDocumentBodyDto> => {
+        return serverMutation<KbDocumentBodyDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}`,
+            data: input,
+            method: 'PATCH',
+            wrapInData: false,
+        });
     },
 };

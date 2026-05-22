@@ -7,6 +7,7 @@ import { ApiResponseError } from '@/lib/api/server-api';
 import { KbShell } from '@/components/works/detail/kb/KbShell';
 import { KbTreePanel } from '@/components/works/detail/kb/KbTreePanel';
 import { KbDocumentView } from '@/components/works/detail/kb/KbDocumentView';
+import { KbEditor } from '@/components/works/detail/kb/KbEditor';
 
 type Params = {
     params: Promise<{ id: string; path: string[] }>;
@@ -82,11 +83,20 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
             return { items: [], total: 0 };
         });
 
+    // Full-lock docs (`locked && lockMode === 'full'`) stay on the
+    // read-only viewer so accidental edits don't bounce off the API
+    // with a 403. `additions-only` locks still render the editor; the
+    // server enforces the actual restriction on save (row 14 surfaces
+    // an explicit UI for this — for now we trust the API's response).
+    const fullyLocked = doc.locked && doc.lockMode === 'full';
+
     return (
         <KbShell
             workId={id}
             treeSlot={<KbTreePanel workId={id} documents={list.items} activePath={doc.path} />}
-            editorSlot={<KbDocumentView doc={doc} />}
+            editorSlot={
+                fullyLocked ? <KbDocumentView doc={doc} /> : <KbEditor workId={id} doc={doc} />
+            }
         />
     );
 }
