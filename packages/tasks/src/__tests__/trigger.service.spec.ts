@@ -6,6 +6,7 @@ const {
     workGenTriggerMock,
     workImportTriggerMock,
     templateCustomizationTriggerMock,
+    kbOrgOverlayFanoutTriggerMock,
     triggerConfig,
     subscriptionsConfig,
 } = vi.hoisted(() => {
@@ -15,6 +16,7 @@ const {
         workGenTriggerMock: vi.fn(),
         workImportTriggerMock: vi.fn(),
         templateCustomizationTriggerMock: vi.fn(),
+        kbOrgOverlayFanoutTriggerMock: vi.fn(),
         triggerConfig: {
             shouldUseTrigger: vi.fn(),
             getSecretKey: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('@ever-works/agent/tasks', () => ({
     WORK_GENERATION_DISPATCHER: Symbol('WORK_GENERATION_DISPATCHER'),
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
     TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
+    KB_ORG_OVERLAY_FANOUT_DISPATCHER: Symbol('KB_ORG_OVERLAY_FANOUT_DISPATCHER'),
 }));
 
 vi.mock('../tasks/trigger/work-generation.task', () => ({
@@ -56,6 +59,9 @@ vi.mock('../tasks/trigger/work-import.task', () => ({
 }));
 vi.mock('../tasks/trigger/template-customization.task', () => ({
     templateCustomizationTask: { trigger: templateCustomizationTriggerMock },
+}));
+vi.mock('../tasks/trigger/kb-org-overlay-fanout.task', () => ({
+    kbOrgOverlayFanoutTask: { trigger: kbOrgOverlayFanoutTriggerMock },
 }));
 
 import { TriggerService } from '../trigger/trigger.service';
@@ -267,6 +273,78 @@ describe('TriggerService', () => {
         it('returns null when the SDK throws', async () => {
             templateCustomizationTriggerMock.mockRejectedValue(new Error('boom'));
             const out = await service.dispatchTemplateCustomization({ customizationId: 'c1' });
+            expect(out).toBeNull();
+        });
+    });
+
+    // EW-641 Phase 2/e row 37b — TriggerService dispatch path for the
+    // org-overlay fanout task. The KnowledgeBaseService side of the wire
+    // lands in a follow-up row (needs `Work.organizationId` first — the
+    // entity doesn't carry that column on develop today, so the resolver
+    // can't be built yet). This test covers the dispatcher half so the
+    // wiring is exercised end-to-end on the producer side.
+    describe('dispatchKbOrgOverlayFanout', () => {
+        const samplePayload = {
+            organizationId: 'org-1',
+            documentId: 'doc-1',
+            workIds: ['w-a', 'w-b'],
+            operation: 'upsert' as const,
+            path: 'legal/privacy.md',
+            class: 'legal',
+        };
+
+        it('returns null when trigger is disabled', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            const out = await service.dispatchKbOrgOverlayFanout(samplePayload);
+            expect(out).toBeNull();
+            expect(kbOrgOverlayFanoutTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('triggers the kbOrgOverlayFanoutTask with correct tags + concurrency key', async () => {
+            kbOrgOverlayFanoutTriggerMock.mockResolvedValue({ id: 'run_fanout_1' });
+
+            const out = await service.dispatchKbOrgOverlayFanout(samplePayload);
+
+            expect(out).toBe('run_fanout_1');
+            expect(kbOrgOverlayFanoutTriggerMock).toHaveBeenCalledWith(
+                samplePayload,
+                expect.objectContaining({
+                    tags: expect.arrayContaining([
+                        'kb-org-overlay-fanout',
+                        'op:upsert',
+                        'org:org-1',
+                        'doc:doc-1',
+                        'targets:2',
+                    ]),
+                    machine: 'small-1x',
+                    // Serializes per-org so two rapid mutations against
+                    // the same org don't race on writes to overlapping
+                    // target Works.
+                    concurrencyKey: 'kb-org-overlay:org-1',
+                }),
+            );
+        });
+
+        it('reports correct target count + op tag on delete operations', async () => {
+            kbOrgOverlayFanoutTriggerMock.mockResolvedValue({ id: 'run_fanout_del' });
+
+            await service.dispatchKbOrgOverlayFanout({
+                ...samplePayload,
+                operation: 'delete',
+                workIds: ['w-a', 'w-b', 'w-c', 'w-d'],
+            });
+
+            expect(kbOrgOverlayFanoutTriggerMock).toHaveBeenCalledWith(
+                expect.objectContaining({ operation: 'delete' }),
+                expect.objectContaining({
+                    tags: expect.arrayContaining(['op:delete', 'targets:4']),
+                }),
+            );
+        });
+
+        it('returns null when trigger() throws (caller treats as deferred sync)', async () => {
+            kbOrgOverlayFanoutTriggerMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
+            const out = await service.dispatchKbOrgOverlayFanout(samplePayload);
             expect(out).toBeNull();
         });
     });
