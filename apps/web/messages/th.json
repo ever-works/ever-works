@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "การแจ้งเตือนเอกสารที่รับช่วงต่อ",
+                    "bannerTitle": "รับช่วงต่อจากองค์กร",
+                    "bannerDescription": "เอกสารนี้เป็นขององค์กรของคุณและเป็นแบบอ่านอย่างเดียวที่นี่ เขียนทับในเครื่องเพื่อแยกสำเนาที่แก้ไขได้ใน Work นี้",
+                    "overrideCta": "เขียนทับในเครื่อง",
+                    "overrideCtaPendingTooltip": "พร้อมใช้งานเมื่อมีการส่งมอบการกระทำการเขียนทับในแถว 38d"
                 }
             }
         },

@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Thông báo tài liệu được kế thừa",
+                    "bannerTitle": "Kế thừa từ tổ chức",
+                    "bannerDescription": "Tài liệu này thuộc sở hữu của tổ chức của bạn và chỉ đọc tại đây. Ghi đè cục bộ để fork một bản sao có thể chỉnh sửa vào Work này.",
+                    "overrideCta": "Ghi đè cục bộ",
+                    "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d"
                 }
             }
         },

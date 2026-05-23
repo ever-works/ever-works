@@ -147,4 +147,98 @@ describe('KbDocumentView', () => {
             '[[brand/voice.md]] stays raw',
         );
     });
+
+    // ─── EW-641 Phase 2/e row 38c — "Inherited from organization" banner ───
+
+    describe('isInherited — "Inherited from organization" banner', () => {
+        it('omits the banner when isInherited is omitted (back-compat default)', async () => {
+            render(await KbDocumentView({ doc: doc() }));
+            expect(screen.queryByTestId('kb-inherited-banner')).toBeNull();
+            expect(screen.getByTestId('kb-editor').getAttribute('data-inherited')).toBeNull();
+        });
+
+        it('omits the banner when isInherited is explicitly false', async () => {
+            render(await KbDocumentView({ doc: doc(), isInherited: false }));
+            expect(screen.queryByTestId('kb-inherited-banner')).toBeNull();
+            expect(screen.getByTestId('kb-editor').getAttribute('data-inherited')).toBeNull();
+        });
+
+        it('renders the banner with title + description + lock icon + disabled CTA when true', async () => {
+            render(
+                await KbDocumentView({
+                    doc: doc({
+                        workId: null,
+                        organizationId: 'org-1',
+                        path: 'legal/privacy.md',
+                        title: 'Privacy',
+                        class: 'legal',
+                    }),
+                    isInherited: true,
+                }),
+            );
+            const banner = screen.getByTestId('kb-inherited-banner');
+            expect(banner).toBeTruthy();
+            // Editor root signals inherited via data attribute for
+            // Playwright + downstream styling hooks.
+            expect(screen.getByTestId('kb-editor').getAttribute('data-inherited')).toBe('true');
+
+            expect(banner.getAttribute('role')).toBe('note');
+            expect(banner.getAttribute('aria-label')).toBe('inherited.bannerLabel');
+
+            // Lock-icon, title, and description selectors are stable for
+            // the upcoming A19/A20 Playwright e2e (row 38e).
+            expect(screen.getByTestId('kb-inherited-banner-icon').textContent).toContain('🔒');
+            expect(screen.getByTestId('kb-inherited-banner-title').textContent).toBe(
+                'inherited.bannerTitle',
+            );
+            expect(screen.getByTestId('kb-inherited-banner-description').textContent).toBe(
+                'inherited.bannerDescription',
+            );
+
+            // Override CTA renders as a disabled placeholder this row.
+            // Row 38d wires the real server action; the selector is
+            // locked NOW so the e2e can already target it.
+            const cta = screen.getByTestId('kb-inherited-override-cta');
+            expect(cta.tagName).toBe('BUTTON');
+            expect(cta.hasAttribute('disabled')).toBe(true);
+            expect(cta.getAttribute('title')).toBe('inherited.overrideCtaPendingTooltip');
+            expect(cta.textContent).toContain('inherited.overrideCta');
+        });
+
+        it('renders the banner above the document header (DOM order)', async () => {
+            render(
+                await KbDocumentView({
+                    doc: doc({ title: 'Privacy', path: 'legal/privacy.md' }),
+                    isInherited: true,
+                }),
+            );
+            const banner = screen.getByTestId('kb-inherited-banner');
+            const title = screen.getByTestId('kb-document-title');
+            expect(
+                banner.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ).toBeTruthy();
+        });
+
+        it('keeps the body markdown read-only path (no editor swap inside KbDocumentView)', async () => {
+            // KbDocumentView is always non-editable; the route decides
+            // whether to mount it vs `KbEditor`. This guard just
+            // verifies the banner doesn't change the body-render path.
+            render(
+                await KbDocumentView({
+                    doc: doc({
+                        body: '# Privacy\n\nVerbatim text.',
+                        workId: null,
+                        organizationId: 'org-1',
+                    }),
+                    isInherited: true,
+                }),
+            );
+            const body = screen.getByTestId('kb-document-body');
+            const preview = screen.getByTestId('markdown-preview-mock');
+            expect(body.contains(preview)).toBe(true);
+            // org-level docs (workId=null) bypass wikilink rewriting
+            // — same fallback as the existing "org-level docs" case.
+            expect(preview.textContent).toBe('# Privacy\n\nVerbatim text.');
+        });
+    });
 });

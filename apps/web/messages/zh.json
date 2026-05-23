@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "继承文档通知",
+                    "bannerTitle": "继承自组织",
+                    "bannerDescription": "此文档由您的组织拥有,此处为只读。本地覆盖可在此 Work 中创建可编辑的副本。",
+                    "overrideCta": "本地覆盖",
+                    "overrideCtaPendingTooltip": "当 38d 行的覆盖操作发布后可用"
                 }
             }
         },

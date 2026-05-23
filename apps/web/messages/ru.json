@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Уведомление о унаследованном документе",
+                    "bannerTitle": "Унаследовано от организации",
+                    "bannerDescription": "Этот документ принадлежит вашей организации и доступен здесь только для чтения. Переопределите локально, чтобы создать редактируемую копию в этом Work.",
+                    "overrideCta": "Переопределить локально",
+                    "overrideCtaPendingTooltip": "Доступно после выпуска действия переопределения в строке 38d"
                 }
             }
         },

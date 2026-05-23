@@ -2670,6 +2670,13 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "Inherited document notice",
+                    "bannerTitle": "Inherited from organization",
+                    "bannerDescription": "This document is owned by your organization and is read-only here. Override locally to fork an editable copy into this Work.",
+                    "overrideCta": "Override locally",
+                    "overrideCtaPendingTooltip": "Available once the override action ships in row 38d"
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",

@@ -2807,6 +2807,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Hinweis zu geerbtem Dokument",
+                    "bannerTitle": "Von der Organisation geerbt",
+                    "bannerDescription": "Dieses Dokument gehört Ihrer Organisation und ist hier schreibgeschützt. Lokal überschreiben, um eine bearbeitbare Kopie in dieses Work zu forken.",
+                    "overrideCta": "Lokal überschreiben",
+                    "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist"
                 }
             }
         },

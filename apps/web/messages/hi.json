@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "विरासत में मिले दस्तावेज़ की सूचना",
+                    "bannerTitle": "संगठन से विरासत में मिला",
+                    "bannerDescription": "यह दस्तावेज़ आपके संगठन के स्वामित्व में है और यहाँ केवल पढ़ने योग्य है। इस Work में संपादन योग्य प्रति बनाने के लिए स्थानीय रूप से ओवरराइड करें।",
+                    "overrideCta": "स्थानीय रूप से ओवरराइड करें",
+                    "overrideCtaPendingTooltip": "पंक्ति 38d में ओवरराइड कार्रवाई आने पर उपलब्ध"
                 }
             }
         },

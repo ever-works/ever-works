@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Devralınan belge bildirimi",
+                    "bannerTitle": "Kuruluştan devralındı",
+                    "bannerDescription": "Bu belge kuruluşunuza aittir ve burada salt okunurdur. Bu Work içine düzenlenebilir bir kopya çatallamak için yerel olarak geçersiz kılın.",
+                    "overrideCta": "Yerel olarak geçersiz kıl",
+                    "overrideCtaPendingTooltip": "38d satırında geçersiz kılma eylemi gönderildiğinde kullanılabilir"
                 }
             }
         },

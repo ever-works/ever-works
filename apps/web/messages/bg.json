@@ -2807,6 +2807,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Известие за наследен документ",
+                    "bannerTitle": "Наследен от организацията",
+                    "bannerDescription": "Този документ е собственост на вашата организация и тук е само за четене. Заменете локално, за да създадете редактируемо копие в тази Работа.",
+                    "overrideCta": "Замени локално",
+                    "overrideCtaPendingTooltip": "Налично, след като действието за замяна бъде доставено в ред 38d"
                 }
             }
         },
