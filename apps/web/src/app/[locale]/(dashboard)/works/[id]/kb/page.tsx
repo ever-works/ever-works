@@ -33,16 +33,32 @@ type Params = { params: Promise<{ id: string }> };
 export default async function WorkKnowledgeBasePage({ params }: Params) {
     const { id } = await params;
 
+    let work;
     try {
-        await workAPI.get(id);
+        const workResponse = await workAPI.get(id);
+        work = workResponse?.work ?? null;
     } catch {
         notFound();
     }
 
-    const docs = await kbAPI.listDocuments(id, { limit: 200 }).catch((error) => {
-        console.error('[kb-tree] failed to list KB documents:', error);
-        return { items: [], total: 0 };
-    });
+    // EW-641 Phase 2/e row 38b — fetch the per-Work docs AND the
+    // inheritable org-overlay docs in parallel. The `inheritable` leg
+    // short-circuits to `[]` when the Work has no `organizationId` (row
+    // 37c column, not yet populated on every existing Work) — see
+    // `kbAPI.listInheritableDocuments`. Both legs `.catch` to a safe
+    // fallback so a transient API error in one doesn't blank the other:
+    // the page renders the half it could fetch + the empty placeholder
+    // / empty section for the half it couldn't.
+    const [docs, inheritedDocuments] = await Promise.all([
+        kbAPI.listDocuments(id, { limit: 200 }).catch((error) => {
+            console.error('[kb-tree] failed to list KB documents:', error);
+            return { items: [], total: 0 };
+        }),
+        kbAPI.listInheritableDocuments(id, work?.organizationId ?? null).catch((error) => {
+            console.error('[kb-tree] failed to list inheritable KB documents:', error);
+            return [];
+        }),
+    ]);
 
     return (
         <div className="flex flex-col gap-4">
@@ -50,7 +66,16 @@ export default async function WorkKnowledgeBasePage({ params }: Params) {
                 <KbSearchPalette workId={id} />
             </div>
             <KbUploadZone workId={id} />
-            <KbShell workId={id} treeSlot={<KbTreePanel workId={id} documents={docs.items} />} />
+            <KbShell
+                workId={id}
+                treeSlot={
+                    <KbTreePanel
+                        workId={id}
+                        documents={docs.items}
+                        inheritedDocuments={inheritedDocuments}
+                    />
+                }
+            />
         </div>
     );
 }
