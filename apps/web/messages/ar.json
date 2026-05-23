@@ -2614,7 +2614,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "مُورَّث من المنظمة",
+                            "description": "مستندات للقراءة فقط مملوكة لمنظمتك. افتح أحدها للعرض أو لتجاوزه محليًا.",
+                            "lockedLabel": "موروث (للقراءة فقط)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

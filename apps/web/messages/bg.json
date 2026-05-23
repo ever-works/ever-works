@@ -2614,7 +2614,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Наследени от организацията",
+                            "description": "Документи само за четене, притежавани от вашата организация. Отворете един, за да го прегледате или замените локално.",
+                            "lockedLabel": "Наследен (само за четене)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

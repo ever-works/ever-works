@@ -163,4 +163,177 @@ describe('KbTreePanel', () => {
         // Link href targets the upcoming `[...path]` route in row 4.
         expect(active?.getAttribute('href')).toBe('/works/work-1/kb/brand/voice.md');
     });
+
+    // ─── EW-641 Phase 2/e row 38a — "Inherited from organization" section ───
+
+    describe('inheritedDocuments — "Inherited from organization" section', () => {
+        it('does NOT render the inherited section when inheritedDocuments is omitted', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [doc({ title: 'Voice', class: 'brand', path: 'brand/v.md' })],
+                }),
+            );
+            expect(screen.queryByTestId('kb-tree-inherited')).toBeNull();
+        });
+
+        it('does NOT render the inherited section when inheritedDocuments is empty', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [doc({ title: 'Voice', class: 'brand', path: 'brand/v.md' })],
+                    inheritedDocuments: [],
+                }),
+            );
+            expect(screen.queryByTestId('kb-tree-inherited')).toBeNull();
+        });
+
+        it('shows the empty placeholder only when BOTH lists are empty', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [],
+                    inheritedDocuments: [],
+                }),
+            );
+            const tree = screen.getByTestId('kb-tree');
+            expect(tree.textContent).toContain('panes.tree.empty');
+            // No header / count / inherited section in pure-empty state.
+            expect(screen.queryByTestId('kb-tree-count')).toBeNull();
+            expect(screen.queryByTestId('kb-tree-inherited')).toBeNull();
+        });
+
+        it('renders the inherited section ABOVE per-class groups when both populate', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [
+                        doc({ id: 'w1', title: 'Voice', class: 'brand', path: 'brand/v.md' }),
+                    ],
+                    inheritedDocuments: [
+                        doc({
+                            id: 'org-1',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: null,
+                            organizationId: 'org-1',
+                        }),
+                    ],
+                }),
+            );
+            const inherited = screen.getByTestId('kb-tree-inherited');
+            const brand = screen.getByTestId('kb-tree-group-brand');
+            // DOM order: inherited section comes first inside the <nav>.
+            expect(
+                inherited.compareDocumentPosition(brand) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ).toBeTruthy();
+        });
+
+        it('emits class+slug-scoped data-testid + lock marker + inherited data-source on each row', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [],
+                    inheritedDocuments: [
+                        doc({
+                            id: 'org-l',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: null,
+                            organizationId: 'org-1',
+                        }),
+                    ],
+                }),
+            );
+            const row = screen.getByTestId('kb-tree-inherited-legal-privacy');
+            expect(row.getAttribute('data-source')).toBe('inherited');
+            expect(row.getAttribute('data-doc-class')).toBe('legal');
+            expect(row.getAttribute('data-doc-path')).toBe('legal/privacy.md');
+            // Lock-overlay marker is always present on inherited rows
+            // — the read-only nature is conveyed at-a-glance.
+            expect(row.textContent).toContain('🔒');
+            // Links to the same nested route shape; row 38c teaches the
+            // detail page to switch to read-only based on inherited
+            // status (no Work-owned override at the same path).
+            expect(row.getAttribute('href')).toBe('/works/work-1/kb/legal/privacy.md');
+        });
+
+        it('sorts inherited rows by canonical class order then by title (case-insensitive)', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [],
+                    inheritedDocuments: [
+                        // Seed order is intentionally noisy.
+                        doc({
+                            id: '1',
+                            title: 'zebra',
+                            class: 'style',
+                            slug: 'z',
+                            path: 'style/z.md',
+                        }),
+                        doc({
+                            id: '2',
+                            title: 'Alpha',
+                            class: 'legal',
+                            slug: 'a',
+                            path: 'legal/a.md',
+                        }),
+                        doc({
+                            id: '3',
+                            title: 'beta',
+                            class: 'legal',
+                            slug: 'b',
+                            path: 'legal/b.md',
+                        }),
+                        doc({
+                            id: '4',
+                            title: 'Charlie',
+                            class: 'style',
+                            slug: 'c',
+                            path: 'style/c.md',
+                        }),
+                    ],
+                }),
+            );
+            // KB_DOCUMENT_CLASSES canonical order places `legal` before
+            // `style`. Within each, titles are sorted case-insensitive ASC.
+            const inheritedSection = screen.getByTestId('kb-tree-inherited');
+            const rows = within(inheritedSection).getAllByRole('link');
+            expect(rows[0].getAttribute('data-doc-path')).toBe('legal/a.md');
+            expect(rows[1].getAttribute('data-doc-path')).toBe('legal/b.md');
+            expect(rows[2].getAttribute('data-doc-path')).toBe('style/c.md');
+            expect(rows[3].getAttribute('data-doc-path')).toBe('style/z.md');
+        });
+
+        it('renders the i18n section title + description copy', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [],
+                    inheritedDocuments: [
+                        doc({
+                            id: 'org-l',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                        }),
+                    ],
+                }),
+            );
+            const inherited = screen.getByTestId('kb-tree-inherited');
+            // The test next-intl mock returns the message key itself —
+            // verifies the component does call getTranslations() for both
+            // the section title and the description copy. Real translations
+            // are exercised by the messages/*.json catalogs.
+            expect(inherited.textContent).toContain('panes.tree.inheritedSection.title');
+            expect(screen.getByTestId('kb-tree-inherited-description').textContent).toBe(
+                'panes.tree.inheritedSection.description',
+            );
+        });
+    });
 });

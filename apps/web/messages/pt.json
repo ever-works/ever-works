@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Herdados da organização",
+                            "description": "Documentos somente leitura pertencentes à sua organização. Abra um para visualizar ou substituí-lo localmente.",
+                            "lockedLabel": "Herdado (somente leitura)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

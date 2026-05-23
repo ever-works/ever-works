@@ -2614,7 +2614,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Von der Organisation geerbt",
+                            "description": "Schreibgeschützte Dokumente, die Ihrer Organisation gehören. Öffnen Sie eines, um es anzuzeigen oder lokal zu überschreiben.",
+                            "lockedLabel": "Geerbt (schreibgeschützt)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",
