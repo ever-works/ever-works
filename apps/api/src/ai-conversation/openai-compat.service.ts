@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
+import {
+    KbMentionResolverService,
+    formatKbContext,
+    parseKbMentions,
+} from '@ever-works/agent/services';
+import type { KbDocumentBodyDto } from '@ever-works/contracts';
 import type {
     ChatMessage,
     ChatCompletionOptions,
@@ -33,6 +39,7 @@ export class OpenAiCompatService {
     constructor(
         private readonly aiFacade: AiFacadeService,
         private readonly workRepository: WorkRepository,
+        private readonly kbMentionResolver: KbMentionResolverService,
     ) {}
 
     /**
@@ -43,7 +50,8 @@ export class OpenAiCompatService {
         facadeOptions: FacadeOptions,
     ): Promise<OpenAiChatCompletionResponse> {
         const resolved = await this.resolveWorkContext(facadeOptions);
-        const options = this.mapToInternalOptions(dto);
+        const baseOptions = this.mapToInternalOptions(dto);
+        const options = await this.injectKbContext(baseOptions, resolved);
 
         const response = await this.aiFacade.createChatCompletion(options, resolved);
 
@@ -60,7 +68,8 @@ export class OpenAiCompatService {
         res: StreamingResponse,
     ): Promise<void> {
         const resolved = await this.resolveWorkContext(facadeOptions);
-        const options = this.mapToInternalOptions(dto);
+        const baseOptions = this.mapToInternalOptions(dto);
+        const options = await this.injectKbContext(baseOptions, resolved);
 
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(
@@ -294,6 +303,104 @@ export class OpenAiCompatService {
         }
 
         return options;
+    }
+
+    /**
+     * EW-641 Phase 2/c row 34c — scan the latest user message for `@kb:`
+     * mentions (row 34a `parseKbMentions`), resolve each against the
+     * Knowledge Base (row 34b `KbMentionResolverService.resolveMentions`),
+     * and prepend a `<kb>...</kb>` system message (row 31 `formatKbContext`)
+     * carrying the resolved docs so the LLM has them in context.
+     *
+     * Layout choice: we **prepend** a fresh system message at index 0
+     * rather than mutating an existing system message in-place. Both
+     * OpenAI- and Anthropic-compatible providers tolerate multiple
+     * system messages (or the gateway flattens them); inserting at
+     * the head also keeps the user's own carefully-crafted system
+     * prompt (if any) intact and downstream of the KB context.
+     *
+     * Idempotence: row 17's mention picker writes the raw `@kb:` token
+     * into the user message; the LLM doesn't see anything special on
+     * its end. The injected `<kb>` block is what carries the document
+     * text. Citations on the response come from row 34d (system-prompt
+     * instruction OR deterministic post-process).
+     *
+     * Degraded paths (all yield the unmodified `options`):
+     *  - no `workId` resolvable (anonymous / no work scope) — can't
+     *    look up docs anyway,
+     *  - latest user message is missing or non-string content (v1
+     *    only scans string content; content-part arrays are a v2
+     *    concern),
+     *  - no `@kb:` mentions parsed,
+     *  - all mentions resolve to `null` documents (404 / forbidden /
+     *    resolver-error — row 34b already swallowed those gracefully).
+     *
+     * The whole thing is wrapped in try/catch so a KB hiccup never
+     * breaks the chat completion request — the conversation continues
+     * exactly as it would have without the KB feature.
+     */
+    private async injectKbContext(
+        options: ChatCompletionOptions,
+        facadeOptions: FacadeOptions,
+    ): Promise<ChatCompletionOptions> {
+        const { workId, userId } = facadeOptions;
+        if (!workId || !userId) return options;
+
+        // v1 only scans string-content user messages. content-part
+        // arrays (vision / multimodal) are a v2 concern; document
+        // the limitation inline so a future contributor knows where
+        // to extend.
+        const latestUser = this.findLatestUserStringMessage(options.messages);
+        if (!latestUser) return options;
+
+        try {
+            const mentions = parseKbMentions(latestUser);
+            if (mentions.length === 0) return options;
+
+            const resolved = await this.kbMentionResolver.resolveMentions(workId, userId, mentions);
+            const docs: KbDocumentBodyDto[] = resolved
+                .map((r) => r.document)
+                .filter((d): d is KbDocumentBodyDto => d !== null);
+
+            if (docs.length === 0) return options;
+
+            const kbBlock = formatKbContext(docs);
+            const kbSystemMessage: ChatMessage = {
+                role: 'system',
+                content: kbBlock,
+            };
+
+            return {
+                ...options,
+                messages: [kbSystemMessage, ...options.messages],
+            };
+        } catch (err) {
+            // Any unexpected failure → log + carry on with the
+            // unmodified options. The user's conversation continues;
+            // the LLM just doesn't get the extra KB grounding.
+            this.logger.warn(
+                `KB context injection failed for work=${workId}: ${(err as Error).message}. Continuing without injected KB.`,
+            );
+            return options;
+        }
+    }
+
+    /**
+     * Find the most recent user-role message whose `content` is a
+     * plain string. Walks from the end so a multi-turn conversation
+     * picks up the just-sent user message, ignoring earlier turns.
+     */
+    private findLatestUserStringMessage(messages: ReadonlyArray<ChatMessage>): string | null {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.role !== 'user') continue;
+            if (typeof m.content === 'string') return m.content;
+            // Non-string user content (content parts / multimodal) —
+            // skip in v1; row 34c v2 would walk the content parts and
+            // scan each `text` part. Documented limitation, not a bug.
+            return null;
+        }
+        return null;
     }
 
     /**
