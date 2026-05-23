@@ -2675,7 +2675,9 @@
                     "bannerTitle": "Inherited from organization",
                     "bannerDescription": "This document is owned by your organization and is read-only here. Override locally to fork an editable copy into this Work.",
                     "overrideCta": "Override locally",
-                    "overrideCtaPendingTooltip": "Available once the override action ships in row 38d"
+                    "overrideCtaBusy": "Forking…",
+                    "overrideCtaPendingTooltip": "Available once the override action ships in row 38d",
+                    "overrideErrorFallback": "Could not fork the inherited document. Try again, or refresh the page."
                 },
                 "status": {
                     "draft": "Draft",

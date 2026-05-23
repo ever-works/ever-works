@@ -2840,7 +2840,9 @@
                     "bannerTitle": "Hérité de l'organisation",
                     "bannerDescription": "Ce document appartient à votre organisation et est en lecture seule ici. Remplacez-le localement pour bifurquer une copie modifiable dans ce Work.",
                     "overrideCta": "Remplacer localement",
-                    "overrideCtaPendingTooltip": "Disponible une fois l'action de remplacement livrée à la ligne 38d"
+                    "overrideCtaPendingTooltip": "Disponible une fois l'action de remplacement livrée à la ligne 38d",
+                    "overrideCtaBusy": "Création du fork…",
+                    "overrideErrorFallback": "Impossible de bifurquer le document hérité. Réessayez ou actualisez la page."
                 }
             }
         },

@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Kuruluştan devralındı",
                     "bannerDescription": "Bu belge kuruluşunuza aittir ve burada salt okunurdur. Bu Work içine düzenlenebilir bir kopya çatallamak için yerel olarak geçersiz kılın.",
                     "overrideCta": "Yerel olarak geçersiz kıl",
-                    "overrideCtaPendingTooltip": "38d satırında geçersiz kılma eylemi gönderildiğinde kullanılabilir"
+                    "overrideCtaPendingTooltip": "38d satırında geçersiz kılma eylemi gönderildiğinde kullanılabilir",
+                    "overrideCtaBusy": "Çatallanıyor…",
+                    "overrideErrorFallback": "Devralınan belge çatallanamadı. Tekrar deneyin veya sayfayı yenileyin."
                 }
             }
         },

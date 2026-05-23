@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Odziedziczony z organizacji",
                     "bannerDescription": "Ten dokument jest własnością Twojej organizacji i jest tutaj tylko do odczytu. Zastąp lokalnie, aby rozwidlić edytowalną kopię w tym Work.",
                     "overrideCta": "Zastąp lokalnie",
-                    "overrideCtaPendingTooltip": "Dostępne po wydaniu akcji zastąpienia w wierszu 38d"
+                    "overrideCtaPendingTooltip": "Dostępne po wydaniu akcji zastąpienia w wierszu 38d",
+                    "overrideCtaBusy": "Forkowanie…",
+                    "overrideErrorFallback": "Nie udało się sforkować odziedziczonego dokumentu. Spróbuj ponownie lub odśwież stronę."
                 }
             }
         },

@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Herdado da organização",
                     "bannerDescription": "Este documento pertence à sua organização e é somente leitura aqui. Substitua localmente para criar uma cópia editável neste Work.",
                     "overrideCta": "Substituir localmente",
-                    "overrideCtaPendingTooltip": "Disponível quando a ação de substituição for lançada na linha 38d"
+                    "overrideCtaPendingTooltip": "Disponível quando a ação de substituição for lançada na linha 38d",
+                    "overrideCtaBusy": "Criando fork…",
+                    "overrideErrorFallback": "Não foi possível criar um fork do documento herdado. Tente novamente ou atualize a página."
                 }
             }
         },

@@ -2813,7 +2813,9 @@
                     "bannerTitle": "בירושה מהארגון",
                     "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
                     "overrideCta": "עקוף מקומית",
-                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d"
+                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
+                    "overrideCtaBusy": "מבצע פיצול…",
+                    "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
                 }
             }
         },
