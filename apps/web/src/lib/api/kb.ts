@@ -48,6 +48,37 @@ export const kbAPI = {
     },
 
     /**
+     * `GET /api/works/:id/kb/inheritable?orgId=<id>` — resolve the merged
+     * set of org-level + Work-override inheritable documents for the
+     * legal/style/seo classes (see `apps/api/src/works/org-kb.controller.ts`
+     * `resolveInheritable` → `KnowledgeBaseService.resolveInheritableDocuments`).
+     *
+     * EW-641 Phase 2/e row 38b — the KB page calls this in parallel with
+     * `listDocuments` and hands the result to
+     * `<KbTreePanel inheritedDocuments={...} />` (row 38a) so the
+     * "Inherited from organization" section actually populates.
+     *
+     * Returns `[]` (no fetch) when `orgId` is null/empty — saves a
+     * round-trip for Works whose `organizationId` column (row 37c)
+     * hasn't been populated yet. The `orgId` value is URL-encoded so
+     * opaque UUIDs survive the query string unchanged. The controller
+     * already accepts a falsy `orgId` and short-circuits to `[]`, but
+     * skipping the fetch on the client side keeps the network panel
+     * and audit log cleaner.
+     */
+    listInheritableDocuments: async (
+        workId: string,
+        orgId: string | null | undefined,
+    ): Promise<KbDocumentDto[]> => {
+        if (!orgId) {
+            return [];
+        }
+        return serverFetch<KbDocumentDto[]>(
+            `/works/${workId}/kb/inheritable?orgId=${encodeURIComponent(orgId)}`,
+        );
+    },
+
+    /**
      * `GET /api/works/:id/kb/documents/:idOrPath` — full document with
      * Markdown body + asset summaries. The backend accepts either a
      * UUID or the canonical `<class>/<slug>.md`-style path; we encode
