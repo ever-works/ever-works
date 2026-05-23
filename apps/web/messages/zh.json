@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "继承自组织",
+                            "description": "由您的组织拥有的只读文档。打开以查看或在本地覆盖。",
+                            "lockedLabel": "继承(只读)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

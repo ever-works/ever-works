@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "संगठन से विरासत में मिले",
+                            "description": "आपके संगठन के स्वामित्व वाले केवल-पठनीय दस्तावेज़। देखने या स्थानीय रूप से ओवरराइड करने के लिए खोलें।",
+                            "lockedLabel": "विरासत में मिला (केवल पढ़ने योग्य)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

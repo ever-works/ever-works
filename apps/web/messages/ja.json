@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "組織から継承",
+                            "description": "組織が所有する読み取り専用のドキュメント。表示するか、ローカルでオーバーライドするには開いてください。",
+                            "lockedLabel": "継承(読み取り専用)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

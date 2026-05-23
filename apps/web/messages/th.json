@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "รับช่วงต่อจากองค์กร",
+                            "description": "เอกสารแบบอ่านอย่างเดียวที่เป็นขององค์กรของคุณ เปิดดูหรือสร้างเวอร์ชันท้องถิ่นทับ",
+                            "lockedLabel": "รับช่วงต่อ (อ่านอย่างเดียว)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

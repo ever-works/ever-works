@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Kế thừa từ tổ chức",
+                            "description": "Tài liệu chỉ đọc thuộc sở hữu của tổ chức của bạn. Mở một tài liệu để xem hoặc ghi đè cục bộ.",
+                            "lockedLabel": "Kế thừa (chỉ đọc)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Успадковано з організації",
+                            "description": "Документи лише для читання, що належать вашій організації. Відкрийте один, щоб переглянути або перевизначити локально.",
+                            "lockedLabel": "Успадковано (лише читання)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

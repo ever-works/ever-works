@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "조직에서 상속됨",
+                            "description": "조직이 소유한 읽기 전용 문서입니다. 보거나 로컬에서 재정의하려면 하나를 여세요.",
+                            "lockedLabel": "상속됨(읽기 전용)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

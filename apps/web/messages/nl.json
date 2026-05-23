@@ -2397,7 +2397,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Overgenomen van organisatie",
+                            "description": "Alleen-lezen documenten van uw organisatie. Open er een om hem te bekijken of lokaal te overschrijven.",
+                            "lockedLabel": "Overgenomen (alleen-lezen)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",

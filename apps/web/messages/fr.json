@@ -2641,7 +2641,12 @@
                 "panes": {
                     "tree": {
                         "title": "Documents",
-                        "empty": "Document tree appears here once you upload or create a KB document."
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Hérités de l'organisation",
+                            "description": "Documents en lecture seule appartenant à votre organisation. Ouvrez-en un pour le consulter ou le remplacer localement.",
+                            "lockedLabel": "Hérité (lecture seule)"
+                        }
                     },
                     "editor": {
                         "title": "Editor",
