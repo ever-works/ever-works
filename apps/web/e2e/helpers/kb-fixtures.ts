@@ -209,3 +209,80 @@ export async function seedKbSkippedUpload(
     }
     return { uploadId, extractionStatus };
 }
+
+export interface SeedOrgKbDocOptions {
+    /** Organization UUID. The org-KB controller (`/api/organizations/:orgId/kb/documents`) doesn't enforce membership today — any authenticated user can post for any orgId. */
+    orgId: string;
+    /** `class/slug.md` style relative path under `.content/kb/<class>/`. Phase 2/e A19 uses `legal/<slug>.md`. */
+    path: string;
+    /** Optional title — falls back to the slug. */
+    title?: string;
+    /** KbDocumentClass enum value. Spec D2 restricts org-scope docs to inheritable classes (`legal`, `style`, `seo`). */
+    targetClass?: 'legal' | 'style' | 'seo';
+    /** Markdown body. */
+    body: string;
+}
+
+/**
+ * POST a single organization-scope KB document via the public REST endpoint
+ * (`POST /api/organizations/:orgId/kb/documents`). Used by the A19 + A20
+ * Playwright specs to seed an inheritable document that a paired Work
+ * (Work.organizationId === orgId) should surface under its "Inherited from
+ * organization" tree section.
+ *
+ * Service-layer guard restricts org-scope documents to the inheritable
+ * class set (`legal | style | seo`) per spec D2 — passing another class
+ * causes the controller to 400.
+ */
+export async function seedOrgKbDoc(
+    request: APIRequestContext,
+    token: string,
+    opts: SeedOrgKbDocOptions,
+): Promise<{ documentId: string; path: string }> {
+    const targetClass = opts.targetClass ?? 'legal';
+    const res = await request.post(`${API_BASE}/api/organizations/${opts.orgId}/kb/documents`, {
+        headers: authedHeaders(token),
+        data: {
+            path: opts.path,
+            title: opts.title ?? opts.path.split('/').pop()?.replace(/\.md$/, '') ?? opts.path,
+            class: targetClass,
+            body: opts.body,
+        },
+    });
+    if (!res.ok()) {
+        const errBody = await res.text();
+        throw new Error(`seedOrgKbDoc failed (${res.status()}): ${errBody}`);
+    }
+    const json = (await res.json()) as { id?: string; path?: string };
+    if (!json.id || !json.path) {
+        throw new Error(
+            `seedOrgKbDoc: created but response shape missing id/path: ${JSON.stringify(json)}`,
+        );
+    }
+    return { documentId: json.id, path: json.path };
+}
+
+/**
+ * PATCH `Work.organizationId` via the public `/api/works/:id` update
+ * endpoint. Pairs the Work with an organization-scope KB document set so
+ * that org docs (seeded via `seedOrgKbDoc`) surface under the Work's KB
+ * tree as "inherited" rows (Phase 2/e A19+A20).
+ *
+ * The endpoint requires editor role on the Work — the access token used
+ * must belong to the Work's owner or an editor member.
+ */
+export async function setWorkOrganizationId(
+    request: APIRequestContext,
+    token: string,
+    workId: string,
+    orgId: string | null,
+): Promise<void> {
+    const res = await request.patch(`${API_BASE}/api/works/${workId}`, {
+        headers: authedHeaders(token),
+        data: { organizationId: orgId },
+    });
+    if (!res.ok()) {
+        const errBody = await res.text();
+        throw new Error(`setWorkOrganizationId failed (${res.status()}): ${errBody}`);
+    }
+}

@@ -167,6 +167,63 @@ describe('WorkLifecycleService', () => {
         );
     });
 
+    describe('updateWork — organizationId (EW-639 Phase 2/e)', () => {
+        const baseWork = (overrides: Record<string, unknown> = {}) =>
+            ({
+                id: 'dir-1',
+                name: 'Test Work',
+                description: 'Test description',
+                owner: 'ever-works',
+                organization: false,
+                organizationId: null,
+                readmeConfig: {},
+                gitProvider: 'github',
+                userId: user.id,
+                website: 'https://example.com',
+                websiteTemplateId: 'classic',
+                getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+                getWebsiteRepo: jest.fn().mockReturnValue('test-work-website'),
+                ...overrides,
+            }) as any;
+
+        it('persists a non-null organizationId from the DTO', async () => {
+            const work = baseWork();
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            workRepository.update.mockResolvedValueOnce({ ...work, organizationId: 'org-42' });
+
+            await service.updateWork(work.id, { organizationId: 'org-42' } as any, user);
+
+            expect(workRepository.update).toHaveBeenCalledWith(
+                work.id,
+                expect.objectContaining({ organizationId: 'org-42' }),
+            );
+        });
+
+        it('persists organizationId: null to clear the org membership', async () => {
+            const work = baseWork({ organizationId: 'org-prior' });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            workRepository.update.mockResolvedValueOnce({ ...work, organizationId: null });
+
+            await service.updateWork(work.id, { organizationId: null } as any, user);
+
+            expect(workRepository.update).toHaveBeenCalledWith(
+                work.id,
+                expect.objectContaining({ organizationId: null }),
+            );
+        });
+
+        it('leaves organizationId untouched when the DTO omits the field', async () => {
+            const work = baseWork({ organizationId: 'org-prior' });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            workRepository.update.mockResolvedValueOnce({ ...work });
+
+            await service.updateWork(work.id, { name: 'renamed' } as any, user);
+
+            const updateArg = workRepository.update.mock.calls[0][1];
+            expect(updateArg).not.toHaveProperty('organizationId');
+        });
+    });
+
     it('rejects website template changes after website repository initialization', async () => {
         const work = {
             id: 'dir-1',

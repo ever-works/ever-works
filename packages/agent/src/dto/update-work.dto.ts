@@ -96,4 +96,16 @@ export class UpdateWorkDto {
     @IsOptional()
     @IsIn(['pull', 'push', 'disabled'])
     activitySyncMode?: 'pull' | 'push' | 'disabled';
+
+    @ApiPropertyOptional({
+        description:
+            'Membership-scope organization UUID. Pairs the Work with an organization-scope KB document set: when set, the Workbench shows org-level docs as "inherited" under the Work\'s KB tree (Phase 2/e A19+A20). Pass `null` to clear the membership. Independent of the `organization: boolean` flag above (which controls Git repository ownership shape, not KB inheritance).',
+        nullable: true,
+    })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) =>
+        value === null || value === '' ? null : typeof value === 'string' ? value.trim() : value,
+    )
+    organizationId?: string | null;
 }
