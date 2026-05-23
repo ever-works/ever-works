@@ -208,7 +208,11 @@ function renderEditorSlot(
     // organization" banner (row 38c). The editor swap happens here at
     // the route level, never inside `KbDocumentView` itself.
     if (isInherited) {
-        return <KbDocumentView doc={doc} isInherited />;
+        // EW-641 Phase 2/e row 38d — pass `workId` so the banner's
+        // "Override locally" CTA can submit the server action against
+        // the right Work. The component reads `doc.organizationId`
+        // directly to construct the inherited-doc reference.
+        return <KbDocumentView doc={doc} isInherited workId={workId} />;
     }
     const fullyLocked = doc.locked && doc.lockMode === 'full';
     if (fullyLocked) {

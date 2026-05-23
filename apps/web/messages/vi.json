@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Kế thừa từ tổ chức",
                     "bannerDescription": "Tài liệu này thuộc sở hữu của tổ chức của bạn và chỉ đọc tại đây. Ghi đè cục bộ để fork một bản sao có thể chỉnh sửa vào Work này.",
                     "overrideCta": "Ghi đè cục bộ",
-                    "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d"
+                    "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d",
+                    "overrideCtaBusy": "Đang fork…",
+                    "overrideErrorFallback": "Không thể fork tài liệu được kế thừa. Thử lại hoặc tải lại trang."
                 }
             }
         },

@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Overgenomen van organisatie",
                     "bannerDescription": "Dit document is eigendom van uw organisatie en is hier alleen-lezen. Overschrijf lokaal om een bewerkbare kopie in dit Work te forken.",
                     "overrideCta": "Lokaal overschrijven",
-                    "overrideCtaPendingTooltip": "Beschikbaar zodra de overschrijfactie wordt geleverd in rij 38d"
+                    "overrideCtaPendingTooltip": "Beschikbaar zodra de overschrijfactie wordt geleverd in rij 38d",
+                    "overrideCtaBusy": "Forken…",
+                    "overrideErrorFallback": "Het overgenomen document kon niet worden geforkt. Probeer opnieuw of vernieuw de pagina."
                 }
             }
         },

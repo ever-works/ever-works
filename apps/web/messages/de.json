@@ -2813,7 +2813,9 @@
                     "bannerTitle": "Von der Organisation geerbt",
                     "bannerDescription": "Dieses Dokument gehört Ihrer Organisation und ist hier schreibgeschützt. Lokal überschreiben, um eine bearbeitbare Kopie in dieses Work zu forken.",
                     "overrideCta": "Lokal überschreiben",
-                    "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist"
+                    "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist",
+                    "overrideCtaBusy": "Wird geforkt…",
+                    "overrideErrorFallback": "Das geerbte Dokument konnte nicht geforkt werden. Versuchen Sie es erneut oder laden Sie die Seite neu."
                 }
             }
         },

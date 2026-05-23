@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
+    CreateKbDocumentInput,
     KbDocumentBodyDto,
     KbDocumentDto,
     KbDocumentHistoryResult,
@@ -102,6 +103,29 @@ export const kbAPI = {
         return serverFetch<KbDocumentBodyDto>(
             `/works/${workId}/kb/inheritable/${encodedPath}?orgId=${encodeURIComponent(orgId)}`,
         );
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents` — create a new Work-scope KB
+     * document.
+     *
+     * EW-641 Phase 2/e row 38d — used by the "Override locally" server
+     * action to fork an inherited org-overlay doc into the user's
+     * Work at the same path/class. The agent-side `createDocument`
+     * already enqueues the row-1B/a mirror task + the row-29c embed
+     * task, so the forked doc joins the per-Work pipeline without any
+     * extra plumbing here.
+     */
+    createDocument: async (
+        workId: string,
+        input: CreateKbDocumentInput,
+    ): Promise<KbDocumentBodyDto> => {
+        return serverMutation<KbDocumentBodyDto>({
+            endpoint: `/works/${workId}/kb/documents`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 
     /**

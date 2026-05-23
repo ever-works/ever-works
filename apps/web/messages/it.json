@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Ereditato dall'organizzazione",
                     "bannerDescription": "Questo documento è di proprietà della tua organizzazione ed è di sola lettura qui. Sovrascrivi localmente per creare una copia modificabile in questo Work.",
                     "overrideCta": "Sovrascrivi localmente",
-                    "overrideCtaPendingTooltip": "Disponibile quando l'azione di sovrascrittura sarà rilasciata nella riga 38d"
+                    "overrideCtaPendingTooltip": "Disponibile quando l'azione di sovrascrittura sarà rilasciata nella riga 38d",
+                    "overrideCtaBusy": "Esecuzione fork…",
+                    "overrideErrorFallback": "Impossibile creare un fork del documento ereditato. Riprova o ricarica la pagina."
                 }
             }
         },

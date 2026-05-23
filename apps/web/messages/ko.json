@@ -2596,7 +2596,9 @@
                     "bannerTitle": "조직에서 상속됨",
                     "bannerDescription": "이 문서는 조직 소유이며 여기서는 읽기 전용입니다. 이 Work에 편집 가능한 복사본을 포크하려면 로컬에서 재정의하세요.",
                     "overrideCta": "로컬에서 재정의",
-                    "overrideCtaPendingTooltip": "38d 행에서 재정의 작업이 출시되면 사용 가능"
+                    "overrideCtaPendingTooltip": "38d 행에서 재정의 작업이 출시되면 사용 가능",
+                    "overrideCtaBusy": "포크 중…",
+                    "overrideErrorFallback": "상속된 문서를 포크할 수 없습니다. 다시 시도하거나 페이지를 새로 고치세요."
                 }
             }
         },

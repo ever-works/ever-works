@@ -2596,7 +2596,9 @@
                     "bannerTitle": "Diwarisi dari organisasi",
                     "bannerDescription": "Dokumen ini dimiliki oleh organisasi Anda dan hanya-baca di sini. Ganti secara lokal untuk membuat salinan yang dapat diedit di Work ini.",
                     "overrideCta": "Ganti secara lokal",
-                    "overrideCtaPendingTooltip": "Tersedia setelah aksi pengganti dikirim di baris 38d"
+                    "overrideCtaPendingTooltip": "Tersedia setelah aksi pengganti dikirim di baris 38d",
+                    "overrideCtaBusy": "Mem-fork…",
+                    "overrideErrorFallback": "Tidak dapat mem-fork dokumen warisan. Coba lagi atau muat ulang halaman."
                 }
             }
         },

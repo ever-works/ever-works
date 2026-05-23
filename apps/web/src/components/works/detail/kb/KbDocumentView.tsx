@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils/cn';
 import { MarkdownPreview } from '@/components/works/detail/items/MarkdownPreview';
+import { KbInheritedOverrideButton } from './KbInheritedOverrideButton';
 import { rewriteWikilinks } from './wikilink-md';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
@@ -11,19 +12,22 @@ interface KbDocumentViewProps {
      * organization" banner above the doc header. When `true`, the
      * component is the read-only org-overlay viewer: editor surface
      * stays mounted as `KbDocumentView` (already non-editable), and
-     * the banner explains the tier + offers an "Override locally"
-     * placeholder CTA.
+     * the banner explains the tier + offers the "Override locally"
+     * CTA (live server action wired in row 38d).
      *
      * Defaults to `false` so every existing call site keeps the
      * legacy read-only behaviour (full-lock docs, etc.).
-     *
-     * Page-level wiring (resolve the inherited doc body when the
-     * Work-scope `getDocument` 404s) lives in a follow-up row; the
-     * real "Override locally" server action lands in row 38d. This
-     * row ships the surface only so subsequent rows can opt in
-     * without touching this component again.
      */
     isInherited?: boolean;
+    /**
+     * EW-641 Phase 2/e row 38d — Work id that owns this detail
+     * route. Required (only) when `isInherited` is true so the
+     * inline `KbInheritedOverrideButton` can submit the
+     * `overrideInheritedKbDocumentAction` against the right Work.
+     * Defaults to `null` to keep every legacy call site (full-lock
+     * docs, etc.) unchanged.
+     */
+    workId?: string | null;
 }
 
 /**
@@ -52,7 +56,11 @@ interface KbDocumentViewProps {
  *    `isInherited` is true; row 38d adds the working override CTA
  *    inside this banner)
  */
-export async function KbDocumentView({ doc, isInherited = false }: KbDocumentViewProps) {
+export async function KbDocumentView({
+    doc,
+    isInherited = false,
+    workId = null,
+}: KbDocumentViewProps) {
     const t = await getTranslations('dashboard.workDetail.kb');
 
     return (
@@ -97,28 +105,38 @@ export async function KbDocumentView({ doc, isInherited = false }: KbDocumentVie
                         </span>
                     </div>
                     {/*
-                     * EW-641 Phase 2/e row 38c — "Override locally" CTA
-                     * placeholder. Renders as a disabled button this
-                     * row; row 38d wires the real server action (clone
-                     * the inherited body into a Work-scope doc + redirect).
-                     * The selector is locked NOW so the row 38e
-                     * Playwright e2e can already target it.
+                     * EW-641 Phase 2/e row 38d — "Override locally" CTA.
+                     * Renders the live client-side button when we have
+                     * the workId + orgId needed to submit the server
+                     * action; falls back to a disabled placeholder when
+                     * a caller renders `isInherited` without those
+                     * (legacy / tests). The placeholder keeps the
+                     * `data-testid` stable for any selector that
+                     * pre-dates this wiring.
                      */}
-                    <button
-                        type="button"
-                        disabled
-                        data-testid="kb-inherited-override-cta"
-                        className={cn(
-                            'ml-auto rounded-md px-3 py-1 text-xs font-medium',
-                            'bg-amber-500/20 dark:bg-amber-400/20',
-                            'text-amber-900 dark:text-amber-100',
-                            'cursor-not-allowed opacity-60',
-                            'border border-amber-500/40 dark:border-amber-400/40',
-                        )}
-                        title={t('inherited.overrideCtaPendingTooltip')}
-                    >
-                        {t('inherited.overrideCta')}
-                    </button>
+                    {workId && doc.organizationId ? (
+                        <KbInheritedOverrideButton
+                            workId={workId}
+                            orgId={doc.organizationId}
+                            idOrPath={doc.id}
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            disabled
+                            data-testid="kb-inherited-override-cta"
+                            className={cn(
+                                'ml-auto rounded-md px-3 py-1 text-xs font-medium',
+                                'bg-amber-500/20 dark:bg-amber-400/20',
+                                'text-amber-900 dark:text-amber-100',
+                                'cursor-not-allowed opacity-60',
+                                'border border-amber-500/40 dark:border-amber-400/40',
+                            )}
+                            title={t('inherited.overrideCtaPendingTooltip')}
+                        >
+                            {t('inherited.overrideCta')}
+                        </button>
+                    )}
                 </aside>
             ) : null}
             <header className="flex flex-col gap-2">
