@@ -17,6 +17,7 @@ import { WorkKnowledgeChunkRepository } from '../database/repositories/work-know
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
+import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { WorkOwnershipService } from './work-ownership.service';
 
 /**
@@ -69,6 +70,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
+        KbMentionResolverService,
     ],
     exports: [
         WorkKnowledgeDocumentRepository,
@@ -79,6 +81,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
+        KbMentionResolverService,
     ],
 })
 export class KnowledgeBaseModule {}
