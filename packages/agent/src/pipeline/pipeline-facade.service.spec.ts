@@ -114,6 +114,30 @@ describe('PipelineFacadeService', () => {
             const ctx = service.createStepExecutionContext(makeWork() as any);
             expect(ctx.signal).toBeUndefined();
         });
+
+        // EW-641 Phase 2/b row 32b — kbContext carrier.
+        it('omits kbContext when not provided (carrier stays undefined)', () => {
+            const ctx = service.createStepExecutionContext(makeWork() as any);
+            expect(ctx.kbContext).toBeUndefined();
+        });
+
+        it('forwards the provided kbContext bundle into the StepExecutionContext', () => {
+            const bundle = {
+                alwaysInjected: [{ id: 'always-doc' }] as any,
+                queryRetrieved: [{ id: 'query-doc' }] as any,
+            };
+            const ctx = service.createStepExecutionContext(
+                makeWork() as any,
+                undefined,
+                undefined,
+                undefined,
+                bundle,
+            );
+            expect(ctx.kbContext).toBe(bundle);
+            // Both lists are reachable through the carrier without further work.
+            expect(ctx.kbContext?.alwaysInjected.map((d) => d.id)).toEqual(['always-doc']);
+            expect(ctx.kbContext?.queryRetrieved.map((d) => d.id)).toEqual(['query-doc']);
+        });
     });
 
     describe('logger prefix', () => {

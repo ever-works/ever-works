@@ -44,19 +44,13 @@ function buildFallbackGeneratedPrompt(input: {
     title: string;
     description: string;
     suggestedCategories: Array<{ name: string; slug: string }>;
-    suggestedFields: Array<{ name: string; type: SuggestedFieldType }>;
     recommendedPlugins: Array<{ pluginId: string; reason: string }>;
 }): string {
     const categories = input.suggestedCategories.map((c) => c.name).join(', ');
-    const fields = input.suggestedFields.map((f) => `${f.name} (${f.type})`).join(', ');
-    const plugins = input.recommendedPlugins.map((p) => p.pluginId).join(', ');
     const parts = [
-        `Create a Work named "${input.title}".`,
+        `Create a Work about ${input.title}.`,
         input.description,
-        categories ? `Organize it around these categories: ${categories}.` : '',
-        fields ? `Track these item fields where useful: ${fields}.` : '',
-        plugins ? `Use these relevant plugins if configured: ${plugins}.` : '',
-        'Research high-quality items and generate useful descriptions, categories, and metadata.',
+        categories ? `Use categories like ${categories}.` : '',
     ].filter(Boolean);
     return clipMax(parts.join(' '), GENERATED_PROMPT_MAX);
 }
@@ -153,7 +147,6 @@ export function coerceWorkProposal(draft: PermissiveWorkProposalDraft): WorkProp
             title,
             description,
             suggestedCategories,
-            suggestedFields,
             recommendedPlugins,
         });
     }

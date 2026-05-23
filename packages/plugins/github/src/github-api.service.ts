@@ -770,6 +770,53 @@ export class GitHubApiService {
 		}
 	}
 
+	/**
+	 * EW-641 Phase 1B/d row 18b — list commits touching `path` via
+	 * `GET /repos/{owner}/{repo}/commits?path=…`. Newest first, capped
+	 * to `[1, 100]` (the GitHub `per_page` limit).
+	 */
+	async listFileCommits(
+		owner: string,
+		repo: string,
+		path: string,
+		token: string,
+		limit?: number,
+		baseUrl?: string
+	): Promise<GitCommit[]> {
+		const octokit = this.createOctokit(token, baseUrl);
+		const perPage = typeof limit === 'number' ? Math.min(Math.max(Math.floor(limit), 1), 100) : 25;
+
+		try {
+			const { data } = await octokit.rest.repos.listCommits({
+				owner,
+				repo,
+				path,
+				per_page: perPage
+			});
+
+			// Some commits are signed by GitHub Actions / bots where the
+			// `commit.author.name` field is set but `data.author` (the
+			// repo-user record) is null — fall back to the commit-level
+			// author so the dialog still shows a meaningful display name.
+			return data.map(
+				(row): GitCommit => ({
+					sha: row.sha,
+					message: row.commit.message,
+					author: {
+						name: row.commit.author?.name ?? row.author?.login ?? '',
+						email: row.commit.author?.email ?? ''
+					},
+					date: row.commit.author?.date ?? row.commit.committer?.date ?? ''
+				})
+			);
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) {
+				return [];
+			}
+			throw err;
+		}
+	}
+
 	async getReadme(
 		owner: string,
 		repo: string,

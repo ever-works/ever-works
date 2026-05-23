@@ -19,6 +19,11 @@ jest.mock(
             DISCOVER: 'discover',
             SCHEDULED: 'scheduled',
         },
+        WorkProposalStatus: {
+            PENDING: 'pending',
+            ACCEPTED: 'accepted',
+            DISMISSED: 'dismissed',
+        },
     }),
     { virtual: true },
 );
@@ -38,7 +43,7 @@ describe('UserResearchListener', () => {
     let logSpy: jest.SpyInstance;
     let debugSpy: jest.SpyInstance;
     let warnSpy: jest.SpyInstance;
-    let proposals: { refresh: jest.Mock };
+    let proposals: { list: jest.Mock; refresh: jest.Mock };
     let config: { get: jest.Mock };
     let listener: UserResearchListener;
 
@@ -46,7 +51,10 @@ describe('UserResearchListener', () => {
         logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
         debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation();
         warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-        proposals = { refresh: jest.fn().mockResolvedValue({ status: 'queued' }) };
+        proposals = {
+            list: jest.fn().mockResolvedValue([]),
+            refresh: jest.fn().mockResolvedValue({ status: 'queued' }),
+        };
         config = { get: jest.fn().mockReturnValue(true) };
         listener = new UserResearchListener(proposals as never, config as unknown as ConfigService);
     });
@@ -59,7 +67,14 @@ describe('UserResearchListener', () => {
 
     it('dispatches research with source=auto-signup when enabled', async () => {
         await listener.onUserConfirmed(makeEvent('u1') as never);
+        expect(proposals.list).toHaveBeenCalledWith('u1', ['pending', 'accepted', 'dismissed']);
         expect(proposals.refresh).toHaveBeenCalledWith('u1', 'auto-signup');
+    });
+
+    it('skips dispatch when proposal history already exists', async () => {
+        proposals.list.mockResolvedValue([{ id: 'p1' }]);
+        await listener.onUserConfirmed(makeEvent('u1') as never);
+        expect(proposals.refresh).not.toHaveBeenCalled();
     });
 
     it('skips dispatch when USER_RESEARCH_ENABLED is false', async () => {

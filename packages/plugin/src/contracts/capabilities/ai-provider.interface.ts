@@ -229,6 +229,17 @@ export interface EmbeddingOptions {
 	readonly input: string | readonly string[];
 	/** Embedding dimensions (if model supports) */
 	readonly dimensions?: number;
+	/**
+	 * Resolved settings for this operation. Mirrors
+	 * `ChatCompletionOptions.settings` so the facade can thread
+	 * user/work-scoped values (`apiKey`, `embeddingModel`, `baseUrl`)
+	 * through to the embedding call without a separate plumbing
+	 * surface. Plugins should prefer these over their stored defaults
+	 * — `BaseAiProvider.resolveConfig` handles the merge.
+	 *
+	 * Added by EW-641 Phase 2/a row 27 (PR following #957).
+	 */
+	readonly settings?: PluginSettings;
 }
 
 /**
@@ -271,7 +282,49 @@ export interface IAiProviderPlugin extends IPlugin {
 	createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk>;
 
 	/**
-	 * Create embeddings
+	 * Create embeddings for one or more text inputs.
+	 *
+	 * Powers EW-641 Phase 2 (KB semantic retrieval) — the agent
+	 * `KnowledgeBaseChunker` task fans chunk text out to whichever
+	 * provider plugin the operator has configured for the `embedding`
+	 * capability, then writes the returned vectors into
+	 * `work_knowledge_chunk.embedding` (pgvector column) for RRF blend
+	 * with lexical search at query time.
+	 *
+	 * **Optional capability.** Plugin authors implement this only when
+	 * the upstream provider exposes a dedicated embeddings endpoint
+	 * (OpenAI `text-embedding-3-small`, Cohere `embed-v3`, etc.).
+	 * Providers that don't have one (e.g. Anthropic on the
+	 * 2026-05-21 launch surface) leave it `undefined` and KB falls
+	 * back to lexical-only retrieval — no semantic blend, but the
+	 * search still returns results from the Postgres FTS index.
+	 *
+	 * **Fallback selection order** (resolved by
+	 * `AiFacadeService.embed(input, opts)`):
+	 *   1. The operator-pinned embedding provider, if configured
+	 *      (`pluginSettings.embeddingProviderId`).
+	 *   2. The first AI-provider plugin in the registry whose
+	 *      `createEmbedding` is defined AND whose `isAvailable()`
+	 *      resolves true.
+	 *   3. If none qualifies, the facade throws
+	 *      `EmbeddingNotConfiguredError`. KB retrieval catches that
+	 *      and degrades to lexical-only — see
+	 *      `KnowledgeBaseService.search` for the consumer-side gate.
+	 *
+	 * **Batch semantics.** Implementations MUST accept `input` as
+	 * either a single string or an array — the response's
+	 * `embeddings` array preserves input order with the same length
+	 * (`embeddings[i]` is the vector for `input[i]`). Splitting +
+	 * rejoining batches across multiple provider calls is the
+	 * plugin's responsibility (not all providers accept the same
+	 * batch size; OpenAI caps at 2048).
+	 *
+	 * **Dimension hint.** `options.dimensions`, when provided, asks
+	 * the provider to return shorter vectors (OpenAI `dimensions`
+	 * field). Plugins that can't honor the request SHOULD ignore it
+	 * and return the model's native dimensionality — the consumer
+	 * detects the mismatch and adapts the pgvector column rather
+	 * than reject the response.
 	 */
 	createEmbedding?(options: EmbeddingOptions): Promise<EmbeddingResponse>;
 

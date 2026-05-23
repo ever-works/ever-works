@@ -53,6 +53,15 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkCacheWarmupService,
         WorkScheduleDispatcherCronService,
         DistributedTaskLockService,
+        // EW-641 1B/b — the KB upload pipeline's storage plugin token
+        // (`KB_STORAGE_PLUGIN`) is now provided by the `@Global()`
+        // `KbStorageModule` (apps/api/src/uploads/kb-storage.module.ts),
+        // imported once at the api.module.ts level. The original
+        // in-module provider here only bound the token within
+        // `WorksModule`'s scope, which `KnowledgeBaseModule` (imported,
+        // not consumer) couldn't see — so `KnowledgeBaseService.storage`
+        // silently injected `undefined` and every upload returned 503.
+        // See the docstring on `KbStorageModule` for the DI walk.
     ],
     controllers: [
         WorksController,

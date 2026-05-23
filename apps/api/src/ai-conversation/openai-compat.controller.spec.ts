@@ -1,5 +1,13 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
+// EW-641 Phase 2/c row 34c — `OpenAiCompatService` now imports the
+// agent/services barrel for KB mention injection. Stub it here to
+// keep the controller spec free of agent transitive deps.
+jest.mock('@ever-works/agent/services', () => ({
+    KbMentionResolverService: class {},
+    parseKbMentions: jest.fn().mockReturnValue([]),
+    formatKbContext: jest.fn().mockReturnValue('<kb>\n</kb>'),
+}));
 
 import { OpenAiCompatController } from './openai-compat.controller';
 import { OpenAiCompatService } from './openai-compat.service';

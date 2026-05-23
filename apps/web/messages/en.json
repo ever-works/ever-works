@@ -1173,7 +1173,8 @@
                 "plugins": "Plugins",
                 "deploy": "Deploy",
                 "members": "Members",
-                "settings": "Settings"
+                "settings": "Settings",
+                "kb": "Knowledge Base"
             },
             "members": {
                 "title": "Team Members",
@@ -2634,6 +2635,216 @@
                     "dnsValue": "Value:",
                     "copyButton": "Copy"
                 }
+            },
+            "kb": {
+                "title": "Knowledge Base",
+                "subtitle": "Per-Work institutional context — documents that ground generation and conversations.",
+                "panes": {
+                    "tree": {
+                        "title": "Documents",
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "Inherited from organization",
+                            "description": "Read-only documents owned by your organization. Open one to view it or override it locally.",
+                            "lockedLabel": "Inherited (read-only)"
+                        }
+                    },
+                    "editor": {
+                        "title": "Editor",
+                        "empty": "Select a document on the left to view or edit it. Drag a file anywhere to upload."
+                    },
+                    "ai": {
+                        "title": "AI assistant",
+                        "empty": "Conversation with the workspace agent will appear here. Use @kb:path to ground replies."
+                    }
+                },
+                "classes": {
+                    "brand": "Brand",
+                    "legal": "Legal",
+                    "seo": "SEO",
+                    "style": "Style",
+                    "glossary": "Glossary",
+                    "competitors": "Competitors",
+                    "personas": "Personas",
+                    "research": "Research",
+                    "output": "Outputs",
+                    "freeform": "Freeform"
+                },
+                "inherited": {
+                    "bannerLabel": "Inherited document notice",
+                    "bannerTitle": "Inherited from organization",
+                    "bannerDescription": "This document is owned by your organization and is read-only here. Override locally to fork an editable copy into this Work.",
+                    "overrideCta": "Override locally",
+                    "overrideCtaBusy": "Forking…",
+                    "overrideCtaPendingTooltip": "Available once the override action ships in row 38d",
+                    "overrideErrorFallback": "Could not fork the inherited document. Try again, or refresh the page."
+                },
+                "status": {
+                    "draft": "Draft",
+                    "active": "Active",
+                    "archived": "Archived"
+                },
+                "lock": {
+                    "full": "Locked",
+                    "additions-only": "Additions only"
+                },
+                "document": {
+                    "emptyBody": "This document has no body yet."
+                },
+                "editor": {
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "saved": "Saved",
+                    "error": "Save failed",
+                    "idle": "Idle",
+                    "dirty": "Unsaved changes…",
+                    "placeholder": "Start typing to add content…",
+                    "additionsOnlyBanner": "Additions-only lock — appending new content is OK, but edits or deletions to existing lines will be rejected by the server."
+                },
+                "lockControls": {
+                    "lock": "Lock",
+                    "unlock": "Unlock",
+                    "modeLabel": "Lock mode"
+                },
+                "upload": {
+                    "title": "Upload to Knowledge Base",
+                    "hint": "Drag & drop files here, or click Browse. Markdown, HTML, PDF, DOCX, XLSX, CSV/TSV, and PPTX are extracted automatically.",
+                    "browse": "Browse files",
+                    "dismiss": "Dismiss",
+                    "status": {
+                        "queued": "Queued",
+                        "uploading": "Uploading",
+                        "succeeded": "Uploaded",
+                        "failed": "Failed"
+                    }
+                },
+                "classify": {
+                    "title": "Classify upload",
+                    "subtitle": "Pick the document class, optional description, and tags. Per-file titles are editable below.",
+                    "classLabel": "Document class",
+                    "descriptionLabel": "Description (optional)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Type to search or add a tag, Enter to confirm",
+                    "tagsFetchFailed": "Could not load existing tags ({error}). You can still type new tags.",
+                    "titleLabel": "Title",
+                    "removeTag": "Remove tag {tag}",
+                    "cancel": "Cancel",
+                    "confirm": "Upload {count, plural, one {# file} other {# files}}"
+                },
+                "pdf": {
+                    "label": "PDF viewer",
+                    "tooLargeTitle": "PDF too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and view in your local PDF reader.",
+                    "download": "Download PDF"
+                },
+                "docx": {
+                    "label": "DOCX viewer",
+                    "loading": "Rendering Word document…",
+                    "renderFailed": "Could not render this DOCX inline ({error}).",
+                    "tooLargeTitle": "DOCX too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Word.",
+                    "download": "Download DOCX"
+                },
+                "xlsx": {
+                    "label": "Spreadsheet viewer",
+                    "loading": "Rendering spreadsheet…",
+                    "renderFailed": "Could not render this XLSX inline ({error}).",
+                    "tooLargeTitle": "Spreadsheet too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Excel.",
+                    "download": "Download XLSX",
+                    "sheetTabsLabel": "Worksheet tabs",
+                    "truncated": "Showing first {cap} of {total} rows. Download the file to see the rest.",
+                    "emptyWorkbook": "Workbook has no worksheets"
+                },
+                "image": {
+                    "label": "Image viewer",
+                    "tooLargeTitle": "Image too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download.",
+                    "download": "Download image"
+                },
+                "video": {
+                    "label": "Video viewer",
+                    "tooLargeTitle": "Video too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download video",
+                    "unsupported": "Your browser does not support inline video playback."
+                },
+                "audio": {
+                    "label": "Audio viewer",
+                    "tooLargeTitle": "Audio too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download audio",
+                    "unsupported": "Your browser does not support inline audio playback."
+                },
+                "search": {
+                    "triggerLabel": "Search KB…",
+                    "dialogLabel": "Knowledge Base search",
+                    "inputLabel": "Search query",
+                    "placeholder": "Type to search documents…",
+                    "hint": "Type at least {min} characters to search.",
+                    "loading": "Searching…",
+                    "empty": "No documents match \"{query}\".",
+                    "error": "Search failed ({error})."
+                },
+                "wikilink": {
+                    "hint": "Type to search for a KB document…",
+                    "empty": "No documents match \"{query}\".",
+                    "listLabel": "Wikilink suggestions"
+                },
+                "mention": {
+                    "hint": "Type to search for a KB document or agent…",
+                    "empty": "Nothing matches \"{query}\".",
+                    "sections": {
+                        "docs": "Documents",
+                        "agents": "Agents"
+                    }
+                },
+                "citation": {
+                    "loading": "Loading citation…",
+                    "missing": "Citation \"{raw}\" not found in this knowledge base.",
+                    "error": "Failed to resolve citation ({error}).",
+                    "open": "Open document",
+                    "citedLabel": "Cited:"
+                },
+                "history": {
+                    "title": "Document history",
+                    "dialogLabel": "Knowledge Base document history",
+                    "close": "Close",
+                    "loading": "Loading history…",
+                    "error": "Failed to load history ({error}).",
+                    "empty": "No prior versions yet. Edits will appear here once the doc has been mirrored to Git.",
+                    "cancel": "Cancel",
+                    "restore": "Restore to {sha}",
+                    "restoring": "Restoring…"
+                },
+                "sidePanel": {
+                    "title": "Document details",
+                    "subtitle": "Metadata, lock state, and history for this document.",
+                    "sections": {
+                        "class": "Class",
+                        "status": "Status",
+                        "lock": "Lock",
+                        "tags": "Tags",
+                        "description": "Description",
+                        "language": "Language",
+                        "source": "Source",
+                        "counts": "Length",
+                        "history": "History"
+                    },
+                    "unlocked": "Unlocked",
+                    "emptyTags": "No tags",
+                    "emptyDescription": "No description",
+                    "wordCount": "{count, plural, one {# word} other {# words}}",
+                    "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+                    "sources": {
+                        "user": "User",
+                        "agent": "Agent",
+                        "imported": "Imported",
+                        "seeded": "Seeded"
+                    },
+                    "viewHistory": "View Git history",
+                    "historyComingSoon": "Git history view ships in the next KB drop."
+                }
             }
         },
         "workCreation": {
@@ -3290,7 +3501,13 @@
                 "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
                 "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
                 "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually."
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually.",
+                "githubConnectHint": "Connect a GitHub account from the dashboard before configuring this plugin.",
+                "personalAccount": "(personal)",
+                "organizations": "Organizations",
+                "pickOwnerFirst": "Pick an owner first.",
+                "loadingRepos": "Loading repositories…",
+                "selectRepo": "Select a repository"
             },
             "oauth": {
                 "title": "Account Connection",
@@ -3397,7 +3614,8 @@
                     "pushing": "Pushing",
                     "succeeded": "Customized",
                     "failed": "Last run failed"
-                }
+                },
+                "syncBase": "Sync from base"
             },
             "dialog": {
                 "title": "Add custom template",
@@ -3474,7 +3692,10 @@
                 "defaultFailed": "Failed to update default template.",
                 "customizeFailed": "Failed to start template customization.",
                 "customizationSucceeded": "Template customization completed.",
-                "customizationFailed": "Template customization failed."
+                "customizationFailed": "Template customization failed.",
+                "syncBaseSuccess": "Template synced from its base.",
+                "syncBaseUpToDate": "Template is already up to date with its base.",
+                "syncBaseFailed": "Failed to sync template from base."
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -3535,6 +3756,14 @@
                     "browsePlugins": "Browse plugin catalog",
                     "noRuns": "No customization runs yet for this template."
                 }
+            },
+            "syncDialog": {
+                "title": "Sync from base template",
+                "description": "Sync this custom template to the latest built-in base template code.",
+                "templateLabel": "Custom template",
+                "cancel": "Cancel",
+                "submit": "Sync and replace",
+                "warning": "This replaces the custom template repository with the latest base template code, then pushes it to GitHub. AI styling and manual code changes in the template repo can be overwritten."
             }
         },
         "templateSelector": {

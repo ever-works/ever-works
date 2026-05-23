@@ -3,6 +3,7 @@ jest.mock('@ever-works/agent/work-operations', () => ({
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkModule: class WorkModule {},
+    KnowledgeBaseModule: class KnowledgeBaseModule {},
 }));
 jest.mock('@ever-works/agent/notifications', () => ({
     NotificationsModule: class NotificationsModule {},
@@ -21,6 +22,7 @@ jest.mock('@ever-works/agent/generators', () => ({
 jest.mock('@ever-works/agent/database', () => ({
     DatabaseModule: class DatabaseModule {},
     WorkRepository: class WorkRepository {},
+    WorkKnowledgeDocumentRepository: class WorkKnowledgeDocumentRepository {},
 }));
 jest.mock('@ever-works/monitoring', () => ({
     AnalyticsService: class AnalyticsService {},
@@ -37,7 +39,7 @@ jest.mock('./trigger-internal.controller', () => ({
 
 import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule } from '@ever-works/agent/notifications';
-import { WorkModule } from '@ever-works/agent/services';
+import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { TriggerInternalController } from './trigger-internal.controller';
@@ -54,6 +56,7 @@ describe('TriggerInternalModule', () => {
                 NotificationsModule,
                 FacadesModule,
                 WorkProposalsModule,
+                KnowledgeBaseModule,
             ]),
         );
     });

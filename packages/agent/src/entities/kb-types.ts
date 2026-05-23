@@ -53,6 +53,28 @@ export const KB_ORG_INHERITABLE_CLASSES: ReadonlyArray<KbDocumentClass> = [
 export type KbInheritableClass = (typeof KB_ORG_INHERITABLE_CLASSES)[number];
 
 /**
+ * EW-641 Phase 2/b row 32a — classes auto-injected as `alwaysInjected`
+ * context on every Phase 2/b pipeline run (spec §15.4 priority list).
+ *
+ * Rationale: these four classes carry "always-relevant" guidance that
+ * shouldn't depend on the user's query — brand voice, legal constraints,
+ * editorial style, and term-substitution rules ground every generation.
+ * The query-retrieved set (driven by RRF over the user's `q`) layers
+ * additional context on top.
+ *
+ * Per-Work overrides live on `WorkKbConfig.retrievalConfig.classFilters`
+ * (a row 41 budget-gauge concern); this constant is the default.
+ */
+export const KB_ALWAYS_INJECTED_CLASSES: ReadonlyArray<KbDocumentClass> = [
+    KbDocumentClass.BRAND,
+    KbDocumentClass.LEGAL,
+    KbDocumentClass.STYLE,
+    KbDocumentClass.GLOSSARY,
+] as const;
+
+export type KbAlwaysInjectedClass = (typeof KB_ALWAYS_INJECTED_CLASSES)[number];
+
+/**
  * Lifecycle status of a KB document. Mirrors the `status` enums on
  * other content-bearing entities (items, comparisons) for consistency.
  */

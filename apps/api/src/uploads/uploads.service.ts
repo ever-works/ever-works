@@ -1,4 +1,5 @@
 import {
+    Inject,
     Injectable,
     Logger,
     BadRequestException,
@@ -8,7 +9,22 @@ import {
 import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import type { IStoragePlugin } from '@ever-works/plugin';
+import type { WorkRepoResolver } from '@ever-works/github-storage-plugin';
 import { getActiveStorageBackend } from './storage-backend.factory';
+
+/**
+ * DI token for the optional `WorkRepoResolver` (EW-644).
+ *
+ * We inject via a token + `type`-only import rather than a direct class
+ * import to keep `uploads.service.ts` from transitively pulling
+ * `@ever-works/agent/database` + `@ever-works/agent/facades` into the
+ * import graph — those modules use the `@src/*` path alias that
+ * resolves only inside the agent package, and importing them from the
+ * api's jest test runtime explodes on `@src/config`. The module
+ * (`uploads.module.ts`) wires the concrete `WorkRepoResolverService` to
+ * this token via `{ provide: WORK_REPO_RESOLVER, useExisting: ... }`.
+ */
+export const WORK_REPO_RESOLVER = Symbol.for('ever-works:upload-work-repo-resolver');
 
 export interface UploadResult {
     id: string;
@@ -101,7 +117,16 @@ export class UploadsService {
     // `@Optional()` Nest passes `undefined` when no provider matches and
     // the service falls back to `getActiveStorageBackend()` lazily on
     // the first call. Tests still inject the backend via the constructor.
-    constructor(@Optional() backend?: IStoragePlugin) {
+    constructor(
+        @Optional() backend?: IStoragePlugin,
+        // EW-644: when present, threaded into the storage backend's
+        // `PluginContext` so `github-storage` in `mode: 'data-repo'` can
+        // resolve per-Work repo coordinates + token. Optional so unit
+        // tests that don't exercise github-storage don't need it.
+        @Optional()
+        @Inject(WORK_REPO_RESOLVER)
+        private readonly workRepoResolver?: WorkRepoResolver,
+    ) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
             this.backendPromise = Promise.resolve(backend);
@@ -115,7 +140,9 @@ export class UploadsService {
      */
     async getBackend(): Promise<IStoragePlugin> {
         if (!this.backendPromise) {
-            this.backendPromise = getActiveStorageBackend();
+            this.backendPromise = getActiveStorageBackend(
+                this.workRepoResolver ? { workRepoResolver: this.workRepoResolver } : undefined,
+            );
         }
         return this.backendPromise;
     }
@@ -138,6 +165,7 @@ export class UploadsService {
     async saveImage(
         userId: string,
         file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,
+        opts?: { workId?: string },
     ): Promise<UploadResult> {
         this.assertValidUserId(userId);
 
@@ -184,12 +212,18 @@ export class UploadsService {
         const filename = `${hash}.${sniffed.ext}`;
 
         const backend = await this.getBackend();
+        // EW-644: workId is threaded through to the backend so the
+        // github-storage plugin in mode='data-repo' can resolve the
+        // Work's data repo per upload. Other backends ignore it.
+        const workId = opts?.workId;
+        if (workId !== undefined) this.assertValidWorkId(workId);
         const { key } = await backend.putObject({
             buffer: file.buffer,
             filename,
             mimeType: sniffed.mime,
             size: file.size,
             ownerId: userId,
+            ...(workId ? { workId } : {}),
         });
 
         // Codex P1 finding on PR #890: returning the plugin's backend-native
@@ -201,11 +235,25 @@ export class UploadsService {
         // the controller reads through `backend.getObject(deriveKey(...))`
         // to do the actual fetch. Operators who want a CDN / public-bucket
         // direct URL can still introspect the active plugin themselves.
+        // EW-644 (Codex P1, second-pass review): in `data-repo` mode the
+        // backend encoded the resolved `workId` into the storage key
+        // (`dr:<workId>:<path>`) and emitted a URL with `?workId=<id>`.
+        // We override the backend URL to the canonical API route (above
+        // PR #890 hardening), so we must propagate the `workId` query
+        // string here — without it, the serve route's
+        // `deriveKey(userId, filename, workId)` can't reconstruct the
+        // `dr:<workId>:...` key and the upload's URL serves 500 / wrong
+        // file. Backends that ignore `workId` (local-fs, S3, MinIO,
+        // github-storage in mode `separate-repo`) are unaffected — the
+        // query string is harmless extra metadata they don't read.
+        const url = workId
+            ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
+            : `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
         return {
             // `id` historically was the sha256 (object segment of the key).
             // Keep that shape for existing callers.
             id: hash,
-            url: `/api/uploads/${encodeURIComponent(userId)}/${filename}`,
+            url,
             filename,
             size: file.size,
             mimeType: sniffed.mime,
@@ -225,9 +273,12 @@ export class UploadsService {
     async readFile(
         userId: string,
         filename: string,
+        opts?: { workId?: string },
     ): Promise<{ buffer: Buffer; mimeType: string }> {
         this.assertValidUserId(userId);
         this.assertValidFilename(filename);
+        const workId = opts?.workId;
+        if (workId !== undefined) this.assertValidWorkId(workId);
         const backend = await this.getBackend();
 
         // Codex P1 finding on PR #890: don't hardcode the storage key
@@ -238,8 +289,13 @@ export class UploadsService {
         // the plugin doesn't implement `deriveKey` (older third-party
         // backends, in-test mocks), fall back to the legacy shape so
         // existing local-fs setups keep working unchanged.
+        //
+        // EW-644: the optional `workId` arg is for backends that store
+        // per-Work — `github-storage` in `data-repo` mode encodes it
+        // into the key so `getObject` knows which Work's repo to read
+        // from. Backends that don't care ignore it.
         const key = backend.deriveKey
-            ? backend.deriveKey(userId, filename)
+            ? backend.deriveKey(userId, filename, workId)
             : `${userId}/${filename}`;
 
         let result: { buffer: Buffer; mimeType: string };
@@ -278,6 +334,23 @@ export class UploadsService {
             if (ok) return { mime: sig.mime, ext: sig.ext };
         }
         return null;
+    }
+
+    private assertValidWorkId(workId: string): void {
+        // Works use UUIDv4 — accept any UUID shape. Belt-and-suspenders
+        // check: refuse anything with path separators or control chars
+        // so a malicious caller can't smuggle a non-UUID through into
+        // the backend layer.
+        if (
+            !workId ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workId)
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'InvalidWorkId',
+                message: 'Invalid workId',
+            });
+        }
     }
 
     private assertValidUserId(userId: string): void {

@@ -86,11 +86,16 @@ describe('FullPipelineExecutorService', () => {
             );
 
             // facade.createStepExecutionContext invoked with documented positional args.
+            // 5th arg is `kbContext` (EW-641 row 32c), 6th is `kbTools`
+            // (EW-641 row 36c) — both undefined when neither
+            // KnowledgeBaseService nor KbToolsFacadeAdapter is injected.
             expect(facadeService.createStepExecutionContext).toHaveBeenCalledWith(
                 work,
                 request.providers,
                 request.aiModel,
                 undefined, // no signal in options
+                undefined, // no kbContext (no KB service wired)
+                undefined, // no kbTools (no adapter wired)
             );
 
             // plugin.execute received {...options, execContext, onLogEntry}.
@@ -137,6 +142,8 @@ describe('FullPipelineExecutorService', () => {
                 request.providers,
                 request.aiModel,
                 signal,
+                undefined,
+                undefined,
             );
         });
 
@@ -168,6 +175,113 @@ describe('FullPipelineExecutorService', () => {
 
             // The wrapper REPLACES the plugin's duration with its own measurement.
             expect(result.duration).toBe(2500);
+        });
+    });
+
+    // EW-641 Phase 2/b row 32c — orchestrator populates execContext.kbContext
+    // by calling KnowledgeBaseService.resolveContext once per run. The bundle
+    // is forwarded as the 5th positional arg to createStepExecutionContext.
+    describe('execute — kbContext wiring (row 32c)', () => {
+        const work = { id: 'w-kb' } as any;
+        const request = { providers: { p: 'x' }, aiModel: 'gpt', prompt: 'voice tone' } as any;
+        const existing = { items: [] } as any;
+
+        it('resolves the KB bundle and forwards it as the 5th arg when KnowledgeBaseService is wired', async () => {
+            const plugin = makePlugin();
+            plugin.execute.mockResolvedValue(makeValidResult());
+
+            const bundle = {
+                alwaysInjected: [{ id: 'b1' }] as any,
+                queryRetrieved: [{ id: 'q1' }] as any,
+            };
+            const kbService = { resolveContext: jest.fn().mockResolvedValue(bundle) };
+
+            const wired = new FullPipelineExecutorService(
+                eventEmitter,
+                facadeService,
+                contextFactory,
+                kbService as any,
+            );
+            jest.spyOn((wired as any).logger, 'log').mockImplementation(() => undefined);
+            jest.spyOn((wired as any).logger, 'error').mockImplementation(() => undefined);
+            jest.spyOn((wired as any).logger, 'warn').mockImplementation(() => undefined);
+
+            await wired.execute(plugin, work, request, existing);
+
+            expect(kbService.resolveContext).toHaveBeenCalledTimes(1);
+            expect(kbService.resolveContext).toHaveBeenCalledWith('w-kb', { query: 'voice tone' });
+
+            expect(facadeService.createStepExecutionContext).toHaveBeenCalledWith(
+                work,
+                request.providers,
+                request.aiModel,
+                undefined,
+                bundle,
+                undefined,
+            );
+        });
+
+        it('does not call resolveContext when work.id is empty (test/fixture path)', async () => {
+            const plugin = makePlugin();
+            plugin.execute.mockResolvedValue(makeValidResult());
+            const kbService = { resolveContext: jest.fn() };
+
+            const wired = new FullPipelineExecutorService(
+                eventEmitter,
+                facadeService,
+                contextFactory,
+                kbService as any,
+            );
+            jest.spyOn((wired as any).logger, 'log').mockImplementation(() => undefined);
+            jest.spyOn((wired as any).logger, 'error').mockImplementation(() => undefined);
+
+            await wired.execute(plugin, { id: '' } as any, request, existing);
+
+            expect(kbService.resolveContext).not.toHaveBeenCalled();
+            // Carrier stays undefined.
+            expect(facadeService.createStepExecutionContext).toHaveBeenCalledWith(
+                expect.objectContaining({ id: '' }),
+                request.providers,
+                request.aiModel,
+                undefined,
+                undefined,
+                undefined,
+            );
+        });
+
+        it('degrades gracefully when resolveContext throws (logs warn, kbContext stays undefined)', async () => {
+            const plugin = makePlugin();
+            plugin.execute.mockResolvedValue(makeValidResult());
+            const kbService = {
+                resolveContext: jest.fn().mockRejectedValue(new Error('db down')),
+            };
+
+            const wired = new FullPipelineExecutorService(
+                eventEmitter,
+                facadeService,
+                contextFactory,
+                kbService as any,
+            );
+            jest.spyOn((wired as any).logger, 'log').mockImplementation(() => undefined);
+            jest.spyOn((wired as any).logger, 'error').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn((wired as any).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            await wired.execute(plugin, work, request, existing);
+
+            // resolveContext threw → bundle is undefined → plugin runs as if no KB.
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('KB context resolution failed'),
+            );
+            expect(facadeService.createStepExecutionContext).toHaveBeenCalledWith(
+                work,
+                request.providers,
+                request.aiModel,
+                undefined,
+                undefined,
+                undefined,
+            );
         });
     });
 

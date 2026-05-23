@@ -5,6 +5,7 @@ import {
     TemplateCustomizationRepository,
     UserRepository,
     UserTemplatePreferenceRepository,
+    WorkKnowledgeDocumentRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -18,7 +19,7 @@ import {
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
-import { CategoryIconService } from '@ever-works/agent/services';
+import { CategoryIconService, KnowledgeBaseGitMirrorService } from '@ever-works/agent/services';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -80,6 +81,17 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
                 createRemoteProxy(apiClient, 'UserRepository'),
             inject: [TriggerInternalApiClient],
         },
+        // EW-641 — `KnowledgeBaseGitMirrorService` runs heavy fs + Git I/O
+        // in-worker, but reads + writes the document row through the API
+        // process. The repository is proxied; the mirror service itself
+        // is a direct provider so the file-system clone lives inside the
+        // worker.
+        {
+            provide: WorkKnowledgeDocumentRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkKnowledgeDocumentRepository'),
+            inject: [TriggerInternalApiClient],
+        },
         // DataGeneratorService consumes CategoryIconService for icon enrichment (EW-357).
         // CACHE_MANAGER is provided globally via TriggerRemoteCacheModule; AiFacadeService
         // comes from TriggerFacadesModule — both deps reachable in worker scope.
@@ -96,11 +108,13 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
         TemplateCustomizationService,
+        KnowledgeBaseGitMirrorService,
     ],
     exports: [
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
         TemplateCustomizationService,
+        KnowledgeBaseGitMirrorService,
         TriggerInternalModule,
     ],
 })

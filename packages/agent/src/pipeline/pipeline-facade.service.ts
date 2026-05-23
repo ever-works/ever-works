@@ -16,6 +16,8 @@ import type {
     ChatCompletionOptions,
     ChatCompletionResponse,
     ChatCompletionChunk,
+    EmbeddingOptions,
+    EmbeddingResponse,
     SearchFacadeOptions,
     SearchFacadeResult,
     ScreenshotCaptureOptions,
@@ -29,7 +31,9 @@ import type {
     DataSourceFacadeResult,
     EnabledDataSource,
     FacadeOptions,
+    IKbToolsFacade,
 } from '@ever-works/plugin';
+import type { KbContextBundleData } from '@ever-works/contracts';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ScreenshotFacadeService } from '../facades/screenshot.facade';
@@ -76,12 +80,20 @@ export class PipelineFacadeService {
     /**
      * Create a StepExecutionContext for step executors.
      * Provides access to bound facades that automatically include work context.
+     *
+     * EW-641 Phase 2/b row 32b — accepts an optional `kbContext` carrier.
+     * When provided (orchestrator wiring lands in a follow-up sub-chunk),
+     * step executors read the resolved KB documents from
+     * `execContext.kbContext.{alwaysInjected,queryRetrieved}` without
+     * re-calling `KnowledgeBaseService.resolveContext`.
      */
     createStepExecutionContext(
         work: WorkReference,
         providerOverrides?: GenerationRequest['providers'],
         aiModelOverride?: string,
         signal?: AbortSignal,
+        kbContext?: KbContextBundleData,
+        kbTools?: IKbToolsFacade,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
@@ -120,6 +132,8 @@ export class PipelineFacadeService {
             work,
             user: work.user,
             signal,
+            kbContext,
+            kbTools,
         };
     }
 
@@ -171,6 +185,14 @@ export class PipelineFacadeService {
                     },
                     boundFacadeOptions,
                 ),
+            // EW-641 Phase 2/a row 29b2a — pipeline-bound shim that forwards
+            // to the real AiFacadeService.embed. Pipelines don't currently
+            // call embed (Phase 2/b will), but the IAiFacade contract
+            // requires the method so the binding shape stays complete.
+            embed: (
+                options: EmbeddingOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<EmbeddingResponse> => facade.embed(options, boundFacadeOptions),
             isConfigured: () => facade.isConfigured(),
             testConnection: (_facadeOptions: FacadeOptions) =>
                 facade.testConnection(boundFacadeOptions),

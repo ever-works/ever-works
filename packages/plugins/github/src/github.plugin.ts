@@ -400,6 +400,17 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.apiService.getFileContent(owner, repo, path, token || '', ref, settings.apiBaseUrl);
 	}
 
+	async listFileCommits(
+		owner: string,
+		repo: string,
+		path: string,
+		token: string,
+		limit?: number
+	): Promise<GitCommit[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listFileCommits(owner, repo, path, token, limit, settings.apiBaseUrl);
+	}
+
 	async getReadme(
 		owner: string,
 		repo: string,

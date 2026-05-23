@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    InternalServerErrorException,
     Param,
     Post,
     Put,
@@ -342,6 +343,65 @@ export class TemplateCatalogController {
             status: 'success',
             customizationId: result.customization.id,
             customization: this.serializeCustomization(result.customization),
+        };
+    }
+
+    @Post('templates/custom/:templateId/sync-base')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Sync a custom template repository from its built-in base',
+        description:
+            'Overwrites the custom repository with the latest base template using the same duplicate update model used for website repositories.',
+    })
+    @ApiResponse({ status: 200, description: 'Template synced' })
+    async syncCustomTemplateFromBase(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+    ) {
+        const result = await this.templateCustomizationService.syncFromBase(
+            auth.userId,
+            templateId,
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_UPDATED,
+                action: 'template.synced',
+                status: ActivityStatus.COMPLETED,
+                summary: `Synced template ${result.template.name} from base`,
+                metadata: {
+                    templateId: result.template.id,
+                    method: result.method,
+                    changed: result.changed,
+                },
+            })
+            .catch(() => {});
+
+        const refreshed = await this.templateCatalogService.refreshTemplatesForUser(
+            result.template.kind,
+            auth.userId,
+        );
+        const template =
+            refreshed.templates.find((candidate) => candidate.id === result.template.id) ??
+            (await this.templateCatalogService.getVisibleTemplateForUser(
+                result.template.kind,
+                result.template.id,
+                auth.userId,
+            ));
+        if (!template) {
+            throw new InternalServerErrorException({
+                status: 'error',
+                message: 'Template was synced but could not be loaded from the catalog.',
+            });
+        }
+
+        return {
+            status: 'success',
+            template,
+            method: result.method,
+            changed: result.changed,
+            message: result.message,
         };
     }
 

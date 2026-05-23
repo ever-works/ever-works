@@ -24,7 +24,20 @@ import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
  * by storage plugins — they resolve config directly from env vars — so
  * the stub keeps those as no-ops.
  */
-function makeStubContext(pluginId: string): PluginContext {
+/**
+ * Extra context fields the factory threads into the stub `PluginContext`
+ * before calling `plugin.onLoad()`. Today only the github-storage plugin
+ * reads anything here (`workRepoResolver` for `mode: 'data-repo'`), but
+ * the bag is intentionally generic so future storage plugins can plug
+ * in their own deps without changing the factory shape.
+ *
+ * EW-644.
+ */
+export interface StorageBackendExtraContext {
+    readonly workRepoResolver?: unknown;
+}
+
+function makeStubContext(pluginId: string, extra?: StorageBackendExtraContext): PluginContext {
     const nestLogger = new Logger(`StoragePlugin/${pluginId}`);
     const logger: PluginLogger = {
         log: (m, ...a) => nestLogger.log(formatMsg(m, a)),
@@ -36,9 +49,12 @@ function makeStubContext(pluginId: string): PluginContext {
     // Storage plugins only ever touch `logger` and `pluginId` in our
     // codebase. Anything else is cast through `unknown` so we don't have
     // to stub the entire plugin SDK surface (cache, http, events, etc).
+    // EW-644 — also merge in any `extra` fields the API wants to thread
+    // through (e.g. `workRepoResolver` for github-storage data-repo mode).
     return {
         pluginId,
         logger,
+        ...(extra ?? {}),
     } as unknown as PluginContext;
 }
 
@@ -51,6 +67,12 @@ export type StorageBackendId = 'local-fs' | 'aws-s3' | 'minio' | 'github-storage
 
 let cached: IStoragePlugin | undefined;
 let cachedId: StorageBackendId | undefined;
+// EW-644 (Greptile P2 fix) — the cache is keyed on backend id PLUS
+// whether the resolver was wired in. Without this, an early boot call
+// (e.g. a health check) that arrives before the NestJS DI graph is
+// ready could cache a github-storage plugin with no resolver, and the
+// next call with a resolver would silently get the stale instance.
+let cachedHasResolver = false;
 
 export function resolveStorageBackendId(): StorageBackendId {
     const raw = (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase();
@@ -68,12 +90,15 @@ export function resolveStorageBackendId(): StorageBackendId {
     }
 }
 
-export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
+export async function getActiveStorageBackend(
+    extraContext?: StorageBackendExtraContext,
+): Promise<IStoragePlugin> {
     const wanted = resolveStorageBackendId();
-    if (cached && cachedId === wanted) return cached;
+    const hasResolver = !!extraContext?.workRepoResolver;
+    if (cached && cachedId === wanted && cachedHasResolver === hasResolver) return cached;
 
     const plugin = await instantiate(wanted);
-    await plugin.onLoad(makeStubContext(plugin.id));
+    await plugin.onLoad(makeStubContext(plugin.id, extraContext));
 
     // Probe `isAvailable()` at boot so misconfigured backends fail loudly
     // here instead of on the first upload with a confusing SDK error
@@ -95,6 +120,7 @@ export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
 
     cached = plugin;
     cachedId = wanted;
+    cachedHasResolver = hasResolver;
     return plugin;
 }
 
@@ -105,6 +131,7 @@ export async function getActiveStorageBackend(): Promise<IStoragePlugin> {
 export function resetStorageBackendCache(): void {
     cached = undefined;
     cachedId = undefined;
+    cachedHasResolver = false;
 }
 
 async function instantiate(id: StorageBackendId): Promise<IStoragePlugin> {

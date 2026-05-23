@@ -7,12 +7,18 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { UserRepository } from '../database/repositories/user.repository';
 import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import type { InferredUserProfile } from '../entities';
 import { UserResearchCompletedEvent, UserResearchFailedEvent } from './events';
 import { USER_RESEARCH_AGENT_PROMPT, buildSeedPrompt, deriveVerticals } from './prompts';
 import { inferredProfileSchema, type InferredProfile } from './schemas';
 import { UserResearchLimitsService, UserResearchRateLimitedError } from './limits';
-import { resolveAiProviderForResearch, resolveSearchProviderIds } from './provider-resolver';
+import {
+    isTransientProviderError,
+    resolveAiProvidersForResearch,
+    resolveSearchProviderIds,
+    type ResolvedAiProvider,
+} from './provider-resolver';
 import { createSearchWebTool, createFetchPageTool, createFinalizeTool } from './tools';
 
 export interface UserResearchResult {
@@ -53,6 +59,7 @@ export class UserResearchService {
         private readonly contentExtractor: ContentExtractorFacadeService,
         private readonly registry: PluginRegistryService,
         private readonly limits: UserResearchLimitsService,
+        private readonly pluginSettings: PluginSettingsService,
         @Optional() private readonly events?: EventEmitter2,
     ) {}
 
@@ -107,17 +114,16 @@ export class UserResearchService {
             );
         }
 
-        let resolvedModel;
-        let providerName: string;
+        let aiProviders: ResolvedAiProvider[];
         let searchChain: string[];
         try {
-            const resolved = await resolveAiProviderForResearch(
+            aiProviders = await resolveAiProvidersForResearch(
                 this.aiFacade,
                 this.registry,
                 userId,
                 this.logger,
             );
-            if (!resolved) {
+            if (aiProviders.length === 0) {
                 return {
                     status: 'error',
                     tokensUsed: 0,
@@ -126,9 +132,11 @@ export class UserResearchService {
                     error: 'ai-provider-not-configured',
                 };
             }
-            resolvedModel = resolved.model;
-            providerName = resolved.providerName;
-            searchChain = await resolveSearchProviderIds(this.registry, userId);
+            searchChain = await resolveSearchProviderIds(
+                this.registry,
+                userId,
+                this.pluginSettings,
+            );
         } catch (err) {
             const message = (err as Error).message;
             this.logger.warn(`Provider resolution failed for ${userId}: ${message}`);
@@ -152,76 +160,107 @@ export class UserResearchService {
 
         const seedPrompt = buildSeedPrompt(user, socials);
 
-        try {
-            this.logger.log(
-                `User research starting for ${userId} via "${providerName}" (timeout=${timeoutMs}ms, steps=${maxSteps})`,
-            );
+        let generationError: string | null = null;
+        for (let index = 0; index < aiProviders.length; index++) {
+            const provider = aiProviders[index];
+            finalProfile = null;
 
-            const result = await generateText({
-                model: resolvedModel,
-                system: USER_RESEARCH_AGENT_PROMPT,
-                prompt: seedPrompt,
-                tools: {
-                    searchWeb: createSearchWebTool({
-                        searchFacade: this.searchFacade,
-                        limits: this.limits,
-                        userId,
-                        providerChain: searchChain,
-                        logger: this.logger,
-                    }),
-                    fetchPage: createFetchPageTool({
-                        contentExtractor: this.contentExtractor,
-                        limits: this.limits,
-                        userId,
-                        logger: this.logger,
-                    }),
-                    finalize: createFinalizeTool({
-                        onFinalize: (profile) => {
-                            finalProfile = profile;
-                        },
-                    }),
-                },
-                stopWhen: stepCountIs(maxSteps),
-                abortSignal: signals,
-                maxRetries: 1,
-                // Increment tokens per step so aborted/timed-out runs still
-                // count against the daily cap (tokens were already spent).
-                onStepFinish: (step) => {
-                    const t = step.usage?.totalTokens ?? 0;
-                    if (t > 0) {
-                        tokensUsed += t;
-                        this.limits.addTokens(userId, t).catch(() => undefined);
-                    }
-                    toolCallsCount += step.toolCalls?.length ?? 0;
-                },
-            });
+            try {
+                this.logger.log(
+                    `User research starting for ${userId} via "${provider.providerName}" (timeout=${timeoutMs}ms, steps=${maxSteps})`,
+                );
 
-            // Reconcile with the SDK's final totals so we don't undercount if
-            // onStepFinish didn't see every step's usage. The delta is committed
-            // to the daily cap; per-step calls already covered the rest.
-            const sdkToolCalls = result.steps.reduce(
-                (sum, step) => sum + (step.toolCalls?.length ?? 0),
-                0,
-            );
-            toolCallsCount = Math.max(toolCallsCount, sdkToolCalls);
-            const sdkTotal = result.totalUsage?.totalTokens ?? 0;
-            if (sdkTotal > tokensUsed) {
-                await this.limits.addTokens(userId, sdkTotal - tokensUsed);
-                tokensUsed = sdkTotal;
+                const result = await generateText({
+                    model: provider.model,
+                    system: USER_RESEARCH_AGENT_PROMPT,
+                    prompt: seedPrompt,
+                    tools: {
+                        searchWeb: createSearchWebTool({
+                            searchFacade: this.searchFacade,
+                            limits: this.limits,
+                            userId,
+                            providerChain: searchChain,
+                            logger: this.logger,
+                        }),
+                        fetchPage: createFetchPageTool({
+                            contentExtractor: this.contentExtractor,
+                            limits: this.limits,
+                            userId,
+                            logger: this.logger,
+                        }),
+                        finalize: createFinalizeTool({
+                            onFinalize: (profile) => {
+                                finalProfile = profile;
+                            },
+                        }),
+                    },
+                    stopWhen: stepCountIs(maxSteps),
+                    abortSignal: signals,
+                    maxRetries: 1,
+                    // Track usage for observability even when runs abort or time out.
+                    onStepFinish: (step) => {
+                        const t = step.usage?.totalTokens ?? 0;
+                        if (t > 0) {
+                            tokensUsed += t;
+                        }
+                        toolCallsCount += step.toolCalls?.length ?? 0;
+                    },
+                });
+
+                // Reconcile with the SDK's final totals so we don't undercount if
+                // onStepFinish didn't see every step's usage.
+                const sdkToolCalls = result.steps.reduce(
+                    (sum, step) => sum + (step.toolCalls?.length ?? 0),
+                    0,
+                );
+                toolCallsCount = Math.max(toolCallsCount, sdkToolCalls);
+                const sdkTotal = result.totalUsage?.totalTokens ?? 0;
+                if (sdkTotal > tokensUsed) {
+                    tokensUsed = sdkTotal;
+                }
+                generationError = null;
+                break;
+            } catch (err) {
+                const message = (err as Error).message;
+                generationError = message;
+
+                const canTryNext =
+                    !signals.aborted &&
+                    isTransientProviderError(err) &&
+                    index < aiProviders.length - 1;
+                if (canTryNext) {
+                    this.logger.warn(
+                        `User research provider ${provider.providerName} failed transiently for ${userId}: ${message}; trying next provider`,
+                    );
+                    continue;
+                }
+
+                this.logger.warn(`User research agent failed for ${userId}: ${message}`);
+                this.events?.emit(
+                    UserResearchFailedEvent.EVENT_NAME,
+                    new UserResearchFailedEvent(userId, message),
+                );
+                return {
+                    status: 'error',
+                    tokensUsed,
+                    toolCallsCount,
+                    durationMs: Date.now() - startedAt,
+                    error: message,
+                };
             }
-        } catch (err) {
-            const message = (err as Error).message;
-            this.logger.warn(`User research agent failed for ${userId}: ${message}`);
+        }
+
+        if (generationError) {
             this.events?.emit(
                 UserResearchFailedEvent.EVENT_NAME,
-                new UserResearchFailedEvent(userId, message),
+                new UserResearchFailedEvent(userId, generationError),
             );
             return {
                 status: 'error',
                 tokensUsed,
                 toolCallsCount,
                 durationMs: Date.now() - startedAt,
-                error: message,
+                error: generationError,
             };
         }
 

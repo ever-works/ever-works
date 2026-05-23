@@ -82,6 +82,13 @@ export interface IterateCustomizationInput {
     aiProviderId?: string;
 }
 
+export interface SyncTemplateFromBaseResult {
+    template: Template;
+    method: 'duplicate';
+    changed: boolean;
+    message: string;
+}
+
 /**
  * Provision a brand-new repo for each customization (clone base → push to new
  * repo → run agent → push). NOT a GitHub fork — fork API is 1-per-account,
@@ -246,6 +253,54 @@ export class TemplateCustomizationService {
         return { customization, template };
     }
 
+    async syncFromBase(userId: string, templateId: string): Promise<SyncTemplateFromBaseResult> {
+        const template = await this.templateRepository.findById(templateId);
+        if (!template || template.ownerUserId !== userId || template.sourceType !== 'custom') {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found.',
+            });
+        }
+
+        const baseTemplateId =
+            typeof template.metadata?.baseTemplateId === 'string'
+                ? template.metadata.baseTemplateId
+                : null;
+        if (!baseTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Template is not linked to a customizable base.',
+            });
+        }
+
+        const baseConfig = this.resolveCustomizableBase(baseTemplateId);
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new NotFoundException({ status: 'error', message: 'User not found.' });
+        }
+
+        const committer = await this.resolveCommitter(userId, user);
+        const gitOptions: GitFacadeOptions = { userId, providerId: GIT_PROVIDER_ID };
+
+        await this.syncDuplicateFromBase(template, baseConfig, committer, gitOptions);
+
+        const syncedAt = new Date().toISOString();
+        const metadata = {
+            ...(template.metadata ?? {}),
+            lastBaseSyncedAt: syncedAt,
+            lastBaseSyncMethod: 'duplicate',
+            lastBaseSyncBase: `${baseConfig.owner}/${baseConfig.repo}@${baseConfig.branch}`,
+        };
+        const updated = await this.templateRepository.updateById(template.id, { metadata });
+
+        return {
+            template: updated ?? { ...template, metadata },
+            method: 'duplicate',
+            changed: true,
+            message:
+                'Synced the custom template by replacing it with the latest base template code.',
+        };
+    }
     private async start(customizationId: string): Promise<void> {
         const dispatchedId = this.dispatcher
             ? await this.dispatcher.dispatchTemplateCustomization({ customizationId })
@@ -505,6 +560,46 @@ export class TemplateCustomizationService {
         return removed;
     }
 
+    private async syncDuplicateFromBase(
+        template: Template,
+        baseConfig: WebsiteTemplateConfig,
+        committer: GitCommitter,
+        gitOptions: GitFacadeOptions,
+    ): Promise<void> {
+        await this.gitFacade.removeLocalDir(GIT_PROVIDER_ID, baseConfig.owner, baseConfig.repo);
+        const baseDir = await this.gitFacade.cloneOrPull(
+            {
+                owner: baseConfig.owner,
+                repo: baseConfig.repo,
+                branch: baseConfig.branch,
+                committer,
+            },
+            gitOptions,
+        );
+
+        await this.stripProvisionedDir(baseDir, baseConfig);
+        await this.gitFacade.addAll(GIT_PROVIDER_ID, baseDir);
+        await this.gitFacade.commit(
+            GIT_PROVIDER_ID,
+            baseDir,
+            'chore(template): sync from latest base template',
+            committer,
+        );
+
+        const targetRepoUrl = this.gitFacade.getCloneUrl(
+            GIT_PROVIDER_ID,
+            template.repositoryOwner,
+            template.repositoryName,
+        );
+        await this.gitFacade.switchBranch(GIT_PROVIDER_ID, baseDir, baseConfig.branch);
+        await this.gitFacade.replaceRemote(GIT_PROVIDER_ID, baseDir, 'origin', targetRepoUrl);
+        await this.gitFacade.push({ dir: baseDir, force: true }, gitOptions);
+        await this.gitFacade.removeLocalDir(GIT_PROVIDER_ID, baseConfig.owner, baseConfig.repo);
+
+        this.logger.log(
+            `Synced custom template ${template.repositoryOwner}/${template.repositoryName} from ${baseConfig.owner}/${baseConfig.repo}@${baseConfig.branch} using duplicate method`,
+        );
+    }
     private async resolveTargetOwner(userId: string, override?: string): Promise<string> {
         const trimmed = override?.trim();
         if (trimmed) return trimmed;

@@ -1,21 +1,36 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     Param,
     Patch,
     Post,
     Query,
+    Res,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+    ApiBearerAuth,
+    ApiBody,
+    ApiConsumes,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { KnowledgeBaseService } from '@ever-works/agent/services';
 import {
     CreateKbDocumentDto,
     CreateKbTagDto,
+    CreateKbUploadDto,
     KbDocumentQueryDto,
     LockKbDocumentDto,
     RestoreKbDocumentDto,
@@ -24,7 +39,28 @@ import {
 } from '@ever-works/agent/dto';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import type { KbDocumentClass, KbDocumentStatus, KbLockMode } from '@ever-works/agent/entities';
+import type {
+    KbDocumentClass,
+    KbDocumentStatus,
+    KbLockMode,
+    KbUploadExtractionStatus,
+} from '@ever-works/agent/entities';
+
+/** Per-upload byte cap — spec §9.1 default is 200 MB, tunable per tenant. */
+const KB_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
+
+/**
+ * Minimal Express response surface for `@Res()`-streamed routes. Mirrors
+ * the local pattern in `uploads.controller.ts` to avoid pulling the full
+ * express type-graph into this module (it conflicts with the global
+ * `Express.Response` namespace used elsewhere in the build).
+ */
+type ServeResponse = {
+    status(code: number): ServeResponse;
+    setHeader(name: string, value: string | number): void;
+    json(body: unknown): void;
+    send(body: string | Buffer): void;
+};
 
 /**
  * Knowledge Base REST surface — per-Work routes.
@@ -166,17 +202,44 @@ export class KbController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Restore a KB document to a prior Git commit',
-        description: 'Stub in Phase 1A; full Git integration lands in Phase 1B (EW-641).',
+        description:
+            'Reads the body at the supplied commit SHA from the Work data repo, applies it to the document row, and enqueues a fresh Git mirror so the head commit moves forward with the restored content.',
     })
     @ApiResponse({ status: 200, description: 'KB document restored' })
-    @ApiResponse({ status: 400, description: 'Restore not yet available in Phase 1A' })
+    @ApiResponse({ status: 404, description: 'Document or commit not found' })
     async restoreDocument(
-        @CurrentUser() _auth: AuthenticatedUser,
-        @Param('id') _workId: string,
-        @Param('docId') _docId: string,
-        @Body() _body: RestoreKbDocumentDto,
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('docId') docId: string,
+        @Body() body: RestoreKbDocumentDto,
     ) {
-        return this.kb.restoreDocumentFromHistory();
+        return this.kb.restoreDocumentFromHistory(workId, docId, auth.userId, body.commitSha);
+    }
+
+    @Get('works/:id/kb/documents/:docId/history')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List Git commits that touched a KB document',
+        description:
+            'Returns the commit log for the sidecar `.md` body under `.content/kb/`, newest first. Powers the history dialog (row 18) — operators click a row to feed the SHA back into the existing `/restore` endpoint.',
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description: 'Max commits to return (1-100, default 25)',
+    })
+    @ApiResponse({ status: 200, description: 'Commit history' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async getDocumentHistory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('docId') docId: string,
+        @Query('limit') limit?: string,
+    ) {
+        const parsedLimit = limit && /^\d+$/.test(limit) ? Number(limit) : undefined;
+        return this.kb.getDocumentHistory(workId, docId, auth.userId, {
+            limit: parsedLimit,
+        });
     }
 
     @Get('works/:id/kb/documents/:docId/citations')
@@ -236,5 +299,178 @@ export class KbController {
         @Param('tagId') tagId: string,
     ) {
         await this.kb.deleteTag(workId, tagId, auth.userId);
+    }
+
+    // ─── Uploads (EW-641 1B/b) ────────────────────────────────────────
+
+    @Post('works/:id/kb/uploads')
+    @HttpCode(HttpStatus.CREATED)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: KB_UPLOAD_MAX_BYTES } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({
+        summary: 'Upload a source file to the Knowledge Base',
+        description:
+            'Multipart upload of a file destined for the KB. Server computes SHA-256, dedups against existing uploads in the same Work, persists bytes via the configured storage plugin, and synchronously creates a KB document for text-passthrough MIME types (markdown / plain). Non-text MIMEs are stored with extractionStatus=skipped pending Phase 1B/c extractor routing.',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['file'],
+            properties: {
+                file: { type: 'string', format: 'binary' },
+                targetClass: {
+                    type: 'string',
+                    description: 'Optional kbDocumentClass for the resulting document',
+                },
+                title: { type: 'string' },
+                description: { type: 'string' },
+                tags: { type: 'array', items: { type: 'string' } },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Upload accepted; returns the upload row + the created KB doc (if any)',
+    })
+    @ApiResponse({ status: 400, description: 'Missing file or invalid metadata' })
+    @ApiResponse({ status: 413, description: 'File exceeds the configured size cap' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async createUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body() body: CreateKbUploadDto,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        return this.kb.createUpload({
+            workId,
+            userId: auth.userId,
+            file: {
+                buffer: file.buffer,
+                originalFilename: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+            },
+            // Cast at the controller→service boundary — contracts package
+            // exposes the class union as string literals while the agent
+            // entity package keeps it as a runtime enum (Phase 1A handoff
+            // gotcha #6). Runtime-equivalent, nominally distinct.
+            targetClass: body.targetClass as KbDocumentClass | undefined,
+            tags: body.tags,
+            description: body.description ?? null,
+            title: body.title,
+        });
+    }
+
+    @Get('works/:id/kb/uploads')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List KB uploads for a Work' })
+    @ApiQuery({ name: 'status', required: false })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiQuery({ name: 'offset', required: false, type: Number })
+    @ApiResponse({ status: 200, description: 'Paginated list of upload rows' })
+    async listUploads(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Query('status') status?: KbUploadExtractionStatus,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        return this.kb.listUploads(workId, auth.userId, {
+            status,
+            limit: limit !== undefined ? Number(limit) : undefined,
+            offset: offset !== undefined ? Number(offset) : undefined,
+        });
+    }
+
+    @Get('works/:id/kb/uploads/:uploadId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get a single KB upload row' })
+    @ApiResponse({ status: 200, description: 'Upload row' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    async getUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+    ) {
+        return this.kb.getUpload(workId, uploadId, auth.userId);
+    }
+
+    /**
+     * EW-641 Phase 1B/d row 21a — stream KB upload bytes back to the
+     * caller so per-MIME viewers (`KbPdfViewer`, `KbXlsxViewer`,
+     * `KbDocxViewer`, image/video/audio) can mount. Gated by
+     * `ensureCanView` (same gate as `GET /works/:id/kb/uploads/:uploadId`),
+     * pinned with a strict CSP + nosniff so the browser cannot
+     * reinterpret the bytes as executable HTML even when the MIME is
+     * application/xml-ish.
+     *
+     * Returns the raw buffer with the storage-recovered (or upload-row)
+     * MIME type. Cache-Control is `private, max-age=300` — same as the
+     * generic `uploads.controller.ts` `serve()` route. Content-Disposition
+     * is `inline` because the viewers iframe / `<img>` / `<video>` the
+     * URL directly; the download fallbacks attach their own `download`
+     * attribute on the anchor (KbPdfViewer / KbXlsxViewer / KbDocxViewer).
+     */
+    @Get('works/:id/kb/uploads/:uploadId/download')
+    @Header(
+        'Content-Security-Policy',
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    )
+    @Header('X-Content-Type-Options', 'nosniff')
+    @Header('Cache-Control', 'private, max-age=300')
+    @ApiOperation({
+        summary: 'Stream the persisted bytes for a KB upload',
+        description:
+            'Owner / viewer+ only. Hands the raw upload bytes back so the per-MIME viewers (KbPdfViewer, KbXlsxViewer, KbDocxViewer, image / video / audio) can render inline. CSP-pinned to default-src none + nosniff so the response is safe to embed inside an iframe or media tag.',
+    })
+    @ApiResponse({ status: 200, description: 'Raw upload bytes' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async downloadUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+        @Res() res: ServeResponse,
+    ) {
+        const { buffer, mimeType, filename } = await this.kb.getUploadBytes(
+            workId,
+            uploadId,
+            auth.userId,
+        );
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', buffer.length);
+        // `inline` is safe because we (a) pinned CSP `default-src 'none';
+        // frame-ancestors 'none'` so neither script execution nor
+        // top-frame nesting can fire, and (b) set nosniff so the browser
+        // won't reinterpret the bytes as HTML even if the recorded MIME
+        // is wrong. The viewers expect inline so `<iframe src>` /
+        // `<video src>` / `<img src>` Just Work.
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.send(buffer);
+    }
+
+    @Post('works/:id/kb/uploads/:uploadId/retry-extraction')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Re-run extraction for a failed or skipped KB upload',
+        description:
+            'Owner / manager only. Reads the persisted bytes from storage and runs extract+materialize again. If the MIME type still has no extractor route (Phase 1B/b text passthrough only), the upload stays skipped with an updated reason.',
+    })
+    @ApiResponse({ status: 200, description: 'Re-extraction kicked off / completed' })
+    @ApiResponse({ status: 403, description: 'Manager+ role required' })
+    @ApiResponse({ status: 404, description: 'Upload not found' })
+    @ApiResponse({ status: 409, description: 'Upload already produced a KB document' })
+    async retryUploadExtraction(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('uploadId') uploadId: string,
+    ) {
+        return this.kb.retryUploadExtraction(workId, uploadId, auth.userId);
     }
 }

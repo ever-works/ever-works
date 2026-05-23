@@ -194,6 +194,20 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         dispatches: gh.dispatchWorkflow.mock.calls.map((c: any[]) => c[0]),
     });
 
+    it('writes the Vercel team scope secret name consumed by template workflows', async () => {
+        const { service, githubPlugin } = buildService({
+            plugin: { id: 'vercel' },
+            deployProvider: 'vercel',
+            token: 'vercel-token',
+        });
+
+        await service.deploy('work-1', 'user-1', { teamScope: 'team-acme' });
+
+        const secretKeys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+        expect(secretKeys).toContain('VERCEL_TEAM_SCOPE');
+        expect(secretKeys).toContain('DEPLOY_TEAM_SCOPE');
+    });
+
     it('uses plugin.getWorkflowFilenames() for the dispatch list', async () => {
         const { service, githubPlugin } = buildService({
             plugin: {

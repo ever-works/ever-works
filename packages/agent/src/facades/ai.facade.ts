@@ -8,6 +8,8 @@ import type {
     ChatCompletionOptions,
     ChatCompletionResponse,
     ChatCompletionChunk,
+    EmbeddingOptions,
+    EmbeddingResponse,
     AiRoutingOptions,
     AiModel,
     AiProviderConfig,
@@ -437,6 +439,89 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                         // Usage writes are best-effort and must not turn a successful stream into an error.
                     });
             }
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/a row 29b2a — embed wrapper.
+     *
+     * Resolves the active AI provider plugin via the same chain as
+     * `createChatCompletion` (`providerOverride > work-active >
+     * defaultForCapabilities > first enabled`), threads user/work-scoped
+     * settings through `BaseAiProvider.resolveConfig` (so per-call
+     * `embeddingModel` / `apiKey` overrides win over plugin defaults —
+     * see row 27), and calls the plugin's optional `createEmbedding`
+     * method.
+     *
+     * Throws `AiFacadeError` when the resolved plugin doesn't implement
+     * `createEmbedding`. KB retrieval (row 30 RRF) catches this and
+     * falls back to lexical-only ranking so a misconfigured provider
+     * degrades cleanly rather than crashing the search endpoint.
+     *
+     * Usage is recorded under `PluginUsageCapability.AI` with
+     * `metadata.operation = 'embed'` and `units` set to the response's
+     * `totalTokens` (or input-count fallback when the plugin reports no
+     * usage — Ollama / local models often skip the token accounting).
+     */
+    async embed(
+        options: EmbeddingOptions,
+        facadeOptions: FacadeOptions,
+    ): Promise<EmbeddingResponse> {
+        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.workId,
+        );
+
+        if (typeof plugin.createEmbedding !== 'function') {
+            throw new AiFacadeError(
+                `Active AI provider '${plugin.id}' does not implement createEmbedding`,
+                'embed',
+                plugin.id,
+            );
+        }
+
+        const settings = await this.getResolvedSettings(plugin.id, {
+            userId: facadeOptions.userId,
+            workId: facadeOptions.workId,
+        });
+
+        try {
+            const response = await plugin.createEmbedding({
+                ...options,
+                settings,
+            });
+
+            // `usage` is optional on EmbeddingResponse — fall back to
+            // input count so the ledger always has something to attribute.
+            const inputCount = Array.isArray(options.input) ? options.input.length : 1;
+            const units = response.usage?.totalTokens ?? inputCount;
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                pluginId: plugin.id,
+                capability: PluginUsageCapability.AI,
+                units,
+                costCents: 0,
+                modelId: response.model,
+                metadata: {
+                    operation: 'embed',
+                    inputCount,
+                    promptTokens: response.usage?.promptTokens,
+                    totalTokens: response.usage?.totalTokens,
+                    embeddingsLength: response.embeddings.length,
+                },
+            });
+
+            return response;
+        } catch (err) {
+            if (err instanceof AiFacadeError) throw err;
+            throw new AiFacadeError(
+                `Embedding call failed: ${err instanceof Error ? err.message : String(err)}`,
+                'embed',
+                plugin.id,
+                err instanceof Error ? err : undefined,
+            );
         }
     }
 

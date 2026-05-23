@@ -786,6 +786,7 @@ export class DeployService {
         const promises: Promise<void>[] = [];
 
         if (teamScope) {
+            promises.push(this.setSecret(ctx, 'VERCEL_TEAM_SCOPE', teamScope));
             promises.push(this.setSecret(ctx, 'DEPLOY_TEAM_SCOPE', teamScope));
         }
 
