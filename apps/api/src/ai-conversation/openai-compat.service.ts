@@ -32,6 +32,28 @@ type StreamingResponse = {
     destroy(error?: Error): void;
 };
 
+/**
+ * EW-641 Phase 2/c row 34d — citation marker prompt template.
+ *
+ * Appended to the `<kb>...</kb>` system message that row 34c injects
+ * when `@kb:` mentions resolve to docs. Tells the LLM to reference
+ * KB material inline using the row 17 `kb:{class}/{slug}` token
+ * format — the same shape the user-side `@kb:` mention parser
+ * understands — so:
+ *  - row 35's hover-card UI can detect `kb:{class}/{slug}` tokens
+ *    in the rendered assistant response and resolve them to docs
+ *    via the same KB endpoints the workbench uses,
+ *  - users see consistent citation shape on both sides of the
+ *    conversation,
+ *  - the format round-trips cleanly: paste a citation back at the
+ *    model, the row 34a parser picks it up again as `@kb:...`.
+ *
+ * Exported so the spec can assert verbatim presence in the
+ * injected system message without duplicating the string.
+ */
+export const KB_CITATION_INSTRUCTION =
+    'When citing material from a KB document above, reference it inline using the format `kb:{class}/{slug}` (e.g. `kb:brand/voice`). Use the exact class and slug shown in each document heading.';
+
 @Injectable()
 export class OpenAiCompatService {
     private readonly logger = new Logger(OpenAiCompatService.name);
@@ -365,9 +387,18 @@ export class OpenAiCompatService {
             if (docs.length === 0) return options;
 
             const kbBlock = formatKbContext(docs);
+            // EW-641 Phase 2/c row 34d — citation marker prompt.
+            // Tell the LLM to cite material from the injected docs
+            // using the row 17 `kb:{class}/{slug}` token format so
+            // the row 35 hover-card UI can resolve + tooltip them
+            // in the rendered assistant response. The marker is
+            // the same shape the user-side `@kb:` mention parser
+            // already understands — round-tripping cleanly between
+            // user input and assistant output.
+            const kbContent = `${kbBlock}\n\n${KB_CITATION_INSTRUCTION}`;
             const kbSystemMessage: ChatMessage = {
                 role: 'system',
-                content: kbBlock,
+                content: kbContent,
             };
 
             return {

@@ -12,7 +12,7 @@ jest.mock('@ever-works/agent/services', () => ({
     formatKbContext: jest.fn().mockReturnValue('<kb>\n</kb>'),
 }));
 
-import { OpenAiCompatService } from './openai-compat.service';
+import { OpenAiCompatService, KB_CITATION_INSTRUCTION } from './openai-compat.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { AiFacadeService } from '@ever-works/agent/facades';
 import {
@@ -733,10 +733,64 @@ describe('OpenAiCompatService', () => {
             // System message prepended at index 0, original user message follows.
             expect(opts.messages).toHaveLength(2);
             expect(opts.messages[0].role).toBe('system');
-            expect(opts.messages[0].content).toBe(
+            // Content includes the formatted KB block AND the row 34d
+            // citation-instruction marker (asserted in detail below).
+            expect(opts.messages[0].content).toContain(
                 '<kb>\n## Brand voice (kb:brand/voice)\nbody\n</kb>',
             );
             expect(opts.messages[1].role).toBe('user');
+        });
+
+        // EW-641 Phase 2/c row 34d — citation marker prompt template.
+        it('appends the citation-instruction marker to the `<kb>` system message (row 34d)', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 6, endOffset: 21 },
+            ]);
+            kbMentionResolver.resolveMentions.mockResolvedValue([
+                {
+                    mention: {
+                        raw: '@kb:brand/voice',
+                        reference: 'brand/voice',
+                        startOffset: 6,
+                        endOffset: 21,
+                    },
+                    document: sampleDoc,
+                },
+            ] as any);
+            mockedFormat.mockReturnValue('<kb>\n## Brand voice (kb:brand/voice)\nbody\n</kb>');
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            // Citation instruction is present verbatim.
+            expect(opts.messages[0].content).toContain(KB_CITATION_INSTRUCTION);
+            // And it follows the kb block (block first, then instruction).
+            const content = opts.messages[0].content as string;
+            const blockIdx = content.indexOf('<kb>');
+            const instructionIdx = content.indexOf(KB_CITATION_INSTRUCTION);
+            expect(blockIdx).toBeGreaterThanOrEqual(0);
+            expect(instructionIdx).toBeGreaterThan(blockIdx);
+        });
+
+        it('does NOT include the citation instruction when no <kb> block is injected (no resolved docs)', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:ghost', reference: 'ghost', startOffset: 0, endOffset: 9 },
+            ]);
+            kbMentionResolver.resolveMentions.mockResolvedValue([
+                {
+                    mention: { raw: '@kb:ghost', reference: 'ghost', startOffset: 0, endOffset: 9 },
+                    document: null,
+                },
+            ] as any);
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            // No system message at all → no citation instruction either.
+            expect(opts.messages).toHaveLength(1);
+            for (const msg of opts.messages) {
+                expect(msg.content).not.toContain(KB_CITATION_INSTRUCTION);
+            }
         });
 
         it('does NOT prepend a `<kb>` block when all mentions resolve to null docs', async () => {
