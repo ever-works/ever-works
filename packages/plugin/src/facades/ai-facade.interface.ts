@@ -2,7 +2,9 @@ import type {
 	AiModel,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
-	ChatCompletionChunk
+	ChatCompletionChunk,
+	EmbeddingOptions,
+	EmbeddingResponse
 } from '../contracts/capabilities/ai-provider.interface.js';
 import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
@@ -141,6 +143,31 @@ export interface IAiFacade extends IBaseFacade {
 		options: ChatCompletionOptions,
 		facadeOptions: FacadeOptions
 	): AsyncGenerator<ChatCompletionChunk>;
+
+	/**
+	 * Embed one or more inputs against the active AI provider plugin.
+	 *
+	 * EW-641 Phase 2/a row 29b2a — convenience wrapper around the active
+	 * provider's `IAiProviderPlugin.createEmbedding`. Resolves the active
+	 * plugin via the same `resolvePlugin` chain as `createChatCompletion`,
+	 * threads user/work-scoped settings (including `embeddingModel`)
+	 * through `BaseAiProvider.resolveConfig`, and records `PluginUsage`
+	 * with `capability = AI`. Throws an `AiFacadeError` when the resolved
+	 * plugin doesn't implement `createEmbedding` so KB retrieval can
+	 * surface a clear "no embedding provider configured" path (lexical
+	 * fallback per spec §15.5).
+	 *
+	 * Mirrors `createChatCompletion`'s signature. Pipelines and the KB
+	 * embedding Trigger.dev task call `embed` rather than reaching for
+	 * a plugin directly so usage tracking + provider resolution stay in
+	 * one place.
+	 *
+	 * @returns The embedding response (`{ model, embeddings, usage? }`)
+	 *          from the resolved plugin's `createEmbedding`.
+	 * @throws AiFacadeError when the resolved plugin lacks
+	 *         `createEmbedding`, or any plugin-level error (rewrapped).
+	 */
+	embed(options: EmbeddingOptions, facadeOptions: FacadeOptions): Promise<EmbeddingResponse>;
 
 	/**
 	 * Test the AI provider connection.

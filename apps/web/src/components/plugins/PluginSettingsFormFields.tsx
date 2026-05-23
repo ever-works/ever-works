@@ -55,6 +55,26 @@ export function PluginSettingsFormFields({
                                     handleFieldChange(key, value, propSchema.secret || false)
                                 }
                                 pluginId={pluginId}
+                                // EW-644: widgets like `github-repo` need to
+                                // read/write sibling field values (e.g. set
+                                // `owner` when the user picks a repo). Each
+                                // widget that doesn't care just ignores these.
+                                siblings={{
+                                    get: (siblingKey) => {
+                                        const siblingSchema = visibleProperties[siblingKey];
+                                        if (!siblingSchema) return undefined;
+                                        return getFieldValue(siblingKey, siblingSchema);
+                                    },
+                                    set: (siblingKey, value) => {
+                                        const siblingSchema = visibleProperties[siblingKey];
+                                        if (!siblingSchema) return;
+                                        handleFieldChange(
+                                            siblingKey,
+                                            value,
+                                            siblingSchema.secret || false,
+                                        );
+                                    },
+                                }}
                             />
                             {renderFieldExtra?.(key, propSchema)}
                         </div>

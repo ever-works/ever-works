@@ -550,7 +550,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			referenceTtlDays,
 			onReferenceProcessed: (reference) => {
 				processedReferences.push(reference);
-			}
+			},
+			// EW-641 Phase 2/d row 36c — opt-in KB tool registration.
+			// When the agent's `KbToolsFacadeAdapter` is wired (KB module
+			// present), `execContext.kbTools` is the IKbToolsFacade
+			// instance. `createParentTools` spreads `createKbTools(...)`
+			// into the tools map; otherwise the agent runs without
+			// kb_* tools (pre-row-36c behavior). `generatedByAgentRunId`
+			// stays unset until a follow-up wires the run id through —
+			// `GenerationRequest` doesn't carry one today.
+			kbTools: execContext.kbTools
 		});
 
 		const promptOptions = { work, request, existing };

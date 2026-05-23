@@ -1018,7 +1018,8 @@
                 "plugins": "ส่วนเสริม",
                 "deploy": "เผยแพร่",
                 "members": "สมาชิก",
-                "settings": "การตั้งค่า"
+                "settings": "การตั้งค่า",
+                "kb": "Knowledge Base"
             },
             "members": {
                 "title": "สมาชิกทีม",
@@ -2388,6 +2389,216 @@
                     "dnsName": "ชื่อ:",
                     "dnsValue": "ค่า:",
                     "copyButton": "คัดลอก"
+                }
+            },
+            "kb": {
+                "title": "Knowledge Base",
+                "subtitle": "Per-Work institutional context — documents that ground generation and conversations.",
+                "panes": {
+                    "tree": {
+                        "title": "Documents",
+                        "empty": "Document tree appears here once you upload or create a KB document.",
+                        "inheritedSection": {
+                            "title": "รับช่วงต่อจากองค์กร",
+                            "description": "เอกสารแบบอ่านอย่างเดียวที่เป็นขององค์กรของคุณ เปิดดูหรือสร้างเวอร์ชันท้องถิ่นทับ",
+                            "lockedLabel": "รับช่วงต่อ (อ่านอย่างเดียว)"
+                        }
+                    },
+                    "editor": {
+                        "title": "Editor",
+                        "empty": "Select a document on the left to view or edit it. Drag a file anywhere to upload."
+                    },
+                    "ai": {
+                        "title": "AI assistant",
+                        "empty": "Conversation with the workspace agent will appear here. Use @kb:path to ground replies."
+                    }
+                },
+                "classes": {
+                    "brand": "Brand",
+                    "legal": "Legal",
+                    "seo": "SEO",
+                    "style": "Style",
+                    "glossary": "Glossary",
+                    "competitors": "Competitors",
+                    "personas": "Personas",
+                    "research": "Research",
+                    "output": "Outputs",
+                    "freeform": "Freeform"
+                },
+                "status": {
+                    "draft": "Draft",
+                    "active": "Active",
+                    "archived": "Archived"
+                },
+                "lock": {
+                    "full": "Locked",
+                    "additions-only": "Additions only"
+                },
+                "document": {
+                    "emptyBody": "This document has no body yet."
+                },
+                "editor": {
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "saved": "Saved",
+                    "error": "Save failed",
+                    "idle": "Idle",
+                    "dirty": "Unsaved changes…",
+                    "placeholder": "Start typing to add content…",
+                    "additionsOnlyBanner": "Additions-only lock — appending new content is OK, but edits or deletions to existing lines will be rejected by the server."
+                },
+                "lockControls": {
+                    "lock": "Lock",
+                    "unlock": "Unlock",
+                    "modeLabel": "Lock mode"
+                },
+                "upload": {
+                    "title": "Upload to Knowledge Base",
+                    "hint": "Drag & drop files here, or click Browse. Markdown, HTML, PDF, DOCX, XLSX, CSV/TSV, and PPTX are extracted automatically.",
+                    "browse": "Browse files",
+                    "dismiss": "Dismiss",
+                    "status": {
+                        "queued": "Queued",
+                        "uploading": "Uploading",
+                        "succeeded": "Uploaded",
+                        "failed": "Failed"
+                    }
+                },
+                "classify": {
+                    "title": "Classify upload",
+                    "subtitle": "Pick the document class, optional description, and tags. Per-file titles are editable below.",
+                    "classLabel": "Document class",
+                    "descriptionLabel": "Description (optional)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Type to search or add a tag, Enter to confirm",
+                    "tagsFetchFailed": "Could not load existing tags ({error}). You can still type new tags.",
+                    "titleLabel": "Title",
+                    "removeTag": "Remove tag {tag}",
+                    "cancel": "Cancel",
+                    "confirm": "Upload {count, plural, one {# file} other {# files}}"
+                },
+                "pdf": {
+                    "label": "PDF viewer",
+                    "tooLargeTitle": "PDF too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and view in your local PDF reader.",
+                    "download": "Download PDF"
+                },
+                "docx": {
+                    "label": "DOCX viewer",
+                    "loading": "Rendering Word document…",
+                    "renderFailed": "Could not render this DOCX inline ({error}).",
+                    "tooLargeTitle": "DOCX too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Word.",
+                    "download": "Download DOCX"
+                },
+                "xlsx": {
+                    "label": "Spreadsheet viewer",
+                    "loading": "Rendering spreadsheet…",
+                    "renderFailed": "Could not render this XLSX inline ({error}).",
+                    "tooLargeTitle": "Spreadsheet too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and open in Excel.",
+                    "download": "Download XLSX",
+                    "sheetTabsLabel": "Worksheet tabs",
+                    "truncated": "Showing first {cap} of {total} rows. Download the file to see the rest.",
+                    "emptyWorkbook": "Workbook has no worksheets"
+                },
+                "image": {
+                    "label": "Image viewer",
+                    "tooLargeTitle": "Image too large to preview inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download.",
+                    "download": "Download image"
+                },
+                "video": {
+                    "label": "Video viewer",
+                    "tooLargeTitle": "Video too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download video",
+                    "unsupported": "Your browser does not support inline video playback."
+                },
+                "audio": {
+                    "label": "Audio viewer",
+                    "tooLargeTitle": "Audio too large to stream inline",
+                    "tooLargeBody": "This file is {size}, above the {cap} inline limit. Click to download and play locally.",
+                    "download": "Download audio",
+                    "unsupported": "Your browser does not support inline audio playback."
+                },
+                "search": {
+                    "triggerLabel": "Search KB…",
+                    "dialogLabel": "Knowledge Base search",
+                    "inputLabel": "Search query",
+                    "placeholder": "Type to search documents…",
+                    "hint": "Type at least {min} characters to search.",
+                    "loading": "Searching…",
+                    "empty": "No documents match \"{query}\".",
+                    "error": "Search failed ({error})."
+                },
+                "wikilink": {
+                    "hint": "Type to search for a KB document…",
+                    "empty": "No documents match \"{query}\".",
+                    "listLabel": "Wikilink suggestions"
+                },
+                "mention": {
+                    "hint": "Type to search for a KB document or agent…",
+                    "empty": "Nothing matches \"{query}\".",
+                    "sections": {
+                        "docs": "Documents",
+                        "agents": "Agents"
+                    }
+                },
+                "citation": {
+                    "loading": "Loading citation…",
+                    "missing": "Citation \"{raw}\" not found in this knowledge base.",
+                    "error": "Failed to resolve citation ({error}).",
+                    "open": "Open document",
+                    "citedLabel": "Cited:"
+                },
+                "history": {
+                    "title": "Document history",
+                    "dialogLabel": "Knowledge Base document history",
+                    "close": "Close",
+                    "loading": "Loading history…",
+                    "error": "Failed to load history ({error}).",
+                    "empty": "No prior versions yet. Edits will appear here once the doc has been mirrored to Git.",
+                    "cancel": "Cancel",
+                    "restore": "Restore to {sha}",
+                    "restoring": "Restoring…"
+                },
+                "sidePanel": {
+                    "title": "Document details",
+                    "subtitle": "Metadata, lock state, and history for this document.",
+                    "sections": {
+                        "class": "Class",
+                        "status": "Status",
+                        "lock": "Lock",
+                        "tags": "Tags",
+                        "description": "Description",
+                        "language": "Language",
+                        "source": "Source",
+                        "counts": "Length",
+                        "history": "History"
+                    },
+                    "unlocked": "Unlocked",
+                    "emptyTags": "No tags",
+                    "emptyDescription": "No description",
+                    "wordCount": "{count, plural, one {# word} other {# words}}",
+                    "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+                    "sources": {
+                        "user": "User",
+                        "agent": "Agent",
+                        "imported": "Imported",
+                        "seeded": "Seeded"
+                    },
+                    "viewHistory": "View Git history",
+                    "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "การแจ้งเตือนเอกสารที่รับช่วงต่อ",
+                    "bannerTitle": "รับช่วงต่อจากองค์กร",
+                    "bannerDescription": "เอกสารนี้เป็นขององค์กรของคุณและเป็นแบบอ่านอย่างเดียวที่นี่ เขียนทับในเครื่องเพื่อแยกสำเนาที่แก้ไขได้ใน Work นี้",
+                    "overrideCta": "เขียนทับในเครื่อง",
+                    "overrideCtaPendingTooltip": "พร้อมใช้งานเมื่อมีการส่งมอบการกระทำการเขียนทับในแถว 38d",
+                    "overrideCtaBusy": "กำลังคัดลอก…",
+                    "overrideErrorFallback": "ไม่สามารถสร้างสำเนาของเอกสารที่รับช่วงต่อได้ ลองอีกครั้งหรือรีเฟรชหน้า"
                 }
             }
         },

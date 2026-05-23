@@ -78,6 +78,29 @@ export class Work {
     @Column({ default: false })
     organization: boolean;
 
+    /**
+     * EW-641 Phase 2/e row 37c — owning organization id.
+     *
+     * Free-form UUID, NOT (yet) a foreign key to any `Organization` entity:
+     * the spec (§7.6) describes a future `Organization` entity for KB
+     * org-overlay membership, but no such entity has landed on develop yet.
+     * Treat this column the same way `WorkKnowledgeDocument.organizationId`
+     * is stored — a string that future code links to a yet-to-exist
+     * Organization table.
+     *
+     * Starts NULL for every existing Work. Population happens lazily: org
+     * onboarding flows (not in this PR) will set it on Works the org owns,
+     * and the KB org-overlay fanout (row 37d) reads it to resolve the
+     * target Work id list before dispatching the `kb-org-overlay-fanout`
+     * task. Until then, the column is harmless metadata — no read paths
+     * depend on it.
+     *
+     * Indexed (single-column) for the row-37d
+     * `WorkRepository.findIdsByOrganization(orgId)` lookup.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    organizationId?: string | null;
+
     @Column()
     description: string;
 

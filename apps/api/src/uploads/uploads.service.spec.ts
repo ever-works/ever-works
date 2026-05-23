@@ -228,6 +228,91 @@ describe('UploadsService', () => {
         });
     });
 
+    describe('saveImage — workId threading (EW-644)', () => {
+        // Capture the StoragePutInput the active backend receives so we
+        // can assert the workId field is set / unset / validated. Uses
+        // a tiny spy backend instead of LocalFs because we only care
+        // about what got handed to putObject.
+        const captured: Array<{ workId?: string }> = [];
+        let spyBackend: {
+            id: string;
+            name: string;
+            version: string;
+            category: string;
+            capabilities: readonly string[];
+            providerName: string;
+            putObject: (input: { workId?: string }) => Promise<{ key: string; url: string }>;
+            getObject: () => Promise<{ buffer: Buffer; mimeType: string }>;
+            deleteObject: () => Promise<void>;
+            isAvailable: () => Promise<boolean>;
+            onLoad: () => Promise<void>;
+            onUnload?: () => Promise<void>;
+            getManifest?: () => unknown;
+        };
+        let svc: UploadsService;
+
+        beforeEach(() => {
+            captured.length = 0;
+            spyBackend = {
+                id: 'spy',
+                name: 'spy',
+                version: '0.0.0',
+                category: 'storage',
+                capabilities: ['put-object', 'get-object'],
+                providerName: 'spy',
+                async putObject(input) {
+                    captured.push({ workId: input.workId });
+                    return { key: 'spy-key', url: '/api/uploads/x/y.png' };
+                },
+                async getObject() {
+                    return { buffer: Buffer.from(''), mimeType: 'image/png' };
+                },
+                async deleteObject() {
+                    /* noop */
+                },
+                async isAvailable() {
+                    return true;
+                },
+                async onLoad() {
+                    /* noop */
+                },
+            };
+            svc = new UploadsService(spyBackend as never);
+        });
+
+        it('does not set workId on the backend by default', async () => {
+            await svc.saveImage(userId, fakeFile({}));
+            expect(captured).toHaveLength(1);
+            expect(captured[0].workId).toBeUndefined();
+        });
+
+        it('threads a valid UUID workId through to the backend', async () => {
+            const workId = '11111111-2222-3333-4444-555555555555';
+            await svc.saveImage(userId, fakeFile({}), { workId });
+            expect(captured[0].workId).toBe(workId);
+        });
+
+        it('propagates workId into the returned URL as a ?workId= query (EW-644 Codex P1 #3)', async () => {
+            // Without this, github-storage `data-repo` keys (dr:<workId>:...)
+            // can't be reconstructed on the serve route.
+            const workId = '22222222-3333-4444-5555-666666666666';
+            const out = await svc.saveImage(userId, fakeFile({}), { workId });
+            expect(out.url).toMatch(/\?workId=22222222-3333-4444-5555-666666666666$/);
+        });
+
+        it('does not add a workId query string when no workId is provided', async () => {
+            const out = await svc.saveImage(userId, fakeFile({}));
+            expect(out.url).not.toContain('workId=');
+        });
+
+        it('rejects a malformed workId before reaching the backend', async () => {
+            await expect(
+                svc.saveImage(userId, fakeFile({}), { workId: 'not-a-uuid' }),
+            ).rejects.toThrow(/Invalid workId/);
+            expect(captured).toHaveLength(0);
+        });
+    });
+
     describe('readFile', () => {
         it('round-trips bytes for the owner', async () => {
             const r = await service.saveImage(userId, fakeFile({}));

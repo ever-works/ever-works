@@ -10,11 +10,23 @@ import {
     TemplateCustomizationDispatcher,
     WebhookDeliveryPayload,
     WebhookDeliveryDispatcher,
+    KbMirrorDocumentPayload,
+    KbMirrorDocumentDispatcher,
+    KbBackfillSkeletonPayload,
+    KbBackfillSkeletonDispatcher,
+    KbEmbedDocumentPayload,
+    KbEmbedDocumentDispatcher,
+    KbOrgOverlayFanoutPayload,
+    KbOrgOverlayFanoutDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
 import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
+import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
+import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
+import { kbEmbedDocumentTask } from '../tasks/trigger/kb-embed-document.task';
+import { kbOrgOverlayFanoutTask } from '../tasks/trigger/kb-org-overlay-fanout.task';
 
 @Injectable()
 export class TriggerService
@@ -22,7 +34,11 @@ export class TriggerService
         WorkGenerationDispatcher,
         WorkImportDispatcher,
         TemplateCustomizationDispatcher,
-        WebhookDeliveryDispatcher
+        WebhookDeliveryDispatcher,
+        KbMirrorDocumentDispatcher,
+        KbBackfillSkeletonDispatcher,
+        KbEmbedDocumentDispatcher,
+        KbOrgOverlayFanoutDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -162,6 +178,140 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch webhook-delivery task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 — enqueue one KB document mirror to Trigger.dev. The KB
+     * service calls this after every create / update / delete so the
+     * sidecar `.yml` + body `.md` in the Work's data repo stays in sync
+     * with the DB. Returns the Trigger.dev run id (or `null` when
+     * Trigger.dev is disabled / disposed).
+     */
+    async dispatchKbMirrorDocument(payload: KbMirrorDocumentPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            // Greptile P2: serialize mirror runs per Work so rapid
+            // successive create/update/delete mutations don't race on
+            // `git push`. Trigger.dev's `concurrencyKey` queues
+            // subsequent runs behind any in-flight one with the same
+            // key — keyed on `workId`, two Works run in parallel but
+            // two mutations on the same Work run sequentially.
+            const handle = await kbMirrorDocumentTask.trigger(payload, {
+                tags: [
+                    'kb-mirror-document',
+                    `op:${payload.operation}`,
+                    `work:${payload.workId}`,
+                    `doc:${payload.documentId}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-mirror:${payload.workId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-mirror-document task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 — enqueue an idempotent KB skeleton backfill for the
+     * supplied Works. Used from admin scripts / one-off bootstrap
+     * tasks; the per-document mirror task already lazy-creates the
+     * skeleton, so this is only needed when the operator wants to
+     * pre-populate it without an outbound mutation.
+     */
+    async dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbBackfillSkeletonTask.trigger(payload, {
+                tags: ['kb-backfill-skeleton', `count:${payload.workIds?.length ?? 0}`],
+                machine: this.machine() as any,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-backfill-skeleton task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/a row 29c — enqueue a chunk + embed run for a
+     * single KB document. Called by `KnowledgeBaseService.{create,update,
+     * restore}Document` immediately after the mirror enqueue. The
+     * `concurrencyKey` keyed on `workId` serializes per-Work runs so a
+     * paragraph edited + saved twice quickly produces sensible final
+     * state (the chunk table is overwritten via row 29a's
+     * delete-then-insert transaction). Returns the Trigger.dev run id
+     * (or `null` when Trigger.dev is disabled / disposed — KB retrieval
+     * falls back to lexical via row 30 RRF until the dispatch lands).
+     */
+    async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbEmbedDocumentTask.trigger(payload, {
+                tags: ['kb-embed-document', `work:${payload.workId}`, `doc:${payload.documentId}`],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-embed:${payload.workId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-embed-document task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37b — enqueue an org-overlay fanout run for one
+     * org-scope KB document mutation. The task body (row 37) iterates the
+     * pre-resolved `workIds` and calls `materializeOrgDocument` /
+     * `removeOrgDocument` per Work.
+     *
+     * Serializes per-org so two rapid org-doc edits don't race on writes
+     * against the same set of target Work repos. Keyed on `organizationId`
+     * (not on the cross product of org × Work) because each fanout already
+     * sequences its own Works in-task, and serializing per-Work would
+     * over-constrain throughput for orgs with many Works.
+     *
+     * Returns the Trigger.dev run id, or `null` when Trigger.dev is
+     * disabled / the dispatch threw — `KnowledgeBaseService` treats both
+     * as a deferred sync and relies on Phase 3 reconciliation to catch
+     * drift.
+     */
+    async dispatchKbOrgOverlayFanout(payload: KbOrgOverlayFanoutPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbOrgOverlayFanoutTask.trigger(payload, {
+                tags: [
+                    'kb-org-overlay-fanout',
+                    `op:${payload.operation}`,
+                    `org:${payload.organizationId}`,
+                    `doc:${payload.documentId}`,
+                    `targets:${payload.workIds.length}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-org-overlay:${payload.organizationId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-org-overlay-fanout task', error as Error);
             return null;
         }
     }

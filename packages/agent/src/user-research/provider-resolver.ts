@@ -1,21 +1,15 @@
 import { Logger } from '@nestjs/common';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, type JsonSchema } from '@ever-works/plugin';
 import type {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
 import type { AiFacadeService } from '../facades/ai.facade';
+import type { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
 const DEFAULT_PROVIDER_FALLBACK_MAX = 2;
-
-function getProviderFallbackMax(): number {
-    const raw = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-    if (!raw) return DEFAULT_PROVIDER_FALLBACK_MAX;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_PROVIDER_FALLBACK_MAX;
-}
 
 /**
  * Returns the user's enabled plugins for a capability, ordered with
@@ -40,20 +34,50 @@ export function capChain<T>(chain: T[], max: number): T[] {
     return chain.slice(0, Math.max(1, max));
 }
 
+function hasAllRequiredSettings(
+    schema: JsonSchema | undefined,
+    resolvedSettings: Record<string, unknown>,
+): boolean {
+    if (!schema?.required || !schema.properties) return true;
+
+    for (const field of schema.required) {
+        const propSchema = schema.properties[field];
+        if (!propSchema) continue;
+        if (propSchema['x-envVar']) continue;
+        if (propSchema['x-adminOnly']) continue;
+
+        const value = resolvedSettings[field];
+        if (value === undefined || value === null || value === '') return false;
+    }
+
+    return true;
+}
+
 /**
- * Returns ordered plugin IDs of the user's enabled search providers, capped
- * by USER_RESEARCH_PROVIDER_FALLBACK_MAX. Convenience over
- * resolveProviderChain + capChain + .map(p.plugin.id) at the call site.
+ * Returns ordered plugin IDs of the user's enabled AND configured search providers, capped
+ * by the internal provider fallback limit. System plugins are included through scoped
+ * enablement; plugins missing required user/work settings are skipped.
  */
 export async function resolveSearchProviderIds(
     registry: PluginRegistryService,
     userId: string,
+    settingsService?: PluginSettingsService,
 ): Promise<string[]> {
-    const chain = capChain(
-        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.SEARCH, userId),
-        getProviderFallbackMax(),
-    );
-    return chain.map((p) => p.plugin.id);
+    const chain = await resolveProviderChain(registry, PLUGIN_CAPABILITIES.SEARCH, userId);
+    const configured: RegisteredPlugin[] = [];
+
+    for (const candidate of chain) {
+        if (settingsService) {
+            const settings = await settingsService.getSettings(candidate.plugin.id, {
+                userId,
+                includeSecrets: true,
+            });
+            if (!hasAllRequiredSettings(candidate.plugin.settingsSchema, settings)) continue;
+        }
+        configured.push(candidate);
+    }
+
+    return capChain(configured, DEFAULT_PROVIDER_FALLBACK_MAX).map((p) => p.plugin.id);
 }
 
 /**
@@ -114,12 +138,14 @@ export interface ResolvedAiProvider {
     modelName: string;
 }
 
-async function resolveAiProviderFromChain(
+async function resolveAiProvidersFromChain(
     aiFacade: AiFacadeService,
     chain: RegisteredPlugin[],
     userId: string | undefined,
     logger?: Logger,
-): Promise<ResolvedAiProvider | null> {
+): Promise<ResolvedAiProvider[]> {
+    const resolved: ResolvedAiProvider[] = [];
+
     for (const candidate of chain) {
         try {
             const cfg = await aiFacade.getProviderConfig({
@@ -136,32 +162,54 @@ async function resolveAiProviderFromChain(
                 baseURL: cfg.baseUrl,
                 apiKey: cfg.apiKey,
             });
-            return {
+            resolved.push({
                 model: provider(modelName),
                 providerId: cfg.providerId,
                 providerName: cfg.providerName ?? cfg.providerId,
                 modelName,
-            };
+            });
         } catch (err) {
             if (isAuthOrConfigError(err)) throw err;
             logger?.warn(`ai-provider ${candidate.plugin.id} unusable: ${(err as Error).message}`);
         }
+    }
+    return resolved;
+}
+
+async function resolveFirstAiProviderFromChain(
+    aiFacade: AiFacadeService,
+    chain: RegisteredPlugin[],
+    userId: string | undefined,
+    logger?: Logger,
+): Promise<ResolvedAiProvider | null> {
+    for (const candidate of chain) {
+        const resolved = await resolveAiProvidersFromChain(aiFacade, [candidate], userId, logger);
+        if (resolved[0]) return resolved[0];
     }
     return null;
 }
 
 /**
  * Walks the user's enabled ai-provider plugins in priority order and returns
- * the first one with a usable config (baseUrl + apiKey + model). Capped by
- * USER_RESEARCH_PROVIDER_FALLBACK_MAX so one bad provider chain can't burn
- * through every configured key.
- *
- * If the user-scoped chain has no usable config, falls back to globally ready
- * AI providers so env/admin configured platform defaults can power research
- * without requiring every new user to configure an AI plugin first. Auth-shape
- * errors re-throw so misconfigured keys aren't silently masked by trying the
- * next provider.
+ * the providers with usable config (baseUrl + apiKey + model). Capped by
+ * the internal provider fallback limit so one bad provider chain can't burn
+ * through every configured key. System plugins are included through the same
+ * scoped enablement rules as user-installed plugins. Auth-shape errors re-throw
+ * so misconfigured keys aren't silently masked by trying the next provider.
  */
+export async function resolveAiProvidersForResearch(
+    aiFacade: AiFacadeService,
+    registry: PluginRegistryService,
+    userId: string,
+    logger?: Logger,
+): Promise<ResolvedAiProvider[]> {
+    const chain = capChain(
+        await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
+        DEFAULT_PROVIDER_FALLBACK_MAX,
+    );
+    return resolveAiProvidersFromChain(aiFacade, chain, userId, logger);
+}
+
 export async function resolveAiProviderForResearch(
     aiFacade: AiFacadeService,
     registry: PluginRegistryService,
@@ -170,30 +218,7 @@ export async function resolveAiProviderForResearch(
 ): Promise<ResolvedAiProvider | null> {
     const chain = capChain(
         await resolveProviderChain(registry, PLUGIN_CAPABILITIES.AI_PROVIDER, userId),
-        getProviderFallbackMax(),
+        DEFAULT_PROVIDER_FALLBACK_MAX,
     );
-    const scoped = await resolveAiProviderFromChain(aiFacade, chain, userId, logger);
-    if (scoped) return scoped;
-
-    const globalChain = capChain(
-        registry
-            .getReady()
-            .filter((p) => p.manifest.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER))
-            .sort((a, b) => {
-                const ad = a.manifest.defaultForCapabilities?.includes(
-                    PLUGIN_CAPABILITIES.AI_PROVIDER,
-                )
-                    ? 0
-                    : 1;
-                const bd = b.manifest.defaultForCapabilities?.includes(
-                    PLUGIN_CAPABILITIES.AI_PROVIDER,
-                )
-                    ? 0
-                    : 1;
-                return ad - bd;
-            }),
-        getProviderFallbackMax(),
-    );
-
-    return resolveAiProviderFromChain(aiFacade, globalChain, undefined, logger);
+    return resolveFirstAiProviderFromChain(aiFacade, chain, userId, logger);
 }

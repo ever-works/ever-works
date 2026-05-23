@@ -1,4 +1,5 @@
 import {
+    buildUserResearchLimitsConfig,
     DEFAULT_USER_RESEARCH_LIMITS,
     UserResearchLimitsService,
     UserResearchRateLimitedError,
@@ -6,16 +7,35 @@ import {
 import { Test } from '@nestjs/testing';
 
 describe('UserResearchLimitsService', () => {
+    const originalEnv = process.env;
     let svc: UserResearchLimitsService;
 
     beforeEach(() => {
+        process.env = { ...originalEnv };
         svc = new UserResearchLimitsService(undefined, { ...DEFAULT_USER_RESEARCH_LIMITS });
+    });
+
+    afterEach(() => {
+        process.env = originalEnv;
+    });
+
+    it('builds max runs config from environment variables', () => {
+        process.env.USER_RESEARCH_MAX_RUNS_PER_DAY = '8';
+
+        expect(buildUserResearchLimitsConfig()).toEqual({
+            ...DEFAULT_USER_RESEARCH_LIMITS,
+            maxRunsPerDay: 8,
+        });
+    });
+
+    it('falls back to defaults for invalid max runs values', () => {
+        process.env.USER_RESEARCH_MAX_RUNS_PER_DAY = '0';
+
+        expect(buildUserResearchLimitsConfig()).toEqual(DEFAULT_USER_RESEARCH_LIMITS);
     });
 
     it('starts at 0 for an unseen user', async () => {
         await expect(svc.assertCanRun('u1')).resolves.toBeUndefined();
-        await expect(svc.assertSearchAllowed('u1')).resolves.toBeUndefined();
-        await expect(svc.assertFetchAllowed('u1')).resolves.toBeUndefined();
     });
 
     it('can be instantiated by Nest without an explicit limits config provider', async () => {
@@ -47,26 +67,5 @@ describe('UserResearchLimitsService', () => {
             await svc.incrementRuns('u1');
         }
         await expect(svc.assertCanRun('u2')).resolves.toBeUndefined();
-    });
-
-    it('counts search increments', async () => {
-        const cap = DEFAULT_USER_RESEARCH_LIMITS.maxSearchesPerDay;
-        for (let i = 0; i < cap; i++) {
-            await svc.incrementSearches('u1');
-        }
-        await expect(svc.assertSearchAllowed('u1')).rejects.toThrow(UserResearchRateLimitedError);
-    });
-
-    it('counts fetch increments', async () => {
-        const cap = DEFAULT_USER_RESEARCH_LIMITS.maxFetchesPerDay;
-        for (let i = 0; i < cap; i++) {
-            await svc.incrementFetches('u1');
-        }
-        await expect(svc.assertFetchAllowed('u1')).rejects.toThrow(UserResearchRateLimitedError);
-    });
-
-    it('accumulates tokens with custom deltas', async () => {
-        expect(await svc.addTokens('u1', 1_000)).toBe(1_000);
-        expect(await svc.addTokens('u1', 500)).toBe(1_500);
     });
 });

@@ -26,6 +26,31 @@ export class WorkKnowledgeUploadRepository {
         });
     }
 
+    /**
+     * Paginated list — used by the EW-641 1B/b API surface so the UI
+     * can scroll the upload history without pulling the whole table.
+     * Existing `list(workId, status?)` is preserved for older callers
+     * that just need an in-memory array.
+     */
+    async listPaged(opts: {
+        workId: string;
+        status?: KbUploadExtractionStatus;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ items: WorkKnowledgeUpload[]; total: number }> {
+        const qb = this.repository.createQueryBuilder('upload');
+        qb.where('upload.workId = :workId', { workId: opts.workId });
+        if (opts.status) {
+            qb.andWhere('upload.extractionStatus = :status', { status: opts.status });
+        }
+        qb.orderBy('upload.createdAt', 'DESC');
+        const total = await qb.getCount();
+        if (opts.limit !== undefined) qb.take(opts.limit);
+        if (opts.offset !== undefined) qb.skip(opts.offset);
+        const items = await qb.getMany();
+        return { items, total };
+    }
+
     async create(data: Partial<WorkKnowledgeUpload>): Promise<WorkKnowledgeUpload> {
         const entity = this.repository.create(data);
         return this.repository.save(entity);

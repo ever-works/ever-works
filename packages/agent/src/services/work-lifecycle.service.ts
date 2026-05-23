@@ -502,6 +502,16 @@ export class WorkLifecycleService {
                 updateData.activitySyncMode = updateDto.activitySyncMode;
             }
 
+            // EW-639 Phase 2/e: pair the Work with an organization-scope KB
+            // document set. `organizationId === null` clears the membership
+            // (no inheritance); a UUID makes the Work inherit org-level KB
+            // docs that aren't shadowed by a Work-scope override. The
+            // org-overlay fan-out flow (row 37) reads this column to resolve
+            // which Works receive `.content/kb/.org/...` materialization.
+            if (updateDto.organizationId !== undefined) {
+                updateData.organizationId = updateDto.organizationId;
+            }
+
             const updatedWork = await this.workRepository.update(id, updateData);
 
             if (!updatedWork) {

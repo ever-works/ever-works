@@ -25,6 +25,7 @@ import {
     TemplateCustomizationRepository,
     UserTemplatePreferenceRepository,
     UserRepository,
+    WorkKnowledgeDocumentRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
@@ -144,6 +145,10 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly dataSyncDispatcher: DataSyncDispatcherService,
         // EW-617 G8 — exposed for the deploy-ready-poller cron task.
         private readonly deployReadyPoller: DeployReadyPollerService,
+        // EW-641 — exposed for the KB mirror Trigger.dev task so it can
+        // read + update WorkKnowledgeDocument rows over the internal
+        // RPC channel without direct DB access from worker scope.
+        private readonly workKnowledgeDocumentRepository: WorkKnowledgeDocumentRepository,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -169,6 +174,8 @@ export class TriggerInternalController implements OnModuleInit {
             DataSyncDispatcherService: this.dataSyncDispatcher,
             // EW-617 G8 — exposed for the deploy-ready-poller cron task.
             DeployReadyPollerService: this.deployReadyPoller,
+            // EW-641 — exposed for the KB mirror Trigger.dev task.
+            WorkKnowledgeDocumentRepository: this.workKnowledgeDocumentRepository,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

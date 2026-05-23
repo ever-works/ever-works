@@ -436,7 +436,7 @@ Knowledge Base is the per-Work institutional-context subsystem (see [feature spe
 
 **Inheritance pattern:** org-level documents (`legal` / `style` / `seo` only in v1) are stored in the same `work_knowledge_documents` table with `organizationId` set instead of `workId`. Resolution at read time merges org + Work documents per class, with Work overriding org for the same `path`. The merged effective set is also materialized into each Work's Git data repo under `.content/kb/.org/{class}/` for direct-Git consumers (pipelines reading from disk).
 
-**Two-layer persistence:** the DB is the source of truth for metadata + indexes + locks; the Work's Git data repository is the source of truth for content (sidecar `.yml` + `.md` per document at `.content/kb/<class>/<slug>.{yml,md}`). The `KnowledgeBaseService` orchestrator keeps the two in sync via a two-phase write (DB → Git; rollback DB on Git failure).
+**Two-layer persistence:** the DB is the source of truth for metadata + indexes + locks; the Work's Git data repository is the source of truth for content (sidecar `.yml` + `.md` per document at `.content/kb/<class>/<slug>.{yml,md}`). `KnowledgeBaseService` writes the DB row inline and then enqueues a Trigger.dev `kb-mirror-document` run that materializes the sidecar + body + `.index.yml` in the data repo via `KnowledgeBaseGitMirrorService` (EW-641 Phase 1B/a). The mirror task is idempotent: re-running it against an unchanged DB row produces a no-op commit. `lastCommitSha` on the document row records the last successful Git sync; rows whose `lastCommitSha` stays `null` after a write are pending mirror.
 
 ## 15. References
 

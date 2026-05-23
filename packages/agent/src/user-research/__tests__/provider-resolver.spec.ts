@@ -3,6 +3,7 @@ import {
     isAuthOrConfigError,
     isTransientProviderError,
     resolveAiProviderForResearch,
+    resolveAiProvidersForResearch,
     resolveProviderChain,
     resolveSearchProviderIds,
 } from '../provider-resolver';
@@ -16,11 +17,12 @@ type FakePlugin = {
     id: string;
     defaultForCapabilities?: string[];
     capabilities?: string[];
+    settingsSchema?: RegisteredPlugin['plugin']['settingsSchema'];
 };
 
 function makeRegistered(p: FakePlugin): RegisteredPlugin {
     return {
-        plugin: { id: p.id } as RegisteredPlugin['plugin'],
+        plugin: { id: p.id, settingsSchema: p.settingsSchema } as RegisteredPlugin['plugin'],
         manifest: {
             defaultForCapabilities: p.defaultForCapabilities,
             capabilities: p.capabilities ?? ['ai-provider', 'search'],
@@ -29,13 +31,9 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
     } as RegisteredPlugin;
 }
 
-function makeRegistry(
-    plugins: FakePlugin[],
-    readyPlugins: FakePlugin[] = plugins,
-): PluginRegistryService {
+function makeRegistry(plugins: FakePlugin[]): PluginRegistryService {
     return {
         getEnabledPluginsScoped: jest.fn().mockResolvedValue(plugins.map(makeRegistered)),
-        getReady: jest.fn().mockReturnValue(readyPlugins.map(makeRegistered)),
     } as unknown as PluginRegistryService;
 }
 
@@ -87,17 +85,54 @@ describe('resolveSearchProviderIds', () => {
             { id: 'exa' },
         ]);
 
-        const prev = process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-        process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = '2';
-        try {
-            await expect(resolveSearchProviderIds(registry, 'u-1')).resolves.toEqual([
-                'tavily',
-                'brave',
-            ]);
-        } finally {
-            if (prev === undefined) delete process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX;
-            else process.env.USER_RESEARCH_PROVIDER_FALLBACK_MAX = prev;
-        }
+        await expect(resolveSearchProviderIds(registry, 'u-1')).resolves.toEqual([
+            'tavily',
+            'brave',
+        ]);
+    });
+
+    it('skips enabled search providers missing required settings', async () => {
+        const registry = makeRegistry([
+            {
+                id: 'tavily',
+                defaultForCapabilities: ['search'],
+                settingsSchema: {
+                    type: 'object',
+                    required: ['apiKey'],
+                    properties: { apiKey: { type: 'string' } },
+                } as RegisteredPlugin['plugin']['settingsSchema'],
+            },
+            { id: 'local-search' },
+        ]);
+        const settings = {
+            getSettings: jest.fn().mockResolvedValueOnce({ apiKey: '' }).mockResolvedValueOnce({}),
+        };
+
+        await expect(resolveSearchProviderIds(registry, 'u-1', settings as never)).resolves.toEqual(
+            ['local-search'],
+        );
+        expect(settings.getSettings).toHaveBeenCalledWith('tavily', {
+            userId: 'u-1',
+            includeSecrets: true,
+        });
+    });
+
+    it('allows settings satisfied by env/admin-only fields', async () => {
+        const registry = makeRegistry([
+            {
+                id: 'env-search',
+                settingsSchema: {
+                    type: 'object',
+                    required: ['apiKey'],
+                    properties: { apiKey: { type: 'string', 'x-envVar': 'SEARCH_API_KEY' } },
+                } as RegisteredPlugin['plugin']['settingsSchema'],
+            },
+        ]);
+        const settings = { getSettings: jest.fn().mockResolvedValue({}) };
+
+        await expect(resolveSearchProviderIds(registry, 'u-1', settings as never)).resolves.toEqual(
+            ['env-search'],
+        );
     });
 });
 
@@ -194,6 +229,36 @@ describe('resolveAiProviderForResearch', () => {
         expect(getProviderConfig).toHaveBeenCalledTimes(1);
     });
 
+    it('returns all usable provider configs for generation-time fallback', async () => {
+        const getProviderConfig = jest
+            .fn()
+            .mockResolvedValueOnce({
+                providerId: 'openai',
+                providerName: 'OpenAI',
+                baseUrl: 'https://api.openai.com/v1',
+                apiKey: 'sk-test',
+                defaultModel: 'gpt-4o',
+                routing: {},
+            })
+            .mockResolvedValueOnce({
+                providerId: 'anthropic',
+                providerName: 'Anthropic',
+                baseUrl: 'https://api.anthropic.com',
+                apiKey: 'sk-ant',
+                defaultModel: 'claude-haiku',
+                routing: {},
+            });
+
+        const result = await resolveAiProvidersForResearch(
+            makeAiFacade(getProviderConfig),
+            registry,
+            'u',
+        );
+
+        expect(result.map((provider) => provider.providerId)).toEqual(['openai', 'anthropic']);
+        expect(getProviderConfig).toHaveBeenCalledTimes(2);
+    });
+
     it('skips providers with no apiKey/baseUrl and tries the next one', async () => {
         const getProviderConfig = jest
             .fn()
@@ -223,28 +288,15 @@ describe('resolveAiProviderForResearch', () => {
         expect(getProviderConfig).toHaveBeenCalledTimes(2);
     });
 
-    it('falls back to globally ready providers when user-scoped providers are not configured', async () => {
-        const registry = makeRegistry(
-            [{ id: 'user-openai' }],
-            [{ id: 'user-openai' }, { id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-        );
-        const getProviderConfig = jest
-            .fn()
-            .mockResolvedValueOnce({
-                providerId: 'user-openai',
-                baseUrl: 'https://api.openai.com/v1',
-                apiKey: '',
-                defaultModel: 'gpt-4o',
-                routing: {},
-            })
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: 'sk-or-test',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            });
+    it('does not fall back to globally ready providers outside scoped enablement', async () => {
+        const registry = makeRegistry([{ id: 'user-openai' }]);
+        const getProviderConfig = jest.fn().mockResolvedValueOnce({
+            providerId: 'user-openai',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: '',
+            defaultModel: 'gpt-4o',
+            routing: {},
+        });
 
         const result = await resolveAiProviderForResearch(
             makeAiFacade(getProviderConfig),
@@ -252,59 +304,11 @@ describe('resolveAiProviderForResearch', () => {
             'u',
         );
 
-        expect(result).toMatchObject({
-            providerId: 'openrouter',
-            providerName: 'OpenRouter',
-            modelName: 'openai/gpt-5-mini',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
+        expect(result).toBeNull();
+        expect(getProviderConfig).toHaveBeenCalledTimes(1);
+        expect(getProviderConfig).toHaveBeenCalledWith({
             userId: 'u',
             providerOverride: 'user-openai',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
-            userId: undefined,
-            providerOverride: 'openrouter',
-        });
-    });
-
-    it('retries the same provider globally when user settings shadow an env/admin config', async () => {
-        const registry = makeRegistry(
-            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-            [{ id: 'openrouter', defaultForCapabilities: ['ai-provider'] }],
-        );
-        const getProviderConfig = jest
-            .fn()
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: '',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            })
-            .mockResolvedValueOnce({
-                providerId: 'openrouter',
-                providerName: 'OpenRouter',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                apiKey: 'sk-or-env',
-                defaultModel: 'openai/gpt-5-mini',
-                routing: {},
-            });
-
-        const result = await resolveAiProviderForResearch(
-            makeAiFacade(getProviderConfig),
-            registry,
-            'u',
-        );
-
-        expect(result?.providerId).toBe('openrouter');
-        expect(getProviderConfig).toHaveBeenNthCalledWith(1, {
-            userId: 'u',
-            providerOverride: 'openrouter',
-        });
-        expect(getProviderConfig).toHaveBeenNthCalledWith(2, {
-            userId: undefined,
-            providerOverride: 'openrouter',
         });
     });
 

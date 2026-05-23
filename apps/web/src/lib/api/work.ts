@@ -171,6 +171,14 @@ export interface Work {
     owner?: string;
     website?: string;
     organization: boolean;
+    /**
+     * EW-641 Phase 2/e row 37c — owning organization id (free-form UUID,
+     * not yet a FK; see the entity docstring for the deliberate design).
+     * Used by the KB tree-panel row 38b to fetch `inheritable` docs for
+     * the Work's org tier. `null`/`undefined` ⇒ no org-overlay docs to
+     * resolve.
+     */
+    organizationId?: string | null;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;

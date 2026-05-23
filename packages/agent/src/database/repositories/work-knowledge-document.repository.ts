@@ -61,6 +61,28 @@ export class WorkKnowledgeDocumentRepository {
         });
     }
 
+    /**
+     * EW-641 Phase 2/e row 38c-2 — look up an org-scope KB document by
+     * `(organizationId, path)`. Sibling to `findOrgById`; used by
+     * `KnowledgeBaseService.getInheritedDocument` so the workbench
+     * detail page can render an inherited doc body when the Work-scope
+     * `findByWorkOrPath` 404s.
+     *
+     * `workId IS NULL` is asserted at the DB level so a Work-scope row
+     * that happens to share the same path can NEVER leak via this
+     * lookup. The composite `(organizationId, path)` uniqueness
+     * (migration `1779971000000-CreateWorkKnowledgeDocuments`) means
+     * at most one row matches.
+     */
+    async findOrgByPath(
+        organizationId: string,
+        path: string,
+    ): Promise<WorkKnowledgeDocument | null> {
+        return this.repository.findOne({
+            where: { organizationId, path, workId: IsNull() },
+        });
+    }
+
     async list(
         opts: KbDocumentListOptions,
     ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
