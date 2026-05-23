@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Сповіщення про успадкований документ",
+                    "bannerTitle": "Успадковано з організації",
+                    "bannerDescription": "Цей документ належить вашій організації і тут доступний лише для читання. Перевизначте локально, щоб створити редагований форк у цьому Work.",
+                    "overrideCta": "Перевизначити локально",
+                    "overrideCtaPendingTooltip": "Доступно після випуску дії перевизначення в рядку 38d"
                 }
             }
         },

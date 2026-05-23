@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "継承ドキュメントの通知",
+                    "bannerTitle": "組織から継承",
+                    "bannerDescription": "このドキュメントは組織が所有しており、ここでは読み取り専用です。この Work に編集可能なコピーをフォークするには、ローカルでオーバーライドしてください。",
+                    "overrideCta": "ローカルでオーバーライド",
+                    "overrideCtaPendingTooltip": "行 38d でオーバーライドアクションが出荷されると利用可能になります"
                 }
             }
         },

@@ -2807,6 +2807,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Aviso de documento heredado",
+                    "bannerTitle": "Heredado de la organización",
+                    "bannerDescription": "Este documento es propiedad de tu organización y es de solo lectura aquí. Sobrescribe localmente para bifurcar una copia editable en este Trabajo.",
+                    "overrideCta": "Sobrescribir localmente",
+                    "overrideCtaPendingTooltip": "Disponible cuando se lance la acción de sobrescritura en la fila 38d"
                 }
             }
         },

@@ -6,6 +6,24 @@ import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbDocumentViewProps {
     doc: KbDocumentBodyDto;
+    /**
+     * EW-641 Phase 2/e row 38c — render the "Inherited from
+     * organization" banner above the doc header. When `true`, the
+     * component is the read-only org-overlay viewer: editor surface
+     * stays mounted as `KbDocumentView` (already non-editable), and
+     * the banner explains the tier + offers an "Override locally"
+     * placeholder CTA.
+     *
+     * Defaults to `false` so every existing call site keeps the
+     * legacy read-only behaviour (full-lock docs, etc.).
+     *
+     * Page-level wiring (resolve the inherited doc body when the
+     * Work-scope `getDocument` 404s) lives in a follow-up row; the
+     * real "Override locally" server action lands in row 38d. This
+     * row ships the surface only so subsequent rows can opt in
+     * without touching this component again.
+     */
+    isInherited?: boolean;
 }
 
 /**
@@ -18,19 +36,29 @@ interface KbDocumentViewProps {
  * pill) arrives in row 5 + 6 — this PR ships the read-only view so
  * deep-linking from the tree works the moment the route lands.
  *
+ * EW-641 Phase 2/e row 38c — when `isInherited` is true, also renders
+ * an "Inherited from organization" banner above the header with an
+ * "Override locally" placeholder CTA. The component itself stays
+ * read-only either way (the editor swap happens at the parent route
+ * level by selecting `KbDocumentView` vs `KbEditor`).
+ *
  * Selectors locked for the upcoming Playwright e2e suite (A12-A17):
  *  - `data-testid="kb-editor"` (root, matches the placeholder slot
  *    in `KbShell` so tests that pre-date this PR keep working)
  *  - `data-testid="kb-document-title"`
  *  - `data-testid="kb-document-meta"` (chip row)
  *  - `data-testid="kb-document-body"` (Markdown render wrapper)
+ *  - `data-testid="kb-inherited-banner"` (row 38c — only when
+ *    `isInherited` is true; row 38d adds the working override CTA
+ *    inside this banner)
  */
-export async function KbDocumentView({ doc }: KbDocumentViewProps) {
+export async function KbDocumentView({ doc, isInherited = false }: KbDocumentViewProps) {
     const t = await getTranslations('dashboard.workDetail.kb');
 
     return (
         <section
             data-testid="kb-editor"
+            data-inherited={isInherited ? 'true' : undefined}
             aria-label={t('panes.editor.title')}
             className={cn(
                 'rounded-lg border border-border dark:border-border-dark',
@@ -38,6 +66,61 @@ export async function KbDocumentView({ doc }: KbDocumentViewProps) {
                 'p-4 flex flex-col gap-3 min-h-[24rem]',
             )}
         >
+            {isInherited ? (
+                <aside
+                    data-testid="kb-inherited-banner"
+                    role="note"
+                    aria-label={t('inherited.bannerLabel')}
+                    className={cn(
+                        'rounded-md border border-amber-500/30 dark:border-amber-400/30',
+                        'bg-amber-500/10 dark:bg-amber-400/10',
+                        'p-3 flex flex-wrap items-center gap-2 text-sm',
+                        'text-amber-900 dark:text-amber-100',
+                    )}
+                >
+                    <span
+                        aria-hidden="true"
+                        className="text-base leading-none"
+                        data-testid="kb-inherited-banner-icon"
+                    >
+                        🔒
+                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                        <span data-testid="kb-inherited-banner-title" className="font-medium">
+                            {t('inherited.bannerTitle')}
+                        </span>
+                        <span
+                            data-testid="kb-inherited-banner-description"
+                            className="text-xs text-amber-900/80 dark:text-amber-100/80"
+                        >
+                            {t('inherited.bannerDescription')}
+                        </span>
+                    </div>
+                    {/*
+                     * EW-641 Phase 2/e row 38c — "Override locally" CTA
+                     * placeholder. Renders as a disabled button this
+                     * row; row 38d wires the real server action (clone
+                     * the inherited body into a Work-scope doc + redirect).
+                     * The selector is locked NOW so the row 38e
+                     * Playwright e2e can already target it.
+                     */}
+                    <button
+                        type="button"
+                        disabled
+                        data-testid="kb-inherited-override-cta"
+                        className={cn(
+                            'ml-auto rounded-md px-3 py-1 text-xs font-medium',
+                            'bg-amber-500/20 dark:bg-amber-400/20',
+                            'text-amber-900 dark:text-amber-100',
+                            'cursor-not-allowed opacity-60',
+                            'border border-amber-500/40 dark:border-amber-400/40',
+                        )}
+                        title={t('inherited.overrideCtaPendingTooltip')}
+                    >
+                        {t('inherited.overrideCta')}
+                    </button>
+                </aside>
+            ) : null}
             <header className="flex flex-col gap-2">
                 <h2
                     data-testid="kb-document-title"

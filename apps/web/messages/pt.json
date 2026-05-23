@@ -2590,6 +2590,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "Aviso de documento herdado",
+                    "bannerTitle": "Herdado da organização",
+                    "bannerDescription": "Este documento pertence à sua organização e é somente leitura aqui. Substitua localmente para criar uma cópia editável neste Work.",
+                    "overrideCta": "Substituir localmente",
+                    "overrideCtaPendingTooltip": "Disponível quando a ação de substituição for lançada na linha 38d"
                 }
             }
         },

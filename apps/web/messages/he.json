@@ -2807,6 +2807,13 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "inherited": {
+                    "bannerLabel": "הודעת מסמך בירושה",
+                    "bannerTitle": "בירושה מהארגון",
+                    "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
+                    "overrideCta": "עקוף מקומית",
+                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d"
                 }
             }
         },
