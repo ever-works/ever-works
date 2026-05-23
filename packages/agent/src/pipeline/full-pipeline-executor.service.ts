@@ -14,12 +14,14 @@ import type {
 } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 import type { KbContextBundleData } from '@ever-works/contracts';
+import type { IKbToolsFacade } from '@ever-works/plugin';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { validatePipelineResult } from './validators';
 import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 import { KnowledgeBaseService } from '../services/knowledge-base.service';
+import { KbToolsFacadeAdapter } from '../services/kb-tools-facade.adapter';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -41,6 +43,11 @@ export class FullPipelineExecutorService {
         // KB wiring still construct (and `execContext.kbContext` stays
         // undefined for those callers).
         @Optional() private readonly knowledgeBaseService?: KnowledgeBaseService,
+        // EW-641 Phase 2/d row 36c — LLM-callable KB tools facade,
+        // threaded via `execContext.kbTools` for self-managed pipeline
+        // plugins (agent-pipeline + family). Same optionality contract
+        // as `knowledgeBaseService`.
+        @Optional() private readonly kbToolsFacade?: KbToolsFacadeAdapter,
     ) {}
 
     /**
@@ -63,6 +70,17 @@ export class FullPipelineExecutorService {
             );
             return undefined;
         }
+    }
+
+    /**
+     * EW-641 Phase 2/d row 36c — resolve the LLM-callable KB tools
+     * facade for this pipeline run. Mirrors the step-executor helper
+     * of the same name (synchronous-friendly; the adapter is a
+     * singleton @Injectable).
+     */
+    private resolveKbToolsFacadeSafe(work: WorkReference): IKbToolsFacade | undefined {
+        if (!this.kbToolsFacade || !work.id) return undefined;
+        return this.kbToolsFacade;
     }
 
     /**
@@ -106,10 +124,11 @@ export class FullPipelineExecutorService {
             );
         }
 
-        // EW-641 Phase 2/b row 32c — resolve KB bundle once before the
-        // plugin executes; the bundle rides on the same execContext that
-        // facades use.
+        // EW-641 Phase 2/b row 32c + 2/d row 36c — resolve KB bundle +
+        // tools facade once before the plugin executes; both ride on
+        // the same execContext that facades use.
         const kbContext = await this.resolveKbContextSafe(work, request);
+        const kbTools = this.resolveKbToolsFacadeSafe(work);
 
         try {
             // Create execContext for the plugin to use facades
@@ -119,6 +138,7 @@ export class FullPipelineExecutorService {
                 request.aiModel,
                 options?.signal,
                 kbContext,
+                kbTools,
             );
 
             // Delegate to the plugin's execute method with execContext

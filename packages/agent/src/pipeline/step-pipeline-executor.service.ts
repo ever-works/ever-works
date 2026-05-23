@@ -29,6 +29,7 @@ import {
     createEmptyPipelineOutputs,
     isPipelineModifierPlugin,
 } from '@ever-works/plugin';
+import type { IKbToolsFacade } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 import type { KbContextBundleData } from '@ever-works/contracts';
 import { PipelineBuilderService } from './pipeline-builder.service';
@@ -37,6 +38,7 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
 import { KnowledgeBaseService } from '../services/knowledge-base.service';
+import { KbToolsFacadeAdapter } from '../services/kb-tools-facade.adapter';
 
 export interface CheckpointData {
     stepIndex: number;
@@ -108,6 +110,15 @@ export class StepPipelineExecutorService {
         // isolated unit tests, legacy bootstraps) keep constructing
         // identically — `execContext.kbContext` stays `undefined` then.
         @Optional() private readonly knowledgeBaseService?: KnowledgeBaseService,
+        // EW-641 Phase 2/d row 36c — `KbToolsFacadeAdapter` implements
+        // the LLM-callable `IKbToolsFacade` by delegating to
+        // `KbAgentToolsService`. We thread it via
+        // `execContext.kbTools` so agent-pipeline (and any other
+        // tool-using pipeline) can register the 5 `kb_*` tools via
+        // row 36b's `createKbTools()`. Same `@Optional()` story as
+        // `knowledgeBaseService` — deployments without the KB module
+        // keep constructing identically.
+        @Optional() private readonly kbToolsFacade?: KbToolsFacadeAdapter,
     ) {}
 
     /**
@@ -137,6 +148,21 @@ export class StepPipelineExecutorService {
             );
             return undefined;
         }
+    }
+
+    /**
+     * EW-641 Phase 2/d row 36c — resolve the LLM-callable KB tools
+     * facade for this pipeline run, returning `undefined` when the
+     * adapter isn't wired (no KB module) or `work.id` is empty.
+     *
+     * Synchronous-friendly: the adapter is a singleton @Injectable, so
+     * "resolving" it is a no-op DI lookup. Wrapped in a method to mirror
+     * `resolveKbContextSafe`'s shape and to leave room for future
+     * permission gating (e.g. per-Work feature flags).
+     */
+    private resolveKbToolsFacadeSafe(work: WorkReference): IKbToolsFacade | undefined {
+        if (!this.kbToolsFacade || !work.id) return undefined;
+        return this.kbToolsFacade;
     }
 
     async execute(
@@ -172,11 +198,20 @@ export class StepPipelineExecutorService {
             );
         }
 
-        // EW-641 Phase 2/b row 32c — resolve KB bundle once per run.
+        // EW-641 Phase 2/b row 32c + 2/d row 36c — resolve KB bundle +
+        // tools facade once per run; both fan out to every step.
         const kbContext = await this.resolveKbContextSafe(work, request);
+        const kbTools = this.resolveKbToolsFacadeSafe(work);
 
         try {
-            return await this.executePipeline(plugin, context, options, onProgress, kbContext);
+            return await this.executePipeline(
+                plugin,
+                context,
+                options,
+                onProgress,
+                kbContext,
+                kbTools,
+            );
         } finally {
             removeInterceptor?.();
         }
@@ -188,6 +223,7 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
         kbContext?: KbContextBundleData,
+        kbTools?: IKbToolsFacade,
     ): Promise<PipelineResult> {
         const startTime = Date.now();
         const work = context.work;
@@ -245,6 +281,7 @@ export class StepPipelineExecutorService {
                                 options,
                                 onProgress,
                                 kbContext,
+                                kbTools,
                             ),
                         ),
                     );
@@ -263,6 +300,7 @@ export class StepPipelineExecutorService {
                                 options,
                                 onProgress,
                                 kbContext,
+                                kbTools,
                             ),
                     );
                     await this.runWithConcurrencyLimit(stepThunks, concurrency);
@@ -328,6 +366,7 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
         kbContext?: KbContextBundleData,
+        kbTools?: IKbToolsFacade,
     ): Promise<void> {
         const onLogEntry = options?.onLogEntry;
 
@@ -399,7 +438,7 @@ export class StepPipelineExecutorService {
                 throw new Error(`No executor found for step "${step.id}"`);
             }
 
-            await this.executeStep(step, executor, plugin, context, options, kbContext);
+            await this.executeStep(step, executor, plugin, context, options, kbContext, kbTools);
 
             const durationMs = Date.now() - stepStartTime;
             const metrics = this.createStepMetrics(step, stepStartTime, true);
@@ -456,11 +495,13 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        // EW-641 Phase 2/b row 32c — also resolve KB bundle on the
-        // resume-from-checkpoint path so a resumed pipeline gets the
-        // same KB grounding as a fresh run.
+        // EW-641 Phase 2/b row 32c + 2/d row 36c — also resolve KB
+        // bundle + tools facade on the resume-from-checkpoint path
+        // so a resumed pipeline gets the same KB grounding + tools
+        // as a fresh run.
         const kbContext = await this.resolveKbContextSafe(context.work, context.request);
-        return this.executePipeline(plugin, context, options, onProgress, kbContext);
+        const kbTools = this.resolveKbToolsFacadeSafe(context.work);
+        return this.executePipeline(plugin, context, options, onProgress, kbContext, kbTools);
     }
 
     async resumeFromCheckpoint(
@@ -516,6 +557,7 @@ export class StepPipelineExecutorService {
         context: IPipelineContext,
         options?: PipelineExecutionOptions,
         kbContext?: KbContextBundleData,
+        kbTools?: IKbToolsFacade,
     ): Promise<void> {
         const execContext = this.facadeService.createStepExecutionContext(
             context.work,
@@ -523,6 +565,7 @@ export class StepPipelineExecutorService {
             context.request.aiModel,
             options?.signal,
             kbContext,
+            kbTools,
         );
 
         if (executor.type === 'builtin') {

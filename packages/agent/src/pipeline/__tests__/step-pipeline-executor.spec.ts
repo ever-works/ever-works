@@ -538,11 +538,13 @@ describe('StepPipelineExecutorService', () => {
             await service.execute(standardPlugin, mockWork, requestWithProviders, mockExisting);
 
             // Verify facade service was called with provider overrides.
-            // 5th arg is `kbContext` (EW-641 row 32c) — undefined when
-            // KnowledgeBaseService is not injected.
+            // 5th arg is `kbContext` (EW-641 row 32c), 6th is `kbTools`
+            // (EW-641 row 36c) — both undefined when neither
+            // KnowledgeBaseService nor KbToolsFacadeAdapter is injected.
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
                 requestWithProviders.providers,
+                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -555,6 +557,7 @@ describe('StepPipelineExecutorService', () => {
             // Verify facade service was called without provider overrides
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
+                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -575,6 +578,7 @@ describe('StepPipelineExecutorService', () => {
                 mockWork,
                 undefined,
                 'openai/gpt-4.1',
+                undefined,
                 undefined,
                 undefined,
             );
@@ -601,13 +605,15 @@ describe('StepPipelineExecutorService', () => {
                 query: 'voice tone',
             });
             // Bundle reaches the facade as the 5th positional arg of every
-            // per-step createStepExecutionContext call.
+            // per-step createStepExecutionContext call. The 6th arg
+            // (kbTools, row 36c) stays undefined — no adapter wired.
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
                 undefined,
                 undefined,
                 undefined,
                 bundle,
+                undefined,
             );
         });
 
@@ -625,6 +631,7 @@ describe('StepPipelineExecutorService', () => {
             // 5th arg stays undefined even though resolveContext rejected.
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockWork,
+                undefined,
                 undefined,
                 undefined,
                 undefined,

@@ -31,6 +31,7 @@ import type {
     DataSourceFacadeResult,
     EnabledDataSource,
     FacadeOptions,
+    IKbToolsFacade,
 } from '@ever-works/plugin';
 import type { KbContextBundleData } from '@ever-works/contracts';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -92,6 +93,7 @@ export class PipelineFacadeService {
         aiModelOverride?: string,
         signal?: AbortSignal,
         kbContext?: KbContextBundleData,
+        kbTools?: IKbToolsFacade,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
@@ -131,6 +133,7 @@ export class PipelineFacadeService {
             user: work.user,
             signal,
             kbContext,
+            kbTools,
         };
     }
 

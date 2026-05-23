@@ -1,29 +1,27 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import type { PluginLogger } from '@ever-works/plugin';
+import type {
+	IKbToolsFacade,
+	IKbToolsFacadeSearchInput,
+	IKbToolsFacadeWriteInput,
+	KbToolFacadeResult,
+	PluginLogger
+} from '@ever-works/plugin';
 
 /**
  * EW-641 Phase 2/d row 36b — agent-pipeline plugin-side wrappers for
  * the LLM-callable KB tools (`kb_search` / `kb_read` / `kb_write` /
  * `kb_lock` / `kb_unlock`). Each wrapper is a `tool({...})` definition
  * (Vercel AI SDK) with a zod input schema and an `execute` callback
- * that delegates to the row 36 `KbAgentToolsService`.
+ * that delegates to row 36's `KbAgentToolsService` via the row 36c
+ * `IKbToolsFacade` adapter.
  *
  * The agent-pipeline plugin lives in `packages/plugins/` and runs
  * outside the NestJS container. It can't directly inject
- * `KbAgentToolsService` — instead, the wiring layer (row 36c, future
- * PR) supplies an `IKbToolsFacade` adapter through the existing
- * `ParentToolContext.facades` mechanism. The interface lives here
- * (local-first) so this PR doesn't have to bump `@ever-works/plugin`'s
- * public surface; row 36c can promote it if cross-package reuse
- * shows up.
- *
- * **Scope note**: this row only ADDS the tool builders and a
- * `createKbTools()` aggregator. It does NOT wire them into
- * `createParentTools()` — that lives in row 36c so the agent-pipeline
- * tool-set roster change is reviewed separately from the tool
- * definitions themselves. Importing this module is therefore a no-op
- * for the existing pipeline until 36c flips the switch.
+ * `KbAgentToolsService` — instead, the row 36c wiring layer supplies
+ * an `IKbToolsFacade` adapter (from `@ever-works/plugin`) through the
+ * `ParentToolContext.kbTools` field. This module reads it and builds
+ * the 5 tool definitions.
  *
  * Tool inputs accept string-union shapes for class / status / lockMode
  * to keep the LLM-facing schema simple. The facade implementation
@@ -31,68 +29,11 @@ import type { PluginLogger } from '@ever-works/plugin';
  * agent enums at the boundary per cumulative gotcha #5.
  */
 
-// ─── Facade contract (LLM-callable surface) ────────────────────────────
-
-/** Shapes returned by every KB tool. Mirrors `KbToolResult<T>` from
- *  `@ever-works/agent/services` so the LLM sees a uniform `{ok, ...}`
- *  envelope regardless of which tool it called. */
-export type KbToolResult<T> = { ok: true; data: T } | { ok: false; error: string };
-
-/** Tool input contracts — match `KbSearchToolInput` / `KbWriteToolInput`
- *  on the agent side. Kept here as TS interfaces (not zod schemas) so
- *  this file can be consumed from non-zod contexts too. */
-export interface IKbSearchInput {
-	readonly q?: string;
-	readonly class?: string;
-	readonly status?: string;
-	readonly limit?: number;
-}
-
-export interface IKbWriteInput {
-	readonly path: string;
-	readonly title: string;
-	readonly class: string;
-	readonly body: string;
-	readonly description?: string | null;
-	readonly tags?: string[];
-	readonly categories?: string[];
-	readonly language?: string;
-	readonly generatedByAgentRunId?: string | null;
-}
-
-/**
- * Facade interface the wiring layer (row 36c) will implement against
- * NestJS-side `KbAgentToolsService`. Keeping the contract here so the
- * agent-pipeline plugin doesn't take a runtime dep on the agent
- * package (it consumes only the interface shape).
- *
- * Each method returns a `KbToolResult<T>` so the tool's `execute`
- * can pass-through to the LLM as-is.
- */
-export interface IKbToolsFacade {
-	kbSearch(
-		workId: string,
-		userId: string,
-		input: IKbSearchInput
-	): Promise<KbToolResult<{ items: ReadonlyArray<unknown>; total: number }>>;
-
-	kbRead(workId: string, userId: string, idOrPath: string): Promise<KbToolResult<unknown>>;
-
-	kbWrite(
-		workId: string,
-		userId: string,
-		input: IKbWriteInput
-	): Promise<KbToolResult<{ document: unknown; action: 'created' | 'updated' }>>;
-
-	kbLock(
-		workId: string,
-		userId: string,
-		docId: string,
-		mode: 'full' | 'additions-only'
-	): Promise<KbToolResult<unknown>>;
-
-	kbUnlock(workId: string, userId: string, docId: string): Promise<KbToolResult<unknown>>;
-}
+// Re-exports for callers that imported these names from row 36b's
+// pre-promotion local definitions. The canonical home is now
+// `@ever-works/plugin`.
+export type { IKbToolsFacade, IKbToolsFacadeSearchInput as IKbSearchInput, IKbToolsFacadeWriteInput as IKbWriteInput };
+export type KbToolResult<T> = KbToolFacadeResult<T>;
 
 // ─── Tool-builder context ───────────────────────────────────────────────
 

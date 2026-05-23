@@ -16,3 +16,4 @@ export * from './git-facade.interface.js';
 export * from './oauth-facade.interface.js';
 export * from './deploy-facade.interface.js';
 export * from './prompt-facade.interface.js';
+export * from './kb-tools-facade.interface.js';
