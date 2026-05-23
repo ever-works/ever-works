@@ -2784,6 +2784,12 @@
                         "agents": "Agents"
                     }
                 },
+                "citation": {
+                    "loading": "Loading citation…",
+                    "missing": "Citation \"{raw}\" not found in this knowledge base.",
+                    "error": "Failed to resolve citation ({error}).",
+                    "open": "Open document"
+                },
                 "history": {
                     "title": "Document history",
                     "dialogLabel": "Knowledge Base document history",
