@@ -90,9 +90,10 @@ export const kbAPI = {
      * `<KbDocumentView isInherited />` for the render path.
      *
      * Path segments are URL-encoded individually so embedded slashes
-     * survive — the wildcard `:idOrPath(*)` route param on the
-     * controller side preserves the slash separator. The `orgId` is
-     * sent as a query param (mirrors `listInheritableDocuments`).
+     * survive — the wildcard `*idOrPath` route param on the
+     * controller side (path-to-regexp@8 catch-all syntax) preserves
+     * the slash separator. The `orgId` is sent as a query param
+     * (mirrors `listInheritableDocuments`).
      */
     getInheritedDocument: async (
         workId: string,
