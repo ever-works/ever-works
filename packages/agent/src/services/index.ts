@@ -34,6 +34,7 @@ export * from './kb-chunker';
 export * from './kb-rrf';
 export * from './kb-prompt-formatter';
 export * from './kb-context-bundle';
+export * from './kb-mention-parser';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';
