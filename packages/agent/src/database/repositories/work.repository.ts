@@ -451,6 +451,40 @@ export class WorkRepository {
         return await this.repository.find({ where: { userId } });
     }
 
+    /**
+     * EW-641 Phase 2/e row 37d — list every Work id under an organization.
+     *
+     * Used by `KnowledgeBaseService.enqueueOrgOverlayFanout` to resolve
+     * the target Work id list BEFORE dispatching the
+     * `kb-org-overlay-fanout` Trigger.dev task — the row-37 task body is
+     * pure-iteration and expects pre-resolved ids in its payload.
+     *
+     * Returns raw id strings only — the task body iterates ids and calls
+     * `KnowledgeBaseGitMirrorService.materializeOrgDocument(workId, ...)`,
+     * which fetches its own Work row. Hydrating full entities + the
+     * `user` relation here would be wasted I/O for an enqueue payload.
+     *
+     * Ordered by `id ASC` for deterministic enqueue payloads (helps
+     * with cross-run diffing in Trigger.dev tags + payload snapshots).
+     * Returns `[]` when `organizationId` is falsy so callers don't
+     * need a separate guard.
+     *
+     * `organizationId` is a free-form UUID on `Work` (column added in
+     * row 37c) and is NOT yet an FK — see the entity docstring for the
+     * deliberate design choice.
+     */
+    async findIdsByOrganization(organizationId: string): Promise<string[]> {
+        if (!organizationId) {
+            return [];
+        }
+        const rows = await this.repository.find({
+            where: { organizationId },
+            select: { id: true } as never,
+            order: { id: 'ASC' },
+        });
+        return rows.map((w) => w.id);
+    }
+
     async updateLastPullRequest(
         id: string,
         lastPullRequest: Work['lastPullRequest'],

@@ -1117,4 +1117,44 @@ describe('WorkRepository', () => {
             expect(partial.sourceValidationNextRunAt).toBe(nextRunAt);
         });
     });
+
+    // EW-641 Phase 2/e row 37d — `findIdsByOrganization` resolves
+    // target Works for the KB org-overlay fanout enqueue.
+    describe('findIdsByOrganization', () => {
+        it('returns empty array (no DB hit) when organizationId is falsy', async () => {
+            const result = await service.findIdsByOrganization('');
+            expect(result).toEqual([]);
+            expect(repository.find).not.toHaveBeenCalled();
+        });
+
+        it('queries by organizationId with id-only projection ordered ASC', async () => {
+            repository.find.mockResolvedValueOnce([
+                { id: 'w-a' },
+                { id: 'w-b' },
+                { id: 'w-c' },
+            ] as Work[]);
+
+            const result = await service.findIdsByOrganization('org-1');
+
+            expect(result).toEqual(['w-a', 'w-b', 'w-c']);
+            expect(repository.find).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { organizationId: 'org-1' },
+                    order: { id: 'ASC' },
+                }),
+            );
+            // id-only projection — avoids hydrating user / every column for
+            // an enqueue payload that only needs ids.
+            const call = repository.find.mock.calls[0][0] as {
+                select?: { id?: boolean };
+            };
+            expect(call.select).toEqual({ id: true });
+        });
+
+        it('returns [] when the org has no Works', async () => {
+            repository.find.mockResolvedValueOnce([]);
+            const result = await service.findIdsByOrganization('org-empty');
+            expect(result).toEqual([]);
+        });
+    });
 });

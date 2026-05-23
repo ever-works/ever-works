@@ -38,6 +38,8 @@ import {
 } from '../entities/kb-types';
 import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '../tasks';
 import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '../tasks';
+import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } from '../tasks';
+import { WorkRepository } from '../database/repositories/work.repository';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -168,6 +170,24 @@ export class KnowledgeBaseService {
         // lexical-only ranking.
         @Optional() private readonly chunkRepository?: WorkKnowledgeChunkRepository,
         @Optional() private readonly aiFacade?: AiFacadeService,
+        // EW-641 Phase 2/e row 37d — org-overlay fanout dispatcher.
+        // Optional so isolated unit tests + deployments without
+        // Trigger.dev wired still construct; when absent, org docs
+        // persist in the DB but per-Work `.org/` materialization
+        // defers to the Phase 3 reconciliation job (spec §9.6).
+        // Fire-and-forget shape mirrors `mirrorDispatcher` /
+        // `embedDispatcher` — failures are logged but never bubble
+        // to the user-facing API write.
+        @Optional()
+        @Inject(KB_ORG_OVERLAY_FANOUT_DISPATCHER)
+        private readonly orgOverlayDispatcher?: KbOrgOverlayFanoutDispatcher,
+        // EW-641 Phase 2/e row 37d — used by `enqueueOrgOverlayFanout`
+        // to resolve the target Work id list for an org via the
+        // row-37c `organizationId` column. Optional so existing
+        // isolated unit tests (which don't provide WorkRepository)
+        // keep constructing — when absent, the enqueue degrades to
+        // a no-op log and defers to Phase 3 reconciliation.
+        @Optional() private readonly workRepository?: WorkRepository,
     ) {}
 
     /**
@@ -228,6 +248,66 @@ export class KnowledgeBaseService {
         } catch (error) {
             this.logger.warn(
                 `Failed to enqueue KB embed for doc ${documentId} (work=${workId}): ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37d — enqueue a Trigger.dev
+     * `kb-org-overlay-fanout` run for one org-scope document mutation
+     * (upsert or delete).
+     *
+     * Resolves the target Work id list via
+     * `WorkRepository.findIdsByOrganization(orgId)` BEFORE dispatching
+     * so the task body stays pure-iteration with no DB pagination
+     * concerns (per the row-37 design). The dispatcher AND the
+     * repository are both `@Optional()` — when either is missing
+     * the call is a no-op and the Phase 3 reconciliation job
+     * (spec §9.6) eventually catches per-Work drift.
+     *
+     * Fire-and-forget: failures are logged but never bubble to the
+     * user-facing API caller, matching `enqueueMirror` / `enqueueEmbed`.
+     *
+     * Returns early when the org has zero Works so the caller doesn't
+     * pay for an empty dispatch (and the Trigger.dev tags stay clean
+     * — `targets:0` would be a misleading signal in production telemetry).
+     *
+     * NOT called from the per-Work `createDocument` / `updateDocument`
+     * / `deleteDocument` paths — those only touch `workId !== null`
+     * rows and use the existing `enqueueMirror` per-Work fanout. The
+     * single producer on develop today is `createOrgDocument`;
+     * `updateOrgDocument` / `deleteOrgDocument` are tracked as
+     * follow-up rows (37e) since those service methods don't yet exist.
+     */
+    private async enqueueOrgOverlayFanout(
+        organizationId: string,
+        documentId: string,
+        operation: 'upsert' | 'delete',
+        docPath: string,
+        docClass: string,
+    ): Promise<void> {
+        if (!this.orgOverlayDispatcher || !this.workRepository) {
+            return;
+        }
+        try {
+            const workIds = await this.workRepository.findIdsByOrganization(organizationId);
+            if (workIds.length === 0) {
+                this.logger.debug(
+                    `Skipping KB org-overlay fanout for ${operation} ${docPath} (org=${organizationId}): no Works in org`,
+                );
+                return;
+            }
+            await this.orgOverlayDispatcher.dispatchKbOrgOverlayFanout({
+                organizationId,
+                documentId,
+                workIds,
+                operation,
+                path: docPath,
+                class: docClass,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enqueue KB org-overlay fanout for ${operation} ${docPath} (org=${organizationId}): ${(error as Error).message}`,
             );
         }
     }
@@ -866,6 +946,20 @@ export class KnowledgeBaseService {
             updatedById: userId,
             metadata: { body } as Record<string, unknown>,
         });
+
+        // EW-641 Phase 2/e row 37d — fan the org overlay out to every
+        // Work in the org so `.content/kb/.org/<doc.path>` is
+        // materialized in each Work's data repo. Per-Work `enqueueMirror`
+        // is NOT used here — that path writes to `.content/kb/<path>`
+        // (work-owned), which would collide with overlay precedence
+        // semantics in spec §7.6.
+        await this.enqueueOrgOverlayFanout(
+            organizationId,
+            doc.id,
+            'upsert',
+            doc.path,
+            doc.kbDocumentClass,
+        );
 
         return this.toBodyDto(doc);
     }
