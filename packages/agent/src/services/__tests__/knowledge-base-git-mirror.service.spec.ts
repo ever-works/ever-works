@@ -316,6 +316,157 @@ describe('KnowledgeBaseGitMirrorService', () => {
         });
     });
 
+    // EW-641 Phase 2/e row 37 — org overlay materialization +
+    // removal. Same on-disk shape as `materializeDocument` /
+    // `removeDocument`, but rooted under `.content/kb/.org/` so
+    // Work owners can tell inherited docs apart from local ones.
+    describe('materializeOrgDocument (row 37)', () => {
+        const ORG_ID = '00000000-0000-0000-0000-000000000003';
+        const ORG_DOC_ID = '00000000-0000-0000-0000-000000000020';
+
+        function buildOrgDoc(overrides: Partial<WorkKnowledgeDocument> = {}) {
+            return buildDoc({
+                id: ORG_DOC_ID,
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'brand/voice.md',
+                slug: 'voice',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                metadata: { body: '# Org brand voice\n\nUse the org-wide tone.' },
+                ...overrides,
+            });
+        }
+
+        beforeEach(() => {
+            documentRepository.findOrgById = jest.fn().mockResolvedValue(buildOrgDoc());
+        });
+
+        it('writes sidecar + body under .content/kb/.org/<class>/<slug>.{yml,md}', async () => {
+            await service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID);
+
+            expect(documentRepository.findOrgById).toHaveBeenCalledWith(ORG_ID, ORG_DOC_ID);
+
+            const bodyPath = path.join(tempDir, '.content/kb/.org/brand/voice.md');
+            const sidecarPath = path.join(tempDir, '.content/kb/.org/brand/voice.yml');
+
+            const body = await fs.readFile(bodyPath, 'utf-8');
+            expect(body).toContain('Org brand voice');
+
+            const sidecarRaw = await fs.readFile(sidecarPath, 'utf-8');
+            const sidecar = yaml.parse(sidecarRaw);
+            // Sidecar carries the org provenance — Work owners can
+            // tell from the filesystem alone that this is inherited.
+            expect(sidecar.source).toBe('org-overlay');
+            expect(sidecar.organizationId).toBe(ORG_ID);
+
+            expect(gitFacade.commit).toHaveBeenCalledWith(
+                'github',
+                tempDir,
+                expect.stringContaining('[kb] upsert org overlay brand/voice'),
+                expect.any(Object),
+            );
+        });
+
+        it('throws NotFoundException when the org doc no longer exists', async () => {
+            documentRepository.findOrgById = jest.fn().mockResolvedValue(null);
+
+            await expect(
+                service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+
+            expect(gitFacade.commit).not.toHaveBeenCalled();
+            expect(gitFacade.push).not.toHaveBeenCalled();
+        });
+
+        it('rejects org docs with traversal paths before touching the repo', async () => {
+            documentRepository.findOrgById = jest
+                .fn()
+                .mockResolvedValue(buildOrgDoc({ path: '../../.git/config' }));
+
+            await expect(
+                service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            // Path validation runs after the clone; the commit call is
+            // what's gated. Defense-in-depth — the org doc row itself
+            // should never persist a bad path (KnowledgeBaseService
+            // validates on write), but a manually-inserted row would
+            // be rejected here.
+            expect(gitFacade.commit).not.toHaveBeenCalled();
+        });
+
+        it('does NOT touch the source doc lastCommitSha (one row → many commits)', async () => {
+            documentRepository.update.mockClear();
+            await service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID);
+            // Per-Work materializations would race for the field if
+            // we wrote it back — org rows intentionally skip it.
+            expect(documentRepository.update).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('removeOrgDocument (row 37)', () => {
+        it('removes both .org/ sidecar + body and commits with the org-overlay marker', async () => {
+            await fs.mkdir(path.join(tempDir, '.content/kb/.org/brand'), { recursive: true });
+            await fs.writeFile(
+                path.join(tempDir, '.content/kb/.org/brand/voice.yml'),
+                'placeholder',
+                'utf-8',
+            );
+            await fs.writeFile(
+                path.join(tempDir, '.content/kb/.org/brand/voice.md'),
+                'placeholder',
+                'utf-8',
+            );
+
+            await service.removeOrgDocument(WORK_ID, {
+                documentId: '00000000-0000-0000-0000-000000000020',
+                path: 'brand/voice.md',
+                class: 'brand',
+            });
+
+            await expect(
+                fs.access(path.join(tempDir, '.content/kb/.org/brand/voice.yml')),
+            ).rejects.toBeDefined();
+            await expect(
+                fs.access(path.join(tempDir, '.content/kb/.org/brand/voice.md')),
+            ).rejects.toBeDefined();
+
+            expect(gitFacade.commit).toHaveBeenCalledWith(
+                'github',
+                tempDir,
+                expect.stringContaining('[kb] delete org overlay brand/voice'),
+                expect.any(Object),
+            );
+        });
+
+        it('is idempotent when the overlay files are already gone', async () => {
+            await service.removeOrgDocument(WORK_ID, {
+                documentId: '00000000-0000-0000-0000-000000000020',
+                path: 'brand/missing.md',
+                class: 'brand',
+            });
+
+            expect(gitFacade.commit).toHaveBeenCalledWith(
+                'github',
+                tempDir,
+                expect.stringContaining('already absent'),
+                expect.any(Object),
+            );
+        });
+
+        it('rejects traversal paths before unlinking anything', async () => {
+            await expect(
+                service.removeOrgDocument(WORK_ID, {
+                    documentId: '00000000-0000-0000-0000-000000000020',
+                    path: '../../.git/config',
+                    class: 'brand',
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(gitFacade.commit).not.toHaveBeenCalled();
+        });
+    });
+
     describe('initializeSkeleton', () => {
         it('creates the empty class folders + .index.yml and commits once', async () => {
             await service.initializeSkeleton(WORK_ID);

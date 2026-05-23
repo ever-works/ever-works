@@ -4,6 +4,7 @@ export * from './deploy-ready-poller.task';
 export * from './kb-backfill-skeleton.task';
 export * from './kb-embed-document.task';
 export * from './kb-mirror-document.task';
+export * from './kb-org-overlay-fanout.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './template-customization.task';
 export * from './work-generation.task';

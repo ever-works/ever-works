@@ -38,6 +38,13 @@ export class KnowledgeBaseGitMirrorService {
     private static readonly INDEX_FILE = '.index.yml';
     private static readonly INDEX_GENERATOR = 'ever-works-platform/kb-indexer';
     private static readonly INDEX_VERSION = 1;
+    /**
+     * EW-641 Phase 2/e row 37 — first segment under `.content/kb/`
+     * where org-scope KB documents get materialized in each Work's
+     * data repo (spec §7.6). Hidden-dot prefix keeps it visually
+     * distinct from class folders + signals "platform-managed".
+     */
+    private static readonly ORG_OVERLAY_DIR = '.org';
 
     /**
      * Class folders the platform ensures exist on every backfill /
@@ -142,6 +149,83 @@ export class KnowledgeBaseGitMirrorService {
             if (commitSha) {
                 await this.documentRepository.update(doc.id, { lastCommitSha: commitSha });
             }
+        });
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37 — materialize an org-scope document into
+     * a single target Work's data repo. The fan-out across every Work
+     * in the org is owned by the `kb-org-overlay-fanout` Trigger.dev
+     * task; this method runs once per `(workId, orgDocumentId)` pair.
+     *
+     * The on-disk layout follows spec §7.6: org overlays live under a
+     * `.org/` first segment so the Work owner can tell at a glance
+     * which docs are inherited from the org vs which they wrote
+     * locally:
+     *
+     *   .content/kb/.org/<class>/<slug>.yml   (sidecar)
+     *   .content/kb/.org/<class>/<slug>.md    (body)
+     *
+     * Path discipline: `doc.path` is validated with the existing
+     * `validateRelativeKbPath` (rejects `../`, absolute paths, Windows
+     * separators, null bytes) — the platform-controlled `.org/` prefix
+     * is applied AFTER validation so it can't be smuggled in via a
+     * malicious doc row.
+     *
+     * Idempotent — running twice with no DB change is a no-op commit.
+     */
+    async materializeOrgDocument(
+        workId: string,
+        organizationId: string,
+        documentId: string,
+    ): Promise<void> {
+        const doc = await this.documentRepository.findOrgById(organizationId, documentId);
+        if (!doc) {
+            throw new NotFoundException(
+                `KB org document not found for overlay materialization: ${documentId} (org=${organizationId})`,
+            );
+        }
+
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            await this.ensureSkeletonOnDisk(dir);
+            await this.writeOrgDocumentFiles(dir, doc);
+            await this.writeIndex(dir, workId);
+
+            await this.commitAndPush(
+                work,
+                dir,
+                `[kb] upsert org overlay ${doc.kbDocumentClass}/${doc.slug}`,
+                committer,
+            );
+            // Org overlays don't update lastCommitSha on the source doc —
+            // a single org row maps to N commits across N Works; storing
+            // the last per-Work SHA on the org row would race.
+        });
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37 — remove an org-scope document's overlay
+     * files from a single target Work's data repo. Counterpart to
+     * `materializeOrgDocument`; called per-Work by the fan-out task
+     * when the org row was deleted (the DB row is gone by the time we
+     * run, so `path` + `class` carry the resolution forward — mirrors
+     * the per-Work `removeDocument` contract).
+     */
+    async removeOrgDocument(
+        workId: string,
+        options: { documentId: string; path: string; class: string },
+    ): Promise<void> {
+        await this.runInRepo(workId, async ({ dir, work, committer }) => {
+            await this.ensureSkeletonOnDisk(dir);
+
+            const removed = await this.removeOrgDocumentFiles(dir, options.path);
+            await this.writeIndex(dir, workId);
+
+            const message = removed
+                ? `[kb] delete org overlay ${options.class}/${this.slugFromPath(options.path)}`
+                : `[kb] index refresh after org overlay ${options.class}/${this.slugFromPath(options.path)} (already absent)`;
+
+            await this.commitAndPush(work, dir, message, committer);
         });
     }
 
@@ -428,6 +512,89 @@ export class KnowledgeBaseGitMirrorService {
         const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
         const sidecarPath = this.resolveInsideKbRoot(kbRoot, this.sidecarPath(relativePath));
         const bodyPath = this.resolveInsideKbRoot(kbRoot, relativePath);
+
+        let removed = false;
+        for (const target of [bodyPath, sidecarPath]) {
+            try {
+                await fs.unlink(target);
+                removed = true;
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37 — write the org overlay sidecar + body
+     * for a single org-scope document into a Work's repo. The
+     * `.org/` first segment is applied here AFTER `doc.path` has been
+     * validated, so a malicious `path` field on the org doc row
+     * cannot escape `.content/kb/.org/`.
+     */
+    private async writeOrgDocumentFiles(
+        repoDir: string,
+        doc: WorkKnowledgeDocument,
+    ): Promise<void> {
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(doc.path);
+
+        const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
+        const orgRoot = path.join(kbRoot, KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR);
+        const sidecarPath = this.resolveInsideKbRoot(
+            kbRoot,
+            path.posix.join(
+                KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR,
+                this.sidecarPath(doc.path),
+            ),
+        );
+        const bodyPath = this.resolveInsideKbRoot(
+            kbRoot,
+            path.posix.join(KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR, doc.path),
+        );
+
+        await fs.mkdir(path.dirname(sidecarPath), { recursive: true });
+
+        const sidecar = this.buildSidecar(doc);
+        // Tag the sidecar so a Work owner reading the file knows it's
+        // an inherited org overlay, not their own doc. The flag stays
+        // out of the platform DTOs (the row's `organizationId` carries
+        // the truth there); this is purely a filesystem affordance.
+        sidecar.source = 'org-overlay';
+        sidecar.organizationId = doc.organizationId;
+        await fs.writeFile(sidecarPath, yaml.stringify(sidecar), 'utf-8');
+
+        const body = this.readBody(doc);
+        await fs.writeFile(bodyPath, body, 'utf-8');
+
+        // Ensure the org root exists even when only the body was
+        // written via the sidecar's parent-dir creation above.
+        await fs.mkdir(orgRoot, { recursive: true });
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37 — counterpart of `writeOrgDocumentFiles`.
+     * Removes both files under `.content/kb/.org/<doc.path>` and its
+     * `.yml` sidecar; returns whether anything was actually deleted
+     * so the commit message can distinguish a real delete from an
+     * idempotent rerun.
+     */
+    private async removeOrgDocumentFiles(repoDir: string, relativePath: string): Promise<boolean> {
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(relativePath);
+
+        const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
+        const sidecarPath = this.resolveInsideKbRoot(
+            kbRoot,
+            path.posix.join(
+                KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR,
+                this.sidecarPath(relativePath),
+            ),
+        );
+        const bodyPath = this.resolveInsideKbRoot(
+            kbRoot,
+            path.posix.join(KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR, relativePath),
+        );
 
         let removed = false;
         for (const target of [bodyPath, sidecarPath]) {
