@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import type { KbMention } from './kb-mention-parser';
+import type { KbCitation } from './kb-citation-parser';
 
 /**
  * EW-641 Phase 2/c row 34b — resolves parsed `@kb:` mentions
@@ -50,6 +51,21 @@ export interface ResolvedKbMention {
     readonly document: KbDocumentBodyDto | null;
 }
 
+/**
+ * Result row from `KbMentionResolverService.resolveCitations`
+ * (EW-641 Phase 2/c row 35b).
+ *
+ * Companion to `ResolvedKbMention`: pairs an assistant-side
+ * `kb:{class}/{slug}` citation (parsed by row 35a's `parseKbCitations`)
+ * with the resolved `KbDocumentBodyDto`, or `null` when the citation
+ * doesn't match any visible doc. Row 35c `<CitationHover>` consumes
+ * this shape to render the hover-card content.
+ */
+export interface ResolvedKbCitation {
+    readonly citation: KbCitation;
+    readonly document: KbDocumentBodyDto | null;
+}
+
 @Injectable()
 export class KbMentionResolverService {
     private readonly logger = new Logger(KbMentionResolverService.name);
@@ -90,6 +106,78 @@ export class KbMentionResolverService {
             out.push({ mention, document: doc });
         }
         return out;
+    }
+
+    /**
+     * Resolve every parsed assistant-text citation
+     * (`kb:{class}/{slug}` token from row 35a) to its KB document
+     * (or `null` if the citation doesn't match any visible doc).
+     *
+     * Implementation strategy (row 35b): synthesize a `KbMention`
+     * for each citation with `reference = ${cls}/${slug}`, delegate
+     * to `resolveMentions`, then re-pair each resolved entry back
+     * to its originating citation via object identity on the
+     * `mention` field. This keeps a single resolution path (one
+     * `.md`-retry policy, one graceful-degradation contract, one
+     * dedup-by-`document.id` rule) instead of duplicating logic.
+     *
+     * @param workId - Work scope for the lookup.
+     * @param userId - User performing the lookup; `getDocument`
+     *   gates on `ensureCanView` for this user, so an unauthorized
+     *   citation yields `null` instead of a leak.
+     * @param citations - Parsed citations from row 35a's
+     *   `parseKbCitations`.
+     * @returns Resolved entries in textual order, deduplicated by
+     *   `document.id` (first occurrence wins — inherits the dedup
+     *   semantics from `resolveMentions`).
+     */
+    async resolveCitations(
+        workId: string,
+        userId: string,
+        citations: ReadonlyArray<KbCitation>,
+    ): Promise<ResolvedKbCitation[]> {
+        if (citations.length === 0) return [];
+
+        // Build parallel arrays so we can re-pair via object identity
+        // on the `mention` field that `resolveMentions` preserves in
+        // its returned entries (see the `out.push({ mention, ... })`
+        // line above — same KbMention instance is threaded through).
+        const synthesizedMentions: KbMention[] = citations.map((c) =>
+            this.synthesizeMentionFromCitation(c),
+        );
+        const mentionToCitation = new Map<KbMention, KbCitation>();
+        for (let i = 0; i < synthesizedMentions.length; i++) {
+            mentionToCitation.set(synthesizedMentions[i], citations[i]);
+        }
+
+        const resolved = await this.resolveMentions(workId, userId, synthesizedMentions);
+
+        // `resolveMentions` preserves input order with later duplicates
+        // dropped; the surviving entries carry the EXACT KbMention
+        // objects we passed in, so identity lookup recovers the
+        // originating citation safely.
+        return resolved.map((r) => ({
+            citation: mentionToCitation.get(r.mention) as KbCitation,
+            document: r.document,
+        }));
+    }
+
+    /**
+     * Build a `KbMention` shell from a `KbCitation` so the existing
+     * `resolveMentions` plumbing (lookup → `.md` retry → exception
+     * swallow → dedup) handles both surfaces. `reference` is the
+     * canonical `${cls}/${slug}` path; `raw` adds the `@kb:` prefix
+     * so the synthesized mention is structurally a valid output of
+     * row 34a's parser (helpful for logging consistency).
+     */
+    private synthesizeMentionFromCitation(citation: KbCitation): KbMention {
+        const reference = `${citation.cls}/${citation.slug}`;
+        return {
+            raw: `@kb:${reference}`,
+            reference,
+            startOffset: citation.startOffset,
+            endOffset: citation.endOffset,
+        };
     }
 
     /**
