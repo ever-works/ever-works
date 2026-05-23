@@ -86,14 +86,16 @@ describe('FullPipelineExecutorService', () => {
             );
 
             // facade.createStepExecutionContext invoked with documented positional args.
-            // 5th arg is `kbContext` (EW-641 row 32c) — undefined when
-            // KnowledgeBaseService is not injected (the default ctor here).
+            // 5th arg is `kbContext` (EW-641 row 32c), 6th is `kbTools`
+            // (EW-641 row 36c) — both undefined when neither
+            // KnowledgeBaseService nor KbToolsFacadeAdapter is injected.
             expect(facadeService.createStepExecutionContext).toHaveBeenCalledWith(
                 work,
                 request.providers,
                 request.aiModel,
                 undefined, // no signal in options
                 undefined, // no kbContext (no KB service wired)
+                undefined, // no kbTools (no adapter wired)
             );
 
             // plugin.execute received {...options, execContext, onLogEntry}.
@@ -140,6 +142,7 @@ describe('FullPipelineExecutorService', () => {
                 request.providers,
                 request.aiModel,
                 signal,
+                undefined,
                 undefined,
             );
         });
@@ -214,6 +217,7 @@ describe('FullPipelineExecutorService', () => {
                 request.aiModel,
                 undefined,
                 bundle,
+                undefined,
             );
         });
 
@@ -239,6 +243,7 @@ describe('FullPipelineExecutorService', () => {
                 expect.objectContaining({ id: '' }),
                 request.providers,
                 request.aiModel,
+                undefined,
                 undefined,
                 undefined,
             );
@@ -273,6 +278,7 @@ describe('FullPipelineExecutorService', () => {
                 work,
                 request.providers,
                 request.aiModel,
+                undefined,
                 undefined,
                 undefined,
             );

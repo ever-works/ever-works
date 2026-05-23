@@ -5,6 +5,7 @@ import type { IScreenshotFacade } from '../facades/screenshot-facade.interface.j
 import type { IContentExtractorFacade } from '../facades/content-extractor-facade.interface.js';
 import type { IDataSourceFacade } from '../facades/data-source-facade.interface.js';
 import type { IPromptFacade } from '../facades/prompt-facade.interface.js';
+import type { IKbToolsFacade } from '../facades/kb-tools-facade.interface.js';
 import type { WorkReference, UserReference } from './generation-context.interface.js';
 
 /**
@@ -102,4 +103,27 @@ export interface StepExecutionContext {
 	 * exposes `format()` on its bundle).
 	 */
 	readonly kbContext?: KbContextBundleData;
+
+	/**
+	 * EW-641 Phase 2/d row 36c — LLM-callable KB tools facade. When
+	 * present, pipeline plugins that support tool-use (agent-pipeline
+	 * and friends) can build `kb_search` / `kb_read` / `kb_write` /
+	 * `kb_lock` / `kb_unlock` tools via the row 36b
+	 * `createKbTools()` factory and pass the resulting tool map to
+	 * `streamText({ tools })`. Each tool's `execute` callback
+	 * delegates to this facade.
+	 *
+	 * Populated by the same orchestrator pattern as `kbContext` (row
+	 * 32c): pipeline executors inject the NestJS-side
+	 * `KbToolsFacadeAdapter` via `@Optional()`, the
+	 * `PipelineFacadeService.createStepExecutionContext` accepts a
+	 * 6th positional `kbTools` argument, and the executors thread it
+	 * through alongside `kbContext`.
+	 *
+	 * Optional so deployments that haven't wired the agent module
+	 * yet (older builds, isolated unit tests, OSS images without the
+	 * agent package) keep constructing identically — the carrier is
+	 * here, the row-36c orchestrator call site populates it.
+	 */
+	readonly kbTools?: IKbToolsFacade;
 }

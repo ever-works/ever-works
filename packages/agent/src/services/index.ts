@@ -38,6 +38,7 @@ export * from './kb-mention-parser';
 export * from './kb-mention-resolver.service';
 export * from './kb-citation-parser';
 export * from './kb-agent-tools.service';
+export * from './kb-tools-facade.adapter';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';

@@ -5,6 +5,7 @@ import type {
 	ISearchFacade,
 	IContentExtractorFacade,
 	IPromptFacade,
+	IKbToolsFacade,
 	FacadeOptions,
 	PipelineProgressCallback,
 	PipelineExecutionOptions,
@@ -24,6 +25,7 @@ import { createSearchTool, createReportProgressTool } from './facade-tools.js';
 import type { FacadeToolOptions } from './facade-tools.js';
 import { readWorkspaceOverview } from './workspace-overview.js';
 import { createFindItemsTool } from './find-items-tool.js';
+import { createKbTools } from './kb-tools.js';
 import { processUrlWorker } from '../worker/url-worker.js';
 import type { WorkerPromptOptions } from '../worker/extraction-prompt.js';
 import { processModification } from '../worker/modification-worker.js';
@@ -53,6 +55,17 @@ export interface ParentToolContext {
 	onLogEntry?: PipelineExecutionOptions['onLogEntry'];
 	referenceTtlDays?: number;
 	onReferenceProcessed?: (reference: ReferenceEntry) => void;
+	/**
+	 * EW-641 Phase 2/d row 36c — optional KB tools facade. When set,
+	 * the returned tools map gains the 5 `kb_*` tool definitions
+	 * (kb_search / kb_read / kb_write / kb_lock / kb_unlock — row 36b)
+	 * so the LLM can search, read, and mutate the Work's Knowledge
+	 * Base during generation. When unset (deployments without the
+	 * agent KB module wired), the kb tools simply aren't registered.
+	 */
+	kbTools?: IKbToolsFacade;
+	/** Optional agent-run id stamped on docs created via `kb_write`. */
+	generatedByAgentRunId?: string;
 }
 
 export interface ParentToolsResult {
@@ -234,6 +247,24 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 		execute: () => readWorkspaceOverview(ctx.workspacePath, ctx.existing.items)
 	});
 
+	// EW-641 Phase 2/d row 36c — when the agent-side `kbToolsFacade`
+	// adapter is wired (i.e. the deployment has the KB module), spread
+	// the 5 LLM-callable KB tools (row 36b) into the tools map. When
+	// `kbTools` is unset (OSS images, KB-disabled deployments) the
+	// pipeline runs with the same tool set as before — no behavior
+	// change on existing configurations.
+	const kbToolEntries = ctx.kbTools
+		? createKbTools(
+				{
+					workId: ctx.facadeOptions.workId,
+					userId: ctx.facadeOptions.userId,
+					facade: ctx.kbTools,
+					logger: ctx.logger
+				},
+				ctx.generatedByAgentRunId
+			)
+		: {};
+
 	return {
 		tools: {
 			search: createSearchTool(ctx.facades.searchFacade, ctx.facadeOptions, toolOptions),
@@ -241,7 +272,8 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 			processUrl: processUrlTool,
 			modifyItems: modifyItemsTool,
 			getWorkspaceOverview: getWorkspaceOverviewTool,
-			reportProgress: createReportProgressTool(ctx.onProgress, 1, ctx.totalSteps)
+			reportProgress: createReportProgressTool(ctx.onProgress, 1, ctx.totalSteps),
+			...kbToolEntries
 		},
 		breaker
 	};

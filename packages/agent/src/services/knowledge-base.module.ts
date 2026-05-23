@@ -19,6 +19,7 @@ import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.servi
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { KbAgentToolsService } from './kb-agent-tools.service';
+import { KbToolsFacadeAdapter } from './kb-tools-facade.adapter';
 import { WorkOwnershipService } from './work-ownership.service';
 
 /**
@@ -73,6 +74,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseBufferExtractorService,
         KbMentionResolverService,
         KbAgentToolsService,
+        KbToolsFacadeAdapter,
     ],
     exports: [
         WorkKnowledgeDocumentRepository,
@@ -85,6 +87,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseBufferExtractorService,
         KbMentionResolverService,
         KbAgentToolsService,
+        KbToolsFacadeAdapter,
     ],
 })
 export class KnowledgeBaseModule {}
