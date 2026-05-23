@@ -7,6 +7,9 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.service';
 import { KB_EMBED_DOCUMENT_DISPATCHER } from '../../tasks/kb-embed-document-dispatcher';
+import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../../tasks/kb-org-overlay-fanout-dispatcher';
+import { KB_MIRROR_DOCUMENT_DISPATCHER } from '../../tasks/kb-mirror-document-dispatcher';
+import { WorkRepository } from '../../database/repositories/work.repository';
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../../database/repositories/work-knowledge-upload.repository';
@@ -725,6 +728,215 @@ describe('KnowledgeBaseService', () => {
             expect(result.organizationId).toBe(ORG_ID);
             expect(result.workId).toBeNull();
             expect(result.class).toBe('legal');
+        });
+    });
+
+    // EW-641 Phase 2/e row 37d — org-overlay fanout enqueue from
+    // `createOrgDocument`. The base test module doesn't wire the
+    // fanout dispatcher or `WorkRepository`, so these cases build a
+    // fresh service with those providers and assert the row-37d
+    // contract end-to-end (resolver → dispatcher).
+    describe('createOrgDocument — org-overlay fanout enqueue (row 37d)', () => {
+        type FanoutCall = {
+            organizationId: string;
+            documentId: string;
+            workIds: ReadonlyArray<string>;
+            operation: 'upsert' | 'delete';
+            path: string;
+            class: string;
+        };
+
+        async function buildWithFanout(opts: {
+            workIds?: string[];
+            findThrows?: boolean;
+            dispatchThrows?: boolean;
+        }) {
+            const workIds = opts.workIds ?? ['work-a', 'work-b'];
+            const workRepoMock = {
+                findIdsByOrganization: opts.findThrows
+                    ? jest.fn().mockRejectedValue(new Error('db boom'))
+                    : jest.fn().mockResolvedValue(workIds),
+            };
+            const fanoutDispatcher = {
+                dispatchKbOrgOverlayFanout: opts.dispatchThrows
+                    ? jest.fn().mockRejectedValue(new Error('trigger boom'))
+                    : jest.fn().mockResolvedValue('run-id'),
+            };
+            const mirrorDispatcher = {
+                dispatchKbMirrorDocument: jest.fn().mockResolvedValue('mirror-run-id'),
+            };
+
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    { provide: KB_EMBED_DOCUMENT_DISPATCHER, useValue: embedDispatcher },
+                    { provide: KB_MIRROR_DOCUMENT_DISPATCHER, useValue: mirrorDispatcher },
+                    { provide: KB_ORG_OVERLAY_FANOUT_DISPATCHER, useValue: fanoutDispatcher },
+                    { provide: WorkRepository, useValue: workRepoMock },
+                ],
+            }).compile();
+
+            return {
+                service: module.get(KnowledgeBaseService),
+                fanoutDispatcher,
+                mirrorDispatcher,
+                workRepoMock,
+            };
+        }
+
+        it('enqueues fanout with resolved workIds for an inheritable org doc', async () => {
+            const {
+                service: svc,
+                fanoutDispatcher,
+                mirrorDispatcher,
+                workRepoMock,
+            } = await buildWithFanout({ workIds: ['work-a', 'work-b'] });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({
+                    ...data,
+                    id: 'org-doc-1',
+                    workId: null,
+                    organizationId: ORG_ID,
+                }),
+            );
+
+            await svc.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/privacy.md',
+                title: 'Privacy policy',
+                class: 'legal' as KbDocumentClass,
+                body: 'verbatim',
+            });
+
+            expect(workRepoMock.findIdsByOrganization).toHaveBeenCalledWith(ORG_ID);
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).toHaveBeenCalledTimes(1);
+            const call = fanoutDispatcher.dispatchKbOrgOverlayFanout.mock.calls[0][0] as FanoutCall;
+            expect(call.organizationId).toBe(ORG_ID);
+            expect(call.documentId).toBe('org-doc-1');
+            expect(call.workIds).toEqual(['work-a', 'work-b']);
+            expect(call.operation).toBe('upsert');
+            expect(call.path).toBe('legal/privacy.md');
+            expect(call.class).toBe('legal');
+            // Per-Work `kb-mirror-document` MUST NOT fire for an org-scope
+            // row — that path writes to `.content/kb/<path>` (work-owned)
+            // and would collide with overlay precedence semantics.
+            expect(mirrorDispatcher.dispatchKbMirrorDocument).not.toHaveBeenCalled();
+        });
+
+        it('skips fanout dispatch when the org has zero Works', async () => {
+            const {
+                service: svc,
+                fanoutDispatcher,
+                workRepoMock,
+            } = await buildWithFanout({ workIds: [] });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, workId: null, organizationId: ORG_ID }),
+            );
+
+            await svc.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/privacy.md',
+                title: 'Privacy policy',
+                class: 'legal' as KbDocumentClass,
+                body: 'body',
+            });
+
+            expect(workRepoMock.findIdsByOrganization).toHaveBeenCalledWith(ORG_ID);
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
+        });
+
+        it('swallows WorkRepository errors so the API write still succeeds', async () => {
+            const { service: svc, fanoutDispatcher } = await buildWithFanout({
+                findThrows: true,
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, workId: null, organizationId: ORG_ID }),
+            );
+
+            // Should not throw — `enqueueOrgOverlayFanout` is fire-and-forget.
+            await expect(
+                svc.createOrgDocument(ORG_ID, USER_ID, {
+                    path: 'legal/privacy.md',
+                    title: 'Privacy policy',
+                    class: 'legal' as KbDocumentClass,
+                    body: 'body',
+                }),
+            ).resolves.toBeDefined();
+
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
+        });
+
+        it('swallows dispatcher errors so the API write still succeeds', async () => {
+            const { service: svc, fanoutDispatcher } = await buildWithFanout({
+                workIds: ['work-a'],
+                dispatchThrows: true,
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, workId: null, organizationId: ORG_ID }),
+            );
+
+            await expect(
+                svc.createOrgDocument(ORG_ID, USER_ID, {
+                    path: 'legal/privacy.md',
+                    title: 'Privacy policy',
+                    class: 'legal' as KbDocumentClass,
+                    body: 'body',
+                }),
+            ).resolves.toBeDefined();
+
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).toHaveBeenCalledTimes(1);
+        });
+
+        it('still creates the doc when neither dispatcher nor repo are wired (degraded)', async () => {
+            // Uses the base `service` from the outer beforeEach — it has
+            // neither KB_ORG_OVERLAY_FANOUT_DISPATCHER nor WorkRepository
+            // wired. The mutation must still succeed (Phase 3 reconciliation
+            // catches drift).
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, workId: null, organizationId: ORG_ID }),
+            );
+
+            const result = await service.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/privacy.md',
+                title: 'Privacy policy',
+                class: 'legal' as KbDocumentClass,
+                body: 'body',
+            });
+
+            expect(result.organizationId).toBe(ORG_ID);
+        });
+
+        it('does NOT enqueue fanout from createDocument (Work-scope path)', async () => {
+            const {
+                service: svc,
+                fanoutDispatcher,
+                mirrorDispatcher,
+            } = await buildWithFanout({ workIds: ['work-a', 'work-b'] });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'work-doc-1' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/voice.md',
+                title: 'Brand voice',
+                class: 'brand' as KbDocumentClass,
+                body: 'work-scoped body',
+            });
+
+            // Work-scope rows use the per-Work mirror path only — never
+            // the org-overlay fanout (verifies the call-site is org-only).
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
+            expect(mirrorDispatcher.dispatchKbMirrorDocument).toHaveBeenCalledTimes(1);
         });
     });
 
