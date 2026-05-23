@@ -6,10 +6,7 @@ import type {
     KbToolFacadeResult,
 } from '@ever-works/plugin';
 import { KbAgentToolsService } from './kb-agent-tools.service';
-import type {
-    KbSearchToolInput,
-    KbWriteToolInput,
-} from './kb-agent-tools.service';
+import type { KbSearchToolInput, KbWriteToolInput } from './kb-agent-tools.service';
 
 /**
  * EW-641 Phase 2/d row 36c — bridges `@ever-works/plugin`'s
