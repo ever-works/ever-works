@@ -94,7 +94,21 @@ export class OrgKbController {
         return this.kb.resolveInheritableDocuments(workId, orgId ?? null);
     }
 
-    @Get('works/:id/kb/inheritable/:idOrPath(*)')
+    /**
+     * EW-639 Phase 2/e row 38c-2 — inherited-doc body endpoint.
+     *
+     * The catch-all segment uses `*idOrPath` instead of the legacy
+     * `:idOrPath(*)` syntax: `path-to-regexp@8` (shipped with
+     * NestJS 11.x via Express 5) rejects the legacy form at module-
+     * init time and the API crashes on boot — the failure surfaced
+     * on every push to develop's e2e workflow after row 38c-2 landed
+     * (PR #998). The new syntax binds the joined remainder of the
+     * URL (e.g. `legal/privacy.md`) to the `idOrPath` request param.
+     * Express 5 exposes catch-all segments as an array on `req.params`;
+     * we rejoin with `/` below so the service-layer heuristic still
+     * resolves either a UUID or a slash-separated path.
+     */
+    @Get('works/:id/kb/inheritable/*idOrPath')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Read the body of one inherited (org-scope) KB document',
@@ -107,9 +121,10 @@ export class OrgKbController {
     async getInheritedDocument(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') workId: string,
-        @Param('idOrPath') idOrPath: string,
+        @Param('idOrPath') idOrPath: string | string[],
         @Query('orgId') orgId: string,
     ) {
-        return this.kb.getInheritedDocument(workId, orgId, idOrPath, auth.userId);
+        const joinedIdOrPath = Array.isArray(idOrPath) ? idOrPath.join('/') : idOrPath;
+        return this.kb.getInheritedDocument(workId, orgId, joinedIdOrPath, auth.userId);
     }
 }
