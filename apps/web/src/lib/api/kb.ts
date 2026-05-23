@@ -79,6 +79,32 @@ export const kbAPI = {
     },
 
     /**
+     * `GET /api/works/:id/kb/inheritable/:idOrPath?orgId=<id>` — read the
+     * body of one inherited (org-scope) KB document.
+     *
+     * EW-641 Phase 2/e row 38c-2 — the workbench detail page calls this
+     * as a fallback when `getDocument(workId, joined)` 404s, so clicking
+     * an inherited tree row (row 38a/38b) actually surfaces the
+     * read-only doc instead of a dead link. Pairs with row 38c's
+     * `<KbDocumentView isInherited />` for the render path.
+     *
+     * Path segments are URL-encoded individually so embedded slashes
+     * survive — the wildcard `:idOrPath(*)` route param on the
+     * controller side preserves the slash separator. The `orgId` is
+     * sent as a query param (mirrors `listInheritableDocuments`).
+     */
+    getInheritedDocument: async (
+        workId: string,
+        orgId: string,
+        idOrPath: string,
+    ): Promise<KbDocumentBodyDto> => {
+        const encodedPath = idOrPath.split('/').map(encodeURIComponent).join('/');
+        return serverFetch<KbDocumentBodyDto>(
+            `/works/${workId}/kb/inheritable/${encodedPath}?orgId=${encodeURIComponent(orgId)}`,
+        );
+    },
+
+    /**
      * `GET /api/works/:id/kb/documents/:idOrPath` — full document with
      * Markdown body + asset summaries. The backend accepts either a
      * UUID or the canonical `<class>/<slug>.md`-style path; we encode

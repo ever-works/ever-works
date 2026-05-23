@@ -425,6 +425,49 @@ export class KnowledgeBaseService {
     }
 
     /**
+     * EW-641 Phase 2/e row 38c-2 — read the body of an org-scope KB
+     * document that the user's Work inherits from. Used by the
+     * workbench detail page (`apps/web/.../[id]/kb/[...path]/page.tsx`)
+     * as a fallback when the per-Work `getDocument` 404s — so clicking
+     * an inherited tree row (row 38a/38b) actually surfaces a viewable
+     * read-only doc instead of a dead link.
+     *
+     * Permission model: the caller must have view access to `workId`
+     * — the Work is the user's entry point and the gate. Org-tier docs
+     * are visible to anyone who can see the Work; this is consistent
+     * with `resolveInheritableDocuments` (no extra org-membership
+     * check). A future org-admin role gate would tighten this; not in
+     * this PR.
+     *
+     * Path-vs-id resolution uses the same heuristic as
+     * `findByWorkOrPath` — anything containing `/` or ending in `.md`
+     * is a path; otherwise a doc id. `NotFoundException` when no
+     * org-scope row at `(organizationId, idOrPath)` (e.g. user navigated
+     * to a Work-scope path that doesn't exist either).
+     */
+    async getInheritedDocument(
+        workId: string,
+        organizationId: string,
+        idOrPath: string,
+        userId: string,
+    ): Promise<KbDocumentBodyDto> {
+        await this.ownershipService.ensureCanView(workId, userId);
+
+        const isPath = idOrPath.includes('/') || idOrPath.endsWith('.md');
+        const doc = isPath
+            ? await this.documentRepository.findOrgByPath(organizationId, idOrPath)
+            : await this.documentRepository.findOrgById(organizationId, idOrPath);
+
+        if (!doc) {
+            throw new NotFoundException(
+                `KB inherited document not found: org=${organizationId} ${idOrPath}`,
+            );
+        }
+
+        return this.toBodyDto(doc);
+    }
+
+    /**
      * EW-641 Phase 2/a row 29b2b — system-op helper used by the
      * `kb-embed-document` Trigger.dev task to fetch a document body
      * without a user-bound `ensureCanView` gate.

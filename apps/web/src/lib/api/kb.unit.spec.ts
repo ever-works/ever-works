@@ -85,4 +85,58 @@ describe('kbAPI', () => {
             expect(result).toBe(rows);
         });
     });
+
+    describe('getInheritedDocument (row 38c-2)', () => {
+        it('calls /works/:id/kb/inheritable/:path?orgId=<uuid> for a slash-separated path', async () => {
+            const body = {
+                id: 'org-doc-1',
+                workId: null,
+                organizationId: 'org-uuid-1',
+                path: 'legal/privacy.md',
+                slug: 'privacy',
+                class: 'legal',
+                title: 'Privacy',
+                body: 'Org privacy text.',
+            } as unknown;
+            serverFetchMock.mockResolvedValueOnce(body);
+
+            const result = await kbAPI.getInheritedDocument(
+                'work-1',
+                'org-uuid-1',
+                'legal/privacy.md',
+            );
+
+            expect(result).toBe(body);
+            expect(serverFetchMock).toHaveBeenCalledTimes(1);
+            // Path segments encoded individually so the `/` stays as a
+            // route separator for the controller's wildcard param.
+            expect(serverFetchMock).toHaveBeenCalledWith(
+                '/works/work-1/kb/inheritable/legal/privacy.md?orgId=org-uuid-1',
+            );
+        });
+
+        it('calls /works/:id/kb/inheritable/:id?orgId=<uuid> for a UUID id', async () => {
+            // UUIDs have no `/` so encoding is a no-op; this verifies
+            // the helper doesn't accidentally double-encode hyphens.
+            serverFetchMock.mockResolvedValueOnce({} as unknown);
+
+            await kbAPI.getInheritedDocument('work-1', 'org-1', 'd0e1f2-uuid');
+
+            expect(serverFetchMock).toHaveBeenCalledWith(
+                '/works/work-1/kb/inheritable/d0e1f2-uuid?orgId=org-1',
+            );
+        });
+
+        it('URL-encodes path segments AND orgId for safety against reserved chars', async () => {
+            serverFetchMock.mockResolvedValueOnce({} as unknown);
+
+            await kbAPI.getInheritedDocument('work-1', 'org with spaces', 'legal/has space.md');
+
+            // The space in the segment is encoded; the `/` separator is
+            // preserved. The orgId query is also encoded.
+            expect(serverFetchMock).toHaveBeenCalledWith(
+                '/works/work-1/kb/inheritable/legal/has%20space.md?orgId=org%20with%20spaces',
+            );
+        });
+    });
 });

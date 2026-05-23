@@ -93,4 +93,23 @@ export class OrgKbController {
     ) {
         return this.kb.resolveInheritableDocuments(workId, orgId ?? null);
     }
+
+    @Get('works/:id/kb/inheritable/:idOrPath(*)')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Read the body of one inherited (org-scope) KB document',
+        description:
+            'Returns the org-scope KbDocumentBodyDto rendered by the workbench detail page when the user navigates to an inherited row from the row-38a tree. Accepts either a UUID or a slash-separated path (e.g. `legal/privacy.md`). Permission gate is `ensureCanView(workId)` — anyone who can see the Work can read its inherited org docs (consistent with `resolveInheritable`).',
+    })
+    @ApiQuery({ name: 'orgId', required: true })
+    @ApiResponse({ status: 200, description: 'Inherited KB document body' })
+    @ApiResponse({ status: 404, description: 'No org-scope row at that path/id' })
+    async getInheritedDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') workId: string,
+        @Param('idOrPath') idOrPath: string,
+        @Query('orgId') orgId: string,
+    ) {
+        return this.kb.getInheritedDocument(workId, orgId, idOrPath, auth.userId);
+    }
 }

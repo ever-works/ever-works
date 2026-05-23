@@ -79,29 +79,64 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
         notFound();
     }
 
+    // EW-641 Phase 2/e row 38c-2 — fetch the Work itself (not just
+    // check for existence) so we can read `work.organizationId` for
+    // the inherited-doc fallback below.
+    const workResponse = await workAPI.get(id).catch(() => null);
+    const work = workResponse?.work ?? null;
+    if (!work) {
+        notFound();
+    }
+
     // Parent layout already verifies the Work exists, so we lean on the
     // doc fetch as the single source of truth for "this URL is valid".
+    // EW-641 Phase 2/e row 38c-2 — if the Work-scope doc isn't found,
+    // fall back to the inherited (org-scope) doc the Work overlays.
+    // 404 is taken only when neither the Work nor the org has a row.
     let doc;
+    let isInherited = false;
     try {
         doc = await kbAPI.getDocument(id, joined);
     } catch (error) {
-        if (error instanceof ApiResponseError && error.statusCode === 404) {
+        if (!(error instanceof ApiResponseError) || error.statusCode !== 404) {
+            throw error;
+        }
+        if (work.organizationId) {
+            try {
+                doc = await kbAPI.getInheritedDocument(id, work.organizationId, joined);
+                isInherited = true;
+            } catch (inheritedError) {
+                if (
+                    inheritedError instanceof ApiResponseError &&
+                    inheritedError.statusCode === 404
+                ) {
+                    notFound();
+                }
+                throw inheritedError;
+            }
+        } else {
             notFound();
         }
-        throw error;
     }
 
-    // Tree list + (optional) source-upload row alongside the doc. Tree
-    // failures fall back to an empty tree; upload-row failures fall back
-    // to the markdown editor path (treat an orphaned `sourceUploadId`
-    // as "not a binary doc").
-    const upload = await loadSourceUpload(id, doc);
-    const list = await Promise.all([workAPI.get(id), kbAPI.listDocuments(id, { limit: 200 })])
-        .then(([, docs]) => docs)
-        .catch((error) => {
-            console.error('[kb-tree] failed to list KB documents:', error);
-            return { items: [], total: 0 };
-        });
+    // Inherited docs never have a source upload — they live in the
+    // org's overlay folder, not in any per-Work upload pipeline. Skip
+    // the upload fetch entirely so a 404 there doesn't get logged.
+    const upload = isInherited ? null : await loadSourceUpload(id, doc);
+    const list = await kbAPI.listDocuments(id, { limit: 200 }).catch((error) => {
+        console.error('[kb-tree] failed to list KB documents:', error);
+        return { items: [], total: 0 };
+    });
+
+    // Plumb the inheritable list into the tree panel so the
+    // "Inherited from organization" section keeps populating on the
+    // detail page too (matches the row-38b plumbing on the index page).
+    const inheritedDocuments = work.organizationId
+        ? await kbAPI.listInheritableDocuments(id, work.organizationId).catch((error) => {
+              console.error('[kb-tree] failed to list inheritable KB documents:', error);
+              return [];
+          })
+        : [];
 
     return (
         <div className="flex flex-col gap-4">
@@ -111,8 +146,15 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
             <KbUploadZone workId={id} targetClass={doc.class} />
             <KbShell
                 workId={id}
-                treeSlot={<KbTreePanel workId={id} documents={list.items} activePath={doc.path} />}
-                editorSlot={renderEditorSlot(id, doc, upload)}
+                treeSlot={
+                    <KbTreePanel
+                        workId={id}
+                        documents={list.items}
+                        inheritedDocuments={inheritedDocuments}
+                        activePath={doc.path}
+                    />
+                }
+                editorSlot={renderEditorSlot(id, doc, upload, isInherited)}
                 asideSlot={<KbSidePanel doc={doc} />}
             />
         </div>
@@ -159,7 +201,15 @@ function renderEditorSlot(
     workId: string,
     doc: KbDocumentBodyDto,
     upload: KbUploadDto | null,
+    isInherited: boolean,
 ): ReactNode {
+    // EW-641 Phase 2/e row 38c-2 — inherited org-overlay docs render
+    // through the read-only viewer with the "Inherited from
+    // organization" banner (row 38c). The editor swap happens here at
+    // the route level, never inside `KbDocumentView` itself.
+    if (isInherited) {
+        return <KbDocumentView doc={doc} isInherited />;
+    }
     const fullyLocked = doc.locked && doc.lockMode === 'full';
     if (fullyLocked) {
         return <KbDocumentView doc={doc} />;

@@ -86,6 +86,7 @@ describe('KnowledgeBaseService', () => {
             findById: jest.fn(),
             findByPath: jest.fn(),
             findOrgById: jest.fn(),
+            findOrgByPath: jest.fn(),
             findByWorkOrPath: jest.fn(),
             list: jest.fn(),
             listInheritableForOrg: jest.fn(),
@@ -251,6 +252,83 @@ describe('KnowledgeBaseService', () => {
             await expect(service.getDocument(WORK_ID, 'missing', USER_ID)).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+    });
+
+    // EW-641 Phase 2/e row 38c-2 — read the body of an org-scope doc
+    // that the user's Work inherits from. Used by the workbench detail
+    // page as a fallback when the per-Work getDocument 404s.
+    describe('getInheritedDocument', () => {
+        it('uses findOrgByPath when idOrPath looks like a path (contains "/" or ends in .md)', async () => {
+            const orgDoc = buildDocument({
+                id: 'org-doc-1',
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'legal/privacy.md',
+                slug: 'privacy',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                metadata: { body: 'Verbatim privacy text.' },
+            });
+            docRepo.findOrgByPath.mockResolvedValue(orgDoc);
+
+            const result = await service.getInheritedDocument(
+                WORK_ID,
+                ORG_ID,
+                'legal/privacy.md',
+                USER_ID,
+            );
+
+            expect(ownership.ensureCanView).toHaveBeenCalledWith(WORK_ID, USER_ID);
+            expect(docRepo.findOrgByPath).toHaveBeenCalledWith(ORG_ID, 'legal/privacy.md');
+            expect(docRepo.findOrgById).not.toHaveBeenCalled();
+            expect(result.id).toBe('org-doc-1');
+            expect(result.workId).toBeNull();
+            expect(result.organizationId).toBe(ORG_ID);
+            expect(result.body).toContain('Verbatim privacy text');
+        });
+
+        it('uses findOrgById when idOrPath is a bare id (no "/" or .md)', async () => {
+            const orgDoc = buildDocument({
+                id: 'org-doc-2',
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'style/voice.md',
+                kbDocumentClass: 'style' as KbDocumentClass,
+            });
+            docRepo.findOrgById.mockResolvedValue(orgDoc);
+
+            await service.getInheritedDocument(WORK_ID, ORG_ID, 'org-doc-2', USER_ID);
+
+            expect(docRepo.findOrgById).toHaveBeenCalledWith(ORG_ID, 'org-doc-2');
+            expect(docRepo.findOrgByPath).not.toHaveBeenCalled();
+        });
+
+        it('throws NotFoundException when no org-scope row matches the path', async () => {
+            docRepo.findOrgByPath.mockResolvedValue(null);
+
+            await expect(
+                service.getInheritedDocument(WORK_ID, ORG_ID, 'legal/missing.md', USER_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('throws NotFoundException when no org-scope row matches the id', async () => {
+            docRepo.findOrgById.mockResolvedValue(null);
+
+            await expect(
+                service.getInheritedDocument(WORK_ID, ORG_ID, 'nonexistent-id', USER_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('enforces canView on the Work (same gate as getDocument)', async () => {
+            ownership.ensureCanView.mockRejectedValueOnce(new ForbiddenException('no access'));
+
+            await expect(
+                service.getInheritedDocument(WORK_ID, ORG_ID, 'legal/privacy.md', USER_ID),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+
+            // No DB lookup ran because the gate rejected first.
+            expect(docRepo.findOrgByPath).not.toHaveBeenCalled();
+            expect(docRepo.findOrgById).not.toHaveBeenCalled();
         });
     });
 
