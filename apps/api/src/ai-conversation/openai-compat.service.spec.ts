@@ -1,9 +1,28 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
 
+// EW-641 Phase 2/c row 34c — stub the agent/services barrel.
+// `parseKbMentions` + `formatKbContext` are pure, but mocking them as
+// jest.fn() lets the tests assert "no-op when nothing matched" without
+// shipping fixture KB docs. The default fn() returns undefined, which
+// the service treats as "no mentions / empty block" gracefully.
+jest.mock('@ever-works/agent/services', () => ({
+    KbMentionResolverService: class {},
+    parseKbMentions: jest.fn().mockReturnValue([]),
+    formatKbContext: jest.fn().mockReturnValue('<kb>\n</kb>'),
+}));
+
 import { OpenAiCompatService } from './openai-compat.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { AiFacadeService } from '@ever-works/agent/facades';
+import {
+    KbMentionResolverService,
+    parseKbMentions,
+    formatKbContext,
+} from '@ever-works/agent/services';
+
+const mockedParse = parseKbMentions as unknown as jest.Mock;
+const mockedFormat = formatKbContext as unknown as jest.Mock;
 
 type ResMock = {
     write: jest.Mock;
@@ -43,8 +62,14 @@ describe('OpenAiCompatService', () => {
         Pick<AiFacadeService, 'createChatCompletion' | 'createStreamingChatCompletion'>
     >;
     let workRepository: jest.Mocked<Pick<WorkRepository, 'findByUser'>>;
+    let kbMentionResolver: jest.Mocked<Pick<KbMentionResolverService, 'resolveMentions'>>;
 
     beforeEach(() => {
+        // Reset the agent/services mock functions before each test so a
+        // prior test's mockReturnValue doesn't leak into this one.
+        mockedParse.mockReset().mockReturnValue([]);
+        mockedFormat.mockReset().mockReturnValue('<kb>\n</kb>');
+
         aiFacade = {
             createChatCompletion: jest.fn(),
             createStreamingChatCompletion: jest.fn(),
@@ -52,9 +77,13 @@ describe('OpenAiCompatService', () => {
         workRepository = {
             findByUser: jest.fn().mockResolvedValue([]),
         } as any;
+        kbMentionResolver = {
+            resolveMentions: jest.fn().mockResolvedValue([]),
+        } as any;
         service = new OpenAiCompatService(
             aiFacade as unknown as AiFacadeService,
             workRepository as unknown as WorkRepository,
+            kbMentionResolver as unknown as KbMentionResolverService,
         );
     });
 
@@ -623,6 +652,155 @@ describe('OpenAiCompatService', () => {
             const body = JSON.parse(endArg);
             expect(body.error.message).not.toContain('abcdef1234567890ghijk');
             expect(body.error.message).toContain('[redacted]');
+        });
+    });
+
+    // EW-641 Phase 2/c row 34c — `@kb:` mentions in the latest user
+    // message resolve into KB docs and get prepended as a `<kb>` system
+    // message before the LLM call.
+    describe('handleCompletion — kbContext injection (row 34c)', () => {
+        const baseDto = {
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: 'hello @kb:brand/voice' }],
+        } as any;
+
+        const sampleDoc = {
+            id: 'doc-1',
+            workId: 'w-1',
+            organizationId: null,
+            path: 'brand/voice.md',
+            slug: 'voice',
+            title: 'Brand voice',
+            class: 'brand',
+        } as any;
+
+        beforeEach(() => {
+            aiFacade.createChatCompletion.mockResolvedValue({
+                id: 'x',
+                created: 0,
+                model: 'm',
+                choices: [
+                    {
+                        index: 0,
+                        message: { role: 'assistant', content: 'ok' },
+                        finishReason: 'stop',
+                    },
+                ],
+            } as any);
+        });
+
+        it('passes messages through unchanged when no mentions are parsed', async () => {
+            mockedParse.mockReturnValue([]);
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            expect(kbMentionResolver.resolveMentions).not.toHaveBeenCalled();
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            // No KB system message prepended.
+            expect(opts.messages).toHaveLength(1);
+            expect(opts.messages[0].role).toBe('user');
+        });
+
+        it('prepends a `<kb>` system message when mentions resolve to docs', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 6, endOffset: 21 },
+            ]);
+            kbMentionResolver.resolveMentions.mockResolvedValue([
+                {
+                    mention: {
+                        raw: '@kb:brand/voice',
+                        reference: 'brand/voice',
+                        startOffset: 6,
+                        endOffset: 21,
+                    },
+                    document: sampleDoc,
+                },
+            ] as any);
+            mockedFormat.mockReturnValue('<kb>\n## Brand voice (kb:brand/voice)\nbody\n</kb>');
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            // resolver called with (workId, userId, mentions).
+            expect(kbMentionResolver.resolveMentions).toHaveBeenCalledWith(
+                'w-1',
+                'u-1',
+                expect.any(Array),
+            );
+            // formatKbContext called with just the resolved (non-null) docs.
+            expect(mockedFormat).toHaveBeenCalledWith([sampleDoc]);
+
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            // System message prepended at index 0, original user message follows.
+            expect(opts.messages).toHaveLength(2);
+            expect(opts.messages[0].role).toBe('system');
+            expect(opts.messages[0].content).toBe(
+                '<kb>\n## Brand voice (kb:brand/voice)\nbody\n</kb>',
+            );
+            expect(opts.messages[1].role).toBe('user');
+        });
+
+        it('does NOT prepend a `<kb>` block when all mentions resolve to null docs', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:ghost', reference: 'ghost', startOffset: 0, endOffset: 9 },
+            ]);
+            kbMentionResolver.resolveMentions.mockResolvedValue([
+                {
+                    mention: { raw: '@kb:ghost', reference: 'ghost', startOffset: 0, endOffset: 9 },
+                    document: null,
+                },
+            ] as any);
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            expect(mockedFormat).not.toHaveBeenCalled();
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            expect(opts.messages).toHaveLength(1);
+        });
+
+        it('skips injection entirely when no workId can be resolved', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 0, endOffset: 15 },
+            ]);
+
+            await service.handleCompletion(baseDto, { userId: 'u-1' });
+
+            expect(kbMentionResolver.resolveMentions).not.toHaveBeenCalled();
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            expect(opts.messages).toHaveLength(1);
+        });
+
+        it('finds the latest user message even when later messages have non-string content', async () => {
+            mockedParse.mockReturnValue([]);
+            const dto = {
+                model: 'gpt-4o',
+                messages: [
+                    { role: 'user', content: 'older message with @kb:brand/voice' },
+                    { role: 'assistant', content: 'reply' },
+                    // Latest user message — but content is null (e.g., multimodal placeholder).
+                    { role: 'user', content: null },
+                ],
+            } as any;
+
+            await service.handleCompletion(dto, { userId: 'u-1', workId: 'w-1' });
+
+            // Latest user message is the null-content one — v1 skips
+            // when latest user content is non-string. We don't scan
+            // earlier messages.
+            expect(mockedParse).not.toHaveBeenCalled();
+        });
+
+        it('degrades gracefully when resolveMentions throws — passes original messages through', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 6, endOffset: 21 },
+            ]);
+            kbMentionResolver.resolveMentions.mockRejectedValue(new Error('kb backend down'));
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            // No throw bubbles up; original messages preserved.
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            expect(opts.messages).toHaveLength(1);
+            expect(opts.messages[0].role).toBe('user');
         });
     });
 });
