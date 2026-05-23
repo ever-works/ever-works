@@ -8,6 +8,7 @@ import {
     KB_MIRROR_DOCUMENT_DISPATCHER,
     KB_BACKFILL_SKELETON_DISPATCHER,
     KB_EMBED_DOCUMENT_DISPATCHER,
+    KB_ORG_OVERLAY_FANOUT_DISPATCHER,
 } from '@ever-works/agent/tasks';
 
 @Global()
@@ -42,6 +43,10 @@ import {
             provide: KB_EMBED_DOCUMENT_DISPATCHER,
             useExisting: TriggerService,
         },
+        {
+            provide: KB_ORG_OVERLAY_FANOUT_DISPATCHER,
+            useExisting: TriggerService,
+        },
     ],
     exports: [
         TriggerService,
@@ -52,6 +57,7 @@ import {
         KB_MIRROR_DOCUMENT_DISPATCHER,
         KB_BACKFILL_SKELETON_DISPATCHER,
         KB_EMBED_DOCUMENT_DISPATCHER,
+        KB_ORG_OVERLAY_FANOUT_DISPATCHER,
     ],
 })
 export class TriggerModule {}

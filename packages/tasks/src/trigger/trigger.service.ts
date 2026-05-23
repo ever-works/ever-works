@@ -16,6 +16,8 @@ import {
     KbBackfillSkeletonDispatcher,
     KbEmbedDocumentPayload,
     KbEmbedDocumentDispatcher,
+    KbOrgOverlayFanoutPayload,
+    KbOrgOverlayFanoutDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
@@ -24,6 +26,7 @@ import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
 import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
 import { kbEmbedDocumentTask } from '../tasks/trigger/kb-embed-document.task';
+import { kbOrgOverlayFanoutTask } from '../tasks/trigger/kb-org-overlay-fanout.task';
 
 @Injectable()
 export class TriggerService
@@ -34,7 +37,8 @@ export class TriggerService
         WebhookDeliveryDispatcher,
         KbMirrorDocumentDispatcher,
         KbBackfillSkeletonDispatcher,
-        KbEmbedDocumentDispatcher
+        KbEmbedDocumentDispatcher,
+        KbOrgOverlayFanoutDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -266,6 +270,48 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch kb-embed-document task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-641 Phase 2/e row 37b — enqueue an org-overlay fanout run for one
+     * org-scope KB document mutation. The task body (row 37) iterates the
+     * pre-resolved `workIds` and calls `materializeOrgDocument` /
+     * `removeOrgDocument` per Work.
+     *
+     * Serializes per-org so two rapid org-doc edits don't race on writes
+     * against the same set of target Work repos. Keyed on `organizationId`
+     * (not on the cross product of org × Work) because each fanout already
+     * sequences its own Works in-task, and serializing per-Work would
+     * over-constrain throughput for orgs with many Works.
+     *
+     * Returns the Trigger.dev run id, or `null` when Trigger.dev is
+     * disabled / the dispatch threw — `KnowledgeBaseService` treats both
+     * as a deferred sync and relies on Phase 3 reconciliation to catch
+     * drift.
+     */
+    async dispatchKbOrgOverlayFanout(payload: KbOrgOverlayFanoutPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbOrgOverlayFanoutTask.trigger(payload, {
+                tags: [
+                    'kb-org-overlay-fanout',
+                    `op:${payload.operation}`,
+                    `org:${payload.organizationId}`,
+                    `doc:${payload.documentId}`,
+                    `targets:${payload.workIds.length}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-org-overlay:${payload.organizationId}`,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-org-overlay-fanout task', error as Error);
             return null;
         }
     }
