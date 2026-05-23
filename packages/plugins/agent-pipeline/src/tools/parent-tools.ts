@@ -253,17 +253,24 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	// `kbTools` is unset (OSS images, KB-disabled deployments) the
 	// pipeline runs with the same tool set as before — no behavior
 	// change on existing configurations.
-	const kbToolEntries = ctx.kbTools
-		? createKbTools(
-				{
-					workId: ctx.facadeOptions.workId,
-					userId: ctx.facadeOptions.userId,
-					facade: ctx.kbTools,
-					logger: ctx.logger
-				},
-				ctx.generatedByAgentRunId
-			)
-		: {};
+	//
+	// `FacadeOptions.workId` is optional in the contract; guard against
+	// the missing-workId case (test fixtures, ad-hoc CLI invocations).
+	// The agent-side facade requires a workId to scope KB operations
+	// against the right Work — without one the tools would fail at
+	// call time anyway, so we skip registration up front.
+	const kbToolEntries =
+		ctx.kbTools && ctx.facadeOptions.workId
+			? createKbTools(
+					{
+						workId: ctx.facadeOptions.workId,
+						userId: ctx.facadeOptions.userId,
+						facade: ctx.kbTools,
+						logger: ctx.logger
+					},
+					ctx.generatedByAgentRunId
+				)
+			: {};
 
 	return {
 		tools: {
