@@ -3614,7 +3614,8 @@
                     "pushing": "Pushing",
                     "succeeded": "Customized",
                     "failed": "Last run failed"
-                }
+                },
+                "syncBase": "Sync from base"
             },
             "dialog": {
                 "title": "Add custom template",
@@ -3691,7 +3692,10 @@
                 "defaultFailed": "Failed to update default template.",
                 "customizeFailed": "Failed to start template customization.",
                 "customizationSucceeded": "Template customization completed.",
-                "customizationFailed": "Template customization failed."
+                "customizationFailed": "Template customization failed.",
+                "syncBaseSuccess": "Template synced from its base.",
+                "syncBaseUpToDate": "Template is already up to date with its base.",
+                "syncBaseFailed": "Failed to sync template from base."
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -3752,6 +3756,14 @@
                     "browsePlugins": "Browse plugin catalog",
                     "noRuns": "No customization runs yet for this template."
                 }
+            },
+            "syncDialog": {
+                "title": "Sync from base template",
+                "description": "Sync this custom template to the latest built-in base template code.",
+                "templateLabel": "Custom template",
+                "cancel": "Cancel",
+                "submit": "Sync and replace",
+                "warning": "This replaces the custom template repository with the latest base template code, then pushes it to GitHub. AI styling and manual code changes in the template repo can be overwritten."
             }
         },
         "templateSelector": {

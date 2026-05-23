@@ -37,13 +37,13 @@ describe('customization prompt registry', () => {
         });
 
         it('reminds the agent it must not commit or push', () => {
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/No commits, no PRs/i);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/No commits (?:or|, no) PRs/i);
         });
 
-        it('points the agent at the canonical styling levers (global.css, BaseLayout, @theme)', () => {
+        it('points the agent at the canonical styling levers (global.css, BaseLayout, Tailwind tokens)', () => {
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/styles\/global\.css/);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/@theme/);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/--color-brand-/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/Tailwind v4 tokens/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/color tokens/i);
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/BaseLayout\.astro/);
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/data-component/);
         });
