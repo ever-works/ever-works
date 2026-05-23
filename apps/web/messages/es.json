@@ -2761,7 +2761,8 @@
                     "loading": "Loading citation…",
                     "missing": "Citation \"{raw}\" not found in this knowledge base.",
                     "error": "Failed to resolve citation ({error}).",
-                    "open": "Open document"
+                    "open": "Open document",
+                    "citedLabel": "Cited:"
                 },
                 "history": {
                     "title": "Document history",
