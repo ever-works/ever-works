@@ -1136,7 +1136,7 @@
             },
             "tabs": {
                 "overview": "Resumen",
-                "activity": "Activity Feed",
+                "activity": "Actividad",
                 "items": "Elementos",
                 "generator": "Generador",
                 "schedule": "Programación",
@@ -1146,7 +1146,13 @@
                 "deploy": "Implementar",
                 "members": "Miembros",
                 "settings": "Configuración",
-                "kb": "Knowledge Base"
+                "kb": "Base de conocimiento",
+                "tooltips": {
+                    "activity": "Feed de actividad",
+                    "kb": "Base de conocimiento",
+                    "generator": "Generar Work, una vez o según programación",
+                    "deploy": "Desplegar Work"
+                }
             },
             "members": {
                 "title": "Miembros del equipo",

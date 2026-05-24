@@ -1136,7 +1136,7 @@
             },
             "tabs": {
                 "overview": "Übersicht",
-                "activity": "Activity Feed",
+                "activity": "Aktivität",
                 "items": "Elemente",
                 "generator": "Generator",
                 "schedule": "Zeitplan",
@@ -1146,7 +1146,13 @@
                 "deploy": "Bereitstellen",
                 "members": "Mitglieder",
                 "settings": "Einstellungen",
-                "kb": "Knowledge Base"
+                "kb": "Wissensdatenbank",
+                "tooltips": {
+                    "activity": "Aktivitäts-Feed",
+                    "kb": "Wissensdatenbank",
+                    "generator": "Work generieren – einmalig oder nach Zeitplan",
+                    "deploy": "Work bereitstellen"
+                }
             },
             "members": {
                 "title": "Teammitglieder",
