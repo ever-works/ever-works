@@ -9,7 +9,7 @@ import {
     listProposalsAction,
     refreshProposalsAction,
 } from '@/app/actions/dashboard/work-proposals';
-import { WorkProposalCard } from './WorkProposalCard';
+import { IdeaCard } from '@/components/ideas';
 
 const POLL_INTERVAL_MS = 2_500;
 const POLL_MAX_MS = 120_000;
@@ -153,7 +153,7 @@ export function WorkProposalsSection({
             {proposals.length > 0 && (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {proposals.map((p) => (
-                        <WorkProposalCard key={p.id} proposal={p} onDismissed={handleDismissed} />
+                        <IdeaCard key={p.id} proposal={p} onDismissed={handleDismissed} />
                     ))}
                 </div>
             )}
