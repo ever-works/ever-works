@@ -80,10 +80,18 @@ export class WorkKnowledgeUpload {
     @Column({ type: 'text', nullable: true, name: 'extraction_error' })
     extractionError?: string | null;
 
-    @TimestampColumn({ nullable: true })
+    // EW-639 prod-hotfix: the 1779972 migration creates these columns
+    // as snake_case `extraction_started_at` / `extraction_finished_at`;
+    // without an explicit `name:` override TypeORM defaulted to the
+    // camelCase property name and Postgres rejected every upload with
+    // `QueryFailedError: column WorkKnowledgeUpload.extractionStartedAt
+    // does not exist`. Pass the snake_case names explicitly to match
+    // the migration. Same fix lands on `lastIndexedAt` over in the
+    // sibling `work-knowledge-document.entity.ts`.
+    @TimestampColumn({ nullable: true, name: 'extraction_started_at' })
     extractionStartedAt?: Date | null;
 
-    @TimestampColumn({ nullable: true })
+    @TimestampColumn({ nullable: true, name: 'extraction_finished_at' })
     extractionFinishedAt?: Date | null;
 
     /** The KB document this upload was extracted into, if any. */
