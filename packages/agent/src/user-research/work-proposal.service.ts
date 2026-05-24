@@ -6,7 +6,12 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { WorkProposalRepository } from './work-proposal.repository';
 import { permissiveWorkProposalsBatchSchema, type WorkProposalDraft } from './schemas';
 import { coerceWorkProposal } from './proposal-coercion';
-import { PROPOSALS_SYSTEM_PROMPT, buildProposalsPrompt } from './prompts';
+import {
+    PROPOSALS_SYSTEM_PROMPT,
+    buildProposalsPrompt,
+    type ExistingIdeaContext,
+    type MissionContext,
+} from './prompts';
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
@@ -26,6 +31,22 @@ export interface GenerateProposalsOptions {
     generationRunId?: string;
     /** Suppress generation when confidence is 'low'. Default true. */
     suppressLowConfidence?: boolean;
+    /**
+     * Phase 3 PR J — Mission-scoped generation context. When set,
+     * the prompt asks the model to bias every generated Idea
+     * toward the Mission's Goal description (and KB excerpts when
+     * supplied). Spawned Ideas should be persisted with
+     * `missionId = <mission.id>` by the caller (Mission tick
+     * worker), so this option carries the prompt-side payload
+     * separate from the FK-side wiring.
+     */
+    missionContext?: MissionContext;
+    /**
+     * Phase 1 PR C — when set, the FK on every persisted Idea
+     * gets this value (`source = MISSION` callers pass this so
+     * the Idea is back-linked to the spawning Mission).
+     */
+    missionId?: string;
 }
 
 @Injectable()
@@ -98,6 +119,21 @@ export class WorkProposalService {
         let tokensUsed = 0;
         let drafts: WorkProposalDraft[] = [];
 
+        // Phase 1 PR C / spec §3.3 — fetch every existing Idea (across
+        // all statuses incl. DONE / DISMISSED / FAILED) once, here, so:
+        //   (a) buildProposalsPrompt can render them as exclusion +
+        //       positive-context for the model, and
+        //   (b) the post-coercion dedupe loop below can use the same
+        //       set to filter out anything the model still produced
+        //       that matches an existing slug/title (belt-and-braces).
+        const existingProposals = await this.repo.findRecentByUser(userId).catch(() => []);
+        const existingIdeasContext: ExistingIdeaContext[] = existingProposals.map((p) => ({
+            title: p.title,
+            slug: p.slugSuggestion,
+            description: p.description,
+            status: p.status,
+        }));
+
         try {
             // Use the permissive schema so low-quality model output (sloppy
             // slugs, wrong enum values, off-by-one length bounds) doesn't
@@ -106,7 +142,13 @@ export class WorkProposalService {
             const result = await this.aiFacade.askJson(
                 [
                     PROPOSALS_SYSTEM_PROMPT,
-                    buildProposalsPrompt(profile, existingWorkNames, availablePluginIds),
+                    buildProposalsPrompt(
+                        profile,
+                        existingWorkNames,
+                        availablePluginIds,
+                        existingIdeasContext,
+                        opts.missionContext,
+                    ),
                 ].join('\n\n'),
                 permissiveWorkProposalsBatchSchema,
                 {
@@ -168,9 +210,12 @@ export class WorkProposalService {
             reasoning: p.reasoning,
             source: opts.source,
             generationRunId: opts.generationRunId,
+            // Phase 1 PR C — Mission tick worker passes missionId so
+            // the spawned Idea is back-linked to the originating
+            // Mission. NULL for non-Mission sources.
+            missionId: opts.missionId,
         }));
 
-        const existingProposals = await this.repo.findRecentByUser(userId).catch(() => []);
         const existingKeys = new Set(
             existingProposals.flatMap((proposal) => [
                 this.proposalKey(proposal.slugSuggestion),

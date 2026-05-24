@@ -1,5 +1,36 @@
 import type { User } from '../entities';
+import type { WorkProposalStatus } from '../entities/work-proposal.entity';
 import type { InferredProfile } from './schemas';
+
+/**
+ * Mission-context payload passed to `buildProposalsPrompt` by the
+ * Mission tick worker (Phase 3 PR J). When present, the prompt is
+ * instructed to bias every generated Idea toward this Mission's
+ * Goal description and KB excerpts.
+ *
+ * `description` is the Mission's Goal text — the same prompt the
+ * user typed when creating the Mission. `kbExcerpts` is optional;
+ * the Mission tick worker reads the Mission's `.works/` KB seed
+ * paths (Phase 8 PR JJ) and packs short excerpts here when room.
+ */
+export interface MissionContext {
+    description: string;
+    kbExcerpts?: string[];
+}
+
+/**
+ * Compact view of a single existing Idea — title + slug + short
+ * description + status — passed to the proposal generator as both
+ * an exclusion list (don't re-suggest these) AND a positive
+ * context signal (the user has explored these areas; lean into or
+ * around them per the per-status hint). Spec §3.3, Decision A4.
+ */
+export interface ExistingIdeaContext {
+    title: string;
+    slug: string;
+    description: string;
+    status: WorkProposalStatus;
+}
 
 export const USER_RESEARCH_AGENT_PROMPT = `You are a research assistant for Ever Works, a platform that helps people build content-rich directory websites called "Works".
 
@@ -96,20 +127,90 @@ export function buildSeedPrompt(user: User, socials: string[]): string {
     return lines.join('\n');
 }
 
+/** Hard cap on Idea-context entries injected into the prompt — keeps
+ *  the token budget bounded even for users with hundreds of Ideas. */
+const MAX_EXISTING_IDEAS_IN_PROMPT = 50;
+
+/** Per-entry description truncation when rendering existing Ideas
+ *  into the prompt. Long descriptions add tokens fast. */
+const EXISTING_IDEA_DESC_MAX_CHARS = 140;
+
 export function buildProposalsPrompt(
     profile: InferredProfile,
     existingWorkNames: string[],
     availablePluginIds: string[],
+    /**
+     * Phase 1 PR C / spec §3.3 — optional context list of EVERY
+     * existing Idea (across ALL statuses incl. DONE / DISMISSED /
+     * FAILED). The generator uses this both to avoid literal
+     * duplicates AND as a positive signal of what the user is
+     * interested in. Suggesting net-new directions adjacent to
+     * what's been tried is better than blank-slate riffing.
+     *
+     * Optional + back-compat default `[]` so existing callers
+     * that haven't been updated yet still produce a valid prompt.
+     */
+    existingIdeas: ExistingIdeaContext[] = [],
+    /**
+     * Phase 3 PR J — optional Mission-scoped context. When
+     * present, the prompt asks the model to bias every
+     * generated Idea toward this Mission's Goal description and
+     * any KB excerpts the tick worker passed along.
+     */
+    missionContext?: MissionContext,
 ): string {
     const lines: string[] = [];
     lines.push('## Inferred user profile');
     lines.push(JSON.stringify(profile, null, 2));
     lines.push('');
+
+    if (missionContext) {
+        lines.push('## Mission context — bias all proposals toward this Goal');
+        lines.push(missionContext.description.trim());
+        if (missionContext.kbExcerpts && missionContext.kbExcerpts.length > 0) {
+            lines.push('');
+            lines.push('### Background excerpts from the Mission KB');
+            for (const excerpt of missionContext.kbExcerpts) {
+                lines.push(`- ${excerpt.trim()}`);
+            }
+        }
+        lines.push('');
+        lines.push(
+            'Every proposal you generate MUST advance the Mission above. Reject directions that do not.',
+        );
+        lines.push('');
+    }
+
     if (existingWorkNames.length > 0) {
         lines.push('## Works the user already has (avoid duplicating these)');
         existingWorkNames.forEach((n) => lines.push(`- ${n}`));
         lines.push('');
     }
+
+    if (existingIdeas.length > 0) {
+        lines.push(
+            "## The user's existing Ideas (do NOT re-suggest these; use as context for what they care about)",
+        );
+        lines.push(
+            'Each row includes the status — for done Ideas the Work has shipped, for dismissed Ideas the user rejected the direction, for pending/queued/building/failed the work is in motion. Use this signal: lean adjacent to ACCEPTED themes, avoid replays of DISMISSED ones.',
+        );
+        lines.push('');
+        const limited = existingIdeas.slice(0, MAX_EXISTING_IDEAS_IN_PROMPT);
+        for (const idea of limited) {
+            const desc = idea.description
+                .trim()
+                .replace(/\s+/g, ' ')
+                .slice(0, EXISTING_IDEA_DESC_MAX_CHARS);
+            lines.push(`- [${idea.status}] "${idea.title}" (${idea.slug}) — ${desc}`);
+        }
+        if (existingIdeas.length > MAX_EXISTING_IDEAS_IN_PROMPT) {
+            lines.push(
+                `- … and ${existingIdeas.length - MAX_EXISTING_IDEAS_IN_PROMPT} older Ideas omitted for brevity.`,
+            );
+        }
+        lines.push('');
+    }
+
     lines.push('## Available plugin IDs (use only these)');
     lines.push(availablePluginIds.join(', '));
     lines.push('');
