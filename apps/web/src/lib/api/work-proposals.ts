@@ -164,4 +164,22 @@ export const workProposalsAPI = {
             wrapInData: false,
         });
     },
+
+    // Phase 7 PR U — per-Idea current-period spend + GLOBAL cap
+    // status. Shape mirrors missionsAPI.getBudget exactly so the
+    // shared BudgetSummaryCard can render either without
+    // branching. Re-using the type from the missions client keeps
+    // the wire contract single-sourced.
+    async getBudget(id: string): Promise<OwnerBudgetSummary> {
+        return serverFetch<OwnerBudgetSummary>(`/me/work-proposals/${id}/budget`, {
+            method: 'GET',
+        });
+    },
 };
+
+// Phase 7 PR U — single-source the OwnerBudgetSummary type. Defined
+// alongside the missions client (the first consumer) and re-exported
+// here so the work-proposals client / its consumers can import from
+// either location.
+import type { OwnerBudgetSummary } from './missions';
+export type { OwnerBudgetSummary };

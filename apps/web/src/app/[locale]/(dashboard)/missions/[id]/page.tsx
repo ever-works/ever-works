@@ -46,7 +46,11 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // "Related Works (inherited)" read-only panel. Decision A26:
     // Works are NOT copied during Clone, but the cloned Mission's
     // detail page surfaces them as inherited references.
-    const [ideas, sourceMission, sourceAcceptedIdeas] = await Promise.all([
+    // Phase 7 PR V — also fetch the per-Mission budget summary so
+    // the Spend section can render real data instead of the PR GG
+    // placeholder. Defensive catch — a flaky budget endpoint
+    // surfaces the empty state, never 500s the detail page.
+    const [ideas, sourceMission, sourceAcceptedIdeas, budget] = await Promise.all([
         workProposalsAPI
             .list(
                 ['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'],
@@ -61,6 +65,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
                   .list(['accepted'], { missionId: mission.sourceMissionId })
                   .catch(() => [])
             : Promise.resolve([]),
+        missionsAPI.getBudget(id).catch(() => null),
     ]);
 
     return (
@@ -69,6 +74,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             ideas={ideas}
             sourceMission={sourceMission}
             inheritedIdeas={sourceAcceptedIdeas}
+            budget={budget}
         />
     );
 }

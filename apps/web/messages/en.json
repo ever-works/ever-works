@@ -562,6 +562,17 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
         "missionDetail": {
             "backToMissions": "Back to Missions",
             "badges": {

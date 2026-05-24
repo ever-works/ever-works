@@ -60,6 +60,27 @@ export interface CloneMissionResult {
     ideasSkipped: number;
 }
 
+/**
+ * Phase 7 PR U — shape returned by the `GET /:id/budget` endpoints
+ * (both `/me/missions/:id/budget` and `/me/work-proposals/:id/budget`
+ * return the same envelope; the discriminator is `ownerType`).
+ * Lives here on the missions client since the Mission detail page
+ * is the first surface; re-exported for the work-proposals client
+ * to consume.
+ */
+export interface OwnerBudgetSummary {
+    ownerType: 'work' | 'mission' | 'idea';
+    ownerId: string;
+    periodStart: string;
+    periodEnd: string;
+    currentSpendCents: number;
+    capCents: number | null;
+    currency: string;
+    percentUsed: number | null;
+    allowOverage: boolean;
+    blocked: boolean;
+}
+
 /** Phase 3 PR J — shape of the `POST /:id/run-now` response. */
 export interface MissionRunNowResponse {
     status:
@@ -158,6 +179,16 @@ export const missionsAPI = {
             data: title ? { title } : {},
             method: 'POST',
             wrapInData: false,
+        });
+    },
+
+    // Phase 7 PR U — per-Mission current-period spend + GLOBAL cap
+    // status. Throws on network failure; callers (Mission detail
+    // page) catch + render the friendly empty surface so a flaky
+    // API doesn't 500 the page.
+    async getBudget(id: string): Promise<OwnerBudgetSummary> {
+        return serverFetch<OwnerBudgetSummary>(`/me/missions/${id}/budget`, {
+            method: 'GET',
         });
     },
 };

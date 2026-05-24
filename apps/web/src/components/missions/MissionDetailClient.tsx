@@ -37,9 +37,10 @@ import {
     runMissionNowAction,
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
-import type { Mission } from '@/lib/api/missions';
+import type { Mission, OwnerBudgetSummary } from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
+import { BudgetSummaryCard } from '@/components/budgets';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
@@ -87,6 +88,13 @@ export interface MissionDetailClientProps {
      * references.
      */
     inheritedIdeas?: WorkProposal[];
+    /**
+     * Phase 7 PR V — current-period spend + cap status for this
+     * Mission, fetched server-side via `missionsAPI.getBudget`.
+     * `null` when the budget endpoint failed (the Spend section
+     * gracefully falls back to its empty surface).
+     */
+    budget?: OwnerBudgetSummary | null;
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -99,6 +107,7 @@ export function MissionDetailClient({
     ideas,
     sourceMission = null,
     inheritedIdeas = [],
+    budget = null,
 }: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
@@ -484,15 +493,25 @@ export function MissionDetailClient({
                     </p>
                 </section>
                 <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                         <BarChart3 className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                         <h2 className="text-sm font-semibold text-text dark:text-text-dark">
                             {t('sections.spend')}
                         </h2>
                     </div>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('spend.empty')}
-                    </p>
+                    {/* Phase 7 PR V — real BudgetSummaryCard replaces the
+                        PR GG v1 placeholder when the budget endpoint
+                        returns. Page-level fetch already catch-defended
+                        so `budget = null` only when the API failed —
+                        keep the original placeholder copy in that
+                        branch so the section still occupies its slot. */}
+                    {budget ? (
+                        <BudgetSummaryCard summary={budget} />
+                    ) : (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('spend.empty')}
+                        </p>
+                    )}
                 </section>
             </div>
 
