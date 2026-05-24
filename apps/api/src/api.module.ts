@@ -32,6 +32,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
+import { MissionsModule } from './missions/missions.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -100,6 +101,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TemplateCatalogModule,
         WorkProposalsModule,
         WorkAgentModule,
+        // Missions/Ideas/Works (spec 2026-05-24) — Phase 3 PR G:
+        // skeleton module exposing GET /me/missions. CRUD + lifecycle
+        // ship in PR H; Clone in PR HH; tick worker (Trigger.dev) in PR J.
+        MissionsModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

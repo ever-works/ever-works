@@ -140,6 +140,10 @@
         "./work-agent": {
             "types": "./dist/work-agent/index.d.ts",
             "default": "./dist/work-agent/index.js"
+        },
+        "./missions": {
+            "types": "./dist/missions/index.d.ts",
+            "default": "./dist/missions/index.js"
         }
     },
     "scripts": {
