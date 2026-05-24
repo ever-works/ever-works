@@ -1,23 +1,52 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseUUIDPipe,
+    Patch,
+    Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { MissionsService, type MissionDto } from '@ever-works/agent/missions';
+import { Throttle } from '@nestjs/throttler';
+import {
+    MissionsService,
+    type MissionDto,
+    type MissionGuardrailsOverride,
+} from '@ever-works/agent/missions';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
 
 /**
- * Phase 3 PR G — MissionsController skeleton (Missions/Ideas/Works
- * build).
+ * Phase 3 PR H — full Missions CRUD + lifecycle surface
+ * (Missions/Ideas/Works build).
  *
- * Ships only the `GET /me/missions` list endpoint so the module
- * boots cleanly and `/api/me/missions` round-trips (returning []
- * for users with no Missions yet). Phase 3 PR H adds the full
- * CRUD + lifecycle surface (create / get-one / update / pause /
- * resume / complete / delete / run-now); Phase 3 PR HH adds
- * `POST /:id/clone`.
+ * Endpoints:
+ *   GET    /api/me/missions              list mine
+ *   POST   /api/me/missions              create
+ *   GET    /api/me/missions/:id          get one
+ *   PATCH  /api/me/missions/:id          partial update
+ *   DELETE /api/me/missions/:id          delete (any status)
+ *   POST   /api/me/missions/:id/pause    ACTIVE → PAUSED
+ *   POST   /api/me/missions/:id/resume   PAUSED → ACTIVE
+ *   POST   /api/me/missions/:id/complete (ACTIVE | PAUSED) → COMPLETED
+ *   POST   /api/me/missions/:id/run-now  manually trigger a tick (placeholder)
  *
- * Decorated with `@ApiTags('missions')` + `@ApiOperation` per
+ * Phase 3 PR HH adds `POST /:id/clone`; PR J wires the actual
+ * Trigger.dev tick dispatch.
+ *
+ * Decorated with @ApiTags('missions') + @ApiOperation per
  * Decision A19 so the Phase 9 PR Z2 MCP whitelist auto-derivation
- * can pick the endpoint up without extra config.
+ * picks each route up.
+ *
+ * Write endpoints are rate-limited to 30/min — looser than the
+ * 10/min on /me/work-proposals (Phase 1 PR B) because Mission
+ * operations are coarser (one Mission tends to spawn many Ideas)
+ * and users may flip toggles via settings UI.
  */
 @ApiTags('missions')
 @Controller('api/me/missions')
@@ -29,5 +58,117 @@ export class MissionsController {
     @HttpCode(HttpStatus.OK)
     async list(@CurrentUser() auth: AuthenticatedUser): Promise<MissionDto[]> {
         return this.service.listForUser(auth.userId);
+    }
+
+    @Post()
+    @ApiOperation({ summary: 'Create a new mission' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async create(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateMissionDto,
+    ): Promise<MissionDto> {
+        return this.service.create(auth.userId, {
+            title: body.title,
+            description: body.description,
+            type: body.type,
+            schedule: body.schedule ?? null,
+            autoBuildWorks: body.autoBuildWorks,
+            outstandingIdeasCap: body.outstandingIdeasCap ?? null,
+            guardrailsOverride:
+                (body.guardrailsOverride as MissionGuardrailsOverride | null | undefined) ?? null,
+            missionTemplateRepo: body.missionTemplateRepo ?? null,
+        });
+    }
+
+    @Get(':id')
+    @ApiOperation({ summary: 'Get one mission' })
+    @HttpCode(HttpStatus.OK)
+    async getOne(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionDto> {
+        return this.service.getForUser(auth.userId, id);
+    }
+
+    @Patch(':id')
+    @ApiOperation({ summary: 'Update mission fields (partial)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async update(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: UpdateMissionDto,
+    ): Promise<MissionDto> {
+        return this.service.update(auth.userId, id, {
+            title: body.title,
+            description: body.description,
+            type: body.type,
+            schedule: body.schedule,
+            autoBuildWorks: body.autoBuildWorks,
+            outstandingIdeasCap: body.outstandingIdeasCap,
+            guardrailsOverride: body.guardrailsOverride as
+                | MissionGuardrailsOverride
+                | null
+                | undefined,
+            missionTemplateRepo: body.missionTemplateRepo,
+        });
+    }
+
+    @Delete(':id')
+    @ApiOperation({ summary: 'Delete a mission (allowed from any status)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ deleted: true }> {
+        return this.service.delete(auth.userId, id);
+    }
+
+    @Post(':id/pause')
+    @ApiOperation({ summary: 'Pause a mission (ACTIVE → PAUSED)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async pause(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionDto> {
+        return this.service.pause(auth.userId, id);
+    }
+
+    @Post(':id/resume')
+    @ApiOperation({ summary: 'Resume a paused mission (PAUSED → ACTIVE)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async resume(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionDto> {
+        return this.service.resume(auth.userId, id);
+    }
+
+    @Post(':id/complete')
+    @ApiOperation({ summary: 'Mark a mission complete ((ACTIVE|PAUSED) → COMPLETED)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    async complete(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionDto> {
+        return this.service.complete(auth.userId, id);
+    }
+
+    @Post(':id/run-now')
+    @ApiOperation({
+        summary: 'Manually trigger a mission tick (placeholder — actual dispatch lands in PR J)',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async runNow(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ status: 'noop-placeholder' | 'queued'; missionId: string }> {
+        return this.service.runNow(auth.userId, id);
     }
 }
