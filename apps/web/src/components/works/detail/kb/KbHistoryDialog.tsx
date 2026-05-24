@@ -127,7 +127,11 @@ export function KbHistoryDialog({ workId, docId, path, open, onClose }: KbHistor
             <div
                 className={cn(
                     'w-full max-w-xl rounded-lg border shadow-2xl',
-                    'border-border bg-card dark:border-border-dark dark:bg-card-primary-dark',
+                    // EW-639 dark-theme fix: see KbClassifyModal for context.
+                    // `card-primary-dark` is intentionally translucent
+                    // (#ffffff08) — wrong for a modal panel. `card-dark`
+                    // (#1e293b) is the solid elevated-surface convention.
+                    'border-border bg-card dark:border-border-dark dark:bg-card-dark',
                     'flex flex-col gap-2 p-4',
                 )}
             >
