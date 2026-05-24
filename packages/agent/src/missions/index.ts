@@ -11,6 +11,8 @@ export * from './mission-tick.service';
 // Phase 3 PR HH — Mission Clone (Full Fork). Exported so the API
 // controller can wire `POST /me/missions/:id/clone` to it.
 export * from './mission-clone.service';
+// Phase 8 PR X — Mission Templates catalog (curated list + helpers).
+export * from './mission-template.config';
 export {
     Mission,
     MissionStatus,
