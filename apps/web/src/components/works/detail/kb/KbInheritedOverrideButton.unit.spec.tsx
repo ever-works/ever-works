@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
@@ -10,8 +11,28 @@ vi.mock('@/app/actions/works/kb-document', () => ({
     overrideInheritedKbDocumentAction: actionMock,
 }));
 
+// KbInheritedOverrideButton now imports `useRouter` from
+// `@/i18n/navigation` (locale-aware). The legacy `next/navigation`
+// mock stays as a safety net in case any transitive code path still
+// hits it; both share the same hoisted `pushMock` so existing
+// assertions keep working.
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ push: pushMock }),
+}));
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: pushMock,
+        refresh: vi.fn(),
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 
 vi.mock('next-intl', () => ({

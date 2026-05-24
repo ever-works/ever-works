@@ -1,3 +1,4 @@
+import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -6,9 +7,29 @@ vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
 }));
 
-const routerRefreshMock = vi.fn();
+const { routerRefreshMock } = vi.hoisted(() => ({ routerRefreshMock: vi.fn() }));
+// KbLockControls now imports `useRouter` from `@/i18n/navigation`
+// (locale-aware). The legacy `next/navigation` mock stays as dead-code
+// protection; both share the hoisted `routerRefreshMock` so the existing
+// `routerRefreshMock.mockReset()` / `toHaveBeenCalled()` assertions
+// continue to work.
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ refresh: routerRefreshMock }),
+}));
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: vi.fn(),
+        refresh: routerRefreshMock,
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 
 vi.mock('@/components/ui/button', () => ({
