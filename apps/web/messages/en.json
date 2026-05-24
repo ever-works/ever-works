@@ -3860,6 +3860,11 @@
         "templates": {
             "title": "Templates",
             "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "Add custom template",
                 "customizeTemplate": "Create with AI",

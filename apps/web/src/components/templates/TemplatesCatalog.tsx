@@ -22,7 +22,11 @@ import {
     TriangleAlert,
     CheckCircle2,
     Wand2,
+    Target,
+    Globe,
+    FolderClosed,
 } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
 import type {
     CustomizationAiProvider,
     CustomizationProvider,
@@ -856,6 +860,12 @@ export function TemplatesCatalog({
                     <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
                         {t('subtitle')}
                     </p>
+                    {/* Phase 8 PR W — kind-switch segmented control.
+                        Mission Templates default per spec §10, Work
+                        Templates secondary, Website third. Navigation
+                        is via `?kind=...` query param so the server
+                        page can fetch the right list on render. */}
+                    <KindSwitcher current={kind} />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -1354,6 +1364,49 @@ export function TemplatesCatalog({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+        </div>
+    );
+}
+
+/**
+ * Phase 8 PR W — segmented control flipping between the three
+ * TemplateKind values. Mission Templates is rendered FIRST per
+ * spec §10 ("Mission Templates default"). Each pill is a Link
+ * to `/templates?kind=<value>` so the server page can refetch
+ * the appropriate template list on render — no client-side
+ * state involved.
+ */
+function KindSwitcher({ current }: { current: TemplateKind }) {
+    const t = useTranslations('dashboard.templates.kindSwitcher');
+    const items: Array<{ value: TemplateKind; label: string; Icon: typeof Target }> = [
+        // Mission first per spec §10.
+        { value: 'mission', label: t('mission'), Icon: Target },
+        // Works second.
+        { value: 'work', label: t('work'), Icon: FolderClosed },
+        // Website third (legacy default — kept for back-compat).
+        { value: 'website', label: t('website'), Icon: Globe },
+    ];
+    return (
+        <div className="mt-3 inline-flex rounded-lg border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark p-0.5">
+            {items.map(({ value, label, Icon }) => {
+                const isActive = current === value;
+                return (
+                    <Link
+                        key={value}
+                        href={`/templates?kind=${value}`}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors no-underline',
+                            isActive
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
+                        )}
+                        aria-current={isActive ? 'page' : undefined}
+                    >
+                        <Icon className="w-3.5 h-3.5" />
+                        {label}
+                    </Link>
+                );
+            })}
         </div>
     );
 }
