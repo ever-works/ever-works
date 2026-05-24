@@ -276,9 +276,25 @@ export class WorkProposalsApiService {
                 );
                 return;
             }
-            const generated = await this.proposals.generate(userId, { source });
+            // Phase 1 PR D — read the user's autoGenerateBatchSize pref
+            // (Phase 0 PR 0.4 column) and pass it through to the
+            // generator. NULL on the column → prompt builder applies
+            // its own hardcoded default (3). Wrapped in catch because
+            // pref-fetch failures must not block proposal generation —
+            // we just fall back to the default.
+            let targetCount: number | null = null;
+            try {
+                const prefs = await this.workAgent.getPreferences(userId);
+                targetCount = prefs.autoGenerateBatchSize ?? null;
+            } catch (err) {
+                this.logger.debug(
+                    `Pref-fetch for autoGenerateBatchSize failed for ${userId}; using default: ${(err as Error).message}`,
+                );
+            }
+
+            const generated = await this.proposals.generate(userId, { source, targetCount });
             this.logger.log(
-                `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}`,
+                `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}, target=${targetCount ?? 'default'}`,
             );
         } catch (err) {
             this.logger.error(

@@ -69,6 +69,17 @@ export class WorkAgentService {
         const preference = await this.findOrCreatePreferences(userId);
         const guardrails = this.mergeGuardrails(preference.guardrails, input);
 
+        // Tri-state semantics for the 4 promoted-constant columns
+        // (Phase 1 PR D): `undefined` in input means "leave existing
+        // value untouched" (PATCH-like); `null` means "reset to
+        // platform-hardcoded default" (NULL on the DB column).
+        // `nullable3rd` lets us distinguish those two cases instead of
+        // collapsing them via `??`.
+        const nullable3rd = <T>(
+            inputValue: T | null | undefined,
+            existing: T | null | undefined,
+        ): T | null | undefined => (inputValue === undefined ? (existing ?? null) : inputValue);
+
         const saved = await this.preferences.save({
             ...preference,
             enabled: input.enabled ?? preference.enabled,
@@ -76,6 +87,36 @@ export class WorkAgentService {
             dailySuggestionsEnabled:
                 input.dailySuggestionsEnabled ?? preference.dailySuggestionsEnabled,
             guardrails,
+            // 4 promoted constants — nullable on the DB side, tri-state
+            // input handling per nullable3rd above.
+            autoGenerateCadence: nullable3rd(
+                input.autoGenerateCadence,
+                preference.autoGenerateCadence,
+            ),
+            autoGenerateBatchSize: nullable3rd(
+                input.autoGenerateBatchSize,
+                preference.autoGenerateBatchSize,
+            ),
+            autoBuildThrottlePerDay: nullable3rd(
+                input.autoBuildThrottlePerDay,
+                preference.autoBuildThrottlePerDay,
+            ),
+            missionDefaultOutstandingCap: nullable3rd(
+                input.missionDefaultOutstandingCap,
+                preference.missionDefaultOutstandingCap,
+            ),
+            // Auto-retry policy — NOT NULL on the DB side, simple `??` works.
+            maxAutoRetries: input.maxAutoRetries ?? preference.maxAutoRetries,
+            backoffSeconds: input.backoffSeconds ?? preference.backoffSeconds,
+            exponentialBackoffFactor:
+                input.exponentialBackoffFactor ?? preference.exponentialBackoffFactor,
+            // Account-wide budget — cap is nullable; allowOverage is NOT NULL.
+            accountWideMonthlyCapCents: nullable3rd(
+                input.accountWideMonthlyCapCents,
+                preference.accountWideMonthlyCapCents,
+            ),
+            accountWideAllowOverage:
+                input.accountWideAllowOverage ?? preference.accountWideAllowOverage,
         });
 
         return this.toPreferencesDto(saved);
@@ -255,6 +296,21 @@ export class WorkAgentService {
                     autoApproveLowImpact: false,
                     dailySuggestionsEnabled: true,
                     guardrails: { ...DEFAULT_WORK_AGENT_GUARDRAILS },
+                    // Phase 1 PR D — explicit defaults match the DB
+                    // column defaults from migrations 0.4-0.6. The DB
+                    // would set these on INSERT anyway; setting them
+                    // here too keeps the in-memory entity shape
+                    // (visible in tests and in the API layer before
+                    // the row is reloaded) consistent with the DB row.
+                    autoGenerateCadence: null,
+                    autoGenerateBatchSize: null,
+                    autoBuildThrottlePerDay: null,
+                    missionDefaultOutstandingCap: null,
+                    maxAutoRetries: 2,
+                    backoffSeconds: 60,
+                    exponentialBackoffFactor: 2.0,
+                    accountWideMonthlyCapCents: null,
+                    accountWideAllowOverage: true,
                 }),
             );
         } catch (error) {
@@ -343,6 +399,20 @@ export class WorkAgentService {
             autoApproveLowImpact: preference.autoApproveLowImpact,
             dailySuggestionsEnabled: preference.dailySuggestionsEnabled,
             guardrails: preference.guardrails,
+            // Phase 1 PR D — surface the 4 promoted constants + 3
+            // auto-retry knobs + 2 account-wide budget knobs through
+            // the API. `?? null` normalizes `undefined` (TypeORM may
+            // return undefined for never-set nullable columns) to
+            // `null` so the JSON boundary is consistent.
+            autoGenerateCadence: preference.autoGenerateCadence ?? null,
+            autoGenerateBatchSize: preference.autoGenerateBatchSize ?? null,
+            autoBuildThrottlePerDay: preference.autoBuildThrottlePerDay ?? null,
+            missionDefaultOutstandingCap: preference.missionDefaultOutstandingCap ?? null,
+            maxAutoRetries: preference.maxAutoRetries,
+            backoffSeconds: preference.backoffSeconds,
+            exponentialBackoffFactor: preference.exponentialBackoffFactor,
+            accountWideMonthlyCapCents: preference.accountWideMonthlyCapCents ?? null,
+            accountWideAllowOverage: preference.accountWideAllowOverage,
         };
     }
 

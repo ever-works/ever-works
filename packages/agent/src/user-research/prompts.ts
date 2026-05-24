@@ -135,6 +135,17 @@ const MAX_EXISTING_IDEAS_IN_PROMPT = 50;
  *  into the prompt. Long descriptions add tokens fast. */
 const EXISTING_IDEA_DESC_MAX_CHARS = 140;
 
+/**
+ * Default count of Ideas to ask the model for per generation tick
+ * when the caller doesn't provide one (Phase 1 PR D). Matches the
+ * previous hardcoded "3-5" range's midpoint; user-pref
+ * `autoGenerateBatchSize` (Phase 0 PR 0.4) overrides when set.
+ * Clamped to 1–20 at the prompt-builder boundary.
+ */
+const DEFAULT_PROPOSALS_PER_TICK = 3;
+const MIN_PROPOSALS_PER_TICK = 1;
+const MAX_PROPOSALS_PER_TICK = 20;
+
 export function buildProposalsPrompt(
     profile: InferredProfile,
     existingWorkNames: string[],
@@ -158,6 +169,14 @@ export function buildProposalsPrompt(
      * any KB excerpts the tick worker passed along.
      */
     missionContext?: MissionContext,
+    /**
+     * Phase 1 PR D — number of Ideas to ask the model for. When
+     * omitted, defaults to `DEFAULT_PROPOSALS_PER_TICK`.
+     * `WorkAgentPreference.autoGenerateBatchSize` flows into here
+     * from the caller (WorkProposalsApiService). Clamped to
+     * [1, 20] to keep prompts and budgets bounded.
+     */
+    targetCount?: number,
 ): string {
     const lines: string[] = [];
     lines.push('## Inferred user profile');
@@ -214,7 +233,12 @@ export function buildProposalsPrompt(
     lines.push('## Available plugin IDs (use only these)');
     lines.push(availablePluginIds.join(', '));
     lines.push('');
-    lines.push('Generate 3-5 personalized Work proposals matching the schema.');
+
+    const clampedCount = Math.min(
+        MAX_PROPOSALS_PER_TICK,
+        Math.max(MIN_PROPOSALS_PER_TICK, Math.trunc(targetCount ?? DEFAULT_PROPOSALS_PER_TICK)),
+    );
+    lines.push(`Generate exactly ${clampedCount} personalized Work proposals matching the schema.`);
     return lines.join('\n');
 }
 

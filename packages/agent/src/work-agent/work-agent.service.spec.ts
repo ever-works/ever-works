@@ -106,6 +106,20 @@ describe('WorkAgentService', () => {
             autoApproveLowImpact: false,
             dailySuggestionsEnabled: true,
             guardrails: DEFAULT_WORK_AGENT_GUARDRAILS,
+            // Phase 1 PR D — the 4 promoted-constant columns
+            // default to NULL ("inherit platform-hardcoded default"),
+            // the 3 auto-retry columns default to non-null platform
+            // values (immediately effective), and the 2 account-wide
+            // budget columns default to (NULL cap, allowOverage=true).
+            autoGenerateCadence: null,
+            autoGenerateBatchSize: null,
+            autoBuildThrottlePerDay: null,
+            missionDefaultOutstandingCap: null,
+            maxAutoRetries: 2,
+            backoffSeconds: 60,
+            exponentialBackoffFactor: 2.0,
+            accountWideMonthlyCapCents: null,
+            accountWideAllowOverage: true,
         });
         expect(preferences.rows).toHaveLength(1);
     });

@@ -32,6 +32,14 @@ export interface GenerateProposalsOptions {
     /** Suppress generation when confidence is 'low'. Default true. */
     suppressLowConfidence?: boolean;
     /**
+     * Phase 1 PR D — number of Ideas to ask the model for. Caller
+     * (WorkProposalsApiService) passes `user.autoGenerateBatchSize`
+     * (Phase 0 PR 0.4 column). When omitted / null the prompt
+     * builder applies its own hardcoded default
+     * (DEFAULT_PROPOSALS_PER_TICK = 3). Clamped to 1-20.
+     */
+    targetCount?: number | null;
+    /**
      * Phase 3 PR J — Mission-scoped generation context. When set,
      * the prompt asks the model to bias every generated Idea
      * toward the Mission's Goal description (and KB excerpts when
@@ -148,6 +156,7 @@ export class WorkProposalService {
                         availablePluginIds,
                         existingIdeasContext,
                         opts.missionContext,
+                        opts.targetCount ?? undefined,
                     ),
                 ].join('\n\n'),
                 permissiveWorkProposalsBatchSchema,
