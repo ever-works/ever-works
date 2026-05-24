@@ -517,6 +517,46 @@
                 "label": "Suggested plugins"
             }
         },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed"
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            }
+        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
@@ -3367,6 +3407,7 @@
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
+                "ideas": "Ideas",
                 "works": "Works",
                 "plugins": "Plugins",
                 "templates": "Templates",

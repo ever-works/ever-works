@@ -22,6 +22,7 @@ import {
     Keyboard,
     Activity,
     LayoutTemplate,
+    Lightbulb,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,12 @@ export function DashboardSidebar({
 
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
+        // Phase 5 PR N — Ideas catalog. Placed between Dashboard and
+        // Works to match the spec §5.1 stats-tile order (Missions →
+        // Ideas → Works) so the nav reads the same direction. The
+        // Missions nav entry lands in Phase 6 PR Q and slots above
+        // this one.
+        { name: t('navigation.ideas'), href: ROUTES.DASHBOARD_IDEAS, icon: Lightbulb },
         {
             name: t('navigation.works'),
             href: ROUTES.DASHBOARD_WORKS,

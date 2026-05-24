@@ -68,6 +68,12 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Phase 5 PR N — dedicated Ideas catalog page (replaces the
+    // dashboard-preview-only surface from Phase 2). Sidebar nav
+    // entry + quick-add `+ Add` button + status-filter toggles +
+    // gears menu deep-linking to the auto-generate/auto-build
+    // settings anchors from Phase 4 PR L / PR EE.
+    DASHBOARD_IDEAS: '/ideas',
     DASHBOARD_WORKS: '/works',
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
