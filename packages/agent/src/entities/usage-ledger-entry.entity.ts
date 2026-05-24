@@ -13,6 +13,9 @@ import { User } from './user.entity';
 import { Work } from './work.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkGenerationHistory } from './work-generation-history.entity';
+// Import from the leaf-types file (NOT from work-budget.entity) — see
+// `_types.ts` for the cycle-break rationale.
+import { BudgetOwnerType } from './_types';
 
 export enum UsageLedgerTriggerType {
     MANUAL = 'manual',
@@ -30,6 +33,7 @@ export enum UsageLedgerStatus {
 @Index(['workId'])
 @Index(['createdAt'])
 @Index(['scheduleId'])
+@Index('idx_usage_ledger_entries_owner', ['ownerType', 'ownerId'])
 @Entity({ name: 'usage_ledger_entries' })
 export class UsageLedgerEntry {
     @PrimaryGeneratedColumn('uuid')
@@ -86,6 +90,21 @@ export class UsageLedgerEntry {
 
     @Column({ type: 'json', nullable: true })
     metadata?: Record<string, any> | null;
+
+    /**
+     * Polymorphic-owner discriminator (Missions/Ideas/Works spec §8.2).
+     * Backfilled to `'work'` by Phase 0 PR 0.3 for existing rows.
+     */
+    @Column({ type: 'varchar', length: 16, default: BudgetOwnerType.WORK })
+    ownerType: BudgetOwnerType;
+
+    /**
+     * UUID of the owning Work / Idea / Mission. Backfilled to
+     * `workId` for existing rows. See `WorkBudget.ownerId` for
+     * full rationale.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    ownerId?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;
