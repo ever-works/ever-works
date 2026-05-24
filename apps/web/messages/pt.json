@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Disponível quando a ação de substituição for lançada na linha 38d",
                     "overrideCtaBusy": "Criando fork…",
                     "overrideErrorFallback": "Não foi possível criar um fork do documento herdado. Tente novamente ou atualize a página."
+                },
+                "addDoc": {
+                    "button": "+ Adicionar",
+                    "title": "Criar um novo documento",
+                    "subtitle": "Escolha uma classe, dê um nome, adicione descrição e etiquetas opcionais. O editor abre após criar.",
+                    "classLabel": "Classe",
+                    "titleLabel": "Título",
+                    "titlePlaceholder": "ex.: princípios da voz da marca",
+                    "descriptionLabel": "Descrição (opcional)",
+                    "tagsLabel": "Etiquetas",
+                    "tagsPlaceholder": "Digite para pesquisar ou adicionar etiqueta, Enter para confirmar",
+                    "confirm": "Criar documento",
+                    "cancel": "Cancelar",
+                    "errorFallback": "Não foi possível criar o documento. Tente novamente.",
+                    "errorBusy": "Criando…"
+                },
+                "delete": {
+                    "docTooltip": "Excluir documento",
+                    "classTooltip": "Excluir todos os documentos em {class}",
+                    "docConfirmTitle": "Excluir documento?",
+                    "docConfirmBody": "{title} será removido permanentemente deste Work. Não pode ser desfeito.",
+                    "classConfirmTitle": "Excluir todos os {count} documentos em {class}?",
+                    "classConfirmBody": "Todos os documentos desta classe serão removidos permanentemente. Não pode ser desfeito.",
+                    "confirm": "Excluir",
+                    "cancel": "Cancelar",
+                    "errorFallback": "Não foi possível excluir. Tente novamente.",
+                    "errorBusy": "Excluindo…",
+                    "errorPartial": "Excluídos {ok}, falharam {failed}."
                 }
             }
         },

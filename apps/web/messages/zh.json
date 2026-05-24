@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "当 38d 行的覆盖操作发布后可用",
                     "overrideCtaBusy": "分叉中…",
                     "overrideErrorFallback": "无法分叉继承的文档。请重试或刷新页面。"
+                },
+                "addDoc": {
+                    "button": "+ 添加",
+                    "title": "创建新文档",
+                    "subtitle": "选择类别，命名文档，添加可选描述和标签。创建后将打开编辑器。",
+                    "classLabel": "类别",
+                    "titleLabel": "标题",
+                    "titlePlaceholder": "例如：品牌声音原则",
+                    "descriptionLabel": "描述（可选）",
+                    "tagsLabel": "标签",
+                    "tagsPlaceholder": "输入以搜索或添加标签，按 Enter 确认",
+                    "confirm": "创建文档",
+                    "cancel": "取消",
+                    "errorFallback": "无法创建文档。请重试。",
+                    "errorBusy": "创建中…"
+                },
+                "delete": {
+                    "docTooltip": "删除文档",
+                    "classTooltip": "删除 {class} 中的所有文档",
+                    "docConfirmTitle": "删除文档？",
+                    "docConfirmBody": "{title} 将从此 Work 中永久删除。无法撤销。",
+                    "classConfirmTitle": "删除 {class} 中的全部 {count} 个文档？",
+                    "classConfirmBody": "此类别中的所有文档将被永久删除。无法撤销。",
+                    "confirm": "删除",
+                    "cancel": "取消",
+                    "errorFallback": "无法删除。请重试。",
+                    "errorBusy": "删除中…",
+                    "errorPartial": "已删除 {ok}，失败 {failed}。"
                 }
             }
         },

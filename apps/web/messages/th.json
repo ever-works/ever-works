@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "พร้อมใช้งานเมื่อมีการส่งมอบการกระทำการเขียนทับในแถว 38d",
                     "overrideCtaBusy": "กำลังคัดลอก…",
                     "overrideErrorFallback": "ไม่สามารถสร้างสำเนาของเอกสารที่รับช่วงต่อได้ ลองอีกครั้งหรือรีเฟรชหน้า"
+                },
+                "addDoc": {
+                    "button": "+ เพิ่ม",
+                    "title": "สร้างเอกสารใหม่",
+                    "subtitle": "เลือกคลาส ตั้งชื่อเอกสาร เพิ่มคำอธิบายและแท็กตามต้องการ ตัวแก้ไขจะเปิดหลังจากสร้าง",
+                    "classLabel": "คลาส",
+                    "titleLabel": "ชื่อ",
+                    "titlePlaceholder": "เช่น หลักการเสียงของแบรนด์",
+                    "descriptionLabel": "คำอธิบาย (ไม่บังคับ)",
+                    "tagsLabel": "แท็ก",
+                    "tagsPlaceholder": "พิมพ์เพื่อค้นหาหรือเพิ่มแท็ก กด Enter เพื่อยืนยัน",
+                    "confirm": "สร้างเอกสาร",
+                    "cancel": "ยกเลิก",
+                    "errorFallback": "ไม่สามารถสร้างเอกสารได้ โปรดลองอีกครั้ง",
+                    "errorBusy": "กำลังสร้าง…"
+                },
+                "delete": {
+                    "docTooltip": "ลบเอกสาร",
+                    "classTooltip": "ลบเอกสารทั้งหมดใน {class}",
+                    "docConfirmTitle": "ลบเอกสารหรือไม่?",
+                    "docConfirmBody": "{title} จะถูกลบอย่างถาวรจาก Work นี้ ไม่สามารถยกเลิกได้",
+                    "classConfirmTitle": "ลบเอกสารทั้งหมด {count} ฉบับใน {class} หรือไม่?",
+                    "classConfirmBody": "เอกสารทั้งหมดในคลาสนี้จะถูกลบอย่างถาวร ไม่สามารถยกเลิกได้",
+                    "confirm": "ลบ",
+                    "cancel": "ยกเลิก",
+                    "errorFallback": "ไม่สามารถลบได้ โปรดลองอีกครั้ง",
+                    "errorBusy": "กำลังลบ…",
+                    "errorPartial": "ลบสำเร็จ {ok}, ล้มเหลว {failed}"
                 }
             }
         },
