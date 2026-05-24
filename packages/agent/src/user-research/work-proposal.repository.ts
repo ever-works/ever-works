@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
     WorkProposal,
     WorkProposalSource,
@@ -94,12 +94,84 @@ export class WorkProposalRepository {
         return (res.affected ?? 0) > 0;
     }
 
-    async markAccepted(id: string, userId: string, workId: string): Promise<boolean> {
+    /**
+     * Mark a proposal accepted (transition to ACCEPTED + record the
+     * `acceptedWorkId`), optionally limiting which source statuses
+     * the transition is valid from.
+     *
+     * Phase 1 PR B extends the original PENDING-only contract: the
+     * Goal-completion handler (Phase 1 PR FF) calls this with
+     * `fromStatuses = [BUILDING]` because by the time a Goal
+     * completes successfully the originating Idea is in BUILDING,
+     * not PENDING. The existing user-facing
+     * `POST /me/work-proposals/:id/accept` controller keeps calling
+     * with the default `[PENDING]` — back-compat preserved.
+     */
+    async markAccepted(
+        id: string,
+        userId: string,
+        workId: string,
+        fromStatuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+    ): Promise<boolean> {
         const res = await this.repository.update(
-            { id, userId, status: WorkProposalStatus.PENDING },
+            { id, userId, status: In(fromStatuses) },
             { status: WorkProposalStatus.ACCEPTED, acceptedWorkId: workId },
         );
         return (res.affected ?? 0) > 0;
+    }
+
+    /**
+     * Transition a proposal to `QUEUED` (Phase 1 PR B build-from-Idea
+     * flow). Valid only from `PENDING` or `FAILED` (a stuck BUILDING
+     * Idea needs the goal-completion or retry path, not re-queueing
+     * via this method). Clears `failureMessage` + `failureKind` so a
+     * post-retry build doesn't carry stale failure data.
+     */
+    async markQueuedForBuild(id: string, userId: string): Promise<boolean> {
+        const res = await this.repository.update(
+            {
+                id,
+                userId,
+                status: In([WorkProposalStatus.PENDING, WorkProposalStatus.FAILED]),
+            },
+            {
+                status: WorkProposalStatus.QUEUED,
+                failureMessage: null,
+                failureKind: null,
+            },
+        );
+        return (res.affected ?? 0) > 0;
+    }
+
+    /**
+     * Create a single user-typed Idea (`source = USER_MANUAL`,
+     * Phase 1 PR B `POST /me/work-proposals`). Auto-fills empty
+     * arrays for the structured-suggestion fields the AI-generated
+     * proposals normally carry — the user-manual Idea relies on the
+     * description alone, and the build pipeline (PR FF / Phase 7)
+     * can enrich during generation.
+     */
+    async createUserManual(input: {
+        userId: string;
+        title: string;
+        description: string;
+        slugSuggestion: string;
+    }): Promise<WorkProposal> {
+        return this.repository.save(
+            this.repository.create({
+                userId: input.userId,
+                title: input.title,
+                description: input.description,
+                slugSuggestion: input.slugSuggestion,
+                suggestedCategories: [],
+                suggestedFields: [],
+                recommendedPlugins: [],
+                generatedPrompt: input.description,
+                reasoning: 'Manually entered by user via +Add (spec §3.4).',
+                source: WorkProposalSource.USER_MANUAL,
+                status: WorkProposalStatus.PENDING,
+            }),
+        );
     }
 
     async countPendingByUser(userId: string): Promise<number> {

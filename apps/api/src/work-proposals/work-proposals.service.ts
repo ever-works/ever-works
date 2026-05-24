@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
-import { User } from '@ever-works/agent/entities';
+import { User, type WorkProposal } from '@ever-works/agent/entities';
 import { UserRepository } from '@ever-works/agent/database';
 import {
     UserResearchService,
@@ -12,6 +12,8 @@ import {
     WorkProposalSource,
     WorkProposalStatus,
 } from '@ever-works/agent/user-research';
+import { WorkAgentService } from '@ever-works/agent/work-agent';
+import type { WorkAgentGoalDto } from '@ever-works/agent/work-agent';
 
 export interface ScheduledBatchSummary {
     candidates: number;
@@ -37,6 +39,7 @@ export class WorkProposalsApiService {
         private readonly users: UserRepository,
         @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
         private readonly config: ConfigService,
+        private readonly workAgent: WorkAgentService,
     ) {}
 
     async list(
@@ -52,9 +55,71 @@ export class WorkProposalsApiService {
     }
 
     async accept(userId: string, proposalId: string, workId: string): Promise<boolean> {
-        const proposal = await this.proposals.getForUser(userId, proposalId);
-        if (!proposal) return false;
-        return this.proposals.markAccepted(userId, proposalId, workId);
+        // Existing user-facing accept: only valid from PENDING (today's
+        // contract — preserved). The shared helper now lives on the
+        // agent-side service so PR FF's Goal-completion handler can
+        // call it with `[BUILDING]` instead.
+        return this.proposals.acceptInternal(userId, proposalId, workId, [
+            WorkProposalStatus.PENDING,
+        ]);
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
+     * create. The user types a description; the service derives
+     * a title (placeholder until the AI titler ships in PR I),
+     * persists with source=USER_MANUAL, status=PENDING, and
+     * returns the new proposal.
+     */
+    async createUserManual(
+        userId: string,
+        input: { description: string; title?: string },
+    ): Promise<WorkProposal> {
+        const description = input.description?.trim() ?? '';
+        if (description.length < 10) {
+            throw new BadRequestException('description must be at least 10 characters');
+        }
+        return this.proposals.createUserManual(userId, {
+            description,
+            title: input.title,
+        });
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue an
+     * existing Idea for build. Transitions Idea to QUEUED + creates
+     * a `WorkAgentGoal` with `maxWorksPerRun=1` and `ideaId` set
+     * back to this Idea. On Goal completion (Phase 1 PR FF) the
+     * Goal-completion handler reads `ideaId` and calls
+     * `acceptInternal(userId, ideaId, workId, [BUILDING])` to
+     * finish the cycle.
+     *
+     * Returns the updated Idea + the freshly-created Goal.
+     */
+    async build(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (
+            existing.status !== WorkProposalStatus.PENDING &&
+            existing.status !== WorkProposalStatus.FAILED
+        ) {
+            throw new BadRequestException(
+                `Idea cannot be queued for build from status "${existing.status}". Allowed: pending, failed.`,
+            );
+        }
+        const proposal = await this.proposals.queueForBuild(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
     }
 
     async getForUser(userId: string, proposalId: string) {

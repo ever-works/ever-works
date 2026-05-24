@@ -117,6 +117,7 @@ export class WorkAgentService {
                         Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
                     agentPlanSummary,
                     approvalSummary,
+                    ideaId: input.ideaId ?? null,
                 }),
             );
 

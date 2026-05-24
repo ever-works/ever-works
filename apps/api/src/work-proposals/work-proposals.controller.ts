@@ -17,11 +17,14 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { WorkProposalStatus } from '@ever-works/agent/user-research';
+import type { WorkProposal } from '@ever-works/agent/entities';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
+    BuildWorkProposalResponseDto,
+    CreateWorkProposalDto,
     ListWorkProposalsQueryDto,
     UpdateWorkProposalPreferencesDto,
     type RefreshResponseDto,
@@ -30,6 +33,34 @@ import {
 
 const GENERIC_PROPOSAL_PROMPT =
     'Create a Work from this personalized idea. Research relevant items, categories, fields, and metadata based on the proposal details.';
+
+/**
+ * Shared map from WorkProposal entity → response DTO. Extracted in
+ * Phase 1 PR B so the three controller paths (`list()`, `getOne()`,
+ * `build()`) and the user-manual `createUserManual()` all return
+ * the same shape with the new missionId / failureMessage /
+ * failureKind fields.
+ */
+function toResponseDto(proposal: WorkProposal): WorkProposalResponseDto {
+    return {
+        id: proposal.id,
+        title: proposal.title,
+        description: proposal.description,
+        slugSuggestion: proposal.slugSuggestion,
+        suggestedCategories: proposal.suggestedCategories,
+        suggestedFields: proposal.suggestedFields,
+        recommendedPlugins: proposal.recommendedPlugins,
+        generatedPrompt: toProposalUserPrompt(proposal),
+        reasoning: proposal.reasoning,
+        source: proposal.source,
+        status: proposal.status,
+        acceptedWorkId: proposal.acceptedWorkId ?? null,
+        missionId: proposal.missionId ?? null,
+        failureMessage: proposal.failureMessage ?? null,
+        failureKind: proposal.failureKind ?? null,
+        generatedAt: proposal.generatedAt,
+    };
+}
 
 function toProposalUserPrompt(proposal: {
     title: string;
@@ -56,6 +87,30 @@ function toProposalUserPrompt(proposal: {
 export class WorkProposalsController {
     constructor(private readonly service: WorkProposalsApiService) {}
 
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
+     * create. Body: `{ description, title? }`. Returns the new
+     * Idea row. Title is derived from the description until the
+     * AI shared titler ships in PR I.
+     *
+     * @Throttle: 10 per minute matches the modest cadence a real
+     * user would create Ideas via the +Add quick-add (spec §3.4).
+     */
+    @Post()
+    @ApiOperation({ summary: 'Create a user-typed Idea (USER_MANUAL source)' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async createUserManual(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateWorkProposalDto,
+    ): Promise<WorkProposalResponseDto> {
+        const created = await this.service.createUserManual(auth.userId, {
+            description: body.description,
+            title: body.title,
+        });
+        return toResponseDto(created);
+    }
+
     @Get()
     @ApiOperation({ summary: 'List my work proposals' })
     @HttpCode(HttpStatus.OK)
@@ -70,24 +125,7 @@ export class WorkProposalsController {
         const proposals = await this.service.list(auth.userId, statuses, {
             missionId: query.missionId,
         });
-        return proposals.map((p) => ({
-            id: p.id,
-            title: p.title,
-            description: p.description,
-            slugSuggestion: p.slugSuggestion,
-            suggestedCategories: p.suggestedCategories,
-            suggestedFields: p.suggestedFields,
-            recommendedPlugins: p.recommendedPlugins,
-            generatedPrompt: toProposalUserPrompt(p),
-            reasoning: p.reasoning,
-            source: p.source,
-            status: p.status,
-            acceptedWorkId: p.acceptedWorkId ?? null,
-            missionId: p.missionId ?? null,
-            failureMessage: p.failureMessage ?? null,
-            failureKind: p.failureKind ?? null,
-            generatedAt: p.generatedAt,
-        }));
+        return proposals.map(toResponseDto);
     }
 
     @Get('status')
@@ -157,24 +195,7 @@ export class WorkProposalsController {
     ): Promise<WorkProposalResponseDto> {
         const proposal = await this.service.getForUser(auth.userId, id);
         if (!proposal) throw new NotFoundException('Proposal not found');
-        return {
-            id: proposal.id,
-            title: proposal.title,
-            description: proposal.description,
-            slugSuggestion: proposal.slugSuggestion,
-            suggestedCategories: proposal.suggestedCategories,
-            suggestedFields: proposal.suggestedFields,
-            recommendedPlugins: proposal.recommendedPlugins,
-            generatedPrompt: toProposalUserPrompt(proposal),
-            reasoning: proposal.reasoning,
-            source: proposal.source,
-            status: proposal.status,
-            acceptedWorkId: proposal.acceptedWorkId ?? null,
-            missionId: proposal.missionId ?? null,
-            failureMessage: proposal.failureMessage ?? null,
-            failureKind: proposal.failureKind ?? null,
-            generatedAt: proposal.generatedAt,
-        };
+        return toResponseDto(proposal);
     }
 
     @Patch(':id/dismiss')
@@ -189,6 +210,37 @@ export class WorkProposalsController {
         if (!ok) {
             throw new NotFoundException('Proposal not found or not pending');
         }
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
+     * an Idea for build. Transitions to QUEUED + creates a
+     * WorkAgentGoal (`maxWorksPerRun=1`, `ideaId` set) so the
+     * goal-completion handler (PR FF) can transition the Idea
+     * to ACCEPTED with the new Work when the build finishes.
+     */
+    @Post(':id/build')
+    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent goal pipeline' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async build(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.build(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return {
+            proposal: toResponseDto(result.proposal),
+            goal: {
+                id: result.goal.id,
+                instruction: result.goal.instruction,
+                status: result.goal.status,
+                dryRun: result.goal.dryRun,
+                createdAt: result.goal.createdAt,
+            },
+        };
     }
 
     @Post(':id/accept')

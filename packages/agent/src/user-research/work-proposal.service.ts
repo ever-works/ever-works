@@ -233,6 +233,74 @@ export class WorkProposalService {
         return this.repo.markAccepted(proposalId, userId, workId);
     }
 
+    /**
+     * Shared accept-flow helper called by BOTH the existing
+     * `POST /me/work-proposals/:id/accept` controller (passing
+     * `fromStatuses = [PENDING]`, preserving today's contract) AND
+     * the Goal-completion handler (Phase 1 PR FF, passing
+     * `fromStatuses = [BUILDING]`). PLAN Decision A3.
+     *
+     * Returns `false` when the proposal doesn't exist for this
+     * user or is not currently in one of the allowed source
+     * statuses (idempotent — re-acceptance is a no-op).
+     */
+    async acceptInternal(
+        userId: string,
+        proposalId: string,
+        workId: string,
+        fromStatuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+    ): Promise<boolean> {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) return false;
+        return this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+    }
+
+    /**
+     * Transition an Idea to QUEUED for build (Phase 1 PR B
+     * `POST /me/work-proposals/:id/build`). Returns the freshly-
+     * read Idea on success, `null` if the Idea doesn't exist for
+     * the user or its status doesn't allow queuing.
+     */
+    async queueForBuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
+        const ok = await this.repo.markQueuedForBuild(proposalId, userId);
+        if (!ok) return null;
+        return this.repo.findByIdForUser(proposalId, userId);
+    }
+
+    /**
+     * Create a user-typed Idea (`source = USER_MANUAL`, Phase 1
+     * PR B `POST /me/work-proposals`). Title defaults to a
+     * derivation of the description when the caller doesn't
+     * provide one — Phase 3 PR I will swap in the AI-generated
+     * shared titler call when it lands.
+     */
+    async createUserManual(
+        userId: string,
+        input: { description: string; title?: string },
+    ): Promise<WorkProposal> {
+        const description = input.description.trim();
+        const title = (input.title?.trim() || this.deriveTitle(description)).slice(0, 120);
+        const slugSuggestion = this.proposalKey(title).slice(0, 80) || 'untitled-idea';
+        return this.repo.createUserManual({
+            userId,
+            title,
+            description,
+            slugSuggestion,
+        });
+    }
+
+    /**
+     * Cheap derivation of a title from a free-text description.
+     * Used as a placeholder until the shared AI titler ships in
+     * Phase 3 PR I. Keep simple — first sentence-ish, clipped to
+     * 80 chars, fallback to "Untitled Idea" when empty.
+     */
+    private deriveTitle(description: string): string {
+        const firstLine = description.split(/[.\n]/, 1)[0]?.trim() ?? '';
+        const trimmed = firstLine.slice(0, 80).trim();
+        return trimmed || 'Untitled Idea';
+    }
+
     async getForUser(userId: string, proposalId: string) {
         return this.repo.findByIdForUser(proposalId, userId);
     }

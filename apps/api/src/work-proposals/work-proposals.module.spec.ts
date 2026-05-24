@@ -17,12 +17,24 @@ jest.mock('@ever-works/agent/user-research', () => ({
         AUTO_SIGNUP: 'auto-signup',
         USER_REFRESH: 'user-refresh',
         SCHEDULED: 'scheduled',
+        USER_MANUAL: 'user-manual',
+        MISSION: 'mission',
     },
     WorkProposalStatus: {
         PENDING: 'pending',
         DISMISSED: 'dismissed',
         ACCEPTED: 'accepted',
+        QUEUED: 'queued',
+        BUILDING: 'building',
+        FAILED: 'failed',
     },
+}));
+// Phase 1 PR B — WorkProposalsApiService now imports WorkAgentService
+// from @ever-works/agent/work-agent; matching the other deep-import
+// stubs in this file.
+jest.mock('@ever-works/agent/work-agent', () => ({
+    WorkAgentService: class WorkAgentService {},
+    WorkAgentModule: class WorkAgentModule {},
 }));
 jest.mock('@ever-works/agent/config', () => ({
     config: { trigger: { shouldUseTrigger: jest.fn(() => false) } },

@@ -16,6 +16,19 @@ export interface UpdateWorkAgentPreferencesInput extends Partial<WorkAgentGuardr
 export interface CreateWorkAgentGoalInput extends Partial<WorkAgentGuardrails> {
     instruction: string;
     dryRun?: boolean;
+    /**
+     * Optional FK to the originating `WorkProposal` (Idea) when this
+     * Goal was created by the build-from-Idea path (Phase 1 PR B,
+     * `POST /me/work-proposals/:id/build`). Persisted on the Goal
+     * so the Goal-completion handler (Phase 1 PR FF) can join back
+     * to the Idea — on success calls `acceptInternal(ideaId, workId)`
+     * to transition the Idea to ACCEPTED with the new Work; on
+     * failure persists `failureMessage` + `failureKind` on the Idea.
+     *
+     * NULL for the existing direct-queue path
+     * (`POST /me/work-agent/goals`). PLAN Decision A3.
+     */
+    ideaId?: string;
 }
 
 export interface WorkAgentPreferencesDto {

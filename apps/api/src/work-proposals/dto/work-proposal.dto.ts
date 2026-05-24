@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+    IsArray,
+    IsBoolean,
+    IsEnum,
+    IsOptional,
+    IsString,
+    IsUUID,
+    MaxLength,
+    MinLength,
+} from 'class-validator';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
 import { IdeaFailureKind } from '@ever-works/agent/entities';
 
@@ -43,6 +52,42 @@ export class AcceptWorkProposalDto {
     @IsUUID()
     workId: string;
 }
+
+/**
+ * Phase 1 PR B — body for `POST /me/work-proposals` user-manual
+ * create. Description is the only required field; title is auto-
+ * derived if absent (placeholder until the AI titler ships in
+ * PR I).
+ */
+export class CreateWorkProposalDto {
+    @ApiProperty({
+        description:
+            'Free-text Idea description. The build pipeline uses this as the prompt to generate the Work.',
+        minLength: 10,
+        maxLength: 5000,
+    })
+    @IsString()
+    @MinLength(10)
+    @MaxLength(5000)
+    description: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Optional short title. When omitted, the service derives one from the description (placeholder for the AI-generated title from the shared titler in Phase 3 PR I).',
+        maxLength: 120,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    title?: string;
+}
+
+// `BuildWorkProposalResponseDto` is declared AFTER
+// `WorkProposalResponseDto` further down — it references that class
+// in a decorator, and JS class declarations are not hoisted (unlike
+// function declarations), so referencing the class before its
+// declaration line throws ReferenceError at module-init time.
 
 export class UpdateWorkProposalPreferencesDto {
     @ApiProperty({
@@ -150,6 +195,35 @@ export class WorkProposalResponseDto {
 
     @ApiProperty()
     generatedAt: Date;
+}
+
+/**
+ * Phase 1 PR B — response shape for `POST /me/work-proposals/:id/build`.
+ * Returns both the Idea after the QUEUED transition AND a compact
+ * view of the WorkAgentGoal the build pipeline just created (so the
+ * UI can show "build queued, goal id=…").
+ *
+ * Declared AFTER `WorkProposalResponseDto` because it references that
+ * class in a decorator — JS class declarations are not hoisted, so
+ * declaring this earlier would throw ReferenceError at module init.
+ */
+export class BuildWorkProposalResponseDto {
+    @ApiProperty({
+        description: 'The Idea row after the QUEUED transition.',
+        type: () => WorkProposalResponseDto,
+    })
+    proposal: WorkProposalResponseDto;
+
+    @ApiProperty({
+        description: 'The WorkAgentGoal that the build pipeline just created.',
+    })
+    goal: {
+        id: string;
+        instruction: string;
+        status: string;
+        dryRun: boolean;
+        createdAt: Date;
+    };
 }
 
 export class RefreshResponseDto {

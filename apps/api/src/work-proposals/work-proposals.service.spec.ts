@@ -36,12 +36,27 @@ jest.mock(
             USER_REFRESH: 'user-refresh',
             DISCOVER: 'discover',
             SCHEDULED: 'scheduled',
+            USER_MANUAL: 'user-manual',
+            MISSION: 'mission',
         },
         WorkProposalStatus: {
             PENDING: 'pending',
             DISMISSED: 'dismissed',
             ACCEPTED: 'accepted',
+            QUEUED: 'queued',
+            BUILDING: 'building',
+            FAILED: 'failed',
         },
+    }),
+    { virtual: true },
+);
+
+// Phase 1 PR B — WorkProposalsApiService now injects WorkAgentService.
+// Stub the barrel for the same deep-import-chain reason as the others.
+jest.mock(
+    '@ever-works/agent/work-agent',
+    () => ({
+        WorkAgentService: class WorkAgentService {},
     }),
     { virtual: true },
 );
@@ -70,6 +85,17 @@ describe('WorkProposalsApiService', () => {
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
+        // Phase 1 PR B — WorkProposalsApiService now injects
+        // WorkAgentService for the build-from-Idea path. Stubbed
+        // with a minimal `createGoal` so the existing refresh /
+        // accept / dismiss specs (which don't exercise build) keep
+        // working unchanged.
+        const workAgent = {
+            createGoal: jest.fn().mockResolvedValue({
+                goal: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
+                run: { id: 'r1' },
+            }),
+        };
         const svc = new WorkProposalsApiService(
             research as never,
             proposals as never,
@@ -77,8 +103,9 @@ describe('WorkProposalsApiService', () => {
             users as never,
             userOrmRepo as never,
             config as never,
+            workAgent as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config };
+        return { svc, research, proposals, limits, users, userOrmRepo, config, workAgent };
     };
 
     it('queues a refresh when caps are within budget', async () => {
