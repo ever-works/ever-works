@@ -784,6 +784,14 @@
                     "recentGoals": {
                         "title": "Recent goals",
                         "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
                     }
                 },
                 "fields": {
@@ -797,10 +805,16 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal"
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)"
                 },
                 "actions": {
                     "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
                     "queueGoal": "Queue goal",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"

@@ -4,7 +4,16 @@ import { useState, useTransition } from 'react';
 import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { Bot, CircleStop, Clock, ListChecks, Play, ShieldCheck } from 'lucide-react';
+import {
+    Bot,
+    CircleStop,
+    Clock,
+    ListChecks,
+    Play,
+    ShieldCheck,
+    Sparkles,
+    Zap,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     cancelWorkAgentGoalAction,
@@ -18,11 +27,17 @@ import type {
     WorkAgentRunLog,
 } from '@/lib/api/work-agent';
 import {
+    DEFAULT_AUTOBUILD_THROTTLE,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_CADENCE_MINUTES,
+    DEFAULT_MISSION_OUTSTANDING_CAP,
     LiveRun,
     MoneyField,
     NumberField,
     StatusPill,
     ToggleRow,
+    formatCadenceMinutes,
+    parseCadenceMinutes,
 } from '@/components/work-agent';
 
 interface WorkAgentSettingsProps {
@@ -35,11 +50,32 @@ interface WorkAgentSettingsProps {
 export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
     const [isSaving, startSaving] = useTransition();
+    const [isSavingAutoGen, startSavingAutoGen] = useTransition();
+    const [isSavingAutoBuild, startSavingAutoBuild] = useTransition();
     const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
     const [instruction, setInstruction] = useState('');
     const [dryRun, setDryRun] = useState(preferences.guardrails.dryRunByDefault);
+
+    // Phase 4 PR L — local edit state for the four promoted constants.
+    // `null` on the API field means "use platform default" — the UI
+    // shows the platform default value in the input but tracks whether
+    // the user has explicitly overridden it. On save, the override
+    // value is sent; if the user wants to clear back to default they
+    // hit "Use default" which sends null.
+    const [cadenceMinutes, setCadenceMinutes] = useState<number>(
+        parseCadenceMinutes(preferences.autoGenerateCadence) ?? DEFAULT_CADENCE_MINUTES,
+    );
+    const [batchSize, setBatchSize] = useState<number>(
+        preferences.autoGenerateBatchSize ?? DEFAULT_BATCH_SIZE,
+    );
+    const [autoBuildThrottle, setAutoBuildThrottle] = useState<number>(
+        preferences.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE,
+    );
+    const [missionCap, setMissionCap] = useState<number>(
+        preferences.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
+    );
 
     const updatePreference = <K extends keyof WorkAgentPreferences>(
         key: K,
@@ -83,6 +119,69 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                 toast.success(t('toasts.goalQueued'));
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : t('toasts.goalError'));
+            }
+        });
+    };
+
+    // Phase 4 PR L — section-scoped save handlers. Each section has
+    // its own button so the user can adjust + save just the two
+    // fields they care about without re-validating the rest of the
+    // form. The save sends a tiny PATCH (just the two fields the
+    // section owns) — the server PUT endpoint treats unmentioned
+    // fields as "leave alone" per PR D's nullable3rd semantics.
+    const saveAutoGeneratePrefs = (resetToDefault: boolean) => {
+        startSavingAutoGen(async () => {
+            try {
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? { autoGenerateCadence: null, autoGenerateBatchSize: null }
+                        : {
+                              autoGenerateCadence: formatCadenceMinutes(cadenceMinutes),
+                              autoGenerateBatchSize: batchSize,
+                          },
+                );
+                setLocalPreferences(saved);
+                // After reset, refresh the displayed values to the new
+                // platform-default-driven view.
+                if (resetToDefault) {
+                    setCadenceMinutes(
+                        parseCadenceMinutes(saved.autoGenerateCadence) ?? DEFAULT_CADENCE_MINUTES,
+                    );
+                    setBatchSize(saved.autoGenerateBatchSize ?? DEFAULT_BATCH_SIZE);
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAutoBuildPrefs = (resetToDefault: boolean) => {
+        startSavingAutoBuild(async () => {
+            try {
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              autoBuildThrottlePerDay: null,
+                              missionDefaultOutstandingCap: null,
+                          }
+                        : {
+                              autoBuildThrottlePerDay: autoBuildThrottle,
+                              missionDefaultOutstandingCap: missionCap,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setAutoBuildThrottle(
+                        saved.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE,
+                    );
+                    setMissionCap(
+                        saved.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
+                    );
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
             }
         });
     };
@@ -191,6 +290,102 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                     <div className="pl-11 pt-4">
                         <Button size="sm" onClick={savePreferences} disabled={isSaving}>
                             {t('actions.saveSettings')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="auto-generate-ideas"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Sparkles}
+                        title={t('sections.autoGenerateIdeas.title')}
+                        description={t('sections.autoGenerateIdeas.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-2">
+                        <NumberField
+                            label={t('fields.autoGenerateCadenceMinutes')}
+                            value={cadenceMinutes}
+                            min={1}
+                            max={1440}
+                            onChange={setCadenceMinutes}
+                        />
+                        <NumberField
+                            label={t('fields.autoGenerateBatchSize')}
+                            value={batchSize}
+                            min={1}
+                            max={20}
+                            onChange={setBatchSize}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoGeneratePrefs(false)}
+                            disabled={isSavingAutoGen}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoGeneratePrefs(true)}
+                            disabled={isSavingAutoGen}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="auto-build-works"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Zap}
+                        title={t('sections.autoBuildWorks.title')}
+                        description={t('sections.autoBuildWorks.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-2">
+                        <NumberField
+                            label={t('fields.autoBuildThrottlePerDay')}
+                            value={autoBuildThrottle}
+                            min={0}
+                            max={1000}
+                            onChange={setAutoBuildThrottle}
+                        />
+                        <NumberField
+                            label={t('fields.missionDefaultOutstandingCap')}
+                            value={missionCap}
+                            min={-1}
+                            max={1000}
+                            onChange={setMissionCap}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoBuildPrefs(false)}
+                            disabled={isSavingAutoBuild}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoBuildPrefs(true)}
+                            disabled={isSavingAutoBuild}
+                        >
+                            {t('actions.useDefault')}
                         </Button>
                     </div>
                 </div>

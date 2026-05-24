@@ -10,3 +10,12 @@ export { MoneyField } from './money-field';
 export { NumberField } from './number-field';
 export { StatusPill, STATUS_STYLES } from './status-pill';
 export { ToggleRow } from './toggle-row';
+// Phase 4 PR L — cadence string ⇄ minutes helpers + display defaults.
+export {
+    DEFAULT_AUTOBUILD_THROTTLE,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_CADENCE_MINUTES,
+    DEFAULT_MISSION_OUTSTANDING_CAP,
+    formatCadenceMinutes,
+    parseCadenceMinutes,
+} from './cadence-minutes';
