@@ -122,6 +122,37 @@ export class WorkAgentPreference {
     @Column({ type: 'float', default: 2.0 })
     exponentialBackoffFactor: number;
 
+    /**
+     * Account-wide monthly spend cap, in cents (spec §5.1, §6.6 /
+     * Decision A28). Aggregates spend across ALL of the user's
+     * Works + Ideas + Missions for the current billing period.
+     *
+     * NULL = no account-wide cap (the user has not configured one).
+     * The Dashboard `Month Spend` tile (6th tile, Phase 7 PR II)
+     * shows `$spent` only when this is NULL, or `$spent / $cap`
+     * with a progress bar when set. Per-Work and per-Mission caps
+     * stay independent — the account-wide cap is an additional
+     * outer guard, not a replacement.
+     *
+     * `bigint` rather than `int` because monthly spend in cents
+     * can plausibly cross 2^31 for power users (e.g. a user with
+     * many Missions auto-building at high cadence — $21,474 / mo
+     * is the int32 ceiling).
+     */
+    @Column({ type: 'bigint', nullable: true })
+    accountWideMonthlyCapCents?: string | null;
+
+    /**
+     * Whether the account-wide cap is a soft cap (true — alerts
+     * only, work continues over the cap) or a hard cap (false —
+     * BudgetGuardService blocks plugin calls once the cap is hit).
+     * Default `true` matches the per-Work `WorkBudget.allowOverage`
+     * default for consistency. Ignored when
+     * `accountWideMonthlyCapCents` is NULL.
+     */
+    @Column({ type: 'boolean', default: true })
+    accountWideAllowOverage: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 
