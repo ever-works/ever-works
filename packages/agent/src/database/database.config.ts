@@ -45,6 +45,7 @@ import {
     WorkKnowledgeTag,
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
+    Mission,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -118,6 +119,8 @@ export const ENTITIES = [
     WorkAgentGoal,
     WorkAgentRun,
     WorkAgentRunLog,
+    // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
+    Mission,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,
