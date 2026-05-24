@@ -13,6 +13,8 @@ export * from './mission-tick.service';
 export * from './mission-clone.service';
 // Phase 8 PR X — Mission Templates catalog (curated list + helpers).
 export * from './mission-template.config';
+// Phase 8 PR JJ — Mission Template `.works/mission.yml` parser.
+export * from './mission-template-manifest.service';
 export {
     Mission,
     MissionStatus,

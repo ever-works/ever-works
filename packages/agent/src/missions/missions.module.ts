@@ -6,6 +6,7 @@ import { TitlerModule } from '../titler/titler.module';
 import { UserResearchModule } from '../user-research/user-research.module';
 import { WorkAgentModule } from '../work-agent/work-agent.module';
 import { MissionCloneService } from './mission-clone.service';
+import { MissionTemplateManifestService } from './mission-template-manifest.service';
 import { MissionsService } from './missions.service';
 import { MissionTickService } from './mission-tick.service';
 
@@ -35,7 +36,17 @@ import { MissionTickService } from './mission-tick.service';
         UserResearchModule,
         WorkAgentModule,
     ],
-    providers: [MissionsService, MissionTickService, MissionCloneService],
-    exports: [MissionsService, MissionTickService, MissionCloneService],
+    providers: [
+        MissionsService,
+        MissionTickService,
+        MissionCloneService,
+        MissionTemplateManifestService,
+    ],
+    exports: [
+        MissionsService,
+        MissionTickService,
+        MissionCloneService,
+        MissionTemplateManifestService,
+    ],
 })
 export class MissionsModule {}
