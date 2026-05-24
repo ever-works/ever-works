@@ -555,7 +555,8 @@
             "empty": {
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            }
+            },
+            "viewAll": "View all ({n}) →"
         },
         "discover": {
             "title": "Discover",
