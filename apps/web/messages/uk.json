@@ -620,7 +620,7 @@
                 "generating": "Генерується",
                 "totalItems": "Всього елементів"
             },
-            "recent": "Недавні роботи",
+            "recent": "Works",
             "viewAll": "Переглянути всі ({count})",
             "search": "Пошук робіт...",
             "create": "Створити робота",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Всього робіт",
             "totalItems": "Всього елементів",
             "activeWebsites": "Активні вебсайти",

@@ -620,7 +620,7 @@
                 "generating": "Generowanie",
                 "totalItems": "Łączna liczba elementów"
             },
-            "recent": "Ostatnie prace",
+            "recent": "Works",
             "viewAll": "Zobacz wszystkie ({count})",
             "search": "Wyszukaj prace…",
             "create": "Utwórz praca",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Łączna liczba prac",
             "totalItems": "Łączna liczba elementów",
             "activeWebsites": "Aktywne witryny",

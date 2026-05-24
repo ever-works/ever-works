@@ -620,7 +620,7 @@
                 "generating": "जनरेट हो रही",
                 "totalItems": "कुल आइटम"
             },
-            "recent": "हाल की कार्यज़",
+            "recent": "Works",
             "viewAll": "सभी देखें ({count})",
             "search": "कार्यज़ खोजें...",
             "create": "कार्य बनाएं",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "कुल कार्यएँ",
             "totalItems": "कुल आइटम",
             "activeWebsites": "सक्रिय वेबसाइटें",

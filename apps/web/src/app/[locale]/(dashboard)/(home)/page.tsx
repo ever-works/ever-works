@@ -24,6 +24,11 @@ export default async function Dashboard() {
             totalWorks: 0,
             totalItems: 0,
             activeWebsites: 0,
+            // Phase 2 PR F — new Dashboard tiles. Catch-fallback must
+            // include these so the type-narrowed branch below doesn't
+            // see undefined.
+            totalMissions: 0,
+            totalIdeas: 0,
         })),
         workProposalsAPI.list(['pending']).catch(() => []),
         workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
@@ -38,6 +43,8 @@ export default async function Dashboard() {
             totalWorks={totalWorks}
             totalItems={statsResponse.totalItems}
             activeWebsites={statsResponse.activeWebsites}
+            totalMissions={statsResponse.totalMissions ?? 0}
+            totalIdeas={statsResponse.totalIdeas ?? 0}
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}

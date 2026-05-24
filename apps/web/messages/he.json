@@ -465,14 +465,14 @@
         },
         "proposals": {
             "header": {
-                "title": "רעיונות עבורך",
-                "titleWithName": "רעיונות עבורך, {username}"
+                "title": "Ideas",
+                "titleWithName": "Ideas"
             },
             "actions": {
-                "accept": "השתמש ברעיון זה",
+                "accept": "Build",
                 "dismiss": "דחה",
                 "dismissAria": "דחה רעיון זה",
-                "refresh": "הצע עוד רעיונות"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "מכין רעיונות מהפרופיל שלך...",
@@ -651,7 +651,7 @@
                 "generating": "מייצר",
                 "totalItems": "סה\"כ פריטים"
             },
-            "recent": "עבודות אחרונות",
+            "recent": "Works",
             "viewAll": "הצג הכל ({count})",
             "search": "חפש עבודות...",
             "create": "צור עבודה",
@@ -1052,6 +1052,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "סה\"ס עבודות",
             "totalItems": "סה\"ס פריטים",
             "activeWebsites": "אתרים פעילים",

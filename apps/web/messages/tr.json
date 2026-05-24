@@ -620,7 +620,7 @@
                 "generating": "Üretiliyor",
                 "totalItems": "Toplam Öğe"
             },
-            "recent": "Son İşler",
+            "recent": "Works",
             "viewAll": "Tümünü görüntüle ({count})",
             "search": "İşleri ara...",
             "create": "İş Oluştur",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Toplam İş",
             "totalItems": "Toplam Öğe",
             "activeWebsites": "Aktif Web Siteleri",

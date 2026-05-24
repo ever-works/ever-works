@@ -620,7 +620,7 @@
                 "generating": "Đang tạo",
                 "totalItems": "Tổng Số Mục"
             },
-            "recent": "Công việc Gần đây",
+            "recent": "Works",
             "viewAll": "Xem tất cả ({count})",
             "search": "Tìm kiếm công việc...",
             "create": "Tạo Công việc",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Tổng công việc",
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",

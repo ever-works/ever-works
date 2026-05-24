@@ -492,14 +492,14 @@
         },
         "proposals": {
             "header": {
-                "title": "Idées pour vous",
-                "titleWithName": "Idées pour vous, {username}"
+                "title": "Ideas",
+                "titleWithName": "Ideas"
             },
             "actions": {
-                "accept": "Utiliser cette idée",
+                "accept": "Build",
                 "dismiss": "Rejeter",
                 "dismissAria": "Rejeter cette idée",
-                "refresh": "Suggérer plus d'idées"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "Élaboration d'idées à partir de votre profil…",
@@ -678,7 +678,7 @@
                 "generating": "En génération",
                 "totalItems": "Total des éléments"
             },
-            "recent": "Travaux récents",
+            "recent": "Works",
             "viewAll": "Voir tout ({count})",
             "search": "Rechercher des travaux...",
             "create": "Créer un travail",
@@ -1079,6 +1079,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Total des travaux",
             "totalItems": "Total des éléments",
             "activeWebsites": "Sites web actifs",

@@ -17,6 +17,9 @@ interface DashboardClientProps {
     totalWorks: number;
     totalItems: number;
     activeWebsites: number;
+    /** Phase 2 PR F — Dashboard tiles for Missions/Ideas/Works v6 spec §5.1. */
+    totalMissions: number;
+    totalIdeas: number;
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
@@ -28,6 +31,8 @@ export default function DashboardClient({
     totalWorks,
     totalItems,
     activeWebsites,
+    totalMissions,
+    totalIdeas,
     initialProposals,
     initiallyResearching,
     initiallyCanRefresh,
@@ -48,6 +53,8 @@ export default function DashboardClient({
             </div>
 
             <StatsOverview
+                totalMissions={totalMissions}
+                totalIdeas={totalIdeas}
                 totalWorks={totalWorks}
                 totalItems={totalItems}
                 activeWebsites={activeWebsites}

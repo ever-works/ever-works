@@ -662,11 +662,20 @@ export class WorkRepository {
         totalItems: number;
         activeWebsites: number;
         generatingCount: number;
+        totalMissions: number;
+        totalIdeas: number;
     }> {
         const { userId, memberWorkIds = [] } = options;
 
         if (!userId) {
-            return { totalWorks: 0, totalItems: 0, activeWebsites: 0, generatingCount: 0 };
+            return {
+                totalWorks: 0,
+                totalItems: 0,
+                activeWebsites: 0,
+                generatingCount: 0,
+                totalMissions: 0,
+                totalIdeas: 0,
+            };
         }
 
         const queryBuilder = this.repository.createQueryBuilder('work');
@@ -700,11 +709,38 @@ export class WorkRepository {
             )
             .getRawOne();
 
+        // Phase 2 PR F — count Missions + Ideas the user owns. Both
+        // sit in tables (missions / work_proposals) that don't have
+        // an FK to `works`, so we count by userId directly. Run in
+        // parallel with the works query results to keep latency
+        // bounded at one DB roundtrip per query rather than serial.
+        // Counts include ALL statuses (the dashboard tile is a
+        // sense-of-activity gauge per spec §5.1, not a queue-depth
+        // gauge).
+        //
+        // Idempotent in face of missing tables: if either table
+        // doesn't exist yet on a freshly-cloned dev box (Phase 0
+        // migrations not run), the count returns 0 and the tile
+        // renders 0 rather than blowing up the whole stats endpoint.
+        const manager = this.repository.manager;
+        const [missionsCount, ideasCount] = await Promise.all([
+            manager
+                .query('SELECT COUNT(*) AS c FROM missions WHERE "userId" = $1', [userId])
+                .catch(() => [{ c: 0 }]),
+            manager
+                .query('SELECT COUNT(*) AS c FROM work_proposals WHERE "userId" = $1', [userId])
+                .catch(() => [{ c: 0 }]),
+        ]);
+        const totalMissions = parseInt(missionsCount?.[0]?.c ?? '0', 10) || 0;
+        const totalIdeas = parseInt(ideasCount?.[0]?.c ?? '0', 10) || 0;
+
         return {
             totalWorks: parseInt(result.totalWorks, 10) || 0,
             totalItems: parseInt(result.totalItems, 10) || 0,
             activeWebsites: parseInt(result.activeWebsites, 10) || 0,
             generatingCount: parseInt(result.generatingCount, 10) || 0,
+            totalMissions,
+            totalIdeas,
         };
     }
 

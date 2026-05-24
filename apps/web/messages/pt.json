@@ -620,7 +620,7 @@
                 "generating": "Gerando",
                 "totalItems": "Total de Itens"
             },
-            "recent": "Trabalhos Recentes",
+            "recent": "Works",
             "viewAll": "Ver todos ({count})",
             "search": "Pesquisar trabalhos...",
             "create": "Criar Trabalho",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Total de Trabalhos",
             "totalItems": "Total de Itens",
             "activeWebsites": "Sites Ativos",

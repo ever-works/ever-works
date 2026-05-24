@@ -620,7 +620,7 @@
                 "generating": "생성 중",
                 "totalItems": "총 항목 수"
             },
-            "recent": "최근 워크",
+            "recent": "Works",
             "viewAll": "모두 보기 ({count})",
             "search": "워크 검색...",
             "create": "워크 생성",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "총 워크",
             "totalItems": "총 항목",
             "activeWebsites": "활성 웹사이트",

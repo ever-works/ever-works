@@ -620,7 +620,7 @@
                 "generating": "生成中",
                 "totalItems": "アイテム合計"
             },
-            "recent": "最近のワーク",
+            "recent": "Works",
             "viewAll": "すべて表示 ({count})",
             "search": "ワークを検索...",
             "create": "ワークを作成",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "ワークの合計",
             "totalItems": "項目の合計",
             "activeWebsites": "アクティブなウェブサイト",

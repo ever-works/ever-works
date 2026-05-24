@@ -620,7 +620,7 @@
                 "generating": "Membuat",
                 "totalItems": "Total Item"
             },
-            "recent": "Karya Terbaru",
+            "recent": "Works",
             "viewAll": "Lihat semua ({count})",
             "search": "Cari karya...",
             "create": "Buat Karya",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Total Karya",
             "totalItems": "Total Item",
             "activeWebsites": "Situs Web Aktif",

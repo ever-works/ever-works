@@ -620,7 +620,7 @@
                 "generating": "正在生成",
                 "totalItems": "项目总数"
             },
-            "recent": "最近作品",
+            "recent": "Works",
             "viewAll": "查看全部 ({count})",
             "search": "搜索作品...",
             "create": "创建作品",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "总作品数",
             "totalItems": "总项目数",
             "activeWebsites": "活动网站",

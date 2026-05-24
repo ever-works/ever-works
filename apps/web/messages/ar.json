@@ -465,14 +465,14 @@
         },
         "proposals": {
             "header": {
-                "title": "الأفكار لك",
-                "titleWithName": "الأفكار لك، {username}"
+                "title": "Ideas",
+                "titleWithName": "Ideas"
             },
             "actions": {
-                "accept": "استخدم هذه الفكرة",
+                "accept": "Build",
                 "dismiss": "تجاهل",
                 "dismissAria": "تجاهل هذه الفكرة",
-                "refresh": "اقترح المزيد من الأفكار"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "صياغة الأفكار من ملفك الشخصي...",
@@ -651,7 +651,7 @@
                 "generating": "جار التوليد",
                 "totalItems": "إجمالي العناصر"
             },
-            "recent": "الأعمال الأخيرة",
+            "recent": "Works",
             "viewAll": "عرض الكل ({count})",
             "search": "البحث في الأعمال...",
             "create": "إنشاء عمل",
@@ -1052,6 +1052,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "إجمالي الأعمال",
             "totalItems": "إجمالي العناصر",
             "activeWebsites": "المواقع النشطة",

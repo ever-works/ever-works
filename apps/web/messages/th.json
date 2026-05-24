@@ -620,7 +620,7 @@
                 "generating": "กำลังสร้าง",
                 "totalItems": "รายการทั้งหมด"
             },
-            "recent": "งานล่าสุด",
+            "recent": "Works",
             "viewAll": "ดูทั้งหมด ({count})",
             "search": "ค้นหางาน...",
             "create": "สร้างงาน",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "งานทั้งหมด",
             "totalItems": "รายการทั้งหมด",
             "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",

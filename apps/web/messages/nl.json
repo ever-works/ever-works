@@ -620,7 +620,7 @@
                 "generating": "Genereren",
                 "totalItems": "Totaal items"
             },
-            "recent": "Recente werken",
+            "recent": "Works",
             "viewAll": "Alle bekijken ({count})",
             "search": "Werken doorzoeken...",
             "create": "Werk maken",
@@ -949,6 +949,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Totaal werken",
             "totalItems": "Totaal items",
             "activeWebsites": "Actieve websites",

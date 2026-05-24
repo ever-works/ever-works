@@ -2,18 +2,29 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { FolderClosed, ListTodo, Globe, type LucideIcon } from 'lucide-react';
+import { FolderClosed, ListTodo, Globe, Target, Lightbulb, type LucideIcon } from 'lucide-react';
 
 interface StatsOverviewProps {
     totalWorks?: number;
     totalItems?: number;
     activeWebsites?: number;
+    /**
+     * Phase 2 PR F — Missions/Ideas/Works v6 spec §5.1.
+     * New Dashboard tiles, rendered in this order (LEFT to RIGHT):
+     *   [Missions] [Ideas] [Works] [Items] [Sites]
+     * Each defaults to 0 so existing call sites that haven't been
+     * updated still render (showing 0 instead of crashing).
+     */
+    totalMissions?: number;
+    totalIdeas?: number;
 }
 
 export function StatsOverview({
     totalWorks = 0,
     totalItems = 0,
     activeWebsites = 0,
+    totalMissions = 0,
+    totalIdeas = 0,
 }: StatsOverviewProps) {
     const t = useTranslations('dashboard.stats');
 
@@ -26,6 +37,25 @@ export function StatsOverview({
         iconColor?: string;
         dotColor?: string;
     }> = [
+        // Phase 2 PR F — new tiles FIRST, in spec §5.1 order.
+        {
+            title: t('totalMissions'),
+            value: totalMissions,
+            icon: Target,
+            iconColor: 'text-amber-500',
+            dotColor: 'bg-amber-500',
+            change: '+0%',
+            changeType: 'neutral',
+        },
+        {
+            title: t('totalIdeas'),
+            value: totalIdeas,
+            icon: Lightbulb,
+            iconColor: 'text-yellow-500',
+            dotColor: 'bg-yellow-500',
+            change: '+0%',
+            changeType: 'neutral',
+        },
         {
             title: t('totalWorks'),
             value: totalWorks,
@@ -56,7 +86,10 @@ export function StatsOverview({
     ];
 
     return (
-        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-6">
+        // Phase 2 PR F — grid now sized for 5 tiles. The @5xl breakpoint
+        // shows all 5 in a row on wide screens; smaller breakpoints
+        // wrap gracefully (3 then 2 then 1 per row).
+        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 @5xl/main:grid-cols-5 gap-6">
             {statCards.map((stat) => (
                 <div
                     key={stat.title}

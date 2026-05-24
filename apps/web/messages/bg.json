@@ -465,14 +465,14 @@
         },
         "proposals": {
             "header": {
-                "title": "Идеи за вас",
-                "titleWithName": "Идеи за вас, {username}"
+                "title": "Ideas",
+                "titleWithName": "Ideas"
             },
             "actions": {
-                "accept": "Използвайте тази идея",
+                "accept": "Build",
                 "dismiss": "Отхвърляне",
                 "dismissAria": "Отхвърлете тази идея",
-                "refresh": "Предложете повече идеи"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "Изготвяне на идеи от вашия профил…",
@@ -651,7 +651,7 @@
                 "generating": "Генериране",
                 "totalItems": "Общо елементи"
             },
-            "recent": "Скорошни работи",
+            "recent": "Works",
             "viewAll": "Виж всички ({count})",
             "search": "Търси работи…",
             "create": "Създай работа",
@@ -1052,6 +1052,8 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Общо работи",
             "totalItems": "Общо елементи",
             "activeWebsites": "Активни уебсайтове",
