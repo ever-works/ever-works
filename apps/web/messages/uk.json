@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Огляд",
-                "activity": "Activity Feed",
+                "activity": "Активність",
                 "items": "Елементи",
                 "generator": "Генератор",
                 "schedule": "Розклад",
@@ -1019,7 +1019,13 @@
                 "deploy": "Розгортання",
                 "members": "Учасники",
                 "settings": "Налаштування",
-                "kb": "Knowledge Base"
+                "kb": "База знань",
+                "tooltips": {
+                    "activity": "Стрічка активності",
+                    "kb": "База знань",
+                    "generator": "Згенерувати Work — разово або за розкладом",
+                    "deploy": "Розгорнути Work"
+                }
             },
             "members": {
                 "title": "Учасники команди",

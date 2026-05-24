@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "ภาพรวม",
-                "activity": "Activity Feed",
+                "activity": "กิจกรรม",
                 "items": "รายการ",
                 "generator": "เครื่องสร้าง",
                 "schedule": "กำหนดการ",
@@ -1019,7 +1019,13 @@
                 "deploy": "เผยแพร่",
                 "members": "สมาชิก",
                 "settings": "การตั้งค่า",
-                "kb": "Knowledge Base"
+                "kb": "ฐานความรู้",
+                "tooltips": {
+                    "activity": "ฟีดกิจกรรม",
+                    "kb": "ฐานความรู้",
+                    "generator": "สร้าง Work ครั้งเดียวหรือตามตารางเวลา",
+                    "deploy": "ปรับใช้ Work"
+                }
             },
             "members": {
                 "title": "สมาชิกทีม",

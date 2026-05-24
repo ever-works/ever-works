@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Ringkasan",
-                "activity": "Activity Feed",
+                "activity": "Aktivitas",
                 "items": "Item",
                 "generator": "Generator",
                 "schedule": "Jadwal",
@@ -1019,7 +1019,13 @@
                 "deploy": "Penerapan",
                 "members": "Anggota",
                 "settings": "Pengaturan",
-                "kb": "Knowledge Base"
+                "kb": "Basis Pengetahuan",
+                "tooltips": {
+                    "activity": "Umpan Aktivitas",
+                    "kb": "Basis Pengetahuan",
+                    "generator": "Buat Work, sekali atau terjadwal",
+                    "deploy": "Deploy Work"
+                }
             },
             "members": {
                 "title": "Anggota Tim",

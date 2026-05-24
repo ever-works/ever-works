@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Panoramica",
-                "activity": "Activity Feed",
+                "activity": "Attività",
                 "items": "Elementi",
                 "generator": "Generatore",
                 "schedule": "Programmazione",
@@ -1019,7 +1019,13 @@
                 "deploy": "Distribuzione",
                 "members": "Membri",
                 "settings": "Impostazioni",
-                "kb": "Knowledge Base"
+                "kb": "Base di conoscenza",
+                "tooltips": {
+                    "activity": "Feed attività",
+                    "kb": "Base di conoscenza",
+                    "generator": "Genera Work, una tantum o pianificato",
+                    "deploy": "Distribuisci Work"
+                }
             },
             "members": {
                 "title": "Membri del team",

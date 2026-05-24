@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Visão Geral",
-                "activity": "Activity Feed",
+                "activity": "Atividade",
                 "items": "Itens",
                 "generator": "Gerador",
                 "schedule": "Agendamento",
@@ -1019,7 +1019,13 @@
                 "deploy": "Implantar",
                 "members": "Membros",
                 "settings": "Configurações",
-                "kb": "Knowledge Base"
+                "kb": "Base de conhecimento",
+                "tooltips": {
+                    "activity": "Feed de atividade",
+                    "kb": "Base de conhecimento",
+                    "generator": "Gerar Work, uma vez ou em agenda",
+                    "deploy": "Implantar Work"
+                }
             },
             "members": {
                 "title": "Membros da Equipe",

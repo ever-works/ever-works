@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "개요",
-                "activity": "Activity Feed",
+                "activity": "활동",
                 "items": "항목",
                 "generator": "생성기",
                 "schedule": "스케줄",
@@ -1019,7 +1019,13 @@
                 "deploy": "배포",
                 "members": "멤버",
                 "settings": "설정",
-                "kb": "Knowledge Base"
+                "kb": "지식 베이스",
+                "tooltips": {
+                    "activity": "활동 피드",
+                    "kb": "지식 베이스",
+                    "generator": "Work를 일회성 또는 예약된 일정으로 생성",
+                    "deploy": "Work 배포"
+                }
             },
             "members": {
                 "title": "팀 멤버",

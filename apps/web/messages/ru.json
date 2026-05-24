@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Обзор",
-                "activity": "Activity Feed",
+                "activity": "Активность",
                 "items": "Элементы",
                 "generator": "Генератор",
                 "schedule": "Расписание",
@@ -1019,7 +1019,13 @@
                 "deploy": "Развертывание",
                 "members": "Участники",
                 "settings": "Настройки",
-                "kb": "Knowledge Base"
+                "kb": "База знаний",
+                "tooltips": {
+                    "activity": "Лента активности",
+                    "kb": "База знаний",
+                    "generator": "Сгенерировать Work — разово или по расписанию",
+                    "deploy": "Развернуть Work"
+                }
             },
             "members": {
                 "title": "Участники команды",

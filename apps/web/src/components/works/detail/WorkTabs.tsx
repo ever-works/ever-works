@@ -14,6 +14,7 @@ interface WorkTabsProps {
 
 export function WorkTabs({ work }: WorkTabsProps) {
     const t = useTranslations('dashboard.workDetail.tabs');
+    const tTooltip = useTranslations('dashboard.workDetail.tabs.tooltips');
     const pathname = usePathname();
     const { config } = useWorkDetail();
     const permissions = useWorkPermissions();
@@ -21,6 +22,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
     const tabs = [
         {
             name: t('overview'),
+            tooltip: undefined as string | undefined,
             href: ROUTES.DASHBOARD_WORK(work.id),
             icon: (
                 <svg
@@ -41,6 +43,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('activity'),
+            tooltip: tTooltip('activity'),
             href: ROUTES.DASHBOARD_WORK_ACTIVITY(work.id),
             icon: (
                 <svg
@@ -61,6 +64,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('items'),
+            tooltip: undefined as string | undefined,
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/items`,
             icon: (
                 <svg
@@ -81,6 +85,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('kb'),
+            tooltip: tTooltip('kb'),
             href: ROUTES.DASHBOARD_WORK_KB(work.id),
             icon: (
                 <svg
@@ -101,6 +106,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('generator'),
+            tooltip: tTooltip('generator'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/generator`,
             visible: permissions.canGenerate,
             icon: (
@@ -122,6 +128,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('plugins'),
+            tooltip: undefined as string | undefined,
             href: ROUTES.DASHBOARD_WORK_PLUGINS(work.id),
             visible: permissions.canAccessSettings,
             icon: (
@@ -143,6 +150,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('deploy'),
+            tooltip: tTooltip('deploy'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/deploy`,
             visible: Boolean(config) && permissions.canDeploy,
             icon: (
@@ -164,6 +172,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
         },
         {
             name: t('settings'),
+            tooltip: undefined as string | undefined,
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/settings`,
             visible: permissions.canAccessSettings,
             icon: (
@@ -199,6 +208,8 @@ export function WorkTabs({ work }: WorkTabsProps) {
                         <Link
                             key={tab.name}
                             href={tab.href}
+                            title={tab.tooltip}
+                            aria-label={tab.tooltip ? `${tab.name} — ${tab.tooltip}` : tab.name}
                             className={cn(
                                 'flex items-center gap-1.5 @sm/main:gap-2 py-3 @sm/main:py-4 px-3 @2xl/main:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
                                 tab.isActive

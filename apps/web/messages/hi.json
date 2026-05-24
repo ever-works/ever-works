@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "अवलोकन",
-                "activity": "Activity Feed",
+                "activity": "गतिविधि",
                 "items": "आइटम",
                 "generator": "जनरेटर",
                 "schedule": "अनुसूची",
@@ -1019,7 +1019,13 @@
                 "deploy": "तैनाती",
                 "members": "सदस्य",
                 "settings": "सेटिंग्स",
-                "kb": "Knowledge Base"
+                "kb": "ज्ञान आधार",
+                "tooltips": {
+                    "activity": "गतिविधि फ़ीड",
+                    "kb": "ज्ञान आधार",
+                    "generator": "Work उत्पन्न करें, एक बार या निर्धारित समय पर",
+                    "deploy": "Work परिनियोजित करें"
+                }
             },
             "members": {
                 "title": "टीम सदस्य",

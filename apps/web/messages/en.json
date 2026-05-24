@@ -1164,7 +1164,7 @@
             },
             "tabs": {
                 "overview": "Overview",
-                "activity": "Activity Feed",
+                "activity": "Activity",
                 "items": "Items",
                 "generator": "Generator",
                 "schedule": "Schedule",
@@ -1174,7 +1174,13 @@
                 "deploy": "Deploy",
                 "members": "Members",
                 "settings": "Settings",
-                "kb": "Knowledge Base"
+                "kb": "KB",
+                "tooltips": {
+                    "activity": "Activity Feed",
+                    "kb": "Knowledge Base",
+                    "generator": "Generate Work, one time or on schedule",
+                    "deploy": "Deploy Work"
+                }
             },
             "members": {
                 "title": "Team Members",
