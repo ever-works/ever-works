@@ -217,8 +217,12 @@ export class WorkProposalService {
             .replace(/^-|-$/g, '');
     }
 
-    async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
-        return this.repo.findByUser(userId, statuses);
+    async list(
+        userId: string,
+        statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { missionId?: string | null } = {},
+    ) {
+        return this.repo.findByUser(userId, statuses, opts);
     }
 
     async dismiss(userId: string, proposalId: string): Promise<boolean> {

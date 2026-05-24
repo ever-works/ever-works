@@ -10,16 +10,8 @@
 
 ## Current focus
 
-**Tick 6 (DONE — Phase 0 COMPLETE):** chained PRs 0.6 → 0.10 in one tick (operator: "do them one by one", "we finishing each tick very very fast"). All schema migrations for the Missions/Ideas/Works feature now landed:
-  - 0.6 — `accountWideMonthlyCapCents` (bigint NULL) + `accountWideAllowOverage` (bool, default true) on `work_agent_preferences`.
-  - 0.7 — `ideaId` FK + index on `work_agent_goals` → `work_proposals` (ON DELETE SET NULL).
-  - 0.8 — `IdeaFailureKind` enum + `failureMessage` (text NULL) + `failureKind` (varchar 32 NULL) on `work_proposals`.
-  - 0.9 — `acceptedFromIdeaId` FK + index on `works` → `work_proposals` (ON DELETE SET NULL).
-  - 0.10 — `sourceMissionId` self-FK + index on `missions` (ON DELETE SET NULL) for Mission Clone.
-
-  All 5 PRs committed individually for clean history (commits `c0306756`, `c0af3a9c`, `1da650ba`, `c85b4dc8`, `00f5b703`). 139 tests green across the full agent test sweep (work-agent + budgets + work-proposal + database drift detectors).
-
-**Next:** Phase 1 PR A — extend `WorkProposalsApiService` to recognize and surface the new statuses (`QUEUED` / `BUILDING` / `FAILED`) and new sources (`USER_MANUAL` / `MISSION`) added at the schema level in PR 0.1. Pure business-logic + DTO changes; no new endpoints yet (those land in PR B + PR FF). Loop tightened from 30-min cadence to back-to-back per operator request — next tick fires shortly after this push lands.
+**Tick 7 (DONE):** Phase 1 PR A — surfaced new schema fields through the service + DTO + controller layers. Three new fields on `WorkProposalResponseDto` (`missionId`, `failureMessage`, `failureKind`); optional `missionId` filter on `ListWorkProposalsQueryDto` with tri-state semantics (undefined = no filter, UUID = scope to Mission, explicit `null` = standalone Ideas only); `CreateWorkProposalInput` extended to carry `missionId` so Phase 3 PR J's Mission tick worker can persist it; both controller code paths (`list()` + `getOne()`) populate the new DTO fields. 79 tests green (58 agent + 21 API).
+**Next:** Phase 1 PR B — add `POST /me/work-proposals` (user-manual create) + `POST /me/work-proposals/:id/build` (queue for build via Goal). Extract `acceptInternal(ideaId, workId)` from existing accept controller method into a service helper callable from both the controller AND (Phase 1 PR FF) the goal-completion handler.
 
 ---
 
@@ -78,7 +70,7 @@ Dependency notation `[after X]` means PR X must be DONE before this PR starts.
 
 | PR | Status | Description | Deps | Commit | Summary |
 |---|---|---|---|---|---|
-| A | TODO | Extend `WorkProposal` entity + service for new statuses/sources + `missionId`. (PLAN §3.3 PR A) | 0.1 | `<hash>` | |
+| A | DONE | Extend `WorkProposal` entity + service for new statuses/sources + `missionId`. (PLAN §3.3 PR A) | 0.1 | _next-commit_ | Entity work already shipped in PR 0.1; this PR carries the service + DTO + controller surface changes. `WorkProposalRepository.findByUser` + `WorkProposalService.list` + `WorkProposalsApiService.list` all gain optional `{ missionId }` opts (tri-state: undefined = no filter, UUID = scope, `null` = standalone only). `CreateWorkProposalInput` extended with `missionId` for Phase 3 PR J. `WorkProposalResponseDto` gains `missionId` + `failureMessage` + `failureKind` (latter typed against the `IdeaFailureKind` enum from PR 0.8). `ListWorkProposalsQueryDto` gains `missionId` UUID query param. Both controller paths (`list()` + `getOne()`) populate the new fields. Existing API behavior unchanged when `missionId` query param absent — fully back-compat. 79 tests green (58 agent + 21 API). |
 | B | TODO | Add `POST /me/work-proposals` (user-manual create) + `POST /me/work-proposals/:id/build` (queue for build via `WorkAgentGoal` with `maxWorksPerRun=1` + `ideaId`). Extract `acceptInternal(ideaId, workId)` from existing `accept` controller method so it can be called from both the controller AND the goal-completion handler. (PLAN §3.3 PR B; Decision A3) | A, 0.7 | `<hash>` | |
 | C | TODO | Extend user-research proposal generator to accept exclusion+context list (every existing Idea title/slug/desc across ALL statuses incl. DONE) + `missionContext` parameter. (PLAN §3.3 PR C) | A | `<hash>` | |
 | D | TODO | Promote four work-agent constants (cadence, batch size, throttle, mission cap) from hardcoded to user settings. (PLAN §3.3 PR D) | 0.4 | `<hash>` | |

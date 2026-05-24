@@ -39,8 +39,12 @@ export class WorkProposalsApiService {
         private readonly config: ConfigService,
     ) {}
 
-    async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
-        return this.proposals.list(userId, statuses);
+    async list(
+        userId: string,
+        statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { missionId?: string | null } = {},
+    ) {
+        return this.proposals.list(userId, statuses, opts);
     }
 
     async dismiss(userId: string, proposalId: string): Promise<boolean> {

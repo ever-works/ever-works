@@ -22,6 +22,12 @@ export interface CreateWorkProposalInput {
     reasoning: string;
     source: WorkProposalSource;
     generationRunId?: string;
+    /**
+     * Optional FK to the spawning Mission (Phase 0 PR 0.1).
+     * Set by the Mission tick worker (Phase 3 PR J) when creating
+     * Ideas with `source = MISSION`. NULL for all other sources.
+     */
+    missionId?: string | null;
 }
 
 @Injectable()
@@ -42,13 +48,26 @@ export class WorkProposalRepository {
     async findByUser(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { missionId?: string | null } = {},
     ): Promise<WorkProposal[]> {
-        return this.repository
+        const qb = this.repository
             .createQueryBuilder('p')
             .where('p.userId = :userId', { userId })
-            .andWhere('p.status IN (:...statuses)', { statuses })
-            .orderBy('p.generatedAt', 'DESC')
-            .getMany();
+            .andWhere('p.status IN (:...statuses)', { statuses });
+
+        // `missionId` filter supports three modes:
+        //   - undefined / not passed → no filter (return all Ideas across all
+        //     Missions + standalone Ideas with NULL missionId).
+        //   - a string UUID → return Ideas tied to that specific Mission.
+        //   - `null` explicitly → return only standalone (non-Mission) Ideas
+        //     (`missionId IS NULL`).
+        if (opts.missionId === null) {
+            qb.andWhere('p.missionId IS NULL');
+        } else if (typeof opts.missionId === 'string') {
+            qb.andWhere('p.missionId = :missionId', { missionId: opts.missionId });
+        }
+
+        return qb.orderBy('p.generatedAt', 'DESC').getMany();
     }
 
     async findRecentByUser(userId: string, take = 50): Promise<WorkProposal[]> {

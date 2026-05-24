@@ -67,7 +67,9 @@ export class WorkProposalsController {
             query.statuses && query.statuses.length > 0
                 ? query.statuses
                 : [WorkProposalStatus.PENDING];
-        const proposals = await this.service.list(auth.userId, statuses);
+        const proposals = await this.service.list(auth.userId, statuses, {
+            missionId: query.missionId,
+        });
         return proposals.map((p) => ({
             id: p.id,
             title: p.title,
@@ -81,6 +83,9 @@ export class WorkProposalsController {
             source: p.source,
             status: p.status,
             acceptedWorkId: p.acceptedWorkId ?? null,
+            missionId: p.missionId ?? null,
+            failureMessage: p.failureMessage ?? null,
+            failureKind: p.failureKind ?? null,
             generatedAt: p.generatedAt,
         }));
     }
@@ -165,6 +170,9 @@ export class WorkProposalsController {
             source: proposal.source,
             status: proposal.status,
             acceptedWorkId: proposal.acceptedWorkId ?? null,
+            missionId: proposal.missionId ?? null,
+            failureMessage: proposal.failureMessage ?? null,
+            failureKind: proposal.failureKind ?? null,
             generatedAt: proposal.generatedAt,
         };
     }

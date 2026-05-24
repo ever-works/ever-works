@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
+import { IdeaFailureKind } from '@ever-works/agent/entities';
 
 export class ListWorkProposalsQueryDto {
     @ApiProperty({
@@ -19,6 +20,22 @@ export class ListWorkProposalsQueryDto {
     @IsArray()
     @IsEnum(WorkProposalStatus, { each: true })
     statuses?: WorkProposalStatus[];
+
+    /**
+     * Optional: scope the list to Ideas spawned by a specific Mission
+     * (Phase 0 PR 0.1, Phase 1 PR A). When omitted, returns Ideas
+     * across all Missions plus standalone Ideas (the existing
+     * dashboard behavior). Phase 6 PR R uses this from the Mission
+     * detail page; the Dashboard Ideas block and `/ideas` page leave
+     * it unset.
+     */
+    @ApiProperty({
+        required: false,
+        description: 'Filter by missionId — Ideas spawned by this Mission only',
+    })
+    @IsOptional()
+    @IsUUID()
+    missionId?: string;
 }
 
 export class AcceptWorkProposalDto {
@@ -105,6 +122,31 @@ export class WorkProposalResponseDto {
 
     @ApiProperty({ required: false, nullable: true })
     acceptedWorkId?: string | null;
+
+    /**
+     * FK to the spawning Mission (Phase 0 PR 0.1). NULL for Ideas
+     * not spawned by a Mission. Phase 6 PR R uses this on the
+     * Mission detail page to group child Ideas.
+     */
+    @ApiProperty({ required: false, nullable: true })
+    missionId?: string | null;
+
+    /**
+     * Human-readable failure reason (Phase 0 PR 0.8, spec §3.9).
+     * Populated only when `status = FAILED`. Rendered inline on
+     * the Idea Card in Phase 6 PR GG.
+     */
+    @ApiProperty({ required: false, nullable: true })
+    failureMessage?: string | null;
+
+    /**
+     * Machine-readable failure classification (Phase 0 PR 0.8,
+     * Decision A23). Populated only when `status = FAILED`. Drives
+     * the auto-retry decision in the Goal-completion handler
+     * (Phase 1 PR FF).
+     */
+    @ApiProperty({ required: false, nullable: true, enum: IdeaFailureKind })
+    failureKind?: IdeaFailureKind | null;
 
     @ApiProperty()
     generatedAt: Date;
