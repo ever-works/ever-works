@@ -17,7 +17,13 @@ import type {
     WorkAgentRun,
     WorkAgentRunLog,
 } from '@/lib/api/work-agent';
-import { cn } from '@/lib/utils/cn';
+import {
+    LiveRun,
+    MoneyField,
+    NumberField,
+    StatusPill,
+    ToggleRow,
+} from '@/components/work-agent';
 
 interface WorkAgentSettingsProps {
     preferences: WorkAgentPreferences;
@@ -25,19 +31,6 @@ interface WorkAgentSettingsProps {
     activeRun: WorkAgentRun | null;
     logs: WorkAgentRunLog[];
 }
-
-const STATUS_STYLES: Record<string, string> = {
-    pending: 'bg-warning/10 text-warning border-warning/20',
-    queued: 'bg-warning/10 text-warning border-warning/20',
-    running: 'bg-info/10 text-info border-info/20',
-    researching: 'bg-info/10 text-info border-info/20',
-    generating: 'bg-info/10 text-info border-info/20',
-    writing: 'bg-info/10 text-info border-info/20',
-    'waiting-for-approval': 'bg-warning/10 text-warning border-warning/20',
-    completed: 'bg-success/10 text-success border-success/20',
-    canceled: 'bg-surface-secondary text-text-muted border-border/70',
-    failed: 'bg-danger/10 text-danger border-danger/20',
-};
 
 export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
@@ -252,37 +245,16 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             description={t('sections.liveRun.description')}
                         />
                         <div className="pl-11 space-y-3">
-                            {activeRun ? (
-                                <>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <StatusPill status={activeRun.status} />
-                                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                            {activeRun.progressPercent}%
-                                        </span>
-                                    </div>
-                                    <div className="h-2 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark overflow-hidden">
-                                        <div
-                                            className="h-full bg-primary transition-all"
-                                            style={{ width: `${activeRun.progressPercent}%` }}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <Metric
-                                            label={t('metrics.works')}
-                                            value={activeRun.summary.worksCreated}
-                                        />
-                                        <Metric
-                                            label={t('metrics.items')}
-                                            value={activeRun.summary.itemsCreated}
-                                        />
-                                    </div>
-                                    <LogList logs={logs} emptyText={t('empty.waitingForUpdate')} />
-                                </>
-                            ) : (
-                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    {t('empty.noActiveRun')}
-                                </p>
-                            )}
+                            <LiveRun
+                                activeRun={activeRun}
+                                logs={logs}
+                                labels={{
+                                    worksMetric: t('metrics.works'),
+                                    itemsMetric: t('metrics.items'),
+                                    emptyWaitingForUpdate: t('empty.waitingForUpdate'),
+                                    emptyNoActiveRun: t('empty.noActiveRun'),
+                                }}
+                            />
                         </div>
                     </div>
                 </section>
@@ -369,121 +341,6 @@ function Header({
                     {description}
                 </p>
             </div>
-        </div>
-    );
-}
-
-function ToggleRow({
-    label,
-    checked,
-    onChange,
-}: {
-    label: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-}) {
-    return (
-        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => onChange(event.target.checked)}
-                className="rounded border-border dark:border-border-dark"
-            />
-            <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                {label}
-            </span>
-        </label>
-    );
-}
-
-function NumberField({
-    label,
-    value,
-    min,
-    max,
-    onChange,
-}: {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    onChange: (value: number) => void;
-}) {
-    return (
-        <label className="space-y-1.5">
-            <span className="text-xs text-text-muted dark:text-text-muted-dark">{label}</span>
-            <input
-                type="number"
-                value={value}
-                min={min}
-                max={max}
-                onChange={(event) => onChange(Number(event.target.value))}
-                className="w-full h-9 rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark px-3 text-sm text-text dark:text-text-dark outline-none focus:ring-2 focus:ring-primary/25"
-            />
-        </label>
-    );
-}
-
-function MoneyField({
-    label,
-    cents,
-    onChange,
-}: {
-    label: string;
-    cents: number;
-    onChange: (value: number) => void;
-}) {
-    return (
-        <NumberField
-            label={label}
-            value={Math.round(cents / 100)}
-            min={0}
-            max={10_000}
-            onChange={(value) => onChange(Math.max(0, Math.round(value * 100)))}
-        />
-    );
-}
-
-function StatusPill({ status }: { status: string }) {
-    return (
-        <span
-            className={cn(
-                'shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize',
-                STATUS_STYLES[status] ?? 'bg-surface-secondary text-text-muted border-border/70',
-            )}
-        >
-            {status.replaceAll('-', ' ')}
-        </span>
-    );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="rounded-lg border border-border/60 dark:border-border-dark/60 p-2">
-            <div className="text-[11px] text-text-muted dark:text-text-muted-dark">{label}</div>
-            <div className="text-sm font-semibold text-text dark:text-text-dark">{value}</div>
-        </div>
-    );
-}
-
-function LogList({ logs, emptyText }: { logs: WorkAgentRunLog[]; emptyText: string }) {
-    if (logs.length === 0) {
-        return <p className="text-xs text-text-muted dark:text-text-muted-dark">{emptyText}</p>;
-    }
-
-    return (
-        <div className="space-y-2">
-            {logs.slice(-6).map((log) => (
-                <div key={log.id} className="rounded-lg bg-surface dark:bg-surface-dark px-3 py-2">
-                    <div className="text-[11px] uppercase text-text-muted dark:text-text-muted-dark">
-                        {log.step}
-                    </div>
-                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                        {log.message}
-                    </div>
-                </div>
-            ))}
         </div>
     );
 }
