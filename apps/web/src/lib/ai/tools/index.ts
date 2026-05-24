@@ -36,6 +36,32 @@ import { setSchedule, runScheduleNow, cancelSchedule } from './schedule.tools';
 import { webSearch } from './search.tools';
 import { getUserInfo } from './user.tools';
 import { createSuggestWorksTool } from './suggest.tools';
+// Phase 9 PR Z1 — Missions + Ideas tools so the in-app chat can
+// drive the same surfaces the dashboard buttons do.
+import {
+    listMissions,
+    getMissionDetails,
+    getMissionBudget,
+    createMission,
+    updateMission,
+    pauseMission,
+    resumeMission,
+    completeMission,
+    deleteMission,
+    runMissionNow,
+    cloneMission,
+} from './missions.tools';
+import {
+    listIdeas,
+    getIdeaDetails,
+    getIdeaBudget,
+    getIdeasRefreshStatus,
+    createIdea,
+    refreshIdeas,
+    buildIdea,
+    dismissIdea,
+    acceptIdea,
+} from './ideas.tools';
 
 /**
  * Build the full tool set for the chat agent.
@@ -96,6 +122,30 @@ export function buildChatTools(model: LanguageModel) {
         // Navigation
         navigate,
         reloadPage,
+
+        // Phase 9 PR Z1 — Missions
+        listMissions,
+        getMissionDetails,
+        getMissionBudget,
+        createMission,
+        updateMission,
+        pauseMission,
+        resumeMission,
+        completeMission,
+        deleteMission,
+        runMissionNow,
+        cloneMission,
+
+        // Phase 9 PR Z1 — Ideas
+        listIdeas,
+        getIdeaDetails,
+        getIdeaBudget,
+        getIdeasRefreshStatus,
+        createIdea,
+        refreshIdeas,
+        buildIdea,
+        dismissIdea,
+        acceptIdea,
     };
 }
 
