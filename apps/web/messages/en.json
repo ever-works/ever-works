@@ -3902,6 +3902,7 @@
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
                 "fork": "Fork",
+                "useTemplate": "Use this Template",
                 "edit": "Edit",
                 "archive": "Archive",
                 "customizeAgain": "Customize again",

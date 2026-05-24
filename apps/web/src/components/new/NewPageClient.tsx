@@ -81,12 +81,30 @@ const CHIP_ICONS: Record<ChipType, LucideIcon> = {
 
 export interface NewPageClientProps {
     initialType?: ChipType | null;
+    /**
+     * Phase 8 PR Y — when the user lands here from a Mission
+     * Template's "Use this Template" button, the server page
+     * resolves the template + passes its name+description as
+     * the initial prompt. NewPageClient just renders it.
+     */
+    initialPrompt?: string;
+    /**
+     * Phase 8 PR Y — id of the source template, forwarded to
+     * the Mission-create submit so the spawned Mission can be
+     * tagged with `missionTemplateRepo` for the back-link.
+     * Wired through `createMissionAction` when present.
+     */
+    initialTemplateId?: string;
 }
 
-export function NewPageClient({ initialType = null }: NewPageClientProps) {
+export function NewPageClient({
+    initialType = null,
+    initialPrompt,
+    initialTemplateId,
+}: NewPageClientProps) {
     const t = useTranslations('dashboard.newPage');
     const router = useRouter();
-    const [prompt, setPrompt] = useState('');
+    const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType | null>(initialType);
     const [submitting, startSubmit] = useTransition();
 
@@ -100,9 +118,19 @@ export function NewPageClient({ initialType = null }: NewPageClientProps) {
                 if (selectedChip === 'mission') {
                     // Mission is a one-shot in v1; the user can flip
                     // it to scheduled on the detail page (PR R).
+                    // Phase 8 PR Y — when the user landed via a
+                    // Mission Template's "Use this Template" button,
+                    // forward the template id as `missionTemplateRepo`
+                    // so the new Mission carries the back-link. The
+                    // field accepts a string identifier — PR JJ's
+                    // manifest service will resolve it to the actual
+                    // repo coords at scaffold time.
                     const mission = await createMissionAction({
                         description,
                         type: 'one-shot',
+                        ...(initialTemplateId
+                            ? { missionTemplateRepo: initialTemplateId }
+                            : {}),
                     });
                     toast.success(t('toasts.missionCreated'));
                     router.push(ROUTES.DASHBOARD_MISSION(mission.id));

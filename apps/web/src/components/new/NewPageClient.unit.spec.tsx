@@ -140,6 +140,63 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         expect(href).toContain('prompt=Landing+page+for+my+SaaS+launch');
     });
 
+    describe('Phase 8 PR Y — template prefill', () => {
+        it('renders initialPrompt verbatim in the prompt textarea', () => {
+            // Real newlines (template string) so we test the realistic
+            // prefill the server page builds via `${name}\n\n${desc}`.
+            const prefill = `Starter Business\n\nA blank-slate Mission for cats.`;
+            render(<NewPageClient initialType="mission" initialPrompt={prefill} />);
+            const textarea = screen.getByPlaceholderText(
+                'dashboard.newPage.promptPlaceholder',
+            ) as HTMLTextAreaElement;
+            expect(textarea.value).toBe(prefill);
+        });
+
+        it('Submit forwards initialTemplateId as missionTemplateRepo for mission chip', async () => {
+            createMissionMock.mockClear();
+            createMissionMock.mockResolvedValueOnce({ id: 'm-new', title: 'x' });
+            render(
+                <NewPageClient
+                    initialType="mission"
+                    initialPrompt="Starter Business"
+                    initialTemplateId="starter-business"
+                />,
+            );
+            // Stretch the prompt past the 10-char minimum so Submit enables.
+            const textarea = screen.getByPlaceholderText(
+                'dashboard.newPage.promptPlaceholder',
+            ) as HTMLTextAreaElement;
+            fireEvent.change(textarea, {
+                target: { value: 'Starter Business — long enough to enable Submit' },
+            });
+            fireEvent.click(screen.getByText('dashboard.newPage.submit'));
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(createMissionMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    description: 'Starter Business — long enough to enable Submit',
+                    type: 'one-shot',
+                    missionTemplateRepo: 'starter-business',
+                }),
+            );
+        });
+
+        it('Submit does NOT include missionTemplateRepo when no initialTemplateId', async () => {
+            createMissionMock.mockClear();
+            createMissionMock.mockResolvedValueOnce({ id: 'm-direct', title: 'x' });
+            render(<NewPageClient initialType="mission" />);
+            fireEvent.change(
+                screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'),
+                { target: { value: 'No template, just a typed mission goal' } },
+            );
+            fireEvent.click(screen.getByText('dashboard.newPage.submit'));
+            await Promise.resolve();
+            await Promise.resolve();
+            const call = createMissionMock.mock.calls[0][0];
+            expect(call.missionTemplateRepo).toBeUndefined();
+        });
+    });
+
     it('CreationBlockTrio renders below the chip strip with labelSet="unified"', () => {
         const { container } = render(<NewPageClient />);
         // Unified label set: title key is "dashboard.newPage.cards.ai.title"

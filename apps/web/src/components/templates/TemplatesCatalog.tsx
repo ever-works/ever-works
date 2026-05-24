@@ -330,6 +330,33 @@ function TemplateCard({
                     )}
 
                     <div className="flex items-center gap-1 shrink-0">
+                        {/* Phase 8 PR Y — "Use this Template" button on
+                            Mission Template cards. Routes the user
+                            into the unified /new page (PR CC2) with
+                            type=mission preselected and the template
+                            id forwarded so NewPageClient can prefill
+                            the prompt from the template's name +
+                            description. Rendered for ALL Mission
+                            templates (built-in + custom) since a
+                            forked Mission template is just as
+                            launchable as a curated one. */}
+                        {template.kind === 'mission' && (
+                            <Button
+                                asChild
+                                variant="primary"
+                                size="sm"
+                                className="whitespace-nowrap text-xs"
+                            >
+                                <Link
+                                    href={`/new?type=mission&template=${encodeURIComponent(
+                                        template.id,
+                                    )}`}
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    {t('card.useTemplate')}
+                                </Link>
+                            </Button>
+                        )}
                         {template.sourceType === 'built_in' ? (
                             <Button
                                 variant="ghost"
