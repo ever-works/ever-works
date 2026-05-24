@@ -2822,6 +2822,34 @@
                     "overrideCtaPendingTooltip": "متاح بمجرد شحن إجراء التجاوز في الصف 38d",
                     "overrideCtaBusy": "جارٍ التفريع…",
                     "overrideErrorFallback": "تعذّر تفريع المستند الموروث. حاول مرة أخرى أو حدّث الصفحة."
+                },
+                "addDoc": {
+                    "button": "+ إضافة",
+                    "title": "إنشاء مستند جديد",
+                    "subtitle": "اختر فئة، سمّ المستند، أضف وصفاً ووسوماً اختيارية. سيُفتح المحرر بعد الإنشاء.",
+                    "classLabel": "الفئة",
+                    "titleLabel": "العنوان",
+                    "titlePlaceholder": "مثال: مبادئ صوت العلامة التجارية",
+                    "descriptionLabel": "الوصف (اختياري)",
+                    "tagsLabel": "الوسوم",
+                    "tagsPlaceholder": "اكتب للبحث أو لإضافة وسم، Enter للتأكيد",
+                    "confirm": "إنشاء المستند",
+                    "cancel": "إلغاء",
+                    "errorFallback": "تعذّر إنشاء المستند. حاول مرة أخرى.",
+                    "errorBusy": "جارٍ الإنشاء…"
+                },
+                "delete": {
+                    "docTooltip": "حذف المستند",
+                    "classTooltip": "حذف جميع المستندات في {class}",
+                    "docConfirmTitle": "هل تريد حذف المستند؟",
+                    "docConfirmBody": "سيُحذف {title} نهائيًا من هذا الـWork. لا يمكن التراجع.",
+                    "classConfirmTitle": "حذف جميع المستندات الـ{count} في {class}؟",
+                    "classConfirmBody": "سيُحذف جميع المستندات في هذه الفئة نهائيًا. لا يمكن التراجع.",
+                    "confirm": "حذف",
+                    "cancel": "إلغاء",
+                    "errorFallback": "تعذّر الحذف. حاول مرة أخرى.",
+                    "errorBusy": "جارٍ الحذف…",
+                    "errorPartial": "تم حذف {ok}، فشل {failed}."
                 }
             }
         },

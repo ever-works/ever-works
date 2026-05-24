@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "行 38d でオーバーライドアクションが出荷されると利用可能になります",
                     "overrideCtaBusy": "フォーク中…",
                     "overrideErrorFallback": "継承ドキュメントをフォークできませんでした。再試行するかページを再読み込みしてください。"
+                },
+                "addDoc": {
+                    "button": "+ 追加",
+                    "title": "新しいドキュメントを作成",
+                    "subtitle": "クラスを選び、名前を付け、任意で説明とタグを追加します。作成後にエディターが開きます。",
+                    "classLabel": "クラス",
+                    "titleLabel": "タイトル",
+                    "titlePlaceholder": "例: ブランドボイスの原則",
+                    "descriptionLabel": "説明 (任意)",
+                    "tagsLabel": "タグ",
+                    "tagsPlaceholder": "入力して検索または追加、Enter で確定",
+                    "confirm": "ドキュメントを作成",
+                    "cancel": "キャンセル",
+                    "errorFallback": "ドキュメントを作成できませんでした。再試行してください。",
+                    "errorBusy": "作成中…"
+                },
+                "delete": {
+                    "docTooltip": "ドキュメントを削除",
+                    "classTooltip": "{class} のすべてのドキュメントを削除",
+                    "docConfirmTitle": "ドキュメントを削除しますか？",
+                    "docConfirmBody": "{title} はこの Work から完全に削除されます。元に戻せません。",
+                    "classConfirmTitle": "{class} のすべての {count} 件のドキュメントを削除しますか？",
+                    "classConfirmBody": "このクラスのすべてのドキュメントが完全に削除されます。元に戻せません。",
+                    "confirm": "削除",
+                    "cancel": "キャンセル",
+                    "errorFallback": "削除できませんでした。再試行してください。",
+                    "errorBusy": "削除中…",
+                    "errorPartial": "削除 {ok} 件、失敗 {failed} 件。"
                 }
             }
         },

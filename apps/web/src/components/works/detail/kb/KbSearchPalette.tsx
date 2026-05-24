@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+// EW-641 follow-up — use the locale-aware `useRouter` from
+// `@/i18n/navigation` so search-palette `router.push` to a doc keeps
+// the active locale prefix (the catch-all KB route 404s otherwise).
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';

@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+// EW-641 follow-up — use the locale-aware `useRouter` from
+// `@/i18n/navigation` so `router.refresh()` / future `push()` calls
+// keep the active locale prefix on catch-all KB routes.
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils/cn';

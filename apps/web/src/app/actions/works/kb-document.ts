@@ -44,6 +44,120 @@ export async function updateKbDocumentAction(args: {
 }
 
 /**
+ * EW-641 KB workbench follow-up — "+ Add document" server action.
+ *
+ * Powers the `KbAddDocModal` flow on the KB index + detail pages. The
+ * modal collects `{ class, title, description, tags }`; we derive a
+ * slug from the title, build the canonical `<class>/<slug>.md` path,
+ * and POST through `kbAPI.createDocument`. The agent's `createDocument`
+ * already enqueues the per-Work git mirror (row 1B/a) + the embed task
+ * (row 29c), so the new row lights up everywhere without extra
+ * plumbing here.
+ *
+ * Returns `{ id, path }` so the client can `router.push` to the brand
+ * new doc's editor route (Tiptap surface) immediately on success.
+ *
+ * Slugging mirrors the convention used by `Spec §8`: lowercase, ASCII
+ * alnum, single-dash separators, trimmed to 96 chars. We trim trailing
+ * dashes so titles with punctuation tails don't produce `foo-.md`.
+ */
+export async function createKbDocumentAction(args: {
+    workId: string;
+    class: KbDocumentClass;
+    title: string;
+    description?: string | null;
+    tags?: string[];
+}): Promise<ActionResult<{ id: string; path: string }>> {
+    const { workId, class: docClass, title, description, tags } = args;
+    try {
+        const trimmedTitle = title.trim();
+        if (trimmedTitle.length === 0) {
+            return { success: false, error: 'Title is required' };
+        }
+
+        // Canonical slug — keep aligned with spec §8 path shape so the
+        // git mirror + embed pipeline pick up the new row exactly the
+        // same way uploaded docs do.
+        const slug = trimmedTitle
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 96);
+        if (slug.length === 0) {
+            return {
+                success: false,
+                error: 'Title must contain at least one alphanumeric character',
+            };
+        }
+        const path = `${docClass}/${slug}.md`;
+
+        const created = await kbAPI.createDocument(workId, {
+            path,
+            title: trimmedTitle,
+            class: docClass,
+            body: '',
+            description: description ?? null,
+            tags: tags && tags.length > 0 ? tags : undefined,
+        });
+
+        revalidatePath(`/works/${workId}/kb`);
+        revalidatePath(`/works/${workId}/kb/${created.path}`);
+
+        return { success: true, data: { id: created.id, path: created.path } };
+    } catch (error) {
+        console.error('[kb-add-doc] failed to create KB document:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to create document',
+        };
+    }
+}
+
+/**
+ * EW-641 KB workbench follow-up — delete a KB document.
+ *
+ * Powers the per-row trash in the tree (`KbTreeDocRow`), the per-class
+ * bulk delete (`KbTreeClassDeleteButton`), and the detail-page
+ * `KbDeleteDocButton`. All three call this server action with the
+ * doc id (the backend accepts either id or path, but we surface the
+ * id from the tree row to keep the route param deterministic + avoid
+ * URL-encoding edge cases).
+ *
+ * Returns `{ id }` on success so the caller can correlate failures in
+ * a `Promise.all` (the per-class bulk delete uses the id to surface
+ * which rows didn't delete). On error, the envelope's `error` is a
+ * short human-readable message — the UI surfaces a generic
+ * `errorFallback` toast unless the response includes something more
+ * specific.
+ *
+ * `revalidatePath` covers both the KB index (tree refresh) and the
+ * deleted doc's URL (so any open detail tab gets a fresh 404 instead
+ * of a stale render).
+ */
+export async function deleteKbDocumentAction(args: {
+    workId: string;
+    docId: string;
+    /** Optional doc path — used purely to bust the detail-page route cache. */
+    path?: string;
+}): Promise<ActionResult<{ id: string }>> {
+    const { workId, docId, path } = args;
+    try {
+        await kbAPI.deleteDocument(workId, docId);
+        revalidatePath(`/works/${workId}/kb`);
+        if (path) {
+            revalidatePath(`/works/${workId}/kb/${path}`);
+        }
+        return { success: true, data: { id: docId } };
+    } catch (error) {
+        console.error('[kb-delete] failed to delete KB document:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete document',
+        };
+    }
+}
+
+/**
  * EW-641 Phase 2/e row 38d — "Override locally" server action.
  *
  * Forks an inherited org-overlay KB document into a new Work-scope
