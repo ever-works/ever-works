@@ -28,6 +28,9 @@ interface DashboardClientProps {
     /** Phase 6 PR S — Missions preview block. */
     initialMissions: Mission[];
     initialAllIdeas: WorkProposal[];
+    /** Phase 7 PR II — account-wide spend for the 6th dashboard tile. */
+    monthSpendCents?: number;
+    monthSpendCurrency?: string;
 }
 
 export default function DashboardClient({
@@ -43,6 +46,8 @@ export default function DashboardClient({
     initiallyCanRefresh,
     initialMissions,
     initialAllIdeas,
+    monthSpendCents = 0,
+    monthSpendCurrency = 'usd',
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -65,6 +70,8 @@ export default function DashboardClient({
                 totalWorks={totalWorks}
                 totalItems={totalItems}
                 activeWebsites={activeWebsites}
+                monthSpendCents={monthSpendCents}
+                monthSpendCurrency={monthSpendCurrency}
             />
 
             {/* Phase 6 PR S — Missions preview ABOVE Ideas so the home

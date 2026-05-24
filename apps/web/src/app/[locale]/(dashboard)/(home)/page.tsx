@@ -6,6 +6,7 @@ import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
 import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import { missionsAPI } from '@/lib/api/missions';
+import { usageAPI } from '@/lib/api/usage';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -13,8 +14,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Dashboard() {
-    const [user, worksResponse, statsResponse, proposals, proposalsStatus, missions, allIdeas] =
-        await Promise.all([
+    const [
+        user,
+        worksResponse,
+        statsResponse,
+        proposals,
+        proposalsStatus,
+        missions,
+        allIdeas,
+        accountWide,
+    ] = await Promise.all([
             getAuthFromCookie(),
             getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
                 success: false,
@@ -44,6 +53,10 @@ export default async function Dashboard() {
             workProposalsAPI
                 .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'])
                 .catch(() => []),
+            // Phase 7 PR II — account-wide spend for the 6th
+            // dashboard tile. Catch-defended so a flaky usage
+            // endpoint surfaces $0 instead of 500ing the page.
+            usageAPI.accountWide().catch(() => null),
         ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
@@ -62,6 +75,8 @@ export default async function Dashboard() {
             initiallyCanRefresh={proposalsStatus.canRefresh}
             initialMissions={missions}
             initialAllIdeas={allIdeas}
+            monthSpendCents={accountWide?.currentSpendCents ?? 0}
+            monthSpendCurrency={accountWide?.currency ?? 'usd'}
         />
     );
 }

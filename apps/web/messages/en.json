@@ -1303,6 +1303,7 @@
             "totalWorks": "Total Works",
             "totalItems": "Total Items",
             "activeWebsites": "Active Websites",
+            "monthSpend": "Month Spend",
             "fromLastMonth": "from last month"
         },
         "adminUsage": {

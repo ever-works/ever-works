@@ -20,6 +20,26 @@ export interface ApplicableBudgets {
  * (the API layer needs ISO strings for the wire), so the same
  * shape can be sent verbatim from the controllers.
  */
+/**
+ * Phase 7 PR II — shape returned by `BudgetService.summarizeForUser`,
+ * powering the Dashboard `Month Spend` tile and the new
+ * `GET /me/usage/account-wide` endpoint. Aggregates across every
+ * Work/Mission/Idea owned by the user — `userId` is the
+ * discriminator, not an owner ref.
+ */
+export interface UserBudgetSummary {
+    readonly userId: string;
+    readonly periodStart: string;
+    readonly periodEnd: string;
+    readonly currentSpendCents: number;
+    /** Account-wide monthly cap, in cents. NULL when no cap is set. */
+    readonly capCents: number | null;
+    readonly currency: string;
+    readonly percentUsed: number | null;
+    readonly allowOverage: boolean;
+    readonly blocked: boolean;
+}
+
 export interface OwnerBudgetSummary {
     readonly ownerType: BudgetOwnerType;
     readonly ownerId: string;
@@ -136,6 +156,52 @@ export class BudgetService {
      *     forbids overage (matches the BudgetGuardService's gate
      *     semantics)
      */
+    /**
+     * Phase 7 PR II — account-wide spend summary. The cap inputs
+     * are passed by the caller (typically the API controller after
+     * a `WorkAgentService.getPreferences` read) so the
+     * BudgetsModule stays decoupled from the WorkAgent module.
+     * Mirrors the `summarizeForOwner` shape using `ownerType=null`
+     * to flag "this is account-aggregate, not a single owner".
+     *
+     * Cap inputs:
+     *   - `capCents`: nullable monthly cap (NULL = no cap).
+     *   - `allowOverage`: whether spend past the cap is permitted
+     *      (still warns but doesn't block).
+     *   - `currency`: defaults to 'usd' to match the per-Work
+     *      budget default.
+     */
+    async summarizeForUser(
+        userId: string,
+        prefs: { capCents: number | null; allowOverage: boolean; currency?: string },
+        now: Date = new Date(),
+    ): Promise<UserBudgetSummary> {
+        const currency = prefs.currency ?? 'usd';
+        const currentSpendCents = await this.usageRepository.getTotalSpendCentsForUser(
+            userId,
+            this.getCurrentPeriodStart(now),
+            this.getNextPeriodStart(now),
+            currency,
+        );
+        const capCents = prefs.capCents;
+        const percentUsed =
+            capCents !== null && capCents > 0
+                ? (currentSpendCents / capCents) * 100
+                : null;
+        const blocked = capCents !== null && currentSpendCents >= capCents && !prefs.allowOverage;
+        return {
+            userId,
+            periodStart: this.getCurrentPeriodStart(now).toISOString(),
+            periodEnd: this.getNextPeriodStart(now).toISOString(),
+            currentSpendCents,
+            capCents,
+            currency,
+            percentUsed,
+            allowOverage: prefs.allowOverage,
+            blocked,
+        };
+    }
+
     async summarizeForOwner(
         owner: BudgetOwnerRef,
         now: Date = new Date(),

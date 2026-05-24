@@ -65,6 +65,38 @@ export class PluginUsageRepository {
     }
 
     /**
+     * Phase 7 PR II — account-wide spend rollup for a single user.
+     * Sums `costCents` across every PluginUsageEvent attributed to
+     * the user this period, regardless of Work / Mission / Idea
+     * owner. Drives the new `GET /me/usage/account-wide` endpoint
+     * and the Dashboard's `Month Spend` tile (spec §5.1 / PR II).
+     *
+     * Uses the `(userId, occurredAt)` index already on the entity
+     * so a busy user's history still aggregates fast — no new
+     * migration needed.
+     */
+    async getTotalSpendCentsForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        currency?: string,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
+        }
+
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /**
      * Phase 7 PR T — polymorphic-owner spend rollup. Same
      * period-window + currency filter as `getTotalSpendCents`, but
      * keyed on the `ownerType + ownerId` pair so per-Mission and

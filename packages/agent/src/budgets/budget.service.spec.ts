@@ -39,6 +39,8 @@ function makeUsageRepo(overrides: Record<string, jest.Mock> = {}) {
         getTotalSpendCents: jest.fn().mockResolvedValue(0),
         // Phase 7 PR T — owner-scoped spend rollup.
         getTotalSpendCentsForOwner: jest.fn().mockResolvedValue(0),
+        // Phase 7 PR II — user-scoped account-wide rollup.
+        getTotalSpendCentsForUser: jest.fn().mockResolvedValue(0),
         getSpendByPlugin: jest.fn().mockResolvedValue([]),
         getDailySpend: jest.fn().mockResolvedValue([]),
         getCrossUserSpend: jest.fn().mockResolvedValue([]),
@@ -303,6 +305,66 @@ describe('BudgetService', () => {
             );
             // Legacy workId-keyed query is NOT used for non-Work owners.
             expect(usage.getTotalSpendCents).not.toHaveBeenCalled();
+        });
+
+        describe('Phase 7 PR II — summarizeForUser', () => {
+            it('rolls up account-wide spend with no cap', async () => {
+                const usage = makeUsageRepo({
+                    getTotalSpendCentsForUser: jest.fn().mockResolvedValue(750),
+                });
+                const service = new BudgetService(makeBudgetRepo() as any, usage as any);
+                const result = await service.summarizeForUser('user-1', {
+                    capCents: null,
+                    allowOverage: true,
+                });
+                expect(result.currentSpendCents).toBe(750);
+                expect(result.capCents).toBeNull();
+                expect(result.percentUsed).toBeNull();
+                expect(result.blocked).toBe(false);
+                expect(usage.getTotalSpendCentsForUser).toHaveBeenCalledWith(
+                    'user-1',
+                    expect.any(Date),
+                    expect.any(Date),
+                    'usd',
+                );
+            });
+
+            it('computes percentUsed when a cap is set', async () => {
+                const usage = makeUsageRepo({
+                    getTotalSpendCentsForUser: jest.fn().mockResolvedValue(2500),
+                });
+                const service = new BudgetService(makeBudgetRepo() as any, usage as any);
+                const result = await service.summarizeForUser('user-1', {
+                    capCents: 10_000,
+                    allowOverage: true,
+                });
+                expect(result.percentUsed).toBe(25);
+            });
+
+            it('blocks when spend >= cap and allowOverage = false', async () => {
+                const usage = makeUsageRepo({
+                    getTotalSpendCentsForUser: jest.fn().mockResolvedValue(10_000),
+                });
+                const service = new BudgetService(makeBudgetRepo() as any, usage as any);
+                const result = await service.summarizeForUser('user-1', {
+                    capCents: 10_000,
+                    allowOverage: false,
+                });
+                expect(result.blocked).toBe(true);
+            });
+
+            it('does NOT block when allowOverage = true even past cap', async () => {
+                const usage = makeUsageRepo({
+                    getTotalSpendCentsForUser: jest.fn().mockResolvedValue(20_000),
+                });
+                const service = new BudgetService(makeBudgetRepo() as any, usage as any);
+                const result = await service.summarizeForUser('user-1', {
+                    capCents: 10_000,
+                    allowOverage: true,
+                });
+                expect(result.blocked).toBe(false);
+                expect(result.percentUsed).toBe(200);
+            });
         });
 
         it('evaluateBudget keeps using the legacy workId query for Work-owned budgets (back-compat)', async () => {

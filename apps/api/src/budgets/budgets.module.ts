@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BudgetsModule as AgentBudgetsModule } from '@ever-works/agent/budgets';
+import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { NotificationsModule as AgentNotificationsModule } from '@ever-works/agent/notifications';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { User, Work } from '@ever-works/agent/entities';
@@ -11,6 +12,7 @@ import { BudgetAlertHandler } from './budget-alert.handler';
 import { UsageController } from './usage.controller';
 import { BudgetsController } from './budgets.controller';
 import { AdminUsageController } from './admin-usage.controller';
+import { AccountUsageController } from './account-usage.controller';
 import { PluginUsageCleanupService } from './plugin-usage-cleanup.service';
 
 /**
@@ -30,11 +32,15 @@ import { PluginUsageCleanupService } from './plugin-usage-cleanup.service';
     imports: [
         DatabaseModule,
         AgentBudgetsModule,
+        // Phase 7 PR II — AccountUsageController reads
+        // accountWideMonthlyCapCents / accountWideAllowOverage
+        // from WorkAgentPreference via WorkAgentService.
+        WorkAgentModule,
         AgentNotificationsModule,
         MailModule,
         TypeOrmModule.forFeature([User, Work]),
     ],
-    controllers: [UsageController, BudgetsController, AdminUsageController],
+    controllers: [UsageController, BudgetsController, AdminUsageController, AccountUsageController],
     providers: [
         BudgetAlertHandler,
         PluginUsageCleanupService,
