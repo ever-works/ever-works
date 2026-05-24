@@ -13,6 +13,30 @@ export interface ApplicableBudgets {
     readonly plugin: WorkBudget | null;
 }
 
+/**
+ * Phase 7 PR U — shape returned by `BudgetService.summarizeForOwner`,
+ * powering the new per-Mission and per-Idea budget endpoints.
+ * Pure value object — no entities, no Dates as Date instances
+ * (the API layer needs ISO strings for the wire), so the same
+ * shape can be sent verbatim from the controllers.
+ */
+export interface OwnerBudgetSummary {
+    readonly ownerType: BudgetOwnerType;
+    readonly ownerId: string;
+    readonly periodStart: string;
+    readonly periodEnd: string;
+    readonly currentSpendCents: number;
+    /** GLOBAL monthly cap, in cents. NULL when no cap is set. */
+    readonly capCents: number | null;
+    readonly currency: string;
+    /** Percent of cap used. NULL when capCents is NULL. */
+    readonly percentUsed: number | null;
+    /** Mirror of the cap row's `allowOverage` flag (default true when no cap). */
+    readonly allowOverage: boolean;
+    /** True iff currentSpendCents >= capCents AND !allowOverage. */
+    readonly blocked: boolean;
+}
+
 export type { BudgetOwnerRef };
 
 export interface BudgetEvaluation {
@@ -90,6 +114,60 @@ export class BudgetService {
             this.budgetRepository.findForOwnerPlugin(owner, pluginId),
         ]);
         return { global, plugin };
+    }
+
+    /**
+     * Phase 7 PR U — read-side helper for the new
+     * `GET /me/missions/:id/budget` + `GET /me/work-proposals/:id/budget`
+     * endpoints. Reports current-period spend for an owner plus
+     * an optional GLOBAL-budget cap status. Plugin-scoped caps
+     * are NOT included in v1 — those are surfaced one-at-a-time
+     * via the existing per-Work plugin-cap views; the per-Mission
+     * / per-Idea pages need the aggregate first.
+     *
+     * Shape:
+     *   - `currentSpendCents` — total spend across every plugin
+     *     attributed to this owner this period
+     *   - `capCents | null` — the owner's GLOBAL monthly cap, or
+     *     null if no cap is set (= unlimited / inherit)
+     *   - `percentUsed | null` — percent of cap used, or null
+     *     when there's no cap
+     *   - `blocked` — true iff current spend >= cap AND the cap
+     *     forbids overage (matches the BudgetGuardService's gate
+     *     semantics)
+     */
+    async summarizeForOwner(
+        owner: BudgetOwnerRef,
+        now: Date = new Date(),
+    ): Promise<OwnerBudgetSummary> {
+        const [global, currentSpendCents] = await Promise.all([
+            this.budgetRepository.findGlobalForOwner(owner),
+            this.usageRepository.getTotalSpendCentsForOwner(
+                owner.ownerType,
+                owner.ownerId,
+                this.getCurrentPeriodStart(now),
+                this.getNextPeriodStart(now),
+            ),
+        ]);
+        const capCents = global?.monthlyCapCents ?? null;
+        const allowOverage = global?.allowOverage ?? true;
+        const percentUsed =
+            capCents !== null && capCents > 0
+                ? (currentSpendCents / capCents) * 100
+                : null;
+        const blocked = capCents !== null && currentSpendCents >= capCents && !allowOverage;
+        return {
+            ownerType: owner.ownerType,
+            ownerId: owner.ownerId,
+            periodStart: this.getCurrentPeriodStart(now).toISOString(),
+            periodEnd: this.getNextPeriodStart(now).toISOString(),
+            currentSpendCents,
+            capCents,
+            currency: global?.currency ?? 'usd',
+            percentUsed,
+            allowOverage,
+            blocked,
+        };
     }
 
     async getCurrentSpendCents(

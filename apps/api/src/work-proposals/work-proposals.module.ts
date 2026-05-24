@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { UserResearchModule } from '@ever-works/agent/user-research';
 import { WorkAgentModule } from '@ever-works/agent/work-agent';
+import { BudgetsModule } from '@ever-works/agent/budgets';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { User } from '@ever-works/agent/entities';
 import { AuthModule } from '../auth/auth.module';
@@ -23,6 +24,9 @@ import { ScheduledReRunService } from './scheduled-rerun.service';
         // Phase 1 PR B — POST /me/work-proposals/:id/build calls
         // WorkAgentService.createGoal() to spin up the build pipeline.
         WorkAgentModule,
+        // Phase 7 PR U — GET /me/work-proposals/:id/budget calls
+        // BudgetService.summarizeForOwner.
+        BudgetsModule,
     ],
     controllers: [WorkProposalsController],
     providers: [

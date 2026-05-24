@@ -36,6 +36,12 @@ jest.mock('@ever-works/agent/work-agent', () => ({
     WorkAgentService: class WorkAgentService {},
     WorkAgentModule: class WorkAgentModule {},
 }));
+// Phase 7 PR U — module now imports BudgetsModule so the
+// controller can wire GET /:id/budget to BudgetService.
+jest.mock('@ever-works/agent/budgets', () => ({
+    BudgetService: class BudgetService {},
+    BudgetsModule: class BudgetsModule {},
+}));
 jest.mock('@ever-works/agent/config', () => ({
     config: { trigger: { shouldUseTrigger: jest.fn(() => false) } },
 }));

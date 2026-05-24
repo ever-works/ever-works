@@ -18,6 +18,8 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import type { WorkProposal } from '@ever-works/agent/entities';
+import { BudgetOwnerType } from '@ever-works/agent/entities';
+import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
@@ -107,7 +109,11 @@ function toProposalUserPrompt(proposal: {
 @ApiTags('work-proposals')
 @Controller('api/me/work-proposals')
 export class WorkProposalsController {
-    constructor(private readonly service: WorkProposalsApiService) {}
+    constructor(
+        private readonly service: WorkProposalsApiService,
+        // Phase 7 PR U — per-Idea budget summary.
+        private readonly budgetService: BudgetService,
+    ) {}
 
     /**
      * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
@@ -218,6 +224,27 @@ export class WorkProposalsController {
         const proposal = await this.service.getForUser(auth.userId, id);
         if (!proposal) throw new NotFoundException('Proposal not found');
         return toResponseDto(proposal);
+    }
+
+    @Get(':id/budget')
+    @ApiOperation({
+        summary:
+            'Current period spend + cap status for this Idea (Phase 7 PR U). 404 when the Idea belongs to another user.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async budget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<OwnerBudgetSummary> {
+        // Phase 7 PR U — ownership gate first so the per-Idea
+        // spend isn't introspectable by unrelated users. Mirrors
+        // the Mission endpoint shape.
+        const proposal = await this.service.getForUser(auth.userId, id);
+        if (!proposal) throw new NotFoundException('Proposal not found');
+        return this.budgetService.summarizeForOwner({
+            ownerType: BudgetOwnerType.IDEA,
+            ownerId: id,
+        });
     }
 
     @Patch(':id/dismiss')

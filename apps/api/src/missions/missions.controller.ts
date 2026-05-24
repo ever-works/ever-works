@@ -19,6 +19,8 @@ import {
     type MissionDto,
     type MissionGuardrailsOverride,
 } from '@ever-works/agent/missions';
+import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
+import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { CloneMissionDto, CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
@@ -57,6 +59,8 @@ export class MissionsController {
         private readonly service: MissionsService,
         // Phase 3 PR HH — Mission Clone (Full Fork).
         private readonly cloneService: MissionCloneService,
+        // Phase 7 PR U — per-Mission budget summary.
+        private readonly budgetService: BudgetService,
     ) {}
 
     @Get()
@@ -95,6 +99,28 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
         return this.service.getForUser(auth.userId, id);
+    }
+
+    @Get(':id/budget')
+    @ApiOperation({
+        summary:
+            'Current period spend + cap status for this Mission (Phase 7 PR U). Plugin-scoped caps not surfaced in v1.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async budget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<OwnerBudgetSummary> {
+        // Phase 7 PR U — ownership gate first so an unrelated user
+        // can't introspect another user's per-Mission spend. The
+        // service.getForUser call 404s when the Mission belongs to
+        // another user, which translates to the standard NestJS
+        // 404 response shape.
+        await this.service.getForUser(auth.userId, id);
+        return this.budgetService.summarizeForOwner({
+            ownerType: BudgetOwnerType.MISSION,
+            ownerId: id,
+        });
     }
 
     @Patch(':id')
