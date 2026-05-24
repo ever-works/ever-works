@@ -68,6 +68,12 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Phase 6 PR Q — dedicated Missions catalog page. Sits ABOVE
+    // Ideas in the sidebar to match the spec §5.1 stats-tile order
+    // (Missions → Ideas → Works), reading the same direction as the
+    // dashboard tiles. Detail page wires in PR R.
+    DASHBOARD_MISSIONS: '/missions',
+    DASHBOARD_MISSION: (id: string) => `/missions/${id}`,
     // Phase 5 PR N — dedicated Ideas catalog page (replaces the
     // dashboard-preview-only surface from Phase 2). Sidebar nav
     // entry + quick-add `+ Add` button + status-filter toggles +

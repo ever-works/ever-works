@@ -518,6 +518,26 @@
                 "label": "Suggested plugins"
             }
         },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
         "ideasPage": {
             "title": "Ideas",
             "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
@@ -3411,6 +3431,7 @@
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
+                "missions": "Missions",
                 "ideas": "Ideas",
                 "works": "Works",
                 "plugins": "Plugins",
