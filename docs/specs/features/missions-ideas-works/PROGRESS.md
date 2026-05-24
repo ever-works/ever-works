@@ -4,14 +4,44 @@
 **Worktree:** `C:/Coding/Worktrees/wt-missions-build`
 **Loop:** autonomous self-paced `/loop` with 30-min ticks. See [Per-tick procedure](#per-tick-procedure) below.
 **Started:** 2026-05-24
-**Spec:** [Workspace v6 spec](https://github.com/ever-works/workspace/blob/develop/knowledge/notes/2026-05-24-missions-ideas-works-spec.md) · [PLAN v6](https://github.com/ever-works/workspace/blob/develop/knowledge/notes/2026-05-24-missions-ideas-works-plan.md)
+**Spec:** [./spec.md](./spec.md) · [./plan.md](./plan.md) (canonical local copies as of PR DOC2; source-of-truth still in Workspace at `knowledge/notes/2026-05-24-missions-ideas-works-{spec,plan}.md`)
 
 ---
 
 ## Current focus
 
-**Tick 43 (DONE):** Phase 11 PR DOC1 — User-facing docs for Missions/Ideas/Works. Four new docs under `docs/features/` (the Docusaurus content root the `apps/docs` site renders from): **`missions.md`** (when-to-use table, create flow incl. Use-this-Template entry path, state-machine diagram for ACTIVE/PAUSED/COMPLETED with transition gates, run-now semantics, auto-build behavior + cost implications, outstanding-Ideas cap resolution priority, Full-Fork clone semantics, delete-detaches-Ideas note), **`ideas.md`** (source taxonomy table — auto-signup / user-refresh / discover / scheduled / user-manual / mission — same Idea shape regardless; full PENDING→QUEUED→BUILDING→ACCEPTED/FAILED state-machine diagram with Retry/Rebuild back-edges; Build vs Accept distinction; refresh rate-limit behavior; failure-kind playbook table with action per kind; Mission-spawned dual-surface — global /ideas + per-Mission detail; API + MCP verb table), **`mission-templates.md`** (catalog navigation via Kind chip, curated vs custom, Use-this-Template wiring incl. `?type=mission&template=…` query-param contract, full `.works/mission.yml` example + per-section explanation table, A21 empty-is-valid + A22 forward-compat behavior, author-a-template checklist), **`budgets-and-usage.md`** (what-gets-counted owner-type table, account-wide caps, per-Mission guardrails table covering all 7 fields, per-Idea/per-Work budget card shape, billing modes USAGE vs PRO-RATA, precedence ladder when a cap is hit, the `blocked=true` audit-row pattern, API + MCP verb table). All four cross-link each other plus the existing `mcp-server` + `scheduled-updates` + `website-templates` docs. **Features index** (`docs/features/index.md`) gets 4 new rows at the top of the table. **`apps/docs/sidebarsPlatform.ts`** updated to list the four new pages right after `creating-a-work` so they show up in the Features section nav. Tone matches existing docs (concise, table-heavy, mermaid for state machines, code blocks for cron + YAML). Docusaurus type-check has pre-existing unrelated errors (`@theme/SearchBar`, `@theme/Heading` modules in src/theme/ + src/pages/ — not touched by this PR).
-**Next:** Phase 11 PR DOC2 — Cross-link the spec + plan from `C:/Coding/Workspace/knowledge/notes/2026-05-24-missions-ideas-works-{spec,plan}.md` into `docs/specs/features/missions-ideas-works/{spec,plan}.md` so the public docs site has the canonical design + implementation references next to the user-facing pages PR DOC1 just added.
+**Tick 44 (DONE — FINAL):** Phase 11 PR DOC2 — Cross-linked spec + plan into the in-repo docs tree. Copied verbatim from `C:/Coding/Workspace/knowledge/notes/2026-05-24-missions-ideas-works-{spec,plan}.md` (the Workspace-side source-of-truth) to `docs/specs/features/missions-ideas-works/{spec.md,plan.md}` so the public docs site (`apps/docs`) carries them alongside the user-facing pages PR DOC1 just landed (`docs/features/{missions,ideas,mission-templates,budgets-and-usage}.md`). Layout matches the existing `docs/specs/features/<slug>/{spec,plan,tasks}.md` convention used by `activity-log`, `agent-zero-friction-onboarding`, etc. **Link rewrites**: the 8 intra-document `2026-05-24-missions-ideas-works-{spec,plan}.md` cross-references in the copied files were rewritten to `spec.md` / `plan.md`. The plan.md's §13.1 user-docs reference (which previously pointed at the Workspace user-docs file) was rewritten to link directly at the 4 new feature docs DOC1 added. `file:///C:/Coding/Workspace/AGENTS.md` workstation-local links were intentionally left alone — they document historical context, not callable navigation. **PROGRESS.md** updated: the top `**Spec:**` link now points at the local `./spec.md` + `./plan.md` and notes the canonical source still lives in Workspace. spec.md = 1091 lines; plan.md = 1021 lines. No code changes — pure docs lift.
+**🎉 ALL PRs DONE.** Final summary below.
+
+## Final summary — Missions/Ideas/Works build
+
+44 ticks across **44 PR-equivalents** landed on `feat/missions-ideas-works` between 2026-05-23 and 2026-05-25. All TODO rows below are now DONE.
+
+**By phase:**
+- **Phase 0** (schema, 11 PRs): `missions` + `work_proposals` extensions + 9 supporting columns + `sourceMissionId` Clone back-link. Every entity change shipped a TypeORM migration in the same commit (NN #16).
+- **Phase 1** (Ideas API, 6 PRs): A/B/C/D/E/FF — entity + service + DTO + controller; user-manual create, queue-for-build, exclusion+context generator, promoted constants → user prefs, i18n renames, /retry + /rebuild + auto-retry policy.
+- **Phase 2** (Work-Agent prefs UI, 1 PR): EE — auto-retry + account-wide-budget settings sections.
+- **Phase 3** (Missions agent, 4 PRs): G/H/HH/J — module skeleton, full CRUD + lifecycle (pause/resume/complete/runNow), Full-Fork Clone, cron tick worker + zero-dep cron matcher.
+- **Phase 4** (Component extraction, 1 PR): K — IdeaCard primitive lift with snapshot lock.
+- **Phase 5** (Ideas page, 2 PRs): M/N — IdeaCard component + dedicated `/ideas` page.
+- **Phase 6** (Missions UI, 3 PRs): O/Q/R + S/GG — `/missions` catalog page, Mission detail page, state-aware action buttons, activity timeline + spend-over-time chart.
+- **Phase 6.5** (Unified `/new`, 3 PRs): CC1/CC2/DD — extracted CreationBlockTrio, new `/new` page with chip strip, sidebar `+ New` repoint.
+- **Phase 7** (Budget surfaces, 3 PRs): T/U/V/II — owner-aware spend aggregation, per-owner budget endpoints, shared BudgetSummaryCard, dashboard Month-Spend tile.
+- **Phase 8** (Mission Templates, 3 PRs): W/X/Y/JJ — KindSwitcher, curated catalog seed, Use-this-Template flow, `.works/mission.yml` Zod manifest parser.
+- **Phase 9** (Chat tools, 2 PRs): Z1/Z2 — web-side Vercel AI SDK `tool()` defs (20 verbs) + MCP whitelist entries (25 entries).
+- **Phase 10** (i18n, 1 PR): LOC — 7564 keys added across 20 non-English locales; all 21 files now at byte-identical parity.
+- **Phase 11** (Docs, 2 PRs): DOC1/DOC2 — 4 user-facing feature docs + spec + plan cross-linked into the docs tree.
+
+**Operating constraints (all honored):**
+- NN #20 (extension only, never replacement) — every UI change additive; no surface deleted.
+- NN #16 (TypeORM entity changes ship with migration in same commit) — confirmed across all schema PRs.
+- Conventional commits only — commitlint passed every commit.
+- No push to develop/main — every commit on `feat/missions-ideas-works`.
+- No PRs created — manual PR creation deferred to operator post-merge.
+
+**Test posture:** Targeted test runs per tick (NOT full suite). All targeted suites green at PR-close. Cross-cutting checks at LOC and Z2 tied to component snapshots + whitelist invariants.
+
+**Branch is ready for manual PR creation against `develop`.**
 
 ---
 
@@ -163,7 +193,7 @@ Dependency notation `[after X]` means PR X must be DONE before this PR starts.
 | PR | Status | Description | Deps | Commit | Summary |
 |---|---|---|---|---|---|
 | DOC1 | DONE | Lift end-user docs from Workspace into `apps/docs/` under `docs/features/missions.md`, `ideas.md`, `mission-templates.md`, `budgets-and-usage.md`. Index updated. (PLAN §13) | — | `d5503306` | Four new docs (`missions.md`, `ideas.md`, `mission-templates.md`, `budgets-and-usage.md`) with mermaid state-machine diagrams, when-to-use tables, full `.works/mission.yml` example w/ per-section table, failure-kind action playbook, owner-type cost-rollup table, cap precedence ladder, API + MCP verb tables. Features index extended (4 new rows). Sidebar (`apps/docs/sidebarsPlatform.ts`) updated to slot the new pages after `creating-a-work`. All cross-link each other plus mcp-server + scheduled-updates + website-templates. Docusaurus typecheck has pre-existing unrelated errors not touched by this PR. |
-| DOC2 | TODO | Cross-link spec + plan under `docs/specs/features/missions-ideas-works/{spec,plan}.md` (copy from Workspace). (PLAN §13) | — | `<hash>` | |
+| DOC2 | DONE | Cross-link spec + plan under `docs/specs/features/missions-ideas-works/{spec,plan}.md` (copy from Workspace). (PLAN §13) | — | `<hash>` | Spec (1091 lines) + plan (1021 lines) copied verbatim from Workspace `knowledge/notes/2026-05-24-missions-ideas-works-{spec,plan}.md` to local sibling files. Layout matches the existing `{spec,plan,tasks}.md` convention used elsewhere under `docs/specs/features/`. 8 intra-document cross-links rewritten to the new filenames; plan §13.1 user-docs reference rewritten to point at PR DOC1's 4 feature docs directly. PROGRESS Spec header repointed at the local copies. No code changes — pure docs lift. |
 
 ---
 
