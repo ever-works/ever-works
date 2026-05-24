@@ -105,7 +105,7 @@ Dependency notation `[after X]` means PR X must be DONE before this PR starts.
 
 | PR | Status | Description | Deps | Commit | Summary |
 |---|---|---|---|---|---|
-| M | DONE | Extract `<IdeaCard />` from `WorkProposalsSection.tsx` to `apps/web/src/components/ideas/`. Snapshot-verify byte-identical. (PLAN §7.3 PR M) | K | _next-commit_ | New `apps/web/src/components/ideas/IdeaCard.tsx` (canonical) + index barrel. Old `dashboard/WorkProposalCard.tsx` shrunk to one-line back-compat shim (`export { IdeaCard as WorkProposalCard }`) per NN #20 — external imports of the old name keep working. `WorkProposalsSection.tsx` switched to the new import path. 9 new IdeaCard tests including a full-markup inline snapshot locking byte-identical render (Decision A10). |
+| M | DONE | Extract `<IdeaCard />` from `WorkProposalsSection.tsx` to `apps/web/src/components/ideas/`. Snapshot-verify byte-identical. (PLAN §7.3 PR M) | K | `c4145549` | New `apps/web/src/components/ideas/IdeaCard.tsx` (canonical) + index barrel. Old `dashboard/WorkProposalCard.tsx` shrunk to one-line back-compat shim (`export { IdeaCard as WorkProposalCard }`) per NN #20 — external imports of the old name keep working. `WorkProposalsSection.tsx` switched to the new import path. 9 new IdeaCard tests including a full-markup inline snapshot locking byte-identical render (Decision A10). |
 | N | TODO | New `/ideas` page (sidebar + page + quick-add `+Add` button + two toggles + ⚙ gears + sorted list). (PLAN §7.3 PR N) | M, B | `<hash>` | |
 | O | TODO | Reshape Dashboard Ideas preview block: add toggles + `+Add` + gears + `View all (N)` link. Max 3 cards. (PLAN §7.3 PR O) | N | `<hash>` | |
 | P | TODO | Done filter chip on `/ideas`. (PLAN §7.3 PR P) | N | `<hash>` | |
