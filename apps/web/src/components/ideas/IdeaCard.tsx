@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -132,6 +132,40 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 <p className="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4">
                     "{proposal.reasoning}"
                 </p>
+            )}
+
+            {/* Phase 6 PR GG / spec §3.9 — inline failure error block.
+                Renders only when the Idea is in the FAILED terminal
+                status. `failureKind` is the platform-classified
+                category from PR FF (translated via the
+                `dashboard.proposals.failureKinds.*` namespace);
+                `failureMessage` is the raw human-readable error.
+                Renders both because the kind summarizes the class of
+                problem while the message often holds the specific
+                detail (4xx body, plugin trace) the user needs to
+                act on. Clamped at 3 lines so a stack-trace-y message
+                doesn't dominate the card. */}
+            {proposal.status === 'failed' && (proposal.failureMessage || proposal.failureKind) && (
+                <div
+                    role="alert"
+                    className="mb-4 rounded-md border border-danger/30 bg-danger/5 dark:bg-danger/10 p-2 text-xs text-danger"
+                >
+                    <div className="flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                            {proposal.failureKind && (
+                                <div className="font-medium">
+                                    {t(`failureKinds.${proposal.failureKind}`)}
+                                </div>
+                            )}
+                            {proposal.failureMessage && (
+                                <p className="line-clamp-3 mt-0.5 text-text-secondary dark:text-text-secondary-dark">
+                                    {proposal.failureMessage}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
 
             <button

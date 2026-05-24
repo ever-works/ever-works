@@ -32,6 +32,7 @@ const completeMock = vi.fn();
 const deleteMock = vi.fn();
 const runNowMock = vi.fn();
 const updateMock = vi.fn();
+const cloneMock = vi.fn();
 vi.mock('@/app/actions/dashboard/missions', () => ({
     pauseMissionAction: (...args: unknown[]) => pauseMock(...args),
     resumeMissionAction: (...args: unknown[]) => resumeMock(...args),
@@ -39,6 +40,7 @@ vi.mock('@/app/actions/dashboard/missions', () => ({
     deleteMissionAction: (...args: unknown[]) => deleteMock(...args),
     runMissionNowAction: (...args: unknown[]) => runNowMock(...args),
     updateMissionAction: (...args: unknown[]) => updateMock(...args),
+    cloneMissionAction: (...args: unknown[]) => cloneMock(...args),
 }));
 
 // The IdeaCard inside the Ideas section pulls its own action mocks
@@ -245,5 +247,135 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
             />,
         );
         expect(screen.getByText('badges.cloned')).toBeTruthy();
+    });
+
+    describe('PR GG extras', () => {
+        it('Activity + Spend sections render with v1 placeholder copy', () => {
+            render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
+            expect(screen.getByText('sections.activity')).toBeTruthy();
+            expect(screen.getByText('activity.empty')).toBeTruthy();
+            expect(screen.getByText('sections.spend')).toBeTruthy();
+            expect(screen.getByText('spend.empty')).toBeTruthy();
+        });
+
+        it('Clone button opens the confirmation modal and wires a Cancel button', () => {
+            render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
+            // Modal title not rendered before opening.
+            expect(screen.queryByText('clone.title')).toBeNull();
+            fireEvent.click(screen.getByText('actions.clone'));
+            // Now visible.
+            expect(screen.getByText('clone.title')).toBeTruthy();
+            expect(screen.getByText('clone.description')).toBeTruthy();
+            // Cancel button is present + wired (Headless UI dismount is
+            // animated, so we don't synchronously assert the modal
+            // disappears — just that the Cancel button rendered).
+            const cancel = screen.getByText('clone.cancel');
+            expect(cancel.closest('button')?.disabled).toBe(false);
+        });
+
+        it('Clone modal Confirm calls cloneMissionAction with the title override', async () => {
+            cloneMock.mockClear();
+            routerPushMock.mockClear();
+            cloneMock.mockResolvedValueOnce({
+                mission: mkMission({ id: 'clone-1' }),
+                ideasCloned: 2,
+                ideasSkipped: 1,
+            });
+            render(<MissionDetailClient mission={mkMission({ id: 'src' })} ideas={[]} />);
+            fireEvent.click(screen.getByText('actions.clone'));
+            // Type a custom title.
+            const input = screen.getByPlaceholderText(/Copy of/);
+            fireEvent.change(input, { target: { value: 'My Forked Mission' } });
+            fireEvent.click(screen.getByText('clone.confirm'));
+            // Wait for action + transition.
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(cloneMock).toHaveBeenCalledWith('src', 'My Forked Mission');
+            // Navigation kicks to the new clone's detail page.
+            expect(routerPushMock).toHaveBeenCalledWith('/missions/clone-1');
+        });
+
+        it('Clone modal Confirm with empty title omits the title arg (server uses "Copy of ..." default)', async () => {
+            cloneMock.mockClear();
+            cloneMock.mockResolvedValueOnce({
+                mission: mkMission({ id: 'clone-2' }),
+                ideasCloned: 0,
+                ideasSkipped: 0,
+            });
+            render(<MissionDetailClient mission={mkMission({ id: 'src' })} ideas={[]} />);
+            fireEvent.click(screen.getByText('actions.clone'));
+            fireEvent.click(screen.getByText('clone.confirm'));
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(cloneMock).toHaveBeenCalledWith('src', undefined);
+        });
+
+        it('Inherited Works panel hidden for direct-created Missions (sourceMissionId null)', () => {
+            render(
+                <MissionDetailClient
+                    mission={mkMission({ sourceMissionId: null })}
+                    ideas={[]}
+                />,
+            );
+            expect(screen.queryByText('sections.inheritedWorks')).toBeNull();
+        });
+
+        it('Inherited Works panel shows when sourceMissionId is set, with from-source link + Work list', () => {
+            const source = mkMission({ id: 'src', title: 'Source Mission' });
+            const cloned = mkMission({ id: 'clone', sourceMissionId: 'src' });
+            const inheritedIdeas = [
+                mkIdea('i1', {
+                    status: 'accepted',
+                    acceptedWorkId: 'work-A',
+                    title: 'Inherited Idea A',
+                }),
+                mkIdea('i2', {
+                    status: 'accepted',
+                    acceptedWorkId: 'work-B',
+                    title: 'Inherited Idea B',
+                }),
+                // Pending Idea should NOT appear (no acceptedWorkId).
+                mkIdea('i3', { status: 'pending' }),
+            ];
+            render(
+                <MissionDetailClient
+                    mission={cloned}
+                    ideas={[]}
+                    sourceMission={source}
+                    inheritedIdeas={inheritedIdeas}
+                />,
+            );
+            // Section heading + count badge.
+            const heading = screen.getByText(/sections\.inheritedWorks/);
+            expect(heading.textContent).toMatch(/2/);
+            // From-source link points at the source Mission detail page.
+            const sourceLink = screen.getByText('Source Mission').closest('a');
+            expect(sourceLink?.getAttribute('href')).toBe('/missions/src');
+            // Work links use the inherited IdeaCard's title text.
+            const workALink = screen.getByText('Inherited Idea A').closest('a');
+            expect(workALink?.getAttribute('href')).toBe('/works/work-A');
+        });
+
+        it('IdeaCard inline failure error renders for FAILED Ideas with failureMessage + kind', () => {
+            const failed = mkIdea('f1', {
+                status: 'failed',
+                failureMessage: 'Upstream returned 503 after 3 retries.',
+                failureKind: 'transient-upstream-5xx',
+            });
+            render(<MissionDetailClient mission={mkMission()} ideas={[failed]} />);
+            // Failure-kind label (i18n key returned as the key under the mock).
+            expect(
+                screen.getByText('failureKinds.transient-upstream-5xx'),
+            ).toBeTruthy();
+            // Failure message body.
+            expect(screen.getByText(/Upstream returned 503/)).toBeTruthy();
+        });
+
+        it('IdeaCard inline failure error is NOT rendered for non-FAILED Ideas', () => {
+            const ok = mkIdea('a', { status: 'pending' });
+            render(<MissionDetailClient mission={mkMission()} ideas={[ok]} />);
+            // No failure-kind text anywhere.
+            expect(screen.queryByText(/failureKinds\./)).toBeNull();
+        });
     });
 });

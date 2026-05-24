@@ -2,9 +2,12 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
+    Activity,
+    BarChart3,
     CalendarClock,
     CheckCircle2,
     ChevronLeft,
+    Copy,
     GitFork,
     Pause,
     Play,
@@ -26,6 +29,7 @@ import {
     ToggleRow,
 } from '@/components/work-agent';
 import {
+    cloneMissionAction,
     completeMissionAction,
     deleteMissionAction,
     pauseMissionAction,
@@ -36,6 +40,8 @@ import {
 import type { Mission } from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 /**
  * Phase 6 PR R — Mission detail page client. First UI consumer
@@ -65,6 +71,22 @@ import { IdeaCard } from '@/components/ideas';
 export interface MissionDetailClientProps {
     mission: Mission;
     ideas: WorkProposal[];
+    /**
+     * Phase 6 PR GG — the source Mission this one was Cloned
+     * from, if any. NULL for direct-created Missions (the common
+     * case). When set, the "Related Works (inherited)" panel
+     * renders below the Related Works panel.
+     */
+    sourceMission?: Mission | null;
+    /**
+     * Phase 6 PR GG — ACCEPTED Ideas attached to the source
+     * Mission. Used to derive the inherited Works list (those
+     * Ideas' `acceptedWorkId` values). Decision A26: Works are
+     * NOT duplicated during Clone, but the cloned Mission's
+     * detail page surfaces them as read-only inherited
+     * references.
+     */
+    inheritedIdeas?: WorkProposal[];
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -72,7 +94,12 @@ const PAUSABLE_STATUSES = new Set(['active']);
 const RESUMABLE_STATUSES = new Set(['paused']);
 const COMPLETABLE_STATUSES = new Set(['active', 'paused']);
 
-export function MissionDetailClient({ mission: initial, ideas }: MissionDetailClientProps) {
+export function MissionDetailClient({
+    mission: initial,
+    ideas,
+    sourceMission = null,
+    inheritedIdeas = [],
+}: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
 
@@ -81,6 +108,11 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
     const [pendingSettings, startSettings] = useTransition();
     const [pendingRunNow, startRunNow] = useTransition();
     const [pendingDelete, startDelete] = useTransition();
+    const [pendingClone, startClone] = useTransition();
+
+    // Phase 6 PR GG — Clone modal state.
+    const [cloneOpen, setCloneOpen] = useState(false);
+    const [cloneTitleDraft, setCloneTitleDraft] = useState('');
 
     // Editable mirrors of the per-Mission knobs.
     const [scheduleDraft, setScheduleDraft] = useState<string>(mission.schedule ?? '');
@@ -109,6 +141,24 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
                 workId: i.acceptedWorkId as string,
             }));
     }, [ideas]);
+
+    // Phase 6 PR GG — inherited Works derived from the source
+    // Mission's accepted Ideas. Same shape as acceptedWorkLinks
+    // so the panel render path can be uniform.
+    const inheritedWorkLinks = useMemo(() => {
+        return inheritedIdeas
+            .filter(
+                (i) =>
+                    i.status === 'accepted' &&
+                    typeof i.acceptedWorkId === 'string' &&
+                    i.acceptedWorkId.length > 0,
+            )
+            .map((i) => ({
+                ideaId: i.id,
+                ideaTitle: i.title,
+                workId: i.acceptedWorkId as string,
+            }));
+    }, [inheritedIdeas]);
 
     const saveSettings = () => {
         startSettings(async () => {
@@ -163,6 +213,32 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
             } catch (err) {
                 toast.error(
                     err instanceof Error ? err.message : t('toasts.runNowError'),
+                );
+            }
+        });
+    };
+
+    const handleClone = () => {
+        startClone(async () => {
+            try {
+                const result = await cloneMissionAction(
+                    mission.id,
+                    cloneTitleDraft.trim() || undefined,
+                );
+                toast.success(
+                    t('toasts.cloned', {
+                        ideasCloned: result.ideasCloned,
+                        ideasSkipped: result.ideasSkipped,
+                    }),
+                );
+                setCloneOpen(false);
+                setCloneTitleDraft('');
+                // Navigate to the new clone's detail page so the
+                // user sees their fork immediately.
+                router.push(ROUTES.DASHBOARD_MISSION(result.mission.id));
+            } catch (err) {
+                toast.error(
+                    err instanceof Error ? err.message : t('toasts.cloneError'),
                 );
             }
         });
@@ -299,6 +375,17 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
                             type="button"
                             size="sm"
                             variant="secondary"
+                            className="gap-1.5"
+                            onClick={() => setCloneOpen(true)}
+                            disabled={pendingClone}
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            {t('actions.clone')}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
                             className="gap-1.5 text-danger hover:text-danger"
                             onClick={handleDelete}
                             disabled={pendingDelete}
@@ -375,6 +462,40 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
                 </p>
             </section>
 
+            {/* Phase 6 PR GG — Activity timeline + Spend-over-time pair.
+                Both are "wired surfaces, empty data" v1 placeholders.
+                Activity-feed shape lives behind PR J's tick events
+                (the Mission run record doesn't yet emit timeline
+                events); spend buckets come from Phase 7 PR U's
+                budget query. The sections render the heading + the
+                empty state so users see the planned surface even
+                before the data wires through, and the layout
+                doesn't reshuffle later. */}
+            <div className="grid gap-6 @3xl/main:grid-cols-2">
+                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Activity className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('sections.activity')}
+                        </h2>
+                    </div>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('activity.empty')}
+                    </p>
+                </section>
+                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('sections.spend')}
+                        </h2>
+                    </div>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('spend.empty')}
+                    </p>
+                </section>
+            </div>
+
             {/* Live runs section (Decision A15 — LIST shape, not single
                 run). v1 lists nothing because Mission ticks don't yet
                 produce queryable run records; PR J / PR GG wires it. */}
@@ -429,6 +550,98 @@ export function MissionDetailClient({ mission: initial, ideas }: MissionDetailCl
                     </ul>
                 )}
             </section>
+
+            {/* Phase 6 PR GG — Related Works (inherited) panel.
+                Renders only when this Mission is a Full-Fork Clone
+                (sourceMissionId set, Decision A26). Works from the
+                source Mission are NOT duplicated during Clone — this
+                panel surfaces them as read-only references. */}
+            {mission.sourceMissionId && (
+                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <GitFork className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('sections.inheritedWorks')} ({inheritedWorkLinks.length})
+                        </h2>
+                    </div>
+                    {sourceMission && (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">
+                            {t('inherited.fromSource')}{' '}
+                            <Link
+                                href={ROUTES.DASHBOARD_MISSION(sourceMission.id)}
+                                className="text-primary hover:underline"
+                            >
+                                {sourceMission.title}
+                            </Link>
+                        </p>
+                    )}
+                    {inheritedWorkLinks.length === 0 ? (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('inherited.empty')}
+                        </p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {inheritedWorkLinks.map((w) => (
+                                <li key={w.workId}>
+                                    <Link
+                                        href={ROUTES.DASHBOARD_WORK(w.workId)}
+                                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                    >
+                                        {w.ideaTitle}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+            )}
+
+            {/* Phase 6 PR GG — Clone confirmation modal. Opens from
+                the toolbar Clone button. Optional title override; on
+                confirm calls cloneMissionAction and navigates to the
+                new fork's detail page. */}
+            <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('clone.title')}</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('clone.description')}
+                    </p>
+                    <label className="block mt-3 space-y-1.5">
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('clone.titleLabel')}
+                        </span>
+                        <Input
+                            value={cloneTitleDraft}
+                            onChange={(e) => setCloneTitleDraft(e.target.value)}
+                            placeholder={`Copy of ${mission.title}`}
+                            maxLength={200}
+                        />
+                    </label>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setCloneOpen(false)}
+                            disabled={pendingClone}
+                        >
+                            {t('clone.cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={handleClone}
+                            disabled={pendingClone}
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            {t('clone.confirm')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

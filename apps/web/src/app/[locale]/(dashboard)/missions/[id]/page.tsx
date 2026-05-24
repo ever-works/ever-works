@@ -39,12 +39,36 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // renders IdeaCards in order). Defensive .catch(() => []) so
     // a flaky API doesn't 500 the page — the empty-state surface
     // absorbs the failure.
-    const ideas = await workProposalsAPI
-        .list(
-            ['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'],
-            { missionId: id },
-        )
-        .catch(() => []);
+    //
+    // Phase 6 PR GG — when this Mission was Cloned from another
+    // (sourceMissionId set), ALSO fetch the source Mission's
+    // accepted Ideas so the detail page can render the
+    // "Related Works (inherited)" read-only panel. Decision A26:
+    // Works are NOT copied during Clone, but the cloned Mission's
+    // detail page surfaces them as inherited references.
+    const [ideas, sourceMission, sourceAcceptedIdeas] = await Promise.all([
+        workProposalsAPI
+            .list(
+                ['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'],
+                { missionId: id },
+            )
+            .catch(() => []),
+        mission.sourceMissionId
+            ? missionsAPI.get(mission.sourceMissionId).catch(() => null)
+            : Promise.resolve(null),
+        mission.sourceMissionId
+            ? workProposalsAPI
+                  .list(['accepted'], { missionId: mission.sourceMissionId })
+                  .catch(() => [])
+            : Promise.resolve([]),
+    ]);
 
-    return <MissionDetailClient mission={mission} ideas={ideas} />;
+    return (
+        <MissionDetailClient
+            mission={mission}
+            ideas={ideas}
+            sourceMission={sourceMission}
+            inheritedIdeas={sourceAcceptedIdeas}
+        />
+    );
 }

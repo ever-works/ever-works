@@ -516,6 +516,14 @@
             },
             "plugins": {
                 "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
             }
         },
         "missionsPreview": {
@@ -567,7 +575,10 @@
                 "guardrails": "Guardrails override",
                 "liveRuns": "Live runs",
                 "ideas": "Ideas",
-                "relatedWorks": "Related Works"
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
             },
             "fields": {
                 "schedule": "Schedule (cron, UTC)",
@@ -581,7 +592,8 @@
                 "resume": "Resume",
                 "complete": "Complete",
                 "delete": "Delete",
-                "runNow": "Run now"
+                "runNow": "Run now",
+                "clone": "Clone"
             },
             "confirm": {
                 "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
@@ -599,6 +611,23 @@
             "works": {
                 "empty": "No Works have been built from this Mission's Ideas yet."
             },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -611,6 +640,8 @@
                 "deleted": "Mission deleted",
                 "deleteError": "Couldn't delete",
                 "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
                 "runNow": {
                     "noop-placeholder": "Run-now queued (placeholder)",
                     "queued": "Tick queued",
