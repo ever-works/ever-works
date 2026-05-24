@@ -538,6 +538,74 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
         "ideasPage": {
             "title": "Ideas",
             "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",

@@ -76,9 +76,20 @@ export const workProposalsAPI = {
         }
     },
 
-    async list(statuses: WorkProposalStatus[] = ['pending']): Promise<WorkProposal[]> {
-        const params = statuses.map((s) => `statuses=${encodeURIComponent(s)}`).join('&');
-        return serverFetch<WorkProposal[]>(`/me/work-proposals?${params}`, {
+    async list(
+        statuses: WorkProposalStatus[] = ['pending'],
+        opts: { missionId?: string } = {},
+    ): Promise<WorkProposal[]> {
+        const params = statuses.map((s) => `statuses=${encodeURIComponent(s)}`);
+        // Phase 6 PR R — server-side `missionId` filter is already
+        // wired through `WorkProposalRepository.findByUser` (Phase 1
+        // PR A). The Mission detail page passes this so it gets
+        // only the Ideas attached to its Mission, not the user's
+        // entire catalog.
+        if (opts.missionId) {
+            params.push(`missionId=${encodeURIComponent(opts.missionId)}`);
+        }
+        return serverFetch<WorkProposal[]>(`/me/work-proposals?${params.join('&')}`, {
             method: 'GET',
         });
     },

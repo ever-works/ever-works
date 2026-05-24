@@ -46,8 +46,9 @@ export async function getProposalsStatusAction() {
 
 export async function listProposalsAction(
     statuses: WorkProposalStatus[] = ['pending'],
+    opts: { missionId?: string } = {},
 ) {
-    return workProposalsAPI.list(statuses);
+    return workProposalsAPI.list(statuses, opts);
 }
 
 // Phase 5 PR N — quick-add Idea from the `+ Add` button on the
