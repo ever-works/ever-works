@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { WorkBudgetRepository } from '@src/database/repositories/work-budget.repository';
+import {
+    WorkBudgetRepository,
+    type BudgetOwnerRef,
+} from '@src/database/repositories/work-budget.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
+import { BudgetOwnerType } from '@src/entities/_types';
 import { WorkBudget } from '@src/entities/work-budget.entity';
 import { WorkBudgetAlertThreshold } from '@src/entities/work-budget-alert-state.entity';
 
@@ -8,6 +12,8 @@ export interface ApplicableBudgets {
     readonly global: WorkBudget | null;
     readonly plugin: WorkBudget | null;
 }
+
+export type { BudgetOwnerRef };
 
 export interface BudgetEvaluation {
     readonly budget: WorkBudget;
@@ -66,6 +72,26 @@ export class BudgetService {
         return { global, plugin };
     }
 
+    /**
+     * Phase 7 PR T — polymorphic-owner version. Same shape +
+     * semantics as `getApplicableBudgets(workId, pluginId)` but
+     * keyed on `(ownerType, ownerId)` so per-Mission and per-Idea
+     * budgets resolve correctly. For Work owners this returns
+     * the same rows as the legacy method (PR 0.3 backfilled
+     * `ownerType='work'` + `ownerId=workId` on every pre-existing
+     * row).
+     */
+    async getApplicableBudgetsForOwner(
+        owner: BudgetOwnerRef,
+        pluginId: string,
+    ): Promise<ApplicableBudgets> {
+        const [global, plugin] = await Promise.all([
+            this.budgetRepository.findGlobalForOwner(owner),
+            this.budgetRepository.findForOwnerPlugin(owner, pluginId),
+        ]);
+        return { global, plugin };
+    }
+
     async getCurrentSpendCents(
         workId: string,
         pluginId?: string,
@@ -84,12 +110,32 @@ export class BudgetService {
     }
 
     async evaluateBudget(budget: WorkBudget, now: Date = new Date()): Promise<BudgetEvaluation> {
-        const currentSpendCents = await this.getCurrentSpendCents(
-            budget.workId,
-            budget.pluginId ?? undefined,
-            now,
-            budget.currency,
-        );
+        // Phase 7 PR T — when the budget carries a non-Work owner
+        // (a Mission or Idea), use the polymorphic-owner spend
+        // rollup so per-Mission and per-Idea evaluations resolve
+        // correctly. Work-owned budgets keep using the legacy
+        // workId-keyed query so existing tests that mock only
+        // `getTotalSpendCents` keep passing (NN #20: extension,
+        // not replacement). Both queries return the same number
+        // for Work owners thanks to the PR 0.3 backfill.
+        const ownerType = budget.ownerType ?? BudgetOwnerType.WORK;
+        const ownerId = budget.ownerId ?? budget.workId;
+        const isNonWorkOwner = ownerType !== BudgetOwnerType.WORK;
+        const currentSpendCents = isNonWorkOwner
+            ? await this.usageRepository.getTotalSpendCentsForOwner(
+                  ownerType,
+                  ownerId,
+                  this.getCurrentPeriodStart(now),
+                  this.getNextPeriodStart(now),
+                  budget.pluginId ?? undefined,
+                  budget.currency,
+              )
+            : await this.getCurrentSpendCents(
+                  budget.workId,
+                  budget.pluginId ?? undefined,
+                  now,
+                  budget.currency,
+              );
 
         const capCents = budget.monthlyCapCents;
         const percentUsed = capCents > 0 ? (currentSpendCents / capCents) * 100 : 0;
