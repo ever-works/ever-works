@@ -19,3 +19,9 @@ export {
     formatCadenceMinutes,
     parseCadenceMinutes,
 } from './cadence-minutes';
+// Phase 4 PR EE — account-wide cap (bigint-as-string) ⇄ cents-as-number helpers.
+export {
+    DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+    formatCapCents,
+    parseCapCents,
+} from './bigint-cents';

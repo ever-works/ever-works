@@ -10,8 +10,10 @@ import {
     Clock,
     ListChecks,
     Play,
+    RotateCcw,
     ShieldCheck,
     Sparkles,
+    Wallet,
     Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,7 @@ import type {
     WorkAgentRunLog,
 } from '@/lib/api/work-agent';
 import {
+    DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
     DEFAULT_AUTOBUILD_THROTTLE,
     DEFAULT_BATCH_SIZE,
     DEFAULT_CADENCE_MINUTES,
@@ -37,7 +40,9 @@ import {
     StatusPill,
     ToggleRow,
     formatCadenceMinutes,
+    formatCapCents,
     parseCadenceMinutes,
+    parseCapCents,
 } from '@/components/work-agent';
 
 interface WorkAgentSettingsProps {
@@ -52,6 +57,8 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     const [isSaving, startSaving] = useTransition();
     const [isSavingAutoGen, startSavingAutoGen] = useTransition();
     const [isSavingAutoBuild, startSavingAutoBuild] = useTransition();
+    const [isSavingAutoRetry, startSavingAutoRetry] = useTransition();
+    const [isSavingAccountBudget, startSavingAccountBudget] = useTransition();
     const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
@@ -75,6 +82,30 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     );
     const [missionCap, setMissionCap] = useState<number>(
         preferences.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
+    );
+
+    // Phase 4 PR EE — auto-retry policy (NOT NULL on the DB side per
+    // PR 0.5 — these have hardcoded defaults in the entity, so we
+    // just mirror whatever the API returns).
+    const [maxAutoRetries, setMaxAutoRetries] = useState<number>(preferences.maxAutoRetries);
+    const [backoffSeconds, setBackoffSeconds] = useState<number>(preferences.backoffSeconds);
+    const [exponentialBackoffFactor, setExponentialBackoffFactor] = useState<number>(
+        preferences.exponentialBackoffFactor,
+    );
+
+    // Phase 4 PR EE — account-wide budget. Cap is nullable bigint
+    // (string-over-the-wire) — when null the user hasn't set an
+    // explicit account-wide guard. `allowOverage` is NOT NULL with
+    // default true on the entity side.
+    const [accountCapCents, setAccountCapCents] = useState<number>(
+        parseCapCents(preferences.accountWideMonthlyCapCents) ??
+            DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+    );
+    const [accountCapEnabled, setAccountCapEnabled] = useState<boolean>(
+        preferences.accountWideMonthlyCapCents !== null,
+    );
+    const [accountAllowOverage, setAccountAllowOverage] = useState<boolean>(
+        preferences.accountWideAllowOverage,
     );
 
     const updatePreference = <K extends keyof WorkAgentPreferences>(
@@ -178,6 +209,77 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                     setMissionCap(
                         saved.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
                     );
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAutoRetryPrefs = (resetToDefault: boolean) => {
+        startSavingAutoRetry(async () => {
+            try {
+                // Auto-retry fields are NOT NULL on the DB side, so
+                // "Use default" can't send literal null. Instead it
+                // snaps each value back to the entity default (PR 0.5
+                // seeds: maxAutoRetries=2, backoffSeconds=60,
+                // exponentialBackoffFactor=2.0) and sends those.
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              maxAutoRetries: 2,
+                              backoffSeconds: 60,
+                              exponentialBackoffFactor: 2,
+                          }
+                        : {
+                              maxAutoRetries,
+                              backoffSeconds,
+                              exponentialBackoffFactor,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setMaxAutoRetries(saved.maxAutoRetries);
+                    setBackoffSeconds(saved.backoffSeconds);
+                    setExponentialBackoffFactor(saved.exponentialBackoffFactor);
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAccountBudgetPrefs = (resetToDefault: boolean) => {
+        startSavingAccountBudget(async () => {
+            try {
+                // Cap: nullable. Either user enabled it (send the cents-
+                // as-string) or they want no cap (send literal null —
+                // server's nullable3rd treats that as "clear override").
+                // The reset-to-default path also nulls the cap AND
+                // restores allowOverage to its entity default (true).
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              accountWideMonthlyCapCents: null,
+                              accountWideAllowOverage: true,
+                          }
+                        : {
+                              accountWideMonthlyCapCents: accountCapEnabled
+                                  ? formatCapCents(accountCapCents)
+                                  : null,
+                              accountWideAllowOverage: accountAllowOverage,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setAccountCapEnabled(saved.accountWideMonthlyCapCents !== null);
+                    setAccountCapCents(
+                        parseCapCents(saved.accountWideMonthlyCapCents) ??
+                            DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+                    );
+                    setAccountAllowOverage(saved.accountWideAllowOverage);
                 }
                 toast.success(t('toasts.settingsSaved'));
             } catch (error) {
@@ -384,6 +486,115 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             variant="secondary"
                             onClick={() => saveAutoBuildPrefs(true)}
                             disabled={isSavingAutoBuild}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="auto-retry"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={RotateCcw}
+                        title={t('sections.autoRetry.title')}
+                        description={t('sections.autoRetry.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-3">
+                        <NumberField
+                            label={t('fields.maxAutoRetries')}
+                            value={maxAutoRetries}
+                            min={0}
+                            max={5}
+                            onChange={setMaxAutoRetries}
+                        />
+                        <NumberField
+                            label={t('fields.backoffSeconds')}
+                            value={backoffSeconds}
+                            min={10}
+                            max={3600}
+                            onChange={setBackoffSeconds}
+                        />
+                        <NumberField
+                            label={t('fields.exponentialBackoffFactor')}
+                            value={exponentialBackoffFactor}
+                            min={1}
+                            max={4}
+                            step={0.1}
+                            onChange={setExponentialBackoffFactor}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoRetryPrefs(false)}
+                            disabled={isSavingAutoRetry}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoRetryPrefs(true)}
+                            disabled={isSavingAutoRetry}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="account-budgets"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Wallet}
+                        title={t('sections.accountBudgets.title')}
+                        description={t('sections.accountBudgets.description')}
+                    />
+
+                    <div className="pl-11 space-y-3">
+                        <ToggleRow
+                            label={t('fields.accountWideCapEnabled')}
+                            checked={accountCapEnabled}
+                            onChange={setAccountCapEnabled}
+                        />
+                        {accountCapEnabled && (
+                            <div className="grid gap-3 @3xl/main:grid-cols-2">
+                                <MoneyField
+                                    label={t('fields.accountWideMonthlyCap')}
+                                    cents={accountCapCents}
+                                    onChange={setAccountCapCents}
+                                />
+                            </div>
+                        )}
+                        <ToggleRow
+                            label={t('fields.accountWideAllowOverage')}
+                            checked={accountAllowOverage}
+                            onChange={setAccountAllowOverage}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAccountBudgetPrefs(false)}
+                            disabled={isSavingAccountBudget}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAccountBudgetPrefs(true)}
+                            disabled={isSavingAccountBudget}
                         >
                             {t('actions.useDefault')}
                         </Button>

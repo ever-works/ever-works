@@ -792,6 +792,14 @@
                     "autoBuildWorks": {
                         "title": "Auto-build Works",
                         "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
                     }
                 },
                 "fields": {
@@ -809,7 +817,13 @@
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
-                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)"
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
                 },
                 "actions": {
                     "saveSettings": "Save settings",
