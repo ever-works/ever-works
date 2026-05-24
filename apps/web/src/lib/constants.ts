@@ -68,6 +68,11 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Phase 6.5 PR CC2 — unified "+ New" page. Single entry point for
+    // creating Missions, Ideas, and Works of every flavor (Website,
+    // Landing Page, Blog, Directory, Awesome Repo). Phase 6.5 PR DD
+    // repoints the sidebar "+ New Work" → "+ New" button here.
+    DASHBOARD_NEW: '/new',
     // Phase 6 PR Q — dedicated Missions catalog page. Sits ABOVE
     // Ideas in the sidebar to match the spec §5.1 stats-tile order
     // (Missions → Ideas → Works), reading the same direction as the

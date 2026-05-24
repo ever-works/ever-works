@@ -3091,6 +3091,31 @@
             }
         },
         "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "submit": "Create",
+            "or": "or",
+            "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
             "cards": {
                 "ai": {
                     "title": "Create Work with AI",
