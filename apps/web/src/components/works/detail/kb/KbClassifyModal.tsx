@@ -193,7 +193,17 @@ export function KbClassifyModal({
             <div
                 className={cn(
                     'w-full max-w-xl rounded-lg border border-border dark:border-border-dark',
-                    'bg-card dark:bg-card-primary-dark p-5 shadow-xl',
+                    // EW-639 dark-theme fix: `--color-card-primary-dark`
+                    // resolves to `#ffffff08` (a 3% translucent overlay,
+                    // intended for cards that sit on top of solid page
+                    // chrome). Using it as the modal panel background
+                    // made the dialog see-through in dark mode — the
+                    // page content behind the `bg-black/40` overlay
+                    // bled through. `bg-card-dark` (#1e293b, solid
+                    // slate) matches the elevated-surface convention
+                    // used by the shadcn `DialogContent` primitive
+                    // elsewhere in the app.
+                    'bg-card dark:bg-card-dark p-5 shadow-xl',
                     'flex flex-col gap-4',
                 )}
             >
