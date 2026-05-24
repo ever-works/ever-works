@@ -10,8 +10,8 @@
 
 ## Current focus
 
-**Tick 0 (init):** infrastructure setup — worktree, branch, this tracker. Done as part of the user's setup turn.
-**Next:** orientation tick — read PLAN + Spec end-to-end, validate platform tooling boots, then start Phase 0 PR-by-PR.
+**Tick 1 (DONE):** PR 0.1 — extended `WorkProposal` entity (new statuses + sources + `missionId` column + index swap) and shipped its migration. Type-check + targeted test both green.
+**Next:** PR 0.2 — `CreateMissionsTable` migration. Brings the `missions` table into existence AND adds the deferred FK constraint on `work_proposals.missionId → missions.id`. Also creates the `Mission` entity file in `packages/agent/src/entities/`.
 
 ---
 
@@ -55,7 +55,7 @@ Dependency notation `[after X]` means PR X must be DONE before this PR starts.
 
 | PR | Status | Description | Deps | Commit | Summary |
 |---|---|---|---|---|---|
-| 0.1 | TODO | `ExtendWorkProposalForMissions` migration: add `missionId uuid NULL` FK; extend `status` enum (`QUEUED`, `BUILDING`, `FAILED`); extend `source` enum (`USER_MANUAL`, `MISSION`); new index `(userId, status, missionId, generatedAt)`. Entity edits in same commit. | — | `<hash>` | |
+| 0.1 | DONE | `ExtendWorkProposalForMissions` migration: add `missionId uuid NULL` FK; extend `status` enum (`QUEUED`, `BUILDING`, `FAILED`); extend `source` enum (`USER_MANUAL`, `MISSION`); new index `(userId, status, missionId, generatedAt)`. Entity edits in same commit. | — | _next-commit_ | Entity extended (status + source enums + `missionId` column + new composite index decorator); migration `1779978000000-ExtendWorkProposalForMissions.ts` idempotent up/down. Type-check + work-proposal integration test green. FK constraint to `missions(id)` intentionally deferred to PR 0.2 when target table exists. |
 | 0.2 | TODO | `CreateMissionsTable` migration: new `missions` table per spec §1.3 + Mission entity. Defer the FK constraint on `work_proposals.missionId` to here (added in 0.1 as nullable). | 0.1 | `<hash>` | |
 | 0.3 | TODO | `ExtendBudgetsToPolymorphicOwner` migration: add `ownerType` + `ownerId` to `work_budgets`, `usage_ledger_entries`, `plugin_usage_events`, `work_budget_alert_states`; backfill `ownerType='work', ownerId=workId`; composite index `(ownerType, ownerId)`. | — | `<hash>` | |
 | 0.4 | TODO | `PromoteWorkAgentConstantsToSettings` migration: add `auto_generate_cadence`, `auto_generate_batch_size`, `auto_build_throttle_per_day`, `mission_default_outstanding_cap` to `work_agent_preferences`. | — | `<hash>` | |
