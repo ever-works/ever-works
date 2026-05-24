@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+// EW-641 follow-up — use the locale-aware `useRouter` from
+// `@/i18n/navigation` so `router.push` to the freshly-overridden doc
+// keeps the active locale prefix (otherwise the catch-all KB route 404s
+// on non-default locales).
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { overrideInheritedKbDocumentAction } from '@/app/actions/works/kb-document';

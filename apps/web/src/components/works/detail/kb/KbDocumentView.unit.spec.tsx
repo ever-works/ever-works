@@ -1,8 +1,30 @@
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string) => key,
+}));
+
+// next-intl 4.9.2's navigation client uses a bare `next/navigation`
+// specifier that fails to resolve under pnpm's symlinked tree in
+// Vitest. Stub `@/i18n/navigation` (used transitively by the
+// KbInheritedOverrideButton client component rendered inside the
+// inherited banner) with passthrough primitives.
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 
 // MarkdownPreview is a client component that pulls in react-markdown.

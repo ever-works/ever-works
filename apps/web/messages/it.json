@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Disponibile quando l'azione di sovrascrittura sarà rilasciata nella riga 38d",
                     "overrideCtaBusy": "Esecuzione fork…",
                     "overrideErrorFallback": "Impossibile creare un fork del documento ereditato. Riprova o ricarica la pagina."
+                },
+                "addDoc": {
+                    "button": "+ Aggiungi",
+                    "title": "Crea un nuovo documento",
+                    "subtitle": "Scegli una classe, dai un nome, aggiungi descrizione e tag facoltativi. L'editor si apre dopo la creazione.",
+                    "classLabel": "Classe",
+                    "titleLabel": "Titolo",
+                    "titlePlaceholder": "es. principi della voce del brand",
+                    "descriptionLabel": "Descrizione (facoltativa)",
+                    "tagsLabel": "Tag",
+                    "tagsPlaceholder": "Digita per cercare o aggiungere un tag, Invio per confermare",
+                    "confirm": "Crea documento",
+                    "cancel": "Annulla",
+                    "errorFallback": "Impossibile creare il documento. Riprova.",
+                    "errorBusy": "Creazione…"
+                },
+                "delete": {
+                    "docTooltip": "Elimina documento",
+                    "classTooltip": "Elimina tutti i documenti in {class}",
+                    "docConfirmTitle": "Eliminare il documento?",
+                    "docConfirmBody": "{title} verrà rimosso definitivamente da questo Work. Azione irreversibile.",
+                    "classConfirmTitle": "Eliminare tutti i {count} documenti in {class}?",
+                    "classConfirmBody": "Tutti i documenti di questa classe verranno rimossi definitivamente. Azione irreversibile.",
+                    "confirm": "Elimina",
+                    "cancel": "Annulla",
+                    "errorFallback": "Eliminazione non riuscita. Riprova.",
+                    "errorBusy": "Eliminazione…",
+                    "errorPartial": "Eliminati {ok}, falliti {failed}."
                 }
             }
         },

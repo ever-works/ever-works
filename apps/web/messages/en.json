@@ -2850,6 +2850,34 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
+                },
+                "addDoc": {
+                    "button": "+ Add",
+                    "title": "Create a new document",
+                    "subtitle": "Pick a class, name the doc, add an optional description and tags. The editor opens after Create.",
+                    "classLabel": "Class",
+                    "titleLabel": "Title",
+                    "titlePlaceholder": "e.g. brand voice principles",
+                    "descriptionLabel": "Description (optional)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Type to search or add a tag, Enter to confirm",
+                    "confirm": "Create document",
+                    "cancel": "Cancel",
+                    "errorFallback": "Could not create the document. Please try again.",
+                    "errorBusy": "Creating…"
+                },
+                "delete": {
+                    "docTooltip": "Delete document",
+                    "classTooltip": "Delete all documents in {class}",
+                    "docConfirmTitle": "Delete document?",
+                    "docConfirmBody": "{title} will be permanently removed from this Work. This cannot be undone.",
+                    "classConfirmTitle": "Delete all {count} documents in {class}?",
+                    "classConfirmBody": "All documents in this class will be permanently removed. This cannot be undone.",
+                    "confirm": "Delete",
+                    "cancel": "Cancel",
+                    "errorFallback": "Could not delete. Please try again.",
+                    "errorBusy": "Deleting…",
+                    "errorPartial": "Deleted {ok}, failed {failed}."
                 }
             }
         },

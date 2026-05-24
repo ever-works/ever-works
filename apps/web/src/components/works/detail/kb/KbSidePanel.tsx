@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils/cn';
 import { KbHistoryButton } from './KbHistoryButton';
 import { KbLockControls } from './KbLockControls';
+import { KbDeleteDocButton } from './KbDeleteDocButton';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 
 interface KbSidePanelProps {
@@ -92,7 +93,25 @@ export async function KbSidePanel({ doc }: KbSidePanelProps) {
             </Section>
 
             <Section title={t('sidePanel.sections.lock')}>
-                <KbLockControls doc={doc} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <KbLockControls doc={doc} />
+                    {/*
+                     * EW-641 KB workbench follow-up — delete affordance
+                     * lives next to the lock controls so destructive
+                     * actions cluster in one section. Inherited
+                     * (org-overlay) docs have `doc.workId === null` and
+                     * are NOT deletable from this Work — the button
+                     * only renders for rows the Work actually owns.
+                     */}
+                    {doc.workId ? (
+                        <KbDeleteDocButton
+                            workId={doc.workId}
+                            docId={doc.id}
+                            path={doc.path}
+                            title={doc.title}
+                        />
+                    ) : null}
+                </div>
             </Section>
 
             <Section title={t('sidePanel.sections.tags')}>

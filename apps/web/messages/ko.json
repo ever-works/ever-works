@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "38d 행에서 재정의 작업이 출시되면 사용 가능",
                     "overrideCtaBusy": "포크 중…",
                     "overrideErrorFallback": "상속된 문서를 포크할 수 없습니다. 다시 시도하거나 페이지를 새로 고치세요."
+                },
+                "addDoc": {
+                    "button": "+ 추가",
+                    "title": "새 문서 만들기",
+                    "subtitle": "클래스를 선택하고 문서 이름을 지정하며 선택적 설명과 태그를 추가하세요. 만들기 후 편집기가 열립니다.",
+                    "classLabel": "클래스",
+                    "titleLabel": "제목",
+                    "titlePlaceholder": "예: 브랜드 보이스 원칙",
+                    "descriptionLabel": "설명 (선택 사항)",
+                    "tagsLabel": "태그",
+                    "tagsPlaceholder": "검색하거나 태그 추가 입력, Enter로 확인",
+                    "confirm": "문서 만들기",
+                    "cancel": "취소",
+                    "errorFallback": "문서를 만들 수 없습니다. 다시 시도하세요.",
+                    "errorBusy": "만드는 중…"
+                },
+                "delete": {
+                    "docTooltip": "문서 삭제",
+                    "classTooltip": "{class}의 모든 문서 삭제",
+                    "docConfirmTitle": "문서를 삭제하시겠습니까?",
+                    "docConfirmBody": "{title}이(가) 이 Work에서 영구적으로 제거됩니다. 되돌릴 수 없습니다.",
+                    "classConfirmTitle": "{class}의 모든 {count}개 문서를 삭제하시겠습니까?",
+                    "classConfirmBody": "이 클래스의 모든 문서가 영구적으로 제거됩니다. 되돌릴 수 없습니다.",
+                    "confirm": "삭제",
+                    "cancel": "취소",
+                    "errorFallback": "삭제할 수 없습니다. 다시 시도하세요.",
+                    "errorBusy": "삭제 중…",
+                    "errorPartial": "삭제 {ok}개, 실패 {failed}개."
                 }
             }
         },

@@ -1,3 +1,4 @@
+import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -11,9 +12,29 @@ vi.mock('next-intl', () => ({
     },
 }));
 
-const pushMock = vi.fn();
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+// KbSearchPalette now imports `useRouter` from `@/i18n/navigation`
+// (locale-aware). The legacy `next/navigation` mock stays as dead-code
+// protection; both share the hoisted `pushMock` so existing
+// `pushMock.mockReset()` / `toHaveBeenCalledWith(...)` assertions
+// continue to work.
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ push: pushMock }),
+}));
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: pushMock,
+        refresh: vi.fn(),
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 
 import { KbSearchPalette } from './KbSearchPalette';

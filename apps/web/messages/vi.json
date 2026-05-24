@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d",
                     "overrideCtaBusy": "Đang fork…",
                     "overrideErrorFallback": "Không thể fork tài liệu được kế thừa. Thử lại hoặc tải lại trang."
+                },
+                "addDoc": {
+                    "button": "+ Thêm",
+                    "title": "Tạo tài liệu mới",
+                    "subtitle": "Chọn lớp, đặt tên tài liệu, thêm mô tả và thẻ tùy chọn. Trình chỉnh sửa mở sau khi tạo.",
+                    "classLabel": "Lớp",
+                    "titleLabel": "Tiêu đề",
+                    "titlePlaceholder": "vd: nguyên tắc giọng nói thương hiệu",
+                    "descriptionLabel": "Mô tả (tùy chọn)",
+                    "tagsLabel": "Thẻ",
+                    "tagsPlaceholder": "Nhập để tìm hoặc thêm thẻ, Enter để xác nhận",
+                    "confirm": "Tạo tài liệu",
+                    "cancel": "Hủy",
+                    "errorFallback": "Không thể tạo tài liệu. Vui lòng thử lại.",
+                    "errorBusy": "Đang tạo…"
+                },
+                "delete": {
+                    "docTooltip": "Xóa tài liệu",
+                    "classTooltip": "Xóa tất cả tài liệu trong {class}",
+                    "docConfirmTitle": "Xóa tài liệu?",
+                    "docConfirmBody": "{title} sẽ bị xóa vĩnh viễn khỏi Work này. Không thể hoàn tác.",
+                    "classConfirmTitle": "Xóa tất cả {count} tài liệu trong {class}?",
+                    "classConfirmBody": "Tất cả tài liệu trong lớp này sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+                    "confirm": "Xóa",
+                    "cancel": "Hủy",
+                    "errorFallback": "Không thể xóa. Vui lòng thử lại.",
+                    "errorBusy": "Đang xóa…",
+                    "errorPartial": "Đã xóa {ok}, thất bại {failed}."
                 }
             }
         },

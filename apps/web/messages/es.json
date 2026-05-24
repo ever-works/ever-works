@@ -2822,6 +2822,34 @@
                     "overrideCtaPendingTooltip": "Disponible cuando se lance la acción de sobrescritura en la fila 38d",
                     "overrideCtaBusy": "Bifurcando…",
                     "overrideErrorFallback": "No se pudo bifurcar el documento heredado. Inténtalo de nuevo o recarga la página."
+                },
+                "addDoc": {
+                    "button": "+ Añadir",
+                    "title": "Crear un nuevo documento",
+                    "subtitle": "Elige una clase, dale nombre, añade descripción y etiquetas opcionales. El editor se abre al crear.",
+                    "classLabel": "Clase",
+                    "titleLabel": "Título",
+                    "titlePlaceholder": "ej. principios de voz de marca",
+                    "descriptionLabel": "Descripción (opcional)",
+                    "tagsLabel": "Etiquetas",
+                    "tagsPlaceholder": "Escribe para buscar o añadir etiqueta, Enter para confirmar",
+                    "confirm": "Crear documento",
+                    "cancel": "Cancelar",
+                    "errorFallback": "No se pudo crear el documento. Inténtalo de nuevo.",
+                    "errorBusy": "Creando…"
+                },
+                "delete": {
+                    "docTooltip": "Eliminar documento",
+                    "classTooltip": "Eliminar todos los documentos en {class}",
+                    "docConfirmTitle": "¿Eliminar documento?",
+                    "docConfirmBody": "{title} se eliminará permanentemente de este Work. No se puede deshacer.",
+                    "classConfirmTitle": "¿Eliminar los {count} documentos en {class}?",
+                    "classConfirmBody": "Todos los documentos de esta clase se eliminarán permanentemente. No se puede deshacer.",
+                    "confirm": "Eliminar",
+                    "cancel": "Cancelar",
+                    "errorFallback": "No se pudo eliminar. Inténtalo de nuevo.",
+                    "errorBusy": "Eliminando…",
+                    "errorPartial": "Eliminados {ok}, fallidos {failed}."
                 }
             }
         },

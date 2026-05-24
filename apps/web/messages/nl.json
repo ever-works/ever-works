@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Beschikbaar zodra de overschrijfactie wordt geleverd in rij 38d",
                     "overrideCtaBusy": "Forken…",
                     "overrideErrorFallback": "Het overgenomen document kon niet worden geforkt. Probeer opnieuw of vernieuw de pagina."
+                },
+                "addDoc": {
+                    "button": "+ Toevoegen",
+                    "title": "Nieuw document maken",
+                    "subtitle": "Kies een klasse, geef het document een naam, voeg een optionele beschrijving en tags toe. De editor opent na maken.",
+                    "classLabel": "Klasse",
+                    "titleLabel": "Titel",
+                    "titlePlaceholder": "bijv. merkstem-principes",
+                    "descriptionLabel": "Beschrijving (optioneel)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Typ om te zoeken of een tag toe te voegen, Enter om te bevestigen",
+                    "confirm": "Document maken",
+                    "cancel": "Annuleren",
+                    "errorFallback": "Document kon niet worden gemaakt. Probeer opnieuw.",
+                    "errorBusy": "Bezig met maken…"
+                },
+                "delete": {
+                    "docTooltip": "Document verwijderen",
+                    "classTooltip": "Alle documenten in {class} verwijderen",
+                    "docConfirmTitle": "Document verwijderen?",
+                    "docConfirmBody": "{title} wordt definitief uit deze Work verwijderd. Niet ongedaan te maken.",
+                    "classConfirmTitle": "Alle {count} documenten in {class} verwijderen?",
+                    "classConfirmBody": "Alle documenten in deze klasse worden definitief verwijderd. Niet ongedaan te maken.",
+                    "confirm": "Verwijderen",
+                    "cancel": "Annuleren",
+                    "errorFallback": "Verwijderen mislukt. Probeer opnieuw.",
+                    "errorBusy": "Bezig met verwijderen…",
+                    "errorPartial": "{ok} verwijderd, {failed} mislukt."
                 }
             }
         },

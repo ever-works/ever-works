@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -12,15 +13,35 @@ vi.mock('next-intl/server', () => ({
     },
 }));
 
-// KbLockControls is a client component nested inside the server-rendered
-// side panel — it pulls in next-intl, next/navigation, and the lock
-// server actions. Mock those so the side-panel spec stays focused on the
-// outer structure (the controls have their own spec).
+// KbLockControls + KbHistoryButton/Dialog are client components nested
+// inside the server-rendered side panel — they pull in next-intl,
+// next/navigation, `@/i18n/navigation`, and various server actions.
+// Mock those so the side-panel spec stays focused on the outer
+// structure (the controls have their own specs).
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
 }));
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ refresh: () => undefined }),
+}));
+// KbLockControls + KbHistoryDialog now import `useRouter` from
+// `@/i18n/navigation` (locale-aware). Stub it with a passthrough
+// implementation — the side-panel spec doesn't assert on the
+// router itself.
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 vi.mock('@/components/ui/button', () => ({
     Button: ({

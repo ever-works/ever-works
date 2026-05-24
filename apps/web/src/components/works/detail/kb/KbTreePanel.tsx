@@ -1,9 +1,17 @@
-import Link from 'next/link';
+// EW-641 follow-up — use the locale-aware `Link` from `@/i18n/navigation`
+// so clicks on KB tree rows route through the next-intl middleware and
+// keep the active locale prefix (`/en/...`, `/fr/...`, etc.). Plain
+// `next/link` produces hrefs without the locale prefix, which makes the
+// catch-all `[...path]` route 404 in production whenever the user is on
+// a non-default locale.
+import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { KB_DOCUMENT_CLASSES } from '@ever-works/contracts';
 import type { KbDocumentClass, KbDocumentDto } from '@ever-works/contracts';
+import { KbTreeDocRow } from './KbTreeDocRow';
+import { KbTreeClassDeleteButton } from './KbTreeClassDeleteButton';
 
 interface KbTreePanelProps {
     workId: string;
@@ -147,44 +155,48 @@ interface KbTreeGroupProps {
 
 function KbTreeGroup({ workId, kbClass, label, docs, activePath }: KbTreeGroupProps) {
     return (
-        <div data-testid={`kb-tree-group-${kbClass}`} className="flex flex-col gap-1">
+        <div data-testid={`kb-tree-group-${kbClass}`} className="group/class flex flex-col gap-1">
             <h3
                 className={cn(
+                    'flex items-center gap-1.5',
                     'text-[11px] font-semibold uppercase tracking-wider',
                     'text-text-muted dark:text-text-muted-dark/70',
                 )}
             >
-                {label}
-                <span className="ml-1 text-text-muted/60">({docs.length})</span>
+                <span>{label}</span>
+                <span className="text-text-muted/60">({docs.length})</span>
+                {/*
+                 * EW-641 KB workbench follow-up — per-class bulk-delete
+                 * button. Lives in the section header so it sits next
+                 * to the class label / count and only reveals on
+                 * hover of the parent `group/class`. Confirm dialog
+                 * fans out to `deleteKbDocumentAction` in parallel for
+                 * every doc in the class.
+                 */}
+                <span className="ml-auto">
+                    <KbTreeClassDeleteButton
+                        workId={workId}
+                        classLabel={label}
+                        docs={docs.map((doc) => ({ id: doc.id, path: doc.path }))}
+                    />
+                </span>
             </h3>
             <ul className="flex flex-col gap-0.5">
                 {docs.map((doc) => {
                     const isActive = activePath !== null && activePath === doc.path;
                     return (
                         <li key={doc.id}>
-                            <Link
+                            <KbTreeDocRow
+                                workId={workId}
+                                doc={{
+                                    id: doc.id,
+                                    path: doc.path,
+                                    title: doc.title,
+                                    locked: doc.locked,
+                                }}
                                 href={`${ROUTES.DASHBOARD_WORK_KB(workId)}/${doc.path}`}
-                                data-testid="kb-tree-item"
-                                data-doc-path={doc.path}
-                                data-locked={doc.locked ? 'true' : undefined}
-                                aria-current={isActive ? 'page' : undefined}
-                                className={cn(
-                                    'flex items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors',
-                                    isActive
-                                        ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                                        : 'text-text-secondary dark:text-text-secondary-dark/80 hover:bg-card-hover dark:hover:bg-card-primary-dark/40 hover:text-text dark:hover:text-text-dark',
-                                )}
-                            >
-                                <span className="truncate">{doc.title || doc.path}</span>
-                                {doc.locked ? (
-                                    <span
-                                        aria-label="locked"
-                                        className="ml-auto text-xs text-text-muted dark:text-text-muted-dark/60"
-                                    >
-                                        🔒
-                                    </span>
-                                ) : null}
-                            </Link>
+                                isActive={isActive}
+                            />
                         </li>
                     );
                 })}

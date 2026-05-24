@@ -1,3 +1,4 @@
+import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -12,9 +13,28 @@ vi.mock('next-intl', () => ({
     },
 }));
 
-const routerRefreshMock = vi.fn();
+const { routerRefreshMock } = vi.hoisted(() => ({ routerRefreshMock: vi.fn() }));
+// KbHistoryDialog now imports `useRouter` from `@/i18n/navigation`
+// (locale-aware variant). The `next/navigation` mock below stays in
+// place as dead-code protection in case any transitive import still
+// pulls it in. The hoisted ref lets both mocks share the same spy.
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ refresh: routerRefreshMock }),
+}));
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: vi.fn(),
+        refresh: routerRefreshMock,
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
 }));
 
 vi.mock('@/components/ui/button', () => ({

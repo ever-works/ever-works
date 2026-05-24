@@ -12,6 +12,7 @@ import { KbEditor } from '@/components/works/detail/kb/KbEditor';
 import { KbSearchPalette } from '@/components/works/detail/kb/KbSearchPalette';
 import { KbSidePanel } from '@/components/works/detail/kb/KbSidePanel';
 import { KbUploadZone } from '@/components/works/detail/kb/KbUploadZone';
+import { KbAddDocButton } from '@/components/works/detail/kb/KbAddDocButton';
 import { KbPdfViewer } from '@/components/works/detail/kb/viewers/KbPdfViewer';
 import { KbXlsxViewer } from '@/components/works/detail/kb/viewers/KbXlsxViewer';
 import { KbDocxViewer } from '@/components/works/detail/kb/viewers/KbDocxViewer';
@@ -140,7 +141,8 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+                <KbAddDocButton workId={id} />
                 <KbSearchPalette workId={id} />
             </div>
             <KbUploadZone workId={id} targetClass={doc.class} />
