@@ -518,6 +518,22 @@
                 "label": "Suggested plugins"
             }
         },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
         "missionsPage": {
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",

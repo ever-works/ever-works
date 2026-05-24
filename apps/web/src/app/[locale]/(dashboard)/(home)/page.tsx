@@ -5,6 +5,7 @@ import DashboardClient from './dashboard-client';
 import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
 import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
+import { missionsAPI } from '@/lib/api/missions';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -12,27 +13,38 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Dashboard() {
-    const [user, worksResponse, statsResponse, proposals, proposalsStatus] = await Promise.all([
-        getAuthFromCookie(),
-        getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
-            success: false,
-            works: [],
-            total: 0,
-        })),
-        getWorkStats().catch(() => ({
-            success: false,
-            totalWorks: 0,
-            totalItems: 0,
-            activeWebsites: 0,
-            // Phase 2 PR F — new Dashboard tiles. Catch-fallback must
-            // include these so the type-narrowed branch below doesn't
-            // see undefined.
-            totalMissions: 0,
-            totalIdeas: 0,
-        })),
-        workProposalsAPI.list(['pending']).catch(() => []),
-        workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
-    ]);
+    const [user, worksResponse, statsResponse, proposals, proposalsStatus, missions, allIdeas] =
+        await Promise.all([
+            getAuthFromCookie(),
+            getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
+                success: false,
+                works: [],
+                total: 0,
+            })),
+            getWorkStats().catch(() => ({
+                success: false,
+                totalWorks: 0,
+                totalItems: 0,
+                activeWebsites: 0,
+                // Phase 2 PR F — new Dashboard tiles. Catch-fallback must
+                // include these so the type-narrowed branch below doesn't
+                // see undefined.
+                totalMissions: 0,
+                totalIdeas: 0,
+            })),
+            workProposalsAPI.list(['pending']).catch(() => []),
+            workProposalsAPI
+                .status()
+                .catch(() => ({ researching: false, canRefresh: true }) as const),
+            // Phase 6 PR S — Missions preview block needs the user's
+            // Mission list + every Idea across all statuses (used
+            // client-side to derive per-Mission counters without N+1
+            // round-trips).
+            missionsAPI.list().catch(() => []),
+            workProposalsAPI
+                .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'])
+                .catch(() => []),
+        ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
 
@@ -48,6 +60,8 @@ export default async function Dashboard() {
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}
+            initialMissions={missions}
+            initialAllIdeas={allIdeas}
         />
     );
 }

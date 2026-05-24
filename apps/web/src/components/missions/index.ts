@@ -5,3 +5,4 @@
 export { MissionCard } from './MissionCard';
 export { MissionsList } from './MissionsList';
 export { MissionDetailClient } from './MissionDetailClient';
+export { MissionsPreviewSection } from './MissionsPreviewSection';

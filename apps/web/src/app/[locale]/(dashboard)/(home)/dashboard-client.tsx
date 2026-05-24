@@ -4,12 +4,14 @@ import { AuthUser } from '@/lib/auth';
 import { WorkList } from '@/components/works/WorkList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { WorkProposalsSection } from '@/components/dashboard/WorkProposalsSection';
+import { MissionsPreviewSection } from '@/components/missions';
 import { EmptyState } from '@/components/common/EmptyState';
 import { GET_WORK_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api';
 import type { WorkProposal } from '@/lib/api/work-proposals';
+import type { Mission } from '@/lib/api/missions';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -23,6 +25,9 @@ interface DashboardClientProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
+    /** Phase 6 PR S — Missions preview block. */
+    initialMissions: Mission[];
+    initialAllIdeas: WorkProposal[];
 }
 
 export default function DashboardClient({
@@ -36,6 +41,8 @@ export default function DashboardClient({
     initialProposals,
     initiallyResearching,
     initiallyCanRefresh,
+    initialMissions,
+    initialAllIdeas,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -59,6 +66,11 @@ export default function DashboardClient({
                 totalItems={totalItems}
                 activeWebsites={activeWebsites}
             />
+
+            {/* Phase 6 PR S — Missions preview ABOVE Ideas so the home
+                page reads Missions → Ideas → Works in the same
+                direction as the stats tiles + sidebar nav. */}
+            <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
 
             <WorkProposalsSection
                 initialProposals={initialProposals}
