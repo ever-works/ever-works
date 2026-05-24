@@ -35,6 +35,28 @@ const GENERIC_PROPOSAL_PROMPT =
     'Create a Work from this personalized idea. Research relevant items, categories, fields, and metadata based on the proposal details.';
 
 /**
+ * Phase 1 PR FF — shared BuildWorkProposalResponseDto builder. The
+ * /build, /retry, and /rebuild endpoints all return the same shape
+ * (the Idea after the state transition + the freshly-created Goal).
+ * Extracted so the three controller methods stay one-liners.
+ */
+function toBuildResponseDto(result: {
+    proposal: WorkProposal;
+    goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: Date };
+}): BuildWorkProposalResponseDto {
+    return {
+        proposal: toResponseDto(result.proposal),
+        goal: {
+            id: result.goal.id,
+            instruction: result.goal.instruction,
+            status: result.goal.status,
+            dryRun: result.goal.dryRun,
+            createdAt: result.goal.createdAt,
+        },
+    };
+}
+
+/**
  * Shared map from WorkProposal entity → response DTO. Extracted in
  * Phase 1 PR B so the three controller paths (`list()`, `getOne()`,
  * `build()`) and the user-manual `createUserManual()` all return
@@ -231,16 +253,49 @@ export class WorkProposalsController {
         if (!result) {
             throw new NotFoundException('Proposal not found');
         }
-        return {
-            proposal: toResponseDto(result.proposal),
-            goal: {
-                id: result.goal.id,
-                instruction: result.goal.instruction,
-                status: result.goal.status,
-                dryRun: result.goal.dryRun,
-                createdAt: result.goal.createdAt,
-            },
-        };
+        return toBuildResponseDto(result);
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
+     * Retry button (spec §3.9). Only valid for FAILED Ideas; clears
+     * the failureMessage + failureKind, transitions FAILED → QUEUED,
+     * spins up a fresh build Goal.
+     */
+    @Post(':id/retry')
+    @ApiOperation({ summary: 'Manually retry a failed Idea build' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async retry(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.retry(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return toBuildResponseDto(result);
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/rebuild` for a
+     * DONE Idea (Decision A27). Creates a NEW Work; on Goal
+     * completion the Idea's `acceptedWorkId` is re-pointed to the
+     * new Work. The original Work is NOT deleted.
+     */
+    @Post(':id/rebuild')
+    @ApiOperation({ summary: 'Re-build a done Idea — produces a new Work, original is preserved' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async rebuild(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.rebuild(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return toBuildResponseDto(result);
     }
 
     @Post(':id/accept')

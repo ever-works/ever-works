@@ -122,6 +122,67 @@ export class WorkProposalsApiService {
         return { proposal, goal };
     }
 
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
+     * Retry button for a FAILED Idea (spec §3.9). Clears the
+     * failureMessage + failureKind, transitions FAILED → QUEUED,
+     * creates a fresh WorkAgentGoal. Same shape as `build()` but
+     * with stricter "must be FAILED" precondition.
+     */
+    async retry(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (existing.status !== WorkProposalStatus.FAILED) {
+            throw new BadRequestException(
+                `Retry is only valid for FAILED Ideas. Current status: "${existing.status}".`,
+            );
+        }
+        const proposal = await this.proposals.retryFailed(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/rebuild` for a
+     * DONE Idea (spec §3.9, Decision A27). Creates a NEW Work
+     * (separate from the original); on Goal completion the Idea's
+     * `acceptedWorkId` is re-pointed to the new Work. The original
+     * Work is NOT deleted — user can keep, repurpose, or manually
+     * delete it.
+     */
+    async rebuild(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (existing.status !== WorkProposalStatus.ACCEPTED) {
+            throw new BadRequestException(
+                `Rebuild is only valid for ACCEPTED (Done) Ideas. Current status: "${existing.status}".`,
+            );
+        }
+        const proposal = await this.proposals.beginRebuild(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
+    }
+
     async getForUser(userId: string, proposalId: string) {
         return this.proposals.getForUser(userId, proposalId);
     }

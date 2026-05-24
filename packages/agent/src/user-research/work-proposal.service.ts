@@ -12,6 +12,56 @@ import {
     type ExistingIdeaContext,
     type MissionContext,
 } from './prompts';
+import { classifyIdeaFailure, computeBackoffSeconds, isTransient } from './idea-failure-classifier';
+import { IdeaFailureKind } from '../entities/work-proposal.entity';
+
+/**
+ * Output of `handleGoalCompletion` — the decision the
+ * goal-completion handler made about what to do with the Idea.
+ * Callers (the future goal-execution path) use this to either
+ * schedule the next retry (in `retry`-outcome) or just record the
+ * terminal state.
+ *
+ * Phase 1 PR FF / spec §3.9 / Decision A23.
+ */
+export type GoalCompletionDecision =
+    | { outcome: 'accepted'; ideaId: string; workId: string }
+    | { outcome: 'rebuild-accepted'; ideaId: string; workId: string; previousWorkId: string | null }
+    | {
+          outcome: 'retry';
+          ideaId: string;
+          attempts: number;
+          retryDelaySeconds: number;
+          kind: IdeaFailureKind;
+      }
+    | { outcome: 'failed'; ideaId: string; kind: IdeaFailureKind; message: string }
+    | { outcome: 'noop'; reason: string };
+
+/**
+ * Auto-retry policy snapshot passed to `handleGoalCompletion` by
+ * the caller. Read from `WorkAgentPreference` columns added in
+ * Phase 0 PR 0.5 (`maxAutoRetries`, `backoffSeconds`,
+ * `exponentialBackoffFactor`).
+ */
+export interface AutoRetryPolicy {
+    maxAutoRetries: number;
+    backoffSeconds: number;
+    exponentialBackoffFactor: number;
+}
+
+/** Best-effort extraction of a human-readable message from an
+ *  unknown error value. Mirrors the classifier's input shape (Error
+ *  / string / object-with-message), trimmed and bounded so the
+ *  Idea Card UI can render it inline without overflow. */
+function extractFailureMessage(input: unknown): string {
+    if (typeof input === 'string') return input.trim() || 'Unknown failure';
+    if (input instanceof Error) return (input.message || 'Unknown failure').trim();
+    if (input && typeof input === 'object') {
+        const m = (input as Record<string, unknown>).message;
+        if (typeof m === 'string' && m.trim().length > 0) return m.trim();
+    }
+    return 'Unknown failure';
+}
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
@@ -353,6 +403,132 @@ export class WorkProposalService {
         const firstLine = description.split(/[.\n]/, 1)[0]?.trim() ?? '';
         const trimmed = firstLine.slice(0, 80).trim();
         return trimmed || 'Untitled Idea';
+    }
+
+    // ─── Phase 1 PR FF — Retry, Re-build, and Goal-completion ─────
+
+    /**
+     * Re-queue a FAILED Idea for build (spec §3.9 manual Retry
+     * button). Clears `failureMessage` + `failureKind`, transitions
+     * FAILED → QUEUED. Same `markQueuedForBuild` repo method as the
+     * regular build path uses (it already allows the FAILED source
+     * status).
+     *
+     * Caller (`WorkProposalsApiService.retry`) is responsible for
+     * also creating the new `WorkAgentGoal`. This service method
+     * only owns the Idea-side state transition.
+     */
+    async retryFailed(userId: string, proposalId: string): Promise<WorkProposal | null> {
+        const ok = await this.repo.markQueuedForBuild(proposalId, userId);
+        if (!ok) return null;
+        return this.repo.findByIdForUser(proposalId, userId);
+    }
+
+    /**
+     * Transition an ACCEPTED Idea to BUILDING for the Re-build
+     * flow (Decision A27). The Idea returns to ACCEPTED when the
+     * new Goal completes, with `acceptedWorkId` re-pointed at the
+     * NEW Work. The ORIGINAL Work is preserved (not deleted) —
+     * the user can keep, repurpose, or manually delete it.
+     */
+    async beginRebuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
+        const ok = await this.repo.markRebuildingFromAccepted(proposalId, userId);
+        if (!ok) return null;
+        return this.repo.findByIdForUser(proposalId, userId);
+    }
+
+    /**
+     * Phase 1 PR FF — pure decision API for the goal-completion
+     * handler (spec §3.9, Decisions A23 + A24 + A27).
+     *
+     * Given a Goal outcome for an Idea-tagged Goal, decide:
+     *   - accept the Idea with the new Work id (success path),
+     *   - schedule a retry per the user's policy (transient failure
+     *     with retry budget left),
+     *   - mark the Idea FAILED (terminal failure),
+     *   - or no-op (Idea isn't in a state we should touch).
+     *
+     * This method DOES write Idea state for the terminal outcomes
+     * (`accepted`, `rebuild-accepted`, `failed`). It does NOT
+     * actually schedule the retry — that's the caller's
+     * responsibility, since the scheduling primitive depends on
+     * the surrounding execution infra (Trigger.dev today, possibly
+     * BullMQ later). The returned `retryDelaySeconds` is the
+     * computed wait per spec §3.9; the caller passes it to
+     * whichever scheduler is in scope.
+     *
+     * `attempts` is the count of attempts ALREADY made (i.e. the
+     * Goal that just completed counts as 1). The auto-retry budget
+     * check is `attempts < policy.maxAutoRetries`. Caller derives
+     * `attempts` from `goalRepo.count({ where: { ideaId } })` — no
+     * new column needed.
+     */
+    async handleGoalCompletion(input: {
+        userId: string;
+        ideaId: string;
+        outcome: { kind: 'success'; workId: string } | { kind: 'failure'; error: unknown };
+        attempts: number;
+        policy: AutoRetryPolicy;
+    }): Promise<GoalCompletionDecision> {
+        const proposal = await this.repo.findByIdForUser(input.ideaId, input.userId);
+        if (!proposal) {
+            return { outcome: 'noop', reason: 'idea-not-found' };
+        }
+
+        if (input.outcome.kind === 'success') {
+            const previousWorkId = proposal.acceptedWorkId ?? null;
+            const ok = await this.repo.markAccepted(
+                input.ideaId,
+                input.userId,
+                input.outcome.workId,
+                [WorkProposalStatus.BUILDING],
+            );
+            if (!ok) {
+                return { outcome: 'noop', reason: 'idea-not-in-building' };
+            }
+            // Re-build flow: previousWorkId was non-null before the
+            // accept overwrote it. The Decision A27 "original Work
+            // is NOT deleted" guarantee is enforced by the absence
+            // of a delete call here — Work survives standalone.
+            if (previousWorkId !== null) {
+                return {
+                    outcome: 'rebuild-accepted',
+                    ideaId: input.ideaId,
+                    workId: input.outcome.workId,
+                    previousWorkId,
+                };
+            }
+            return { outcome: 'accepted', ideaId: input.ideaId, workId: input.outcome.workId };
+        }
+
+        // Failure path.
+        const kind = classifyIdeaFailure(input.outcome.error);
+        const message = extractFailureMessage(input.outcome.error);
+
+        if (isTransient(kind) && input.attempts < input.policy.maxAutoRetries) {
+            const retryDelaySeconds = computeBackoffSeconds(
+                input.policy.backoffSeconds,
+                input.policy.exponentialBackoffFactor,
+                input.attempts,
+            );
+            // Idea status STAYS at BUILDING across auto-retries
+            // (Decision A24 — no flicker to FAILED then QUEUED).
+            // We don't write to the Idea here; the caller schedules
+            // the retry, then when the new Goal starts it calls
+            // markBuilding (a no-op when already BUILDING).
+            return {
+                outcome: 'retry',
+                ideaId: input.ideaId,
+                attempts: input.attempts + 1,
+                retryDelaySeconds,
+                kind,
+            };
+        }
+
+        // Terminal failure — either non-transient or retry budget
+        // exhausted. Mark FAILED with the classified kind + message.
+        await this.repo.markFailed(input.ideaId, input.userId, message, kind);
+        return { outcome: 'failed', ideaId: input.ideaId, kind, message };
     }
 
     async getForUser(userId: string, proposalId: string) {

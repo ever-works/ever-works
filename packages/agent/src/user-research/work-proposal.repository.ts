@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
+    IdeaFailureKind,
     WorkProposal,
     WorkProposalSource,
     WorkProposalStatus,
@@ -178,5 +179,76 @@ export class WorkProposalRepository {
         return this.repository.count({
             where: { userId, status: WorkProposalStatus.PENDING },
         });
+    }
+
+    /**
+     * Transition Idea to BUILDING. Caller: the goal-execution path
+     * (when a queued Goal actually starts running). Valid from
+     * QUEUED or BUILDING (the latter for the auto-retry loop —
+     * Decision A24, Idea stays BUILDING across retries instead of
+     * flickering to FAILED and back). Returns true iff the row was
+     * affected.
+     */
+    async markBuilding(id: string, userId: string): Promise<boolean> {
+        const res = await this.repository.update(
+            {
+                id,
+                userId,
+                status: In([WorkProposalStatus.QUEUED, WorkProposalStatus.BUILDING]),
+            },
+            { status: WorkProposalStatus.BUILDING },
+        );
+        return (res.affected ?? 0) > 0;
+    }
+
+    /**
+     * Transition Idea to FAILED. Caller: the goal-completion handler
+     * on terminal failure (Phase 1 PR FF). Persists the
+     * human-readable `message` and the platform-classified `kind` so
+     * the Idea Card UI can render the inline error block (spec §3.9)
+     * and the user can hit Retry to clear them.
+     *
+     * Allowed source statuses: BUILDING (normal terminal failure)
+     * and QUEUED (failure during the queue → build transition).
+     */
+    async markFailed(
+        id: string,
+        userId: string,
+        message: string,
+        kind: IdeaFailureKind,
+    ): Promise<boolean> {
+        const res = await this.repository.update(
+            {
+                id,
+                userId,
+                status: In([WorkProposalStatus.BUILDING, WorkProposalStatus.QUEUED]),
+            },
+            {
+                status: WorkProposalStatus.FAILED,
+                failureMessage: message.slice(0, 5000),
+                failureKind: kind,
+            },
+        );
+        return (res.affected ?? 0) > 0;
+    }
+
+    /**
+     * Transition Idea ACCEPTED → BUILDING for the Re-build path
+     * (Phase 1 PR FF `POST /me/work-proposals/:id/rebuild`,
+     * Decision A27). The Idea will return to ACCEPTED when the
+     * new Goal completes, with `acceptedWorkId` re-pointed at the
+     * new Work. Returns the freshly-loaded Idea on success, `null`
+     * if the Idea isn't in ACCEPTED for this user.
+     */
+    async markRebuildingFromAccepted(id: string, userId: string): Promise<boolean> {
+        const res = await this.repository.update(
+            { id, userId, status: WorkProposalStatus.ACCEPTED },
+            {
+                status: WorkProposalStatus.BUILDING,
+                failureMessage: null,
+                failureKind: null,
+            },
+        );
+        return (res.affected ?? 0) > 0;
     }
 }
