@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -8,6 +8,7 @@ import {
     type MissionGuardrailsOverride,
 } from '../entities/mission.entity';
 import { TitlerService } from '../titler/titler.service';
+import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
 
 /**
@@ -103,6 +104,14 @@ export class MissionsService {
         // Phase 3 PR I — shared titler. Used by create() when the
         // caller's title is empty or missing.
         private readonly titler: TitlerService,
+        // Phase 3 PR J — Mission tick worker. Optional so the
+        // existing MissionsService unit-test (which constructs
+        // the service hand-rolled with only repo + titler) keeps
+        // compiling without rewiring all four downstream deps.
+        // In production DI both providers live in MissionsModule
+        // and the @Optional() resolves to a real instance.
+        @Optional()
+        private readonly tickService?: MissionTickService,
     ) {}
 
     /**
@@ -278,30 +287,59 @@ export class MissionsService {
     }
 
     /**
-     * Phase 3 PR H — manually trigger a Mission tick. PLACEHOLDER:
-     * the actual Trigger.dev dispatch wiring lands in PR J. For
-     * now we log + return a noop response so the endpoint is
-     * callable end-to-end and the UI (Phase 6 PR R "Run now"
-     * button) can wire to it without waiting for PR J.
+     * Phase 3 PR J — manually trigger a Mission tick. Delegates
+     * to `MissionTickService.runOnce`, which bypasses the cron
+     * match check (the whole point of runNow) but still enforces
+     * the outstanding-Ideas cap so repeated clicks can't flood
+     * the Mission past the user's own throttle.
      *
-     * The state-machine gate is enforced even though there's no
-     * tick: PR J's tick logic will trust callers to have validated
-     * the Mission is runnable.
+     * When MissionTickService isn't wired (the hand-rolled unit
+     * tests construct MissionsService without the tick dep), the
+     * old PR H noop response is returned so those tests keep
+     * passing. Production DI always provides it via
+     * `MissionsModule`.
+     *
+     * The state-machine gate (ACTIVE | PAUSED) is enforced before
+     * the dispatch — PR J's tick service trusts callers to have
+     * validated the Mission is runnable.
      */
     async runNow(
         userId: string,
         missionId: string,
-    ): Promise<{ status: 'noop-placeholder' | 'queued'; missionId: string }> {
+    ): Promise<{
+        status:
+            | 'noop-placeholder'
+            | 'queued'
+            | 'spawned'
+            | 'cap-hit'
+            | 'no-ideas'
+            | 'failed'
+            | 'cron-no-match';
+        missionId: string;
+        ideasCreated?: number;
+        ideasQueued?: number;
+        message?: string;
+    }> {
         const mission = await this.findOrThrow(userId, missionId);
         if (!RUNNABLE_STATUSES.includes(mission.status)) {
             throw new BadRequestException(
                 `Mission cannot be run from status "${mission.status}". Allowed: ${RUNNABLE_STATUSES.join(', ')}.`,
             );
         }
-        this.logger.log(
-            `Mission ${missionId} run-now requested (placeholder — actual tick wiring lands in Phase 3 PR J)`,
-        );
-        return { status: 'noop-placeholder', missionId };
+        if (!this.tickService) {
+            this.logger.warn(
+                `Mission ${missionId} run-now: MissionTickService not wired — returning placeholder.`,
+            );
+            return { status: 'noop-placeholder', missionId };
+        }
+        const result = await this.tickService.runOnce(missionId, userId);
+        return {
+            status: result.outcome,
+            missionId,
+            ideasCreated: result.ideasCreated,
+            ideasQueued: result.ideasQueued,
+            message: result.message,
+        };
     }
 
     // ─── internals ──────────────────────────────────────────────────

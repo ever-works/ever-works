@@ -2,27 +2,34 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from '../entities/mission.entity';
 import { TitlerModule } from '../titler/titler.module';
+import { UserResearchModule } from '../user-research/user-research.module';
+import { WorkAgentModule } from '../work-agent/work-agent.module';
 import { MissionsService } from './missions.service';
+import { MissionTickService } from './mission-tick.service';
 
 /**
  * Phase 3 PR G — MissionsModule skeleton (Missions/Ideas/Works
- * build).
+ * build). Extended in PR J with the Mission tick worker, which
+ * spans three other modules:
+ *   - UserResearchModule for `WorkProposalService` (proposal
+ *     generator) + `WorkProposalRepository` (outstanding-Ideas
+ *     count).
+ *   - WorkAgentModule for `WorkAgentService.getPreferences`
+ *     (user-level `missionDefaultOutstandingCap` cap fallback).
+ *   - TitlerModule (PR I) for the create() title fallback.
  *
- * Mirrors the work-agent module shape: register the `Mission`
- * entity via TypeORM forFeature so the service can inject a
- * `Repository<Mission>`, expose `MissionsService` for consumers
- * (api-side controller in this PR; Phase 3 PR J tick worker
- * later; Phase 8 PR X Mission Templates scaffolder later).
- *
- * PR G ships listForUser only; PR H extends with the full CRUD
- * + lifecycle surface.
+ * The tick service is exported so the Trigger.dev task at
+ * `packages/tasks/src/tasks/trigger/mission-tick.task.ts` can
+ * resolve it from the application context.
  */
 @Module({
-    // Phase 3 PR I — TitlerModule provides TitlerService for
-    // MissionsService.create (used when the caller's `title` is
-    // empty or missing).
-    imports: [TypeOrmModule.forFeature([Mission]), TitlerModule],
-    providers: [MissionsService],
-    exports: [MissionsService],
+    imports: [
+        TypeOrmModule.forFeature([Mission]),
+        TitlerModule,
+        UserResearchModule,
+        WorkAgentModule,
+    ],
+    providers: [MissionsService, MissionTickService],
+    exports: [MissionsService, MissionTickService],
 })
 export class MissionsModule {}

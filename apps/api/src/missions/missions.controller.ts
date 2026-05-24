@@ -161,14 +161,28 @@ export class MissionsController {
 
     @Post(':id/run-now')
     @ApiOperation({
-        summary: 'Manually trigger a mission tick (placeholder — actual dispatch lands in PR J)',
+        summary:
+            'Manually trigger a Mission tick — bypasses cron, enforces the outstanding-Ideas cap',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     async runNow(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<{ status: 'noop-placeholder' | 'queued'; missionId: string }> {
+    ): Promise<{
+        status:
+            | 'noop-placeholder'
+            | 'queued'
+            | 'spawned'
+            | 'cap-hit'
+            | 'no-ideas'
+            | 'failed'
+            | 'cron-no-match';
+        missionId: string;
+        ideasCreated?: number;
+        ideasQueued?: number;
+        message?: string;
+    }> {
         return this.service.runNow(auth.userId, id);
     }
 }

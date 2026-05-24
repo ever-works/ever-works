@@ -182,6 +182,32 @@ export class WorkProposalRepository {
     }
 
     /**
+     * Phase 3 PR J — count Ideas attached to `missionId` whose
+     * status is still "outstanding" (PENDING / QUEUED / BUILDING).
+     * Used by the Mission tick worker to enforce the per-Mission
+     * `outstandingIdeasCap`: when the count meets or exceeds the
+     * cap, the tick generates nothing this cycle.
+     *
+     * Spec §1.3: ACCEPTED/DISMISSED/FAILED Ideas don't count
+     * (they're terminal — they no longer occupy a "slot" for the
+     * user to triage). PR FF moves Ideas back to QUEUED on
+     * manual Retry, so a retried Idea correctly re-enters the
+     * outstanding count.
+     */
+    async countOutstandingByMission(missionId: string): Promise<number> {
+        return this.repository.count({
+            where: {
+                missionId,
+                status: In([
+                    WorkProposalStatus.PENDING,
+                    WorkProposalStatus.QUEUED,
+                    WorkProposalStatus.BUILDING,
+                ]),
+            },
+        });
+    }
+
+    /**
      * Transition Idea to BUILDING. Caller: the goal-execution path
      * (when a queued Goal actually starts running). Valid from
      * QUEUED or BUILDING (the latter for the auto-retry loop —
