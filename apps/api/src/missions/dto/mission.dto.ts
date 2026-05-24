@@ -94,6 +94,29 @@ export class CreateMissionDto {
 }
 
 /**
+ * Phase 3 PR HH — request body for `POST /me/missions/:id/clone`.
+ * Only field today is the optional `title` override; everything
+ * else carries verbatim from the source Mission (spec §4.4a +
+ * Decision A25). Future additions (e.g. opt-out of Ideas copy,
+ * select-which-Ideas) would land here as additional optional
+ * fields without breaking the empty-body case.
+ */
+export class CloneMissionDto {
+    @ApiProperty({
+        required: false,
+        minLength: 1,
+        maxLength: 200,
+        description:
+            'Title for the cloned Mission. Defaults to "Copy of <source title>" when omitted.',
+    })
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(200)
+    title?: string;
+}
+
+/**
  * Phase 3 PR H — request body for `PATCH /me/missions/:id`. All
  * fields optional; undefined = leave existing untouched; `null`
  * on the nullable fields explicitly clears them. State (`status`)

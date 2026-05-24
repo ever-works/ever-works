@@ -8,6 +8,9 @@ export * from './types';
 // task at packages/tasks/src/tasks/trigger/mission-tick.task.ts
 // can resolve it from the application context.
 export * from './mission-tick.service';
+// Phase 3 PR HH — Mission Clone (Full Fork). Exported so the API
+// controller can wire `POST /me/missions/:id/clone` to it.
+export * from './mission-clone.service';
 export {
     Mission,
     MissionStatus,

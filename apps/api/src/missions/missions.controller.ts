@@ -13,13 +13,15 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+    MissionCloneService,
     MissionsService,
+    type CloneMissionResult,
     type MissionDto,
     type MissionGuardrailsOverride,
 } from '@ever-works/agent/missions';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
+import { CloneMissionDto, CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -51,7 +53,11 @@ import { CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
 @ApiTags('missions')
 @Controller('api/me/missions')
 export class MissionsController {
-    constructor(private readonly service: MissionsService) {}
+    constructor(
+        private readonly service: MissionsService,
+        // Phase 3 PR HH — Mission Clone (Full Fork).
+        private readonly cloneService: MissionCloneService,
+    ) {}
 
     @Get()
     @ApiOperation({ summary: 'List my missions' })
@@ -157,6 +163,23 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
         return this.service.complete(auth.userId, id);
+    }
+
+    @Post(':id/clone')
+    @ApiOperation({
+        summary:
+            'Full-fork clone: metadata + non-DISMISSED Ideas (as PENDING) + sourceMissionId backlink. Works NOT cloned (Decisions A25, A26).',
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async clone(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: CloneMissionDto,
+    ): Promise<CloneMissionResult> {
+        return this.cloneService.cloneForUser(auth.userId, id, {
+            title: body.title,
+        });
     }
 
     @Post(':id/run-now')
