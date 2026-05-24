@@ -1,6 +1,10 @@
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
+// Legacy `next/link` mock — KbTreePanel now imports `Link` from
+// `@/i18n/navigation` (locale-aware), so this mock is dead-code; we
+// leave it in place as a safety net for any transitive consumers.
 vi.mock('next/link', () => ({
     default: ({
         href,
@@ -16,8 +20,43 @@ vi.mock('next/link', () => ({
     ),
 }));
 
+// KbTreePanel imports `Link` from `@/i18n/navigation`. next-intl
+// 4.9.2's navigation client uses a bare `next/navigation` specifier
+// that fails to resolve under pnpm's symlinked tree in Vitest — stub
+// the whole module with a passthrough `<a>` and no-op router.
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+        React.createElement('a', { href, ...rest }, children),
+    useRouter: () => ({
+        push: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        replace: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+    usePathname: () => '/',
+    redirect: vi.fn(),
+    getPathname: ({ href }: { href: string }) => href,
+}));
+
 vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string) => key,
+}));
+
+// KbTreeDocRow + KbTreeClassDeleteButton (rendered by KbTreePanel)
+// are client components that pull in `useTranslations` from
+// `next-intl`. The panel itself is a server component, so this mock
+// only needs to satisfy the nested client subtree.
+vi.mock('next-intl', () => ({
+    useTranslations: () => (key: string) => key,
+}));
+
+// Server actions invoked by the delete affordances. The KbTreePanel
+// spec doesn't assert on them — we just stub them so the imports
+// resolve without pulling in `server-only`.
+vi.mock('@/app/actions/works/kb-document', () => ({
+    deleteKbDocumentAction: vi.fn(),
 }));
 
 import { KbTreePanel } from './KbTreePanel';

@@ -203,7 +203,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
     return (
         <nav className="border-b border-border dark:border-border-dark">
             <div className="-mb-px flex overflow-x-auto scrollbar-none">
-                <div className="flex min-w-full @sm/main:min-w-0 gap-1 @sm/main:gap-2 @2xl/main:gap-6 @3xl/main:gap-8 px-1">
+                <div className="flex min-w-full @sm/main:min-w-0 gap-0.5 @sm/main:gap-1 @2xl/main:gap-2 @3xl/main:gap-3 px-1">
                     {tabs.map((tab) => (
                         <Link
                             key={tab.name}
@@ -211,7 +211,7 @@ export function WorkTabs({ work }: WorkTabsProps) {
                             title={tab.tooltip}
                             aria-label={tab.tooltip ? `${tab.name} — ${tab.tooltip}` : tab.name}
                             className={cn(
-                                'flex items-center gap-1.5 @sm/main:gap-2 py-3 @sm/main:py-4 px-3 @2xl/main:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
+                                'flex items-center gap-1 @sm/main:gap-1.5 py-3 px-2 @2xl/main:px-2.5 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
                                 tab.isActive
                                     ? 'border-primary dark:border-gray-100 dark:text-text-dark text-primary'
                                     : 'border-transparent text-text-secondary dark:text-text-secondary-dark/70 hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',

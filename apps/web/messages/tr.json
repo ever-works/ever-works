@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "38d satırında geçersiz kılma eylemi gönderildiğinde kullanılabilir",
                     "overrideCtaBusy": "Çatallanıyor…",
                     "overrideErrorFallback": "Devralınan belge çatallanamadı. Tekrar deneyin veya sayfayı yenileyin."
+                },
+                "addDoc": {
+                    "button": "+ Ekle",
+                    "title": "Yeni belge oluştur",
+                    "subtitle": "Bir sınıf seçin, belgeyi adlandırın, isteğe bağlı açıklama ve etiketler ekleyin. Oluşturduktan sonra düzenleyici açılır.",
+                    "classLabel": "Sınıf",
+                    "titleLabel": "Başlık",
+                    "titlePlaceholder": "örn. marka sesi ilkeleri",
+                    "descriptionLabel": "Açıklama (isteğe bağlı)",
+                    "tagsLabel": "Etiketler",
+                    "tagsPlaceholder": "Aramak veya etiket eklemek için yazın, onaylamak için Enter",
+                    "confirm": "Belge oluştur",
+                    "cancel": "İptal",
+                    "errorFallback": "Belge oluşturulamadı. Lütfen tekrar deneyin.",
+                    "errorBusy": "Oluşturuluyor…"
+                },
+                "delete": {
+                    "docTooltip": "Belgeyi sil",
+                    "classTooltip": "{class} içindeki tüm belgeleri sil",
+                    "docConfirmTitle": "Belge silinsin mi?",
+                    "docConfirmBody": "{title} bu Work'ten kalıcı olarak kaldırılacak. Geri alınamaz.",
+                    "classConfirmTitle": "{class} içindeki tüm {count} belge silinsin mi?",
+                    "classConfirmBody": "Bu sınıftaki tüm belgeler kalıcı olarak kaldırılacak. Geri alınamaz.",
+                    "confirm": "Sil",
+                    "cancel": "İptal",
+                    "errorFallback": "Silinemedi. Lütfen tekrar deneyin.",
+                    "errorBusy": "Siliniyor…",
+                    "errorPartial": "{ok} silindi, {failed} başarısız."
                 }
             }
         },

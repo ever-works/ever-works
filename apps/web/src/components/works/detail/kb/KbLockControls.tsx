@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+// EW-641 follow-up — use the locale-aware `useRouter` from
+// `@/i18n/navigation` so `router.refresh()` after a lock toggle keeps
+// the active locale prefix on the KB detail route.
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';

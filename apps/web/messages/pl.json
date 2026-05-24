@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Dostępne po wydaniu akcji zastąpienia w wierszu 38d",
                     "overrideCtaBusy": "Forkowanie…",
                     "overrideErrorFallback": "Nie udało się sforkować odziedziczonego dokumentu. Spróbuj ponownie lub odśwież stronę."
+                },
+                "addDoc": {
+                    "button": "+ Dodaj",
+                    "title": "Utwórz nowy dokument",
+                    "subtitle": "Wybierz klasę, nazwij dokument, dodaj opcjonalny opis i tagi. Edytor otworzy się po utworzeniu.",
+                    "classLabel": "Klasa",
+                    "titleLabel": "Tytuł",
+                    "titlePlaceholder": "np. zasady głosu marki",
+                    "descriptionLabel": "Opis (opcjonalnie)",
+                    "tagsLabel": "Tagi",
+                    "tagsPlaceholder": "Wpisz, aby wyszukać lub dodać tag, Enter potwierdza",
+                    "confirm": "Utwórz dokument",
+                    "cancel": "Anuluj",
+                    "errorFallback": "Nie udało się utworzyć dokumentu. Spróbuj ponownie.",
+                    "errorBusy": "Tworzenie…"
+                },
+                "delete": {
+                    "docTooltip": "Usuń dokument",
+                    "classTooltip": "Usuń wszystkie dokumenty w {class}",
+                    "docConfirmTitle": "Usunąć dokument?",
+                    "docConfirmBody": "{title} zostanie trwale usunięty z tego Work. Tego nie można cofnąć.",
+                    "classConfirmTitle": "Usunąć wszystkie {count} dokumentów w {class}?",
+                    "classConfirmBody": "Wszystkie dokumenty z tej klasy zostaną trwale usunięte. Tego nie można cofnąć.",
+                    "confirm": "Usuń",
+                    "cancel": "Anuluj",
+                    "errorFallback": "Nie udało się usunąć. Spróbuj ponownie.",
+                    "errorBusy": "Usuwanie…",
+                    "errorPartial": "Usunięto {ok}, nie udało się {failed}."
                 }
             }
         },

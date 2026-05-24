@@ -2849,6 +2849,34 @@
                     "overrideCtaPendingTooltip": "Disponible une fois l'action de remplacement livrée à la ligne 38d",
                     "overrideCtaBusy": "Création du fork…",
                     "overrideErrorFallback": "Impossible de bifurquer le document hérité. Réessayez ou actualisez la page."
+                },
+                "addDoc": {
+                    "button": "+ Ajouter",
+                    "title": "Créer un nouveau document",
+                    "subtitle": "Choisissez une classe, nommez le document, ajoutez une description et des étiquettes facultatives. L'éditeur s'ouvre après la création.",
+                    "classLabel": "Classe",
+                    "titleLabel": "Titre",
+                    "titlePlaceholder": "ex. principes de voix de marque",
+                    "descriptionLabel": "Description (facultatif)",
+                    "tagsLabel": "Étiquettes",
+                    "tagsPlaceholder": "Tapez pour rechercher ou ajouter, Entrée pour valider",
+                    "confirm": "Créer le document",
+                    "cancel": "Annuler",
+                    "errorFallback": "Impossible de créer le document. Réessayez.",
+                    "errorBusy": "Création…"
+                },
+                "delete": {
+                    "docTooltip": "Supprimer le document",
+                    "classTooltip": "Supprimer tous les documents dans {class}",
+                    "docConfirmTitle": "Supprimer le document ?",
+                    "docConfirmBody": "{title} sera définitivement supprimé de ce Work. Action irréversible.",
+                    "classConfirmTitle": "Supprimer les {count} documents dans {class} ?",
+                    "classConfirmBody": "Tous les documents de cette classe seront définitivement supprimés. Action irréversible.",
+                    "confirm": "Supprimer",
+                    "cancel": "Annuler",
+                    "errorFallback": "Suppression impossible. Réessayez.",
+                    "errorBusy": "Suppression…",
+                    "errorPartial": "Supprimés {ok}, échec {failed}."
                 }
             }
         },

@@ -2605,6 +2605,34 @@
                     "overrideCtaPendingTooltip": "Tersedia setelah aksi pengganti dikirim di baris 38d",
                     "overrideCtaBusy": "Mem-fork…",
                     "overrideErrorFallback": "Tidak dapat mem-fork dokumen warisan. Coba lagi atau muat ulang halaman."
+                },
+                "addDoc": {
+                    "button": "+ Tambah",
+                    "title": "Buat dokumen baru",
+                    "subtitle": "Pilih kelas, beri nama dokumen, tambahkan deskripsi dan tag opsional. Editor akan terbuka setelah dibuat.",
+                    "classLabel": "Kelas",
+                    "titleLabel": "Judul",
+                    "titlePlaceholder": "mis. prinsip suara merek",
+                    "descriptionLabel": "Deskripsi (opsional)",
+                    "tagsLabel": "Tag",
+                    "tagsPlaceholder": "Ketik untuk mencari atau menambah tag, Enter untuk konfirmasi",
+                    "confirm": "Buat dokumen",
+                    "cancel": "Batal",
+                    "errorFallback": "Tidak dapat membuat dokumen. Silakan coba lagi.",
+                    "errorBusy": "Membuat…"
+                },
+                "delete": {
+                    "docTooltip": "Hapus dokumen",
+                    "classTooltip": "Hapus semua dokumen di {class}",
+                    "docConfirmTitle": "Hapus dokumen?",
+                    "docConfirmBody": "{title} akan dihapus permanen dari Work ini. Tindakan ini tidak dapat dibatalkan.",
+                    "classConfirmTitle": "Hapus semua {count} dokumen di {class}?",
+                    "classConfirmBody": "Semua dokumen di kelas ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+                    "confirm": "Hapus",
+                    "cancel": "Batal",
+                    "errorFallback": "Tidak dapat menghapus. Silakan coba lagi.",
+                    "errorBusy": "Menghapus…",
+                    "errorPartial": "Terhapus {ok}, gagal {failed}."
                 }
             }
         },

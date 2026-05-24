@@ -2822,6 +2822,34 @@
                     "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
                     "overrideCtaBusy": "מבצע פיצול…",
                     "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
+                },
+                "addDoc": {
+                    "button": "+ הוסף",
+                    "title": "צור מסמך חדש",
+                    "subtitle": "בחר מחלקה, תן שם למסמך, הוסף תיאור ותגיות אופציונליים. העורך ייפתח לאחר היצירה.",
+                    "classLabel": "מחלקה",
+                    "titleLabel": "כותרת",
+                    "titlePlaceholder": "לדוגמה: עקרונות קול המותג",
+                    "descriptionLabel": "תיאור (אופציונלי)",
+                    "tagsLabel": "תגיות",
+                    "tagsPlaceholder": "הקלד כדי לחפש או להוסיף תגית, Enter לאישור",
+                    "confirm": "צור מסמך",
+                    "cancel": "ביטול",
+                    "errorFallback": "לא ניתן ליצור את המסמך. נסה שוב.",
+                    "errorBusy": "יוצר…"
+                },
+                "delete": {
+                    "docTooltip": "מחק מסמך",
+                    "classTooltip": "מחק את כל המסמכים ב-{class}",
+                    "docConfirmTitle": "למחוק את המסמך?",
+                    "docConfirmBody": "{title} יוסר לצמיתות מ-Work זה. פעולה זו אינה ניתנת לביטול.",
+                    "classConfirmTitle": "למחוק את כל {count} המסמכים ב-{class}?",
+                    "classConfirmBody": "כל המסמכים במחלקה זו יוסרו לצמיתות. פעולה זו אינה ניתנת לביטול.",
+                    "confirm": "מחק",
+                    "cancel": "ביטול",
+                    "errorFallback": "המחיקה נכשלה. נסה שוב.",
+                    "errorBusy": "מוחק…",
+                    "errorPartial": "נמחקו {ok}, נכשלו {failed}."
                 }
             }
         },

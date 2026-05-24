@@ -2822,6 +2822,34 @@
                     "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist",
                     "overrideCtaBusy": "Wird geforkt…",
                     "overrideErrorFallback": "Das geerbte Dokument konnte nicht geforkt werden. Versuchen Sie es erneut oder laden Sie die Seite neu."
+                },
+                "addDoc": {
+                    "button": "+ Hinzufügen",
+                    "title": "Neues Dokument erstellen",
+                    "subtitle": "Klasse wählen, Dokument benennen, optional Beschreibung und Tags hinzufügen. Der Editor öffnet sich nach dem Erstellen.",
+                    "classLabel": "Klasse",
+                    "titleLabel": "Titel",
+                    "titlePlaceholder": "z. B. Markenstimme-Prinzipien",
+                    "descriptionLabel": "Beschreibung (optional)",
+                    "tagsLabel": "Tags",
+                    "tagsPlaceholder": "Tippen, um zu suchen oder hinzuzufügen, Enter zum Bestätigen",
+                    "confirm": "Dokument erstellen",
+                    "cancel": "Abbrechen",
+                    "errorFallback": "Dokument konnte nicht erstellt werden. Bitte erneut versuchen.",
+                    "errorBusy": "Wird erstellt…"
+                },
+                "delete": {
+                    "docTooltip": "Dokument löschen",
+                    "classTooltip": "Alle Dokumente in {class} löschen",
+                    "docConfirmTitle": "Dokument löschen?",
+                    "docConfirmBody": "{title} wird endgültig aus diesem Work entfernt. Kann nicht rückgängig gemacht werden.",
+                    "classConfirmTitle": "Alle {count} Dokumente in {class} löschen?",
+                    "classConfirmBody": "Alle Dokumente dieser Klasse werden endgültig entfernt. Kann nicht rückgängig gemacht werden.",
+                    "confirm": "Löschen",
+                    "cancel": "Abbrechen",
+                    "errorFallback": "Löschen fehlgeschlagen. Bitte erneut versuchen.",
+                    "errorBusy": "Wird gelöscht…",
+                    "errorPartial": "Gelöscht: {ok}, fehlgeschlagen: {failed}."
                 }
             }
         },

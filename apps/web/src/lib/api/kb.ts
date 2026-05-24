@@ -165,6 +165,25 @@ export const kbAPI = {
     },
 
     /**
+     * `DELETE /api/works/:id/kb/documents/:docId` — permanently remove a
+     * Work-scope KB document.
+     *
+     * Backend route is gated by `ensureCanManage` and cascades the
+     * row-1B/a git mirror + row-29c embed cleanup via the
+     * `KnowledgeBaseService.deleteDocument` service method. Returns
+     * 204 No Content on success (no body), so this helper resolves to
+     * `void`.
+     */
+    deleteDocument: async (workId: string, docId: string): Promise<void> => {
+        await serverMutation<void>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
      * `POST /api/works/:id/kb/documents/:docId/lock` — lock the document
      * in the requested mode. `full` blocks all body mutations; the
      * `additions-only` mode lets the API enforce diff-merge semantics
