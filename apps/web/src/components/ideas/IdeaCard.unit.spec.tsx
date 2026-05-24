@@ -157,6 +157,54 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         expect(onDismissed).not.toHaveBeenCalled();
     });
 
+    describe('Done CTA (Phase 5 PR P)', () => {
+        it('shows "View Work" CTA when ACCEPTED + acceptedWorkId is set', () => {
+            const accepted = {
+                ...minimalProposal,
+                status: 'accepted' as const,
+                acceptedWorkId: 'work-42',
+            };
+            render(<IdeaCard proposal={accepted} />);
+            // i18n mock collapses to the key. Build CTA absent;
+            // View Work CTA present.
+            expect(screen.queryByText('actions.accept')).toBeNull();
+            expect(screen.getByText('actions.viewWork')).toBeTruthy();
+        });
+
+        it('navigates to /works/<workId> on View Work click', () => {
+            routerPushMock.mockClear();
+            const accepted = {
+                ...minimalProposal,
+                status: 'accepted' as const,
+                acceptedWorkId: 'work-42',
+            };
+            render(<IdeaCard proposal={accepted} />);
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-42');
+        });
+
+        it('keeps the Build CTA for ACCEPTED rows that have no acceptedWorkId (legacy / in-flight)', () => {
+            const acceptedNoWork = {
+                ...minimalProposal,
+                status: 'accepted' as const,
+                acceptedWorkId: null,
+            };
+            render(<IdeaCard proposal={acceptedNoWork} />);
+            expect(screen.queryByText('actions.viewWork')).toBeNull();
+            expect(screen.getByText('actions.accept')).toBeTruthy();
+        });
+
+        it('Build CTA + /works/new flow unchanged for non-ACCEPTED statuses', () => {
+            routerPushMock.mockClear();
+            // Status PENDING — even if acceptedWorkId is somehow set
+            // (it shouldn't be), the Done state requires status =
+            // 'accepted', so this row uses the Build flow.
+            render(<IdeaCard proposal={minimalProposal} />);
+            fireEvent.click(screen.getByText('actions.accept'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
+        });
+    });
+
     it('locks the rendered markup so the extraction is byte-identical (Decision A10)', () => {
         const { container } = render(
             <IdeaCard
@@ -279,7 +327,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               "
             </p>
             <button
-              class="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors active:scale-[0.98]"
+              class="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-primary hover:bg-primary-hover"
               type="button"
             >
               actions.accept

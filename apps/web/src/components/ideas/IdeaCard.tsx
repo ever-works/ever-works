@@ -1,9 +1,10 @@
 'use client';
 
 import { useTransition } from 'react';
-import { Sparkles, X, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
@@ -32,7 +33,24 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
+    // Phase 5 PR P — Done state CTA. When the Idea has been
+    // accepted AND the platform has a Work id to point at (the
+    // common case post-Phase 1 PR B build flow), swap the
+    // "Build" CTA for "View Work →" linking directly to the
+    // /works/<id> detail page. ACCEPTED Ideas without a Work id
+    // (legacy pre-PR-B accepts, or in-flight accepts where the
+    // back-FK didn't land yet) keep the Build CTA so the user
+    // can still kick off a new build cycle.
+    const isDone =
+        proposal.status === 'accepted' &&
+        typeof proposal.acceptedWorkId === 'string' &&
+        proposal.acceptedWorkId.length > 0;
+
     const handleAccept = () => {
+        if (isDone && proposal.acceptedWorkId) {
+            router.push(ROUTES.DASHBOARD_WORK(proposal.acceptedWorkId));
+            return;
+        }
         router.push(`/works/new?proposal=${proposal.id}`);
     };
 
@@ -119,10 +137,28 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
             <button
                 type="button"
                 onClick={handleAccept}
-                className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors active:scale-[0.98]"
+                className={cn(
+                    'mt-auto inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
+                    // Phase 5 PR P — Done state uses the success
+                    // color and a checkmark icon. Visually distinct
+                    // from the primary-blue Build CTA so a finished
+                    // Idea reads as "completed" at a glance.
+                    isDone
+                        ? 'bg-success hover:bg-success/90'
+                        : 'bg-primary hover:bg-primary-hover',
+                )}
             >
-                {t('actions.accept')}
-                <ChevronRight className="w-4 h-4" />
+                {isDone ? (
+                    <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        {t('actions.viewWork')}
+                    </>
+                ) : (
+                    <>
+                        {t('actions.accept')}
+                        <ChevronRight className="w-4 h-4" />
+                    </>
+                )}
             </button>
         </div>
     );

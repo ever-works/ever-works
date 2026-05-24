@@ -57,7 +57,20 @@ type Toggles = {
     showDismissed: boolean;
 };
 
-type StatusFilter = 'all' | WorkProposalStatus;
+/**
+ * Phase 5 PR P — pseudo-filter `'done'` is an alias for ACCEPTED
+ * with two distinct behaviors:
+ *   1. The Done chip is enabled regardless of the "Show accepted"
+ *      toggle (it expresses "show my completed work" rather than
+ *      "include the hidden accepted bucket in my browse view").
+ *   2. While Done is active, ACCEPTED Ideas are visible even if
+ *      the toggle is off — same data, different semantics.
+ *
+ * The chip lives at the FAR END of the filter strip with a
+ * checkmark glyph to read as a celebratory/terminal state, not
+ * just another filter.
+ */
+type StatusFilter = 'all' | WorkProposalStatus | 'done';
 
 const ACTIONABLE_STATUSES: WorkProposalStatus[] = ['pending', 'queued', 'building', 'failed'];
 
@@ -69,6 +82,7 @@ const STATUS_FILTER_ORDER: StatusFilter[] = [
     'failed',
     'accepted',
     'dismissed',
+    'done',
 ];
 
 interface IdeasPageClientProps {
@@ -89,12 +103,29 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     const [isBuilding, startBuilding] = useTransition();
 
     const visibleIdeas = useMemo(() => {
+        // Phase 5 PR P — Done bypasses the showAccepted toggle.
+        // When Done is selected, the user is explicitly asking to
+        // see their completed Ideas — the toggle gate would be a
+        // mis-feature.
+        const isDoneFilter = statusFilter === 'done';
         return ideas.filter((idea) => {
-            // Toggles gate the terminal-status surfaces.
-            if (idea.status === 'accepted' && !toggles.showAccepted) return false;
+            // Toggles gate the terminal-status surfaces — unless
+            // the Done filter is active (then accepted rows show
+            // regardless).
+            if (idea.status === 'accepted' && !toggles.showAccepted && !isDoneFilter) {
+                return false;
+            }
             if (idea.status === 'dismissed' && !toggles.showDismissed) return false;
-            // Filter chip narrows further.
-            if (statusFilter !== 'all' && idea.status !== statusFilter) return false;
+            // Filter chip narrows further. `'done'` is an alias
+            // for ACCEPTED.
+            if (statusFilter === 'done' && idea.status !== 'accepted') return false;
+            if (
+                statusFilter !== 'all' &&
+                statusFilter !== 'done' &&
+                idea.status !== statusFilter
+            ) {
+                return false;
+            }
             return true;
         });
     }, [ideas, toggles, statusFilter]);
@@ -108,6 +139,9 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         for (const idea of ideas) {
             map.set(idea.status, (map.get(idea.status) ?? 0) + 1);
         }
+        // Phase 5 PR P — `done` chip aliases ACCEPTED; mirror the
+        // count so the badge is meaningful.
+        map.set('done', map.get('accepted') ?? 0);
         return map;
     }, [ideas]);
 
@@ -317,6 +351,11 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                         const c = counts.get(s) ?? 0;
                         const isActive = statusFilter === s;
                         const isTerminal = s === 'accepted' || s === 'dismissed';
+                        const isDoneChip = s === 'done';
+                        // Phase 5 PR P — Done is enabled REGARDLESS of
+                        // the showAccepted toggle (different semantics:
+                        // "show me my completed work" vs. "include the
+                        // hidden accepted bucket in my browse view").
                         const isHidden =
                             (s === 'accepted' && !toggles.showAccepted) ||
                             (s === 'dismissed' && !toggles.showDismissed);
@@ -328,20 +367,32 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                                 disabled={isHidden}
                                 className={cn(
                                     'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                    isActive
-                                        ? 'bg-primary text-white border-primary'
-                                        : 'bg-card dark:bg-card-primary-dark border-border dark:border-border-dark text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
+                                    // Done chip uses a success-tinted
+                                    // active/inactive palette so it
+                                    // reads as a celebratory terminal
+                                    // state, not just another filter.
+                                    isDoneChip
+                                        ? isActive
+                                            ? 'bg-success text-white border-success'
+                                            : 'bg-success/5 dark:bg-success/10 border-success/30 text-success hover:border-success/60'
+                                        : isActive
+                                          ? 'bg-primary text-white border-primary'
+                                          : 'bg-card dark:bg-card-primary-dark border-border dark:border-border-dark text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
                                     isHidden && 'opacity-40 cursor-not-allowed',
                                     isTerminal && !isActive && 'italic',
                                 )}
+                                title={isDoneChip ? t('filters.doneTooltip') : undefined}
                             >
+                                {isDoneChip && <span aria-hidden>✓</span>}
                                 {t(`filters.${s}`)}
                                 <span
                                     className={cn(
                                         'rounded-full px-1.5 text-[10px] font-medium',
                                         isActive
                                             ? 'bg-white/20'
-                                            : 'bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
+                                            : isDoneChip
+                                              ? 'bg-success/15 dark:bg-success/20 text-success'
+                                              : 'bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
                                     )}
                                 >
                                     {c}

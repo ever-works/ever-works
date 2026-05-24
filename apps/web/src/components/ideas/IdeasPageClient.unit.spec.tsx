@@ -110,8 +110,8 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             mkIdea({ id: 'a1', status: 'accepted' }),
         ];
         const { container } = render(<IdeasPageClient initialIdeas={ideas} />);
-        // 7 chips total ('all' + 6 statuses).
-        expect(container.querySelectorAll('button.rounded-full')).toHaveLength(7);
+        // 8 chips total ('all' + 6 statuses + 'done' alias, Phase 5 PR P).
+        expect(container.querySelectorAll('button.rounded-full')).toHaveLength(8);
         // 'all' badge shows total count (5), pending shows (2).
         expect(screen.getByText('filters.all').parentElement?.textContent).toMatch(/5/);
         expect(screen.getByText('filters.pending').parentElement?.textContent).toMatch(/2/);
@@ -187,5 +187,52 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         ]) {
             expect(links).toContain(expected);
         }
+    });
+
+    describe('Done filter chip (Phase 5 PR P)', () => {
+        it('renders a "Done" chip in the filter strip at the end of the list', () => {
+            render(<IdeasPageClient initialIdeas={[]} />);
+            // The 'done' chip uses the same i18n key namespace.
+            expect(screen.getByText('filters.done')).toBeTruthy();
+        });
+
+        it('Done chip surfaces ACCEPTED Ideas even when "Show accepted" toggle is OFF', () => {
+            const ideas: WorkProposal[] = [
+                mkIdea({ id: 'p1', status: 'pending' }),
+                mkIdea({ id: 'a1', status: 'accepted' }),
+                mkIdea({ id: 'a2', status: 'accepted' }),
+            ];
+            render(<IdeasPageClient initialIdeas={ideas} />);
+            // Toggle is OFF — accepted rows hidden initially.
+            expect(screen.queryByText('Idea a1')).toBeNull();
+            // Click Done chip — accepted rows surface regardless.
+            fireEvent.click(screen.getByText('filters.done'));
+            expect(screen.getByText('Idea a1')).toBeTruthy();
+            expect(screen.getByText('Idea a2')).toBeTruthy();
+            // Non-accepted rows are filtered out by the Done alias.
+            expect(screen.queryByText('Idea p1')).toBeNull();
+        });
+
+        it('Done chip is enabled even when "Show accepted" toggle is OFF (different semantics)', () => {
+            render(<IdeasPageClient initialIdeas={[]} />);
+            const doneBtn = screen.getByText('filters.done').closest('button')! as HTMLButtonElement;
+            // Should be enabled regardless — the toggle gates the
+            // *Accepted* chip, not the Done chip (which expresses
+            // "show my completed work").
+            expect(doneBtn.disabled).toBe(false);
+        });
+
+        it('Done chip count mirrors the ACCEPTED count', () => {
+            const ideas: WorkProposal[] = [
+                mkIdea({ id: 'a1', status: 'accepted' }),
+                mkIdea({ id: 'a2', status: 'accepted' }),
+                mkIdea({ id: 'a3', status: 'accepted' }),
+                mkIdea({ id: 'p1', status: 'pending' }),
+            ];
+            render(<IdeasPageClient initialIdeas={ideas} />);
+            const doneBtn = screen.getByText('filters.done').closest('button')!;
+            // The badge span inside the button shows the count.
+            expect(doneBtn.textContent).toMatch(/3/);
+        });
     });
 });

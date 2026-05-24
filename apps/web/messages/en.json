@@ -497,6 +497,7 @@
             },
             "actions": {
                 "accept": "Build",
+                "viewWork": "View Work",
                 "dismiss": "Dismiss",
                 "dismissAria": "Dismiss this idea",
                 "refresh": "Suggest more"
@@ -537,7 +538,9 @@
                 "building": "Building",
                 "failed": "Failed",
                 "accepted": "Accepted",
-                "dismissed": "Dismissed"
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
             },
             "gears": {
                 "menuLabel": "Settings",
