@@ -7,6 +7,7 @@ import {
     MissionType,
     type MissionGuardrailsOverride,
 } from '../entities/mission.entity';
+import { TitlerService } from '../titler/titler.service';
 import { toMissionDto, type MissionDto } from './types';
 
 /**
@@ -17,7 +18,13 @@ import { toMissionDto, type MissionDto } from './types';
  * (`CreateMissionDto` in apps/api).
  */
 export interface CreateMissionInput {
-    title: string;
+    /**
+     * Phase 3 PR I — optional. When omitted/empty, the service
+     * derives a short title from `description` via the shared
+     * TitlerService (heuristic today; AI-backed in a follow-up
+     * without touching this signature).
+     */
+    title?: string;
     description: string;
     type: MissionType;
     schedule?: string | null;
@@ -93,6 +100,9 @@ export class MissionsService {
     constructor(
         @InjectRepository(Mission)
         private readonly missions: Repository<Mission>,
+        // Phase 3 PR I — shared titler. Used by create() when the
+        // caller's title is empty or missing.
+        private readonly titler: TitlerService,
     ) {}
 
     /**
@@ -137,11 +147,27 @@ export class MissionsService {
      */
     async create(userId: string, input: CreateMissionInput): Promise<MissionDto> {
         this.assertScheduleConsistency(input.type, input.schedule);
+        const description = input.description.trim();
+        // Phase 3 PR I — when the caller doesn't pass a title (or
+        // passes an empty/whitespace one), generate one from the
+        // description via the shared titler. Mission titles use the
+        // 'mission' kind hint so the future AI-backed titler can
+        // tune its style (ambitious + goal-oriented) per spec §1.3.
+        const callerTitle = input.title?.trim();
+        const title = callerTitle
+            ? callerTitle.slice(0, 200)
+            : (
+                  await this.titler.generateTitle(description, {
+                      kind: 'mission',
+                      userId,
+                      maxChars: 200,
+                  })
+              ).slice(0, 200);
         const saved = await this.missions.save(
             this.missions.create({
                 userId,
-                title: input.title.trim().slice(0, 200),
-                description: input.description.trim(),
+                title,
+                description,
                 type: input.type,
                 status: MissionStatus.ACTIVE,
                 schedule: this.normalizeSchedule(input.type, input.schedule ?? null),

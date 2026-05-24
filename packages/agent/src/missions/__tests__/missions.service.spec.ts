@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import { MissionsService } from '../missions.service';
 import { Mission, MissionStatus, MissionType } from '../../entities/mission.entity';
+import { TitlerService } from '../../titler/titler.service';
 
 /** Hand-rolled in-memory Repository<Mission> mock. Enough surface
  *  for what Phase 3 PR H's MissionsService actually calls. */
@@ -54,7 +55,10 @@ describe('MissionsService', () => {
 
     beforeEach(() => {
         repo = makeRepoMock();
-        service = new MissionsService(repo as unknown as Repository<Mission>);
+        // Phase 3 PR I — real TitlerService (no DI deps), so tests
+        // exercise the actual heuristic. Cheap + deterministic.
+        const titler = new TitlerService();
+        service = new MissionsService(repo as unknown as Repository<Mission>, titler);
     });
 
     describe('create', () => {

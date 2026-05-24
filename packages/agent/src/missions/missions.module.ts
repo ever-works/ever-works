@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from '../entities/mission.entity';
+import { TitlerModule } from '../titler/titler.module';
 import { MissionsService } from './missions.service';
 
 /**
@@ -17,7 +18,10 @@ import { MissionsService } from './missions.service';
  * + lifecycle surface.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([Mission])],
+    // Phase 3 PR I — TitlerModule provides TitlerService for
+    // MissionsService.create (used when the caller's `title` is
+    // empty or missing).
+    imports: [TypeOrmModule.forFeature([Mission]), TitlerModule],
     providers: [MissionsService],
     exports: [MissionsService],
 })

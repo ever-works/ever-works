@@ -144,6 +144,10 @@
         "./missions": {
             "types": "./dist/missions/index.d.ts",
             "default": "./dist/missions/index.js"
+        },
+        "./titler": {
+            "types": "./dist/titler/index.d.ts",
+            "default": "./dist/titler/index.js"
         }
     },
     "scripts": {

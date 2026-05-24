@@ -24,11 +24,17 @@ import { MissionType } from '@ever-works/agent/missions';
  * of truth that PATCH also reuses.
  */
 export class CreateMissionDto {
-    @ApiProperty({ minLength: 1, maxLength: 200 })
+    /**
+     * Phase 3 PR I — optional. When omitted, the service generates
+     * a short title from `description` via the shared TitlerService.
+     * Callers that DO want to control the title can still pass it.
+     */
+    @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
+    @IsOptional()
     @IsString()
     @MinLength(1)
     @MaxLength(200)
-    title: string;
+    title?: string;
 
     @ApiProperty({ minLength: 1, maxLength: 10000 })
     @IsString()
