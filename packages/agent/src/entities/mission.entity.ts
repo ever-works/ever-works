@@ -184,6 +184,31 @@ export class Mission {
     @Column({ type: 'varchar', length: 200, nullable: true })
     missionRepo?: string | null;
 
+    /**
+     * Self-FK for Mission Clone traceability (spec §4.4a +
+     * Decision A25). When a Mission was created via Full-Fork
+     * Clone of another Mission (`POST /me/missions/:id/clone`,
+     * Phase 3 PR HH), this points back at the source. NULL for
+     * Missions created directly (the common case).
+     *
+     * UI usage:
+     *   - Cloned Mission detail page renders "Cloned from: [source
+     *     title]" backlink in the header.
+     *   - Source Mission detail page renders "Cloned as: N other
+     *     Mission(s)" with a popover listing the clones — query
+     *     uses this same FK reversed.
+     *
+     * Also used by Phase 6 PR GG's "Related Works (inherited from
+     * source Mission)" panel on the cloned Mission's detail page
+     * (read-only references to the source's Works — those are NOT
+     * duplicated during Clone per Decision A25).
+     *
+     * ON DELETE SET NULL: deleting the source Mission breaks the
+     * back-link but leaves the clone intact.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    sourceMissionId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 
