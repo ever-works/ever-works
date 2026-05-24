@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Overzicht",
-                "activity": "Activity Feed",
+                "activity": "Activiteit",
                 "items": "Items",
                 "generator": "Generator",
                 "schedule": "Planning",
@@ -1019,7 +1019,13 @@
                 "deploy": "Deployen",
                 "members": "Leden",
                 "settings": "Instellingen",
-                "kb": "Knowledge Base"
+                "kb": "Kennisbank",
+                "tooltips": {
+                    "activity": "Activiteitenfeed",
+                    "kb": "Kennisbank",
+                    "generator": "Work genereren — eenmalig of volgens planning",
+                    "deploy": "Work uitrollen"
+                }
             },
             "members": {
                 "title": "Teamleden",

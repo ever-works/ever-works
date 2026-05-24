@@ -1136,7 +1136,7 @@
             },
             "tabs": {
                 "overview": "Преглед",
-                "activity": "Activity Feed",
+                "activity": "Активност",
                 "items": "Елементи",
                 "generator": "Генератор",
                 "schedule": "График",
@@ -1146,7 +1146,13 @@
                 "deploy": "Разполагане",
                 "members": "Членове",
                 "settings": "Настройки",
-                "kb": "Knowledge Base"
+                "kb": "База знания",
+                "tooltips": {
+                    "activity": "Поток на активността",
+                    "kb": "База знания",
+                    "generator": "Генериране на Work — еднократно или по график",
+                    "deploy": "Разгръщане на Work"
+                }
             },
             "members": {
                 "title": "Членове на екипа",

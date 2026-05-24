@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Tổng quan",
-                "activity": "Activity Feed",
+                "activity": "Hoạt động",
                 "items": "Mục",
                 "generator": "Trình tạo",
                 "schedule": "Lịch trình",
@@ -1019,7 +1019,13 @@
                 "deploy": "Triển khai",
                 "members": "Thành viên",
                 "settings": "Cài đặt",
-                "kb": "Knowledge Base"
+                "kb": "Cơ sở tri thức",
+                "tooltips": {
+                    "activity": "Bảng tin hoạt động",
+                    "kb": "Cơ sở tri thức",
+                    "generator": "Tạo Work một lần hoặc theo lịch",
+                    "deploy": "Triển khai Work"
+                }
             },
             "members": {
                 "title": "Thành viên đội ngũ",

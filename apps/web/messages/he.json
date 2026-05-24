@@ -1136,7 +1136,7 @@
             },
             "tabs": {
                 "overview": "סקירה כללית",
-                "activity": "Activity Feed",
+                "activity": "פעילות",
                 "items": "פריטים",
                 "generator": "מחולל",
                 "schedule": "לוח זמנים",
@@ -1146,7 +1146,13 @@
                 "deploy": "פריסה",
                 "members": "חברים",
                 "settings": "הגדרות",
-                "kb": "Knowledge Base"
+                "kb": "מאגר ידע",
+                "tooltips": {
+                    "activity": "פיד פעילות",
+                    "kb": "מאגר ידע",
+                    "generator": "צור Work, חד-פעמי או על פי לוח זמנים",
+                    "deploy": "פרוס Work"
+                }
             },
             "members": {
                 "title": "חברי צוות",

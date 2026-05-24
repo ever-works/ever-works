@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Genel Bakış",
-                "activity": "Activity Feed",
+                "activity": "Etkinlik",
                 "items": "Öğeler",
                 "generator": "Oluşturucu",
                 "schedule": "Program",
@@ -1019,7 +1019,13 @@
                 "deploy": "Dağıt",
                 "members": "Üyeler",
                 "settings": "Ayarlar",
-                "kb": "Knowledge Base"
+                "kb": "Bilgi Tabanı",
+                "tooltips": {
+                    "activity": "Etkinlik Akışı",
+                    "kb": "Bilgi Tabanı",
+                    "generator": "Work'i tek seferlik veya zamanlanmış üret",
+                    "deploy": "Work'i dağıt"
+                }
             },
             "members": {
                 "title": "Takım Üyeleri",

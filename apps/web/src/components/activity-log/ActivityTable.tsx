@@ -295,15 +295,19 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-border dark:divide-border-dark">
                     <thead className="bg-muted/50 dark:bg-muted/20">
+                        {/*
+                         * Column order (user-requested 2026-05-24):
+                         *   expander | DATE/TIME | WORK | TYPE | SUMMARY | STATUS
+                         * Status moves to the rightmost data column so the
+                         * scannable left-to-right reading order is
+                         * temporal-first ("when did it happen?"), then
+                         * subject ("which Work?"), then nature ("what kind
+                         * of event?"), then narrative ("what's the gist?"),
+                         * then state ("did it succeed?").
+                         */}
                         <tr>
                             <th scope="col" className="w-8 px-3 py-3">
                                 <span className="sr-only">{t('detail.expand')}</span>
-                            </th>
-                            <th
-                                scope="col"
-                                className="w-[9rem] whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
-                            >
-                                {t('columns.status')}
                             </th>
                             <th
                                 scope="col"
@@ -328,6 +332,12 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                 className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
                             >
                                 {t('columns.summary')}
+                            </th>
+                            <th
+                                scope="col"
+                                className="w-[9rem] whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
+                            >
+                                {t('columns.status')}
                             </th>
                         </tr>
                     </thead>
@@ -394,9 +404,11 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                 )}
                                             </Tooltip>
                                         </td>
-                                        <td className="w-[9rem] whitespace-nowrap px-4 py-3 align-top">
-                                            <ActivityStatusBadge status={activity.status} />
-                                        </td>
+                                        {/*
+                                         * Cells reordered 2026-05-24 to match the
+                                         * new column header order:
+                                         *   expander | DATE/TIME | WORK | TYPE | SUMMARY | STATUS
+                                         */}
                                         <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
                                             <ActivityTimestamp
                                                 value={activity.createdAt}
@@ -445,6 +457,9 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                     </div>
                                                 ) : null}
                                             </div>
+                                        </td>
+                                        <td className="w-[9rem] whitespace-nowrap px-4 py-3 align-top">
+                                            <ActivityStatusBadge status={activity.status} />
                                         </td>
                                     </tr>
                                     <tr

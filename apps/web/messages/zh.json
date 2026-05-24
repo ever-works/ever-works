@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "概览",
-                "activity": "Activity Feed",
+                "activity": "活动",
                 "items": "项目",
                 "generator": "生成器",
                 "schedule": "计划",
@@ -1019,7 +1019,13 @@
                 "deploy": "部署",
                 "members": "成员",
                 "settings": "设置",
-                "kb": "Knowledge Base"
+                "kb": "知识库",
+                "tooltips": {
+                    "activity": "活动动态",
+                    "kb": "知识库",
+                    "generator": "生成 Work，一次性或按计划",
+                    "deploy": "部署 Work"
+                }
             },
             "members": {
                 "title": "团队成员",
