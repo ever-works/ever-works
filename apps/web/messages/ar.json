@@ -1136,7 +1136,7 @@
             },
             "tabs": {
                 "overview": "نظرة عامة",
-                "activity": "Activity Feed",
+                "activity": "النشاط",
                 "items": "العناصر",
                 "generator": "مولد",
                 "schedule": "جدولة",
@@ -1146,7 +1146,13 @@
                 "deploy": "نشر",
                 "members": "الأعضاء",
                 "settings": "الإعدادات",
-                "kb": "Knowledge Base"
+                "kb": "قاعدة المعرفة",
+                "tooltips": {
+                    "activity": "موجز النشاط",
+                    "kb": "قاعدة المعرفة",
+                    "generator": "توليد الـWork مرة واحدة أو وفق جدول",
+                    "deploy": "نشر الـWork"
+                }
             },
             "members": {
                 "title": "أعضاء الفريق",

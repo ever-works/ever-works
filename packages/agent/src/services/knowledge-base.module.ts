@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import {
@@ -42,6 +43,17 @@ import { WorkOwnershipService } from './work-ownership.service';
  * imports only `DatabaseModule + UsageModule + BudgetsModule`, none of
  * which depend on KB.
  *
+ * EW-639 Phase 2/e (post-cascade fix) — `ActivityLogModule` is imported
+ * for the same DI-walkback reason. `KnowledgeBaseService.recordUploadActivity`
+ * injects `@Optional() activityLog?: ActivityLogService` and silently
+ * early-returns when it's undefined. Without this import the API boots
+ * fine but no `kb_upload_created` / `kb_upload_extracted` /
+ * `kb_document_created` / `kb_upload_deduped` / `kb_upload_extraction_skipped`
+ * rows are ever written, which manifests as 3 of the 4 KB e2e specs
+ * timing out polling for activity rows that never arrive (kb-activity-log,
+ * kb-dedup, kb-extraction-retry). `ActivityLogModule` imports only
+ * `DatabaseModule`, no circular dep.
+ *
  * Entities registered:
  *  - WorkKnowledgeDocument
  *  - WorkKnowledgeUpload
@@ -54,6 +66,7 @@ import { WorkOwnershipService } from './work-ownership.service';
     imports: [
         DatabaseModule,
         FacadesModule,
+        ActivityLogModule,
         TypeOrmModule.forFeature([
             WorkKnowledgeDocument,
             WorkKnowledgeUpload,

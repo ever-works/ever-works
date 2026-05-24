@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "概要",
-                "activity": "Activity Feed",
+                "activity": "アクティビティ",
                 "items": "アイテム",
                 "generator": "ジェネレーター",
                 "schedule": "スケジュール",
@@ -1019,7 +1019,13 @@
                 "deploy": "デプロイ",
                 "members": "メンバー",
                 "settings": "設定",
-                "kb": "Knowledge Base"
+                "kb": "ナレッジベース",
+                "tooltips": {
+                    "activity": "アクティビティフィード",
+                    "kb": "ナレッジベース",
+                    "generator": "Work を 1 回またはスケジュールで生成",
+                    "deploy": "Work をデプロイ"
+                }
             },
             "members": {
                 "title": "チームメンバー",

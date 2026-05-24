@@ -221,7 +221,11 @@ export function KbSearchPalette({
                     <div
                         className={cn(
                             'w-full max-w-xl rounded-lg border shadow-2xl',
-                            'border-border bg-card dark:border-border-dark dark:bg-card-primary-dark',
+                            // EW-639 dark-theme fix: see KbClassifyModal /
+                            // KbHistoryDialog. `card-primary-dark` is
+                            // translucent — wrong for a modal panel. Use
+                            // `card-dark` for solid elevated-surface.
+                            'border-border bg-card dark:border-border-dark dark:bg-card-dark',
                         )}
                     >
                         <input

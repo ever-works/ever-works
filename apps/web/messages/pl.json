@@ -1009,7 +1009,7 @@
             },
             "tabs": {
                 "overview": "Przegląd",
-                "activity": "Activity Feed",
+                "activity": "Aktywność",
                 "items": "Elementy",
                 "generator": "Generator",
                 "schedule": "Harmonogram",
@@ -1019,7 +1019,13 @@
                 "deploy": "Wdrożenie",
                 "members": "Członkowie",
                 "settings": "Ustawienia",
-                "kb": "Knowledge Base"
+                "kb": "Baza wiedzy",
+                "tooltips": {
+                    "activity": "Kanał aktywności",
+                    "kb": "Baza wiedzy",
+                    "generator": "Wygeneruj Work — jednorazowo lub według harmonogramu",
+                    "deploy": "Wdróż Work"
+                }
             },
             "members": {
                 "title": "Członkowie zespołu",

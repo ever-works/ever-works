@@ -150,7 +150,11 @@ export class WorkKnowledgeDocument {
     @JoinColumn({ name: 'updated_by_id' })
     updatedBy?: ClassToObject<User> | null;
 
-    @TimestampColumn({ nullable: true })
+    // EW-639 prod-hotfix: the 1779971 migration creates this column as
+    // snake_case `last_indexed_at`; same camelCase/snake_case mismatch
+    // class as the upload entity's `extractionStartedAt`. Pass the
+    // explicit `name:` so TypeORM emits the right column in SELECTs.
+    @TimestampColumn({ nullable: true, name: 'last_indexed_at' })
     lastIndexedAt?: Date | null;
 
     @Column({ type: 'varchar', length: 40, nullable: true, name: 'last_commit_sha' })
