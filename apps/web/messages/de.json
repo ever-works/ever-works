@@ -3327,7 +3327,8 @@
                 "keyboardShortcuts": "Tastaturkürzel"
             },
             "signOut": "Abmelden",
-            "signingOut": "Melden ab..."
+            "signingOut": "Melden ab...",
+            "new": "Neu"
         },
         "dangerZone": {
             "title": "Gefahrenzone",

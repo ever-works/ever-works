@@ -3327,7 +3327,8 @@
                 "keyboardShortcuts": "Клавишни комбинации"
             },
             "signOut": "Изход",
-            "signingOut": "Излизане..."
+            "signingOut": "Излизане...",
+            "new": "Ново"
         },
         "dangerZone": {
             "title": "Зона на опасност",

@@ -3106,7 +3106,8 @@
                 "keyboardShortcuts": "Scorciatoie Tastiera"
             },
             "signOut": "Esci",
-            "signingOut": "Uscita in corso..."
+            "signingOut": "Uscita in corso...",
+            "new": "Nuovo"
         },
         "dangerZone": {
             "title": "Zona Pericolosa",

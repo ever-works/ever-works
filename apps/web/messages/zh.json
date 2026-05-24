@@ -3106,7 +3106,8 @@
                 "keyboardShortcuts": "键盘快捷键"
             },
             "signOut": "退出登录",
-            "signingOut": "退出登录中..."
+            "signingOut": "退出登录中...",
+            "new": "新建"
         },
         "dangerZone": {
             "title": "危险区域",

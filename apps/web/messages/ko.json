@@ -3106,7 +3106,8 @@
                 "keyboardShortcuts": "키보드 단축키"
             },
             "signOut": "로그아웃",
-            "signingOut": "로그아웃 중..."
+            "signingOut": "로그아웃 중...",
+            "new": "새로"
         },
         "dangerZone": {
             "title": "위험 영역",

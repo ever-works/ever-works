@@ -3106,7 +3106,8 @@
                 "keyboardShortcuts": "Горячие клавиши"
             },
             "signOut": "Выйти",
-            "signingOut": "Выход..."
+            "signingOut": "Выход...",
+            "new": "Новое"
         },
         "dangerZone": {
             "title": "Зона опасности",

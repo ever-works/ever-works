@@ -3106,7 +3106,8 @@
                 "keyboardShortcuts": "ทางลัดคีย์บอร์ด"
             },
             "signOut": "ออกจากระบบ",
-            "signingOut": "กำลังออกจากระบบ..."
+            "signingOut": "กำลังออกจากระบบ...",
+            "new": "ใหม่"
         },
         "dangerZone": {
             "title": "เขตอันตราย",

@@ -3327,7 +3327,8 @@
                 "keyboardShortcuts": "Atajos de Teclado"
             },
             "signOut": "Cerrar Sesión",
-            "signingOut": "Cerrando sesión..."
+            "signingOut": "Cerrando sesión...",
+            "new": "Nuevo"
         },
         "dangerZone": {
             "title": "Zona Peligrosa",

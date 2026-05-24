@@ -210,14 +210,23 @@ export function DashboardSidebar({
                     </div>
                 </div>
 
-                {/* New Work */}
+                {/* Phase 6.5 PR DD — sidebar "+ New" button.
+                    Repointed from ROUTES.DASHBOARD_WORKS_NEW to
+                    ROUTES.DASHBOARD_NEW per spec §8b: the unified
+                    /new page lets the user pick what they're
+                    building (Mission / Idea / Work-of-N-flavors).
+                    The old /works/new route stays put — workflows
+                    that land directly on it (deep links, AI Chat
+                    pivots, the per-mode trio's onSelect handlers)
+                    still work. The sidebar button is just nudging
+                    the default entry point one level up. */}
                 <div
                     className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}
                 >
                     {isCollapsed ? (
-                        <ConditionalTooltip show content={t('newWork')}>
+                        <ConditionalTooltip show content={t('new')}>
                             <Button
-                                href={ROUTES.DASHBOARD_WORKS_NEW}
+                                href={ROUTES.DASHBOARD_NEW}
                                 variant="primary"
                                 size="icon"
                                 className="w-8 h-8 shadow-sm rounded-xl"
@@ -228,7 +237,7 @@ export function DashboardSidebar({
                         </ConditionalTooltip>
                     ) : (
                         <Button
-                            href={ROUTES.DASHBOARD_WORKS_NEW}
+                            href={ROUTES.DASHBOARD_NEW}
                             variant="primary"
                             size="sm"
                             fullWidth
@@ -236,7 +245,7 @@ export function DashboardSidebar({
                             onClick={() => onInteraction?.()}
                         >
                             <Plus className="w-5 h-5" />
-                            <span className="font-medium">{t('newWork')}</span>
+                            <span className="font-medium">{t('new')}</span>
                         </Button>
                     )}
                 </div>

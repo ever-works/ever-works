@@ -3327,7 +3327,8 @@
                 "keyboardShortcuts": "اختصارات لوحة المفاتيح"
             },
             "signOut": "تسجيل الخروج",
-            "signingOut": "جاري تسجيل الخروج..."
+            "signingOut": "جاري تسجيل الخروج...",
+            "new": "جديد"
         },
         "dangerZone": {
             "title": "منطقة الخطر",

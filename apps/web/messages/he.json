@@ -3327,7 +3327,8 @@
                 "keyboardShortcuts": "קיצורי מקלדת"
             },
             "signOut": "התנתק",
-            "signingOut": "מתנתק..."
+            "signingOut": "מתנתק...",
+            "new": "חדש"
         },
         "dangerZone": {
             "title": "אזור סכנה",
