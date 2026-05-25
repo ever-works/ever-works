@@ -1,5 +1,14 @@
 # Open Questions — Agents, Skills, Tasks specs
 
+> **Round-9 status update (2026-05-25) — design set locked.** Operator answered all remaining questions. Most defaulted to the ★ recommendation; explicit round-9 overrides:
+> - **N5 override** — BOTH export AND import for Agents ship in v1 (was ★a = export only). New phase 6a (T64a-T64h) in `agents/tasks.md` for the per-Agent envelope + controller + UI + e2e. Distinct from the bulk account-transfer flow in ADR-008.
+> - **N6 override** — Keep all 5 `AgentBudget.intervalUnit` values in v1 + implement multi-interval aggregator. Reversed round-6 narrowing in `agents/plan.md §3.1`; new task T34a covers the `getCurrentPeriodStart` / `getNextPeriodStart` helpers handling hour/day/week/month/unlimited with anchored rolling periods.
+> - **P1** — 6 starters seeded in [`ever-works/agents`](https://github.com/ever-works/agents) repo at launch: CEO, CTO, Researcher, PR-Reviewer, Editor, Designer.
+> - **P4 explicit no-modal** — No announcement modal, no migration story, no existing-user UX work. Operator quote: _"NO NEED THIS! WE DO NOT HAVE ANY REAL USERS YET, WE DON'T NEED SUCH THINGS!!!"_ Confirms K3. UX-DESIGN §11.3 updated.
+> - **All other items** are now `[Answered: ★ default per recommendation]` — bulk-marked by script. Spec set is design-locked; next phase is implementation per the 12-18 PR shipping plan in `architecture/implementation-reuse-map.md §14`.
+
+---
+
 > **Round-8 status update (2026-05-25):** Operator answered the bulk of A-L sections inline. The `[Answered: X]` tag now appears on each resolved question with the chosen option. Where the answer overrode my ★ recommendation OR triggered substantive spec changes, the change is noted in the relevant feature spec / plan / tasks file with a back-reference to this question. Major substantive impacts from round-8 answers:
 > - **F4-b** (reversed my F4-a): Tasks created on an Idea do NOT follow to a Work when the Idea is accepted. Idea-level tasks (validity checks, marketing efforts, etc.) stay on the Idea.
 > - **F5** (operator override): Recurring tasks MUST ship in v1 (was Out of Scope). New Trigger.dev cron task; full plan in `task-tracking/plan.md`.
