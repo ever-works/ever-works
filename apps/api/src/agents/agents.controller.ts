@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Delete,
@@ -9,13 +10,17 @@ import {
 	ParseUUIDPipe,
 	Patch,
 	Post,
+	Put,
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+	AgentFileService,
+	AGENT_FILE_NAMES,
 	AgentsService,
 	type AgentDto,
+	type AgentFileName,
 	type AgentTarget,
 } from '@ever-works/agent/agents';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -49,7 +54,11 @@ import { CreateAgentDto, ListAgentsQueryDto, UpdateAgentDto } from './dto/agent.
 @ApiTags('agents')
 @Controller('api/agents')
 export class AgentsController {
-	constructor(private readonly service: AgentsService) {}
+	constructor(
+		private readonly service: AgentsService,
+		// Phase 4 — file read/write endpoints.
+		private readonly files: AgentFileService,
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: 'List my Agents (filter by scope/status/target/search)' })
@@ -177,5 +186,56 @@ export class AgentsController {
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<AgentDto> {
 		return this.service.resume(auth.userId, id);
+	}
+
+	// ── Phase 4 — Agent file storage (5 canonical MD files + agent.yml) ─
+
+	@Get(':id/files/:name')
+	@ApiOperation({
+		summary:
+			'Read one Agent definition file (SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md / agent.yml)',
+	})
+	@HttpCode(HttpStatus.OK)
+	async readFile(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Param('name') name: string,
+	): Promise<{ name: AgentFileName; body: string; hash: string; storage: 'git' | 'db' }> {
+		this.assertValidFileName(name);
+		return this.files.read(auth.userId, id, name as AgentFileName);
+	}
+
+	@Put(':id/files/:name')
+	@ApiOperation({
+		summary:
+			'Replace one Agent definition file body. Optimistic concurrency: pass `expectedHash` to guard against concurrent edits.',
+	})
+	@HttpCode(HttpStatus.OK)
+	@Throttle({ default: { limit: 60, ttl: 60_000 } })
+	async writeFile(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Param('name') name: string,
+		@Body() body: { body: string; expectedHash?: string },
+	): Promise<{ newHash: string }> {
+		this.assertValidFileName(name);
+		if (typeof body?.body !== 'string') {
+			throw new BadRequestException('Request body must include a string `body` field.');
+		}
+		return this.files.write({
+			userId: auth.userId,
+			agentId: id,
+			name: name as AgentFileName,
+			body: body.body,
+			expectedHash: body.expectedHash,
+		});
+	}
+
+	private assertValidFileName(name: string): void {
+		if (!AGENT_FILE_NAMES.includes(name as AgentFileName)) {
+			throw new BadRequestException(
+				`Invalid Agent file name "${name}". Allowed: ${AGENT_FILE_NAMES.join(', ')}.`,
+			);
+		}
 	}
 }

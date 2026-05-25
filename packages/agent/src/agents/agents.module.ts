@@ -11,6 +11,8 @@ import { AgentRunLogRepository } from '../database/repositories/agent-run-log.re
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentsService } from './agents.service';
+import { AgentFileService } from './agent-file.service';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
  * Agents/Skills/Tasks — Phase 3 (PR #1017 specs). The agent-side
@@ -25,6 +27,7 @@ import { AgentsService } from './agents.service';
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Agent, AgentRun, AgentRunLog, AgentBudget, AgentMembership]),
+		ActivityLogModule,
 	],
 	providers: [
 		AgentRepository,
@@ -33,6 +36,7 @@ import { AgentsService } from './agents.service';
 		AgentBudgetRepository,
 		AgentMembershipRepository,
 		AgentsService,
+		AgentFileService,
 	],
 	exports: [
 		AgentRepository,
@@ -41,6 +45,7 @@ import { AgentsService } from './agents.service';
 		AgentBudgetRepository,
 		AgentMembershipRepository,
 		AgentsService,
+		AgentFileService,
 	],
 })
 export class AgentsModule {}

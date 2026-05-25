@@ -91,6 +91,36 @@ export enum ActivityActionType {
     KB_DOCUMENT_CREATED = 'kb_document_created',
     KB_DOCUMENT_UPDATED = 'kb_document_updated',
     KB_DOCUMENT_DELETED = 'kb_document_deleted',
+
+    // Agents / Skills / Tasks (PR #1017 specs — architecture §10).
+    // Lifecycle + heartbeat + file edits + budget + skills + tasks.
+    // Storage stays `varchar` (no Postgres ENUM); the API layer is the
+    // single source of allowed strings.
+    AGENT_CREATED = 'agent_created',
+    AGENT_PAUSED = 'agent_paused',
+    AGENT_RESUMED = 'agent_resumed',
+    AGENT_ARCHIVED = 'agent_archived',
+    AGENT_DELETED = 'agent_deleted',
+    AGENT_HEARTBEAT_STARTED = 'agent_heartbeat_started',
+    AGENT_HEARTBEAT_COMPLETED = 'agent_heartbeat_completed',
+    AGENT_HEARTBEAT_FAILED = 'agent_heartbeat_failed',
+    AGENT_RUN_CANCELLED = 'agent_run_cancelled',
+    AGENT_FILE_EDITED = 'agent_file_edited',
+    AGENT_FILE_REVERTED = 'agent_file_reverted',
+    AGENT_FILE_EDIT_FAILED = 'agent_file_edit_failed',
+    AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
+    AGENT_EXPORTED = 'agent_exported',
+    AGENT_IMPORTED = 'agent_imported',
+    SKILL_INSTALLED = 'skill_installed',
+    SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
+    SKILL_INVOKED = 'skill_invoked',
+    SKILL_FILE_EDITED = 'skill_file_edited',
+    TASK_CREATED = 'task_created',
+    TASK_UPDATED = 'task_updated',
+    TASK_ASSIGNED = 'task_assigned',
+    TASK_COMMENTED = 'task_commented',
+    TASK_COMPLETED = 'task_completed',
+    TASK_RECURRENCE_FIRED = 'task_recurrence_fired',
 }
 
 export enum ActivityStatus {

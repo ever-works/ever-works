@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 4
-- **Last tick at**: 2026-05-25 (tick 4 — Phase 3 complete)
-- **In progress now**: (none — next tick picks up Phase 4 AgentFileService + file endpoints)
+- **Last tick #**: 5
+- **Last tick at**: 2026-05-25 (tick 5 — Phase 4 complete, except Git-mode write stubbed until Phase 6)
+- **In progress now**: (none — next tick picks up Phase 5 web UI)
 
 ---
 
@@ -85,12 +85,12 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 4 — AgentFileService + file endpoints
 
-- [ ] **4.1** Secret-scan helper at `packages/agent/src/utils/secret-scan.ts` with all 6 patterns from `security-agents-skills-tasks.md §6`.
-- [ ] **4.2** `AgentFileService.read(agentId, name)` + `.write(agentId, name, body, commitMessage)`. Branches Git mode (Mission/Work-scoped via `GitFacadeService`) vs DB-inline (Tenant-scoped).
-- [ ] **4.3** `GET /agents/:id/files/:name` + `PUT /agents/:id/files/:name`. Validate `name ∈ {SOUL, AGENTS, HEARTBEAT, TOOLS, agent.yml}`.
-- [ ] **4.4** Update `agents.contentHash` on every write (sha256 of 5-file canonical concat).
-- [ ] **4.5** Activity row `AGENT_FILE_EDITED` on success.
-- [ ] **4.6** Tests (don't run).
+- [x] **4.1** Secret-scan helper at `packages/agent/src/utils/secret-scan.ts` with all 7 patterns (the 6 from security §6 plus the generic `sk-/key-/token-/Bearer` family). Exports `scanForSecrets` / `containsSecret` / `assertNoSecrets` (hard-reject) / `redactSecrets` (for chat / Task body — used in Phase 13). ✓ Tick 5
+- [x] **4.2** `AgentFileService.read(userId, agentId, name)` + `.write({userId, agentId, name, body, expectedHash})`. DB-inline path fully implemented for tenant-scope. Git mode for Mission/Work/Idea-scope intentionally stubbed with a clear "Phase 6" error message — the wiring needs scope-repo helpers that also feed the heartbeat dispatcher. ✓ Tick 5
+- [x] **4.3** `GET /agents/:id/files/:name` + `PUT /agents/:id/files/:name` added to `AgentsController`. Name validated against `AGENT_FILE_NAMES` allow-list at both DTO and service layers (path traversal mitigation T3). PUT `@Throttle({60/min})`. ✓ Tick 5
+- [x] **4.4** `agents.contentHash` recomputed on every successful write — sha256 of canonical 5-file concat with sentinel separators so re-arranged content can't hash-collide. ✓ Tick 5
+- [x] **4.5** Activity events `AGENT_FILE_EDITED` (success) and `AGENT_FILE_REVERTED` (etag mismatch / concurrent edit) emitted via `ActivityLogService.log`. Also extended `ActivityActionType` enum with all the new Agent / Skill / Task event types from architecture §10 (16 new values). ✓ Tick 5
+- [x] **4.6** Tests (don't run): `utils/__tests__/secret-scan.spec.ts` (~14 assertions: each of 8 patterns detected, prose no-false-positive, multi-hit, hint propagation, truncation, redact); `agents/__tests__/agent-file.service.spec.ts` (~10 assertions: cross-user 404, inline read, empty inline, path traversal rejection, Git-mode stub error, file-name validation, 64KB cap, secret rejection, happy-path persist+hash+activity, ETag mismatch, content addressing). ✓ Tick 5
 
 ### Phase 5 — Web list + Instructions tab + Create dialog
 

@@ -1,7 +1,8 @@
 // Public surface of the agent-side Agents module (Agents/Skills/Tasks
-// — PR #1017 specs, Phase 3).
+// — PR #1017 specs, Phase 3 + 4).
 export * from './agents.module';
 export * from './agents.service';
+export * from './agent-file.service';
 export * from './types';
 // Re-export the entity types so api callers don't need a deep import.
 export {
