@@ -970,21 +970,33 @@ A single page showing Mission templates + Agent templates from `ever-works/agent
 
 ## S. Open-source & self-hosted angle
 
-### S1 — Self-hosted users: same default off? [Answered: ★ default per recommendation]
+### S1 — Self-hosted users: same default off? [Answered: always all ON — no flags, same for hosted SaaS and self-hosted]
+
+**Operator (round 9)**: _"S1 — always all on, no need feature flags, it's all on for platform we host and for self-hosted."_
+
+Confirms round-6 decision to drop all `FEATURE_*` flags. Features ship on for everyone from day one — both the hosted Ever Works SaaS and self-hosted installs. No tenant-level opt-in toggles; no admin gating.
 
 Open-source self-hosted instances get all features default ON immediately (no rollout) vs. opt-in like SaaS tenants?
 
 - ★ **S1-a — Default ON for self-hosted.** They opted into the platform; no reason to gate.
 - S1-b — Same default OFF; admin enables.
 
-### S2 — Catalog skills under MIT vs more permissive? [Answered: ★ default per recommendation]
+### S2 — Catalog skills under MIT vs more permissive? [Answered: MIT for catalog repos — but PLATFORM is AGPLv3, important correction]
 
-Catalog skills shipped in the platform repo inherit the platform's MIT license. Confirm this is OK for prompt content (it should be).
+**Operator correction (round 9)**: I previously assumed the platform was MIT — that was wrong. The platform `LICENSE` file is **AGPL-3.0**. The catalog repos (Skills, Agents, Task Templates) are **MIT** by deliberate choice so content can be reused without inheriting AGPL obligations. See [ADR-014 §"License posture"](./decisions/014-no-hardcoded-catalogs.md) for the full split.
+
+> Operator quote: _"Skills catalog is MIT, but note that platform is AGPLv3 !!!!!! Same Agents in they own repo, let's them be MIT too."_
+
+Spec corrections landed in ADR-011 + ADR-014 + this question.
 
 - ★ **S2-a — MIT inherits, no separate license.**
 - S2-b — Separate LICENSE in `apps/api/src/skills/catalog/LICENSE` carving out skill content as CC-0.
 
-### S3 — Encourage community catalog contributions? [Answered: ★ default per recommendation]
+### S3 — Encourage community catalog contributions? [Answered: yes, CONTRIBUTING.md lives in each separate catalog repo]
+
+**Operator (round 9)**: _"S3 — in separate skills repo. Same for Agents repo btw."_
+
+The community contribution guide for each catalog (Skills, Agents, Task Templates, Mission Templates) ships inside **its own repo** as `CONTRIBUTING.md`, not in the platform repo. Each catalog's contributing guide covers: schema validation, MD style, PR review checklist, MIT-licensing acknowledgement on contribution.
 
 Community can PR a new catalog skill against the platform repo.
 

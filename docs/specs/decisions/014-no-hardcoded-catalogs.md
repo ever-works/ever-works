@@ -44,7 +44,7 @@ This list will grow as future catalog-shaped features land.
     - One folder per entry (Agent templates, Mission Templates), OR one file per entry (Skills, simple Task templates).
     - `README.md` — repo overview + format docs.
     - `CONTRIBUTING.md` — community PR guide.
-    - `LICENSE` — MIT (matches platform).
+    - `LICENSE` — **MIT** (intentionally permissive for content; see §"License posture" below).
     - `.github/workflows/validate.yml` — lints MD + validates manifests against a Zod schema on every PR.
 
 2. **Per-entry manifest**:
@@ -86,6 +86,33 @@ export class XCatalogService {
 - `EVER_WORKS_<KIND>_REF` env var pins to a release ref (default: latest semver tag).
 - `EVER_WORKS_<KIND>_PATH` env var points at a local clone for self-hosted / air-gapped installs.
 - Admin endpoint `POST /admin/catalogs/<kind>/refresh` force-busts the cache without a restart.
+
+## License posture — platform is AGPLv3; catalog content is MIT
+
+**This is an intentional split. Both halves are deliberate.**
+
+- The **Ever Works platform** (`ever-works/ever-works`) is licensed under **AGPL-3.0** (see `LICENSE` in the repo root, confirmed in `docs/specs/architecture/plugin-sdk.md` and `package.json` plugin manifests). AGPL's copyleft applies to the platform code and to derivative works built on it.
+- The **catalog content repos** (`ever-works/agents`, `ever-works/skills`, `ever-works/task-templates`, Mission Template repos) are licensed under **MIT**. Operator confirmed in round 9:
+    > "Skills catalog is MIT, but note that platform is AGPLv3 !!!!!! Same Agents in they own repo, let's them be MIT too."
+
+### Why the split makes sense
+
+- **Catalog content is data, not code.** Markdown bodies, frontmatter, RRULE strings, prompt text — none of it links into the platform binary. The platform consumes it at runtime via the plugin facade.
+- **Catalog reuse should be friction-free.** A user (or a competitor, or a downstream community) can copy `ever-works/skills` into their own product without inheriting AGPL obligations. That maximizes adoption + community contribution.
+- **Platform copyleft stays intact.** Anyone who runs the Ever Works platform and modifies it must still publish those changes (per AGPL §13). Consuming MIT-licensed catalog content doesn't dilute that.
+
+### What this means for each catalog repo's `LICENSE` file
+
+Every catalog repo's `LICENSE` file is **the standard MIT license** with copyright "Ever Works contributors". The repo's `README.md` MUST include a short note clarifying the platform-vs-content license split so contributors aren't confused.
+
+### Contributing guidance lives in each repo
+
+Per operator S3 answer (round 9):
+> "S3 — in separate skills repo. Same for Agents repo btw."
+
+The `CONTRIBUTING.md` for community contributions lives **inside each catalog repo**, not in the platform repo. Each catalog's `CONTRIBUTING.md` covers: schema validation, MD style guide, PR review checklist, MIT-licensing acknowledgement on contribution.
+
+---
 
 ## What this does NOT cover
 

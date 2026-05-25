@@ -39,7 +39,7 @@ Concrete arrangement:
     - DB-inline columns on the `agents` row for Tenant-scoped Agents without a control repo (per [ADR-008](./008-tenant-control-repo-deferred-to-v2.md)).
 - Modifications to the user's local copy never propagate back to the source repo. The template is a starting point, not a live subscription.
 
-The repo is **MIT-licensed** to match the platform; community PRs to add new templates are welcome.
+The repo is **MIT-licensed** so the templates can be reused widely (including by non-AGPL projects) and to maximize the community contribution surface. **Note: the platform itself is AGPLv3** (see `LICENSE`) — the catalog content is intentionally licensed under a more permissive scheme so it's separable from platform code. This split is documented further in [ADR-014 §"License posture"](./014-no-hardcoded-catalogs.md).
 
 ## Why this diverges from ADR-007 (Skills in-monorepo)
 
@@ -103,7 +103,7 @@ The Mission Templates infrastructure (already on develop) has exactly this shape
 ## Operational notes
 
 - Repo: [`ever-works/agents`](https://github.com/ever-works/agents) — to be created if not yet present.
-- License: MIT (matches platform).
+- License: MIT (intentionally permissive for content reuse — the platform itself is AGPLv3; see ADR-014 §"License posture").
 - Top-level files: `README.md` (format + contribution guide), `LICENSE`, `.github/` workflows (lint MD + validate `agent.yml` against schema).
 - Each template folder: `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md` (+ optional `skills/`).
 - Tagged releases — semver per template aggregate; platform `EVER_WORKS_AGENTS_REF` env var picks the ref.
