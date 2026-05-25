@@ -67,6 +67,14 @@ export interface BuildIdeaResponse {
     goalId: string;
 }
 
+// Raw wire shape of `POST /me/work-proposals/:id/{build,retry,rebuild}` —
+// matches the API's `BuildWorkProposalResponseDto`. The client method
+// flattens this into `BuildIdeaResponse` for callers.
+interface BuildApiResponse {
+    proposal: WorkProposal;
+    goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: string };
+}
+
 export const workProposalsAPI = {
     async get(id: string): Promise<WorkProposal | null> {
         try {
@@ -156,13 +164,22 @@ export const workProposalsAPI = {
     // Phase 1 PR B — queue an existing Idea for build (transitions
     // PENDING/FAILED → QUEUED + creates a WorkAgentGoal under the
     // hood). Returns the freshly-loaded Idea + the new goal id.
+    //
+    // The API DTO (`BuildWorkProposalResponseDto`) is the public
+    // OpenAPI/MCP contract and uses `{ proposal, goal: { id, ... } }`;
+    // the web client's internal `BuildIdeaResponse` flattens it to
+    // `{ idea, goalId }` for ergonomics. We transform at the boundary
+    // here (rather than reshaping the API) so external API consumers
+    // and the existing OpenAPI/MCP whitelist entries stay untouched.
+    // (Codex review on PR #1013.)
     async build(id: string): Promise<BuildIdeaResponse> {
-        return serverMutation<BuildIdeaResponse>({
+        const raw = await serverMutation<BuildApiResponse>({
             endpoint: `/me/work-proposals/${id}/build`,
             data: {},
             method: 'POST',
             wrapInData: false,
         });
+        return { idea: raw.proposal, goalId: raw.goal.id };
     },
 
     // Phase 7 PR U — per-Idea current-period spend + GLOBAL cap

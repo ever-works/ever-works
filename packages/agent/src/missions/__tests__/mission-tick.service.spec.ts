@@ -376,8 +376,17 @@ describe('MissionTickService', () => {
             expect(res.outcome).toBe('cap-hit');
         });
 
-        it('returns failed when Mission is not ACTIVE', async () => {
-            build();
+        it('allows PAUSED missions to run-now (parity with MissionsService gate)', async () => {
+            // Codex review on PR #1013: `MissionsService.runNow` lets
+            // PAUSED through, so the tick service must too — otherwise
+            // the manual run-now button always fails for paused
+            // missions.
+            build({
+                generateResult: {
+                    status: 'generated',
+                    proposals: [makeProposal('p1', 'm1', 'u1')],
+                },
+            });
             missionRepo._seed({
                 id: 'm1',
                 userId: 'u1',
@@ -385,8 +394,33 @@ describe('MissionTickService', () => {
                 schedule: '* * * * *',
             });
             const res = await service.runOnce('m1', 'u1');
+            expect(res.outcome).toBe('spawned');
+        });
+
+        it('returns failed when Mission is COMPLETED', async () => {
+            build();
+            missionRepo._seed({
+                id: 'm1',
+                userId: 'u1',
+                status: MissionStatus.COMPLETED,
+                schedule: '* * * * *',
+            });
+            const res = await service.runOnce('m1', 'u1');
             expect(res.outcome).toBe('failed');
-            expect(res.message).toMatch(/mission-not-active/);
+            expect(res.message).toMatch(/mission-not-runnable/);
+        });
+
+        it('returns failed when Mission is FAILED', async () => {
+            build();
+            missionRepo._seed({
+                id: 'm1',
+                userId: 'u1',
+                status: MissionStatus.FAILED,
+                schedule: '* * * * *',
+            });
+            const res = await service.runOnce('m1', 'u1');
+            expect(res.outcome).toBe('failed');
+            expect(res.message).toMatch(/mission-not-runnable/);
         });
 
         it('returns failed when the Mission does not exist for the user', async () => {

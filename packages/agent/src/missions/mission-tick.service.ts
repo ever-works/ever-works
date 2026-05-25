@@ -156,10 +156,16 @@ export class MissionTickService {
         if (!mission) {
             return { outcome: 'failed', message: 'mission-not-found' };
         }
-        if (mission.status !== MissionStatus.ACTIVE) {
+        // Manual run-now is allowed from ACTIVE or PAUSED — the API
+        // gate in `MissionsService.runNow` lets PAUSED through
+        // (a paused user click is a legitimate "run this once even
+        // though the cron is paused" request). Mirror it here so the
+        // tick-service path doesn't reject what the API just accepted.
+        // COMPLETED + FAILED remain forbidden (Codex review on PR #1013).
+        if (mission.status !== MissionStatus.ACTIVE && mission.status !== MissionStatus.PAUSED) {
             return {
                 outcome: 'failed',
-                message: `mission-not-active (status=${mission.status})`,
+                message: `mission-not-runnable (status=${mission.status})`,
             };
         }
         return this.evaluateAndRun(mission, new Date(), { allowCronMismatch: true });
