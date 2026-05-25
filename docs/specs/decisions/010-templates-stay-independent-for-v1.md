@@ -15,7 +15,7 @@ By the end of this spec set, the platform will have at least five "template-like
 1. **Mission Templates** — already on develop. In-repo TS constants at `packages/agent/src/missions/mission-template.config.ts`; surfaced via `TemplateCatalogService` on `/templates` page.
 2. **Website / Work Templates** — already on develop. Same `TemplateCatalogService`; users can fork.
 3. **Skill catalog** — proposed in [features/skills/spec.md](../features/skills/spec.md). In-repo MD files at `apps/api/src/skills/catalog/<slug>/<slug>.md`.
-4. **Agent starters** — proposed in [features/UX-DESIGN-agents-skills-tasks.md §4.1](../features/UX-DESIGN-agents-skills-tasks.md). In-repo MD files at `apps/api/src/agents/starters/<slug>/`. 6 starters at launch (CEO, VP-Eng, Researcher, PR-Reviewer, Editor, Designer).
+4. **Agent templates** — proposed in [features/UX-DESIGN-agents-skills-tasks.md §4.1](../features/UX-DESIGN-agents-skills-tasks.md). Stored in a **separate community repo** [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents) — one folder per template with `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`. ~6 starters at launch (CEO, CTO, Researcher, PR-Reviewer, Editor, Designer); community can PR more. See [ADR-011](./011-agent-templates-in-separate-repo.md) for why this diverges from Skill catalog's in-monorepo posture.
 5. **Task templates** — proposed in [features/task-tracking/spec.md §5.4](../features/task-tracking/spec.md), deferred. 3 starters envisioned (bug-report, pr-review, weekly-status).
 
 This pattern emerged organically as each feature shipped its own catalog. The natural architectural question: **should we unify them under a single "Workshop Templates" registry**?
@@ -38,7 +38,7 @@ Cons of unifying:
 Concrete arrangement:
 - `TemplateCatalogService` (existing) — Mission + Work Templates.
 - `SkillCatalogService` (new) — Skills only (ADR-007).
-- `AgentStarterService` (new, small) — Agent starters.
+- `AgentTemplateService` (new) — clones + caches `ever-works/ever-works-agents`, lists templates, copies a chosen template into a Mission/Work repo or DB-inline storage. Mirrors the existing Mission Template fork mechanic, not the Skill catalog install mechanic.
 - `TaskTemplateService` (new, deferred to v2) — Task templates.
 
 The `/templates` page surfaces Mission + Work via the existing `TemplatesCatalog` component. Skills get their own `/skills` page. Agent starters appear inline in the New-Agent dialog. Task templates appear inline in the New-Task dialog (when v2 ships).

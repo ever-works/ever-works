@@ -753,13 +753,15 @@ Pick one term per surface:
 
 ## P. Product / UX decisions
 
-### P1 — Starter prompts vs blank on Agent create
+### P1 — Initial set of templates in `ever-works/ever-works-agents`
 
-[UX-DESIGN §4.1](./features/UX-DESIGN-agents-skills-tasks.md) proposes 6 starter agents (CEO, VP-Eng, Researcher, PR-Reviewer, Editor, Designer, Blank). Each ships with a pre-tuned `SOUL.md` / `AGENTS.md` / `HEARTBEAT.md`.
+Per [ADR-011](./decisions/011-agent-templates-in-separate-repo.md), Agent templates live in the separate community repo [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents). What's the curated set Ever Works seeds the repo with at launch?
 
-- ★ **P1-a — Ship 6 starters.** Wow moment depends on them; blank Agents create cognitive load.
-- P1-b — Ship 3 starters (CEO, Researcher, Blank). Cheaper to curate well.
-- P1-c — Ship 0 starters; blank only. Highest user effort.
+- ★ **P1-a — Six**: CEO, CTO, Researcher, PR-Reviewer, Editor, Designer. Covers common founder + small-team roles.
+- P1-b — Twelve: P1-a + Sales-Lead, Product-Manager, Designer, Marketing-Writer, Compliance-Officer, Customer-Success.
+- P1-c — Three: CEO, CTO, Researcher. Curate fewer, better.
+
+(Community can PR additional templates after launch regardless of starting set.)
 
 ### P2 — "Run first heartbeat now" checkbox default
 
@@ -798,12 +800,12 @@ For new feature events (Agent paused, Task assigned to you):
 - P6-b — Full parity with desktop.
 - P6-c — Mobile completely out of scope; redirect to desktop.
 
-### P7 — Demo Researcher sample Agent
+### P7 — "Start by creating CEO Agent" empty-state button
 
-UX proposes a "Try a sample Agent" button that creates `Demo Researcher` at tenant scope with $5 budget, manual heartbeat.
+The `/agents` empty state has a `[ Start by creating CEO Agent ]` quick-create button that one-clicks a tenant-scoped CEO Agent from the `ever-works/ever-works-agents` repo's CEO template.
 
-- ★ **P7-a — Ship.** Risk-free way for skeptics to see what's possible.
-- P7-b — Don't ship; rely on starters in the New-Agent dialog.
+- ★ **P7-a — Ship.** Single-click path to the wow moment for first-time users.
+- P7-b — Don't ship; only show `[ + New Agent ]` button. User must go through the 2-step dialog every time.
 
 ### P8 — "Wow moment" telemetry
 
@@ -883,12 +885,27 @@ What if a user disables their AI provider plugin while an Agent run is in flight
 - ★ **Q10-a — Run completes; next run fails with `provider_error`. Auto-pause after threshold.**
 - Q10-b — Cancel the in-flight run. More disruptive.
 
-### Q11 — Hot-reload of starter Agents
+### Q11 — Updates to templates in `ever-works/ever-works-agents`
 
-Agent starters are in-repo TS constants. After a deploy, do existing Agents that were created from a starter get an update if the starter's MD content changed?
+When `ever-works/ever-works-agents` ships a new version of (say) the CEO template, do existing user-Agents created from it get notified / updated?
 
-- ★ **Q11-a — No.** Starters are fork-once; existing Agents are immutable once created. Same posture as Skills installed copies.
-- Q11-b — Optional update-prompt like Skills catalog.
+- ★ **Q11-a — No.** Templates are fork-once; existing user Agents are immutable once created. The user owns their `.works/agents/ceo/` files outright; we don't re-pull. Same posture as Mission Templates today.
+- Q11-b — Optional "Update available" prompt on the Agent detail page that diff-applies the template update.
+
+### Q12 — `EVER_WORKS_AGENTS_REF` pinning
+
+Which ref of `ever-works/ever-works-agents` does the platform read by default?
+
+- ★ **Q12-a — Latest tagged release** (`v*` ref pattern). Auto-picks up new templates as they ship; pinned to known-good versions.
+- Q12-b — `main` branch. Bleeding edge; risk of broken templates surfacing immediately.
+- Q12-c — Hard-coded ref per platform release. Most conservative; templates evolve only with platform deploys.
+
+### Q13 — Local override for self-hosted
+
+For self-hosted / offline users:
+
+- ★ **Q13-a — `EVER_WORKS_AGENTS_PATH` env var** points at a local clone; if set, platform reads from there instead of cloning from GitHub.
+- Q13-b — No override; always clone from GitHub. Self-hosted users need outbound access.
 
 ---
 
@@ -908,9 +925,9 @@ User on a Mission Template page sees "This template also includes 2 Agents and 1
 - ★ **R2-a — Yes.** Mission Template manifests already list `agents:` and `skills:` arrays; the UI surfaces them.
 - R2-b — No cross-links; each catalog stays siloed.
 
-### R3 — Should there be a "Browse all starters" page?
+### R3 — Should there be a "Browse all templates" page?
 
-A single page showing Mission templates + Agent starters + Skill catalog + (future) Task templates.
+A single page showing Mission templates + Agent templates from `ever-works/ever-works-agents` + Skill catalog + (future) Task templates.
 
 - ★ **R3-a — No.** Each lives on its own page; cross-links per R2.
 - R3-b — Yes. New `/workshop` page with all four kinds.

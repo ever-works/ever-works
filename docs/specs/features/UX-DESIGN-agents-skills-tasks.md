@@ -47,7 +47,7 @@ Tracked: see [QUESTIONS P1](../QUESTIONS-agents-skills-tasks.md#p1--starter-prom
 └────────────────────────────┘
 ```
 
-Each item shows a count when > 0. The three NEW items each get a small `NEW` badge for the first 30 days after the tenant first enables the feature flag, then auto-removed.
+Each item shows a count when > 0.
 
 ### 2.2 Discovery from Dashboard
 
@@ -77,12 +77,14 @@ On the main dashboard, three new affordances introduce the features to existing 
 │           and suggest next moves. A "PR Reviewer" Agent     │
 │           might review every pull request you open.         │
 │                                                             │
-│           [ + New Agent ]   [ Try a sample Agent ]          │
+│           [ + New Agent ]  [ Start by creating CEO Agent ] │
 │                                                             │
 ╰─────────────────────────────────────────────────────────────╯
 ```
 
-The "Try a sample Agent" button creates a pre-tuned `Demo Researcher` Agent at tenant scope with `manual` heartbeat (no autopilot until user starts it) and a budget of $5 cap, so the user can experiment without risk.
+The **"Start by creating CEO Agent"** button takes the first-time user straight to the wow moment without any decisions. It creates an Agent named `CEO` at **tenant scope** using the CEO template from the [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents) template repo (default account AI provider, weekly heartbeat, sensible default permissions). After create, the user lands on `/agents/ceo` and the first heartbeat is dispatched immediately.
+
+This deliberately bypasses the multi-step create dialog: zero choices, one click, real Agent.
 
 ### 3.2 Populated list
 
@@ -139,7 +141,11 @@ A 2-step modal. Step 1 picks a starter or "blank"; step 2 lets the user edit bef
 ╰─────────────────────────────────────────────────╯
 ```
 
-The 6 starters ship in `apps/api/src/agents/starters/<slug>/` with pre-tuned `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`. They're not in the catalog (the user isn't "installing" them — they're cloning).
+**Starters are external — they live in a separate community-friendly repo: [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents).** Each template is a folder containing `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`, optionally a `skills/` subfolder with bundled skill MD files. The 6 starters above are the curated set Ever Works ships; the community can PR additional templates (Sales Lead, Compliance Officer, Game Designer, etc.) without touching the platform repo.
+
+When the user picks a template, the platform `git clone --depth 1` the agents repo (cached for 1h), reads the chosen folder, and **copies** the MD files into the scope's repo at `.works/agents/<chosen-slug>/`. For tenant scope without a control repo, files are written inline to DB columns (per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)). Modifications to the user's local copy never propagate back to the source repo.
+
+This deliberately diverges from Skills (in-monorepo, [ADR-007](../decisions/007-skill-catalog-in-monorepo.md)) — see [ADR-011](../decisions/011-agent-templates-in-separate-repo.md) for the rationale (community contribution velocity, larger volume).
 
 ### 4.2 Step 2 — fill the details
 
@@ -525,15 +531,87 @@ Notification copy templates:
 
 ## 11. Onboarding flow
 
-For tenants who already have Works (the common case at launch):
+The existing onboarding wizard (Mission / Work creation) gains **two new optional steps** appended toward the end. Both are skippable and explicitly framed as such.
 
-1. After login, a one-time **announcement modal** introduces the three features (1 paragraph each + screenshot).
-2. The modal's CTA is "Tour Agents" (not "Dismiss") — opens `/agents` with an inline coachmark.
-3. Coachmark on the `+ New Agent` button: *"Try a sample Agent — it runs once and shows you what's possible."*
-4. Clicking the sample creates `Demo Researcher` (read-only on tenant data) and runs one heartbeat immediately.
-5. Result modal shows what it did, with a "Now create your own" CTA.
+### 11.1 New step: "Add Agents (optional)"
 
-For brand-new tenants: the existing onboarding flow continues to focus on Mission/Work creation. Agents/Tasks/Skills surface only after the user has at least one Work or Mission, via the Dashboard empty-tile prompts. Don't overwhelm.
+After the user has created their Mission/Work in the existing onboarding flow, the wizard surfaces:
+
+```
+╭─────────────────────────────────────────────────────────────╮
+│  Step 4 of 5 — Add Agents (optional)                          │
+│                                                              │
+│  Agents are named AI workers — a CEO, a CTO, a PR Reviewer.  │
+│  They run on a schedule, handle tasks, and write to your     │
+│  repos. Start with one or two; you can always add more.      │
+│                                                              │
+│  Templates from ever-works/ever-works-agents:                │
+│                                                              │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐                │
+│  │ ☑ CEO  │ │ ☑ CTO  │ │ Editor │ │ Designer│               │
+│  │Strategic│Technical│ │Polishes│Conceives │                │
+│  └────────┘ └────────┘ └────────┘ └────────┘                │
+│  ┌────────┐ ┌────────┐                                       │
+│  │ PR-Rev │ │Researcher                                       │
+│  │Reviews │ │Investig.│                                       │
+│  └────────┘ └────────┘                                       │
+│                                                              │
+│  ☑ Run first heartbeat now after creating                    │
+│                                                              │
+│  [ Skip — I'll add later ]            [ Create selected (2) ]│
+╰─────────────────────────────────────────────────────────────╯
+```
+
+- Default selection: **all unchecked** (user opts in deliberately; no surprise creation).
+- "Skip" is given equal visual weight to "Create" — many users will skip and that's fine.
+- If the user selects any templates, those Agents are created at tenant scope (the most flexible default; user can re-scope later from the detail page).
+- Each selected Agent's MD files are copied from `ever-works/ever-works-agents/<template>/` into the tenant's storage (DB-inline today per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)).
+- If "Run first heartbeat now" stays checked, each created Agent gets one immediate run so the user sees activity on their dashboard.
+
+### 11.2 New step: "Add Skills (optional)"
+
+Step 5 — last step before finishing onboarding:
+
+```
+╭─────────────────────────────────────────────────────────────╮
+│  Step 5 of 5 — Add Skills (optional)                          │
+│                                                              │
+│  Skills are reusable instructions you can attach to Agents   │
+│  or inject into your Work generators. Skip if not sure.       │
+│                                                              │
+│  Popular from the catalog:                                   │
+│                                                              │
+│  ☑ pr-review          Review pull requests, post comments    │
+│  ☑ seo-meta           Optimize SEO meta tags                  │
+│  ☐ release-notes      Draft release notes from PR history    │
+│  ☐ image-alt-text     Generate alt text for images            │
+│  ☐ kb-summarize       Summarize a KB document                 │
+│  ☐ ...                                                        │
+│                                                              │
+│  [ Browse all 10 → ]                                          │
+│                                                              │
+│  ─ Auto-attach selected skills to: ─                          │
+│  ☑ Agents I created in step 4                                 │
+│  ☐ My Works' generators                                        │
+│                                                              │
+│  [ Skip ]                                       [ Install (2) ]│
+╰─────────────────────────────────────────────────────────────╯
+```
+
+- Same opt-in posture: default unchecked. Skip is fine.
+- Surfaces the most-popular catalog skills (curated subset of ~6) with a "Browse all" link to the full `/skills` page.
+- When a user selects skills AND has created Agents in step 4, "Auto-attach" defaults checked — saves a follow-up navigation.
+
+### 11.3 No post-onboarding announcement modal
+
+There is **no separate one-time announcement modal** for existing tenants. The features are discoverable via:
+
+- New sidebar items (Agents, Tasks, Skills) visible immediately after release.
+- Dashboard empty tiles ("Agents enabled — 0 · [Get started →]").
+- A short blog post / changelog entry on the docs site.
+- The Mission/Work create flow re-runs the new wizard steps for tenants who go through it again — they see the Agents and Skills steps as new.
+
+Existing tenants who never re-trigger the wizard can still discover via sidebar + dashboard prompts; we do not interrupt their normal session with a modal.
 
 ---
 
