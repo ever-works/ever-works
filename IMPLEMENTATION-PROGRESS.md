@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 10
-- **Last tick at**: 2026-05-26 (tick 10 — Phase 7 complete: AgentRunService orchestrator + BaseFacadeService.resolvePlugin agentProviderOverride param + tests. Real LLM dispatch wires in once Skill catalog Phase 9 lands.)
-- **In progress now**: (none — next tick picks up Phase 8 Skill catalog + ever-works/skills plugin)
+- **Last tick #**: 11
+- **Last tick at**: 2026-05-26 (tick 11 — Phase 8.1-8.4: Skill + SkillBinding entities + CreateSkillsTables migration + SkillRepository + SkillBindingRepository.resolveActive + tests. Plugin (8.5) + facade (8.6) + read-only API (8.7) follow next tick.)
+- **In progress now**: Phase 8 (8.1-8.4 ticked; 8.5-8.8 remaining)
 
 ---
 
@@ -137,10 +137,10 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 8 — Skill catalog + entities + read-only API
 
-- [ ] **8.1** Entity `skill.entity.ts` per `features/skills/plan.md §3.1`.
-- [ ] **8.2** Entity `skill-binding.entity.ts`.
-- [ ] **8.3** Migration `CreateSkillsTables.ts`.
-- [ ] **8.4** Repositories + `resolveActive()` unit tests.
+- [x] **8.1** Entity `skill.entity.ts` per `features/skills/plan.md §3.1` — owner-type lattice (tenant/mission/idea/work/agent), instructionsMd inline body, contentHash, source-catalog tracking, version. Unique on (ownerType, ownerId, slug). ✓ Tick 11
+- [x] **8.2** Entity `skill-binding.entity.ts` — many-to-many between skills + targets with `injectIntoAgent` / `injectIntoGenerator` toggles + priority. Unique on (skillId, targetType, targetId). ✓ Tick 11
+- [x] **8.3** Migration `apps/api/src/migrations/1779978012000-CreateSkillsTables.ts` — both tables + 6 indexes via `ensureIndex` helper + FK CASCADE on userId / skillId. Idempotent. ✓ Tick 11
+- [x] **8.4** Repositories — `SkillRepository` (CRUD + scope-aware lookup + slug uniqueness check) + `SkillBindingRepository.resolveActive()` (per-target OR filter, priority-sorted, dedups by skillId so highest-priority binding wins). Unit tests at `__tests__/skill-binding.repository.spec.ts` cover the resolver's WHERE clauses, dedup, inject-toggle handling, and malformed-frontmatter safety. ✓ Tick 11
 - [ ] **8.5** **"Ever Works Skills" plugin** at `packages/plugins/everworks-skills/` per ADR-012. Reads `ever-works/skills` repo via clone+cache. `ISkillsProviderPlugin` contract.
 - [ ] **8.6** `SkillsFacadeService` resolving enabled `skills-provider` plugins; dedupe by slug.
 - [ ] **8.7** Read-only API routes (`GET /skills/catalog`, `GET /skills`, `GET /skills/:id`).

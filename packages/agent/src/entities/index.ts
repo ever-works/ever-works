@@ -53,3 +53,5 @@ export * from './agent-run.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
 export * from './agent-membership.entity';
+export * from './skill.entity';
+export * from './skill-binding.entity';
