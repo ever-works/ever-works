@@ -28,29 +28,30 @@ describe('customization prompt registry', () => {
         // These assertions pin load-bearing fragments of the prompt: if any of
         // them silently drop, the agent may break the user's fork. Updating a
         // matcher here should be a deliberate change.
-        it('forbids functional / config changes so the user’s site stays mergeable upstream', () => {
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/UI/i);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/No functional changes/i);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/No content edits/i);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/package\.json/);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/astro\.config/);
+        it("forbids functional / config changes so the user's site stays mergeable upstream", () => {
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/visual design brief/i);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/Do not edit/i);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/\*\.astro/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/\*\.ts/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/config/i);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/deployment files/i);
         });
 
         it('reminds the agent it must not commit or push', () => {
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/No commits (?:or|, no) PRs/i);
         });
 
-        it('points the agent at the canonical styling levers (global.css, BaseLayout, Tailwind tokens)', () => {
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/styles\/global\.css/);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/Tailwind v4 tokens/);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/color tokens/i);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/BaseLayout\.astro/);
+        it('points the agent at the compile-safe styling surface and canonical levers', () => {
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/apps\/web\/src\/styles\/theme\.css/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/plain CSS/i);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/global\.css/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/design tokens/i);
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/data-component/);
         });
 
         it('marks shared workspace packages and content as off-limits', () => {
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/packages\/ui\//);
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/\.content\//);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/packages\/\*\*/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/\.content\/\*\*/);
         });
     });
 });

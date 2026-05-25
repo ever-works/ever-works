@@ -57,6 +57,7 @@ interface Mocks {
         getWebUrl: AnyMock;
         replaceRemote: AnyMock;
         switchBranch: AnyMock;
+        add: AnyMock;
         addAll: AnyMock;
         commit: AnyMock;
         push: AnyMock;
@@ -115,6 +116,7 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
                 .mockReturnValue('https://github.com/evereq/tpl-minimal-mytheme-abc123'),
             replaceRemote: jest.fn().mockResolvedValue(undefined),
             switchBranch: jest.fn().mockResolvedValue('main'),
+            add: jest.fn().mockResolvedValue(undefined),
             addAll: jest.fn().mockResolvedValue(undefined),
             commit: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
@@ -141,7 +143,7 @@ function makeService(): { service: TemplateCustomizationService; mocks: Mocks } 
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 summary: 'Applied UI changes',
-                filesChanged: [{ path: 'src/styles/theme.css', status: 'modified' }],
+                filesChanged: [{ path: 'apps/web/src/styles/theme.css', status: 'modified' }],
             }),
         },
         aiFacade: {
@@ -476,6 +478,28 @@ describe('TemplateCustomizationService.createAndStart — provision strip', () =
 });
 
 describe('TemplateCustomizationService.execute', () => {
+    const fsPromises = jest.requireActual('node:fs/promises') as typeof import('node:fs/promises');
+    const pathMod = jest.requireActual('node:path') as typeof import('node:path');
+    const osMod = jest.requireActual('node:os') as typeof import('node:os');
+
+    async function seedExecutableWorkspace(mocks: Mocks): Promise<string> {
+        const root = await fsPromises.mkdtemp(pathMod.join(osMod.tmpdir(), 'tpl-customize-test-'));
+        await fsPromises.mkdir(pathMod.join(root, 'apps/web/src/layouts'), { recursive: true });
+        await fsPromises.mkdir(pathMod.join(root, 'apps/web/src/styles'), { recursive: true });
+        await fsPromises.writeFile(
+            pathMod.join(root, 'apps/web/src/layouts/BaseLayout.astro'),
+            '---\nimport "../styles/theme.css";\n---\n<slot />',
+            'utf8',
+        );
+        await fsPromises.writeFile(
+            pathMod.join(root, 'apps/web/src/styles/theme.css'),
+            ':root { --primary: #2563eb; }\n',
+            'utf8',
+        );
+        mocks.gitFacade.cloneOrPull.mockResolvedValue(root);
+        return root;
+    }
+
     function seedRunning(mocks: Mocks) {
         mocks.customizationRepository.findById.mockResolvedValue({
             id: 'cust-1',
@@ -501,29 +525,39 @@ describe('TemplateCustomizationService.execute', () => {
     it('clones, runs the agent, commits, pushes, marks succeeded', async () => {
         const { service, mocks } = makeService();
         seedRunning(mocks);
-        await service.execute('cust-1');
-        expect(mocks.codeEditFacade.execute).toHaveBeenCalledTimes(1);
-        expect(mocks.gitFacade.push).toHaveBeenCalled();
-        const finalCall = mocks.customizationRepository.updateById.mock.calls.find(
-            ([, patch]) => patch.status === TemplateCustomizationStatus.SUCCEEDED,
-        );
-        expect(finalCall).toBeTruthy();
+        const workspaceDir = await seedExecutableWorkspace(mocks);
+        try {
+            await service.execute('cust-1');
+            expect(mocks.codeEditFacade.execute).toHaveBeenCalledTimes(1);
+            expect(mocks.gitFacade.push).toHaveBeenCalled();
+            const finalCall = mocks.customizationRepository.updateById.mock.calls.find(
+                ([, patch]) => patch.status === TemplateCustomizationStatus.SUCCEEDED,
+            );
+            expect(finalCall).toBeTruthy();
+        } finally {
+            await fsPromises.rm(workspaceDir, { recursive: true, force: true });
+        }
     });
 
     it('fails the row when the agent reports no changes', async () => {
         const { service, mocks } = makeService();
         seedRunning(mocks);
+        const workspaceDir = await seedExecutableWorkspace(mocks);
         mocks.codeEditFacade.execute.mockResolvedValueOnce({
             success: true,
             summary: '',
             filesChanged: [],
         });
-        await service.execute('cust-1');
-        expect(mocks.gitFacade.push).not.toHaveBeenCalled();
-        const failed = mocks.customizationRepository.updateById.mock.calls.find(
-            ([, patch]) => patch.status === TemplateCustomizationStatus.FAILED,
-        );
-        expect(failed[1].errorMessage).toMatch(/no file changes/i);
+        try {
+            await service.execute('cust-1');
+            expect(mocks.gitFacade.push).not.toHaveBeenCalled();
+            const failed = mocks.customizationRepository.updateById.mock.calls.find(
+                ([, patch]) => patch.status === TemplateCustomizationStatus.FAILED,
+            );
+            expect(failed[1].errorMessage).toMatch(/no changes/i);
+        } finally {
+            await fsPromises.rm(workspaceDir, { recursive: true, force: true });
+        }
     });
 
     it('skips terminal records', async () => {

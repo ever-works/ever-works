@@ -745,9 +745,10 @@ export class TemplateCustomizationService {
         return lines.join('\n');
     }
 
-    private partitionChangedPaths(
-        filesChanged: readonly { path: string }[],
-    ): { allowed: string[]; rejected: string[] } {
+    private partitionChangedPaths(filesChanged: readonly { path: string }[]): {
+        allowed: string[];
+        rejected: string[];
+    } {
         const allowed: string[] = [];
         const rejected: string[] = [];
         for (const change of filesChanged) {

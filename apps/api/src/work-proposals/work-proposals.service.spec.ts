@@ -125,7 +125,17 @@ describe('WorkProposalsApiService', () => {
             workAgent as never,
             taskLock as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config, workAgent, taskLock };
+        return {
+            svc,
+            research,
+            proposals,
+            limits,
+            users,
+            userOrmRepo,
+            config,
+            workAgent,
+            taskLock,
+        };
     };
 
     it('queues a refresh when caps are within budget', async () => {
