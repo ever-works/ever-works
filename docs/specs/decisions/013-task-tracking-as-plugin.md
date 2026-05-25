@@ -120,7 +120,7 @@ Lives at `packages/plugins/everworks-task-tracker/`. `package.json` `everworks.p
 Implementation:
 - All CRUD operations write to the existing `tasks` / `task_*` tables via the existing repositories (which live in `packages/agent/src/database/repositories/`).
 - All capability flags are `true` (the only tracker that supports the full feature set).
-- Bundles the Task templates loaded from [`ever-works/task-templates`](https://github.com/ever-works/task-templates) (per ADR-014) for the "+ New Task from template" flow.
+- Bundles the Task templates loaded from [`ever-works/tasks`](https://github.com/ever-works/tasks) (per ADR-014) for the "+ New Task from template" flow.
 
 ## Consequences
 
@@ -170,5 +170,5 @@ Product behavior in [`features/task-tracking/spec.md`](../features/task-tracking
 - ADR-006 (partially superseded — Tasks no longer "core not plugin").
 - ADR-009 (Tasks vs Items vs KB distinction — still valid; this ADR doesn't change task concept's distinctness).
 - ADR-012 (Skills as plugin — parallel decision).
-- ADR-014 (No hardcoded catalogs — `ever-works/task-templates` repo for task templates).
+- ADR-014 (No hardcoded catalogs — `ever-works/tasks` repo for task templates).
 - [`features/task-tracking/spec.md`](../features/task-tracking/spec.md), [`features/task-tracking/plan.md`](../features/task-tracking/plan.md) — product behavior unchanged; implementation packaging updated.

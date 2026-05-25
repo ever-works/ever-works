@@ -47,7 +47,7 @@ Per operator instruction (round 6):
 - `TemplateCatalogService` (existing) — Mission + Work Templates.
 - `AgentTemplateService` (new) — clones + caches [`ever-works/agents`](https://github.com/ever-works/agents); copies a chosen template into a Mission/Work repo or DB-inline storage.
 - **`SkillsFacadeService` + `"Ever Works Skills"` plugin** (per [ADR-012](./012-skills-as-plugin.md)) — Skill catalog comes from the plugin, which reads [`ever-works/skills`](https://github.com/ever-works/skills).
-- **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](./013-task-tracking-as-plugin.md)) — Task templates come from [`ever-works/task-templates`](https://github.com/ever-works/task-templates), bundled into the first-party tracker plugin.
+- **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](./013-task-tracking-as-plugin.md)) — Task templates come from [`ever-works/tasks`](https://github.com/ever-works/tasks), bundled into the first-party tracker plugin.
 
 **Frontend surfaces — per-feature page is primary; `/templates` page is the bonus all-in-one view:**
 - **Primary surfaces** (each feature page owns its template browsing):

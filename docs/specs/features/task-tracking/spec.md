@@ -35,7 +35,7 @@
 - Facade: `TasksFacadeService` — UI and Agents talk only to the facade.
 - **One active `task-tracker` per tenant.** Unlike `skills-provider` which allows union, only one tracker owns task storage at a time.
 
-Throughout this spec, references to "the platform stores tasks" / "Task service" should be read as the **first-party `"Ever Works Task Tracker"` plugin storing tasks in the platform DB**. Task templates (`bug-report`, `pr-review`, `weekly-status`) live in **[`ever-works/task-templates`](https://github.com/ever-works/task-templates)** repo per [ADR-014](../../decisions/014-no-hardcoded-catalogs.md), bundled by the first-party plugin.
+Throughout this spec, references to "the platform stores tasks" / "Task service" should be read as the **first-party `"Ever Works Task Tracker"` plugin storing tasks in the platform DB**. Task templates (`bug-report`, `pr-review`, `weekly-status`) live in **[`ever-works/tasks`](https://github.com/ever-works/tasks)** repo per [ADR-014](../../decisions/014-no-hardcoded-catalogs.md), bundled by the first-party plugin.
 
 ## 1.1 Tasks vs Ideas — they are NOT the same thing [F3 operator clarification]
 

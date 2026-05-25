@@ -19,7 +19,7 @@ Across the Agents / Skills / Tasks spec set, multiple "catalog-shaped" datasets 
 
 Each catalog was being designed independently with a different storage strategy. The operator's round 6 instruction:
 
-> "It's a HARD rule that we should NOT hardcode into our codebase any templates etc. So Mission templates, Agents catalog, Skill catalog, should all be in separate repos on GitHub in the Ever Works org. Same as Task Templates — those tasks like bug-reports, pr-review, weekly-status task and so on, we can have separate repo called `ever-works/task-templates` and load such tasks templates from it."
+> "It's a HARD rule that we should NOT hardcode into our codebase any templates etc. So Mission templates, Agents catalog, Skill catalog, should all be in separate repos on GitHub in the Ever Works org. Same as Task Templates — those tasks like bug-reports, pr-review, weekly-status task and so on, we can have separate repo called `ever-works/tasks` and load such tasks templates from it."
 
 This ADR codifies the rule platform-side. The Workspace knowledge note `knowledge/notes/2026-05-25-no-hardcoded-catalogs-rule.md` ([blob link](https://github.com/ever-works/workspace/blob/develop/knowledge/notes/2026-05-25-no-hardcoded-catalogs-rule.md)) is the operator-facing version.
 
@@ -34,7 +34,7 @@ Concrete inventory at the time of writing:
 | Mission Templates       | one repo per template (e.g. `ever-works/p2p-marketplace-mission-template`)  | already on develop; the precedent.              |
 | Agent templates         | [`ever-works/agents`](https://github.com/ever-works/agents)                  | new; to be created during Agents v1 impl.       |
 | Skill catalog           | [`ever-works/skills`](https://github.com/ever-works/skills)                  | new; supersedes ADR-007's in-monorepo posture.  |
-| Task templates          | [`ever-works/task-templates`](https://github.com/ever-works/task-templates)  | new; created when Task Templates v2 ships.     |
+| Task templates          | [`ever-works/tasks`](https://github.com/ever-works/tasks)  | new; created when Task Templates v2 ships.     |
 
 This list will grow as future catalog-shaped features land.
 
@@ -92,7 +92,7 @@ export class XCatalogService {
 **This is an intentional split. Both halves are deliberate.**
 
 - The **Ever Works platform** (`ever-works/ever-works`) is licensed under **AGPL-3.0** (see `LICENSE` in the repo root, confirmed in `docs/specs/architecture/plugin-sdk.md` and `package.json` plugin manifests). AGPL's copyleft applies to the platform code and to derivative works built on it.
-- The **catalog content repos** (`ever-works/agents`, `ever-works/skills`, `ever-works/task-templates`, Mission Template repos) are licensed under **MIT**. Operator confirmed in round 9:
+- The **catalog content repos** (`ever-works/agents`, `ever-works/skills`, `ever-works/tasks`, Mission Template repos) are licensed under **MIT**. Operator confirmed in round 9:
     > "Skills catalog is MIT, but note that platform is AGPLv3 !!!!!! Same Agents in they own repo, let's them be MIT too."
 
 ### Why the split makes sense
