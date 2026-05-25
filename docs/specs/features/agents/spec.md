@@ -347,6 +347,25 @@ Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agent
 
 `POST /agents/:id/dry-run` builds the prompt + estimates cost + returns the would-have-been-sent payload without invoking the AI provider. No `agent_runs` row written; doesn't count against budget. Useful during prompt iteration. See [QUESTIONS N4](../../QUESTIONS-agents-skills-tasks.md#n4--per-agent-dry-run-mode).
 
+## 5.10a Agent avatar modes [H3 operator override — all three in v1]
+
+Every Agent has a visual identity that appears on the Agent list cards, Task assignee chips, chat messages, dashboard, etc. Three modes — pick per Agent:
+
+| Mode             | What it renders                                                                                       | Storage                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `initials`       | First 1-2 letters of the Agent's name in a circle, color hashed from the slug. **Default.**           | Nothing extra; rendered client-side.                                     |
+| `icon`           | A lucide-react icon picked from a curated set of ~30 (Bot, Briefcase, Hammer, Microscope, …). Color same hashed palette. | `agents.avatarIcon: varchar(64) nullable` — stores the lucide icon name. |
+| `image`          | Uploaded image (square, ≤ 1 MB, png / jpg / webp). Available only when tenant has file storage enabled. | `agents.avatarImageUploadId: uuid nullable` — FK to `work_knowledge_upload` (reuses existing upload pipeline). |
+
+The Agent's settings tab exposes the three modes as a radio group. Picking `icon` opens an icon picker modal; picking `image` opens the existing KB upload modal (with "1:1 ratio recommended, ≤ 1 MB" copy). Switching modes preserves the unused-mode's data so a user can flip back without re-uploading.
+
+Schema:
+- `agents.avatarMode: varchar(8) NOT NULL DEFAULT 'initials'` (enum: `initials | icon | image`).
+- `agents.avatarIcon: varchar(64) NULL` — only used when mode = `icon`.
+- `agents.avatarImageUploadId: uuid NULL` — only used when mode = `image`.
+
+When the tenant has no file storage configured, the `image` radio option is disabled with a tooltip: "Upload requires storage plugin — enable in /plugins."
+
 ## 5.11 Export (v1, read-only)
 
 `GET /agents/:id/export` returns a JSON envelope: `{meta, soulMd, agentsMd, heartbeatMd, toolsMd, agentYml}`. Sharable text snapshot. Import deferred to v2. See [QUESTIONS N5](../../QUESTIONS-agents-skills-tasks.md#n5--agent-export).

@@ -37,6 +37,32 @@
 
 Throughout this spec, references to "the platform stores tasks" / "Task service" should be read as the **first-party `"Ever Works Task Tracker"` plugin storing tasks in the platform DB**. Task templates (`bug-report`, `pr-review`, `weekly-status`) live in **[`ever-works/task-templates`](https://github.com/ever-works/task-templates)** repo per [ADR-014](../../decisions/014-no-hardcoded-catalogs.md), bundled by the first-party plugin.
 
+## 1.1 Tasks vs Ideas — they are NOT the same thing [F3 operator clarification]
+
+Common point of confusion: Tasks and Ideas are **both** unit-of-work abstractions in the Mission → Idea → Work hierarchy, but they live at different levels and serve different purposes. Conflating them will lead users + AI agents astray when they're deciding "should this be an Idea or a Task?"
+
+| Aspect              | Idea                                                                                                                       | Task                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **What it is**      | A proposal to build something (a Work). Higher-level. PM-flavored.                                                          | A unit of work to be done. Lower-level. Engineering-flavored.                                                  |
+| **Closest PM term** | "Epic" — but even that is not a true match. An Idea is an _exploratory proposal_, not a planned tranche of work.            | "Story" / "Issue" / "Ticket" / "Action item" — pick your tool's word.                                          |
+| **Origin**          | **Auto-generated** by the Work Agent from a Goal, or proposed by a Mission tick, or typed by the user via "+ Add Idea".    | Created by a human, an Agent, or a Generator. Always intentional and specific.                                  |
+| **Lifecycle**       | One-shot. Pending → Queued → Building → Done (or Dismissed / Failed). After Done, the Idea is archived.                    | Mutable. Status flows backlog → todo → in_progress → done / blocked / cancelled with reversals allowed.        |
+| **Bug-ish content** | **Never**. Ideas are about NEW things — new Works to build, new directions to explore.                                    | Frequently. Bugs, refactors, audits, follow-ups — anything you'd put in a tracker.                              |
+| **Droppability**    | **High** — operator quote: _"We can create 'idea' and drop it very easy."_ No commitment.                                 | Lower — once created, Tasks usually flow to a terminal state (done / cancelled).                                |
+| **Cardinality up**  | 1 Mission → many Ideas.                                                                                                    | 1 Idea OR 1 Work OR 1 Mission → many Tasks. Tasks can also live at tenant scope (no parent).                   |
+| **Cardinality down**| 1 Idea → 0..N Works. _(One Idea can spawn a mobile-app Work AND a website Work AND a landing-page Work, all from the same Idea.)_ | 1 Task → 0..N sub-Tasks.                                                                                       |
+| **Storage**         | `work_proposals` DB table (existing).                                                                                       | `tasks` DB table (new; via the "Ever Works Task Tracker" plugin per ADR-013).                                  |
+| **AI behavior**     | Generators propose Ideas. Approval gates exist (`autoBuildWorks`).                                                          | Agents execute Tasks. No approval gates by default.                                                              |
+
+### Concrete rules
+
+- **Don't create a Task for "build a new mobile app for cats business"** — that's an Idea. The right flow: Idea ("Mobile app for cats business") → user accepts → Mobile App Work created → Tasks created on that Work for implementation.
+- **Don't create an Idea for "fix the typo in the landing page hero"** — that's a Task on the landing-page Work.
+- **An Idea may have its OWN tasks** for validity-check / cost-estimate / market-research / prototyping work. These tasks live at Idea scope (`tasks.ideaId = <idea.id>`). They do NOT auto-forward to derived Works — see [§5.7](#57-idea--work-transition-tasks-do-not-follow-operator-decision-f4-b).
+- **Marketing efforts to test whether an Idea is worth pursuing** are Idea-level tasks (and may be assigned to an Agent). Once a Work is created from the Idea, those efforts continue on the Idea, in parallel with new Work-level tasks for implementation.
+
+This distinction is also cross-referenced from [ADR-009 §2 "What to do when a contributor is tempted to blur the lines"](../../decisions/009-tasks-vs-items-vs-kb-distinction.md).
+
 ## 1. Overview
 
 A **Task** is a unit of work with rich metadata: status, priority, labels, multiple assignees (humans + Agents), reviewers, approvers, a parent task (for sub-tasks), blockers, related tasks, a description (markdown), attachments, KB-document mentions, and a flat chat thread. Tasks can be scoped to a Work, a Mission, an Idea, or stand free (tenant-scoped). They drive Agent execution (when an Agent is an assignee on a Task moving to `in_progress`, the platform dispatches an `agent-task-execute` Trigger.dev run — see [agents/spec.md S4](../agents/spec.md)).
@@ -280,23 +306,77 @@ See [QUESTIONS F8](../../QUESTIONS-agents-skills-tasks.md#f8--email--push-notifi
 
 Out of scope in v1, but the `tasks` table reserves `promotedToIdeaId: uuid | null` column from day one to keep the v2 migration small. See [QUESTIONS F3](../../QUESTIONS-agents-skills-tasks.md#f3--task--idea-promotion).
 
-## 5.7 Idea → Work transition: tasks follow
+## 5.7 Idea → Work transition: tasks DO NOT follow [operator decision F4-b]
 
-When a `WorkProposal` (Idea) transitions to `ACCEPTED` and its `acceptedWorkId` is set:
+When a `WorkProposal` (Idea) transitions to `ACCEPTED` and its `acceptedWorkId` is set, **Idea-level tasks STAY on the Idea**. They do NOT auto-forward to the new Work.
 
-1. The platform finds all `tasks WHERE ideaId = <ideaId> AND workId IS NULL`.
-2. Sets `workId = <acceptedWorkId>` on each. **Keeps `ideaId` set** — Tasks stay visible on both the (now-archived) Idea tab and the new Work's tab. Cleaner audit; no orphans.
-3. Emits `TASK_UPDATED` activity rows with `details.reason='idea-promoted'`.
+The reason (operator clarification in [QUESTIONS F4](../../QUESTIONS-agents-skills-tasks.md#f4--idea--work-transition-forward-idea-scoped-tasks)):
 
-This piggybacks on the existing `WorkProposalService.acceptInternal()` flow ([researched in develop](../../architecture/agents-skills-tasks.md)). See [QUESTIONS F4](../../QUESTIONS-agents-skills-tasks.md#f4--idea--work-transition-forward-idea-scoped-tasks).
+> "The tasks that created for idea are usually tasks that just verify validity of idea, does it makes sense, how much it would cost and so on. Yes, some tasks can even do some implementations of idea, but probably unrelated to created Work. Basically from one Idea we can generate many Works, e.g. Mobile App work, Website Work, Landing Page Work etc from single idea and each of those Works can have own tasks / agents etc. While on Idea level, we can have separate tasks / agents that process such idea, unrelated to those Works (e.g. say we can have agent and tasks that will do marketing efforts for idea itself to see if it's valuable idea and measure interest etc)"
 
-## 5.8 Recurring tasks: schema reserved, runtime deferred
+So the model is:
 
-Out of scope for v1 behavior, but the `tasks` table reserves two columns:
-- `recurrenceRule: string | null` (RFC 5545 RRULE format; e.g. `FREQ=WEEKLY;BYDAY=MO`)
-- `parentRecurringTaskId: uuid | null` (back-pointer when a recurring Task generates instances)
+- **Idea-level tasks**: validity checks, cost estimation, market research, prototyping, anything that helps decide whether the Idea is worth pursuing. These live on the Idea forever — even after the Idea spawns Works.
+- **Work-level tasks**: implementation, refinement, deployment, anything specific to one of the Works that came out of the Idea.
 
-Always null in v1. See [QUESTIONS F5](../../QUESTIONS-agents-skills-tasks.md#f5--recurring-tasks-out-of-scope-but-reserve-schema).
+When an Idea is accepted and a Work is created, the platform:
+1. Sets `acceptedWorkId` on the WorkProposal (existing behavior).
+2. **Does NOT touch any `tasks` rows.** Idea-level tasks remain on the Idea.
+3. The new Work starts with zero tasks; users / Agents create Work-level tasks fresh.
+
+Cross-pollination is manual: a user (or Agent) can copy or reference an Idea-level task into a Work-level task via the existing `task_relations` table (`kind: 'follow-up'`) — but the platform never does it automatically.
+
+## 5.8 Recurring tasks — ship in v1 [operator override F5]
+
+Originally deferred; operator promoted to v1 explicitly:
+
+> "We MUST have recurring tasks 100% in v1. I.e. some tasks will be recurring with own schedule of run etc. (using same infra we already have with Trigger.dev etc)"
+
+### Behavior
+
+A recurring task is a **template** that the platform regenerates on a schedule. The template carries:
+
+- `isRecurring: true` (flag column on `tasks`).
+- `recurrenceRule: string` — RFC 5545 RRULE format (e.g. `FREQ=WEEKLY;BYDAY=MO`, `FREQ=DAILY`, `FREQ=MONTHLY;BYMONTHDAY=1`). Parsed via the `rrule` npm package (well-supported library; no DIY parsing).
+- `recurrenceTimezone: string` — defaults to `'UTC'`. Cron-like recurrences honor this for "every Monday at 9am MY local time" use cases.
+- `nextOccurrenceAt: timestamp` — pre-computed for dispatcher efficiency.
+- `recurrenceEndsAt: timestamp | null` — optional end date.
+- `recurrenceMaxOccurrences: int | null` — optional max count.
+- `recurrenceOccurredCount: int` — running counter.
+
+On each tick of the new dispatcher, when `nextOccurrenceAt <= now`:
+
+1. The platform **clones** the recurring task into a fresh instance with `parentRecurringTaskId = <template.id>`, `isRecurring = false`, status `todo`.
+2. Carries over: title, description, priority, labels, assignees, reviewers, approvers, scope. Drops: chat history, attachments-from-prior-instance, watcher state.
+3. Increments `recurrenceOccurredCount`.
+4. Recomputes `nextOccurrenceAt`.
+5. If `recurrenceEndsAt` or `recurrenceMaxOccurrences` reached, sets `isRecurring = false` on the template (effectively ended).
+6. Emits `TASK_RECURRENCE_FIRED` activity row with `details: {templateId, instanceId, occurrenceNumber}`.
+
+### Dispatcher
+
+New Trigger.dev cron task `task-recurrence-dispatcher`:
+- Cadence: `* * * * *` (every minute UTC) — matches Mission tick precedent.
+- CAS-claim per template via `tasks.casClaimRecurrence(taskId, expectedNextOccurrenceAt)` (atomic UPDATE WHERE).
+- Each fire batches up to 200 due templates.
+
+### UI
+
+- The "+ New Task" dialog gets a "Make this recurring" toggle. When on, surfaces:
+    - Frequency picker (Daily / Weekly / Monthly / Custom RRULE).
+    - Day-of-week / time-of-day pickers contextual to the frequency.
+    - Optional end date and max-count.
+- Task detail page shows a "Recurring" badge on the template and instances.
+- Each instance has a "View template" link in the sidebar.
+- Editing the template: a confirmation modal asks "Apply to future instances only, or update template (no retroactive changes)?" — v1 = template edits affect future instances only.
+
+### Constraints
+
+- Sub-tasks of a recurring template are themselves cloned on each fire. Sub-task chains aren't recursive (max depth 1).
+- Recurring tasks **cannot** have parent tasks (the template is a root). A child of a recurring template instance can have its own parent set normally.
+- Per-Agent budget enforcement applies normally — a recurring task whose assignee Agent runs out of budget will fail the same way a manually-created task does.
+
+Full implementation tasks in [task-tracking/plan.md §3.1 Recurring tasks](./plan.md) and [task-tracking/tasks.md Phase 8 — Recurring tasks](./tasks.md).
 
 ## 5.9 "Related" auto-detection
 
@@ -330,7 +410,7 @@ Only explicit `@<user-slug>` or `@<agent-slug>` mentions trigger dispatches/noti
 ## 6. Out of Scope (v1)
 
 - Time tracking (estimate/spent hours). v2.
-- Recurring tasks. v2.
+- Recurring tasks. **MOVED TO v1 per operator F5 override** — see §5.8.
 - Calendar / Gantt view. v2.
 - Email-to-task ingest. v2.
 - Slack/Discord task notifications. v2.

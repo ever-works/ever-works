@@ -107,7 +107,7 @@ This deliberately bypasses the multi-step create dialog: zero choices, one click
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The colored avatar circle uses initials of the Agent name; color hashed from the slug ([QUESTIONS H3-a](../QUESTIONS-agents-skills-tasks.md#h3--agent-card-visual-avatar--emoji--initials)).
+The colored avatar circle uses initials of the Agent name by default; color hashed from the slug. The user can switch to **icon picker** (lucide-react curated set) or **image upload** (when tenant storage enabled) from the Agent's Settings tab — see [features/agents/spec.md §5.10a](agents/spec.md) for the three avatar modes shipped in v1.
 
 ### 3.3 Kanban view
 

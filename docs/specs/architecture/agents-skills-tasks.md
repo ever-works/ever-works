@@ -425,6 +425,7 @@ The detailed open questions are consolidated in [`../QUESTIONS-agents-skills-tas
 - [`trigger-integration.md`](./trigger-integration.md) — Worker dispatch and callback channel re-used by Agent heartbeats.
 - [`activity-log.md`](./activity-log.md) — Activity feed re-used and extended.
 - [`agent-prompt-assembly.md`](./agent-prompt-assembly.md) — exact prompt-assembly recipe (companion deep-dive).
+- [`agent-yml-manifest-schema.md`](./agent-yml-manifest-schema.md) — Zod schema and examples for the `agent.yml` manifest used everywhere Agent definitions live.
 - [`agent-tools-catalog.md`](./agent-tools-catalog.md) — canonical tool API surface exposed to Agents.
 - [`security-agents-skills-tasks.md`](./security-agents-skills-tasks.md) — threat model and mitigations.
 - [`implementation-reuse-map.md`](./implementation-reuse-map.md) — engineer-lens map of every new piece to the platform asset it reuses.

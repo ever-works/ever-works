@@ -239,10 +239,23 @@ export class TaskKbMention {
 }
 ```
 
-Reserve-only columns on `tasks` (v1 always null; v2 populates):
-- `recurrenceRule: string | null`
-- `parentRecurringTaskId: uuid | null`
+Reserve-only column on `tasks` (v1 always null; v2 populates):
 - `promotedToIdeaId: uuid | null`
+
+**Recurring-task columns (v1, per operator F5 override):**
+- `isRecurring: boolean` (default `false`) — when `true`, this row is a template; new instances are cloned from it.
+- `recurrenceRule: string | null` — RFC 5545 RRULE (parsed via `rrule` npm package).
+- `recurrenceTimezone: varchar(64) | null` — defaults to `'UTC'`.
+- `nextOccurrenceAt: timestamp | null` — pre-computed for dispatcher; indexed `(isRecurring, nextOccurrenceAt)` for the dispatcher hot path.
+- `recurrenceEndsAt: timestamp | null` — optional end date.
+- `recurrenceMaxOccurrences: int | null` — optional max count.
+- `recurrenceOccurredCount: int default 0` — running counter.
+- `parentRecurringTaskId: uuid | null` — set on cloned instances; points back at the template.
+
+New Trigger.dev cron task `task-recurrence-dispatcher` (every minute):
+- File: `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`.
+- Pattern: identical to `mission-tick.task.ts` and `agent-heartbeat-dispatcher` — schedules.task + service call.
+- Service: `TaskRecurrenceDispatcherService.dispatchDue()` queries due templates, CAS-claims each, clones into a fresh `tasks` row, advances `nextOccurrenceAt`.
 
 ### 3.3 Migrations
 
@@ -312,10 +325,11 @@ CLI: no v1.
 
 ## 7. Background Jobs
 
-| Trigger ID                | When dispatched                                                          | Idempotency                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `agent-task-execute`      | On Task `* → in_progress` if any Agent is assignee, one run per Agent.   | Dedup key `(taskId, agentId, generation)` — same agent isn't re-dispatched while a run is active.  |
-| `agent-chat-reply`        | On `task_chat_messages` insert that mentions an Agent on the task.       | Dedup key = chatMessageId; replay-safe.                                                            |
+| Trigger ID                    | When dispatched                                                              | Idempotency                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `agent-task-execute`          | On Task `* → in_progress` if any Agent is assignee, one run per Agent.       | Dedup key `(taskId, agentId, generation)` — same agent isn't re-dispatched while a run is active.  |
+| `agent-chat-reply`            | On `task_chat_messages` insert that mentions an Agent on the task.           | Dedup key = chatMessageId; replay-safe.                                                            |
+| `task-recurrence-dispatcher`  | Cron `* * * * *` UTC. Polls `tasks WHERE isRecurring AND nextOccurrenceAt <= now()`. | CAS-claim via `casClaimRecurrence(taskId, expectedNextOccurrenceAt)`; double-fires impossible.     |
 
 Both live in `packages/tasks/src/tasks/trigger/`. Both pre-allocate an `agent_runs` row and use the existing remote-proxy callback channel.
 

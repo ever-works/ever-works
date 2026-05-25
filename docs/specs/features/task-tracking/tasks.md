@@ -101,6 +101,29 @@ Phases mirror [plan.md §10](./plan.md#10-phased-rollout). Tasks sequential unle
 - [ ] **T49**. Internal beta on staging; gather "Kanban scrollbar / drag-drop weirdness" bugs.
 - [ ] **T50**. Flip flag default to on.
 
+## Phase 8 — Recurring tasks [operator override F5: must ship in v1]
+
+> Promoted from v2-out-of-scope to v1 per operator instruction. Pattern mirrors existing `mission-tick` Trigger.dev cron task.
+
+- [ ] **T61**. Add columns to `tasks` table (in the original `CreateTasksTables.ts` migration if not yet landed, else a follow-up migration `AddRecurringTaskColumns.ts`): `isRecurring`, `recurrenceRule`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`, `parentRecurringTaskId`. Index `(isRecurring, nextOccurrenceAt)` for dispatcher hot path.
+- [ ] **T62**. Add `rrule` npm package (`pnpm add rrule -F @ever-works/agent`). Validate `recurrenceRule` on every write via `RRule.fromString()` — reject malformed.
+- [ ] **T63**. Compute `nextOccurrenceAt` on every recurrence-related write (create / update / after-fire). Helper `computeNextOccurrence(rule, timezone, from)` lives in `packages/agent/src/tasks/recurrence.ts`. Honors `recurrenceEndsAt` and `recurrenceMaxOccurrences`.
+- [ ] **T64**. Repository method `TaskRepository.casClaimRecurrence(taskId, expectedNextOccurrenceAt)` — atomic `UPDATE tasks SET nextOccurrenceAt = <newNext>, recurrenceOccurredCount = recurrenceOccurredCount + 1 WHERE id = ? AND nextOccurrenceAt = ?`. Returns affected rows; > 0 means we claimed it.
+- [ ] **T65**. Service method `TaskRecurrenceDispatcherService.dispatchDue(batchSize = 200)` — queries due templates, iterates, CAS-claims, clones into a fresh task row via `cloneRecurringTaskAsInstance(template)`. Emits `TASK_RECURRENCE_FIRED` activity row.
+- [ ] **T66**. Helper `cloneRecurringTaskAsInstance(template)` — copies title/description/priority/labels/assignees/reviewers/approvers/scope, drops chat/attachments/watchers, sets `parentRecurringTaskId = template.id`, `isRecurring = false`, status `todo`, recomputes slug counter.
+- [ ] **T67**. New Trigger.dev cron task `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`. Cadence `* * * * *` UTC. Bootstraps Nest, calls service. **Test**: race two concurrent calls, assert exactly one clones the instance.
+- [ ] **T68**. UI: "Make this recurring" toggle on the New-Task dialog. When ON, surface (Daily / Weekly / Monthly / Custom RRULE) frequency picker + day-of-week / time-of-day pickers contextual to the frequency + optional end date + optional max count. Show RRULE preview text ("Every Monday at 9am UTC, until Dec 31").
+- [ ] **T69**. UI: "Recurring" badge on template task cards; "Instance N of N" badge on cloned instances; "View template" link on instances; "X future occurrences" sidebar widget on templates.
+- [ ] **T70**. UI: edit-template confirmation modal — "Apply to future instances only" (the only v1 path; no retroactive edits).
+- [ ] **T71**. New activity event type `TASK_RECURRENCE_FIRED` added to `ActivityActionType` enum.
+- [ ] **T72**. Playwright e2e: create recurring task with `FREQ=DAILY`, advance clock by 25 hours, observe instance cloned + parent's `recurrenceOccurredCount` incremented.
+
+(Renumbered: account-transfer extension was Phase 7 T51-T60; recurring tasks is Phase 8 T61-T72; what was Phase 8 default-on rollout shifts to Phase 9.)
+
+## Phase 9 — Default-on rollout (was Phase 7 / 8)
+
+(No content change; just shifted in the ordering.)
+
 ## Definition of Done
 
 - [ ] All boxes ticked.
