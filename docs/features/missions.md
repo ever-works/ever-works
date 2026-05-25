@@ -45,16 +45,20 @@ stateDiagram-v2
     PAUSED --> ACTIVE: resume
     ACTIVE --> COMPLETED: complete
     PAUSED --> COMPLETED: complete
+    ACTIVE --> FAILED: tick worker hits fatal error
+    PAUSED --> FAILED: tick worker hits fatal error
     ACTIVE --> [*]: delete
     PAUSED --> [*]: delete
     COMPLETED --> [*]: delete
+    FAILED --> [*]: delete
 ```
 
-| Status        | What it means                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **ACTIVE**    | The tick worker considers this Mission on every cron match.                                                         |
-| **PAUSED**    | The tick worker skips it. Existing Ideas + Works stay untouched.                                                    |
-| **COMPLETED** | Terminal. Existing Ideas + Works stay; the Mission itself stops spawning. Not reversible without delete + recreate. |
+| Status        | What it means                                                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ACTIVE**    | The tick worker considers this Mission on every cron match.                                                                                                          |
+| **PAUSED**    | The tick worker skips it. Existing Ideas + Works stay untouched.                                                                                                     |
+| **COMPLETED** | Terminal. Existing Ideas + Works stay; the Mission itself stops spawning. Not reversible without delete + recreate.                                                  |
+| **FAILED**    | Terminal. Set by the tick worker (not the user) when the generation loop hits a fatal, non-transient error. Existing Ideas + Works stay; tick worker stops spawning. |
 
 Every transition is gated by the source status — you can't `resume` an already-ACTIVE Mission or `pause` a COMPLETED one.
 
