@@ -45,13 +45,8 @@ export class UserResearchListener {
                 return;
             }
 
-            const result = await this.proposals.refresh(
-                userId,
-                WorkProposalSource.AUTO_SIGNUP,
-            );
-            this.logger.log(
-                `User research dispatched for ${userId} (status=${result.status})`,
-            );
+            const result = await this.proposals.refresh(userId, WorkProposalSource.AUTO_SIGNUP);
+            this.logger.log(`User research dispatched for ${userId} (status=${result.status})`);
         } catch (err) {
             this.logger.warn(
                 `Failed to dispatch user research for ${userId}: ${(err as Error).message}`,

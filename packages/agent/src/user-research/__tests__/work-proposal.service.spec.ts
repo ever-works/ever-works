@@ -17,11 +17,13 @@ function makeDraft(title: string, slugSuggestion: string) {
     };
 }
 
-function makeService(overrides: {
-    pendingCount?: number;
-    existingProposals?: Array<{ title: string; slugSuggestion: string }>;
-    drafts?: ReturnType<typeof makeDraft>[];
-} = {}) {
+function makeService(
+    overrides: {
+        pendingCount?: number;
+        existingProposals?: Array<{ title: string; slugSuggestion: string }>;
+        drafts?: ReturnType<typeof makeDraft>[];
+    } = {},
+) {
     const users = {
         findById: jest.fn().mockResolvedValue({
             id: 'u1',
@@ -103,13 +105,17 @@ describe('WorkProposalService proposal limits and dedupe', () => {
         const result = await service.generate('u1', { source: WorkProposalSource.USER_REFRESH });
 
         expect(result.status).toBe('generated');
-        expect(repo.bulkInsert).toHaveBeenCalledWith([expect.objectContaining({ title: 'AI Agent Frameworks' })]);
+        expect(repo.bulkInsert).toHaveBeenCalledWith([
+            expect.objectContaining({ title: 'AI Agent Frameworks' }),
+        ]);
         expect(result.proposals).toHaveLength(1);
     });
 
     it('drops near-duplicate proposals against recent history', async () => {
         const { service, repo } = makeService({
-            existingProposals: [{ title: 'AI Agent Frameworks', slugSuggestion: 'ai-agent-frameworks' }],
+            existingProposals: [
+                { title: 'AI Agent Frameworks', slugSuggestion: 'ai-agent-frameworks' },
+            ],
             drafts: [
                 makeDraft('Open Source AI Agent Frameworks', 'open-source-ai-agent-frameworks'),
                 makeDraft('Developer Documentation Platforms', 'developer-documentation-platforms'),

@@ -16,23 +16,26 @@ interface DashboardPageProps {
 }
 
 export default async function Dashboard({ searchParams }: DashboardPageProps) {
-    const [{ newUser }, user, worksResponse, statsResponse, proposals, proposalsStatus] = await Promise.all([
-        searchParams,
-        getAuthFromCookie(),
-        getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
-            success: false,
-            works: [],
-            total: 0,
-        })),
-        getWorkStats().catch(() => ({
-            success: false,
-            totalWorks: 0,
-            totalItems: 0,
-            activeWebsites: 0,
-        })),
-        workProposalsAPI.list(['pending']).catch(() => []),
-        workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
-    ]);
+    const [{ newUser }, user, worksResponse, statsResponse, proposals, proposalsStatus] =
+        await Promise.all([
+            searchParams,
+            getAuthFromCookie(),
+            getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
+                success: false,
+                works: [],
+                total: 0,
+            })),
+            getWorkStats().catch(() => ({
+                success: false,
+                totalWorks: 0,
+                totalItems: 0,
+                activeWebsites: 0,
+            })),
+            workProposalsAPI.list(['pending']).catch(() => []),
+            workProposalsAPI
+                .status()
+                .catch(() => ({ researching: false, canRefresh: true }) as const),
+        ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
 

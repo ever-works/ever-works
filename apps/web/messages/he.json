@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "איפוס סיסמה הצליח!",
                 "canLogin": "כעת ניתן להתחבר עם הסיסמה החדשה שלך."
+            },
+            "tabs": {
+                "password": "סיסמה",
+                "magicLink": "שלח לי קישור בדואר"
+            },
+            "magicLink": {
+                "subtitle": "נשלח לך קישור חד-פעמי להתחברות לאימייל. אין צורך בסיסמה.",
+                "form": {
+                    "submit": "שלח קישור קסם",
+                    "submitting": "שולח..."
+                },
+                "success": {
+                    "title": "בדוק את תיבת הדואר הנכנס שלך",
+                    "message": "אם חשבון קיים עבור {email}, רק שלחנו קישור התחברות. הוא פג תוקף תוך 15 דקות.",
+                    "resend": "שלח קישור נוסף"
+                },
+                "errors": {
+                    "failed": "לא הצלחנו לשלוח את קישור הקסם. אנא נסה שוב."
+                },
+                "redeem": {
+                    "title": "מתחבר למערכת",
+                    "loading": "מוודא את קישור הקסם שלך...",
+                    "errorTitle": "לא ניתן להשתמש בקישור זה",
+                    "errorBody": "קישור הקסם שלך לא חוקי או שפג תוקפו. ניתן להשתמש בקישורי קסם רק פעם אחת והם תקפים למשך 15 דקות בלבד.",
+                    "requestNewLink": "שלח קישור חדש",
+                    "missingToken": "בקישור הקסם חסר טוקן. בקש קישור חדש כדי להמשיך."
+                }
             }
         },
         "forgotPassword": {
@@ -775,6 +802,7 @@
                 "actions": {
                     "saveSettings": "שמור הגדרות",
                     "queueGoal": "הוסף לתור יעד",
+                    "preparePlan": "הכן תוכנית",
                     "stop": "עצור"
                 },
                 "queue": {
@@ -2648,6 +2676,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "הודעת מסמך בירושה",
+                    "bannerTitle": "בירושה מהארגון",
+                    "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
+                    "overrideCta": "עקוף מקומית",
+                    "overrideCtaBusy": "מבצע פיצול…",
+                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
+                    "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2813,15 +2850,6 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
-                },
-                "inherited": {
-                    "bannerLabel": "הודעת מסמך בירושה",
-                    "bannerTitle": "בירושה מהארגון",
-                    "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
-                    "overrideCta": "עקוף מקומית",
-                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
-                    "overrideCtaBusy": "מבצע פיצול…",
-                    "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
                 },
                 "addDoc": {
                     "button": "+ הוסף",
@@ -3507,7 +3535,13 @@
                 "clusterIngressClassPreVerify": "שמור ואמת כדי לזהות את רשימת IngressClass של הקלאסטר הזה. השאר ריק לבררת המחדל של הקלאסטר.",
                 "clusterIngressClassEmpty": "לא זוהה בקר קלאסטר. התקן ingress-nginx, Traefik או בקר אחר בקלאסטר שלך, ואז שמור מחדש כדי לרענן רשימה זו.",
                 "githubPackagesOAuthConnect": "הרשה עם GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "ההרשמה ל-GitHub נכשלה. נסה שוב או הדבק PAT ידנית."
+                "githubPackagesOAuthFailed": "ההרשמה ל-GitHub נכשלה. נסה שוב או הדבק PAT ידנית.",
+                "githubConnectHint": "חבר חשבון GitHub מהלוח המחווני לפני הגדרת התוסף הזה.",
+                "personalAccount": "(אישי)",
+                "organizations": "ארגונים",
+                "pickOwnerFirst": "בחר בעל ראשון.",
+                "loadingRepos": "טוען מאגרים...",
+                "selectRepo": "בחר מאגר"
             },
             "oauth": {
                 "title": "חיבור חשבון",
@@ -3614,7 +3648,8 @@
                     "pushing": "דוחף",
                     "succeeded": "התאמה אישית הושלמה",
                     "failed": "הריצה האחרונה נכשלה"
-                }
+                },
+                "syncBase": "סנכרן מהבסיס"
             },
             "dialog": {
                 "title": "הוסף תבנית מותאמת",
@@ -3691,7 +3726,10 @@
                 "defaultFailed": "העדכון של ברירת המחדל של התבנית נכשל.",
                 "customizeFailed": "התחלת התאמת התבנית נכשלה.",
                 "customizationSucceeded": "התאמת התבנית הושלמה.",
-                "customizationFailed": "התאמת התבנית נכשלה."
+                "customizationFailed": "התאמת התבנית נכשלה.",
+                "syncBaseSuccess": "התבנית סונכרנה מהבסיס שלה.",
+                "syncBaseUpToDate": "התבנית כבר עדכנית עם הקוד של הבסיס.",
+                "syncBaseFailed": "כשל בסנכרון התבנית מהבסיס."
             },
             "customizeDialog": {
                 "title": "יצירת תבנית מותאמת אישית עם בינה מלאכותית",
@@ -3752,6 +3790,14 @@
                     "browsePlugins": "עיון בקטלוג תוספים",
                     "noRuns": "עדיין אין ריצות התאמה אישית עבור תבנית זו."
                 }
+            },
+            "syncDialog": {
+                "title": "סנכרן מתבנית הבסיס",
+                "description": "סנכרן את תבנית ההתאמה האישית הזו לקוד תבנית הבסיס המובנית העדכנית ביותר.",
+                "templateLabel": "תבנית מותאמת אישית",
+                "cancel": "בטל",
+                "submit": "סנכרן והחלף",
+                "warning": "פעולה זו מחליפה את מאגר התבניות המותאמות אישית בקוד תבנית הבסיס העדכני, ואז דוחפת אותו ל-GitHub. עיצוב AI ושינויים ידניים בקוד במאגר התבניות עלולים להימחות."
             }
         },
         "templateSelector": {
@@ -3929,7 +3975,9 @@
             "unsupportedProvider": "ספק לא נתמך",
             "providerConnectFailed": "נכשל בחיבור לספק",
             "forgotPasswordFailed": "נכשל בשליחת דוא\"ל איפוס סיסמה",
-            "resetPasswordFailed": "נכשל באיפוס סיסמה"
+            "resetPasswordFailed": "נכשל באיפוס סיסמה",
+            "magicLinkFailed": "שליחת קישור הקסם נכשלה",
+            "magicLinkInvalid": "קישור קסם לא חוקי או שפג תוקפו"
         }
     },
     "actions": {
@@ -4061,6 +4109,9 @@
             },
             "username": {
                 "minLength": "שם משתמש חייב להכיל לפחות {length} תווים"
+            },
+            "token": {
+                "required": "הטוקן לא יכול להיות ריק"
             }
         }
     },
