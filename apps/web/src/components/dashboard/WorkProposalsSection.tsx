@@ -87,6 +87,9 @@ export function WorkProposalsSection({
                 setRefreshError(t('errors.rateLimited'));
                 setCanRefresh(false);
                 setResearching(false);
+            } else if (result.status === 'at-limit') {
+                setCanRefresh(false);
+                setResearching(false);
             }
         } catch {
             setRefreshError(t('errors.generic'));

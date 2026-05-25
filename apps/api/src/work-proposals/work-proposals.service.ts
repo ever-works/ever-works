@@ -6,6 +6,7 @@ import { User } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
 import {
+    DEFAULT_MAX_PENDING_WORK_PROPOSALS,
     UserResearchService,
     UserResearchLimitsService,
     UserResearchRateLimitedError,
@@ -26,6 +27,7 @@ export interface ScheduledBatchSummary {
 const SCHEDULED_RERUN_BATCH_SIZE = 20;
 const SCHEDULED_RERUN_STALE_DAYS = 30;
 const PIPELINE_LOCK_TTL_MS = 2 * 60 * 60 * 1000;
+const PIPELINE_LOCK_KEY_PREFIX = 'work-proposals:pipeline';
 
 @Injectable()
 export class WorkProposalsApiService {
@@ -72,13 +74,18 @@ export class WorkProposalsApiService {
     async getRefreshStatus(userId: string): Promise<{
         researching: boolean;
         canRefresh: boolean;
-        refreshDisabledReason?: 'rate-limited';
+        refreshDisabledReason?: 'rate-limited' | 'at-limit';
     }> {
-        const researching = this.inFlight.has(userId);
+        const researching = await this.isPipelineRunning(userId);
         const canRun = await this.limits.canRun(userId);
         if (!canRun) {
             return { researching, canRefresh: false, refreshDisabledReason: 'rate-limited' };
         }
+
+        if (await this.hasReachedPendingProposalLimit(userId)) {
+            return { researching, canRefresh: false, refreshDisabledReason: 'at-limit' };
+        }
+
         return { researching, canRefresh: true };
     }
 
@@ -117,9 +124,13 @@ export class WorkProposalsApiService {
     async refresh(
         userId: string,
         source: WorkProposalSource = WorkProposalSource.USER_REFRESH,
-    ): Promise<{ status: 'queued' | 'rate-limited'; error?: string }> {
-        if (this.inFlight.has(userId)) {
+    ): Promise<{ status: 'queued' | 'rate-limited' | 'at-limit'; error?: string }> {
+        if (await this.isPipelineRunning(userId)) {
             return { status: 'queued', error: 'already in flight' };
+        }
+
+        if (await this.hasReachedPendingProposalLimit(userId)) {
+            return { status: 'at-limit', error: 'pending proposal limit reached' };
         }
 
         try {
@@ -191,6 +202,29 @@ export class WorkProposalsApiService {
         return summary;
     }
 
+    private getPipelineLockKey(userId: string): string {
+        return PIPELINE_LOCK_KEY_PREFIX + ':' + userId;
+    }
+
+    private async isPipelineRunning(userId: string): Promise<boolean> {
+        if (this.inFlight.has(userId)) return true;
+        return (await this.taskLockService?.isLocked(this.getPipelineLockKey(userId))) ?? false;
+    }
+
+    private getMaxPendingProposals(): number {
+        const raw = this.config.get<string | number>(
+            'WORK_PROPOSALS_MAX_PENDING',
+            DEFAULT_MAX_PENDING_WORK_PROPOSALS,
+        );
+        const value = Number(raw);
+        return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_PENDING_WORK_PROPOSALS;
+    }
+
+    private async hasReachedPendingProposalLimit(userId: string): Promise<boolean> {
+        const pending = await this.proposals.countPending(userId).catch(() => 0);
+        return pending >= this.getMaxPendingProposals();
+    }
+
     private async runPipelineLocked(userId: string, source: WorkProposalSource): Promise<void> {
         if (!this.taskLockService) {
             await this.runPipeline(userId, source);
@@ -198,7 +232,7 @@ export class WorkProposalsApiService {
         }
 
         const result = await this.taskLockService.runExclusive(
-            `work-proposals:pipeline:${userId}`,
+            this.getPipelineLockKey(userId),
             async () => this.runPipeline(userId, source),
             {
                 ttlMs: PIPELINE_LOCK_TTL_MS,
@@ -233,7 +267,11 @@ export class WorkProposalsApiService {
                 );
                 return;
             }
-            const generated = await this.proposals.generate(userId, { source });
+            const generated = await this.proposals.generate(userId, {
+                source,
+                suppressLowConfidence: source !== WorkProposalSource.AUTO_SIGNUP,
+                maxPendingProposals: this.getMaxPendingProposals(),
+            });
             this.logger.log(
                 `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}`,
             );

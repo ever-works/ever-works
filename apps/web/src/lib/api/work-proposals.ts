@@ -7,7 +7,7 @@ export type WorkProposalSource = 'auto-signup' | 'user-refresh' | 'discover' | '
 export interface WorkProposalsRefreshStatus {
     researching: boolean;
     canRefresh: boolean;
-    refreshDisabledReason?: 'rate-limited';
+    refreshDisabledReason?: 'rate-limited' | 'at-limit';
 }
 
 export interface WorkProposal {
@@ -48,9 +48,12 @@ export const workProposalsAPI = {
         });
     },
 
-    async refresh(): Promise<{ status: 'queued' | 'rate-limited'; error?: string }> {
+    async refresh(): Promise<{ status: 'queued' | 'rate-limited' | 'at-limit'; error?: string }> {
         try {
-            return await serverMutation<{ status: 'queued' | 'rate-limited'; error?: string }>({
+            return await serverMutation<{
+                status: 'queued' | 'rate-limited' | 'at-limit';
+                error?: string;
+            }>({
                 endpoint: '/me/work-proposals/refresh',
                 data: {},
                 method: 'POST',

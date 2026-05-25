@@ -34,9 +34,6 @@ jest.mock('../auth/decorators/user.decorator', () => ({
     CurrentUser: () => () => undefined,
 }));
 jest.mock('../events', () => ({
-    UserCreatedEvent: class UserCreatedEvent {
-        static EVENT_NAME = 'user.created';
-    },
     UserConfirmedEvent: class UserConfirmedEvent {
         static EVENT_NAME = 'user.confirmed';
     },

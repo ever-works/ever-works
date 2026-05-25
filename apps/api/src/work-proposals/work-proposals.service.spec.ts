@@ -27,6 +27,7 @@ class StubRateLimitedError extends Error {
 jest.mock(
     '@ever-works/agent/user-research',
     () => ({
+        DEFAULT_MAX_PENDING_WORK_PROPOSALS: 6,
         UserResearchRateLimitedError: StubRateLimitedError,
         UserResearchService: class {},
         WorkProposalService: class {},
@@ -54,6 +55,7 @@ describe('WorkProposalsApiService', () => {
     const makeDeps = () => {
         const research = { research: jest.fn().mockResolvedValue({ status: 'completed' }) };
         const proposals = {
+            countPending: jest.fn().mockResolvedValue(0),
             generate: jest.fn().mockResolvedValue({ status: 'generated', proposals: [] }),
             list: jest.fn().mockResolvedValue([]),
             dismiss: jest.fn().mockResolvedValue(true),
@@ -71,6 +73,7 @@ describe('WorkProposalsApiService', () => {
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
         const taskLock = {
+            isLocked: jest.fn().mockResolvedValue(false),
             runExclusive: jest.fn(async (_key: string, fn: () => Promise<void>) => ({
                 acquired: true,
                 result: await fn(),
@@ -98,7 +101,25 @@ describe('WorkProposalsApiService', () => {
             timeoutMs: 1_800_000,
             maxSteps: 14,
         });
-        expect(proposals.generate).toHaveBeenCalledWith('u1', { source: 'user-refresh' });
+        expect(proposals.generate).toHaveBeenCalledWith('u1', {
+            source: 'user-refresh',
+            suppressLowConfidence: true,
+            maxPendingProposals: 6,
+        });
+    });
+
+    it('allows low-confidence proposals for auto-signup runs', async () => {
+        const { svc, proposals } = makeDeps();
+
+        await svc.refresh('u1', 'auto-signup' as never);
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(proposals.generate).toHaveBeenCalledWith('u1', {
+            source: 'auto-signup',
+            suppressLowConfidence: false,
+            maxPendingProposals: 6,
+        });
     });
 
     it('runs refresh pipelines through the distributed per-user lock', async () => {
@@ -132,6 +153,16 @@ describe('WorkProposalsApiService', () => {
         });
     });
 
+    it('returns at-limit before spending research tokens when pending proposals are full', async () => {
+        const { svc, proposals, research } = makeDeps();
+        proposals.countPending.mockResolvedValue(6);
+
+        const result = await svc.refresh('u1');
+
+        expect(result.status).toBe('at-limit');
+        expect(research.research).not.toHaveBeenCalled();
+    });
+
     it('returns rate-limited when cap is exceeded', async () => {
         const { svc, limits } = makeDeps();
         limits.assertCanRun.mockRejectedValue(new StubRateLimitedError('maxRunsPerDay', 3, 3));
@@ -153,6 +184,27 @@ describe('WorkProposalsApiService', () => {
         await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
             researching: false,
             canRefresh: true,
+        });
+    });
+
+    it('getRefreshStatus reports researching=true when another instance holds the pipeline lock', async () => {
+        const { svc, taskLock } = makeDeps();
+        taskLock.isLocked.mockResolvedValue(true);
+
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: true,
+            canRefresh: true,
+        });
+    });
+
+    it('getRefreshStatus reports canRefresh=false when pending proposal limit is reached', async () => {
+        const { svc, proposals } = makeDeps();
+        proposals.countPending.mockResolvedValue(6);
+
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: false,
+            canRefresh: false,
+            refreshDisabledReason: 'at-limit',
         });
     });
 

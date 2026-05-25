@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
-import { UserConfirmedEvent, UserCreatedEvent } from '../events';
+import { UserConfirmedEvent } from '../events';
 import { WorkProposalsApiService } from './work-proposals.service';
 
 @Injectable()
@@ -13,11 +13,6 @@ export class UserResearchListener {
         private readonly proposals: WorkProposalsApiService,
         private readonly config: ConfigService,
     ) {}
-
-    @OnEvent(UserCreatedEvent.EVENT_NAME)
-    async onUserCreated(event: UserCreatedEvent): Promise<void> {
-        await this.dispatchSignupResearch(event.user.id);
-    }
 
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async onUserConfirmed(event: UserConfirmedEvent): Promise<void> {
