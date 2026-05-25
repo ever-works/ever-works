@@ -414,8 +414,20 @@ describe('TemplateCatalogService', () => {
 
     it('seedBuiltInTemplates deactivates orphan built-in rows pointing at the same repo', async () => {
         templateRepository.upsert.mockResolvedValue(undefined);
+        // Phase 8 PR X — the curated catalog now seeds Mission Templates
+        // alongside Website Templates, so the per-curated dedup loop
+        // also calls findAllBuiltInByRepositoryCoordinates for each
+        // Mission repo. The mock returns ONLY the matching curated id
+        // for each (owner, repo) so non-orphan curated rows aren't
+        // erroneously deactivated.
+        const CURATED_BY_REPO: Record<string, string> = {
+            'ever-works/directory-web-template': 'classic',
+            'ever-works/directory-web-minimal-template': 'minimal',
+            'ever-works/starter-business-mission-template': 'starter-business',
+            'ever-works/starter-content-mission-template': 'starter-content',
+        };
         templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
-            async (_kind: string, owner: string, repo: string) => {
+            async (kind: string, owner: string, repo: string) => {
                 if (owner === 'ever-works' && repo === 'directory-web-minimal-template') {
                     return [
                         {
@@ -436,10 +448,12 @@ describe('TemplateCatalogService', () => {
                         },
                     ];
                 }
+                const curatedId = CURATED_BY_REPO[`${owner}/${repo}`];
+                if (!curatedId) return [];
                 return [
                     {
-                        id: 'classic',
-                        kind: 'website',
+                        id: curatedId,
+                        kind,
                         sourceType: 'built_in',
                         repositoryOwner: owner,
                         repositoryName: repo,

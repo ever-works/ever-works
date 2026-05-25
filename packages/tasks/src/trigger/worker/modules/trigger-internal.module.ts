@@ -4,6 +4,7 @@ import {
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
+import { MissionTickService } from '@ever-works/agent/missions';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -44,6 +45,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'DeployReadyPollerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Phase 3 PR J — mission-tick cron task resolves
+        // MissionTickService via this proxy. The real service lives
+        // in the API; the worker only needs the proxy to call
+        // tickDue() over the internal HTTP channel each minute.
+        {
+            provide: MissionTickService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MissionTickService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -51,6 +62,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         WorkScheduleService,
         DATA_SYNC_DISPATCHER_SERVICE,
         DeployReadyPollerService,
+        MissionTickService,
     ],
 })
 export class TriggerInternalModule {}

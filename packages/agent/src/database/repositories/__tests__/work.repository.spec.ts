@@ -65,6 +65,16 @@ describe('WorkRepository', () => {
             delete: jest.fn(),
             createQueryBuilder: jest.fn(),
         };
+        // Phase 2 PR F — getAccessibleStats now also runs 2 raw
+        // COUNT(*) queries (missions + work_proposals) via
+        // `repository.manager.query`. Stub it with a no-op that
+        // returns the empty-result shape (`[{ c: 0 }]`) so the
+        // numeric coercion path still works in tests that don't
+        // care about the mission/idea counts. Tests that DO care
+        // about specific values override per-test via mockResolvedValueOnce.
+        (repository as unknown as { manager: { query: jest.Mock } }).manager = {
+            query: jest.fn().mockResolvedValue([{ c: '0' }]),
+        };
         service = new WorkRepository(repository as unknown as Repository<Work>);
     });
 
@@ -877,6 +887,10 @@ describe('WorkRepository', () => {
                 totalItems: 0,
                 activeWebsites: 0,
                 generatingCount: 0,
+                // Phase 2 PR F — new tiles included in the
+                // empty-user envelope.
+                totalMissions: 0,
+                totalIdeas: 0,
             });
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
         });
@@ -904,6 +918,11 @@ describe('WorkRepository', () => {
                 totalItems: 50,
                 activeWebsites: 7,
                 generatingCount: 2,
+                // Phase 2 PR F — manager.query mock returns
+                // `[{ c: '0' }]` from the beforeEach default; missions
+                // + ideas counts therefore parse to 0.
+                totalMissions: 0,
+                totalIdeas: 0,
             });
 
             // Pin the four select column shapes
@@ -950,6 +969,10 @@ describe('WorkRepository', () => {
                 totalItems: 0,
                 activeWebsites: 0,
                 generatingCount: 0,
+                // Phase 2 PR F — defaults from the beforeEach
+                // manager.query stub.
+                totalMissions: 0,
+                totalIdeas: 0,
             });
         });
 

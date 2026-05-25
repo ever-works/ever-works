@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
-import { User } from '@ever-works/agent/entities';
+import { User, type WorkProposal } from '@ever-works/agent/entities';
 import { UserRepository } from '@ever-works/agent/database';
 import {
     UserResearchService,
@@ -12,6 +12,8 @@ import {
     WorkProposalSource,
     WorkProposalStatus,
 } from '@ever-works/agent/user-research';
+import { WorkAgentService } from '@ever-works/agent/work-agent';
+import type { WorkAgentGoalDto } from '@ever-works/agent/work-agent';
 
 export interface ScheduledBatchSummary {
     candidates: number;
@@ -37,10 +39,15 @@ export class WorkProposalsApiService {
         private readonly users: UserRepository,
         @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
         private readonly config: ConfigService,
+        private readonly workAgent: WorkAgentService,
     ) {}
 
-    async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
-        return this.proposals.list(userId, statuses);
+    async list(
+        userId: string,
+        statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { missionId?: string | null } = {},
+    ) {
+        return this.proposals.list(userId, statuses, opts);
     }
 
     async dismiss(userId: string, proposalId: string): Promise<boolean> {
@@ -48,9 +55,132 @@ export class WorkProposalsApiService {
     }
 
     async accept(userId: string, proposalId: string, workId: string): Promise<boolean> {
-        const proposal = await this.proposals.getForUser(userId, proposalId);
-        if (!proposal) return false;
-        return this.proposals.markAccepted(userId, proposalId, workId);
+        // Existing user-facing accept: only valid from PENDING (today's
+        // contract — preserved). The shared helper now lives on the
+        // agent-side service so PR FF's Goal-completion handler can
+        // call it with `[BUILDING]` instead.
+        return this.proposals.acceptInternal(userId, proposalId, workId, [
+            WorkProposalStatus.PENDING,
+        ]);
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
+     * create. The user types a description; the service derives
+     * a title (placeholder until the AI titler ships in PR I),
+     * persists with source=USER_MANUAL, status=PENDING, and
+     * returns the new proposal.
+     */
+    async createUserManual(
+        userId: string,
+        input: { description: string; title?: string },
+    ): Promise<WorkProposal> {
+        const description = input.description?.trim() ?? '';
+        if (description.length < 10) {
+            throw new BadRequestException('description must be at least 10 characters');
+        }
+        return this.proposals.createUserManual(userId, {
+            description,
+            title: input.title,
+        });
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue an
+     * existing Idea for build. Transitions Idea to QUEUED + creates
+     * a `WorkAgentGoal` with `maxWorksPerRun=1` and `ideaId` set
+     * back to this Idea. On Goal completion (Phase 1 PR FF) the
+     * Goal-completion handler reads `ideaId` and calls
+     * `acceptInternal(userId, ideaId, workId, [BUILDING])` to
+     * finish the cycle.
+     *
+     * Returns the updated Idea + the freshly-created Goal.
+     */
+    async build(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (
+            existing.status !== WorkProposalStatus.PENDING &&
+            existing.status !== WorkProposalStatus.FAILED
+        ) {
+            throw new BadRequestException(
+                `Idea cannot be queued for build from status "${existing.status}". Allowed: pending, failed.`,
+            );
+        }
+        const proposal = await this.proposals.queueForBuild(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
+     * Retry button for a FAILED Idea (spec §3.9). Clears the
+     * failureMessage + failureKind, transitions FAILED → QUEUED,
+     * creates a fresh WorkAgentGoal. Same shape as `build()` but
+     * with stricter "must be FAILED" precondition.
+     */
+    async retry(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (existing.status !== WorkProposalStatus.FAILED) {
+            throw new BadRequestException(
+                `Retry is only valid for FAILED Ideas. Current status: "${existing.status}".`,
+            );
+        }
+        const proposal = await this.proposals.retryFailed(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/rebuild` for a
+     * DONE Idea (spec §3.9, Decision A27). Creates a NEW Work
+     * (separate from the original); on Goal completion the Idea's
+     * `acceptedWorkId` is re-pointed to the new Work. The original
+     * Work is NOT deleted — user can keep, repurpose, or manually
+     * delete it.
+     */
+    async rebuild(
+        userId: string,
+        proposalId: string,
+    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+        const existing = await this.proposals.getForUser(userId, proposalId);
+        if (!existing) return null;
+        if (existing.status !== WorkProposalStatus.ACCEPTED) {
+            throw new BadRequestException(
+                `Rebuild is only valid for ACCEPTED (Done) Ideas. Current status: "${existing.status}".`,
+            );
+        }
+        const proposal = await this.proposals.beginRebuild(userId, proposalId);
+        if (!proposal) return null;
+
+        const { goal } = await this.workAgent.createGoal(userId, {
+            instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+            maxWorksPerRun: 1,
+            ideaId: proposal.id,
+        });
+
+        return { proposal, goal };
     }
 
     async getForUser(userId: string, proposalId: string) {
@@ -207,9 +337,25 @@ export class WorkProposalsApiService {
                 );
                 return;
             }
-            const generated = await this.proposals.generate(userId, { source });
+            // Phase 1 PR D — read the user's autoGenerateBatchSize pref
+            // (Phase 0 PR 0.4 column) and pass it through to the
+            // generator. NULL on the column → prompt builder applies
+            // its own hardcoded default (3). Wrapped in catch because
+            // pref-fetch failures must not block proposal generation —
+            // we just fall back to the default.
+            let targetCount: number | null = null;
+            try {
+                const prefs = await this.workAgent.getPreferences(userId);
+                targetCount = prefs.autoGenerateBatchSize ?? null;
+            } catch (err) {
+                this.logger.debug(
+                    `Pref-fetch for autoGenerateBatchSize failed for ${userId}; using default: ${(err as Error).message}`,
+                );
+            }
+
+            const generated = await this.proposals.generate(userId, { source, targetCount });
             this.logger.log(
-                `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}`,
+                `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}, target=${targetCount ?? 'default'}`,
             );
         } catch (err) {
             this.logger.error(

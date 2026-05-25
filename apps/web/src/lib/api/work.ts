@@ -233,6 +233,17 @@ export interface WorkStatsResponse {
     totalItems: number;
     activeWebsites: number;
     generatingCount: number;
+    /**
+     * Phase 2 PR F — Missions/Ideas/Works v6 spec §5.1. New
+     * Dashboard stat tiles in order: [Missions][Ideas][Works][Items][Sites].
+     * `totalMissions` counts all Mission rows for the user across
+     * all statuses (Active + Paused + Completed + Failed —
+     * sense-of-activity gauge). `totalIdeas` counts all
+     * `work_proposals` rows across all statuses (PENDING + QUEUED
+     * + BUILDING + ACCEPTED + DISMISSED + FAILED).
+     */
+    totalMissions: number;
+    totalIdeas: number;
 }
 
 export interface DeleteWorkResponse {

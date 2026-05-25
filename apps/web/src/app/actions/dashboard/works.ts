@@ -571,12 +571,16 @@ export async function getWorkStats() {
         };
     } catch (error) {
         console.error('Failed to fetch Work stats:', error);
+        // Phase 2 PR F — error fallback includes the new tile values
+        // so the Dashboard render path never sees undefined.
         return {
             success: false,
             totalWorks: 0,
             totalItems: 0,
             activeWebsites: 0,
             generatingCount: 0,
+            totalMissions: 0,
+            totalIdeas: 0,
         };
     }
 }

@@ -11,6 +11,10 @@ This section covers individual capabilities built into the Ever Works Platform b
 
 | Feature                                              | Description                                                                                               |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [Missions](./missions)                               | Long-running goals that spawn Ideas and optionally auto-build Works on a schedule                         |
+| [Ideas](./ideas)                                     | Proposed Works in the queue between "topic" and "finished website" — build, retry, dismiss, accept        |
+| [Mission Templates](./mission-templates)             | Pre-built Mission setups (cadence, guardrails, KB seed) you can fork via "Use this Template"              |
+| [Budgets & Usage](./budgets-and-usage)               | Per-Mission / per-Idea / per-Work / account-wide caps that gate AI spend before the bill arrives          |
 | [Community PR Processing](./community-pr-processing) | Automatically process community-submitted GitHub PRs to extract work items using AI                       |
 | [Work Changelog](./work-changelog)                   | Track item, comparison, taxonomy, and community PR changes in a paginated work history timeline           |
 | [Collections](./collections)                         | Curate items into named groups like "Editor's Picks" or "Best for Beginners"                              |

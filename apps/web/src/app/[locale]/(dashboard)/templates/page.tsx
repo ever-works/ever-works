@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { templatesAPI } from '@/lib/api/templates';
+import { templatesAPI, type TemplateKind } from '@/lib/api/templates';
 import { gitProvidersAPI } from '@/lib/api';
 import { TemplatesCatalog } from '@/components/templates/TemplatesCatalog';
 
@@ -9,12 +9,31 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('templates') };
 }
 
-export default async function TemplatesPage() {
+/**
+ * Phase 8 PR W — `/templates` reads an optional `?kind=` query
+ * param so the kind-switch toggle (Mission / Work / Website) can
+ * flip catalogs without bouncing the user to a different route.
+ * Spec §10 calls for Mission Templates to be the default once
+ * PR X seeds the catalog; for now the legacy `'website'` stays
+ * the implicit default so existing users see the same page
+ * they're used to.
+ */
+type SearchParams = Promise<{ kind?: string }>;
+
+const VALID_KINDS: TemplateKind[] = ['website', 'work', 'mission'];
+
+export default async function TemplatesPage({ searchParams }: { searchParams: SearchParams }) {
+    const params = await searchParams;
+    const raw = (params?.kind ?? '').trim().toLowerCase();
+    const kind: TemplateKind = (VALID_KINDS as string[]).includes(raw)
+        ? (raw as TemplateKind)
+        : 'website';
+
     const [templatesData, gitUserResult, organizationsResult, providersResult, aiProvidersResult] =
         await Promise.all([
-            templatesAPI.list('website').catch(() => ({
+            templatesAPI.list(kind).catch(() => ({
                 status: 'success' as const,
-                kind: 'website' as const,
+                kind,
                 defaultTemplateId: null,
                 templates: [],
             })),
@@ -56,7 +75,7 @@ export default async function TemplatesPage() {
     return (
         <div className="w-full overflow-auto">
             <TemplatesCatalog
-                kind="website"
+                kind={kind}
                 templates={templatesData.templates}
                 defaultTemplateId={templatesData.defaultTemplateId}
                 forkTargets={forkTargets}

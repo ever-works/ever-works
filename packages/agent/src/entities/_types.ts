@@ -1,6 +1,30 @@
 import { Column, type ColumnOptions } from 'typeorm';
 
 /**
+ * Polymorphic-owner discriminator for budgets and usage rows
+ * (Missions/Ideas/Works spec §8.2).
+ *
+ * Defined in this leaf-types file (rather than next to `WorkBudget`)
+ * because four entities use it as a column default (`@Column({
+ * default: BudgetOwnerType.WORK })`). When the enum lived next to
+ * `WorkBudget` the import cycle work-budget → work → user →
+ * work-generation-history → work-schedule → usage-ledger-entry →
+ * work-budget left `BudgetOwnerType` undefined at decorator-evaluation
+ * time on the entities other than `WorkBudget` itself, breaking
+ * module init. Moving it here breaks the cycle: `_types.ts` imports
+ * nothing from entities, so it's always fully loaded before any
+ * entity needs it.
+ *
+ * Re-exported from `work-budget.entity.ts` for back-compat with any
+ * call site that imports `BudgetOwnerType` from there.
+ */
+export enum BudgetOwnerType {
+    WORK = 'work',
+    IDEA = 'idea',
+    MISSION = 'mission',
+}
+
+/**
  * Portable epoch-millis timestamp column. Stores as `bigint` (works
  * cross-DB; raw `Date` defaults to TIMESTAMP WITH TIME ZONE on
  * Postgres and INTEGER on SQLite, breaking parity). The transformer

@@ -17,11 +17,16 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { WorkProposalStatus } from '@ever-works/agent/user-research';
+import type { WorkProposal } from '@ever-works/agent/entities';
+import { BudgetOwnerType } from '@ever-works/agent/entities';
+import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
+    BuildWorkProposalResponseDto,
+    CreateWorkProposalDto,
     ListWorkProposalsQueryDto,
     UpdateWorkProposalPreferencesDto,
     type RefreshResponseDto,
@@ -30,6 +35,56 @@ import {
 
 const GENERIC_PROPOSAL_PROMPT =
     'Create a Work from this personalized idea. Research relevant items, categories, fields, and metadata based on the proposal details.';
+
+/**
+ * Phase 1 PR FF — shared BuildWorkProposalResponseDto builder. The
+ * /build, /retry, and /rebuild endpoints all return the same shape
+ * (the Idea after the state transition + the freshly-created Goal).
+ * Extracted so the three controller methods stay one-liners.
+ */
+function toBuildResponseDto(result: {
+    proposal: WorkProposal;
+    goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: Date };
+}): BuildWorkProposalResponseDto {
+    return {
+        proposal: toResponseDto(result.proposal),
+        goal: {
+            id: result.goal.id,
+            instruction: result.goal.instruction,
+            status: result.goal.status,
+            dryRun: result.goal.dryRun,
+            createdAt: result.goal.createdAt,
+        },
+    };
+}
+
+/**
+ * Shared map from WorkProposal entity → response DTO. Extracted in
+ * Phase 1 PR B so the three controller paths (`list()`, `getOne()`,
+ * `build()`) and the user-manual `createUserManual()` all return
+ * the same shape with the new missionId / failureMessage /
+ * failureKind fields.
+ */
+function toResponseDto(proposal: WorkProposal): WorkProposalResponseDto {
+    return {
+        id: proposal.id,
+        title: proposal.title,
+        description: proposal.description,
+        slugSuggestion: proposal.slugSuggestion,
+        suggestedCategories: proposal.suggestedCategories,
+        suggestedFields: proposal.suggestedFields,
+        recommendedPlugins: proposal.recommendedPlugins,
+        generatedPrompt: toProposalUserPrompt(proposal),
+        reasoning: proposal.reasoning,
+        source: proposal.source,
+        status: proposal.status,
+        acceptedWorkId: proposal.acceptedWorkId ?? null,
+        missionId: proposal.missionId ?? null,
+        failureMessage: proposal.failureMessage ?? null,
+        failureKind: proposal.failureKind ?? null,
+        generatedAt: proposal.generatedAt,
+    };
+}
 
 function toProposalUserPrompt(proposal: {
     title: string;
@@ -54,7 +109,35 @@ function toProposalUserPrompt(proposal: {
 @ApiTags('work-proposals')
 @Controller('api/me/work-proposals')
 export class WorkProposalsController {
-    constructor(private readonly service: WorkProposalsApiService) {}
+    constructor(
+        private readonly service: WorkProposalsApiService,
+        // Phase 7 PR U — per-Idea budget summary.
+        private readonly budgetService: BudgetService,
+    ) {}
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
+     * create. Body: `{ description, title? }`. Returns the new
+     * Idea row. Title is derived from the description until the
+     * AI shared titler ships in PR I.
+     *
+     * @Throttle: 10 per minute matches the modest cadence a real
+     * user would create Ideas via the +Add quick-add (spec §3.4).
+     */
+    @Post()
+    @ApiOperation({ summary: 'Create a user-typed Idea (USER_MANUAL source)' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async createUserManual(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateWorkProposalDto,
+    ): Promise<WorkProposalResponseDto> {
+        const created = await this.service.createUserManual(auth.userId, {
+            description: body.description,
+            title: body.title,
+        });
+        return toResponseDto(created);
+    }
 
     @Get()
     @ApiOperation({ summary: 'List my work proposals' })
@@ -67,22 +150,10 @@ export class WorkProposalsController {
             query.statuses && query.statuses.length > 0
                 ? query.statuses
                 : [WorkProposalStatus.PENDING];
-        const proposals = await this.service.list(auth.userId, statuses);
-        return proposals.map((p) => ({
-            id: p.id,
-            title: p.title,
-            description: p.description,
-            slugSuggestion: p.slugSuggestion,
-            suggestedCategories: p.suggestedCategories,
-            suggestedFields: p.suggestedFields,
-            recommendedPlugins: p.recommendedPlugins,
-            generatedPrompt: toProposalUserPrompt(p),
-            reasoning: p.reasoning,
-            source: p.source,
-            status: p.status,
-            acceptedWorkId: p.acceptedWorkId ?? null,
-            generatedAt: p.generatedAt,
-        }));
+        const proposals = await this.service.list(auth.userId, statuses, {
+            missionId: query.missionId,
+        });
+        return proposals.map(toResponseDto);
     }
 
     @Get('status')
@@ -152,21 +223,28 @@ export class WorkProposalsController {
     ): Promise<WorkProposalResponseDto> {
         const proposal = await this.service.getForUser(auth.userId, id);
         if (!proposal) throw new NotFoundException('Proposal not found');
-        return {
-            id: proposal.id,
-            title: proposal.title,
-            description: proposal.description,
-            slugSuggestion: proposal.slugSuggestion,
-            suggestedCategories: proposal.suggestedCategories,
-            suggestedFields: proposal.suggestedFields,
-            recommendedPlugins: proposal.recommendedPlugins,
-            generatedPrompt: toProposalUserPrompt(proposal),
-            reasoning: proposal.reasoning,
-            source: proposal.source,
-            status: proposal.status,
-            acceptedWorkId: proposal.acceptedWorkId ?? null,
-            generatedAt: proposal.generatedAt,
-        };
+        return toResponseDto(proposal);
+    }
+
+    @Get(':id/budget')
+    @ApiOperation({
+        summary:
+            'Current period spend + cap status for this Idea (Phase 7 PR U). 404 when the Idea belongs to another user.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async budget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<OwnerBudgetSummary> {
+        // Phase 7 PR U — ownership gate first so the per-Idea
+        // spend isn't introspectable by unrelated users. Mirrors
+        // the Mission endpoint shape.
+        const proposal = await this.service.getForUser(auth.userId, id);
+        if (!proposal) throw new NotFoundException('Proposal not found');
+        return this.budgetService.summarizeForOwner({
+            ownerType: BudgetOwnerType.IDEA,
+            ownerId: id,
+        });
     }
 
     @Patch(':id/dismiss')
@@ -181,6 +259,70 @@ export class WorkProposalsController {
         if (!ok) {
             throw new NotFoundException('Proposal not found or not pending');
         }
+    }
+
+    /**
+     * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
+     * an Idea for build. Transitions to QUEUED + creates a
+     * WorkAgentGoal (`maxWorksPerRun=1`, `ideaId` set) so the
+     * goal-completion handler (PR FF) can transition the Idea
+     * to ACCEPTED with the new Work when the build finishes.
+     */
+    @Post(':id/build')
+    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent goal pipeline' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async build(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.build(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return toBuildResponseDto(result);
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
+     * Retry button (spec §3.9). Only valid for FAILED Ideas; clears
+     * the failureMessage + failureKind, transitions FAILED → QUEUED,
+     * spins up a fresh build Goal.
+     */
+    @Post(':id/retry')
+    @ApiOperation({ summary: 'Manually retry a failed Idea build' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async retry(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.retry(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return toBuildResponseDto(result);
+    }
+
+    /**
+     * Phase 1 PR FF — `POST /me/work-proposals/:id/rebuild` for a
+     * DONE Idea (Decision A27). Creates a NEW Work; on Goal
+     * completion the Idea's `acceptedWorkId` is re-pointed to the
+     * new Work. The original Work is NOT deleted.
+     */
+    @Post(':id/rebuild')
+    @ApiOperation({ summary: 'Re-build a done Idea — produces a new Work, original is preserved' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async rebuild(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<BuildWorkProposalResponseDto> {
+        const result = await this.service.rebuild(auth.userId, id);
+        if (!result) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return toBuildResponseDto(result);
     }
 
     @Post(':id/accept')
