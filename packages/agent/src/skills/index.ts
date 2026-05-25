@@ -1,6 +1,7 @@
 // Public surface of the agent-side Skills module
-// (Agents/Skills/Tasks PR #1017 — Phase 8).
+// (Agents/Skills/Tasks PR #1017 — Phase 8 + 9).
 export * from './skills.module';
+export * from './skills.service';
 export { Skill, type SkillOwnerType, type SkillFrontmatter } from '../entities/skill.entity';
 export {
 	SkillBinding,

@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 12
-- **Last tick at**: 2026-05-26 (tick 12 — Phase 8 complete: ISkillsProviderPlugin contract + SKILLS_PROVIDER capability + Ever Works Skills plugin (builtin fallback catalog) + SkillsFacadeService + agent-side SkillsModule + API-side SkillsModule + SkillsController read-only routes + plugin unit tests.)
-- **In progress now**: (none — next tick picks up Phase 9 Skill mutations + /skills page + Bindings tab)
+- **Last tick #**: 13
+- **Last tick at**: 2026-05-26 (tick 13 — Phase 9 complete: SkillsService (CRUD + install-from-catalog + bindings CRUD) + Skills controller write paths + SkillBindingsController + web /skills 3-section page (Installed/Available/Custom) + skills API client + server actions + service unit tests.)
+- **In progress now**: (none — next tick picks up Phase 10 Skill injection into AI calls)
 
 ---
 
@@ -148,11 +148,11 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 9 — Skill mutations + /skills page + Bindings tab
 
-- [ ] **9.1** `POST /skills/install`, `POST /skills`, `PATCH /skills/:id`, `DELETE /skills/:id`.
-- [ ] **9.2** Bindings CRUD endpoints.
-- [ ] **9.3** `/skills` page (3 sections: Installed / Available / Custom).
-- [ ] **9.4** `/skills/[id]` Body + Bindings tabs.
-- [ ] **9.5** Tests.
+- [x] **9.1** `POST /skills/install`, `POST /skills`, `PATCH /skills/:id`, `DELETE /skills/:id` via `SkillsService` (CRUD + install-from-catalog through `SkillsFacadeService.getEntry`). 64 KB cap + secret-scan on every body write; slug uniqueness in (ownerType, ownerId). ✓ Tick 13
+- [x] **9.2** Bindings CRUD: `GET /skills/:id/bindings`, `POST /skills/:id/bindings` (both on the main controller), `DELETE /skill-bindings/:id` on a separate `SkillBindingsController` per spec §4. ✓ Tick 13
+- [x] **9.3** `/skills` page rewritten as a real 3-section client (Installed / Available / Custom) with section toggle. Server-fetches the user's installed Skills + the catalog union in parallel; defensive `.catch()` so a flaky catalog provider still renders the page. Catalog-card Install button calls `installCatalogSkillAction` server action. ✓ Tick 13
+- [ ] **9.4** `/skills/[id]` Body + Bindings tabs — page route + server actions exist; full Tiptap-body + bindings UI deferred to a later sub-tick once the shared KbEditor toolbar is extracted.
+- [x] **9.5** Service unit tests at `packages/agent/src/skills/__tests__/skills.service.spec.ts` (~13 assertions: empty-title rejection, secret rejection, 64 KB cap, slug conflict, contentHash recomputation on body change, install conflict, install activity emission, binding tenant/non-tenant target validation, cross-user 404 on binding delete). ✓ Tick 13
 
 ### Phase 10 — Skill injection into AI calls
 

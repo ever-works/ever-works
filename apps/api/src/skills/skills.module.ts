@@ -2,17 +2,18 @@ import { Module } from '@nestjs/common';
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { SkillsController } from './skills.controller';
+import { SkillBindingsController } from './skill-bindings.controller';
 
 /**
- * Agents/Skills/Tasks PR #1017 — Phase 8.7. API-side Skills module.
- * Imports the agent-side data module + the facade module and mounts
- * the read-only controller.
+ * Agents/Skills/Tasks PR #1017 — Phase 8.7 + Phase 9. API-side
+ * Skills module. Imports the agent-side data module (now with
+ * SkillsService for write paths) + the facade module and mounts:
  *
- * Write paths (POST/PATCH/DELETE) ship with Phase 9 once SkillsService
- * lands.
+ *   - SkillsController         — /api/skills/* (read + write)
+ *   - SkillBindingsController  — /api/skill-bindings/:id (delete)
  */
 @Module({
 	imports: [AgentSkillsModule, FacadesModule],
-	controllers: [SkillsController],
+	controllers: [SkillsController, SkillBindingsController],
 })
 export class SkillsModule {}
