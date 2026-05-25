@@ -47,3 +47,9 @@ export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './kb-types';
 export * from './types';
+// Agents/Skills/Tasks (PR #1017 specs)
+export * from './agent.entity';
+export * from './agent-run.entity';
+export * from './agent-run-log.entity';
+export * from './agent-budget.entity';
+export * from './agent-membership.entity';

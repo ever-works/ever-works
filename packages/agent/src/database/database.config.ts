@@ -46,6 +46,12 @@ import {
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     Mission,
+    // Agents/Skills/Tasks (PR #1017 specs)
+    Agent,
+    AgentRun,
+    AgentRunLog,
+    AgentBudget,
+    AgentMembership,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -121,6 +127,12 @@ export const ENTITIES = [
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Agents / Skills / Tasks (PR #1017 specs, Phase 1)
+    Agent,
+    AgentRun,
+    AgentRunLog,
+    AgentBudget,
+    AgentMembership,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,

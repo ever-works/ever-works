@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 0 (bootstrap)
-- **Last tick at**: 2026-05-25 (bootstrap)
-- **In progress now**: (none — bootstrap complete; tick 1 will pick up Phase 1)
+- **Last tick #**: 1
+- **Last tick at**: 2026-05-25 (tick 1 — Phase 1.1, 1.2, 1.3, 1.5 done)
+- **In progress now**: (none — next tick picks up Phase 1.4 migration)
 
 ---
 
@@ -61,13 +61,13 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 1 — Core Agent entities
 
-- [ ] **1.1** Create `packages/agent/src/entities/agent.entity.ts` per `features/agents/plan.md §3.1`. Includes the 3-avatar columns (`avatarMode` / `avatarIcon` / `avatarImageUploadId`) per H3 override, all 5 `intervalUnit` values per N6 override.
-- [ ] **1.2** Create `agent-run.entity.ts`, `agent-run-log.entity.ts`, `agent-budget.entity.ts`, `agent-membership.entity.ts`.
-- [ ] **1.3** Register entities in `packages/agent/src/entities/index.ts` and `apps/api/src/typeorm.config.ts`.
-- [ ] **1.4** Generate migration `CreateAgentsTables.ts` (inspect SQL; replace any destructive ALTER/DROP with two-phase forward-only).
-- [ ] **1.5** Extend `BudgetOwnerType` enum in `_types.ts` to add `AGENT` value.
-- [ ] **1.6** Migration: `AddAgentIdToPluginUsageEvents.ts` (additive column + `(agentId, occurredAt)` index).
-- [ ] **1.7** Unit tests for entity shape + indexes (don't run).
+- [x] **1.1** Create `packages/agent/src/entities/agent.entity.ts` per `features/agents/plan.md §3.1`. Includes the 3-avatar columns (`avatarMode` / `avatarIcon` / `avatarImageUploadId`) per H3 override, all 5 `intervalUnit` values per N6 override. ✓ Tick 1
+- [x] **1.2** Create `agent-run.entity.ts`, `agent-run-log.entity.ts`, `agent-budget.entity.ts`, `agent-membership.entity.ts`. ✓ Tick 1
+- [x] **1.3** Register entities in `packages/agent/src/entities/index.ts` and `packages/agent/src/database/database.config.ts` (the actual loader the typeorm.config.ts wraps). ✓ Tick 1
+- [ ] **1.4** Generate migration `CreateAgentsTables.ts` (inspect SQL; replace any destructive ALTER/DROP with two-phase forward-only). **Next tick.**
+- [x] **1.5** Extend `BudgetOwnerType` enum in `_types.ts` to add `AGENT` value. ✓ Tick 1
+- [ ] **1.6** Migration: `AddAgentIdToPluginUsageEvents.ts` (additive column + `(agentId, occurredAt)` index). **Next tick.**
+- [ ] **1.7** Unit tests for entity shape + indexes (don't run). **Next tick.**
 
 ### Phase 2 — Agent repositories
 
