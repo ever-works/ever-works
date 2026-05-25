@@ -1,13 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import {
-    Loader2,
-    Plus,
-    RefreshCw,
-    Settings as SettingsIcon,
-    Sparkles,
-} from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
@@ -119,22 +113,19 @@ export function WorkProposalsSection({
     // time so the dashboard payload stays small. Results are
     // merged into the existing local list (de-dup by id) so the
     // PENDING rows from the SSR fetch aren't replaced.
-    const loadStatuses = useCallback(
-        async (statuses: WorkProposalStatus[]) => {
-            try {
-                const rows = await listProposalsAction(statuses);
-                setProposals((prev) => {
-                    const byId = new Map(prev.map((p) => [p.id, p]));
-                    for (const r of rows) byId.set(r.id, r);
-                    return Array.from(byId.values());
-                });
-            } catch {
-                // Silent — empty toggle just renders nothing extra. The
-                // user can refresh the page if they want a retry.
-            }
-        },
-        [],
-    );
+    const loadStatuses = useCallback(async (statuses: WorkProposalStatus[]) => {
+        try {
+            const rows = await listProposalsAction(statuses);
+            setProposals((prev) => {
+                const byId = new Map(prev.map((p) => [p.id, p]));
+                for (const r of rows) byId.set(r.id, r);
+                return Array.from(byId.values());
+            });
+        } catch {
+            // Silent — empty toggle just renders nothing extra. The
+            // user can refresh the page if they want a retry.
+        }
+    }, []);
 
     const handleToggleAccepted = (checked: boolean) => {
         setShowAccepted(checked);
@@ -195,9 +186,7 @@ export function WorkProposalsSection({
                 setQuickAddOpen(false);
                 toast.success(tPage('toasts.ideaCreated'));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : tPage('toasts.ideaCreateError'),
-                );
+                toast.error(err instanceof Error ? err.message : tPage('toasts.ideaCreateError'));
             }
         });
     };
@@ -274,9 +263,7 @@ export function WorkProposalsSection({
                                 </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                onClick={() =>
-                                    router.push('/settings/work-agent#auto-build-works')
-                                }
+                                onClick={() => router.push('/settings/work-agent#auto-build-works')}
                             >
                                 <a
                                     href="/settings/work-agent#auto-build-works"
@@ -298,9 +285,7 @@ export function WorkProposalsSection({
                                 </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                onClick={() =>
-                                    router.push('/settings/work-agent#account-budgets')
-                                }
+                                onClick={() => router.push('/settings/work-agent#account-budgets')}
                             >
                                 <a
                                     href="/settings/work-agent#account-budgets"

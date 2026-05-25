@@ -12,10 +12,7 @@ import {
 // created / dismissed / built / accepted. Defining the paths in
 // one place keeps each action's revalidate list a single source
 // of truth.
-const IDEA_REVALIDATE_PATHS = [
-    '/[locale]/(dashboard)/(home)',
-    '/[locale]/(dashboard)/ideas',
-];
+const IDEA_REVALIDATE_PATHS = ['/[locale]/(dashboard)/(home)', '/[locale]/(dashboard)/ideas'];
 function revalidateIdeaSurfaces() {
     for (const p of IDEA_REVALIDATE_PATHS) {
         revalidatePath(p, 'page');

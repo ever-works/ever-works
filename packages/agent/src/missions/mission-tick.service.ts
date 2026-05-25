@@ -233,10 +233,7 @@ export class MissionTickService {
             let queued = 0;
             if (mission.autoBuildWorks) {
                 for (const proposal of result.proposals) {
-                    const ok = await this.workProposals.queueForBuild(
-                        mission.userId,
-                        proposal.id,
-                    );
+                    const ok = await this.workProposals.queueForBuild(mission.userId, proposal.id);
                     if (ok) queued += 1;
                 }
             }

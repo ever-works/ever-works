@@ -284,10 +284,7 @@ describe('MissionTickService', () => {
             build({
                 generateResult: {
                     status: 'generated',
-                    proposals: [
-                        makeProposal('p1', 'm1', 'u1'),
-                        makeProposal('p2', 'm1', 'u1'),
-                    ],
+                    proposals: [makeProposal('p1', 'm1', 'u1'), makeProposal('p2', 'm1', 'u1')],
                 },
             });
             missionRepo._seed({

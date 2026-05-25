@@ -34,7 +34,8 @@ const minimalProposal: WorkProposal = {
     id: 'prop-1',
     userId: 'u1',
     title: 'Top AI coding assistants',
-    description: 'A curated list of the leading AI-powered coding tools used by professional developers in 2026.',
+    description:
+        'A curated list of the leading AI-powered coding tools used by professional developers in 2026.',
     slugSuggestion: 'top-ai-coding-assistants',
     suggestedCategories: [
         { name: 'AI', slug: 'ai' },
@@ -54,9 +55,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         const { container } = render(<IdeaCard proposal={minimalProposal} />);
         // Title + description rendered.
         expect(screen.getByText('Top AI coding assistants')).toBeTruthy();
-        expect(
-            screen.getByText(/leading AI-powered coding tools/i),
-        ).toBeTruthy();
+        expect(screen.getByText(/leading AI-powered coding tools/i)).toBeTruthy();
         // Both categories rendered as pills.
         expect(screen.getByText('AI')).toBeTruthy();
         expect(screen.getByText('Developer Tools')).toBeTruthy();
@@ -86,9 +85,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
     });
 
     it('hides the reasoning paragraph when reasoning is empty', () => {
-        const { container } = render(
-            <IdeaCard proposal={{ ...minimalProposal, reasoning: '' }} />,
-        );
+        const { container } = render(<IdeaCard proposal={{ ...minimalProposal, reasoning: '' }} />);
         expect(container.textContent).not.toMatch(/Picks adjacent/);
         // Only the title/description italicized text might remain — the
         // reasoning <p> uses italic. Nothing else does.

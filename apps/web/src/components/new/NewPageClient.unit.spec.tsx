@@ -61,9 +61,9 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
 
     it('pre-selects the chip from initialType prop', () => {
         const { container } = render(<NewPageClient initialType="mission" />);
-        const mission = Array.from(
-            container.querySelectorAll('button[aria-pressed]'),
-        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
+        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
+            b.textContent?.includes('mission'),
+        ) as HTMLButtonElement;
         expect(mission.getAttribute('aria-pressed')).toBe('true');
     });
 
@@ -75,9 +75,7 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         fireEvent.click(screen.getByText('dashboard.newPage.chips.idea'));
         expect(submit.disabled).toBe(true);
         // Type something short — still disabled.
-        const textarea = screen.getByPlaceholderText(
-            'dashboard.newPage.promptPlaceholder',
-        );
+        const textarea = screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder');
         fireEvent.change(textarea, { target: { value: 'short' } });
         expect(submit.disabled).toBe(true);
         // Type something long enough — enabled.
@@ -92,10 +90,9 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         routerPushMock.mockClear();
         createMissionMock.mockResolvedValueOnce({ id: 'm-new', title: 'x' });
         render(<NewPageClient initialType="mission" />);
-        fireEvent.change(
-            screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'),
-            { target: { value: 'Build the best cat business' } },
-        );
+        fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
+            target: { value: 'Build the best cat business' },
+        });
         fireEvent.click(screen.getByText('dashboard.newPage.submit'));
         await Promise.resolve();
         await Promise.resolve();
@@ -111,10 +108,9 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         routerPushMock.mockClear();
         createIdeaMock.mockResolvedValueOnce({ id: 'i-new' });
         render(<NewPageClient initialType="idea" />);
-        fireEvent.change(
-            screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'),
-            { target: { value: 'A curated list of AI coding agents' } },
-        );
+        fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
+            target: { value: 'A curated list of AI coding agents' },
+        });
         fireEvent.click(screen.getByText('dashboard.newPage.submit'));
         await Promise.resolve();
         await Promise.resolve();
@@ -127,10 +123,9 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
     it('Submit with chip=website routes to /works/new with kind + prompt query params', () => {
         routerPushMock.mockClear();
         render(<NewPageClient initialType="website" />);
-        fireEvent.change(
-            screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'),
-            { target: { value: 'Landing page for my SaaS launch' } },
-        );
+        fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
+            target: { value: 'Landing page for my SaaS launch' },
+        });
         fireEvent.click(screen.getByText('dashboard.newPage.submit'));
         expect(routerPushMock).toHaveBeenCalledTimes(1);
         const href = routerPushMock.mock.calls[0][0] as string;
@@ -185,10 +180,9 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
             createMissionMock.mockClear();
             createMissionMock.mockResolvedValueOnce({ id: 'm-direct', title: 'x' });
             render(<NewPageClient initialType="mission" />);
-            fireEvent.change(
-                screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'),
-                { target: { value: 'No template, just a typed mission goal' } },
-            );
+            fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
+                target: { value: 'No template, just a typed mission goal' },
+            });
             fireEvent.click(screen.getByText('dashboard.newPage.submit'));
             await Promise.resolve();
             await Promise.resolve();

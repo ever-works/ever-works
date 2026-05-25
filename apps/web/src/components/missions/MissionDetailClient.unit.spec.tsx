@@ -175,10 +175,7 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
             mkMission({ schedule: '*/30 * * * *', autoBuildWorks: true, outstandingIdeasCap: 7 }),
         );
         render(
-            <MissionDetailClient
-                mission={mkMission({ outstandingIdeasCap: null })}
-                ideas={[]}
-            />,
+            <MissionDetailClient mission={mkMission({ outstandingIdeasCap: null })} ideas={[]} />,
         );
         // Toggle autoBuild ON.
         const abLabel = screen.getByText('fields.autoBuildWorks').closest('label');
@@ -202,9 +199,7 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
         const ideas = [mkIdea('p1'), mkIdea('p2'), mkIdea('p3')];
         render(<MissionDetailClient mission={mkMission()} ideas={ideas} />);
         // Count in the section header.
-        expect(
-            screen.getByText(/sections\.ideas/).textContent,
-        ).toMatch(/3/);
+        expect(screen.getByText(/sections\.ideas/).textContent).toMatch(/3/);
         expect(screen.getByText('Idea p1')).toBeTruthy();
         expect(screen.getByText('Idea p2')).toBeTruthy();
         expect(screen.getByText('Idea p3')).toBeTruthy();
@@ -234,17 +229,17 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
 
     it('Related Works empty state when no accepted Ideas have a Work id', () => {
         render(
-            <MissionDetailClient mission={mkMission()} ideas={[mkIdea('a', { status: 'pending' })]} />,
+            <MissionDetailClient
+                mission={mkMission()}
+                ideas={[mkIdea('a', { status: 'pending' })]}
+            />,
         );
         expect(screen.getByText('works.empty')).toBeTruthy();
     });
 
     it('Clone badge surfaces when sourceMissionId is set', () => {
         render(
-            <MissionDetailClient
-                mission={mkMission({ sourceMissionId: 'src-1' })}
-                ideas={[]}
-            />,
+            <MissionDetailClient mission={mkMission({ sourceMissionId: 'src-1' })} ideas={[]} />,
         );
         expect(screen.getByText('badges.cloned')).toBeTruthy();
     });
@@ -312,10 +307,7 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
 
         it('Inherited Works panel hidden for direct-created Missions (sourceMissionId null)', () => {
             render(
-                <MissionDetailClient
-                    mission={mkMission({ sourceMissionId: null })}
-                    ideas={[]}
-                />,
+                <MissionDetailClient mission={mkMission({ sourceMissionId: null })} ideas={[]} />,
             );
             expect(screen.queryByText('sections.inheritedWorks')).toBeNull();
         });
@@ -364,9 +356,7 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
             });
             render(<MissionDetailClient mission={mkMission()} ideas={[failed]} />);
             // Failure-kind label (i18n key returned as the key under the mock).
-            expect(
-                screen.getByText('failureKinds.transient-upstream-5xx'),
-            ).toBeTruthy();
+            expect(screen.getByText('failureKinds.transient-upstream-5xx')).toBeTruthy();
             // Failure message body.
             expect(screen.getByText(/Upstream returned 503/)).toBeTruthy();
         });

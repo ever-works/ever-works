@@ -52,10 +52,9 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // surfaces the empty state, never 500s the detail page.
     const [ideas, sourceMission, sourceAcceptedIdeas, budget] = await Promise.all([
         workProposalsAPI
-            .list(
-                ['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'],
-                { missionId: id },
-            )
+            .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
+                missionId: id,
+            })
             .catch(() => []),
         mission.sourceMissionId
             ? missionsAPI.get(mission.sourceMissionId).catch(() => null)

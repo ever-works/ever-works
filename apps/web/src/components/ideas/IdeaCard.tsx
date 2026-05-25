@@ -177,9 +177,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                     // color and a checkmark icon. Visually distinct
                     // from the primary-blue Build CTA so a finished
                     // Idea reads as "completed" at a glance.
-                    isDone
-                        ? 'bg-success hover:bg-success/90'
-                        : 'bg-primary hover:bg-primary-hover',
+                    isDone ? 'bg-success hover:bg-success/90' : 'bg-primary hover:bg-primary-hover',
                 )}
             >
                 {isDone ? (

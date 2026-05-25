@@ -52,9 +52,7 @@ describe('work-agent primitives — snapshot lock', () => {
 
     it('ToggleRow propagates the new checked state on toggle', async () => {
         const onChange = vi.fn();
-        const { container } = render(
-            <ToggleRow label="x" checked={false} onChange={onChange} />,
-        );
+        const { container } = render(<ToggleRow label="x" checked={false} onChange={onChange} />);
         const checkbox = container.querySelector('input[type="checkbox"]');
         if (!checkbox) throw new Error('missing checkbox');
         await userEvent.click(checkbox);
@@ -186,17 +184,10 @@ describe('work-agent primitives — snapshot lock', () => {
             message: `message ${i}`,
         })) as unknown as WorkAgentRunLog[];
         const { container } = render(<LogList logs={logs} emptyText="x" />);
-        const stepLabels = Array.from(
-            container.querySelectorAll('.text-\\[11px\\].uppercase'),
-        ).map((el) => el.textContent);
-        expect(stepLabels).toEqual([
-            'step-2',
-            'step-3',
-            'step-4',
-            'step-5',
-            'step-6',
-            'step-7',
-        ]);
+        const stepLabels = Array.from(container.querySelectorAll('.text-\\[11px\\].uppercase')).map(
+            (el) => el.textContent,
+        );
+        expect(stepLabels).toEqual(['step-2', 'step-3', 'step-4', 'step-5', 'step-6', 'step-7']);
     });
 
     it('LiveRun renders only the no-run empty state when activeRun is null', () => {

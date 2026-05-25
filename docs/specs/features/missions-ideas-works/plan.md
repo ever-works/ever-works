@@ -4,6 +4,7 @@
 
 > **What changed v5 → v6 in this PLAN:**
 > Six deferred items promoted into v1 (per [spec v6 header](spec.md)). Net delta: 5 new PRs added (EE, FF, GG, HH, II, JJ), 4 phases get new sub-PRs, Phase 0 schema grows by 8 columns + 2 columns. Decision Log adds entries A21–A28.
+>
 > - **Phase 0** (schema): +`failureMessage`, +`failureKind` on `work_proposals`; +`maxAutoRetries`/`backoffSeconds`/`exponentialBackoffFactor`/`accountWideMonthlyCapCents`/`accountWideAllowOverage` on `work_agent_preferences`; +`sourceMissionId` on `missions` (Clone traceability).
 > - **Phase 1**: +PR FF for `/retry` + `/rebuild` endpoints; build-flow handler extended with auto-retry loop.
 > - **Phase 3**: +PR HH for `POST /me/missions/:id/clone` endpoint and the cloning service (metadata + repo snapshot + Idea fan-out + sourceMissionId FK).
@@ -13,6 +14,7 @@
 > - **Phase 8**: +PR JJ for `MissionTemplateManifestService` (parses `.works/mission.yml` with Zod) + mission-repo scaffolder integration (copies `kb.seedPaths` into the new Mission's repo; honors `defaults.*`; passes `recommendedWorkTemplates` to Idea→Work scaffolder).
 >
 > **What changed v4 → v5 in this PLAN:**
+>
 > - Added **§A. Decision Log** at the top — every architectural choice with the file/line that grounds it, so any AI agent picking up a phase knows what was decided vs. open.
 > - Added **§B. Pre-flight code-read checklist per phase** — exact files the implementing agent MUST read before touching anything. Removes guesswork at the start of every phase.
 > - Locked down the **build-from-Idea pipeline** (Phase 1 PR B): new endpoint creates a `WorkAgentGoal` with `maxWorksPerRun=1` + `ideaId`; on goal completion the existing accept-flow auto-runs and sets `acceptedWorkId`. The existing `POST /me/work-proposals/:id/accept` stays for user-created Works (additive, per [NN #20](file:///C:/Coding/Workspace/AGENTS.md)).
@@ -21,10 +23,12 @@
 > - Flagged **first-snapshot-test risk** in Phase 4 PR K — `apps/web/` has Vitest configured but no `*.snap` files yet; this PR creates the snapshot test infrastructure as well as the snapshots.
 >
 > **What changed v3 → v4 in this PLAN:**
+>
 > - Phase 6.5 was going to extend the existing `/works/new` page in place. **Corrected:** the unified entry lives at a **new route `/new`**. `/works/new` is left completely untouched (existing content, existing labels, existing flow). The new `/new` page is built fresh, and the three-Work-creation-block component on `/works/new` is **extracted to a shared component** so `/new` can render the same blocks (with a different label set passed as props) below its prompt input. No edits to `/works/new`'s rendered output.
 > - PR set restructured: PR CC creates the `/new` page from scratch and extracts the shared block component. PR DD renames the sidebar `+ New Work` → `+ New` and points it at `/new`.
 >
 > **What changed v2 → v3 in this PLAN:**
+>
 > - Phase 6 (Missions UI) loses the Mission quick-add component (PR Q's "quick-add" part) and gains a small `+ New Mission` button top-right of `/missions` instead.
 > - **New Phase 6.5** carves out the unified `+ New` page work as its own dedicated phase. (v4 correction above: distinct route, not in-place edit.)
 > - No existing path is removed. The `+ Add` on `/ideas`, the `+ New Mission` on `/missions`, the existing `/works/new` three creation blocks, and the chat verbs from Phase 9 ALL stay alongside the new `+ New` page. Enforced by [Workspace NN #20](file:///C:/Coding/Workspace/AGENTS.md).
@@ -36,36 +40,36 @@
 
 Every architectural decision with the file/line that grounds it. If a decision contradicts what you see in the code, the code wins and this log needs updating — flag and ask before deviating.
 
-| # | Decision | Evidence in code | Phase impacted |
-|---|---|---|---|
-| A1 | `WorkProposalStatus` enum imported from `@ever-works/agent/user-research`, NOT `@ever-works/agent/entities` | `apps/api/src/work-proposals/work-proposals.controller.ts:19` (`import { WorkProposalStatus } from '@ever-works/agent/user-research';`) | 0, 1 |
-| A2 | Today's `work_proposals` statuses: `PENDING` / `DISMISSED` / `ACCEPTED`. Sources: `AUTO_SIGNUP` / `USER_REFRESH` / `DISCOVER` / `SCHEDULED` | `packages/agent/src/entities/work-proposal.entity.ts:14–25` | 0, 1 |
-| A3 | Today's `accept` endpoint takes a `workId` body param — i.e. user already built the Work, the endpoint just records the link. New `build` endpoint inverts this: it kicks off the build via WorkAgentGoal, then on completion the goal handler calls the existing accept-flow internally. **Existing accept endpoint stays untouched** (per NN #20) | `apps/api/src/work-proposals/work-proposals.controller.ts:172–189` | 1 |
-| A4 | `WorkAgentGoal`/`WorkAgentRun`/`WorkAgentRunLog`/`WorkAgentPreference` are 4 separate entities. Goal-create is what initiates the build pipeline (Trigger.dev-based). | `apps/api/src/work-agent/work-agent.controller.ts`, `apps/web/src/lib/api/work-agent.ts:42–84` (interfaces) | 1, 3, 4 |
-| A5 | AI Chat has TWO tool surfaces. Both ship in Phase 9. | (a) `apps/web/src/lib/ai/tools/suggest.tools.ts` (web-side, Vercel AI SDK `tool()` + Zod). (b) `apps/mcp/src/openapi-tools/tool-registration.service.ts` + `whitelist.ts` (MCP, auto-derives from `@ApiOperation` decorators) | 9 |
-| A6 | Existing chat completion handler is OpenAI-compat and already accepts `dto.tools` from clients | `apps/api/src/ai-conversation/openai-compat.service.ts:142–165` | 6.5, 9 |
-| A7 | Trigger.dev is the cron infra (not BullMQ). Pattern: `schedules.task({ id, cron, run })` where `run` builds a NestJS app context, gets a service, calls `.dispatchDue()` or similar | `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts:12–32`. Other reference tasks in same dir: `user-research-rerun-dispatcher.task.ts`, `work-generation.task.ts`. | 3 |
-| A8 | Mission repos and the Mission-repo scaffolder reuse `gitFacade.createRepository()` and land in the same org/account as today's `<slug>-data` Work repos | `packages/agent/src/ever-works-providers/ever-works-git.provider.ts:97`; usage example `packages/agent/src/account-transfer/github-sync.service.ts:78` | 8 |
-| A9 | Mission Template catalog reuses the same source pattern as the existing Work Templates catalog | Implementer reads `apps/web/src/components/templates/TemplatesCatalog.tsx` + its data source (find via the Phase 8 pre-flight checklist) | 8 |
-| A10 | Web app snapshot tests use **Vitest**, not Jest | `apps/web/vitest.config.ts` exists; no `*.snap` files yet — Phase 4 PR K creates the first snapshot tests for this app | 4, 5 |
-| A11 | Existing three creation blocks on `/works/new` are rendered **inline** in `new-work-client.tsx` (lines 57+), NOT as a separate component. PR CC1 is a real extraction (not just a file-move) | `apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx:57–...` | 6.5 |
-| A12 | i18n namespaces in use: `dashboard.proposals.*` (Ideas block), `dashboard.workCreation.*` (the three creation blocks), `dashboard.settings.workAgent.*` (Work Agent settings), `dashboard.sidebar.newWork` (the `+ New Work` button label — confirmed via the `t('newWork')` call) | `apps/web/src/components/dashboard/WorkProposalsSection.tsx:30`, `apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx:49`, `apps/web/src/components/dashboard/DashboardSidebar.tsx:209` | 2, 6.5 |
-| A13 | All 21 web locales must be updated for every i18n change. Locales: `ar bg de en es fr he hi id it ja ko nl pl pt ru th tr uk vi zh`. Hebrew is RTL. | `ls apps/web/messages/` | 2, 10 |
-| A14 | Sidebar `+ New Work` button: `apps/web/src/components/dashboard/DashboardSidebar.tsx:204–...`. Uses `ROUTES.DASHBOARD_WORKS_NEW`. Phase 6.5 adds `ROUTES.DASHBOARD_NEW = '/new'` (new constant — does NOT change the existing one) and points the sidebar button at the new constant. | as above | 6.5 |
-| A15 | Mission detail page Live Run = list of all in-flight runs for this Mission's children (one row per Idea), each row using the extracted `<LiveRun />` + `<LogList />` from Phase 4 PR K | Spec §4.3, §10.6 | 6 |
-| A16 | Dashboard stats source: `getWorkStats()` server action in `apps/web/src/app/actions/dashboard/works.ts`. Returns `{ totalWorks, totalItems, activeWebsites }` today. Phase 2 PR F adds `totalMissions` + `totalIdeas` to the same return shape. | as above | 2 |
-| A17 | Ideas block on Dashboard is rendered by `<WorkProposalsSection>` (`apps/web/src/components/dashboard/WorkProposalsSection.tsx`). The component already has its own polling loop and uses `useTranslations('dashboard.proposals')`. Phase 5 PR M extracts the `<WorkProposalCard>` it uses; Phase 5 PR O reshapes the section itself to add toggles + `+Add` + gears + `View all` link. | `apps/web/src/components/dashboard/WorkProposalsSection.tsx`, `apps/web/src/components/dashboard/WorkProposalCard.tsx` | 5 |
-| A18 | Existing rate-limit on `POST /me/work-proposals/refresh` uses `@Throttle()` decorator (3 per 60s). New endpoints should consider similar limits but are not gated to the same number — implementer's call per endpoint. | `apps/api/src/work-proposals/work-proposals.controller.ts:17–18` (import + usage) | 1 |
-| A19 | All API controllers use NestJS Swagger decorators (`@ApiOperation`, `@ApiTags`, `@ApiResponse`). This is what makes MCP whitelist auto-derivation work (Decision A5) — every new endpoint MUST keep these decorators. | `apps/api/src/work-proposals/work-proposals.controller.ts:54–60` (example) | 1, 3, 7, 8 |
-| A20 | Feature flag for the entire feature. Wrap sidebar items + page routes + Dashboard new blocks behind one flag (`feature.missions_v2` or your team's naming). Backend phases can land without exposing user surfaces. | Phase 14.2 (cross-cutting) | all UI phases |
-| A21 | Mission Template manifest path: `.works/mission.yml` (NOT root-level `mission-template.yaml`). The `.works/` folder convention mirrors `.github/` / `.vscode/`. | spec §7.5 | 8 |
-| A22 | Manifest parser uses Zod for schema validation. Unknown top-level keys → log warning + ignore (forward-compat). Invalid required fields → reject template ingest with clear error to UI. | spec §7.5 | 8 |
-| A23 | Auto-retry transient-error classification is built into platform code (not user-configurable). User configures `maxAutoRetries` (0–5, default 2), `backoffSeconds` (10–3600, default 60), `exponentialBackoffFactor` (1.0–4.0, default 2.0). Wait between attempts = `backoffSeconds * factor ^ attempt`. | spec §3.9, §6.6 | 0, 1, 4 |
-| A24 | Idea status stays `BUILDING` across auto-retries — it does NOT flicker to FAILED then QUEUED. Only transitions to FAILED on final exhaustion or non-transient error. | spec §3.9 | 1 |
-| A25 | Mission Clone semantics = Full Fork: metadata + KB (snapshot of source's `<slug>-mission` repo at clone time) + Ideas (cloned as PENDING, source=MISSION, missionId=newMission.id, no back-FK) + Works (NOT cloned — `sourceMissionId` FK + read-only "Related Works" UI panel). Cloned Mission gets fresh `<slug>-mission` repo via `gitFacade.createRepository` (Decision A8). | spec §4.4a | 0, 3, 6 |
-| A26 | Source Mission's DISMISSED Ideas are **skipped** during Clone (don't carry rejected ideas). All other statuses → PENDING on clone. | spec §4.4a | 3 |
-| A27 | Re-build DONE Idea endpoint re-points `acceptedWorkId` to the NEW Work by default. Original Work is NOT deleted (NN #20). Optional `keepOriginalLink: true` flag creates a new Idea row instead (defer to v2 unless trivial). | spec §3.9 | 1 |
-| A28 | Account-wide spend roll-up uses the same read-time roll-up query pattern as Mission-level spend (spec §8.2) but with the user as the scope key. Tile clicks → scrolls to Work Agent settings page's `#account-budgets` anchor. | spec §5.1, §6.6 | 7 |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                               | Evidence in code                                                                                                                                                                                                              | Phase impacted |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| A1  | `WorkProposalStatus` enum imported from `@ever-works/agent/user-research`, NOT `@ever-works/agent/entities`                                                                                                                                                                                                                                                                            | `apps/api/src/work-proposals/work-proposals.controller.ts:19` (`import { WorkProposalStatus } from '@ever-works/agent/user-research';`)                                                                                       | 0, 1           |
+| A2  | Today's `work_proposals` statuses: `PENDING` / `DISMISSED` / `ACCEPTED`. Sources: `AUTO_SIGNUP` / `USER_REFRESH` / `DISCOVER` / `SCHEDULED`                                                                                                                                                                                                                                            | `packages/agent/src/entities/work-proposal.entity.ts:14–25`                                                                                                                                                                   | 0, 1           |
+| A3  | Today's `accept` endpoint takes a `workId` body param — i.e. user already built the Work, the endpoint just records the link. New `build` endpoint inverts this: it kicks off the build via WorkAgentGoal, then on completion the goal handler calls the existing accept-flow internally. **Existing accept endpoint stays untouched** (per NN #20)                                    | `apps/api/src/work-proposals/work-proposals.controller.ts:172–189`                                                                                                                                                            | 1              |
+| A4  | `WorkAgentGoal`/`WorkAgentRun`/`WorkAgentRunLog`/`WorkAgentPreference` are 4 separate entities. Goal-create is what initiates the build pipeline (Trigger.dev-based).                                                                                                                                                                                                                  | `apps/api/src/work-agent/work-agent.controller.ts`, `apps/web/src/lib/api/work-agent.ts:42–84` (interfaces)                                                                                                                   | 1, 3, 4        |
+| A5  | AI Chat has TWO tool surfaces. Both ship in Phase 9.                                                                                                                                                                                                                                                                                                                                   | (a) `apps/web/src/lib/ai/tools/suggest.tools.ts` (web-side, Vercel AI SDK `tool()` + Zod). (b) `apps/mcp/src/openapi-tools/tool-registration.service.ts` + `whitelist.ts` (MCP, auto-derives from `@ApiOperation` decorators) | 9              |
+| A6  | Existing chat completion handler is OpenAI-compat and already accepts `dto.tools` from clients                                                                                                                                                                                                                                                                                         | `apps/api/src/ai-conversation/openai-compat.service.ts:142–165`                                                                                                                                                               | 6.5, 9         |
+| A7  | Trigger.dev is the cron infra (not BullMQ). Pattern: `schedules.task({ id, cron, run })` where `run` builds a NestJS app context, gets a service, calls `.dispatchDue()` or similar                                                                                                                                                                                                    | `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts:12–32`. Other reference tasks in same dir: `user-research-rerun-dispatcher.task.ts`, `work-generation.task.ts`.                                            | 3              |
+| A8  | Mission repos and the Mission-repo scaffolder reuse `gitFacade.createRepository()` and land in the same org/account as today's `<slug>-data` Work repos                                                                                                                                                                                                                                | `packages/agent/src/ever-works-providers/ever-works-git.provider.ts:97`; usage example `packages/agent/src/account-transfer/github-sync.service.ts:78`                                                                        | 8              |
+| A9  | Mission Template catalog reuses the same source pattern as the existing Work Templates catalog                                                                                                                                                                                                                                                                                         | Implementer reads `apps/web/src/components/templates/TemplatesCatalog.tsx` + its data source (find via the Phase 8 pre-flight checklist)                                                                                      | 8              |
+| A10 | Web app snapshot tests use **Vitest**, not Jest                                                                                                                                                                                                                                                                                                                                        | `apps/web/vitest.config.ts` exists; no `*.snap` files yet — Phase 4 PR K creates the first snapshot tests for this app                                                                                                        | 4, 5           |
+| A11 | Existing three creation blocks on `/works/new` are rendered **inline** in `new-work-client.tsx` (lines 57+), NOT as a separate component. PR CC1 is a real extraction (not just a file-move)                                                                                                                                                                                           | `apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx:57–...`                                                                                                                                                  | 6.5            |
+| A12 | i18n namespaces in use: `dashboard.proposals.*` (Ideas block), `dashboard.workCreation.*` (the three creation blocks), `dashboard.settings.workAgent.*` (Work Agent settings), `dashboard.sidebar.newWork` (the `+ New Work` button label — confirmed via the `t('newWork')` call)                                                                                                     | `apps/web/src/components/dashboard/WorkProposalsSection.tsx:30`, `apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx:49`, `apps/web/src/components/dashboard/DashboardSidebar.tsx:209`                       | 2, 6.5         |
+| A13 | All 21 web locales must be updated for every i18n change. Locales: `ar bg de en es fr he hi id it ja ko nl pl pt ru th tr uk vi zh`. Hebrew is RTL.                                                                                                                                                                                                                                    | `ls apps/web/messages/`                                                                                                                                                                                                       | 2, 10          |
+| A14 | Sidebar `+ New Work` button: `apps/web/src/components/dashboard/DashboardSidebar.tsx:204–...`. Uses `ROUTES.DASHBOARD_WORKS_NEW`. Phase 6.5 adds `ROUTES.DASHBOARD_NEW = '/new'` (new constant — does NOT change the existing one) and points the sidebar button at the new constant.                                                                                                  | as above                                                                                                                                                                                                                      | 6.5            |
+| A15 | Mission detail page Live Run = list of all in-flight runs for this Mission's children (one row per Idea), each row using the extracted `<LiveRun />` + `<LogList />` from Phase 4 PR K                                                                                                                                                                                                 | Spec §4.3, §10.6                                                                                                                                                                                                              | 6              |
+| A16 | Dashboard stats source: `getWorkStats()` server action in `apps/web/src/app/actions/dashboard/works.ts`. Returns `{ totalWorks, totalItems, activeWebsites }` today. Phase 2 PR F adds `totalMissions` + `totalIdeas` to the same return shape.                                                                                                                                        | as above                                                                                                                                                                                                                      | 2              |
+| A17 | Ideas block on Dashboard is rendered by `<WorkProposalsSection>` (`apps/web/src/components/dashboard/WorkProposalsSection.tsx`). The component already has its own polling loop and uses `useTranslations('dashboard.proposals')`. Phase 5 PR M extracts the `<WorkProposalCard>` it uses; Phase 5 PR O reshapes the section itself to add toggles + `+Add` + gears + `View all` link. | `apps/web/src/components/dashboard/WorkProposalsSection.tsx`, `apps/web/src/components/dashboard/WorkProposalCard.tsx`                                                                                                        | 5              |
+| A18 | Existing rate-limit on `POST /me/work-proposals/refresh` uses `@Throttle()` decorator (3 per 60s). New endpoints should consider similar limits but are not gated to the same number — implementer's call per endpoint.                                                                                                                                                                | `apps/api/src/work-proposals/work-proposals.controller.ts:17–18` (import + usage)                                                                                                                                             | 1              |
+| A19 | All API controllers use NestJS Swagger decorators (`@ApiOperation`, `@ApiTags`, `@ApiResponse`). This is what makes MCP whitelist auto-derivation work (Decision A5) — every new endpoint MUST keep these decorators.                                                                                                                                                                  | `apps/api/src/work-proposals/work-proposals.controller.ts:54–60` (example)                                                                                                                                                    | 1, 3, 7, 8     |
+| A20 | Feature flag for the entire feature. Wrap sidebar items + page routes + Dashboard new blocks behind one flag (`feature.missions_v2` or your team's naming). Backend phases can land without exposing user surfaces.                                                                                                                                                                    | Phase 14.2 (cross-cutting)                                                                                                                                                                                                    | all UI phases  |
+| A21 | Mission Template manifest path: `.works/mission.yml` (NOT root-level `mission-template.yaml`). The `.works/` folder convention mirrors `.github/` / `.vscode/`.                                                                                                                                                                                                                        | spec §7.5                                                                                                                                                                                                                     | 8              |
+| A22 | Manifest parser uses Zod for schema validation. Unknown top-level keys → log warning + ignore (forward-compat). Invalid required fields → reject template ingest with clear error to UI.                                                                                                                                                                                               | spec §7.5                                                                                                                                                                                                                     | 8              |
+| A23 | Auto-retry transient-error classification is built into platform code (not user-configurable). User configures `maxAutoRetries` (0–5, default 2), `backoffSeconds` (10–3600, default 60), `exponentialBackoffFactor` (1.0–4.0, default 2.0). Wait between attempts = `backoffSeconds * factor ^ attempt`.                                                                              | spec §3.9, §6.6                                                                                                                                                                                                               | 0, 1, 4        |
+| A24 | Idea status stays `BUILDING` across auto-retries — it does NOT flicker to FAILED then QUEUED. Only transitions to FAILED on final exhaustion or non-transient error.                                                                                                                                                                                                                   | spec §3.9                                                                                                                                                                                                                     | 1              |
+| A25 | Mission Clone semantics = Full Fork: metadata + KB (snapshot of source's `<slug>-mission` repo at clone time) + Ideas (cloned as PENDING, source=MISSION, missionId=newMission.id, no back-FK) + Works (NOT cloned — `sourceMissionId` FK + read-only "Related Works" UI panel). Cloned Mission gets fresh `<slug>-mission` repo via `gitFacade.createRepository` (Decision A8).       | spec §4.4a                                                                                                                                                                                                                    | 0, 3, 6        |
+| A26 | Source Mission's DISMISSED Ideas are **skipped** during Clone (don't carry rejected ideas). All other statuses → PENDING on clone.                                                                                                                                                                                                                                                     | spec §4.4a                                                                                                                                                                                                                    | 3              |
+| A27 | Re-build DONE Idea endpoint re-points `acceptedWorkId` to the NEW Work by default. Original Work is NOT deleted (NN #20). Optional `keepOriginalLink: true` flag creates a new Idea row instead (defer to v2 unless trivial).                                                                                                                                                          | spec §3.9                                                                                                                                                                                                                     | 1              |
+| A28 | Account-wide spend roll-up uses the same read-time roll-up query pattern as Mission-level spend (spec §8.2) but with the user as the scope key. Tile clicks → scrolls to Work Agent settings page's `#account-budgets` anchor.                                                                                                                                                         | spec §5.1, §6.6                                                                                                                                                                                                               | 7              |
 
 ---
 
@@ -74,6 +78,7 @@ Every architectural decision with the file/line that grounds it. If a decision c
 Each phase says "before opening any editor, read these files in full." Skim is not sufficient — the file contains state, side effects, or i18n key references that bite if missed. After reading, the agent should be able to answer the listed questions without re-reading.
 
 ### Phase 0 (Schema)
+
 - [ ] `packages/agent/src/entities/work-proposal.entity.ts`
 - [ ] `packages/agent/src/entities/work-budget.entity.ts`
 - [ ] `packages/agent/src/entities/usage-ledger-entry.entity.ts`
@@ -85,6 +90,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** what's the EXACT current `WorkProposalStatus` enum? What's the EXACT current `WorkProposalSource` enum? Where does `WorkAgentPreference` live and what columns does it have today? Are there any existing CHECK constraints on these columns or are they raw `varchar`?
 
 ### Phase 1 (Backend extensions)
+
 - [ ] All of Phase 0's files (re-read; you've now landed migrations and the entity diffs matter)
 - [ ] `apps/api/src/work-proposals/work-proposals.controller.ts` (full)
 - [ ] `apps/api/src/work-proposals/work-proposals.service.ts`
@@ -97,6 +103,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** which service method actually creates a `WorkAgentGoal`? Does it return synchronously with an id, or via callback? Where is the existing rate-limit guard for `/refresh`?
 
 ### Phase 2 (Dashboard renames + stats)
+
 - [ ] All 21 locale files under `apps/web/messages/` — `ar.json bg.json de.json en.json es.json fr.json he.json hi.json id.json it.json ja.json ko.json nl.json pl.json pt.json ru.json th.json tr.json uk.json vi.json zh.json` — open each and grep for `proposals.header.title`, `proposals.actions.accept`, `proposals.actions.refresh`, `dashboard.proposals`, and the "Recent Works" heading key
 - [ ] `apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx`
 - [ ] `apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx`
@@ -105,6 +112,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** what's the exact i18n key path for "Recent Works"? What's the response shape of `getWorkStats()`?
 
 ### Phase 3 (Missions backend + tick worker)
+
 - [ ] `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts` (the canonical cron pattern — copy it)
 - [ ] `packages/tasks/src/tasks/trigger/user-research-rerun-dispatcher.task.ts` (the existing Auto-generate Ideas loop)
 - [ ] `packages/tasks/trigger.config.ts` (registration mechanism)
@@ -113,6 +121,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** what's the exact registration pattern for a new Trigger.dev cron job? How does the existing service get DI'd inside `run()`?
 
 ### Phase 4 (Work Agent settings refactor)
+
 - [ ] `apps/web/src/components/settings/WorkAgentSettings.tsx` in full (490 lines)
 - [ ] `apps/web/src/lib/api/work-agent.ts`
 - [ ] `apps/web/src/app/actions/settings/work-agent.ts`
@@ -121,6 +130,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** which subcomponents are currently inline (LiveRun, LogList, StatusPill, Metric, ToggleRow, NumberField, MoneyField)? What's the exact JSX they render so the snapshot test can assert byte-identical output post-extraction?
 
 ### Phase 5 (Ideas page + Dashboard Ideas block)
+
 - [ ] `apps/web/src/components/dashboard/WorkProposalsSection.tsx` in full
 - [ ] `apps/web/src/components/dashboard/WorkProposalCard.tsx`
 - [ ] `apps/web/src/app/actions/dashboard/work-proposals.ts`
@@ -129,12 +139,14 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** what props does `WorkProposalsSection` accept? What polling cadence does it use? What's the `WorkProposalCard` signature?
 
 ### Phase 6 (Missions UI)
+
 - [ ] All of Phase 5's files (the IdeaCard is reused on the Mission detail page)
 - [ ] Phase 4's extracted `<LiveRun />` + `<LogList />` (you'll render one per in-flight Idea — Decision A15)
 - [ ] `apps/web/src/components/dashboard/DashboardSidebar.tsx` (add new sidebar items here)
 - [ ] Existing chat-sidebar visibility mechanism (find via `rg 'ChatSidebar|AiChatSidebar' apps/web/src`)
 
 ### Phase 6.5 (Unified `+ New` page at `/new`)
+
 - [ ] `apps/web/src/app/[locale]/(dashboard)/works/new/page.tsx`
 - [ ] `apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx` (full — the three blocks live inline starting around line 57; Phase 6.5 PR CC1 extracts them)
 - [ ] `apps/web/src/components/dashboard/DashboardSidebar.tsx:204–...` (the existing `+ New Work` button; PR DD renames + repoints)
@@ -143,12 +155,14 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - [ ] `apps/web/src/lib/ai/tools/suggest.tools.ts` (model for chip-hinted tool routing in Phase 9)
 
 ### Phase 7 (Budgets)
+
 - [ ] `apps/api/src/budgets/budgets.controller.ts` + `usage.controller.ts` + `admin-usage.controller.ts` + `budget-alert.handler.ts`
 - [ ] Find `BudgetGuardService` — search `rg 'class BudgetGuardService' packages/agent`
 - [ ] Where plugin calls are intercepted (search `rg 'BudgetGuardService' packages/agent`)
 - [ ] Existing per-Work budget UI (find via `rg 'workBudgetAPI|budgetsAPI' apps/web/src`)
 
 ### Phase 8 (Mission Templates)
+
 - [ ] `apps/web/src/components/templates/TemplatesCatalog.tsx` in full
 - [ ] `apps/web/src/components/templates/CreateCustomTemplateDialog.tsx`
 - [ ] `apps/web/src/app/[locale]/(dashboard)/templates/page.tsx`
@@ -159,6 +173,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - **Self-check:** does `gitFacade.createRepository()` already handle name collisions? Where does the destination org come from?
 
 ### Phase 9 (AI Chat tools)
+
 - [ ] `apps/web/src/lib/ai/tools/suggest.tools.ts` (web-side pattern — copy for new tools)
 - [ ] Other files under `apps/web/src/lib/ai/tools/` (e.g. `search.tools.ts`, `user.tools.ts`)
 - [ ] `apps/mcp/src/openapi-tools/whitelist.ts` (the WHITELIST entries pattern)
@@ -166,17 +181,20 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 - [ ] All controllers from Phases 1, 3, 7, 8 that need MCP exposure — confirm each has `@ApiOperation` + `@ApiTags` decorators
 
 ### Phase 10 (Localization)
+
 - [ ] All 21 locale files; diff against `en.json` to find missing keys
 
 ### Phase 11 (Docs)
+
 - [ ] `apps/docs/` structure and `docs/features/` index
 - [ ] The two sibling docs from this Workspace KB
 
 ---
 
-> **Hard rule (repeat from spec):** This is an **extension**. Nothing in production today is removed, rewritten, or significantly changed. Every phase below is additive. Where existing components are *extracted into shared modules*, the original call sites continue to work unchanged. Where the spec proposes a "rename", it's i18n string changes only — never a code path deletion.
+> **Hard rule (repeat from spec):** This is an **extension**. Nothing in production today is removed, rewritten, or significantly changed. Every phase below is additive. Where existing components are _extracted into shared modules_, the original call sites continue to work unchanged. Where the spec proposes a "rename", it's i18n string changes only — never a code path deletion.
 >
 > **Hard rule on workspace process:** Every PR landing this plan must follow the platform repo conventions in [`Ever Works/Code/platform/CLAUDE.md`](file:///C:/Coding/Ever%20Works/Code/platform/CLAUDE.md) and the workstation conventions in [`Workspace/AGENTS.md`](file:///C:/Coding/Workspace/AGENTS.md) — notably:
+>
 > - TypeORM entity changes ship with a migration in the same PR (NN #16).
 > - PR drives to clean review state (NN #14) and bot reviews are a pre-merge gate (NN #18).
 > - CI must be green before stopping (NN #19).
@@ -223,18 +241,18 @@ All schema changes the rest of the plan depends on, in a single migration set. N
 
 ### 2.2 Migrations
 
-| Migration | Table | Change |
-|---|---|---|
-| `<ts>-ExtendWorkProposalForMissions.ts` | `work_proposals` | Add `missionId uuid NULL` FK (no constraint yet — will be activated in Phase 3 when `missions` exists). Add new permitted values to `status` and `source` columns (`QUEUED`, `BUILDING`, `FAILED`, `USER_MANUAL`, `MISSION`). Drop existing index, add `(userId, status, missionId, generatedAt)`. |
-| `<ts>-CreateMissionsTable.ts` | `missions` (NEW) | See §4.1 entity spec. Adds the FK constraint on `work_proposals.missionId`. |
-| `<ts>-ExtendBudgetsToPolymorphicOwner.ts` | `work_budgets`, `usage_ledger_entries`, `plugin_usage_events`, `work_budget_alert_states` | Add `ownerType varchar(16) NOT NULL DEFAULT 'work'` and `ownerId uuid NULL` to each. Backfill `ownerType='work', ownerId=workId`. Add composite index `(ownerType, ownerId)`. Existing `workId` columns stay. |
-| `<ts>-PromoteWorkAgentConstantsToSettings.ts` | `work_agent_preferences` (or whatever table backs `WorkAgentPreferences`) | Add nullable columns for: `auto_generate_cadence` (cron string), `auto_generate_batch_size` (int), `auto_build_throttle_per_day` (int, nullable=`Unlimited`), `mission_default_outstanding_cap` (int, nullable=`Unlimited`). |
-| `<ts>-AddAutoRetryPrefs.ts` (v6) | `work_agent_preferences` | Add `max_auto_retries` (int, default 2, range 0–5), `backoff_seconds` (int, default 60, range 10–3600), `exponential_backoff_factor` (decimal, default 2.0, range 1.0–4.0). Decision A23. |
-| `<ts>-AddAccountWideBudget.ts` (v6) | `work_agent_preferences` | Add `account_wide_monthly_cap_cents` (bigint, nullable), `account_wide_allow_overage` (boolean, default true). Decision A28. |
-| `<ts>-AddIdeaIdToWorkAgentGoal.ts` | `work_agent_goals` (whatever the table is) | Add `ideaId uuid NULL` FK to `work_proposals.id`. Lets us join "this build run" back to "the Idea it was building" (§6.1 row 4 of spec). |
-| `<ts>-AddIdeaFailureColumns.ts` (v6) | `work_proposals` | Add `failure_message` (text, nullable), `failure_kind` (varchar(32), nullable; values: `transient_network`, `transient_rate_limit`, `transient_upstream_5xx`, `transient_plugin`, `permanent_invalid_input`, `permanent_unknown`, etc.). Decisions A23, A24. |
-| `<ts>-AddMissionRefsToWorkProposalAndWork.ts` | `works` | Add `accepted_from_idea_id uuid NULL` (back-pointer to the Idea this Work came from). Lets the Mission detail page roll up Works without a heavy join. |
-| `<ts>-AddSourceMissionIdToMissions.ts` (v6) | `missions` | Add `source_mission_id uuid NULL` self-FK for Clone traceability. Decision A25. |
+| Migration                                     | Table                                                                                     | Change                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ts>-ExtendWorkProposalForMissions.ts`       | `work_proposals`                                                                          | Add `missionId uuid NULL` FK (no constraint yet — will be activated in Phase 3 when `missions` exists). Add new permitted values to `status` and `source` columns (`QUEUED`, `BUILDING`, `FAILED`, `USER_MANUAL`, `MISSION`). Drop existing index, add `(userId, status, missionId, generatedAt)`. |
+| `<ts>-CreateMissionsTable.ts`                 | `missions` (NEW)                                                                          | See §4.1 entity spec. Adds the FK constraint on `work_proposals.missionId`.                                                                                                                                                                                                                        |
+| `<ts>-ExtendBudgetsToPolymorphicOwner.ts`     | `work_budgets`, `usage_ledger_entries`, `plugin_usage_events`, `work_budget_alert_states` | Add `ownerType varchar(16) NOT NULL DEFAULT 'work'` and `ownerId uuid NULL` to each. Backfill `ownerType='work', ownerId=workId`. Add composite index `(ownerType, ownerId)`. Existing `workId` columns stay.                                                                                      |
+| `<ts>-PromoteWorkAgentConstantsToSettings.ts` | `work_agent_preferences` (or whatever table backs `WorkAgentPreferences`)                 | Add nullable columns for: `auto_generate_cadence` (cron string), `auto_generate_batch_size` (int), `auto_build_throttle_per_day` (int, nullable=`Unlimited`), `mission_default_outstanding_cap` (int, nullable=`Unlimited`).                                                                       |
+| `<ts>-AddAutoRetryPrefs.ts` (v6)              | `work_agent_preferences`                                                                  | Add `max_auto_retries` (int, default 2, range 0–5), `backoff_seconds` (int, default 60, range 10–3600), `exponential_backoff_factor` (decimal, default 2.0, range 1.0–4.0). Decision A23.                                                                                                          |
+| `<ts>-AddAccountWideBudget.ts` (v6)           | `work_agent_preferences`                                                                  | Add `account_wide_monthly_cap_cents` (bigint, nullable), `account_wide_allow_overage` (boolean, default true). Decision A28.                                                                                                                                                                       |
+| `<ts>-AddIdeaIdToWorkAgentGoal.ts`            | `work_agent_goals` (whatever the table is)                                                | Add `ideaId uuid NULL` FK to `work_proposals.id`. Lets us join "this build run" back to "the Idea it was building" (§6.1 row 4 of spec).                                                                                                                                                           |
+| `<ts>-AddIdeaFailureColumns.ts` (v6)          | `work_proposals`                                                                          | Add `failure_message` (text, nullable), `failure_kind` (varchar(32), nullable; values: `transient_network`, `transient_rate_limit`, `transient_upstream_5xx`, `transient_plugin`, `permanent_invalid_input`, `permanent_unknown`, etc.). Decisions A23, A24.                                       |
+| `<ts>-AddMissionRefsToWorkProposalAndWork.ts` | `works`                                                                                   | Add `accepted_from_idea_id uuid NULL` (back-pointer to the Idea this Work came from). Lets the Mission detail page roll up Works without a heavy join.                                                                                                                                             |
+| `<ts>-AddSourceMissionIdToMissions.ts` (v6)   | `missions`                                                                                | Add `source_mission_id uuid NULL` self-FK for Clone traceability. Decision A25.                                                                                                                                                                                                                    |
 
 > Confirm table names by reading the entity decorators before generating migrations (`packages/agent/src/entities/`). The migration filenames above are illustrative.
 
@@ -259,7 +277,7 @@ pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>
 
 - TypeORM diff sometimes proposes destructive enum recreation — read SQL, apply two-phase pattern if so.
 - Workstation rule: API auto-applies migrations on boot (`migrationsRun: true`). The deploy after this phase will run all four migrations on stage/prod. Verify against [`knowledge/runbooks/EVER_WORKS_DB_MIGRATIONS.md`](file:///C:/Coding/Workspace/knowledge/runbooks/EVER_WORKS_DB_MIGRATIONS.md) before merging.
-- Rollback: each migration's `down()` reverses cleanly *before* any app code reads the new columns. After Phase 1+ code lands, treat as forward-only.
+- Rollback: each migration's `down()` reverses cleanly _before_ any app code reads the new columns. After Phase 1+ code lands, treat as forward-only.
 
 ### 2.6 Definition of done
 
@@ -274,12 +292,12 @@ pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>
 - `WorkProposal` entity reflects the new enum values + `missionId` column.
 - A new endpoint to user-manually create Ideas: `POST /me/work-proposals` (NestJS controller, body = prompt). Persists with `source='USER_MANUAL'`, calls shared titler for `title`, defaults `status='PENDING'` (or `QUEUED` if global Auto-build is on — see Decision A3 for the auto-flow). Returns the created `WorkProposalResponseDto`. **Must carry `@ApiOperation` + `@ApiTags` + Throttle decorators** (Decisions A18, A19) so it auto-exposes via MCP and is rate-limited.
 - A new endpoint to queue an existing Idea for build: `POST /me/work-proposals/:id/build`. Flow (matches Decision A3):
-  1. Validate Idea exists, user owns it, `status IN ('PENDING','FAILED')`.
-  2. Transition Idea to `status='QUEUED'`.
-  3. Call the existing Work Agent goal-create service (the one `apps/api/src/work-agent/work-agent.controller.ts` calls via `POST /me/work-agent/goals`) with `{ instruction: toProposalUserPrompt(idea), maxWorksPerRun: 1, ideaId: idea.id, dryRun: <global default>, guardrailsOverride: <mission.guardrailsOverride if idea.missionId, else undefined> }`.
-  4. Return the created Goal id + the updated Idea.
-  5. **Goal-completion hook** (in the goal-completion handler — find via Phase 1 pre-flight): when a Goal with non-null `ideaId` completes successfully and produced exactly one Work, internally invoke the existing accept-flow logic (DO NOT bypass it — extract the body of the existing `accept` controller method into a service method `acceptInternal(ideaId, workId)` and call it from both the controller AND the goal-completion handler). On goal failure, transition Idea to `status='FAILED'` and persist the error message on the proposal.
-  6. **The existing `POST /me/work-proposals/:id/accept` endpoint and its controller method stay untouched** (per NN #20) — it still works for the existing "user already built a Work, now record the link" flow.
+    1. Validate Idea exists, user owns it, `status IN ('PENDING','FAILED')`.
+    2. Transition Idea to `status='QUEUED'`.
+    3. Call the existing Work Agent goal-create service (the one `apps/api/src/work-agent/work-agent.controller.ts` calls via `POST /me/work-agent/goals`) with `{ instruction: toProposalUserPrompt(idea), maxWorksPerRun: 1, ideaId: idea.id, dryRun: <global default>, guardrailsOverride: <mission.guardrailsOverride if idea.missionId, else undefined> }`.
+    4. Return the created Goal id + the updated Idea.
+    5. **Goal-completion hook** (in the goal-completion handler — find via Phase 1 pre-flight): when a Goal with non-null `ideaId` completes successfully and produced exactly one Work, internally invoke the existing accept-flow logic (DO NOT bypass it — extract the body of the existing `accept` controller method into a service method `acceptInternal(ideaId, workId)` and call it from both the controller AND the goal-completion handler). On goal failure, transition Idea to `status='FAILED'` and persist the error message on the proposal.
+    6. **The existing `POST /me/work-proposals/:id/accept` endpoint and its controller method stay untouched** (per NN #20) — it still works for the existing "user already built a Work, now record the link" flow.
 - The user-research proposal generator (`packages/agent/src/user-research/*`) extended to accept an exclusion-and-context list (every existing Idea title/slug/description, ALL statuses — including DONE — per spec §3.3) AND an optional `missionContext` (Goal + relevant Mission KB excerpts).
 - The four promoted constants (Phase 0) wired through to `work-agent.service.ts` / generator service so they read user prefs instead of hardcoded constants.
 
@@ -298,10 +316,10 @@ pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>
 3. **PR C** — `feat(api): proposal generator accepts exclusion+context list and missionContext`. Generator + prompt-template change. Unit-test the prompt assembly.
 4. **PR D** — `feat(api): promote four work-agent constants to user settings`. Reads now come from prefs; writes via existing `PUT /me/work-agent/preferences`. Default values match today's hardcoded constants for back-compat.
 5. **PR FF** (v6) — `feat(api): retry + rebuild Idea endpoints + auto-retry handler`. Adds:
-   - `POST /me/work-proposals/:id/retry` — only valid when `status='FAILED'`; clears `failure_message`/`failure_kind`, transitions to QUEUED, creates a new Goal (same shape as original).
-   - `POST /me/work-proposals/:id/rebuild` — only valid when `status='ACCEPTED'`; creates a new Goal with the same instruction; on completion re-points `acceptedWorkId` to the new Work (per Decision A27).
-   - **Auto-retry loop in Goal-completion handler**: on Goal failure, classify the error against the built-in transient set. If transient AND `attempts < user.maxAutoRetries`, schedule a re-queue after `backoffSeconds * factor ^ attempts`. Idea status stays `BUILDING` across attempts (Decision A24). On exhaustion → FAILED + persist `failure_message` + `failure_kind`.
-   - Decorate both endpoints with `@ApiOperation` + `@ApiTags` (Decision A19) and `@Throttle` (Decision A18).
+    - `POST /me/work-proposals/:id/retry` — only valid when `status='FAILED'`; clears `failure_message`/`failure_kind`, transitions to QUEUED, creates a new Goal (same shape as original).
+    - `POST /me/work-proposals/:id/rebuild` — only valid when `status='ACCEPTED'`; creates a new Goal with the same instruction; on completion re-points `acceptedWorkId` to the new Work (per Decision A27).
+    - **Auto-retry loop in Goal-completion handler**: on Goal failure, classify the error against the built-in transient set. If transient AND `attempts < user.maxAutoRetries`, schedule a re-queue after `backoffSeconds * factor ^ attempts`. Idea status stays `BUILDING` across attempts (Decision A24). On exhaustion → FAILED + persist `failure_message` + `failure_kind`.
+    - Decorate both endpoints with `@ApiOperation` + `@ApiTags` (Decision A19) and `@Throttle` (Decision A18).
 
 ### 3.4 Tests
 
@@ -327,13 +345,13 @@ pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>
 The first thing the user sees. Tiny PR. Validates the stats endpoint + i18n updates before anything bigger.
 
 - i18n renames in **every locale**:
-  - `proposals.header.title` → "Ideas"; drop the `titleWithName` username variant in display (leave key for now).
-  - `proposals.actions.accept` → "Build".
-  - `proposals.actions.refresh` → "Suggest more".
-  - Dashboard "Recent Works" key → "Works".
+    - `proposals.header.title` → "Ideas"; drop the `titleWithName` username variant in display (leave key for now).
+    - `proposals.actions.accept` → "Build".
+    - `proposals.actions.refresh` → "Suggest more".
+    - Dashboard "Recent Works" key → "Works".
 - Dashboard stats row gains **two new tiles** in the new order: `[Total Missions]  [Total Ideas]  [Total Works]  [Total Items]  [Active Websites]`.
-  - `Total Missions` returns 0 for now (table is empty until Phase 3) — render the tile anyway so the layout is correct from the start.
-  - `Total Ideas` counts ALL `work_proposals` for the user across all statuses.
+    - `Total Missions` returns 0 for now (table is empty until Phase 3) — render the tile anyway so the layout is correct from the start.
+    - `Total Ideas` counts ALL `work_proposals` for the user across all statuses.
 
 ### 4.2 Files
 
@@ -371,44 +389,44 @@ The first thing the user sees. Tiny PR. Validates the stats endpoint + i18n upda
 @Entity({ name: 'missions' })
 @Index('idx_missions_user_status', ['userId', 'status'])
 export class Mission {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column('uuid') userId: string;
-    @ManyToOne(() => User, { onDelete: 'CASCADE' }) user?: User;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column('uuid') userId: string;
+	@ManyToOne(() => User, { onDelete: 'CASCADE' }) user?: User;
 
-    @Column({ length: 200 }) title: string;
-    @Column({ type: 'text' }) description: string;
+	@Column({ length: 200 }) title: string;
+	@Column({ type: 'text' }) description: string;
 
-    @Column({ type: 'varchar', length: 16 })
-    type: 'one-shot' | 'scheduled';
+	@Column({ type: 'varchar', length: 16 })
+	type: 'one-shot' | 'scheduled';
 
-    @Column({ type: 'varchar', length: 16, default: 'active' })
-    status: 'active' | 'paused' | 'completed' | 'failed';
+	@Column({ type: 'varchar', length: 16, default: 'active' })
+	status: 'active' | 'paused' | 'completed' | 'failed';
 
-    /** Cron string; null when type='one-shot'. */
-    @Column({ type: 'varchar', length: 64, nullable: true })
-    schedule?: string | null;
+	/** Cron string; null when type='one-shot'. */
+	@Column({ type: 'varchar', length: 64, nullable: true })
+	schedule?: string | null;
 
-    @Column({ type: 'boolean', default: false })
-    autoBuildWorks: boolean;
+	@Column({ type: 'boolean', default: false })
+	autoBuildWorks: boolean;
 
-    /** null = inherit global; -1 (or NULL semantic) = Unlimited. Default = global default. */
-    @Column({ type: 'int', nullable: true })
-    outstandingIdeasCap?: number | null;
+	/** null = inherit global; -1 (or NULL semantic) = Unlimited. Default = global default. */
+	@Column({ type: 'int', nullable: true })
+	outstandingIdeasCap?: number | null;
 
-    /** Sparse override of WorkAgentGuardrails for Ideas this Mission spawns. */
-    @Column('simple-json', { nullable: true })
-    guardrailsOverride?: Partial<WorkAgentGuardrails> | null;
+	/** Sparse override of WorkAgentGuardrails for Ideas this Mission spawns. */
+	@Column('simple-json', { nullable: true })
+	guardrailsOverride?: Partial<WorkAgentGuardrails> | null;
 
-    /** Repo this Mission was scaffolded from, e.g. 'ever-works/p2p-marketplace-mission-template'. */
-    @Column({ type: 'varchar', length: 200, nullable: true })
-    missionTemplateRepo?: string | null;
+	/** Repo this Mission was scaffolded from, e.g. 'ever-works/p2p-marketplace-mission-template'. */
+	@Column({ type: 'varchar', length: 200, nullable: true })
+	missionTemplateRepo?: string | null;
 
-    /** Per-Mission repo, e.g. 'ever-works/cats-business-mission'. */
-    @Column({ type: 'varchar', length: 200, nullable: true })
-    missionRepo?: string | null;
+	/** Per-Mission repo, e.g. 'ever-works/cats-business-mission'. */
+	@Column({ type: 'varchar', length: 200, nullable: true })
+	missionRepo?: string | null;
 
-    @CreateDateColumn() createdAt: Date;
-    @UpdateDateColumn() updatedAt: Date;
+	@CreateDateColumn() createdAt: Date;
+	@UpdateDateColumn() updatedAt: Date;
 }
 ```
 
@@ -421,10 +439,10 @@ export class Mission {
 - `missions.module.ts`
 - `missions.controller.ts` — CRUD: list, get, create, update (title/description/schedule/auto-build/cap/guardrails/Template), pause, resume, complete, delete, run-now.
 - `missions.service.ts` — encapsulates the lifecycle. The `create` path:
-  1. Calls the shared titler (§5.4) to generate the Mission title from the prompt.
-  2. (Phase 8 — Mission Templates) If `missionTemplateRepo` is set, calls the Mission repo scaffolder. Otherwise scaffolds from a generic baseline.
-  3. Persists the Mission row.
-  4. If `type === 'one-shot'`, immediately runs the first tick (§5.3).
+    1. Calls the shared titler (§5.4) to generate the Mission title from the prompt.
+    2. (Phase 8 — Mission Templates) If `missionTemplateRepo` is set, calls the Mission repo scaffolder. Otherwise scaffolds from a generic baseline.
+    3. Persists the Mission row.
+    4. If `type === 'one-shot'`, immediately runs the first tick (§5.3).
 - `dto/` for input validation.
 - `*.spec.ts` for service and controller.
 
@@ -434,12 +452,12 @@ A new BullMQ queue (or Trigger.dev job — match the existing scheduled-Works in
 
 - Scheduled by the existing cron infra for every `Mission WHERE status='active' AND type='scheduled' AND schedule != null`.
 - Per tick:
-  1. Re-read the Mission.
-  2. **Honor the outstanding-Ideas cap:** count `WorkProposal WHERE missionId = mission.id AND status IN ('PENDING','QUEUED','BUILDING')`. If `count >= cap` (and cap !== Unlimited), log `mission_at_cap` event and exit.
-  3. Call the extended user-research generator (Phase 1 PR C) with `missionContext = { description, kb: <fetched-from-mission-repo> }` and the standard exclusion list.
-  4. For each returned proposal, persist a `WorkProposal` with `source='MISSION'`, `missionId=mission.id`, `status='PENDING'`.
-  5. If `mission.autoBuildWorks` (after Mission override falls back to global), for each new Idea call `workAgentAPI.createGoal({ instruction, ideaId, maxWorksPerRun: 1, ...mission.guardrailsOverride })`.
-  6. Append a tick log entry (events are the existing `WorkAgentRunLog` machinery — or a parallel `MissionRunLog` if it's cleaner; recommend reuse).
+    1. Re-read the Mission.
+    2. **Honor the outstanding-Ideas cap:** count `WorkProposal WHERE missionId = mission.id AND status IN ('PENDING','QUEUED','BUILDING')`. If `count >= cap` (and cap !== Unlimited), log `mission_at_cap` event and exit.
+    3. Call the extended user-research generator (Phase 1 PR C) with `missionContext = { description, kb: <fetched-from-mission-repo> }` and the standard exclusion list.
+    4. For each returned proposal, persist a `WorkProposal` with `source='MISSION'`, `missionId=mission.id`, `status='PENDING'`.
+    5. If `mission.autoBuildWorks` (after Mission override falls back to global), for each new Idea call `workAgentAPI.createGoal({ instruction, ideaId, maxWorksPerRun: 1, ...mission.guardrailsOverride })`.
+    6. Append a tick log entry (events are the existing `WorkAgentRunLog` machinery — or a parallel `MissionRunLog` if it's cleaner; recommend reuse).
 
 ### 5.4 Shared titler service
 
@@ -452,9 +470,9 @@ A new BullMQ queue (or Trigger.dev job — match the existing scheduled-Works in
 3. **PR I** — `feat(api): shared titler service` (extract from wherever title generation exists today; cover all four call sites).
 4. **PR J** — `feat(api): mission tick worker` (cron registration + handler).
 5. **PR HH** (v6) — `feat(api): Mission Clone endpoint + cloning service`. Adds:
-   - `POST /me/missions/:id/clone` accepting optional overrides for `{ title, description, type, schedule }`.
-   - `MissionCloneService` orchestrating: (a) read source Mission row + assert ownership, (b) build new Mission row with `sourceMissionId = source.id` and (default) title=`"<source.title> (clone)"`, (c) call `gitFacade.createRepository()` for new `<slug>-mission` repo, (d) **snapshot copy** of source repo contents into the new repo (use the same git provider's repo-content-copy primitive — or sequential file fetch+commit if no primitive exists), (e) iterate source's `WorkProposal[]`: skip `DISMISSED`, clone all others as new rows with `status='PENDING'`, `missionId = new.id`, `source='MISSION'`, fresh `generatedAt`, no `acceptedWorkId`, (f) return new Mission DTO + count of cloned Ideas. Does NOT clone Works (they remain on source; the new Mission detail page surfaces them via a `sourceMissionId` join — see Phase 6 PR GG).
-   - Decorate with `@ApiOperation` + `@ApiTags` (Decision A19).
+    - `POST /me/missions/:id/clone` accepting optional overrides for `{ title, description, type, schedule }`.
+    - `MissionCloneService` orchestrating: (a) read source Mission row + assert ownership, (b) build new Mission row with `sourceMissionId = source.id` and (default) title=`"<source.title> (clone)"`, (c) call `gitFacade.createRepository()` for new `<slug>-mission` repo, (d) **snapshot copy** of source repo contents into the new repo (use the same git provider's repo-content-copy primitive — or sequential file fetch+commit if no primitive exists), (e) iterate source's `WorkProposal[]`: skip `DISMISSED`, clone all others as new rows with `status='PENDING'`, `missionId = new.id`, `source='MISSION'`, fresh `generatedAt`, no `acceptedWorkId`, (f) return new Mission DTO + count of cloned Ideas. Does NOT clone Works (they remain on source; the new Mission detail page surfaces them via a `sourceMissionId` join — see Phase 6 PR GG).
+    - Decorate with `@ApiOperation` + `@ApiTags` (Decision A19).
 
 ### 5.6 Tests
 
@@ -481,15 +499,15 @@ The careful "unbundle without removing" work the spec §6 mandates. After this p
 ### 6.2 Steps (in order, all in one PR or two)
 
 1. **Extract shared components** from `apps/web/src/components/settings/WorkAgentSettings.tsx` into `apps/web/src/components/work-agent/`:
-   - `LiveRun.tsx` — the active-run progress + metrics block (lines 246–288 in the existing file).
-   - `LogList.tsx` — the log tail (lines 470–489).
-   - `StatusPill.tsx` — (lines 448–459).
-   - `Metric.tsx` — (lines 461–468).
-   - `ToggleRow.tsx`, `NumberField.tsx`, `MoneyField.tsx` — small primitives reused by the existing settings page AND by Mission detail page's per-Mission override UI.
-   - Keep the existing `WorkAgentSettings.tsx` importing these from the new location. **No visual change.**
+    - `LiveRun.tsx` — the active-run progress + metrics block (lines 246–288 in the existing file).
+    - `LogList.tsx` — the log tail (lines 470–489).
+    - `StatusPill.tsx` — (lines 448–459).
+    - `Metric.tsx` — (lines 461–468).
+    - `ToggleRow.tsx`, `NumberField.tsx`, `MoneyField.tsx` — small primitives reused by the existing settings page AND by Mission detail page's per-Mission override UI.
+    - Keep the existing `WorkAgentSettings.tsx` importing these from the new location. **No visual change.**
 2. **Add anchor IDs** to the two relevant sub-sections:
-   - The Agent section's Auto-generate Ideas sub-region gets `id="auto-generate-ideas"`.
-   - The Guardrails section's Auto-build Works sub-region gets `id="auto-build-works"`.
+    - The Agent section's Auto-generate Ideas sub-region gets `id="auto-generate-ideas"`.
+    - The Guardrails section's Auto-build Works sub-region gets `id="auto-build-works"`.
 3. **Render the four promoted-constant fields** (cadence, batch size, throttle, Mission cap default) using the existing `<NumberField>` and a new schedule-picker primitive (cadence as cron with a friendly preset dropdown).
 4. **Add discoverability links**: small "See this in the new view →" affordance in the Live Run and Recent Goals section headers, linking to `/ideas` (and `/missions/<id>` when the active goal has `missionId`).
 5. **Add the "Advanced — direct goal queue" label** to the Queue section (small description tweak so it reads as the power-user surface).
@@ -507,9 +525,9 @@ The careful "unbundle without removing" work the spec §6 mandates. After this p
 1. **PR K** — `refactor(web): extract shared work-agent components (no behavior change)`.
 2. **PR L** — `feat(web): add anchors + promoted-constant fields to work-agent settings page`.
 3. **PR EE** (v6) — `feat(web): Auto-retry policy + Account-wide budgets sub-sections on work-agent settings`. Adds two new sub-sections to the settings page:
-   - **Auto-retry policy** (anchor `#auto-retry`): three `<NumberField>` rows for `maxAutoRetries`, `backoffSeconds`, `exponentialBackoffFactor`. Help-text per spec §6.6 (4) explains transient-error classification is platform-managed.
-   - **Account-wide budgets** (anchor `#account-budgets`): one `<MoneyField>` for `accountWideMonthlyCapCents` + one `<ToggleRow>` for `accountWideAllowOverage`. Help-text links to per-Work and per-Mission budget surfaces.
-   - All four fields read/write through extended `updateWorkAgentPreferencesAction` (PR D already added the action's signature flexibility).
+    - **Auto-retry policy** (anchor `#auto-retry`): three `<NumberField>` rows for `maxAutoRetries`, `backoffSeconds`, `exponentialBackoffFactor`. Help-text per spec §6.6 (4) explains transient-error classification is platform-managed.
+    - **Account-wide budgets** (anchor `#account-budgets`): one `<MoneyField>` for `accountWideMonthlyCapCents` + one `<ToggleRow>` for `accountWideAllowOverage`. Help-text links to per-Work and per-Mission budget surfaces.
+    - All four fields read/write through extended `updateWorkAgentPreferencesAction` (PR D already added the action's signature flexibility).
 
 ### 6.5 Tests
 
@@ -608,13 +626,13 @@ One server-side create path; many client-side entry points feed into it.
 2. **PR R** — `feat(web): /missions/[id] detail page (header, overrides, live run, Ideas list, Works list)`.
 3. **PR S** — `feat(web): Dashboard Missions block above Ideas block with live counters`.
 4. **PR GG** (v6) — `feat(web): Mission detail page extras + Idea failure UI`. Adds:
-   - **Activity timeline** component on `/missions/[id]` reading the event stream (ticks, generations, build outcomes, schedule changes, Pause/Resume). Renders as vertical timeline with month-based pagination. Reuses any existing event-stream UI primitives if present; otherwise builds from scratch.
-   - **Spend-over-time chart** component on `/missions/[id]` rendering a small line chart of the Mission's monthly spend (current + previous 5 months) with the cap as horizontal reference. **Phase 7 must land first** (it owns the per-Mission spend query); PR GG depends on PR U from Phase 7.
-   - **Related Works (inherited from source Mission)** read-only panel — visible only when `mission.sourceMissionId != null`. Lists source's Works via FK join, links to them but does NOT allow edits.
-   - **Clone button** on Mission detail page header AND on Mission Cards' context menu (`/missions` page + Dashboard Missions block). Opens a small confirmation modal with the cloned title prefilled (editable); on confirm calls `POST /me/missions/:id/clone`.
-   - **Idea failure inline error** on `WorkProposalCard` (or whatever the card component is in Phase 5) — when `idea.status='FAILED'`, renders `failure_message` (truncated, expandable) in a muted danger block below the title.
-   - **Source-Mission backlink affordance** in the Mission detail page header — "Cloned from: [source title]" → click navigates to source Mission. Visible only when `mission.sourceMissionId != null`.
-   - **Cloned-to count** on source Mission detail page header — "Cloned as: N other Mission(s)" → click opens a small popover listing the clones.
+    - **Activity timeline** component on `/missions/[id]` reading the event stream (ticks, generations, build outcomes, schedule changes, Pause/Resume). Renders as vertical timeline with month-based pagination. Reuses any existing event-stream UI primitives if present; otherwise builds from scratch.
+    - **Spend-over-time chart** component on `/missions/[id]` rendering a small line chart of the Mission's monthly spend (current + previous 5 months) with the cap as horizontal reference. **Phase 7 must land first** (it owns the per-Mission spend query); PR GG depends on PR U from Phase 7.
+    - **Related Works (inherited from source Mission)** read-only panel — visible only when `mission.sourceMissionId != null`. Lists source's Works via FK join, links to them but does NOT allow edits.
+    - **Clone button** on Mission detail page header AND on Mission Cards' context menu (`/missions` page + Dashboard Missions block). Opens a small confirmation modal with the cloned title prefilled (editable); on confirm calls `POST /me/missions/:id/clone`.
+    - **Idea failure inline error** on `WorkProposalCard` (or whatever the card component is in Phase 5) — when `idea.status='FAILED'`, renders `failure_message` (truncated, expandable) in a muted danger block below the title.
+    - **Source-Mission backlink affordance** in the Mission detail page header — "Cloned from: [source title]" → click navigates to source Mission. Visible only when `mission.sourceMissionId != null`.
+    - **Cloned-to count** on source Mission detail page header — "Cloned as: N other Mission(s)" → click opens a small popover listing the clones.
 
 ### 8.6 Tests
 
@@ -639,18 +657,18 @@ Spec §4.0. **Purely additive — `/works/new` is left exactly as it is today.**
 
 - Sidebar item label: **`+ New Work` → `+ New`**, and the link href changes from `/works/new` to `/new`. (Direct URL navigation to `/works/new` continues to work for anyone with bookmarks or deep-links; only the sidebar entry-point destination moves.)
 - New page `/new`:
-  - `<h1>` text: "What do you want to build?".
-  - Large prompt input at the top (textarea + paperclip + mic + arrow submit + char counter — modeled on the operator-supplied screenshot).
-  - Chips row below the input in exact order: `Mission` · `Idea` · `Website` · `Landing Page` · `Blog` · `Directory` · `Awesome Repo`.
-  - Three creation blocks below the chips, rendered by the shared block component with the `unified` label set: Create Work with AI · Create Work Manually · Import Existing Work. Click destinations identical to today's blocks on `/works/new`.
-  - AI Chat sidebar is hidden on `/new` until the user submits the prompt. Use the existing chat-visibility mechanism (wherever the chat decides to render — likely a layout-level guard).
+    - `<h1>` text: "What do you want to build?".
+    - Large prompt input at the top (textarea + paperclip + mic + arrow submit + char counter — modeled on the operator-supplied screenshot).
+    - Chips row below the input in exact order: `Mission` · `Idea` · `Website` · `Landing Page` · `Blog` · `Directory` · `Awesome Repo`.
+    - Three creation blocks below the chips, rendered by the shared block component with the `unified` label set: Create Work with AI · Create Work Manually · Import Existing Work. Click destinations identical to today's blocks on `/works/new`.
+    - AI Chat sidebar is hidden on `/new` until the user submits the prompt. Use the existing chat-visibility mechanism (wherever the chat decides to render — likely a layout-level guard).
 - `/works/new` page: **untouched.** Same `page.tsx`, same content, same labels, same flow. The three creation blocks there continue to render via the same shared component (now extracted) with the `work-only` label set (default — preserves today's output byte-for-byte).
 - Submit handler on `/new`:
-  - Posts prompt as the user's first message into AI Chat (re-using the chat's existing send-message client action).
-  - If a chip is selected, includes a hint in the chat's tool-routing context: `Mission` → `missions.create`; `Idea` → `ideas.create`; Work-Type chip → existing Work create flow with that template hint.
-  - If no chip is selected, the chat's normal intent-router decides (existing chat behavior — Phase 9 may add a small bias for Mission/Idea inference, but the chat already does this in some form).
-  - Reveals the chat sidebar.
-  - Navigates Canvas to the newly-created object once the tool response returns.
+    - Posts prompt as the user's first message into AI Chat (re-using the chat's existing send-message client action).
+    - If a chip is selected, includes a hint in the chat's tool-routing context: `Mission` → `missions.create`; `Idea` → `ideas.create`; Work-Type chip → existing Work create flow with that template hint.
+    - If no chip is selected, the chat's normal intent-router decides (existing chat behavior — Phase 9 may add a small bias for Mission/Idea inference, but the chat already does this in some form).
+    - Reveals the chat sidebar.
+    - Navigates Canvas to the newly-created object once the tool response returns.
 
 ### 8b.2 Files
 
@@ -727,9 +745,9 @@ mission spend (this month)
 2. **PR U** — `feat(api): per-Idea + per-Mission budget query endpoints`.
 3. **PR V** — `feat(web): Budget UI on Mission detail page + Idea progress view + settings page`.
 4. **PR II** (v6) — `feat(api+web): account-wide spend roll-up + Dashboard Month Spend tile`. Adds:
-   - API: `GET /me/usage/account-wide` returning `{ monthlyCents, capCents?, allowOverage, periodStart, periodEnd }`. Implementation reuses the `(ownerType, ownerId)` index from PR T but scopes by `userId` across all owner types.
-   - Web: 6th Dashboard stat tile rendering `$X.XX / $Y.YY` (or just `$X.XX` if `capCents=null`). Small inline progress bar when capped. Click → scrolls to `/settings/work-agent#account-budgets`.
-   - Update `getWorkStats()` server action to also return the account-wide spend OR fetch in parallel from the Dashboard page (implementer's call; parallel fetch is simpler if the existing action's caching makes adding fields awkward).
+    - API: `GET /me/usage/account-wide` returning `{ monthlyCents, capCents?, allowOverage, periodStart, periodEnd }`. Implementation reuses the `(ownerType, ownerId)` index from PR T but scopes by `userId` across all owner types.
+    - Web: 6th Dashboard stat tile rendering `$X.XX / $Y.YY` (or just `$X.XX` if `capCents=null`). Small inline progress bar when capped. Click → scrolls to `/settings/work-agent#account-budgets`.
+    - Update `getWorkStats()` server action to also return the account-wide spend OR fetch in parallel from the Dashboard page (implementer's call; parallel fetch is simpler if the existing action's caching makes adding fields awkward).
 
 ### 9.5 Tests
 
@@ -774,16 +792,16 @@ Deferred. v1 ships with naming-convention detection only (suffix `-mission-templ
 2. **PR X** — `feat(api): Mission Templates catalog filter + per-Mission repo scaffolder`.
 3. **PR Y** — `feat(web): Use-this-Template button → /missions quick-add prefill`.
 4. **PR JJ** (v6) — `feat(api): MissionTemplateManifestService — parse .works/mission.yml`. Adds:
-   - `MissionTemplateManifestService` under `apps/api/src/mission-templates/` (or `packages/agent/src/mission-templates/` — pick whichever side already owns Work Template manifests if any, otherwise API side).
-   - Reads `.works/mission.yml` from the template repo at template-ingest time (when a user adds a custom Mission Template OR when the catalog refresh job runs). Uses the GitHub provider to fetch the file contents.
-   - Parses YAML with `yaml` package (already in monorepo, check `pnpm-lock.yaml`). Validates with Zod against the schema in spec §7.5.
-   - Returns `{ valid: true, manifest } | { valid: false, errors }`. On parse failure the catalog UI shows the error inline on the template card.
-   - **Integrates with PR X scaffolder**: when the user creates a Mission from a template, the scaffolder:
-     1. Reads the manifest (if present).
-     2. Copies `kb.seedPaths` directories from template repo → new Mission repo (recursive).
-     3. Applies `defaults.*` to the new Mission row (type, cadence, outstandingIdeasCap, autoBuildWorks, guardrailsOverride, budget overrides) — overridable by user input at create-time.
-     4. Passes `recommendedWorkTemplates` to the Mission tick worker (Phase 3 PR J) as an advisory list — when the tick generates Ideas, the Idea→Work scaffolder biases template selection toward this list. Advisory only; user can override per-Work.
-   - Forward-compat: unknown top-level keys in the manifest emit a single log warning and are ignored. New top-level keys can ship in schema v2 without breaking v1 parsers.
+    - `MissionTemplateManifestService` under `apps/api/src/mission-templates/` (or `packages/agent/src/mission-templates/` — pick whichever side already owns Work Template manifests if any, otherwise API side).
+    - Reads `.works/mission.yml` from the template repo at template-ingest time (when a user adds a custom Mission Template OR when the catalog refresh job runs). Uses the GitHub provider to fetch the file contents.
+    - Parses YAML with `yaml` package (already in monorepo, check `pnpm-lock.yaml`). Validates with Zod against the schema in spec §7.5.
+    - Returns `{ valid: true, manifest } | { valid: false, errors }`. On parse failure the catalog UI shows the error inline on the template card.
+    - **Integrates with PR X scaffolder**: when the user creates a Mission from a template, the scaffolder:
+        1. Reads the manifest (if present).
+        2. Copies `kb.seedPaths` directories from template repo → new Mission repo (recursive).
+        3. Applies `defaults.*` to the new Mission row (type, cadence, outstandingIdeasCap, autoBuildWorks, guardrailsOverride, budget overrides) — overridable by user input at create-time.
+        4. Passes `recommendedWorkTemplates` to the Mission tick worker (Phase 3 PR J) as an advisory list — when the tick generates Ideas, the Idea→Work scaffolder biases template selection toward this list. Advisory only; user can override per-Work.
+    - Forward-compat: unknown top-level keys in the manifest emit a single log warning and are ignored. New top-level keys can ship in schema v2 without breaking v1 parsers.
 
 ### 10.5 Tests
 
@@ -815,9 +833,11 @@ Tool definitions for everything the user must be able to do via chat (spec §3.8
 ### 11.2 Tools
 
 For Ideas:
+
 - `ideas.list`, `ideas.create`, `ideas.build`, `ideas.dismiss`, `ideas.suggestMore`, `ideas.setAutoBuild`, `ideas.setAutoGenerate`, `ideas.listDone`.
 
 For Missions:
+
 - `missions.list`, `missions.create`, `missions.pause`, `missions.resume`, `missions.complete`, `missions.delete`, `missions.runNow`, `missions.setSchedule`, `missions.setAutoBuild`, `missions.setCap`, `missions.listIdeas`, `missions.listWorks`.
 
 Each tool is a thin wrapper around the existing REST controllers — **no new business logic**. New controllers from Phases 1, 3, 7, 8 must keep their `@ApiOperation` + `@ApiTags` decorators so MCP auto-derivation works (Decision A19).
@@ -825,6 +845,7 @@ Each tool is a thin wrapper around the existing REST controllers — **no new bu
 ### 11.3 PR Z1 — web-side tools
 
 **Files:**
+
 - `apps/web/src/lib/ai/tools/ideas.tools.ts` (NEW)
 - `apps/web/src/lib/ai/tools/missions.tools.ts` (NEW)
 - Wherever the in-app chat surface assembles its `tools` array (find by following from `apps/web/src/lib/ai/tools/suggest.tools.ts` to its caller — likely an `ai/index.ts` or per-page chat-provider component) — add the new tool factories to that assembly.
@@ -838,15 +859,15 @@ import { z } from 'zod';
 import { missionsAPI } from '@/lib/api/missions';
 
 export const createMission = tool({
-  description: 'Create a new Mission from a Goal/Project description...',
-  inputSchema: z.object({
-    instruction: z.string().min(10),
-    type: z.enum(['one-shot', 'scheduled']).default('one-shot'),
-    schedule: z.string().optional(),
-  }),
-  execute: async ({ instruction, type, schedule }) => {
-    return missionsAPI.create({ instruction, type, schedule });
-  },
+	description: 'Create a new Mission from a Goal/Project description...',
+	inputSchema: z.object({
+		instruction: z.string().min(10),
+		type: z.enum(['one-shot', 'scheduled']).default('one-shot'),
+		schedule: z.string().optional()
+	}),
+	execute: async ({ instruction, type, schedule }) => {
+		return missionsAPI.create({ instruction, type, schedule });
+	}
 });
 ```
 
@@ -855,6 +876,7 @@ Repeat for every verb in §11.2.
 ### 11.4 PR Z2 — MCP whitelist
 
 **Files:**
+
 - `apps/mcp/src/openapi-tools/whitelist.ts` — append WHITELIST entries for every new endpoint added in Phases 1, 3, 7, 8.
 - Verify by reading `apps/mcp/src/openapi-tools/tool-registration.service.ts:20–58` that the registration loop picks them up.
 
@@ -884,8 +906,8 @@ Z1 and Z2 are independent and can land in either order.
 ### 11.7 Definition of done
 
 - Spec §3.8 and §4.5 chat verbs all work in:
-  - the in-app AI Chat (web app) — PR Z1
-  - the MCP server (verified via an external client like Claude Desktop, or a stub MCP client in the integration test) — PR Z2
+    - the in-app AI Chat (web app) — PR Z1
+    - the MCP server (verified via an external client like Claude Desktop, or a stub MCP client in the integration test) — PR Z2
 
 ---
 
@@ -958,46 +980,46 @@ See [spec §11](spec.md#11-out-of-scope-v2) for what we are NOT doing in v2.
 
 ## 15. PR checklist (one-line summary)
 
-| # | PR | Phase | Brief |
-|---|---|---|---|
-| A | feat(api): extend WorkProposal statuses/sources + missionId | 1 | Entity + service updates |
-| B | feat(api): user-manual Idea create + build-from-Idea endpoint | 1 | New REST endpoints |
-| C | feat(api): proposal generator excludes existing + accepts missionContext | 1 | Generator extension |
-| D | feat(api): promote four work-agent constants to user settings | 1 | Cadence / batch / throttle / Mission cap |
-| FF | feat(api): retry + rebuild Idea endpoints + auto-retry handler | 1 | POST /retry + /rebuild; transient classifier + backoff loop |
-| E | feat(web): i18n renames (Ideas/Works/Build/Suggest more) | 2 | Every locale |
-| F | feat(api+web): Total Missions + Total Ideas dashboard tiles | 2 | Stats reorder |
-| G | feat(api): Mission entity + migration | 3 | Schema |
-| H | feat(api): MissionsModule CRUD + lifecycle endpoints | 3 | Controller/service/DTOs |
-| I | feat(api): shared titler service | 3 | One AI call, four sites |
-| J | feat(api): mission tick worker | 3 | Cron + handler |
-| HH | feat(api): Mission Clone endpoint + cloning service | 3 | Full Fork: metadata + repo snapshot + Idea fan-out + sourceMissionId FK |
-| K | refactor(web): extract shared work-agent components | 4 | LiveRun / LogList / pills / fields |
-| L | feat(web): anchors + promoted-constant fields on work-agent settings | 4 | Deep-link targets + new fields |
-| EE | feat(web): Auto-retry + Account-wide budgets sub-sections | 4 | Two new sub-sections, anchored for deep-link |
-| M | refactor(web): extract IdeaCard from dashboard proposals | 5 | No behavior change |
-| N | feat(web): /ideas page + sidebar item | 5 | Full Ideas page |
-| O | feat(web): Dashboard Ideas block reshape | 5 | Toggles / +Add / gears / View-all |
-| P | feat(web): Done filter chip on /ideas | 5 | Surface hidden Ideas |
-| Q | feat(web): /missions page with Cards + small +New Mission button | 6 | List only — no large quick-add |
-| R | feat(web): /missions/[id] detail page | 6 | Header / overrides / live run / lists |
-| S | feat(web): Dashboard Missions block above Ideas | 6 | 3 cards + live counters |
-| GG | feat(web): Mission detail page extras + Idea failure UI | 6 | Timeline + spend chart + Clone button + Related Works + inline failure msg |
-| CC1 | refactor(web): extract CreationBlockTrio from /works/new | 6.5 | Snapshot-verified byte-identical; enables reuse on /new |
-| CC2 | feat(web): NEW /new page (prompt + Mission/Idea/Work chips + three blocks + hide chat) | 6.5 | Brand-new route, brand-new page; /works/new untouched |
-| DD | chore(web): rename sidebar `+ New Work` → `+ New` AND point href at /new | 6.5 | Label + href change |
-| T | feat(api): polymorphic owner on budget + usage entities | 7 | Phase 0 columns wired |
-| U | feat(api): per-Idea + per-Mission budget endpoints | 7 | Query + alerts |
-| V | feat(web): Budget UI on Mission detail + Idea progress + settings | 7 | Three surfaces |
-| II | feat(api+web): account-wide spend roll-up + Dashboard Month Spend tile | 7 | 6th stat tile; reuses (ownerType, ownerId) index |
-| W | feat(web): kind-switch on TemplatesCatalog | 8 | Mission Templates default |
-| X | feat(api): Mission Templates catalog + Mission repo scaffolder | 8 | GitHub plugin reuse |
-| Y | feat(web): Use-this-Template → /missions prefill | 8 | One-click start |
-| JJ | feat(api): MissionTemplateManifestService — parse .works/mission.yml | 8 | Zod-validated; integrates with PR X scaffolder; honors defaults + KB seed + recommended Work Templates |
-| Z1 | feat(web): in-app AI Chat tools for Missions + extended Ideas | 9 | Vercel AI SDK tool() defs under apps/web/src/lib/ai/tools/ |
-| Z2 | feat(mcp): WHITELIST entries for Missions + Ideas endpoints | 9 | apps/mcp/src/openapi-tools/whitelist.ts; auto-derives from @ApiOperation |
-| AA | docs: end-user pages for Missions, Ideas, Mission Templates, Budgets | 11 | Lift from user-docs file |
-| BB | docs(specs): link spec + plan under docs/specs/features/ | 11 | Cross-link |
+| #   | PR                                                                                     | Phase | Brief                                                                                                  |
+| --- | -------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------ |
+| A   | feat(api): extend WorkProposal statuses/sources + missionId                            | 1     | Entity + service updates                                                                               |
+| B   | feat(api): user-manual Idea create + build-from-Idea endpoint                          | 1     | New REST endpoints                                                                                     |
+| C   | feat(api): proposal generator excludes existing + accepts missionContext               | 1     | Generator extension                                                                                    |
+| D   | feat(api): promote four work-agent constants to user settings                          | 1     | Cadence / batch / throttle / Mission cap                                                               |
+| FF  | feat(api): retry + rebuild Idea endpoints + auto-retry handler                         | 1     | POST /retry + /rebuild; transient classifier + backoff loop                                            |
+| E   | feat(web): i18n renames (Ideas/Works/Build/Suggest more)                               | 2     | Every locale                                                                                           |
+| F   | feat(api+web): Total Missions + Total Ideas dashboard tiles                            | 2     | Stats reorder                                                                                          |
+| G   | feat(api): Mission entity + migration                                                  | 3     | Schema                                                                                                 |
+| H   | feat(api): MissionsModule CRUD + lifecycle endpoints                                   | 3     | Controller/service/DTOs                                                                                |
+| I   | feat(api): shared titler service                                                       | 3     | One AI call, four sites                                                                                |
+| J   | feat(api): mission tick worker                                                         | 3     | Cron + handler                                                                                         |
+| HH  | feat(api): Mission Clone endpoint + cloning service                                    | 3     | Full Fork: metadata + repo snapshot + Idea fan-out + sourceMissionId FK                                |
+| K   | refactor(web): extract shared work-agent components                                    | 4     | LiveRun / LogList / pills / fields                                                                     |
+| L   | feat(web): anchors + promoted-constant fields on work-agent settings                   | 4     | Deep-link targets + new fields                                                                         |
+| EE  | feat(web): Auto-retry + Account-wide budgets sub-sections                              | 4     | Two new sub-sections, anchored for deep-link                                                           |
+| M   | refactor(web): extract IdeaCard from dashboard proposals                               | 5     | No behavior change                                                                                     |
+| N   | feat(web): /ideas page + sidebar item                                                  | 5     | Full Ideas page                                                                                        |
+| O   | feat(web): Dashboard Ideas block reshape                                               | 5     | Toggles / +Add / gears / View-all                                                                      |
+| P   | feat(web): Done filter chip on /ideas                                                  | 5     | Surface hidden Ideas                                                                                   |
+| Q   | feat(web): /missions page with Cards + small +New Mission button                       | 6     | List only — no large quick-add                                                                         |
+| R   | feat(web): /missions/[id] detail page                                                  | 6     | Header / overrides / live run / lists                                                                  |
+| S   | feat(web): Dashboard Missions block above Ideas                                        | 6     | 3 cards + live counters                                                                                |
+| GG  | feat(web): Mission detail page extras + Idea failure UI                                | 6     | Timeline + spend chart + Clone button + Related Works + inline failure msg                             |
+| CC1 | refactor(web): extract CreationBlockTrio from /works/new                               | 6.5   | Snapshot-verified byte-identical; enables reuse on /new                                                |
+| CC2 | feat(web): NEW /new page (prompt + Mission/Idea/Work chips + three blocks + hide chat) | 6.5   | Brand-new route, brand-new page; /works/new untouched                                                  |
+| DD  | chore(web): rename sidebar `+ New Work` → `+ New` AND point href at /new               | 6.5   | Label + href change                                                                                    |
+| T   | feat(api): polymorphic owner on budget + usage entities                                | 7     | Phase 0 columns wired                                                                                  |
+| U   | feat(api): per-Idea + per-Mission budget endpoints                                     | 7     | Query + alerts                                                                                         |
+| V   | feat(web): Budget UI on Mission detail + Idea progress + settings                      | 7     | Three surfaces                                                                                         |
+| II  | feat(api+web): account-wide spend roll-up + Dashboard Month Spend tile                 | 7     | 6th stat tile; reuses (ownerType, ownerId) index                                                       |
+| W   | feat(web): kind-switch on TemplatesCatalog                                             | 8     | Mission Templates default                                                                              |
+| X   | feat(api): Mission Templates catalog + Mission repo scaffolder                         | 8     | GitHub plugin reuse                                                                                    |
+| Y   | feat(web): Use-this-Template → /missions prefill                                       | 8     | One-click start                                                                                        |
+| JJ  | feat(api): MissionTemplateManifestService — parse .works/mission.yml                   | 8     | Zod-validated; integrates with PR X scaffolder; honors defaults + KB seed + recommended Work Templates |
+| Z1  | feat(web): in-app AI Chat tools for Missions + extended Ideas                          | 9     | Vercel AI SDK tool() defs under apps/web/src/lib/ai/tools/                                             |
+| Z2  | feat(mcp): WHITELIST entries for Missions + Ideas endpoints                            | 9     | apps/mcp/src/openapi-tools/whitelist.ts; auto-derives from @ApiOperation                               |
+| AA  | docs: end-user pages for Missions, Ideas, Mission Templates, Budgets                   | 11    | Lift from user-docs file                                                                               |
+| BB  | docs(specs): link spec + plan under docs/specs/features/                               | 11    | Cross-link                                                                                             |
 
 ---
 

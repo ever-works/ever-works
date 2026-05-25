@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
-    formatCapCents,
-    parseCapCents,
-} from './bigint-cents';
+import { DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS, formatCapCents, parseCapCents } from './bigint-cents';
 
 describe('bigint-cents helpers (Phase 4 PR EE)', () => {
     describe('parseCapCents', () => {

@@ -1,15 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import {
-    BookOpen,
-    Files,
-    Globe,
-    Lightbulb,
-    Plus,
-    Star,
-    Target,
-} from 'lucide-react';
+import { BookOpen, Files, Globe, Lightbulb, Plus, Star, Target } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -128,9 +120,7 @@ export function NewPageClient({
                     const mission = await createMissionAction({
                         description,
                         type: 'one-shot',
-                        ...(initialTemplateId
-                            ? { missionTemplateRepo: initialTemplateId }
-                            : {}),
+                        ...(initialTemplateId ? { missionTemplateRepo: initialTemplateId } : {}),
                     });
                     toast.success(t('toasts.missionCreated'));
                     router.push(ROUTES.DASHBOARD_MISSION(mission.id));
@@ -162,9 +152,7 @@ export function NewPageClient({
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                    {t('title')}
-                </h1>
+                <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
                 <p className="text-text-secondary dark:text-text-secondary-dark mt-1">
                     {t('subtitle')}
                 </p>
@@ -172,7 +160,10 @@ export function NewPageClient({
 
             {/* Prompt + chip strip card */}
             <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <label htmlFor="new-prompt" className="text-xs uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                <label
+                    htmlFor="new-prompt"
+                    className="text-xs uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
+                >
                     {t('promptLabel')}
                 </label>
                 <Textarea

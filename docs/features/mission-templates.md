@@ -22,10 +22,10 @@ A Mission template card shows:
 
 ## Curated vs custom
 
-| Kind         | Where it comes from                                                          |
-| ------------ | ---------------------------------------------------------------------------- |
+| Kind         | Where it comes from                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | **Built-in** | Ships with the platform — currently `starter-business` and `starter-content`. Seeded on first boot, immutable from the UI. |
-| **Custom**   | Forked or imported into your account. Edit via the standard Template flow.   |
+| **Custom**   | Forked or imported into your account. Edit via the standard Template flow.                                                 |
 
 Both render in the same catalog; the only difference at use-time is provenance.
 
@@ -52,7 +52,7 @@ Each Mission template repo carries a `.works/mission.yml` file that describes ev
 ```yaml
 version: 1
 defaults:
-    cadence: "0 9 * * *"          # daily at 09:00 UTC
+    cadence: '0 9 * * *' # daily at 09:00 UTC
     autoBuildWorks: false
     outstandingIdeasCap: 10
     guardrails:
@@ -68,15 +68,15 @@ recommendedWorkTemplates:
     - blog-modern
 ```
 
-| Section                    | What it does                                                                                          |
-| -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `version`                  | Manifest schema version. Bump it when making breaking changes.                                        |
-| `defaults`                 | Mission-row defaults the fork carries unless you override.                                            |
-| `defaults.cadence`         | 5-field cron string. Omit (or `null`) = the Mission stays one-shot.                                   |
+| Section                        | What it does                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `version`                      | Manifest schema version. Bump it when making breaking changes.                                    |
+| `defaults`                     | Mission-row defaults the fork carries unless you override.                                        |
+| `defaults.cadence`             | 5-field cron string. Omit (or `null`) = the Mission stays one-shot.                               |
 | `defaults.outstandingIdeasCap` | Cap on un-built Ideas. `-1` = unlimited; omit = inherit account default.                          |
-| `defaults.guardrails`      | WorkAgent guardrails the Mission's builds inherit.                                                    |
-| `kb.seedPaths`             | Files from the template repo the scaffolder copies into the new Mission's repo at fork time.          |
-| `recommendedWorkTemplates` | Work-template IDs the Idea→Work scaffolder pre-picks when building Ideas spawned by this Mission.     |
+| `defaults.guardrails`          | WorkAgent guardrails the Mission's builds inherit.                                                |
+| `kb.seedPaths`                 | Files from the template repo the scaffolder copies into the new Mission's repo at fork time.      |
+| `recommendedWorkTemplates`     | Work-template IDs the Idea→Work scaffolder pre-picks when building Ideas spawned by this Mission. |
 
 The manifest is **optional** — a template with no `.works/mission.yml` is valid; the spawned Mission just gets all-defaults. Empty / null / comment-only manifests count as the all-defaults case, not a schema error.
 

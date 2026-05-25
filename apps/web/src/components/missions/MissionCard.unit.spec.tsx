@@ -26,7 +26,7 @@ function mkMission(overrides: Partial<Mission> = {}): Mission {
     return {
         id: 'm1',
         title: 'Cats Business',
-        description: 'Run the world\'s best cat business.',
+        description: "Run the world's best cat business.",
         type: 'scheduled',
         status: 'active',
         schedule: '0 9 * * MON',
@@ -70,9 +70,7 @@ describe('MissionCard (Phase 6 PR Q)', () => {
 
     it('shows the One-shot badge and no cron line for type=one-shot', () => {
         const { container } = render(
-            <MissionCard
-                mission={mkMission({ type: 'one-shot', schedule: null })}
-            />,
+            <MissionCard mission={mkMission({ type: 'one-shot', schedule: null })} />,
         );
         expect(screen.getByText('oneShot')).toBeTruthy();
         // No cron <code> rendered for one-shot.

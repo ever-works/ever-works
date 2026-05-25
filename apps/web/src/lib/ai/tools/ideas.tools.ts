@@ -46,29 +46,19 @@ function summarizeIdea(p: WorkProposal) {
 // Read
 // ────────────────────────────────────────────────────────────────
 
-const IDEA_STATUSES = [
-    'pending',
-    'dismissed',
-    'accepted',
-    'queued',
-    'building',
-    'failed',
-] as const;
+const IDEA_STATUSES = ['pending', 'dismissed', 'accepted', 'queued', 'building', 'failed'] as const;
 
 export const listIdeas = tool({
     description: [
-        'List the user\'s Ideas, filtered by status. Default = pending.',
-        'When the user mentions a specific Mission, pass `missionId` to scope to just that Mission\'s Ideas.',
+        "List the user's Ideas, filtered by status. Default = pending.",
+        "When the user mentions a specific Mission, pass `missionId` to scope to just that Mission's Ideas.",
     ].join(' '),
     inputSchema: z.object({
         statuses: z
             .array(z.enum(IDEA_STATUSES))
             .optional()
             .describe('Statuses to include. Defaults to ["pending"].'),
-        missionId: z
-            .string()
-            .optional()
-            .describe('Scope to a single Mission. Omit for all Ideas.'),
+        missionId: z.string().optional().describe('Scope to a single Mission. Omit for all Ideas.'),
     }),
     execute: async ({ statuses, missionId }) => {
         const ideas = await listProposalsAction(
@@ -83,7 +73,8 @@ export const listIdeas = tool({
 });
 
 export const getIdeaDetails = tool({
-    description: 'Get full info about a single Idea, including its suggested categories/fields/plugins.',
+    description:
+        'Get full info about a single Idea, including its suggested categories/fields/plugins.',
     inputSchema: z.object({
         ideaId: z.string().describe('Idea / WorkProposal ID'),
     }),
@@ -102,7 +93,7 @@ export const getIdeaDetails = tool({
 
 export const getIdeaBudget = tool({
     description:
-        'Get current-period spend + global cap status for an Idea. Use when the user asks about an Idea\'s cost.',
+        "Get current-period spend + global cap status for an Idea. Use when the user asks about an Idea's cost.",
     inputSchema: z.object({
         ideaId: z.string().describe('Idea ID'),
     }),
@@ -149,7 +140,7 @@ export const createIdea = tool({
 
 export const refreshIdeas = tool({
     description: [
-        'Trigger the AI Ideas-research job to generate fresh proposals from the user\'s context.',
+        "Trigger the AI Ideas-research job to generate fresh proposals from the user's context.",
         'Server enforces a rate-limit; the tool returns `status: "rate-limited"` rather than throwing when the cap is hit.',
     ].join(' '),
     inputSchema: z.object({}),
@@ -183,7 +174,7 @@ export const buildIdea = tool({
 export const dismissIdea = tool({
     description: [
         'Dismiss an Idea so it stops showing in the pending list.',
-        'Used when the user explicitly says they\'re not interested. NOT reversible from the UI — surface a confirmation in chat first.',
+        "Used when the user explicitly says they're not interested. NOT reversible from the UI — surface a confirmation in chat first.",
     ].join(' '),
     inputSchema: z.object({
         ideaId: z.string().describe('Idea ID to dismiss'),

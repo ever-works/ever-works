@@ -123,10 +123,7 @@ recommendedWorkTemplates:
                 'docs/strategy.md',
                 'prompts/seed-ideas.md',
             ]);
-            expect(manifest.recommendedWorkTemplates).toEqual([
-                'directory-classic',
-                'blog-modern',
-            ]);
+            expect(manifest.recommendedWorkTemplates).toEqual(['directory-classic', 'blog-modern']);
         });
 
         it('accepts outstandingIdeasCap of -1 (unlimited)', () => {

@@ -44,10 +44,7 @@ export interface MissionsPreviewSectionProps {
     allIdeas: WorkProposal[];
 }
 
-export function MissionsPreviewSection({
-    missions,
-    allIdeas,
-}: MissionsPreviewSectionProps) {
+export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSectionProps) {
     const t = useTranslations('dashboard.missionsPreview');
 
     // Group Ideas by missionId once. Counters are read off the map

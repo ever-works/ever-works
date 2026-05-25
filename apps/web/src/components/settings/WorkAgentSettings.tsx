@@ -98,8 +98,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     // explicit account-wide guard. `allowOverage` is NOT NULL with
     // default true on the entity side.
     const [accountCapCents, setAccountCapCents] = useState<number>(
-        parseCapCents(preferences.accountWideMonthlyCapCents) ??
-            DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+        parseCapCents(preferences.accountWideMonthlyCapCents) ?? DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
     );
     const [accountCapEnabled, setAccountCapEnabled] = useState<boolean>(
         preferences.accountWideMonthlyCapCents !== null,

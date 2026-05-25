@@ -106,9 +106,7 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
 
     it('toggling "Show accepted" lazy-loads the accepted bucket via listProposalsAction', async () => {
         listProposalsMock.mockClear();
-        listProposalsMock.mockResolvedValueOnce([
-            mkIdea('a1', 'accepted'),
-        ]);
+        listProposalsMock.mockResolvedValueOnce([mkIdea('a1', 'accepted')]);
         render(
             <WorkProposalsSection
                 initialProposals={[mkIdea('p1')]}

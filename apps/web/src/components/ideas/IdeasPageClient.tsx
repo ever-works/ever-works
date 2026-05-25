@@ -119,11 +119,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             // Filter chip narrows further. `'done'` is an alias
             // for ACCEPTED.
             if (statusFilter === 'done' && idea.status !== 'accepted') return false;
-            if (
-                statusFilter !== 'all' &&
-                statusFilter !== 'done' &&
-                idea.status !== statusFilter
-            ) {
+            if (statusFilter !== 'all' && statusFilter !== 'done' && idea.status !== statusFilter) {
                 return false;
             }
             return true;
@@ -158,9 +154,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                 setDraft('');
                 toast.success(t('toasts.ideaCreated'));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.ideaCreateError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.ideaCreateError'));
             }
         });
     };
@@ -170,9 +164,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         // dismissProposalAction; we just mirror the local list so
         // the card disappears from this page without a full re-fetch.
         setIdeas((prev) =>
-            prev.map((idea) =>
-                idea.id === id ? { ...idea, status: 'dismissed' as const } : idea,
-            ),
+            prev.map((idea) => (idea.id === id ? { ...idea, status: 'dismissed' as const } : idea)),
         );
     };
 
@@ -190,9 +182,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                 setIdeas((prev) => prev.map((row) => (row.id === id ? idea : row)));
                 toast.success(t('toasts.ideaQueued'));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.ideaQueueError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.ideaQueueError'));
             }
         });
     };
@@ -424,11 +414,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                                 new Date(a.generatedAt).getTime(),
                         )
                         .map((idea) => (
-                            <IdeaCard
-                                key={idea.id}
-                                proposal={idea}
-                                onDismissed={handleDismissed}
-                            />
+                            <IdeaCard key={idea.id} proposal={idea} onDismissed={handleDismissed} />
                         ))}
                 </div>
             )}

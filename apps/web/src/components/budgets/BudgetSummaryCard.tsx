@@ -59,11 +59,7 @@ export function BudgetSummaryCard({ summary }: BudgetSummaryCardProps) {
     const percent = summary.percentUsed ?? 0;
     const clampedPercent = Math.max(0, Math.min(100, percent));
     const overCap = hasCap && percent > 100;
-    const barTone = summary.blocked
-        ? 'bg-danger'
-        : percent >= 90
-          ? 'bg-warning'
-          : 'bg-primary';
+    const barTone = summary.blocked ? 'bg-danger' : percent >= 90 ? 'bg-warning' : 'bg-primary';
 
     return (
         <div className="space-y-3">

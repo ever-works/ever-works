@@ -28,7 +28,7 @@ describe('mission-template.config (Phase 8 PR X)', () => {
         }
     });
 
-    it('listMissionTemplates returns a fresh copy (mutations don\'t affect the source)', () => {
+    it("listMissionTemplates returns a fresh copy (mutations don't affect the source)", () => {
         const a = listMissionTemplates();
         const b = listMissionTemplates();
         expect(a).not.toBe(b);

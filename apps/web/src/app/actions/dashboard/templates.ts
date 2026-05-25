@@ -104,10 +104,7 @@ export async function updateCustomTemplate(
     }
 }
 
-export async function archiveCustomTemplate(
-    templateId: string,
-    input: { kind: TemplateKind },
-) {
+export async function archiveCustomTemplate(templateId: string, input: { kind: TemplateKind }) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

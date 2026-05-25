@@ -21,12 +21,12 @@ Each AI call records a usage row tagged with:
 
 Owner types:
 
-| Owner type   | When it's used                                                                              |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| **work**     | Calls made during a Work's generation pipeline.                                             |
-| **mission**  | Calls made by a Mission tick (Idea research) or by a Mission's auto-build.                  |
-| **idea**     | Calls made while building a specific Idea into a Work.                                      |
-| **account**  | Account-wide aggregates (no specific owner).                                                |
+| Owner type  | When it's used                                                             |
+| ----------- | -------------------------------------------------------------------------- |
+| **work**    | Calls made during a Work's generation pipeline.                            |
+| **mission** | Calls made by a Mission tick (Idea research) or by a Mission's auto-build. |
+| **idea**    | Calls made while building a specific Idea into a Work.                     |
+| **account** | Account-wide aggregates (no specific owner).                               |
 
 The same call can roll up at multiple scopes — a Mission-auto-build call counts against the **Idea** budget AND the **Mission** budget AND your **account-wide** total.
 
@@ -34,11 +34,11 @@ The same call can roll up at multiple scopes — a Mission-auto-build call count
 
 The **Month Spend** tile on the dashboard shows your current calendar-month total + the global cap (if set). Click through to the full usage breakdown under Settings.
 
-| Cap setting                       | What it does                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------- |
-| `accountMaxSpendCentsPerMonth`    | Hard cap. Every new AI call checks this first and refuses if over.                    |
-| `accountAllowOverage`             | When true, the cap is advisory — you're alerted but not blocked.                      |
-| `accountAlertAtPercent`           | Trigger an in-app notification + email when spend crosses this fraction of the cap.   |
+| Cap setting                    | What it does                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `accountMaxSpendCentsPerMonth` | Hard cap. Every new AI call checks this first and refuses if over.                  |
+| `accountAllowOverage`          | When true, the cap is advisory — you're alerted but not blocked.                    |
+| `accountAlertAtPercent`        | Trigger an in-app notification + email when spend crosses this fraction of the cap. |
 
 Set under **Settings → Account → Usage & Budget**.
 
@@ -46,15 +46,15 @@ Set under **Settings → Account → Usage & Budget**.
 
 Each Mission can carry its own budget guardrails (separate from the account-wide cap). Set them at create time, on the detail page, or inherit them from a [Mission Template's manifest](./mission-templates#the-worksmissionyml-manifest).
 
-| Guardrail                          | What it caps                                                                       |
-| ---------------------------------- | ---------------------------------------------------------------------------------- |
-| `maxWorksPerRun`                   | How many Works a single Mission tick can spawn / queue.                            |
-| `maxItemsPerWork`                  | How many items each spawned Work's generation can produce.                         |
-| `maxBudgetCentsPerRun`             | Hard spend cap for one Mission tick.                                               |
-| `requireApprovalBeforeCreate`      | Hold builds in a `BUILDING-APPROVAL` state until you click **Approve**.            |
-| `requireApprovalBeforeDelete`      | Same, for destructive ops.                                                         |
-| `requireApprovalAboveBudgetCents`  | Approval kicks in only when the spend forecast crosses this threshold.             |
-| `dryRunByDefault`                  | Run the Mission tick without making real AI calls — useful for testing the loop.   |
+| Guardrail                         | What it caps                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `maxWorksPerRun`                  | How many Works a single Mission tick can spawn / queue.                          |
+| `maxItemsPerWork`                 | How many items each spawned Work's generation can produce.                       |
+| `maxBudgetCentsPerRun`            | Hard spend cap for one Mission tick.                                             |
+| `requireApprovalBeforeCreate`     | Hold builds in a `BUILDING-APPROVAL` state until you click **Approve**.          |
+| `requireApprovalBeforeDelete`     | Same, for destructive ops.                                                       |
+| `requireApprovalAboveBudgetCents` | Approval kicks in only when the spend forecast crosses this threshold.           |
+| `dryRunByDefault`                 | Run the Mission tick without making real AI calls — useful for testing the loop. |
 
 These are **additive** — the strictest among Mission / account-wide / per-Work guardrails wins.
 
@@ -105,13 +105,13 @@ Plugin price lists are baked into each plugin's `package.json` under `everworks.
 
 ## API
 
-| Verb                       | Endpoint                                       |
-| -------------------------- | ---------------------------------------------- |
-| Account-wide usage         | `GET /api/me/usage/account-wide`               |
-| Per-Mission budget         | `GET /api/me/missions/:id/budget`              |
-| Per-Idea budget            | `GET /api/me/work-proposals/:id/budget`        |
-| Per-Work budgets           | `GET /api/works/:workId/budgets`               |
-| Per-Work usage             | `GET /api/works/:workId/usage`                 |
+| Verb               | Endpoint                                |
+| ------------------ | --------------------------------------- |
+| Account-wide usage | `GET /api/me/usage/account-wide`        |
+| Per-Mission budget | `GET /api/me/missions/:id/budget`       |
+| Per-Idea budget    | `GET /api/me/work-proposals/:id/budget` |
+| Per-Work budgets   | `GET /api/works/:workId/budgets`        |
+| Per-Work usage     | `GET /api/works/:workId/usage`          |
 
 Same routes are exposed as MCP tools (`get_account_usage`, `get_mission_budget`, `get_idea_budget`) — see the [MCP Server](./mcp-server) docs.
 

@@ -10,10 +10,14 @@ vi.mock('next-intl', () => ({
         // key. Enough fidelity for the empty-state markup test —
         // we don't need to match the exact rendered tree, just
         // verify the tag function was called with content.
-        (fn as unknown as { rich: (k: string, tags: Record<string, (chunks: string) => React.ReactNode>) => React.ReactNode }).rich = (
-            k,
-            tags,
-        ) => {
+        (
+            fn as unknown as {
+                rich: (
+                    k: string,
+                    tags: Record<string, (chunks: string) => React.ReactNode>,
+                ) => React.ReactNode;
+            }
+        ).rich = (k, tags) => {
             const lines: React.ReactNode[] = [k];
             for (const [name, render] of Object.entries(tags)) {
                 lines.push(render(`<${name}>`));
@@ -62,7 +66,11 @@ function mkMission(id: string, overrides: Partial<Mission> = {}): Mission {
     };
 }
 
-function mkIdea(id: string, missionId: string | null, overrides: Partial<WorkProposal> = {}): WorkProposal {
+function mkIdea(
+    id: string,
+    missionId: string | null,
+    overrides: Partial<WorkProposal> = {},
+): WorkProposal {
     return {
         id,
         userId: 'u1',
@@ -165,18 +173,14 @@ describe('MissionsPreviewSection (Phase 6 PR S)', () => {
         // Find the counter chip labeled "counters.sites".
         const sitesChip = screen.getByText('counters.sites').closest('div')!;
         // The value is the next-sibling div.
-        const valueEl = sitesChip.parentElement?.querySelector(
-            '.text-sm.font-semibold',
-        );
+        const valueEl = sitesChip.parentElement?.querySelector('.text-sm.font-semibold');
         expect(valueEl?.textContent).toBe('0');
         void container;
     });
 
     it('each card wraps in a Link to /missions/<id>', () => {
         const missions = [mkMission('mission-42')];
-        const { container } = render(
-            <MissionsPreviewSection missions={missions} allIdeas={[]} />,
-        );
+        const { container } = render(<MissionsPreviewSection missions={missions} allIdeas={[]} />);
         const link = container.querySelector('a[href="/missions/mission-42"]');
         expect(link).toBeTruthy();
     });
@@ -186,9 +190,7 @@ describe('MissionsPreviewSection (Phase 6 PR S)', () => {
             mkMission('s1', { type: 'scheduled' }),
             mkMission('o1', { type: 'one-shot', schedule: null }),
         ];
-        const { container } = render(
-            <MissionsPreviewSection missions={missions} allIdeas={[]} />,
-        );
+        const { container } = render(<MissionsPreviewSection missions={missions} allIdeas={[]} />);
         // Scheduled badge present somewhere on the section.
         expect(screen.getAllByText('badges.scheduled').length).toBe(1);
         void container;

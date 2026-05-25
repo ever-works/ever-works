@@ -58,9 +58,7 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
         if (tpl) {
             initialTemplateId = tpl.id;
             const description = (tpl.description ?? '').trim();
-            initialPrompt = description.length > 0
-                ? `${tpl.name}\n\n${description}`
-                : tpl.name;
+            initialPrompt = description.length > 0 ? `${tpl.name}\n\n${description}` : tpl.name;
         }
     }
 

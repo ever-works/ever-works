@@ -109,8 +109,10 @@ export class MissionCloneService {
                 throw new BadRequestException(`Mission cannot be a clone of itself`);
             }
 
-            const clonedTitle =
-                (overrides.title?.trim() || `Copy of ${source.title}`).slice(0, 200);
+            const clonedTitle = (overrides.title?.trim() || `Copy of ${source.title}`).slice(
+                0,
+                200,
+            );
 
             const newMission = await tx.save(
                 tx.create(Mission, {

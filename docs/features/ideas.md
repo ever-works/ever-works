@@ -10,14 +10,14 @@ An **Idea** is a proposed Work — a title + description + suggested categories 
 
 You'll see Ideas at `/ideas`. They show up from three sources:
 
-| Source           | Where it comes from                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------ |
-| **auto-signup**  | Generated automatically when you sign up, based on your onboarding answers.          |
-| **user-refresh** | You hit **Suggest more** on `/ideas`.                                                |
-| **discover**     | Surfaced from the platform's discovery feeds (curated catalogs, trending topics).    |
-| **scheduled**    | A scheduled refresh job (account-level cadence).                                     |
-| **user-manual**  | You typed one directly via the `+ Add` button or `/new` → Idea chip.                 |
-| **mission**      | Spawned by a [Mission](./missions) tick — carries a `missionId` back-reference.      |
+| Source           | Where it comes from                                                               |
+| ---------------- | --------------------------------------------------------------------------------- |
+| **auto-signup**  | Generated automatically when you sign up, based on your onboarding answers.       |
+| **user-refresh** | You hit **Suggest more** on `/ideas`.                                             |
+| **discover**     | Surfaced from the platform's discovery feeds (curated catalogs, trending topics). |
+| **scheduled**    | A scheduled refresh job (account-level cadence).                                  |
+| **user-manual**  | You typed one directly via the `+ Add` button or `/new` → Idea chip.              |
+| **mission**      | Spawned by a [Mission](./missions) tick — carries a `missionId` back-reference.   |
 
 All sources produce the same Idea shape; only the `source` field on the Idea distinguishes them.
 
@@ -36,14 +36,14 @@ stateDiagram-v2
     PENDING --> ACCEPTED: manual accept (link to existing Work)
 ```
 
-| Status         | What it means                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------ |
-| **PENDING**    | New, waiting for you to act on it.                                                                     |
-| **QUEUED**     | You hit **Build**. Sits in the WorkAgent queue waiting for a free slot.                                |
-| **BUILDING**   | A WorkAgent worker is actively generating the Work.                                                    |
-| **ACCEPTED**   | A Work was successfully built (or manually linked). The `acceptedWorkId` points at the Work.           |
-| **FAILED**     | Build hit an error. The Idea row carries `failureKind` (transient vs permanent) + `failureMessage`.    |
-| **DISMISSED**  | You said "not interested". Won't resurface on refreshes. Not reversible from the UI.                   |
+| Status        | What it means                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| **PENDING**   | New, waiting for you to act on it.                                                                  |
+| **QUEUED**    | You hit **Build**. Sits in the WorkAgent queue waiting for a free slot.                             |
+| **BUILDING**  | A WorkAgent worker is actively generating the Work.                                                 |
+| **ACCEPTED**  | A Work was successfully built (or manually linked). The `acceptedWorkId` points at the Work.        |
+| **FAILED**    | Build hit an error. The Idea row carries `failureKind` (transient vs permanent) + `failureMessage`. |
+| **DISMISSED** | You said "not interested". Won't resurface on refreshes. Not reversible from the UI.                |
 
 ## Build vs Accept
 
@@ -66,14 +66,14 @@ Refreshes pull from your account's research context, **not** from any individual
 
 When a build fails, the Idea moves to `FAILED` and carries diagnostic info:
 
-| Failure kind                | What to do                                                              |
-| --------------------------- | ----------------------------------------------------------------------- |
-| `transient-network`         | Hit **Retry** — usually self-heals on the next try.                     |
-| `transient-rate-limit`      | Wait, then **Retry**. The upstream provider is throttling.              |
-| `transient-upstream-5xx`    | Hit **Retry**. External AI/search provider returned a 5xx.              |
-| `transient-plugin`          | Plugin glitched. **Retry**; if it persists, check the plugin's health.  |
-| `permanent-invalid-input`   | The prompt or suggestion can't be built. Edit the Idea or **Dismiss**.  |
-| `permanent-unknown`         | Edge case the classifier didn't recognize. **Rebuild** (fresh attempt). |
+| Failure kind              | What to do                                                              |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `transient-network`       | Hit **Retry** — usually self-heals on the next try.                     |
+| `transient-rate-limit`    | Wait, then **Retry**. The upstream provider is throttling.              |
+| `transient-upstream-5xx`  | Hit **Retry**. External AI/search provider returned a 5xx.              |
+| `transient-plugin`        | Plugin glitched. **Retry**; if it persists, check the plugin's health.  |
+| `permanent-invalid-input` | The prompt or suggestion can't be built. Edit the Idea or **Dismiss**.  |
+| `permanent-unknown`       | Edge case the classifier didn't recognize. **Rebuild** (fresh attempt). |
 
 **Retry** transitions the same Goal back to QUEUED with the previous attempt's context intact. **Rebuild** spawns a fresh Goal with no carry-over — use it when you suspect the previous attempt's context is the problem.
 

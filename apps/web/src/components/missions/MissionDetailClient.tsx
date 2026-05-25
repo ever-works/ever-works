@@ -23,11 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import {
-    NumberField,
-    StatusPill,
-    ToggleRow,
-} from '@/components/work-agent';
+import { NumberField, StatusPill, ToggleRow } from '@/components/work-agent';
 import {
     cloneMissionAction,
     completeMissionAction,
@@ -41,7 +37,13 @@ import type { Mission, OwnerBudgetSummary } from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { BudgetSummaryCard } from '@/components/budgets';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -173,36 +175,26 @@ export function MissionDetailClient({
         startSettings(async () => {
             try {
                 const updated = await updateMissionAction(mission.id, {
-                    schedule:
-                        mission.type === 'scheduled'
-                            ? scheduleDraft.trim() || null
-                            : null,
+                    schedule: mission.type === 'scheduled' ? scheduleDraft.trim() || null : null,
                     autoBuildWorks: autoBuildDraft,
                     outstandingIdeasCap: capInherit ? null : capValue,
                 });
                 setMission(updated);
                 toast.success(t('toasts.settingsSaved'));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.settingsError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.settingsError'));
             }
         });
     };
 
-    const transition = (
-        verb: 'pause' | 'resume' | 'complete',
-        action: () => Promise<Mission>,
-    ) => {
+    const transition = (verb: 'pause' | 'resume' | 'complete', action: () => Promise<Mission>) => {
         startLifecycle(async () => {
             try {
                 const updated = await action();
                 setMission(updated);
                 toast.success(t(`toasts.${verb}d`));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t(`toasts.${verb}Error`),
-                );
+                toast.error(err instanceof Error ? err.message : t(`toasts.${verb}Error`));
             }
         });
     };
@@ -220,9 +212,7 @@ export function MissionDetailClient({
                     toast.success(`Run now: ${result.status}`);
                 }
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.runNowError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.runNowError'));
             }
         });
     };
@@ -246,9 +236,7 @@ export function MissionDetailClient({
                 // user sees their fork immediately.
                 router.push(ROUTES.DASHBOARD_MISSION(result.mission.id));
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.cloneError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.cloneError'));
             }
         });
     };
@@ -264,9 +252,7 @@ export function MissionDetailClient({
                 toast.success(t('toasts.deleted'));
                 router.push(ROUTES.DASHBOARD_MISSIONS);
             } catch (err) {
-                toast.error(
-                    err instanceof Error ? err.message : t('toasts.deleteError'),
-                );
+                toast.error(err instanceof Error ? err.message : t('toasts.deleteError'));
             }
         });
     };
@@ -347,7 +333,9 @@ export function MissionDetailClient({
                                 size="sm"
                                 variant="secondary"
                                 className="gap-1.5"
-                                onClick={() => transition('pause', () => pauseMissionAction(mission.id))}
+                                onClick={() =>
+                                    transition('pause', () => pauseMissionAction(mission.id))
+                                }
                                 disabled={pendingLifecycle}
                             >
                                 <Pause className="w-3.5 h-3.5" />
@@ -360,7 +348,9 @@ export function MissionDetailClient({
                                 size="sm"
                                 variant="secondary"
                                 className="gap-1.5"
-                                onClick={() => transition('resume', () => resumeMissionAction(mission.id))}
+                                onClick={() =>
+                                    transition('resume', () => resumeMissionAction(mission.id))
+                                }
                                 disabled={pendingLifecycle}
                             >
                                 <Play className="w-3.5 h-3.5" />
@@ -373,7 +363,9 @@ export function MissionDetailClient({
                                 size="sm"
                                 variant="secondary"
                                 className="gap-1.5"
-                                onClick={() => transition('complete', () => completeMissionAction(mission.id))}
+                                onClick={() =>
+                                    transition('complete', () => completeMissionAction(mission.id))
+                                }
                                 disabled={pendingLifecycle}
                             >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -465,7 +457,8 @@ export function MissionDetailClient({
                     {t('sections.guardrails')}
                 </h2>
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {mission.guardrailsOverride && Object.keys(mission.guardrailsOverride).length > 0
+                    {mission.guardrailsOverride &&
+                    Object.keys(mission.guardrailsOverride).length > 0
                         ? t('guardrails.activeOverride')
                         : t('guardrails.inheriting')}
                 </p>

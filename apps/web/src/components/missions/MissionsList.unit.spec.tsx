@@ -51,8 +51,8 @@ describe('MissionsList (Phase 6 PR Q)', () => {
 
     it('renders the top-right "+ New Mission" button linking to /new?type=mission', () => {
         const { container } = render(<MissionsList missions={[]} />);
-        const newMissionLinks = Array.from(container.querySelectorAll('a[href]')).filter(
-            (a) => (a as HTMLAnchorElement).textContent?.includes('newMission'),
+        const newMissionLinks = Array.from(container.querySelectorAll('a[href]')).filter((a) =>
+            (a as HTMLAnchorElement).textContent?.includes('newMission'),
         );
         expect(newMissionLinks.length).toBeGreaterThan(0);
         // All "+ New Mission" links point at /new?type=mission so Phase

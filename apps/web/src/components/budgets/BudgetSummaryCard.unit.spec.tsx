@@ -2,9 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
-    useTranslations: () =>
-        (key: string, vars?: Record<string, unknown>) =>
-            vars ? `${key}:${JSON.stringify(vars)}` : key,
+    useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
+        vars ? `${key}:${JSON.stringify(vars)}` : key,
 }));
 
 import { BudgetSummaryCard } from './BudgetSummaryCard';
@@ -44,9 +43,7 @@ describe('BudgetSummaryCard (Phase 7 PR V)', () => {
     });
 
     it('formats the cap line when capCents is set', () => {
-        const { container } = render(
-            <BudgetSummaryCard summary={mkSummary({ capCents: 9999 })} />,
-        );
+        const { container } = render(<BudgetSummaryCard summary={mkSummary({ capCents: 9999 })} />);
         expect(container.textContent).toContain('$99.99');
         expect(container.textContent).toContain('percentUsed');
         expect(container.textContent).toContain('"percent":"30.0"');

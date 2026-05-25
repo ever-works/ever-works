@@ -37,7 +37,9 @@ vi.mock('@/app/actions/dashboard/work-proposals', () => ({
 import { IdeasPageClient, ACTIONABLE_STATUSES } from './IdeasPageClient';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 
-function mkIdea(overrides: Partial<WorkProposal> & { id: string; status: WorkProposalStatus }): WorkProposal {
+function mkIdea(
+    overrides: Partial<WorkProposal> & { id: string; status: WorkProposalStatus },
+): WorkProposal {
     const { id, status, ...rest } = overrides;
     return {
         id,
@@ -165,11 +167,7 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
     });
 
     it('renders an empty state when no Ideas match the current filters', () => {
-        render(
-            <IdeasPageClient
-                initialIdeas={[mkIdea({ id: 'a', status: 'accepted' })]}
-            />,
-        );
+        render(<IdeasPageClient initialIdeas={[mkIdea({ id: 'a', status: 'accepted' })]} />);
         // ACCEPTED hidden by default → empty state.
         expect(screen.getByText('empty.title')).toBeTruthy();
         expect(screen.getByText('empty.subtitle')).toBeTruthy();
@@ -215,7 +213,9 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
 
         it('Done chip is enabled even when "Show accepted" toggle is OFF (different semantics)', () => {
             render(<IdeasPageClient initialIdeas={[]} />);
-            const doneBtn = screen.getByText('filters.done').closest('button')! as HTMLButtonElement;
+            const doneBtn = screen
+                .getByText('filters.done')
+                .closest('button')! as HTMLButtonElement;
             // Should be enabled regardless — the toggle gates the
             // *Accepted* chip, not the Done chip (which expresses
             // "show my completed work").

@@ -67,10 +67,7 @@ export class WorkBudgetRepository {
      * Mirrors `findForPlugin(workId, pluginId)` but keyed on the
      * polymorphic owner ref.
      */
-    async findForOwnerPlugin(
-        owner: BudgetOwnerRef,
-        pluginId: string,
-    ): Promise<WorkBudget | null> {
+    async findForOwnerPlugin(owner: BudgetOwnerRef, pluginId: string): Promise<WorkBudget | null> {
         return this.repository.findOne({
             where: {
                 ownerType: owner.ownerType,

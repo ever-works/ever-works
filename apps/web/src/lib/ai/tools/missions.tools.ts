@@ -54,7 +54,7 @@ function summarizeMission(m: Mission) {
 
 export const listMissions = tool({
     description:
-        'List the user\'s Missions. Use to find a Mission by title before invoking other Mission tools.',
+        "List the user's Missions. Use to find a Mission by title before invoking other Mission tools.",
     inputSchema: z.object({}),
     execute: async () => {
         const missions = await listMissionsAction();

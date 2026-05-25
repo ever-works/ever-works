@@ -47,11 +47,13 @@ function makeStore() {
     const txManager = {
         findOne: jest.fn(async (entity: unknown, opts: { where: Record<string, unknown> }) => {
             if (entity === Mission) {
-                return missions.find((m) =>
-                    Object.entries(opts.where).every(
-                        ([k, v]) => (m as unknown as Record<string, unknown>)[k] === v,
-                    ),
-                ) ?? null;
+                return (
+                    missions.find((m) =>
+                        Object.entries(opts.where).every(
+                            ([k, v]) => (m as unknown as Record<string, unknown>)[k] === v,
+                        ),
+                    ) ?? null
+                );
             }
             return null;
         }),
@@ -112,7 +114,9 @@ function makeStore() {
             missions.push(m);
             return m;
         },
-        seedProposal(partial: Partial<WorkProposal> & { userId: string; missionId: string }): WorkProposal {
+        seedProposal(
+            partial: Partial<WorkProposal> & { userId: string; missionId: string },
+        ): WorkProposal {
             const p: WorkProposal = createProposalEntity({
                 title: 'src idea',
                 description: 'src idea desc',

@@ -185,9 +185,7 @@ export class BudgetService {
         );
         const capCents = prefs.capCents;
         const percentUsed =
-            capCents !== null && capCents > 0
-                ? (currentSpendCents / capCents) * 100
-                : null;
+            capCents !== null && capCents > 0 ? (currentSpendCents / capCents) * 100 : null;
         const blocked = capCents !== null && currentSpendCents >= capCents && !prefs.allowOverage;
         return {
             userId,
@@ -218,9 +216,7 @@ export class BudgetService {
         const capCents = global?.monthlyCapCents ?? null;
         const allowOverage = global?.allowOverage ?? true;
         const percentUsed =
-            capCents !== null && capCents > 0
-                ? (currentSpendCents / capCents) * 100
-                : null;
+            capCents !== null && capCents > 0 ? (currentSpendCents / capCents) * 100 : null;
         const blocked = capCents !== null && currentSpendCents >= capCents && !allowOverage;
         return {
             ownerType: owner.ownerType,

@@ -39,10 +39,7 @@ export interface CreationBlockTrioProps {
     labelSet?: CreationBlockLabelSet;
 }
 
-export function CreationBlockTrio({
-    onSelect,
-    labelSet = 'legacy',
-}: CreationBlockTrioProps) {
+export function CreationBlockTrio({ onSelect, labelSet = 'legacy' }: CreationBlockTrioProps) {
     // Two namespaces so the same component can render either copy
     // set without an `if` ladder. The active namespace is selected
     // based on `labelSet`.

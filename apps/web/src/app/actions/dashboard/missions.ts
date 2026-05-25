@@ -1,19 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import {
-    missionsAPI,
-    type CreateMissionInput,
-    type UpdateMissionInput,
-} from '@/lib/api/missions';
+import { missionsAPI, type CreateMissionInput, type UpdateMissionInput } from '@/lib/api/missions';
 
 // Phase 6 PR Q — the `/missions` catalog page and (Phase 6 PR S)
 // the dashboard preview block both want their cache invalidated
 // whenever a Mission is created / mutated / lifecycled.
-const MISSION_REVALIDATE_PATHS = [
-    '/[locale]/(dashboard)/(home)',
-    '/[locale]/(dashboard)/missions',
-];
+const MISSION_REVALIDATE_PATHS = ['/[locale]/(dashboard)/(home)', '/[locale]/(dashboard)/missions'];
 function revalidateMissionSurfaces() {
     for (const p of MISSION_REVALIDATE_PATHS) {
         revalidatePath(p, 'page');

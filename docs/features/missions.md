@@ -12,13 +12,13 @@ Use a Mission when you want the platform to keep working on a topic over time �
 
 ## When to use a Mission vs a Work
 
-| You want to…                                                              | Use a…                              |
-| ------------------------------------------------------------------------- | ----------------------------------- |
-| Publish a single directory / blog / landing page from a prompt            | **Work**                            |
-| Have the platform keep finding new angles on a topic and propose Ideas    | **Mission**                         |
-| Run a weekly research → build → publish loop                              | **Mission** (scheduled)             |
-| Treat one prompt as "kick this off once, then leave it alone"             | **Mission** (one-shot)              |
-| Fork someone else's Mission setup so you don't start from scratch         | **Use this Template** on a Mission template |
+| You want to…                                                           | Use a…                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| Publish a single directory / blog / landing page from a prompt         | **Work**                                    |
+| Have the platform keep finding new angles on a topic and propose Ideas | **Mission**                                 |
+| Run a weekly research → build → publish loop                           | **Mission** (scheduled)                     |
+| Treat one prompt as "kick this off once, then leave it alone"          | **Mission** (one-shot)                      |
+| Fork someone else's Mission setup so you don't start from scratch      | **Use this Template** on a Mission template |
 
 A Mission can spawn zero, one, or many Works over its lifetime. The Mission itself is the unit you pause, resume, and budget.
 
@@ -50,10 +50,10 @@ stateDiagram-v2
     COMPLETED --> [*]: delete
 ```
 
-| Status        | What it means                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------ |
-| **ACTIVE**    | The tick worker considers this Mission on every cron match.                                |
-| **PAUSED**    | The tick worker skips it. Existing Ideas + Works stay untouched.                           |
+| Status        | What it means                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **ACTIVE**    | The tick worker considers this Mission on every cron match.                                                         |
+| **PAUSED**    | The tick worker skips it. Existing Ideas + Works stay untouched.                                                    |
 | **COMPLETED** | Terminal. Existing Ideas + Works stay; the Mission itself stops spawning. Not reversible without delete + recreate. |
 
 Every transition is gated by the source status — you can't `resume` an already-ACTIVE Mission or `pause` a COMPLETED one.
