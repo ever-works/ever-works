@@ -63,6 +63,25 @@ export class WorkAgentGoal {
     @Column({ type: 'text', nullable: true })
     approvalSummary?: string | null;
 
+    /**
+     * FK back to the `WorkProposal` (Idea) this Goal is building,
+     * when the Goal was created by the new build-from-Idea path
+     * (`POST /me/work-proposals/:id/build`, Phase 1 PR B). NULL for
+     * Goals created via the existing power-user direct-queue path
+     * (`POST /me/work-agent/goals`).
+     *
+     * Lets the Goal-completion handler join back to "the Idea this
+     * Goal was building" so it can:
+     *   - call `acceptInternal(ideaId, workId)` on success (and
+     *     transition the Idea to ACCEPTED with the new Work),
+     *   - persist `failureMessage` + `failureKind` on the Idea
+     *     on failure (Phase 0 PR 0.8 / Phase 1 PR FF).
+     *
+     * Spec §10.6 + PLAN Decision A3.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    ideaId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

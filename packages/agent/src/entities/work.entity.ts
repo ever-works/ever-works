@@ -330,6 +330,26 @@ export class Work {
     @Column('simple-json', { nullable: true })
     kbConfig?: WorkKbConfig | null;
 
+    /**
+     * FK back to the `WorkProposal` (Idea) this Work was built from
+     * (spec §3.7 + PLAN §10.6). NULL for Works created via any
+     * pre-Missions path (manual creation, wizard, import, etc.) —
+     * those continue to exist exactly as they did before.
+     *
+     * The Mission detail page (Phase 6 PR R) uses this back-link
+     * to roll up "all Works spawned by this Mission" via the join
+     * `Mission -> WorkProposal (missionId) -> Work
+     * (acceptedFromIdeaId)` without a heavy multi-hop traversal.
+     *
+     * Set by the `acceptInternal(ideaId, workId)` helper (Phase 1
+     * PR B) when a build-from-Idea Goal completes successfully.
+     * ON DELETE SET NULL: deleting the source Idea (rare; Ideas
+     * are soft-hidden when Done, not deleted) does NOT delete the
+     * built Work.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    acceptedFromIdeaId?: string | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

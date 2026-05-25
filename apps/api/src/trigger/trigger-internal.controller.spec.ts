@@ -17,6 +17,9 @@ jest.mock('@ever-works/agent/services', () => ({
     WorkScheduleDispatcherService: class WorkScheduleDispatcherService {},
     WorkScheduleService: class WorkScheduleService {},
 }));
+jest.mock('@ever-works/agent/missions', () => ({
+    MissionTickService: class MissionTickService {},
+}));
 jest.mock('@ever-works/agent/notifications', () => ({
     NotificationService: class NotificationService {},
 }));
@@ -79,6 +82,7 @@ describe('TriggerInternalController', () => {
     let userTemplatePreferenceRepository: any;
     let userRepository: any;
     let workKnowledgeDocumentRepository: any;
+    let missionTickService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -102,6 +106,7 @@ describe('TriggerInternalController', () => {
             undefined, // dataSyncDispatcher
             undefined, // deployReadyPoller
             workKnowledgeDocumentRepository,
+            missionTickService,
             undefined, // workProposalsApiService
         );
         c.onModuleInit();
@@ -127,6 +132,7 @@ describe('TriggerInternalController', () => {
         templateRepository = { name: 'TemplateRepository' };
         userTemplatePreferenceRepository = { name: 'UserTemplatePreferenceRepository' };
         workKnowledgeDocumentRepository = { name: 'WorkKnowledgeDocumentRepository' };
+        missionTickService = { name: 'MissionTickService', tickDue: jest.fn() };
 
         controller = buildController();
     });

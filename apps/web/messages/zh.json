@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "密码重置成功！",
                 "canLogin": "您现在可以使用新密码登录。"
+            },
+            "tabs": {
+                "password": "Password",
+                "magicLink": "Email me a link"
+            },
+            "magicLink": {
+                "subtitle": "We'll email you a one-time link to sign in. No password needed.",
+                "form": {
+                    "submit": "Send magic link",
+                    "submitting": "Sending..."
+                },
+                "success": {
+                    "title": "Check your inbox",
+                    "message": "If an account exists for {email}, we just sent a sign-in link. It expires in 15 minutes.",
+                    "resend": "Send another link"
+                },
+                "errors": {
+                    "failed": "We couldn't send the magic link. Please try again."
+                },
+                "redeem": {
+                    "title": "Signing you in",
+                    "loading": "Verifying your magic link...",
+                    "errorTitle": "This link can't be used",
+                    "errorBody": "Your magic link is invalid or has expired. Magic links can only be used once and stay valid for 15 minutes.",
+                    "requestNewLink": "Send a new link",
+                    "missingToken": "This magic link is missing a token. Request a new one to continue."
+                }
             }
         },
         "forgotPassword": {
@@ -620,7 +647,7 @@
                 "generating": "正在生成",
                 "totalItems": "项目总数"
             },
-            "recent": "最近作品",
+            "recent": "Works",
             "viewAll": "查看全部 ({count})",
             "search": "搜索作品...",
             "create": "创建作品",
@@ -678,7 +705,8 @@
                 "data": "数据",
                 "githubApp": "GitHub App",
                 "gitProviders": "Git 提供商",
-                "dangerZone": "危险区域"
+                "dangerZone": "危险区域",
+                "workAgent": "Work Agent"
             },
             "githubApp": {
                 "title": "GitHub App 安装",
@@ -842,6 +870,11 @@
                     "description": "覆盖 git 提交中使用的名称和电子邮件。留空以使用您的帐户名称 ({defaultName}) 和电子邮件 ({defaultEmail})。",
                     "nameLabel": "提交者名称",
                     "emailLabel": "提交者电子邮件"
+                },
+                "budgetAlerts": {
+                    "title": "Budget alert emails",
+                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
+                    "toggleLabel": "Email me budget alerts"
                 }
             },
             "security": {
@@ -946,13 +979,111 @@
                     "revokeError": "撤销 API 密钥失败",
                     "copyError": "复制到剪贴板失败"
                 }
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
+                    },
+                    "queue": {
+                        "title": "Queue a goal",
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
+                    },
+                    "liveRun": {
+                        "title": "Live run",
+                        "description": "Current state and recent agent activity."
+                    },
+                    "recentGoals": {
+                        "title": "Recent goals",
+                        "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
+                    }
+                },
+                "fields": {
+                    "enabled": "Enable Work agent",
+                    "autoApproveLowImpact": "Auto-approve low-impact changes",
+                    "dailySuggestions": "Daily suggestions",
+                    "dryRunByDefault": "Dry run by default",
+                    "maxWorksPerRun": "Max Works per run",
+                    "maxItemsPerWork": "Max items per Work",
+                    "maxBudgetPerRun": "Max budget per run",
+                    "approvalThreshold": "Approval threshold",
+                    "confirmBeforeCreate": "Confirm before creating Works",
+                    "confirmBeforeDelete": "Confirm before deleting items",
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
+                },
+                "actions": {
+                    "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
+                    "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
+                },
+                "metrics": {
+                    "works": "Works",
+                    "items": "Items"
+                },
+                "labels": {
+                    "dryRun": "Dry run",
+                    "liveRun": "Live run"
+                },
+                "empty": {
+                    "noActiveRun": "No active Work agent run.",
+                    "noGoals": "No Work agent goals yet.",
+                    "waitingForUpdate": "Waiting for the first run update."
+                },
+                "toasts": {
+                    "settingsSaved": "Work agent settings saved",
+                    "settingsError": "Failed to save settings",
+                    "goalQueued": "Work agent plan prepared",
+                    "goalError": "Failed to queue goal",
+                    "goalCanceled": "Work agent goal canceled",
+                    "cancelError": "Failed to cancel goal"
+                }
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "总作品数",
             "totalItems": "总项目数",
             "activeWebsites": "活动网站",
-            "fromLastMonth": "上月"
+            "fromLastMonth": "上月",
+            "monthSpend": "Month Spend"
         },
         "workCard": {
             "status": {
@@ -1460,7 +1591,9 @@
                 },
                 "actions": {
                     "refresh": "Refresh",
-                    "viewAll": "View all"
+                    "viewAll": "View all",
+                    "loadMore": "Load More",
+                    "loadingMore": "Loading…"
                 },
                 "filters": {
                     "label": "Filter by category",
@@ -1487,7 +1620,16 @@
                         "parse_error": "Unexpected response from the deployed site"
                     },
                     "lastSuccess": "Last successful sync: {time}",
-                    "lastSuccessNever": "Never synced. Will retry on next deploy."
+                    "lastSuccessNever": "Never synced. Will retry on next deploy.",
+                    "action": {
+                        "not_provisioned": "Redeploy the directory site with the latest activity feed endpoint.",
+                        "disabled": "Turn on activity sync in Settings to collect website events.",
+                        "timeout": "Retry refresh or check the deployed site if this keeps happening.",
+                        "unauthorized": "Rotate the activity sync secret, then redeploy the directory site.",
+                        "upstream_5xx": "Check the deployed site logs and retry after it recovers.",
+                        "network": "Check the deployed site URL and network reachability.",
+                        "parse_error": "Redeploy the directory site so it returns the expected activity payload."
+                    }
                 },
                 "entry": {
                     "itemsSummary": "{added, plural, =0 {} other {# added}} {updated, plural, =0 {} other {# updated}}"
@@ -1574,7 +1716,12 @@
                         "invalidUrl": "请输入有效的 URL，包括 http:// 或 https://",
                         "invalidImageUrl": "请输入有效的图片 URL",
                         "requiredFields": "请填写所有必填字段"
-                    }
+                    },
+                    "markdown": "Content (Markdown, optional)",
+                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
+                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
+                    "showPreview": "Preview",
+                    "hidePreview": "Hide preview"
                 },
                 "editDisplay": "编辑显示",
                 "editDisplayDescription": "切换精选状态并设置显示顺序。",
@@ -1774,7 +1921,12 @@
                     "saving": "保存中...",
                     "saveSuccess": "来源验证设置已保存",
                     "saveFailed": "保存来源验证设置失败"
-                }
+                },
+                "editContent": "Edit content",
+                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
+                "editContentSuccess": "Item content updated.",
+                "editContentFailed": "Failed to update item content.",
+                "editContentError": "An error occurred while updating item content."
             },
             "generator": {
                 "tabs": {
@@ -1946,7 +2098,8 @@
                 "tabs": {
                     "general": "常规",
                     "members": "成员",
-                    "navigationLabel": "设置标签"
+                    "navigationLabel": "设置标签",
+                    "budgets": "Budgets"
                 },
                 "sourceSettings": "源仓库",
                 "originalSource": "原始源",
@@ -2251,6 +2404,70 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
+                },
+                "budgets": {
+                    "title": "Budgets & Usage",
+                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
+                    "periodLabel": "{period} · spent {spent}",
+                    "globalCap": {
+                        "heading": "Global cap",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
+                        "createButton": "Create global cap",
+                        "saveButton": "Save",
+                        "removeButton": "Remove",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
+                        "createSuccess": "Create global budget succeeded",
+                        "createError": "Create global budget failed",
+                        "updateSuccess": "Update global budget succeeded",
+                        "updateError": "Update global budget failed",
+                        "deleteSuccess": "Delete global budget succeeded",
+                        "deleteError": "Delete global budget failed"
+                    },
+                    "pluginCaps": {
+                        "heading": "Per-plugin caps",
+                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
+                        "empty": "No per-plugin caps. Add one below.",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "addHeading": "Add plugin cap",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "e.g. openai",
+                        "pluginSelectPlaceholder": "Select a plugin…",
+                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
+                        "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage",
+                        "addButton": "Add cap",
+                        "saveButton": "Save",
+                        "deleteAria": "Delete budget",
+                        "errorPluginRequired": "Plugin id is required.",
+                        "errorPluginDuplicate": "A budget for this plugin already exists.",
+                        "errorPositive": "Enter a positive cap value.",
+                        "createSuccess": "Create plugin budget succeeded",
+                        "createError": "Create plugin budget failed",
+                        "updateSuccess": "Update plugin budget succeeded",
+                        "updateError": "Update plugin budget failed",
+                        "deleteSuccess": "Delete plugin budget succeeded",
+                        "deleteError": "Delete plugin budget failed"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Spend by plugin",
+                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
+                        "empty": "No usage recorded this period.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capability",
+                        "columnUnits": "Units",
+                        "columnCost": "Cost"
+                    },
+                    "export": {
+                        "downloadCsv": "Download CSV",
+                        "downloadingCsv": "Preparing CSV…",
+                        "csvFailed": "CSV export failed"
+                    }
                 }
             },
             "deploy": {
@@ -2395,6 +2612,10 @@
                     "dnsName": "名称：",
                     "dnsValue": "值：",
                     "copyButton": "复制"
+                },
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
                 }
             },
             "kb": {
@@ -2764,6 +2985,10 @@
                 "createFailed": "创建作品失败",
                 "success": {
                     "created": "作品创建成功！"
+                },
+                "proposalBanner": {
+                    "title": "Pre-filled from an AI suggestion.",
+                    "subtitle": "Tweak anything before creating."
                 }
             },
             "import": {
@@ -3091,7 +3316,9 @@
                 "works": "作品",
                 "plugins": "插件",
                 "templates": "模板",
-                "settings": "设置"
+                "settings": "设置",
+                "missions": "Missions",
+                "ideas": "Ideas"
             },
             "tooltips": {
                 "expandSidebar": "展开侧边栏",
@@ -3104,7 +3331,8 @@
                 "keyboardShortcuts": "键盘快捷键"
             },
             "signOut": "退出登录",
-            "signingOut": "退出登录中..."
+            "signingOut": "退出登录中...",
+            "new": "新建"
         },
         "dangerZone": {
             "title": "危险区域",
@@ -3273,7 +3501,21 @@
                 "addItem": "添加",
                 "modify": "修改",
                 "cancel": "取消",
-                "enterNewValue": "输入新值..."
+                "enterNewValue": "输入新值...",
+                "clusterIngressClassPlaceholder": "e.g. nginx",
+                "clusterIngressClassUseDefault": "Cluster default",
+                "clusterIngressClassDefault": "default",
+                "clusterIngressClassUnknown": "unknown controller",
+                "clusterIngressClassPreVerify": "Save & verify to detect this cluster's IngressClass list. Leave blank for the cluster default.",
+                "clusterIngressClassEmpty": "No ingress controller detected. Install ingress-nginx, Traefik, or another controller in your cluster, then re-save to refresh this list.",
+                "githubPackagesOAuthConnect": "Authorize with GitHub (read:packages + write:packages)",
+                "githubPackagesOAuthFailed": "Failed to start GitHub authorization. Try again or paste a PAT manually.",
+                "githubConnectHint": "Connect a GitHub account from the dashboard before configuring this plugin.",
+                "personalAccount": "(personal)",
+                "organizations": "Organizations",
+                "pickOwnerFirst": "Pick an owner first.",
+                "loadingRepos": "Loading repositories…",
+                "selectRepo": "Select a repository"
             },
             "oauth": {
                 "title": "账户连接",
@@ -3319,14 +3561,20 @@
                 "savedSuccess": "已保存组织访问权限。",
                 "saveFailed": "保存失败。",
                 "removeLabel": "移除 {login}"
-            }
+            },
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh."
         },
         "templates": {
             "title": "模板",
             "subtitle": "浏览内置网站模板，管理您的自定义目录，并控制新工作从哪个模板开始。",
             "actions": {
                 "addTemplate": "添加自定义模板",
-                "refreshTemplates": "刷新模板"
+                "refreshTemplates": "刷新模板",
+                "customizeTemplate": "Create with AI"
             },
             "hero": {
                 "eyebrow": "模板目录",
@@ -3369,7 +3617,19 @@
                 "branch": "分支：{branch}",
                 "syncBranches": "{count} 个同步分支",
                 "betaBranch": "测试版：{branch}",
-                "noDescription": "暂无描述。"
+                "noDescription": "暂无描述。",
+                "useTemplate": "Use this Template",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
+                "status": {
+                    "pending": "Queued",
+                    "forking": "Forking",
+                    "customizing": "Customizing",
+                    "pushing": "Pushing",
+                    "succeeded": "Customized",
+                    "failed": "Last run failed"
+                },
+                "syncBase": "Sync from base"
             },
             "dialog": {
                 "title": "添加自定义模板",
@@ -3443,7 +3703,86 @@
                 "refreshSuccess": "模板目录已刷新。",
                 "refreshFailed": "刷新模板失败。",
                 "defaultUpdated": "默认模板已更新。",
-                "defaultFailed": "更新默认模板失败。"
+                "defaultFailed": "更新默认模板失败。",
+                "customizeFailed": "Failed to start template customization.",
+                "customizationSucceeded": "Template customization completed.",
+                "customizationFailed": "Template customization failed.",
+                "syncBaseSuccess": "Template synced from its base.",
+                "syncBaseUpToDate": "Template is already up to date with its base.",
+                "syncBaseFailed": "Failed to sync template from base."
+            },
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
+            "customizeDialog": {
+                "title": "Create a custom template with AI",
+                "titleIterate": "Customize {name} again",
+                "titleStatus": "Customization status — {name}",
+                "description": "We duplicate a base template into a new repo in your GitHub account, then run your chosen AI agent against it to apply UI-only changes. Functionality stays untouched.",
+                "descriptionIterate": "Run another round of agent edits on the same repository. A new commit is pushed each time.",
+                "descriptionStatus": "Live status of the latest customization run for this template.",
+                "templateLabel": "Template",
+                "templateIterateHelp": "Re-running on this existing custom template's repository.",
+                "nameLabel": "Template name",
+                "namePlaceholder": "e.g. Dark Purple Theme",
+                "nameHelp": "Shown in your catalog and used to name the new GitHub repo.",
+                "baseLabel": "Base template",
+                "baseHelp": "Only bases marked AI-customizable are listed.",
+                "providerLabel": "Code-edit agent",
+                "providerHelp": "Pick one of your installed code-edit plugins. The default is preselected.",
+                "aiProviderLabel": "AI provider",
+                "aiProviderHelp": "{plugin} runs against an external LLM — pick which one to use.",
+                "targetLabel": "GitHub destination",
+                "targetHelp": "Where to create the new repo. Personal account or an org you belong to.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
+                "promptLabel": "Describe the UI you want",
+                "promptPlaceholder": "Example: switch to a dark theme with subtle purple accents, rounded corners, and a more modern serif headline font.",
+                "promptIteratePlaceholder": "Example: increase the sidebar contrast and switch the headline font to Inter.",
+                "promptHelp": "Be specific about styling. New features are out of scope — UI only.",
+                "submit": "Create custom template",
+                "submitIterate": "Run customization",
+                "retry": "Retry",
+                "cancel": "Cancel",
+                "done": "Done",
+                "successHelp": "Your custom template is ready. It now appears in your catalog.",
+                "status": {
+                    "pending": "Queued…",
+                    "forking": "Provisioning the new repo…",
+                    "customizing": "Agent is applying your changes…",
+                    "pushing": "Pushing changes…",
+                    "succeeded": "Customization completed successfully.",
+                    "failed": "Customization failed."
+                },
+                "toast": {
+                    "started": "Customization started — this typically takes a few minutes.",
+                    "success": "Template customized successfully.",
+                    "failed": "Template customization failed.",
+                    "startFailed": "Could not start the customization."
+                },
+                "messages": {
+                    "nameRequired": "Template name is required.",
+                    "baseRequired": "Choose a base template.",
+                    "providerRequired": "Choose a code-edit agent.",
+                    "aiProviderRequired": "Choose an AI provider for the selected agent.",
+                    "promptTooShort": "Describe the changes in at least a few words.",
+                    "noCustomizableBases": "No customizable base templates are available.",
+                    "noProviders": "No code-edit agent plugins are installed or enabled. Install one from the plugin catalog (e.g. claude-code, codex, gemini, opencode).",
+                    "noAiProviders": "{plugin} requires an AI provider, but none are installed or enabled. Install one (e.g. openai, anthropic, google) from the plugin catalog.",
+                    "noTargets": "Connect a GitHub account to choose a destination.",
+                    "browsePlugins": "Browse plugin catalog",
+                    "noRuns": "No customization runs yet for this template."
+                }
+            },
+            "syncDialog": {
+                "title": "Sync from base template",
+                "description": "Sync this custom template to the latest built-in base template code.",
+                "templateLabel": "Custom template",
+                "cancel": "Cancel",
+                "submit": "Sync and replace",
+                "warning": "This replaces the custom template repository with the latest base template code, then pushes it to GitHub. AI styling and manual code changes in the template repo can be overwritten."
             }
         },
         "templateSelector": {
@@ -3518,6 +3857,295 @@
             "toggleError": "切换插件失败",
             "system": "系统",
             "goToPluginSettings": "转到插件设置"
+        },
+        "proposals": {
+            "header": {
+                "title": "Ideas",
+                "titleWithName": "Ideas"
+            },
+            "actions": {
+                "accept": "Build",
+                "viewWork": "View Work",
+                "dismiss": "Dismiss",
+                "dismissAria": "Dismiss this idea",
+                "refresh": "Suggest more"
+            },
+            "researching": {
+                "title": "Drafting ideas from your profile…",
+                "subtitle": "This usually takes under a minute."
+            },
+            "empty": {
+                "title": "No ideas right now.",
+                "subtitle": "New suggestions will appear here when they are ready."
+            },
+            "errors": {
+                "rateLimited": "Daily limit reached. Try again tomorrow.",
+                "generic": "Couldn't refresh ideas. Please try again."
+            },
+            "plugins": {
+                "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
+            }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
+        },
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
+        },
+        "adminUsage": {
+            "title": "Platform usage",
+            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
+            "periodLabel": "{period}",
+            "totalSpend": "Total spend: {amount}",
+            "empty": "No usage recorded this period.",
+            "columnUser": "User",
+            "columnEmail": "Email",
+            "columnWork": "Directory",
+            "columnUnits": "Units",
+            "columnCost": "Cost",
+            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
+        },
+        "budgets": {
+            "overviewTitle": "Spend in {period}",
+            "overviewProgressLabel": "{percent}% of {cap} cap",
+            "overviewOverageSuffix": " (overage allowed)",
+            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
+            "topPluginsTitle": "Top plugins by spend",
+            "topPluginsEmpty": "No usage recorded yet this period.",
+            "trendTitle": "Daily spend — {period}",
+            "trendEmpty": "No usage recorded yet this period.",
+            "trendDayLabel": "Day {day}"
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "submit": "Create",
+            "or": "or",
+            "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
+                }
+            }
         }
     },
     "layout": {
@@ -3604,7 +4232,8 @@
             "security": "安全",
             "apiKeys": "API 密钥",
             "dangerZone": "危险区域",
-            "pluginSettings": "插件设置"
+            "pluginSettings": "插件设置",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -3620,7 +4249,9 @@
             "unsupportedProvider": "不支持的提供商",
             "providerConnectFailed": "连接提供商失败",
             "forgotPasswordFailed": "发送密码重置邮件失败",
-            "resetPasswordFailed": "重置密码失败"
+            "resetPasswordFailed": "重置密码失败",
+            "magicLinkFailed": "Failed to send magic link",
+            "magicLinkInvalid": "Invalid or expired magic link"
         }
     },
     "actions": {
@@ -3752,6 +4383,9 @@
             },
             "username": {
                 "minLength": "用户名必须包含至少 {length} 个字符"
+            },
+            "token": {
+                "required": "Token cannot be empty"
             }
         }
     },

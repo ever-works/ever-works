@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { WorkBudgetRepository } from '@src/database/repositories/work-budget.repository';
+import {
+    WorkBudgetRepository,
+    type BudgetOwnerRef,
+} from '@src/database/repositories/work-budget.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
+import { BudgetOwnerType } from '@src/entities/_types';
 import { WorkBudget } from '@src/entities/work-budget.entity';
 import { WorkBudgetAlertThreshold } from '@src/entities/work-budget-alert-state.entity';
 
@@ -8,6 +12,52 @@ export interface ApplicableBudgets {
     readonly global: WorkBudget | null;
     readonly plugin: WorkBudget | null;
 }
+
+/**
+ * Phase 7 PR U — shape returned by `BudgetService.summarizeForOwner`,
+ * powering the new per-Mission and per-Idea budget endpoints.
+ * Pure value object — no entities, no Dates as Date instances
+ * (the API layer needs ISO strings for the wire), so the same
+ * shape can be sent verbatim from the controllers.
+ */
+/**
+ * Phase 7 PR II — shape returned by `BudgetService.summarizeForUser`,
+ * powering the Dashboard `Month Spend` tile and the new
+ * `GET /me/usage/account-wide` endpoint. Aggregates across every
+ * Work/Mission/Idea owned by the user — `userId` is the
+ * discriminator, not an owner ref.
+ */
+export interface UserBudgetSummary {
+    readonly userId: string;
+    readonly periodStart: string;
+    readonly periodEnd: string;
+    readonly currentSpendCents: number;
+    /** Account-wide monthly cap, in cents. NULL when no cap is set. */
+    readonly capCents: number | null;
+    readonly currency: string;
+    readonly percentUsed: number | null;
+    readonly allowOverage: boolean;
+    readonly blocked: boolean;
+}
+
+export interface OwnerBudgetSummary {
+    readonly ownerType: BudgetOwnerType;
+    readonly ownerId: string;
+    readonly periodStart: string;
+    readonly periodEnd: string;
+    readonly currentSpendCents: number;
+    /** GLOBAL monthly cap, in cents. NULL when no cap is set. */
+    readonly capCents: number | null;
+    readonly currency: string;
+    /** Percent of cap used. NULL when capCents is NULL. */
+    readonly percentUsed: number | null;
+    /** Mirror of the cap row's `allowOverage` flag (default true when no cap). */
+    readonly allowOverage: boolean;
+    /** True iff currentSpendCents >= capCents AND !allowOverage. */
+    readonly blocked: boolean;
+}
+
+export type { BudgetOwnerRef };
 
 export interface BudgetEvaluation {
     readonly budget: WorkBudget;
@@ -66,6 +116,122 @@ export class BudgetService {
         return { global, plugin };
     }
 
+    /**
+     * Phase 7 PR T — polymorphic-owner version. Same shape +
+     * semantics as `getApplicableBudgets(workId, pluginId)` but
+     * keyed on `(ownerType, ownerId)` so per-Mission and per-Idea
+     * budgets resolve correctly. For Work owners this returns
+     * the same rows as the legacy method (PR 0.3 backfilled
+     * `ownerType='work'` + `ownerId=workId` on every pre-existing
+     * row).
+     */
+    async getApplicableBudgetsForOwner(
+        owner: BudgetOwnerRef,
+        pluginId: string,
+    ): Promise<ApplicableBudgets> {
+        const [global, plugin] = await Promise.all([
+            this.budgetRepository.findGlobalForOwner(owner),
+            this.budgetRepository.findForOwnerPlugin(owner, pluginId),
+        ]);
+        return { global, plugin };
+    }
+
+    /**
+     * Phase 7 PR U — read-side helper for the new
+     * `GET /me/missions/:id/budget` + `GET /me/work-proposals/:id/budget`
+     * endpoints. Reports current-period spend for an owner plus
+     * an optional GLOBAL-budget cap status. Plugin-scoped caps
+     * are NOT included in v1 — those are surfaced one-at-a-time
+     * via the existing per-Work plugin-cap views; the per-Mission
+     * / per-Idea pages need the aggregate first.
+     *
+     * Shape:
+     *   - `currentSpendCents` — total spend across every plugin
+     *     attributed to this owner this period
+     *   - `capCents | null` — the owner's GLOBAL monthly cap, or
+     *     null if no cap is set (= unlimited / inherit)
+     *   - `percentUsed | null` — percent of cap used, or null
+     *     when there's no cap
+     *   - `blocked` — true iff current spend >= cap AND the cap
+     *     forbids overage (matches the BudgetGuardService's gate
+     *     semantics)
+     */
+    /**
+     * Phase 7 PR II — account-wide spend summary. The cap inputs
+     * are passed by the caller (typically the API controller after
+     * a `WorkAgentService.getPreferences` read) so the
+     * BudgetsModule stays decoupled from the WorkAgent module.
+     * Mirrors the `summarizeForOwner` shape using `ownerType=null`
+     * to flag "this is account-aggregate, not a single owner".
+     *
+     * Cap inputs:
+     *   - `capCents`: nullable monthly cap (NULL = no cap).
+     *   - `allowOverage`: whether spend past the cap is permitted
+     *      (still warns but doesn't block).
+     *   - `currency`: defaults to 'usd' to match the per-Work
+     *      budget default.
+     */
+    async summarizeForUser(
+        userId: string,
+        prefs: { capCents: number | null; allowOverage: boolean; currency?: string },
+        now: Date = new Date(),
+    ): Promise<UserBudgetSummary> {
+        const currency = prefs.currency ?? 'usd';
+        const currentSpendCents = await this.usageRepository.getTotalSpendCentsForUser(
+            userId,
+            this.getCurrentPeriodStart(now),
+            this.getNextPeriodStart(now),
+            currency,
+        );
+        const capCents = prefs.capCents;
+        const percentUsed =
+            capCents !== null && capCents > 0 ? (currentSpendCents / capCents) * 100 : null;
+        const blocked = capCents !== null && currentSpendCents >= capCents && !prefs.allowOverage;
+        return {
+            userId,
+            periodStart: this.getCurrentPeriodStart(now).toISOString(),
+            periodEnd: this.getNextPeriodStart(now).toISOString(),
+            currentSpendCents,
+            capCents,
+            currency,
+            percentUsed,
+            allowOverage: prefs.allowOverage,
+            blocked,
+        };
+    }
+
+    async summarizeForOwner(
+        owner: BudgetOwnerRef,
+        now: Date = new Date(),
+    ): Promise<OwnerBudgetSummary> {
+        const [global, currentSpendCents] = await Promise.all([
+            this.budgetRepository.findGlobalForOwner(owner),
+            this.usageRepository.getTotalSpendCentsForOwner(
+                owner.ownerType,
+                owner.ownerId,
+                this.getCurrentPeriodStart(now),
+                this.getNextPeriodStart(now),
+            ),
+        ]);
+        const capCents = global?.monthlyCapCents ?? null;
+        const allowOverage = global?.allowOverage ?? true;
+        const percentUsed =
+            capCents !== null && capCents > 0 ? (currentSpendCents / capCents) * 100 : null;
+        const blocked = capCents !== null && currentSpendCents >= capCents && !allowOverage;
+        return {
+            ownerType: owner.ownerType,
+            ownerId: owner.ownerId,
+            periodStart: this.getCurrentPeriodStart(now).toISOString(),
+            periodEnd: this.getNextPeriodStart(now).toISOString(),
+            currentSpendCents,
+            capCents,
+            currency: global?.currency ?? 'usd',
+            percentUsed,
+            allowOverage,
+            blocked,
+        };
+    }
+
     async getCurrentSpendCents(
         workId: string,
         pluginId?: string,
@@ -84,12 +250,32 @@ export class BudgetService {
     }
 
     async evaluateBudget(budget: WorkBudget, now: Date = new Date()): Promise<BudgetEvaluation> {
-        const currentSpendCents = await this.getCurrentSpendCents(
-            budget.workId,
-            budget.pluginId ?? undefined,
-            now,
-            budget.currency,
-        );
+        // Phase 7 PR T — when the budget carries a non-Work owner
+        // (a Mission or Idea), use the polymorphic-owner spend
+        // rollup so per-Mission and per-Idea evaluations resolve
+        // correctly. Work-owned budgets keep using the legacy
+        // workId-keyed query so existing tests that mock only
+        // `getTotalSpendCents` keep passing (NN #20: extension,
+        // not replacement). Both queries return the same number
+        // for Work owners thanks to the PR 0.3 backfill.
+        const ownerType = budget.ownerType ?? BudgetOwnerType.WORK;
+        const ownerId = budget.ownerId ?? budget.workId;
+        const isNonWorkOwner = ownerType !== BudgetOwnerType.WORK;
+        const currentSpendCents = isNonWorkOwner
+            ? await this.usageRepository.getTotalSpendCentsForOwner(
+                  ownerType,
+                  ownerId,
+                  this.getCurrentPeriodStart(now),
+                  this.getNextPeriodStart(now),
+                  budget.pluginId ?? undefined,
+                  budget.currency,
+              )
+            : await this.getCurrentSpendCents(
+                  budget.workId,
+                  budget.pluginId ?? undefined,
+                  now,
+                  budget.currency,
+              );
 
         const capCents = budget.monthlyCapCents;
         const percentUsed = capCents > 0 ? (currentSpendCents / capCents) * 100 : 0;

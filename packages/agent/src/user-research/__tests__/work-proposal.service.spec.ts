@@ -20,7 +20,12 @@ function makeDraft(title: string, slugSuggestion: string) {
 function makeService(
     overrides: {
         pendingCount?: number;
-        existingProposals?: Array<{ title: string; slugSuggestion: string }>;
+        existingProposals?: Array<{
+            title: string;
+            slugSuggestion: string;
+            description?: string;
+            status?: string;
+        }>;
         drafts?: ReturnType<typeof makeDraft>[];
     } = {},
 ) {
@@ -64,11 +69,18 @@ function makeService(
     };
     const repo = {
         countPendingByUser: jest.fn().mockResolvedValue(overrides.pendingCount ?? 0),
-        findRecentByUser: jest.fn().mockResolvedValue(overrides.existingProposals ?? []),
+        findRecentByUser: jest.fn().mockResolvedValue(
+            (overrides.existingProposals ?? []).map((proposal) => ({
+                description: 'Existing idea description',
+                status: 'pending',
+                ...proposal,
+            })),
+        ),
         bulkInsert: jest.fn(async (items) =>
             items.map((item: object, index: number) => ({ ...item, id: `p${index}` })),
         ),
     };
+    const titler = { generateTitle: jest.fn().mockResolvedValue('Manual idea') };
 
     const service = new WorkProposalService(
         users as never,
@@ -76,6 +88,7 @@ function makeService(
         registry as never,
         aiFacade as never,
         repo as never,
+        titler as never,
     );
 
     return { service, aiFacade, repo };

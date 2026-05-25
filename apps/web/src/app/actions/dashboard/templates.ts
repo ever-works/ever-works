@@ -1,6 +1,7 @@
 'use server';
 
 import { templatesAPI } from '@/lib/api';
+import type { TemplateKind } from '@/lib/api/templates';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
@@ -22,7 +23,7 @@ function getResponseMessage(response: unknown): string | null {
 }
 
 export async function addCustomTemplate(input: {
-    kind: 'website' | 'work';
+    kind: TemplateKind;
     repositoryUrl: string;
     name?: string;
     description?: string;
@@ -64,7 +65,7 @@ export async function addCustomTemplate(input: {
 export async function updateCustomTemplate(
     templateId: string,
     input: {
-        kind: 'website' | 'work';
+        kind: TemplateKind;
         name?: string;
         description?: string;
         framework?: string;
@@ -103,10 +104,7 @@ export async function updateCustomTemplate(
     }
 }
 
-export async function archiveCustomTemplate(
-    templateId: string,
-    input: { kind: 'website' | 'work' },
-) {
+export async function archiveCustomTemplate(templateId: string, input: { kind: TemplateKind }) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -140,7 +138,7 @@ export async function archiveCustomTemplate(
     }
 }
 
-export async function setDefaultTemplate(input: { kind: 'website' | 'work'; templateId: string }) {
+export async function setDefaultTemplate(input: { kind: TemplateKind; templateId: string }) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -173,7 +171,7 @@ export async function setDefaultTemplate(input: { kind: 'website' | 'work'; temp
 }
 
 export async function forkTemplate(input: {
-    kind: 'website' | 'work';
+    kind: TemplateKind;
     templateId: string;
     targetOwner: string;
 }) {
@@ -395,7 +393,7 @@ export async function getTemplateCustomization(customizationId: string) {
     }
 }
 
-export async function refreshTemplates(input: { kind: 'website' | 'work' }) {
+export async function refreshTemplates(input: { kind: TemplateKind }) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

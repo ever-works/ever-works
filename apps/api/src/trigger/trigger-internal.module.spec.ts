@@ -33,6 +33,9 @@ jest.mock('../work-proposals/work-proposals.module', () => ({
 jest.mock('../data-sync/data-sync.module', () => ({
     DataSyncModule: class DataSyncModule {},
 }));
+jest.mock('@ever-works/agent/missions', () => ({
+    MissionsModule: class MissionsModule {},
+}));
 jest.mock('./trigger-internal.controller', () => ({
     TriggerInternalController: class TriggerInternalController {},
 }));
@@ -41,6 +44,7 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
+import { MissionsModule } from '@ever-works/agent/missions';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { TriggerInternalModule } from './trigger-internal.module';
@@ -57,6 +61,7 @@ describe('TriggerInternalModule', () => {
                 FacadesModule,
                 WorkProposalsModule,
                 KnowledgeBaseModule,
+                MissionsModule,
             ]),
         );
     });

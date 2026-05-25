@@ -37,12 +37,27 @@ jest.mock(
             USER_REFRESH: 'user-refresh',
             DISCOVER: 'discover',
             SCHEDULED: 'scheduled',
+            USER_MANUAL: 'user-manual',
+            MISSION: 'mission',
         },
         WorkProposalStatus: {
             PENDING: 'pending',
             DISMISSED: 'dismissed',
             ACCEPTED: 'accepted',
+            QUEUED: 'queued',
+            BUILDING: 'building',
+            FAILED: 'failed',
         },
+    }),
+    { virtual: true },
+);
+
+// Phase 1 PR B — WorkProposalsApiService now injects WorkAgentService.
+// Stub the barrel for the same deep-import-chain reason as the others.
+jest.mock(
+    '@ever-works/agent/work-agent',
+    () => ({
+        WorkAgentService: class WorkAgentService {},
     }),
     { virtual: true },
 );
@@ -72,6 +87,27 @@ describe('WorkProposalsApiService', () => {
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
+        const workAgent = {
+            createGoal: jest.fn().mockResolvedValue({
+                goal: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
+                run: { id: 'r1' },
+            }),
+            getPreferences: jest.fn().mockResolvedValue({
+                enabled: false,
+                autoApproveLowImpact: false,
+                dailySuggestionsEnabled: true,
+                guardrails: {},
+                autoGenerateCadence: null,
+                autoGenerateBatchSize: null,
+                autoBuildThrottlePerDay: null,
+                missionDefaultOutstandingCap: null,
+                maxAutoRetries: 2,
+                backoffSeconds: 60,
+                exponentialBackoffFactor: 2.0,
+                accountWideMonthlyCapCents: null,
+                accountWideAllowOverage: true,
+            }),
+        };
         const taskLock = {
             isLocked: jest.fn().mockResolvedValue(false),
             runExclusive: jest.fn(async (_key: string, fn: () => Promise<void>) => ({
@@ -86,9 +122,10 @@ describe('WorkProposalsApiService', () => {
             users as never,
             userOrmRepo as never,
             config as never,
+            workAgent as never,
             taskLock as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config, taskLock };
+        return { svc, research, proposals, limits, users, userOrmRepo, config, workAgent, taskLock };
     };
 
     it('queues a refresh when caps are within budget', async () => {
@@ -105,6 +142,7 @@ describe('WorkProposalsApiService', () => {
             source: 'user-refresh',
             suppressLowConfidence: true,
             maxPendingProposals: 6,
+            targetCount: null,
         });
     });
 
@@ -119,6 +157,7 @@ describe('WorkProposalsApiService', () => {
             source: 'auto-signup',
             suppressLowConfidence: false,
             maxPendingProposals: 6,
+            targetCount: null,
         });
     });
 

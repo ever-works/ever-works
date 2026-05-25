@@ -64,6 +64,76 @@ export class PluginUsageRepository {
         return Number(row?.total ?? 0);
     }
 
+    /**
+     * Phase 7 PR II — account-wide spend rollup for a single user.
+     * Sums `costCents` across every PluginUsageEvent attributed to
+     * the user this period, regardless of Work / Mission / Idea
+     * owner. Drives the new `GET /me/usage/account-wide` endpoint
+     * and the Dashboard's `Month Spend` tile (spec §5.1 / PR II).
+     *
+     * Uses the `(userId, occurredAt)` index already on the entity
+     * so a busy user's history still aggregates fast — no new
+     * migration needed.
+     */
+    async getTotalSpendCentsForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        currency?: string,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
+        }
+
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /**
+     * Phase 7 PR T — polymorphic-owner spend rollup. Same
+     * period-window + currency filter as `getTotalSpendCents`, but
+     * keyed on the `ownerType + ownerId` pair so per-Mission and
+     * per-Idea budgets can compute their current-period spend.
+     *
+     * For the Work owner case (`ownerType='work', ownerId=workId`)
+     * this returns the same number as `getTotalSpendCents(workId,
+     * ...)` because the PR 0.3 backfill populated both columns
+     * consistently.
+     */
+    async getTotalSpendCentsForOwner(
+        ownerType: string,
+        ownerId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        pluginId?: string,
+        currency?: string,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.ownerType = :ownerType', { ownerType })
+            .andWhere('e.ownerId = :ownerId', { ownerId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+
+        if (pluginId) {
+            qb.andWhere('e.pluginId = :pluginId', { pluginId });
+        }
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
+        }
+
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
     async getSpendByPlugin(
         workId: string,
         periodStart: Date,

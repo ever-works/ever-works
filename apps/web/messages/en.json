@@ -492,14 +492,15 @@
         },
         "proposals": {
             "header": {
-                "title": "Ideas for you",
-                "titleWithName": "Ideas for you, {username}"
+                "title": "Ideas",
+                "titleWithName": "Ideas"
             },
             "actions": {
-                "accept": "Use this idea",
+                "accept": "Build",
+                "viewWork": "View Work",
                 "dismiss": "Dismiss",
                 "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more ideas"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "Generating ideas",
@@ -515,7 +516,196 @@
             },
             "plugins": {
                 "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
             }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
         },
         "discover": {
             "title": "Discover",
@@ -678,7 +868,7 @@
                 "generating": "Generating",
                 "totalItems": "Total Items"
             },
-            "recent": "Recent Works",
+            "recent": "Works",
             "viewAll": "View all ({count})",
             "search": "Search works...",
             "create": "New Work",
@@ -784,6 +974,22 @@
                     "recentGoals": {
                         "title": "Recent goals",
                         "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
                     }
                 },
                 "fields": {
@@ -797,10 +1003,22 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal"
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
                 },
                 "actions": {
                     "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
                     "queueGoal": "Queue goal",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
@@ -1080,9 +1298,12 @@
             }
         },
         "stats": {
+            "totalMissions": "Total Missions",
+            "totalIdeas": "Total Ideas",
             "totalWorks": "Total Works",
             "totalItems": "Total Items",
             "activeWebsites": "Active Websites",
+            "monthSpend": "Month Spend",
             "fromLastMonth": "from last month"
         },
         "adminUsage": {
@@ -2881,6 +3102,50 @@
                 }
             }
         },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "submit": "Create",
+            "or": "or",
+            "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
+                }
+            }
+        },
         "workCreation": {
             "title": "New Work",
             "subtitle": "Choose how you'd like to start your Work",
@@ -3333,10 +3598,13 @@
             "menu": "Menu",
             "aiChat": "AI Chat",
             "newWork": "New Work",
+            "new": "New",
             "activityIndicator": "Work generating",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
+                "missions": "Missions",
+                "ideas": "Ideas",
                 "works": "Works",
                 "plugins": "Plugins",
                 "templates": "Templates",
@@ -3592,6 +3860,11 @@
         "templates": {
             "title": "Templates",
             "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "Add custom template",
                 "customizeTemplate": "Create with AI",
@@ -3629,6 +3902,7 @@
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
                 "fork": "Fork",
+                "useTemplate": "Use this Template",
                 "edit": "Edit",
                 "archive": "Archive",
                 "customizeAgain": "Customize again",
