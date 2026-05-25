@@ -802,6 +802,7 @@
                 "actions": {
                     "saveSettings": "Enregistrer les paramètres",
                     "queueGoal": "Mettre l'objectif en file d'attente",
+                    "preparePlan": "Préparer le plan",
                     "stop": "Arrêter"
                 },
                 "queue": {
@@ -2675,6 +2676,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "Notification de document hérité",
+                    "bannerTitle": "Hérité de l'organisation",
+                    "bannerDescription": "Ce document appartient à votre organisation et est en lecture seule ici. Remplacez-le localement pour bifurquer une copie modifiable dans ce Work.",
+                    "overrideCta": "Remplacer localement",
+                    "overrideCtaBusy": "Création du fork…",
+                    "overrideCtaPendingTooltip": "Disponible une fois l'action de remplacement livrée à la ligne 38d",
+                    "overrideErrorFallback": "Impossible de bifurquer le document hérité. Réessayez ou actualisez la page."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2840,15 +2850,6 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
-                },
-                "inherited": {
-                    "bannerLabel": "Notification de document hérité",
-                    "bannerTitle": "Hérité de l'organisation",
-                    "bannerDescription": "Ce document appartient à votre organisation et est en lecture seule ici. Remplacez-le localement pour bifurquer une copie modifiable dans ce Work.",
-                    "overrideCta": "Remplacer localement",
-                    "overrideCtaPendingTooltip": "Disponible une fois l'action de remplacement livrée à la ligne 38d",
-                    "overrideCtaBusy": "Création du fork…",
-                    "overrideErrorFallback": "Impossible de bifurquer le document hérité. Réessayez ou actualisez la page."
                 },
                 "addDoc": {
                     "button": "+ Ajouter",
@@ -3534,7 +3535,13 @@
                 "clusterIngressClassPreVerify": "Enregistrez & vérifiez pour détecter la liste des IngressClass de ce cluster. Laissez vide pour utiliser le défaut du cluster.",
                 "clusterIngressClassEmpty": "Aucun contrôleur d'entrée détecté. Installez ingress-nginx, Traefik ou un autre contrôleur dans votre cluster, puis enregistrez à nouveau pour actualiser cette liste.",
                 "githubPackagesOAuthConnect": "Autoriser avec GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "Échec du démarrage de l'autorisation GitHub. Essayez à nouveau ou collez un PAT manuellement."
+                "githubPackagesOAuthFailed": "Échec du démarrage de l'autorisation GitHub. Essayez à nouveau ou collez un PAT manuellement.",
+                "githubConnectHint": "Connectez un compte GitHub depuis le tableau de bord avant de configurer ce plugin.",
+                "personalAccount": "(personnel)",
+                "organizations": "Organisations",
+                "pickOwnerFirst": "Veuillez sélectionner un propriétaire d'abord.",
+                "loadingRepos": "Chargement des dépôts…",
+                "selectRepo": "Sélectionner un dépôt"
             },
             "oauth": {
                 "title": "Connexion du compte",
@@ -3641,7 +3648,8 @@
                     "pushing": "Push en cours",
                     "succeeded": "Personnalisé",
                     "failed": "La dernière exécution a échoué"
-                }
+                },
+                "syncBase": "Synchroniser depuis la base"
             },
             "dialog": {
                 "title": "Ajouter un modèle personnalisé",
@@ -3718,7 +3726,10 @@
                 "defaultFailed": "Échec de la mise à jour du modèle par défaut",
                 "customizeFailed": "Échec du démarrage de la personnalisation du modèle.",
                 "customizationSucceeded": "La personnalisation du modèle est terminée.",
-                "customizationFailed": "La personnalisation du modèle a échoué."
+                "customizationFailed": "La personnalisation du modèle a échoué.",
+                "syncBaseSuccess": "Modèle synchronisé depuis sa base.",
+                "syncBaseUpToDate": "Le modèle est déjà à jour avec sa base.",
+                "syncBaseFailed": "Échec de la synchronisation du modèle depuis la base."
             },
             "customizeDialog": {
                 "title": "Créer un modèle personnalisé avec IA",
@@ -3779,6 +3790,14 @@
                     "browsePlugins": "Parcourir le catalogue de plugins",
                     "noRuns": "Aucune exécution de personnalisation pour ce modèle."
                 }
+            },
+            "syncDialog": {
+                "title": "Synchroniser depuis le modèle de base",
+                "description": "Synchronisez ce modèle personnalisé avec le code du modèle de base intégré le plus récent.",
+                "templateLabel": "Modèle personnalisé",
+                "cancel": "Annuler",
+                "submit": "Synchroniser et remplacer",
+                "warning": "Ceci remplace le dépôt de modèle personnalisé par le code du modèle de base le plus récent, puis le pousse vers GitHub. Le style IA et les modifications manuelles de code dans le dépôt de modèle peuvent être écrasés."
             }
         },
         "templateSelector": {

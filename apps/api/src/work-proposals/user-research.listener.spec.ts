@@ -28,6 +28,7 @@ jest.mock(
     { virtual: true },
 );
 jest.mock('../events', () => ({
+    UserCreatedEvent: { EVENT_NAME: 'user.created' },
     UserConfirmedEvent: { EVENT_NAME: 'user.confirmed' },
 }));
 
@@ -65,7 +66,13 @@ describe('UserResearchListener', () => {
         warnSpy.mockRestore();
     });
 
-    it('dispatches research with source=auto-signup when enabled', async () => {
+    it('dispatches research from user.created with source=auto-signup when enabled', async () => {
+        await listener.onUserCreated(makeEvent('u1') as never);
+        expect(proposals.list).toHaveBeenCalledWith('u1', ['pending', 'accepted', 'dismissed']);
+        expect(proposals.refresh).toHaveBeenCalledWith('u1', 'auto-signup');
+    });
+
+    it('dispatches research from user.confirmed with source=auto-signup when enabled', async () => {
         await listener.onUserConfirmed(makeEvent('u1') as never);
         expect(proposals.list).toHaveBeenCalledWith('u1', ['pending', 'accepted', 'dismissed']);
         expect(proposals.refresh).toHaveBeenCalledWith('u1', 'auto-signup');

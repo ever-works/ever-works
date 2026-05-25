@@ -502,8 +502,8 @@
                 "refresh": "Suggest more ideas"
             },
             "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
+                "title": "Generating ideas",
+                "subtitle": "Personalized suggestions will appear here as soon as they are ready."
             },
             "empty": {
                 "title": "No ideas right now.",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -12,13 +12,14 @@ import {
 import { WorkProposalCard } from './WorkProposalCard';
 
 const POLL_INTERVAL_MS = 2_500;
-const POLL_MAX_MS = 120_000;
+const POLL_MAX_MS = 10 * 60_000;
 
 interface WorkProposalsSectionProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
     username?: string;
+    autoStart?: boolean;
 }
 
 export function WorkProposalsSection({
@@ -26,6 +27,7 @@ export function WorkProposalsSection({
     initiallyResearching,
     initiallyCanRefresh,
     username,
+    autoStart = false,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const [proposals, setProposals] = useState(initialProposals);
@@ -33,6 +35,7 @@ export function WorkProposalsSection({
     const [canRefresh, setCanRefresh] = useState(initiallyCanRefresh);
     const [pendingRefresh, startRefreshTransition] = useTransition();
     const [refreshError, setRefreshError] = useState<string | null>(null);
+    const autoStartAttempted = useRef(false);
 
     const refreshListAndStatus = useCallback(async () => {
         const [status, list] = await Promise.all([
@@ -72,23 +75,37 @@ export function WorkProposalsSection({
         };
     }, [refreshListAndStatus, researching]);
 
+    const queueRefresh = useCallback(async () => {
+        try {
+            const result = await refreshProposalsAction();
+            if (result.status === 'queued') {
+                setResearching(true);
+                window.setTimeout(() => {
+                    void refreshListAndStatus().catch(() => undefined);
+                }, 1_000);
+            } else if (result.status === 'rate-limited') {
+                setRefreshError(t('errors.rateLimited'));
+                setCanRefresh(false);
+                setResearching(false);
+            }
+        } catch {
+            setRefreshError(t('errors.generic'));
+            setResearching(false);
+        }
+    }, [refreshListAndStatus, t]);
+
+    useEffect(() => {
+        if (!autoStart || autoStartAttempted.current || proposals.length > 0) return;
+        autoStartAttempted.current = true;
+        setRefreshError(null);
+        setResearching(true);
+        void queueRefresh();
+    }, [autoStart, proposals.length, queueRefresh]);
+
     const handleRefresh = () => {
         setRefreshError(null);
         startRefreshTransition(async () => {
-            try {
-                const result = await refreshProposalsAction();
-                if (result.status === 'queued') {
-                    setResearching(true);
-                    window.setTimeout(() => {
-                        void refreshListAndStatus().catch(() => undefined);
-                    }, 1_000);
-                } else if (result.status === 'rate-limited') {
-                    setRefreshError(t('errors.rateLimited'));
-                    setCanRefresh(false);
-                }
-            } catch {
-                setRefreshError(t('errors.generic'));
-            }
+            await queueRefresh();
         });
     };
 
@@ -137,7 +154,14 @@ export function WorkProposalsSection({
                 <div className="rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <div className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{t('researching.title')}</span>
+                        <span>
+                            {t('researching.title')}
+                            <span aria-hidden="true" className="inline-flex w-5 justify-start">
+                                <span className="animate-pulse">.</span>
+                                <span className="animate-pulse [animation-delay:160ms]">.</span>
+                                <span className="animate-pulse [animation-delay:320ms]">.</span>
+                            </span>
+                        </span>
                     </div>
                     <p className="mt-1 text-xs">{t('researching.subtitle')}</p>
                 </div>

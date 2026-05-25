@@ -70,6 +70,12 @@ describe('WorkProposalsApiService', () => {
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
+        const taskLock = {
+            runExclusive: jest.fn(async (_key: string, fn: () => Promise<void>) => ({
+                acquired: true,
+                result: await fn(),
+            })),
+        };
         const svc = new WorkProposalsApiService(
             research as never,
             proposals as never,
@@ -77,8 +83,9 @@ describe('WorkProposalsApiService', () => {
             users as never,
             userOrmRepo as never,
             config as never,
+            taskLock as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config };
+        return { svc, research, proposals, limits, users, userOrmRepo, config, taskLock };
     };
 
     it('queues a refresh when caps are within budget', async () => {
@@ -92,6 +99,20 @@ describe('WorkProposalsApiService', () => {
             maxSteps: 14,
         });
         expect(proposals.generate).toHaveBeenCalledWith('u1', { source: 'user-refresh' });
+    });
+
+    it('runs refresh pipelines through the distributed per-user lock', async () => {
+        const { svc, taskLock } = makeDeps();
+
+        await svc.refresh('u1');
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(taskLock.runExclusive).toHaveBeenCalledWith(
+            'work-proposals:pipeline:u1',
+            expect.any(Function),
+            expect.objectContaining({ ttlMs: 7_200_000 }),
+        );
     });
 
     it('passes configured research timeout and step limits to the agent', async () => {

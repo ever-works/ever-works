@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "¡Contraseña restablecida exitosamente!",
                 "canLogin": "Ahora puedes iniciar sesión con tu nueva contraseña."
+            },
+            "tabs": {
+                "password": "Contraseña",
+                "magicLink": "Envíenme un enlace por correo"
+            },
+            "magicLink": {
+                "subtitle": "Te enviaremos un enlace de un solo uso para iniciar sesión. No se necesita contraseña.",
+                "form": {
+                    "submit": "Enviar enlace mágico",
+                    "submitting": "Enviando..."
+                },
+                "success": {
+                    "title": "Revisa tu bandeja de entrada",
+                    "message": "Si existe una cuenta para {email}, acabamos de enviar un enlace de inicio de sesión. Expira en 15 minutos.",
+                    "resend": "Enviar otro enlace"
+                },
+                "errors": {
+                    "failed": "No pudimos enviar el enlace mágico. Por favor, inténtalo de nuevo."
+                },
+                "redeem": {
+                    "title": "Iniciando sesión",
+                    "loading": "Verificando tu enlace mágico...",
+                    "errorTitle": "Este enlace no puede ser usado",
+                    "errorBody": "Tu enlace mágico es inválido o ha expirado. Los enlaces mágicos solo pueden usarse una vez y son válidos por 15 minutos.",
+                    "requestNewLink": "Enviar un nuevo enlace",
+                    "missingToken": "Este enlace mágico carece de un token. Solicita uno nuevo para continuar."
+                }
             }
         },
         "forgotPassword": {
@@ -775,6 +802,7 @@
                 "actions": {
                     "saveSettings": "Guardar configuración",
                     "queueGoal": "Encolar objetivo",
+                    "preparePlan": "Preparar plan",
                     "stop": "Detener"
                 },
                 "queue": {
@@ -2648,6 +2676,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "Aviso de documento heredado",
+                    "bannerTitle": "Heredado de la organización",
+                    "bannerDescription": "Este documento es propiedad de tu organización y es de solo lectura aquí. Sobrescribe localmente para bifurcar una copia editable en este Trabajo.",
+                    "overrideCta": "Sobrescribir localmente",
+                    "overrideCtaBusy": "Bifurcando…",
+                    "overrideCtaPendingTooltip": "Disponible cuando se lance la acción de sobrescritura en la fila 38d",
+                    "overrideErrorFallback": "No se pudo bifurcar el documento heredado. Inténtalo de nuevo o recarga la página."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2813,15 +2850,6 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
-                },
-                "inherited": {
-                    "bannerLabel": "Aviso de documento heredado",
-                    "bannerTitle": "Heredado de la organización",
-                    "bannerDescription": "Este documento es propiedad de tu organización y es de solo lectura aquí. Sobrescribe localmente para bifurcar una copia editable en este Trabajo.",
-                    "overrideCta": "Sobrescribir localmente",
-                    "overrideCtaPendingTooltip": "Disponible cuando se lance la acción de sobrescritura en la fila 38d",
-                    "overrideCtaBusy": "Bifurcando…",
-                    "overrideErrorFallback": "No se pudo bifurcar el documento heredado. Inténtalo de nuevo o recarga la página."
                 },
                 "addDoc": {
                     "button": "+ Añadir",
@@ -3507,7 +3535,13 @@
                 "clusterIngressClassPreVerify": "Guardar y verificar para detectar la lista de IngressClass de este clúster. Déjalo en blanco para el predeterminado del clúster.",
                 "clusterIngressClassEmpty": "No se detectó controlador de entrada. Instala ingress-nginx, Traefik u otro controlador en tu clúster, luego vuelve a guardar para actualizar esta lista.",
                 "githubPackagesOAuthConnect": "Autorizar con GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "Error al iniciar la autorización de GitHub. Vuelve a intentarlo o pega un PAT manualmente."
+                "githubPackagesOAuthFailed": "Error al iniciar la autorización de GitHub. Vuelve a intentarlo o pega un PAT manualmente.",
+                "githubConnectHint": "Conecta una cuenta de GitHub desde el panel antes de configurar este complemento.",
+                "personalAccount": "(personal)",
+                "organizations": "Organizaciones",
+                "pickOwnerFirst": "Selecciona primero un propietario.",
+                "loadingRepos": "Cargando repositorios...",
+                "selectRepo": "Selecciona un repositorio"
             },
             "oauth": {
                 "title": "Conexión de cuenta",
@@ -3614,7 +3648,8 @@
                     "pushing": "Haciendo push",
                     "succeeded": "Personalizado",
                     "failed": "Última ejecución fallida"
-                }
+                },
+                "syncBase": "Sincronizar desde la base"
             },
             "dialog": {
                 "title": "Agregar plantilla personalizada",
@@ -3691,7 +3726,10 @@
                 "defaultFailed": "Error al actualizar la plantilla predeterminada.",
                 "customizeFailed": "No se pudo iniciar la personalización de la plantilla.",
                 "customizationSucceeded": "Personalización de plantilla completada.",
-                "customizationFailed": "Falló la personalización de la plantilla."
+                "customizationFailed": "Falló la personalización de la plantilla.",
+                "syncBaseSuccess": "Plantilla sincronizada desde su base.",
+                "syncBaseUpToDate": "La plantilla ya está actualizada con su base.",
+                "syncBaseFailed": "Error al sincronizar la plantilla desde la base."
             },
             "customizeDialog": {
                 "title": "Crear una plantilla personalizada con IA",
@@ -3752,6 +3790,14 @@
                     "browsePlugins": "Explorar catálogo de complementos",
                     "noRuns": "Aún no hay ejecuciones de personalización para esta plantilla."
                 }
+            },
+            "syncDialog": {
+                "title": "Sincronizar desde la plantilla base",
+                "description": "Sincroniza esta plantilla personalizada con el código de la plantilla base integrada más reciente.",
+                "templateLabel": "Plantilla personalizada",
+                "cancel": "Cancelar",
+                "submit": "Sincronizar y reemplazar",
+                "warning": "Esto reemplaza el repositorio de la plantilla personalizada con el código de la plantilla base más reciente, luego lo envía a GitHub. El estilo de IA y los cambios manuales de código en el repositorio de la plantilla pueden sobrescribirse."
             }
         },
         "templateSelector": {
@@ -3929,7 +3975,9 @@
             "unsupportedProvider": "Proveedor no compatible",
             "providerConnectFailed": "Fallo al conectar proveedor",
             "forgotPasswordFailed": "Fallo al enviar correo de restablecimiento de contraseña",
-            "resetPasswordFailed": "Fallo al restablecer contraseña"
+            "resetPasswordFailed": "Fallo al restablecer contraseña",
+            "magicLinkFailed": "Error al enviar el enlace mágico",
+            "magicLinkInvalid": "Enlace mágico inválido o expirado"
         }
     },
     "actions": {
@@ -4061,6 +4109,9 @@
             },
             "username": {
                 "minLength": "El nombre de usuario debe contener al menos {length} caracteres"
+            },
+            "token": {
+                "required": "El token no puede estar vacío"
             }
         }
     },

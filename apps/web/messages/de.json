@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "Passwort erfolgreich zurückgesetzt!",
                 "canLogin": "Sie können sich jetzt mit Ihrem neuen Passwort anmelden."
+            },
+            "tabs": {
+                "password": "Passwort",
+                "magicLink": "Sende mir einen Link per E-Mail"
+            },
+            "magicLink": {
+                "subtitle": "Wir senden Ihnen einen einmaligen Link per E-Mail zum Anmelden. Kein Passwort erforderlich.",
+                "form": {
+                    "submit": "Magischen Link senden",
+                    "submitting": "Wird gesendet..."
+                },
+                "success": {
+                    "title": "Überprüfen Sie Ihren Posteingang",
+                    "message": "Wenn ein Konto für {email} vorhanden ist, haben wir Ihnen gerade einen Anmeldelink gesendet. Er läuft in 15 Minuten ab.",
+                    "resend": "Einen anderen Link senden"
+                },
+                "errors": {
+                    "failed": "Wir konnten den magischen Link nicht senden. Bitte versuchen Sie es erneut."
+                },
+                "redeem": {
+                    "title": "Sie werden angemeldet",
+                    "loading": "Ihr magischer Link wird überprüft...",
+                    "errorTitle": "Dieser Link kann nicht verwendet werden",
+                    "errorBody": "Ihr magischer Link ist ungültig oder abgelaufen. Magische Links können nur einmal verwendet sind und bleiben 15 Minuten gültig.",
+                    "requestNewLink": "Einen neuen Link senden",
+                    "missingToken": "Dieser magische Link fehlt ein Token. Fordern Sie ein neues an, um fortzufahren."
+                }
             }
         },
         "forgotPassword": {
@@ -775,6 +802,7 @@
                 "actions": {
                     "saveSettings": "Einstellungen speichern",
                     "queueGoal": "Ziel in die Warteschlange einreihen",
+                    "preparePlan": "Plan vorbereiten",
                     "stop": "Stop"
                 },
                 "queue": {
@@ -2648,6 +2676,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "Hinweis zu geerbtem Dokument",
+                    "bannerTitle": "Von der Organisation geerbt",
+                    "bannerDescription": "Dieses Dokument gehört Ihrer Organisation und ist hier schreibgeschützt. Lokal überschreiben, um eine bearbeitbare Kopie in dieses Work zu forken.",
+                    "overrideCta": "Lokal überschreiben",
+                    "overrideCtaBusy": "Wird geforkt…",
+                    "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist",
+                    "overrideErrorFallback": "Das geerbte Dokument konnte nicht geforkt werden. Versuchen Sie es erneut oder laden Sie die Seite neu."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2813,15 +2850,6 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
-                },
-                "inherited": {
-                    "bannerLabel": "Hinweis zu geerbtem Dokument",
-                    "bannerTitle": "Von der Organisation geerbt",
-                    "bannerDescription": "Dieses Dokument gehört Ihrer Organisation und ist hier schreibgeschützt. Lokal überschreiben, um eine bearbeitbare Kopie in dieses Work zu forken.",
-                    "overrideCta": "Lokal überschreiben",
-                    "overrideCtaPendingTooltip": "Verfügbar, sobald die Überschreibungsaktion in Zeile 38d ausgeliefert ist",
-                    "overrideCtaBusy": "Wird geforkt…",
-                    "overrideErrorFallback": "Das geerbte Dokument konnte nicht geforkt werden. Versuchen Sie es erneut oder laden Sie die Seite neu."
                 },
                 "addDoc": {
                     "button": "+ Hinzufügen",
@@ -3507,7 +3535,13 @@
                 "clusterIngressClassPreVerify": "Speichern & überprüfen, um die Ingress-Liste dieses Clusters zu erkennen. Leer lassen für den Cluster-Standard.",
                 "clusterIngressClassEmpty": "Keing Ingress-Controller erkannt. Installieren Sie ingress-nginx, Traefik oder einen anderen Controller in Ihrem Cluster, speichern Sie dann erneut, um diese Liste zu aktualisieren.",
                 "githubPackagesOAuthConnect": "Mit GitHub autorisieren (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "GitHub-Autorisierung konnte nicht gestartet werden. Versuchen Sie es erneut oder fügen Sie manuell einen PAT hinzu."
+                "githubPackagesOAuthFailed": "GitHub-Autorisierung konnte nicht gestartet werden. Versuchen Sie es erneut oder fügen Sie manuell einen PAT hinzu.",
+                "githubConnectHint": "Verbinden Sie ein GitHub-Konto aus dem Dashboard, bevor Sie dieses Plugin konfigurieren.",
+                "personalAccount": "(persönlich)",
+                "organizations": "Organisationen",
+                "pickOwnerFirst": "Wählen Sie zuerst einen Besitzer.",
+                "loadingRepos": "Repositories werden geladen...",
+                "selectRepo": "Ein Repository auswählen"
             },
             "oauth": {
                 "title": "Kontoverbindung",
@@ -3614,7 +3648,8 @@
                     "pushing": "Pushen",
                     "succeeded": "Angepasst",
                     "failed": "Letzter Lauf fehlgeschlagen"
-                }
+                },
+                "syncBase": "Von Basis synchronisieren"
             },
             "dialog": {
                 "title": "Benutzerdefinierte Vorlage hinzufügen",
@@ -3691,7 +3726,10 @@
                 "defaultFailed": "Standardvorlage konnte nicht aktualisiert werden.",
                 "customizeFailed": "Anpassung der Vorlage konnte nicht gestartet werden.",
                 "customizationSucceeded": "Anpassung der Vorlage abgeschlossen.",
-                "customizationFailed": "Anpassung der Vorlage fehlgeschlagen."
+                "customizationFailed": "Anpassung der Vorlage fehlgeschlagen.",
+                "syncBaseSuccess": "Vorlage von ihrer Basis synchronisiert.",
+                "syncBaseUpToDate": "Vorlage ist bereits mit ihrer Basis auf dem neuesten Stand.",
+                "syncBaseFailed": "Synchronisierung der Vorlage von Basis fehlgeschlagen."
             },
             "customizeDialog": {
                 "title": "Eine benutzerdefinierte Vorlage mit KI erstellen",
@@ -3752,6 +3790,14 @@
                     "browsePlugins": "Plugin-Katalog durchsuchen",
                     "noRuns": "Noch keine Anpassungsläufe für diese Vorlage."
                 }
+            },
+            "syncDialog": {
+                "title": "Von Basisvorlage synchronisieren",
+                "description": "Synchronisieren Sie diese benutzerdefinierte Vorlage mit dem neuesten eingebauten Basisvorlagencode.",
+                "templateLabel": "Benutzerdefinierte Vorlage",
+                "cancel": "Abbrechen",
+                "submit": "Synchronisieren und ersetzen",
+                "warning": "Dadurch wird das Repository der benutzerdefinierten Vorlage durch den neuesten Basisvorlagencode ersetzt und dann zu GitHub gepusht. KI-Styling und manuelle Codeänderungen im Vorlagen-Repo können überschrieben werden."
             }
         },
         "templateSelector": {
@@ -3929,7 +3975,9 @@
             "unsupportedProvider": "Nicht unterstützter Anbieter",
             "providerConnectFailed": "Verbindung zum Anbieter fehlgeschlagen",
             "forgotPasswordFailed": "Passwort-Reset-E-Mail konnte nicht gesendet werden",
-            "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden"
+            "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden",
+            "magicLinkFailed": "Senden des magischen Links fehlgeschlagen",
+            "magicLinkInvalid": "Ungültiger oder abgelaufener magischer Link"
         }
     },
     "actions": {
@@ -4061,6 +4109,9 @@
             },
             "username": {
                 "minLength": "Benutzername muss mindestens {length} Zeichen enthalten"
+            },
+            "token": {
+                "required": "Token darf nicht leer sein"
             }
         }
     },

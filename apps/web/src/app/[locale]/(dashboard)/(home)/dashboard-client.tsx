@@ -20,6 +20,7 @@ interface DashboardClientProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
+    autoStartProposals: boolean;
 }
 
 export default function DashboardClient({
@@ -31,6 +32,7 @@ export default function DashboardClient({
     initialProposals,
     initiallyResearching,
     initiallyCanRefresh,
+    autoStartProposals,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -58,6 +60,7 @@ export default function DashboardClient({
                 initiallyResearching={initiallyResearching}
                 initiallyCanRefresh={initiallyCanRefresh}
                 username={user.username}
+                autoStart={autoStartProposals}
             />
 
             <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">

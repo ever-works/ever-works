@@ -11,8 +11,13 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('dashboard') };
 }
 
-export default async function Dashboard() {
-    const [user, worksResponse, statsResponse, proposals, proposalsStatus] = await Promise.all([
+interface DashboardPageProps {
+    searchParams: Promise<{ newUser?: string }>;
+}
+
+export default async function Dashboard({ searchParams }: DashboardPageProps) {
+    const [{ newUser }, user, worksResponse, statsResponse, proposals, proposalsStatus] = await Promise.all([
+        searchParams,
         getAuthFromCookie(),
         getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
             success: false,
@@ -41,6 +46,7 @@ export default async function Dashboard() {
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}
+            autoStartProposals={newUser === 'true' && proposals.length === 0}
         />
     );
 }
