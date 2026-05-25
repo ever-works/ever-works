@@ -15,6 +15,30 @@ import { Button } from '@/components/ui/button';
 import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 
 const DISMISS_KEY_PREFIX = 'github_connect_dismissed';
+// Keep the modal available for explicit connectGithub=1 redirects, but do not auto-open it after registration.
+const AUTO_OPEN_CONNECT_GITHUB_MODAL = false;
+
+interface ShouldOpenConnectGithubModalOptions {
+    hasGithubConnected: boolean;
+    shouldForcePrompt: boolean;
+    dismissed: boolean;
+}
+
+export function shouldOpenConnectGithubModal({
+    hasGithubConnected,
+    shouldForcePrompt,
+    dismissed,
+}: ShouldOpenConnectGithubModalOptions) {
+    if (hasGithubConnected) {
+        return false;
+    }
+
+    if (shouldForcePrompt) {
+        return true;
+    }
+
+    return AUTO_OPEN_CONNECT_GITHUB_MODAL && !dismissed;
+}
 
 interface ConnectGithubModalProps {
     userId: string;
@@ -28,18 +52,20 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const shouldForcePrompt = searchParams.get('connectGithub') === '1';
-    const isNewUser = searchParams.get('newUser') === 'true';
-    const shouldBypassDismissal = shouldForcePrompt || isNewUser;
     const dismissKey = `${DISMISS_KEY_PREFIX}:${userId}`;
 
     useEffect(() => {
-        if (hasGithubConnected) return;
-
         const dismissed = localStorage.getItem(dismissKey);
-        if (shouldBypassDismissal || !dismissed) {
+        if (
+            shouldOpenConnectGithubModal({
+                hasGithubConnected,
+                shouldForcePrompt,
+                dismissed: Boolean(dismissed),
+            })
+        ) {
             setOpen(true);
         }
-    }, [dismissKey, hasGithubConnected, shouldBypassDismissal]);
+    }, [dismissKey, hasGithubConnected, shouldForcePrompt]);
 
     const handleConnect = async () => {
         setLoading(true);
@@ -60,7 +86,7 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
         localStorage.setItem(dismissKey, 'true');
         setOpen(false);
 
-        if (shouldBypassDismissal) {
+        if (shouldForcePrompt) {
             const url = new URL(window.location.href);
             url.searchParams.delete('connectGithub');
             url.searchParams.delete('newUser');
