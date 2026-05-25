@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache';
 import {
     agentsAPI,
     type Agent,
+    type AgentExportEnvelope,
+    type AgentImportOptions,
+    type AgentImportResult,
     type CreateAgentInput,
     type UpdateAgentInput,
     type AgentFileName,
@@ -67,5 +70,18 @@ export async function writeAgentFileAction(
 ): Promise<{ newHash: string }> {
     const res = await agentsAPI.writeFile(id, name, body, expectedHash);
     revalidatePath(`/agents/${id}/instructions`);
+    return res;
+}
+
+export async function exportAgentAction(id: string): Promise<AgentExportEnvelope> {
+    return agentsAPI.exportOne(id);
+}
+
+export async function importAgentAction(
+    envelope: AgentExportEnvelope,
+    options: AgentImportOptions = {},
+): Promise<AgentImportResult> {
+    const res = await agentsAPI.importOne(envelope, options);
+    revalidatePath('/agents');
     return res;
 }

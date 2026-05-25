@@ -13,6 +13,7 @@ import { AgentMembershipRepository } from '../database/repositories/agent-member
 import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
+import { AgentExportService } from './agent-export.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
@@ -39,6 +40,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentsService,
 		AgentFileService,
 		AgentScheduleDispatcherService,
+		AgentExportService,
 	],
 	exports: [
 		AgentRepository,
@@ -49,6 +51,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentsService,
 		AgentFileService,
 		AgentScheduleDispatcherService,
+		AgentExportService,
 	],
 })
 export class AgentsModule {}

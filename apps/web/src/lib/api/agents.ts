@@ -133,6 +133,81 @@ export interface AgentFileBody {
     storage: 'git' | 'db';
 }
 
+/**
+ * Agents/Skills/Tasks PR #1017 — Phase 6a. Per-Agent export
+ * envelope (mirrors `AgentExportEnvelope` on the API side). Carried
+ * as JSON in the response body of `GET /agents/:id/export` and as
+ * the request body of `POST /agents/import`.
+ */
+export interface AgentExportEnvelope {
+    version: 1;
+    meta: {
+        exportedAt: string;
+        sourceAgentId: string;
+        sourceUserId: string;
+        appVersion?: string;
+    };
+    identity: {
+        name: string;
+        slug: string;
+        title: string | null;
+        capabilities: string | null;
+        scope: AgentScope;
+    };
+    model: {
+        aiProviderId: string | null;
+        modelId: string | null;
+        maxSkillContextTokens: number;
+    };
+    runtime: {
+        permissions: AgentPermissions;
+        targets: AgentTarget[] | null;
+        heartbeatCadence: string | null;
+        idleBehavior: AgentIdleBehavior;
+        pauseAfterFailures: number;
+    };
+    avatar: {
+        mode: AgentAvatarMode;
+        icon: string | null;
+        imageUploadId: string | null;
+    };
+    files: {
+        soulMd: string | null;
+        agentsMd: string | null;
+        heartbeatMd: string | null;
+        toolsMd: string | null;
+        agentYml: string | null;
+    };
+    skillBindings: Array<{
+        skillSlug: string;
+        priority: number;
+        overrides?: Record<string, unknown>;
+    }>;
+    budget: Array<{
+        intervalUnit: string;
+        intervalCount: number;
+        capCents: number | null;
+        currency: string;
+    }>;
+}
+
+export type AgentImportConflictMode = 'skip' | 'overwrite' | 'rename';
+
+export interface AgentImportOptions {
+    onConflict?: AgentImportConflictMode;
+    overrideScope?: AgentScope;
+    missionId?: string | null;
+    ideaId?: string | null;
+    workId?: string | null;
+}
+
+export interface AgentImportResult {
+    created: Agent;
+    conflictResolution: 'none' | 'skipped' | 'overwritten' | 'renamed';
+    originalSlug: string;
+    finalSlug: string;
+}
+
 function buildQuery(q: ListAgentsQuery = {}): string {
     const params = new URLSearchParams();
     if (q.scope) params.set('scope', q.scope);
@@ -228,6 +303,29 @@ export const agentsAPI = {
             endpoint: `/agents/${id}/files/${name}`,
             data: { body, expectedHash },
             method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    async exportOne(id: string): Promise<AgentExportEnvelope> {
+        return serverFetch<AgentExportEnvelope>(`/agents/${id}/export`, { method: 'GET' });
+    },
+
+    async importOne(
+        envelope: AgentExportEnvelope,
+        options: AgentImportOptions = {},
+    ): Promise<AgentImportResult> {
+        const params = new URLSearchParams();
+        if (options.onConflict) params.set('onConflict', options.onConflict);
+        if (options.overrideScope) params.set('scope', options.overrideScope);
+        if (options.missionId) params.set('missionId', options.missionId);
+        if (options.ideaId) params.set('ideaId', options.ideaId);
+        if (options.workId) params.set('workId', options.workId);
+        const qs = params.toString();
+        return serverMutation<AgentImportResult>({
+            endpoint: `/agents/import${qs ? `?${qs}` : ''}`,
+            data: envelope as unknown as Record<string, unknown>,
+            method: 'POST',
             wrapInData: false,
         });
     },

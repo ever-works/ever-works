@@ -19,8 +19,13 @@ import {
 	AgentFileService,
 	AGENT_FILE_NAMES,
 	AgentsService,
+	AgentExportService,
+	AgentScope,
 	type AgentDto,
+	type AgentExportEnvelope,
 	type AgentFileName,
+	type AgentImportConflictMode,
+	type AgentImportResult,
 	type AgentTarget,
 } from '@ever-works/agent/agents';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -58,6 +63,8 @@ export class AgentsController {
 		private readonly service: AgentsService,
 		// Phase 4 — file read/write endpoints.
 		private readonly files: AgentFileService,
+		// Phase 6a — per-Agent export + import endpoints.
+		private readonly exportService: AgentExportService,
 	) {}
 
 	@Get()
@@ -237,5 +244,54 @@ export class AgentsController {
 				`Invalid Agent file name "${name}". Allowed: ${AGENT_FILE_NAMES.join(', ')}.`,
 			);
 		}
+	}
+
+	// ── Phase 6a — per-Agent export / import (N5 override) ─────────────
+
+	@Get(':id/export')
+	@ApiOperation({
+		summary:
+			'Export one Agent as a JSON envelope (identity, files, runtime, avatar, skill bindings, budget).',
+	})
+	@HttpCode(HttpStatus.OK)
+	@Throttle({ default: { limit: 30, ttl: 60_000 } })
+	async exportOne(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<AgentExportEnvelope> {
+		return this.exportService.exportOne(auth.userId, id);
+	}
+
+	@Post('import')
+	@ApiOperation({
+		summary:
+			'Import an Agent envelope. Conflict mode: skip | overwrite | rename (default rename — appends -2, -3, etc.).',
+	})
+	@HttpCode(HttpStatus.CREATED)
+	@Throttle({ default: { limit: 30, ttl: 60_000 } })
+	async importOne(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Body() body: AgentExportEnvelope,
+		@Query('onConflict') onConflict?: string,
+		@Query('scope') overrideScope?: string,
+		@Query('missionId') missionId?: string,
+		@Query('ideaId') ideaId?: string,
+		@Query('workId') workId?: string,
+	): Promise<AgentImportResult> {
+		const mode: AgentImportConflictMode | undefined =
+			onConflict === 'skip' || onConflict === 'overwrite' || onConflict === 'rename'
+				? onConflict
+				: undefined;
+		const scope: AgentScope | undefined =
+			overrideScope && Object.values(AgentScope).includes(overrideScope as AgentScope)
+				? (overrideScope as AgentScope)
+				: undefined;
+		return this.exportService.importOne(auth.userId, body, {
+			onConflict: mode,
+			overrideScope: scope,
+			missionId: missionId ?? null,
+			ideaId: ideaId ?? null,
+			workId: workId ?? null,
+		});
 	}
 }

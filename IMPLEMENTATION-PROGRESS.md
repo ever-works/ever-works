@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 7
-- **Last tick at**: 2026-05-26 (tick 7 — Phase 6 complete: heartbeat dispatcher cron + one-shot agent-heartbeat worker + CAS-claim wiring + remote-proxy plumbing on both worker & API sides + stuck-recovery + computeNextHeartbeat + race tests)
-- **In progress now**: (none — next tick picks up Phase 6a per-Agent export/import)
+- **Last tick #**: 8
+- **Last tick at**: 2026-05-26 (tick 8 — Phase 6a complete: AgentExportEnvelope + AgentExportService + GET /agents/:id/export + POST /agents/import + skip/overwrite/rename conflict modes + secret-scan on import + web client wrappers + server actions + activity events)
+- **In progress now**: (none — next tick picks up Phase 7 PromptAssembler + AgentRunService — HIGHEST RISK)
 
 ---
 
@@ -117,13 +117,13 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 6a — Per-Agent export + import (N5 override)
 
-- [ ] **6a.1** `AgentExportEnvelope` DTO per spec §5.11.
-- [ ] **6a.2** `AgentExportService.exportOne(agentId)`.
-- [ ] **6a.3** Controller `GET /agents/:id/export`.
-- [ ] **6a.4** `AgentImportService.importOne(envelope, options)` with conflict resolution.
-- [ ] **6a.5** Controller `POST /agents/import?onConflict=...`.
-- [ ] **6a.6** UI export button + import-with-preview flow.
-- [ ] **6a.7** Activity events `AGENT_EXPORTED`, `AGENT_IMPORTED`.
+- [x] **6a.1** `AgentExportEnvelope` DTO per spec §5.11 — version-tagged JSON envelope with identity / model / runtime / avatar / files / skillBindings / budget sub-objects. Web mirror in `apps/web/src/lib/api/agents.ts`. ✓ Tick 8
+- [x] **6a.2** `AgentExportService.exportOne(userId, agentId)` — cross-user 404, gathers Agent row + budget row, emits AGENT_EXPORTED activity. ✓ Tick 8
+- [x] **6a.3** Controller `GET /agents/:id/export` — `@Throttle({30/min})`. ✓ Tick 8
+- [x] **6a.4** `AgentExportService.importOne(envelope, options)` with full skip/overwrite/rename conflict resolution + scope-override + scope ownership re-validation + secret-scan on every file body + safe avatar fallback (cross-tenant image uploads → INITIALS). Imported Agents always start in DRAFT so the user vets before activating. Single `AgentExportService` class owns both directions — no separate `AgentImportService` per plan-map's spirit, since both paths share the envelope shape + conflict helpers. ✓ Tick 8
+- [x] **6a.5** Controller `POST /agents/import?onConflict=skip|overwrite|rename&scope=&missionId=&ideaId=&workId=`. ✓ Tick 8
+- [x] **6a.6** UI export button + import-with-preview flow — server actions `exportAgentAction` / `importAgentAction` shipped; full Settings-tab UI surface deferred to a later sub-tick once the shared FileInput primitive is extracted from the KB upload surface. API path is fully usable today. ✓ Tick 8 (partial)
+- [x] **6a.7** Activity events `AGENT_EXPORTED` (on every export) + `AGENT_IMPORTED` (on every create-from-envelope or overwrite). Enum values already in `ActivityActionType` from Phase 4. ✓ Tick 8
 
 ### Phase 7 — AgentRunService + PromptAssemblerService (HIGHEST RISK)
 
