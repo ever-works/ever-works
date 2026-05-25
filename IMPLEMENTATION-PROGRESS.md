@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 2
-- **Last tick at**: 2026-05-25 (tick 2 — Phase 1 complete, ready for Phase 2)
-- **In progress now**: (none — next tick picks up Phase 2 repositories)
+- **Last tick #**: 3
+- **Last tick at**: 2026-05-25 (tick 3 — Phase 2 complete)
+- **In progress now**: (none — next tick picks up Phase 3 AgentService + Controller)
 
 ---
 
@@ -71,9 +71,9 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 2 — Agent repositories
 
-- [ ] **2.1** `AgentRepository` with `findById`, `findByUserIdScoped`, `findByUserIdAndSlug`, `findDueForHeartbeat`, `casUpdateStatus(id, from, to)`, `incrementErrorCount`.
-- [ ] **2.2** `AgentRunRepository`, `AgentRunLogRepository`, `AgentBudgetRepository`, `AgentMembershipRepository`.
-- [ ] **2.3** Repository unit tests (don't run).
+- [x] **2.1** `AgentRepository` with `findById`, `findByIdAndUser`, `findByUserIdScoped`, `findByUserIdAndSlug` (scope-aware), `findDueForHeartbeat`, `tryClaimForRun` (CAS-claim mirroring `WorkScheduleRepository.tryMarkDispatched`), `releaseAfterRun`, `incrementErrorCount` (with auto-pause at threshold), `transitionStatus` (state-machine guarded), `findStuckRunning`, `findByScopeTarget`. ✓ Tick 3
+- [x] **2.2** `AgentRunRepository` (createQueued/markStarted/markCompleted/markFailed/markCancelled, `findInFlightForTaskAgent` for chat-dedup), `AgentRunLogRepository` (append/findByRun), `AgentBudgetRepository` (findByAgentId/upsert/summary), `AgentMembershipRepository` (findByAgent/findAgentIdsForTarget/addMembership/removeMembership/replaceForAgent/findAgentIdsForAnyTarget). ✓ Tick 3
+- [x] **2.3** Repository unit tests — `agent.repository.spec.ts` covers CAS-claim (6 assertions: null on no-row / null nextHeartbeatAt / non-ACTIVE / success returns original timestamp / failure on affected=0 / exact CAS guards), `incrementErrorCount` auto-pause threshold, `transitionStatus` state-machine. Mocked Repository<Agent>; no DB needed. ✓ Tick 3
 
 ### Phase 3 — AgentService + AgentsController (read-only)
 
