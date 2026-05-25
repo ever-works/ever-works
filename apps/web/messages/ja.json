@@ -3077,7 +3077,19 @@
                     "legalNote": "注意：",
                     "legalDescription": "リサーチモードはソースリポジトリを入力データとしてのみ使用します。最終コレクションは主に新規発見アイテムとオリジナル AI 生成説明で構成されます。ソースコンテンツは逐語コピーされません。",
                     "importButton": "インポート＆リサーチを開始",
-                    "importingButton": "リサーチパイプラインを開始中..."
+                    "importingButton": "リサーチパイプラインを開始中...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "リポジトリを解析",
                 "importButton": "ワークをインポート",

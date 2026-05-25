@@ -64,6 +64,7 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
                 sourceUrl: payload.sourceUrl,
                 token: gitToken,
                 createMissingRepos: payload.options?.createMissingRepos,
+                reuseSourceRepositoryAsMain: payload.options?.reuseSourceRepositoryAsMain,
                 expansionFactor: payload.enrichmentConfig?.expansionFactor,
                 providers: payload.providers,
                 worksConfig: payload.worksConfig,

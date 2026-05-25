@@ -59,6 +59,27 @@ import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
 import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
+function shouldReuseAwesomeReadmeRepository(
+    dto: Pick<ImportWorkDto, 'sourceType' | 'awesomeReadmeImportMode'>,
+): boolean {
+    return (
+        dto.sourceType === ImportSourceTypeEnum.AWESOME_README &&
+        dto.awesomeReadmeImportMode === 'reuse_source'
+    );
+}
+
+function repositoriesMatch(
+    left: { owner?: string; repo?: string } | null | undefined,
+    right: { owner?: string; repo?: string } | null | undefined,
+): boolean {
+    return (
+        !!left?.repo &&
+        !!right?.repo &&
+        left.repo.toLowerCase() === right.repo.toLowerCase() &&
+        (left.owner || '').toLowerCase() === (right.owner || '').toLowerCase()
+    );
+}
+
 @Injectable()
 export class WorkImportService {
     private readonly logger = new Logger(WorkImportService.name);
@@ -350,12 +371,13 @@ export class WorkImportService {
             };
 
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
+                const reuseSourceRepositoryAsMain = shouldReuseAwesomeReadmeRepository(dto);
                 updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
                     sourceUrl: dto.sourceUrl,
                     sourceOwner: parsed.owner,
                     sourceRepo: parsed.repo,
                     sourceType: dto.sourceType as ImportSourceType,
-                    sourceRole: null,
+                    sourceRole: reuseSourceRepositoryAsMain ? 'work' : null,
                     worksConfig,
                 });
             } else if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
@@ -390,6 +412,7 @@ export class WorkImportService {
                     sourceType: dto.sourceType,
                     sourceOwner: parsed.owner,
                     sourceRepo: parsed.repo,
+                    awesomeReadmeImportMode: dto.awesomeReadmeImportMode,
                 },
                 triggeredBy: context.triggeredBy,
                 scheduleId: context.scheduleId ?? null,
@@ -547,6 +570,7 @@ export class WorkImportService {
             options: {
                 createMissingRepos: dto.createMissingRepos ?? false,
                 enableSync: dto.sync ?? true,
+                reuseSourceRepositoryAsMain: shouldReuseAwesomeReadmeRepository(dto),
             },
             providers: dto.providers,
             enrichmentConfig: dto.enrichmentConfig,
@@ -616,6 +640,7 @@ export class WorkImportService {
                 sourceUrl: dto.sourceUrl,
                 token,
                 createMissingRepos: dto.createMissingRepos,
+                reuseSourceRepositoryAsMain: shouldReuseAwesomeReadmeRepository(dto),
                 expansionFactor: dto.enrichmentConfig?.expansionFactor,
                 providers: dto.providers,
                 worksConfig,
@@ -866,12 +891,18 @@ export class WorkImportService {
               })
             : null;
 
+        const reuseSourceRepositoryAsMain = repositoriesMatch(
+            work.sourceRepository?.relatedRepositories?.work,
+            source,
+        );
+
         return this.importExecutor.importFromAwesomeReadme({
             work,
             user,
             sourceUrl,
             updateWithPullRequest: true,
             worksConfig,
+            reuseSourceRepositoryAsMain,
         });
     }
 

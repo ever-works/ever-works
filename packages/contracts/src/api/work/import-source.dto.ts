@@ -5,6 +5,10 @@ export const IMPORT_SOURCE_TYPES = ['data_repo', 'awesome_readme', 'link_existin
 
 export type ImportSourceType = (typeof IMPORT_SOURCE_TYPES)[number];
 
+export const AWESOME_README_IMPORT_MODES = ['clone', 'reuse_source'] as const;
+
+export type AwesomeReadmeImportMode = (typeof AWESOME_README_IMPORT_MODES)[number];
+
 export type RepositoryRole = 'data' | 'work' | 'website';
 
 export interface RepositoryTarget {
@@ -78,6 +82,7 @@ export interface AnalyzeRepositoryResponseDto {
 export interface ImportWorkDto {
 	sourceUrl: string;
 	sourceType: ImportSourceType;
+	awesomeReadmeImportMode?: AwesomeReadmeImportMode;
 	name: string;
 	owner?: string;
 	organization?: boolean;

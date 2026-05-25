@@ -40,29 +40,37 @@ function createWorksConfigRestoreServiceMock() {
         }),
         validateForImport: jest.fn().mockResolvedValue(undefined),
         validateRepositoryTargets: jest.fn(),
-        buildSourceRepository: jest.fn((options: any) => ({
-            url: options.sourceUrl,
-            owner: options.sourceOwner,
-            repo: options.sourceRepo,
-            type: options.sourceType,
-            importedAt: new Date('2026-04-24T00:00:00.000Z'),
-            worksConfig: options.worksConfig
-                ? {
-                      initialPrompt: options.worksConfig.initialPrompt,
-                      websiteRepo: options.worksConfig.websiteRepo,
-                      providers: options.worksConfig.providers,
-                  }
-                : undefined,
-            relatedRepositories: {
-                [options.sourceRole ?? 'work']: {
-                    owner: options.sourceOwner,
-                    repo: options.sourceRepo,
+        buildSourceRepository: jest.fn((options: any) => {
+            const sourceRole = options.sourceRole === undefined ? 'work' : options.sourceRole;
+
+            return {
+                url: options.sourceUrl,
+                owner: options.sourceOwner,
+                repo: options.sourceRepo,
+                type: options.sourceType,
+                importedAt: new Date('2026-04-24T00:00:00.000Z'),
+                worksConfig: options.worksConfig
+                    ? {
+                          initialPrompt: options.worksConfig.initialPrompt,
+                          websiteRepo: options.worksConfig.websiteRepo,
+                          providers: options.worksConfig.providers,
+                      }
+                    : undefined,
+                relatedRepositories: {
+                    ...(sourceRole
+                        ? {
+                              [sourceRole]: {
+                                  owner: options.sourceOwner,
+                                  repo: options.sourceRepo,
+                              },
+                          }
+                        : {}),
+                    ...(options.worksConfig?.websiteRepositoryTarget
+                        ? { website: options.worksConfig.websiteRepositoryTarget }
+                        : {}),
                 },
-                ...(options.worksConfig?.websiteRepositoryTarget
-                    ? { website: options.worksConfig.websiteRepositoryTarget }
-                    : {}),
-            },
-        })),
+            };
+        }),
         applyPipelineSettings: jest.fn().mockResolvedValue(undefined),
         applyInitialSchedule: jest.fn().mockResolvedValue(undefined),
         applyScheduleOverrides: jest.fn().mockResolvedValue(undefined),
@@ -382,6 +390,122 @@ describe('WorkImportService.initiateImport', () => {
                 },
             },
         });
+    });
+
+    it('marks an awesome README source repo as the main repo when reuse mode is selected', async () => {
+        const workRepository = {
+            findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+                id: 'dir-1',
+                slug: 'awesome-cloud',
+                name: 'Awesome Cloud',
+                owner: 'ever-works',
+                organization: false,
+                gitProvider: 'github',
+            }),
+            update: jest.fn().mockResolvedValue(undefined),
+            recordGenerationStartTime: jest.fn().mockResolvedValue(undefined),
+            updateGenerateStatus: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const generationHistoryRepository = {
+            createEntry: jest.fn().mockResolvedValue({
+                id: 'history-1',
+                startedAt: new Date('2026-04-24T00:00:00.000Z'),
+            }),
+            updateEntry: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const sourceRepoAnalyzer = {
+            parseGitUrl: jest.fn().mockReturnValue({
+                owner: 'ever-works',
+                repo: 'awesome-cloud',
+                provider: 'github',
+            }),
+            checkSlugConflicts: jest.fn().mockResolvedValue({
+                hasConflict: false,
+                conflictingRepos: [],
+                suggestedSlug: 'awesome-cloud',
+            }),
+        };
+
+        const worksConfigRestoreService = createWorksConfigRestoreServiceMock();
+        const importDispatcher = {
+            dispatchWorkImport: jest.fn().mockResolvedValue('import-run-1'),
+        };
+
+        const service = new WorkImportService(
+            workRepository as any,
+            generationHistoryRepository as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+            } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            {
+                loadFromRepository: jest.fn().mockResolvedValue(null),
+                parseRepositoryReference: jest.fn(),
+            } as any,
+            worksConfigRestoreService as any,
+            {} as any,
+            {
+                validateSelectedProviders: jest.fn().mockResolvedValue(undefined),
+                validateRequiredProvidersForPipeline: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {
+                emit: jest.fn(),
+            } as any,
+            importDispatcher as any,
+        );
+
+        const result = await service.initiateImport(
+            {
+                sourceUrl: 'https://github.com/ever-works/awesome-cloud',
+                sourceType: ImportSourceTypeEnum.AWESOME_README,
+                awesomeReadmeImportMode: 'reuse_source',
+                name: 'Awesome Cloud',
+                gitProvider: 'github',
+                deployProvider: 'vercel',
+                organization: false,
+                sync: false,
+            } as any,
+            {
+                id: 'user-1',
+                username: 'ever-works',
+            } as any,
+        );
+
+        expect(result.status).toBe('success');
+        expect(worksConfigRestoreService.buildSourceRepository).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceType: ImportSourceTypeEnum.AWESOME_README,
+                sourceRole: 'work',
+                worksConfig: null,
+            }),
+        );
+        expect(workRepository.update).toHaveBeenCalledWith(
+            'dir-1',
+            expect.objectContaining({
+                sourceRepository: expect.objectContaining({
+                    relatedRepositories: expect.objectContaining({
+                        work: {
+                            owner: 'ever-works',
+                            repo: 'awesome-cloud',
+                        },
+                    }),
+                }),
+            }),
+        );
+        expect(importDispatcher.dispatchWorkImport).toHaveBeenCalledWith(
+            expect.objectContaining({
+                options: expect.objectContaining({
+                    reuseSourceRepositoryAsMain: true,
+                }),
+            }),
+        );
     });
 
     it('does not restore .works/works.yml settings for data repo imports when disabled', async () => {

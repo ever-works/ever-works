@@ -34,6 +34,7 @@ interface WorkImportFormProps {
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure';
 type ImportPath = 'direct' | 'from_choose_mode';
 type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
+type AwesomeReadmeImportMode = 'clone' | 'reuse_source';
 
 interface ImportProviderErrors {
     ai?: string;
@@ -74,6 +75,8 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
     const [workName, setWorkName] = useState('');
     const [sync, setSync] = useState(false);
     const [restoreWorksConfig, setRestoreWorksConfig] = useState(true);
+    const [awesomeReadmeImportMode, setAwesomeReadmeImportMode] =
+        useState<AwesomeReadmeImportMode>('clone');
     const [analysisResult, setAnalysisResult] = useState<AnalyzeRepositoryResponseDto | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
     const [showLinkConfirm, setShowLinkConfirm] = useState(false);
@@ -105,6 +108,7 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
             if (result.success && result.data) {
                 setAnalysisResult(result.data);
                 setRestoreWorksConfig(true);
+                setAwesomeReadmeImportMode('clone');
 
                 if (result.data.error) {
                     toast.error(result.data.error);
@@ -246,6 +250,8 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
             const result = await importWork({
                 sourceUrl,
                 sourceType,
+                awesomeReadmeImportMode:
+                    sourceType === 'awesome_readme' ? awesomeReadmeImportMode : undefined,
                 name: workName,
                 sync,
                 restoreWorksConfig: analysisResult.worksConfig ? restoreWorksConfig : undefined,
@@ -363,6 +369,8 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
                         onSyncChange={setSync}
                         restoreWorksConfig={restoreWorksConfig}
                         onRestoreWorksConfigChange={setRestoreWorksConfig}
+                        awesomeReadmeImportMode={awesomeReadmeImportMode}
+                        onAwesomeReadmeImportModeChange={setAwesomeReadmeImportMode}
                         gitProvider={gitProvider}
                         isPending={isPending}
                         owner={owner}
