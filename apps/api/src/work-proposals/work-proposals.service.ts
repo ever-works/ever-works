@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
 import { User } from '@ever-works/agent/entities';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
 import {
     UserResearchService,
@@ -24,6 +25,7 @@ export interface ScheduledBatchSummary {
 
 const SCHEDULED_RERUN_BATCH_SIZE = 20;
 const SCHEDULED_RERUN_STALE_DAYS = 30;
+const PIPELINE_LOCK_TTL_MS = 2 * 60 * 60 * 1000;
 
 @Injectable()
 export class WorkProposalsApiService {
@@ -37,6 +39,7 @@ export class WorkProposalsApiService {
         private readonly users: UserRepository,
         @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
         private readonly config: ConfigService,
+        private readonly taskLockService?: DistributedTaskLockService,
     ) {}
 
     async list(userId: string, statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING]) {
@@ -129,7 +132,7 @@ export class WorkProposalsApiService {
         }
 
         this.inFlight.add(userId);
-        void this.runPipeline(userId, source).finally(() => this.inFlight.delete(userId));
+        void this.runPipelineLocked(userId, source).finally(() => this.inFlight.delete(userId));
         return { status: 'queued' };
     }
 
@@ -186,6 +189,29 @@ export class WorkProposalsApiService {
             );
         }
         return summary;
+    }
+
+    private async runPipelineLocked(userId: string, source: WorkProposalSource): Promise<void> {
+        if (!this.taskLockService) {
+            await this.runPipeline(userId, source);
+            return;
+        }
+
+        const result = await this.taskLockService.runExclusive(
+            `work-proposals:pipeline:${userId}`,
+            async () => this.runPipeline(userId, source),
+            {
+                ttlMs: PIPELINE_LOCK_TTL_MS,
+                onLocked: () =>
+                    this.logger.debug(
+                        `Skipping work-proposals pipeline for ${userId}; another instance holds the lock`,
+                    ),
+            },
+        );
+
+        if (!result.acquired) {
+            return;
+        }
     }
 
     private getPositiveNumberConfig(key: string, fallback: number): number {

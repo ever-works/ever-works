@@ -78,6 +78,33 @@
             "passwordReset": {
                 "success": "تم إعادة تعيين كلمة المرور بنجاح!",
                 "canLogin": "يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة."
+            },
+            "tabs": {
+                "password": "كلمة المرور",
+                "magicLink": "أرسل رابطًا إلى بريدي الإلكتروني"
+            },
+            "magicLink": {
+                "subtitle": "سوف نرسل لك رابطًا لمرة واحدة لتسجيل الدخول. لا حاجة لكلمة مرور.",
+                "form": {
+                    "submit": "إرسال الرابط السحري",
+                    "submitting": "جاري الإرسال..."
+                },
+                "success": {
+                    "title": "تحقق من صندوق الوارد الخاص بك",
+                    "message": "إذا كان هناك حساب لـ {email}، لقد أرسلنا للتو رابط تسجيل الدخول. ينتهي صلاحيته خلال 15 دقيقة.",
+                    "resend": "إرسال رابط آخر"
+                },
+                "errors": {
+                    "failed": "تعذر إرسال الرابط السحري. يرجى المحاولة مرة أخرى."
+                },
+                "redeem": {
+                    "title": "تسجيل الدخول",
+                    "loading": "جاري التحقق من رابطك السحري...",
+                    "errorTitle": "لا يمكن استخدام هذا الرابط",
+                    "errorBody": "رابطك السحري غير صالح أو انتهت صلاحيته. يمكن استخدام الروابط السحرية مرة واحدة فقط وتظل صالحة لمدة 15 دقيقة.",
+                    "requestNewLink": "إرسال رابط جديد",
+                    "missingToken": "هذا الرابط السحري لا يحتوي على رمز. اطلب رابطًا جديدًا للمتابعة."
+                }
             }
         },
         "forgotPassword": {
@@ -775,6 +802,7 @@
                 "actions": {
                     "saveSettings": "حفظ الإعدادات",
                     "queueGoal": "ضع الهدف في قائمة الانتظار",
+                    "preparePlan": "إعداد الخطة",
                     "stop": "توقف"
                 },
                 "queue": {
@@ -2648,6 +2676,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "إشعار مستند موروث",
+                    "bannerTitle": "موروث من المنظمة",
+                    "bannerDescription": "هذا المستند مملوك لمنظمتك وللقراءة فقط هنا. قم بتجاوزه محليًا لإنشاء نسخة قابلة للتحرير في هذا العمل.",
+                    "overrideCta": "تجاوز محليًا",
+                    "overrideCtaBusy": "جارٍ التفريع…",
+                    "overrideCtaPendingTooltip": "متاح بمجرد شحن إجراء التجاوز في الصف 38d",
+                    "overrideErrorFallback": "تعذّر تفريع المستند الموروث. حاول مرة أخرى أو حدّث الصفحة."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2813,15 +2850,6 @@
                     },
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
-                },
-                "inherited": {
-                    "bannerLabel": "إشعار مستند موروث",
-                    "bannerTitle": "موروث من المنظمة",
-                    "bannerDescription": "هذا المستند مملوك لمنظمتك وللقراءة فقط هنا. قم بتجاوزه محليًا لإنشاء نسخة قابلة للتحرير في هذا العمل.",
-                    "overrideCta": "تجاوز محليًا",
-                    "overrideCtaPendingTooltip": "متاح بمجرد شحن إجراء التجاوز في الصف 38d",
-                    "overrideCtaBusy": "جارٍ التفريع…",
-                    "overrideErrorFallback": "تعذّر تفريع المستند الموروث. حاول مرة أخرى أو حدّث الصفحة."
                 },
                 "addDoc": {
                     "button": "+ إضافة",
@@ -3507,7 +3535,13 @@
                 "clusterIngressClassPreVerify": "احفظ وتحقق لاكتشاف قائمة IngressClass لهذه الكتلة. اتركها فارغة للكتلة الافتراضية.",
                 "clusterIngressClassEmpty": "لم يتم اكتشاف أي متحكم دخول. قم بتثبيت ingress-nginx أو Traefik أو متحكم آخر في كتلتك، ثم أعد الحفظ لتحديث هذه القائمة.",
                 "githubPackagesOAuthConnect": "التخويل عبر GitHub (read:packages + write:packages)",
-                "githubPackagesOAuthFailed": "فشل بدء التخويل عبر GitHub. جرب مرة أخرى أو الصق PAT يدويًا."
+                "githubPackagesOAuthFailed": "فشل بدء التخويل عبر GitHub. جرب مرة أخرى أو الصق PAT يدويًا.",
+                "githubConnectHint": "اتصل بحساب GitHub من لوحة التحكم قبل تكوين هذا الإضافة.",
+                "personalAccount": "(شخصي)",
+                "organizations": "المنظمات",
+                "pickOwnerFirst": "اختر المالك أولاً.",
+                "loadingRepos": "جاري تحميل المستودعات...",
+                "selectRepo": "اختر مستودعًا"
             },
             "oauth": {
                 "title": "ربط الحساب",
@@ -3614,7 +3648,8 @@
                     "pushing": "الإرسال",
                     "succeeded": "تم التخصيص",
                     "failed": "فشل آخر تشغيل"
-                }
+                },
+                "syncBase": "المزامنة من القاعدة"
             },
             "dialog": {
                 "title": "إضافة قالب مخصص",
@@ -3691,7 +3726,10 @@
                 "defaultFailed": "فشل تحديث القالب الافتراضي。",
                 "customizeFailed": "فشل بدء تخصيص القالب.",
                 "customizationSucceeded": "اكتمل تخصيص القالب.",
-                "customizationFailed": "فشل تخصيص القالب."
+                "customizationFailed": "فشل تخصيص القالب.",
+                "syncBaseSuccess": "تمت مزامنة القالب من قاعدته.",
+                "syncBaseUpToDate": "القالب محدث بالفعل مع قاعدته.",
+                "syncBaseFailed": "فشلت مزامنة القالب من القاعدة."
             },
             "customizeDialog": {
                 "title": "إنشاء قالب مخصص بالذكاء الاصطناعي",
@@ -3752,6 +3790,14 @@
                     "browsePlugins": "استعرض فهرس الإضافات",
                     "noRuns": "لا توجد عمليات تخصيص بعد لهذا القالب."
                 }
+            },
+            "syncDialog": {
+                "title": "المزامنة من القالب الأساسي",
+                "description": "زامن هذا القالب المخصص إلى أحدث كود القالب الأساسي المدمج.",
+                "templateLabel": "قالب مخصص",
+                "cancel": "إلغاء",
+                "submit": "المزامنة واستبدال",
+                "warning": "يستبدل هذا القالب مستودع القالب المخصص بأحدث كود القالب الأساسي، ثم يدفعه إلى GitHub. يمكن الكتابة فوق أنماط الذكاء الاصطناعي والتغييرات اليدوية في كود القالب."
             }
         },
         "templateSelector": {
@@ -3929,7 +3975,9 @@
             "unsupportedProvider": "مزود غير مدعوم",
             "providerConnectFailed": "فشل في ربط المزود",
             "forgotPasswordFailed": "فشل في إرسال بريد إعادة تعيين كلمة المرور",
-            "resetPasswordFailed": "فشل في إعادة تعيين كلمة المرور"
+            "resetPasswordFailed": "فشل في إعادة تعيين كلمة المرور",
+            "magicLinkFailed": "فشل إرسال الرابط السحري",
+            "magicLinkInvalid": "الرابط السحري غير صالح أو انتهت صلاحيته"
         }
     },
     "actions": {
@@ -4061,6 +4109,9 @@
             },
             "username": {
                 "minLength": "يجب أن يحتوي اسم المستخدم على {length} حرفًا على الأقل"
+            },
+            "token": {
+                "required": "لا يمكن أن يكون الرمز فارغًا"
             }
         }
     },
