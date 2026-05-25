@@ -102,4 +102,21 @@ export class AgentRunRepository {
 			.orderBy('run.createdAt', 'DESC')
 			.getOne();
 	}
+
+	/**
+	 * Most-recent queued / running run for an Agent regardless of trigger
+	 * kind. Used by the `agent-heartbeat` Trigger.dev worker to find the
+	 * row the dispatcher created so it can mark it started + completed
+	 * without the caller having to pass the runId through the payload.
+	 */
+	async findInFlightForAgent(agentId: string): Promise<AgentRun | null> {
+		return this.repository
+			.createQueryBuilder('run')
+			.where('run.agentId = :agentId', { agentId })
+			.andWhere('run.status IN (:...statuses)', {
+				statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+			})
+			.orderBy('run.createdAt', 'DESC')
+			.getOne();
+	}
 }

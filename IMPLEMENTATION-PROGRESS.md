@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 6
-- **Last tick at**: 2026-05-26 (tick 6 — Phase 5 complete: sidebar nav, i18n keys, /agents list + create + [id] layout + 6 tab pages + Instructions editor + Tasks/Skills placeholders + API client + server actions)
-- **In progress now**: (none — next tick picks up Phase 6 heartbeat dispatcher)
+- **Last tick #**: 7
+- **Last tick at**: 2026-05-26 (tick 7 — Phase 6 complete: heartbeat dispatcher cron + one-shot agent-heartbeat worker + CAS-claim wiring + remote-proxy plumbing on both worker & API sides + stuck-recovery + computeNextHeartbeat + race tests)
+- **In progress now**: (none — next tick picks up Phase 6a per-Agent export/import)
 
 ---
 
@@ -106,11 +106,14 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 6 — Agent heartbeat dispatcher (HIGH RISK)
 
-- [ ] **6.1** `packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts` cron `*/${AGENT_DISPATCH_INTERVAL_MINUTES} * * * *`.
-- [ ] **6.2** `AgentScheduleDispatcherService.dispatchDue()` with CAS-claim (mirrors `WorkScheduleDispatcherService.markRunDispatched`).
-- [ ] **6.3** Race test (two concurrent calls → exactly one claims).
-- [ ] **6.4** `packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts` (one-shot, maxDuration=30m).
-- [ ] **6.5** Wire to `apps/api/src/trigger/trigger-internal.controller.ts` via remote-proxy table.
+- [x] **6.1** `packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts` cron `*/${AGENT_DISPATCH_INTERVAL_MINUTES} * * * *` (default 1m, env-tunable). Wraps a transient Nest context on `TriggerInternalModule` + a small `AgentHeartbeatTrigger` adapter that `tasks.trigger('agent-heartbeat', payload)`. ✓ Tick 7
+- [x] **6.2** `AgentScheduleDispatcherService.dispatchDue(trigger, limit)` with CAS-claim wiring through `AgentRepository.tryClaimForRun` (the Phase 2.1 primitive that mirrors `WorkScheduleRepository.tryMarkDispatched`). Persists a queued `AgentRun` row up-front so chat-dedup + Activity tab work. Honors `AGENTS_DISPATCHER_ENABLED=false` feature flag. ✓ Tick 7
+- [x] **6.3** Race test in `packages/agent/src/agents/__tests__/agent-schedule-dispatcher.service.spec.ts` — second worker sees `tryClaimForRun → null` and increments `skipped` instead of dispatching. Also covers happy path, failure path, stuck-recovery, and feature-flag gating. ✓ Tick 7
+- [x] **6.4** `packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts` one-shot, `maxDuration = AGENT_MAX_RUN_DURATION_SECONDS` (default 1800s/30m). Phase-6 v1 is a placeholder that marks the AgentRun started + completed, computes `nextHeartbeatAt` from cadence, and releases the Agent back to ACTIVE. Real prompt-assembly + LLM + tools land in Phase 7. `onFailure` hook increments errorCount + auto-pauses past threshold. ✓ Tick 7
+- [x] **6.5** Wired to `apps/api/src/trigger/trigger-internal.controller.ts` via the remote-proxy table — `AgentScheduleDispatcherService`, `AgentRepository`, `AgentRunRepository` exposed on both API-side `remoteMap` and worker-side `TriggerInternalModule` (`packages/tasks/src/trigger/worker/modules/trigger-internal.module.ts`). API-side trigger module also now imports `AgentsModule`. ✓ Tick 7
+- [x] **6.6** `computeNextHeartbeat(cadence, from?)` helper at `packages/agent/src/agents/heartbeat-cron.ts` — iterate forward minute-by-minute against `matchesCron` (same approach mission-tick uses), advances strictly past `from`, returns null for `'manual'` / null / unparseable input. Unit tests in `__tests__/heartbeat-cron.spec.ts`. ✓ Tick 7
+- [x] **6.7** Config getters added: `config.agents.{dispatcherEnabled, getDispatchIntervalMinutes, getMaxBatch, getStuckTimeoutMinutes, getMaxRunDurationSeconds}`. ✓ Tick 7
+- [x] **6.8** `AgentRunRepository.findInFlightForAgent(agentId)` added so the heartbeat worker can find the dispatcher-queued row without the runId being threaded through the Trigger.dev payload. ✓ Tick 7
 
 ### Phase 6a — Per-Agent export + import (N5 override)
 

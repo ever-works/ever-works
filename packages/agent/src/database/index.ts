@@ -32,4 +32,12 @@ export * from './repositories/work-knowledge-upload.repository';
 export * from './repositories/work-knowledge-tag.repository';
 export * from './repositories/work-knowledge-citation.repository';
 export * from './repositories/work-knowledge-chunk.repository';
+// Agents/Skills/Tasks PR #1017 — Phase 6. Export Agent repositories
+// so the heartbeat worker can resolve remote-proxy versions through
+// `TriggerInternalModule`.
+export * from './repositories/agent.repository';
+export * from './repositories/agent-run.repository';
+export * from './repositories/agent-run-log.repository';
+export * from './repositories/agent-budget.repository';
+export * from './repositories/agent-membership.repository';
 export * from './database-init.service';

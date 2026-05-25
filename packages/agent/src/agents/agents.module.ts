@@ -12,6 +12,7 @@ import { AgentBudgetRepository } from '../database/repositories/agent-budget.rep
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
+import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
@@ -37,6 +38,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentMembershipRepository,
 		AgentsService,
 		AgentFileService,
+		AgentScheduleDispatcherService,
 	],
 	exports: [
 		AgentRepository,
@@ -46,6 +48,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentMembershipRepository,
 		AgentsService,
 		AgentFileService,
+		AgentScheduleDispatcherService,
 	],
 })
 export class AgentsModule {}
