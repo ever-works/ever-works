@@ -219,6 +219,59 @@ skills:
       path: .works/skills/release-notes.md
 ```
 
+## 6.1 Skill versioning
+
+Each `skills` row carries `version: string` (semver). Convention:
+
+- `1.0.0` initial.
+- Patch bump on body wording fix that doesn't change behavior.
+- Minor bump on add-an-example, broaden-applicability changes.
+- Major bump on changing the skill's contract — e.g. renaming the parameters the skill expects, dropping `allowed-tools` entries, requiring a different output format.
+
+Catalog skills carry `version` too. On bump, tenants see "Update available" — they choose explicitly whether to update their installed copies (per [QUESTIONS E2](../../QUESTIONS-agents-skills-tasks.md#e2--skill-catalog-updates-auto-pull-new-version-or-always-manual)).
+
+Tenant-authored skills version on every `PATCH /skills/:id` by an opt-in `?bumpVersion=patch|minor|major` query param; default is "no bump" (overwrites in place).
+
+## 6.2 Skill composition: not in v1
+
+Skills do NOT reference other skills in v1 (no `extends:` / `includes:` frontmatter field). Resolver stays simple. See [QUESTIONS E4](../../QUESTIONS-agents-skills-tasks.md#e4--skill-composition-can-a-skill-reference-another-skill).
+
+## 6.3 `examples:` frontmatter
+
+Skills may include an optional `examples` array in frontmatter — short before/after pairs that anchor the model. They're injected after the body excerpt if budget allows.
+
+```yaml
+---
+name: pr-review
+description: Review a pull request and post inline comments.
+allowed-tools: [github, semgrep]
+examples:
+    - input: "PR adds a new SQL query without prepared statements."
+      output: "P0 SQL-injection risk; flag inline with severity P0."
+    - input: "PR renames a variable for clarity."
+      output: "No findings; approve without comment."
+---
+```
+
+## 6.4 `allowed-tools` mapping rules
+
+Frontmatter `allowed-tools: [<plugin-id>]` lists plugin IDs (e.g. `github`, `semgrep`, `tavily`). v1 treats this as **descriptive** — see [QUESTIONS E3](../../QUESTIONS-agents-skills-tasks.md#e3--allowed-tools-frontmatter-enforce-as-acl-or-descriptive-only). The actual ACL is governed by:
+
+- The host **Agent's** `permissions.canCallExternalTools` flag (global gate).
+- The host **Agent's** `TOOLS.md` file (per-tool annotations).
+
+When a Skill is bound to a Work Generator (not an Agent), `allowed-tools` are filtered against the Work's enabled plugins — if `github` plugin isn't enabled on the Work, the skill is still injected but the tool isn't registered for that call.
+
+## 6.5 Skill localization: English-only in v1
+
+Catalog skills ship English-only; tenant-authored skills are whatever the user writes. v2 may add per-locale frontmatter fields (`description.en`, `description.fr`) — see [QUESTIONS E5](../../QUESTIONS-agents-skills-tasks.md#e5--skill-localization-how-is-description-shown-in-users-language).
+
+## 6.6 Testing a skill manually
+
+The Skill detail page gains a "Try this skill" affordance: a small panel where the user types a sample input and the platform calls a quick AI completion with just that skill injected. Returns the response inline. No persistent storage — just a sanity-check.
+
+Implementation: reuses the existing `AiFacadeService.createChatCompletion()` path with `system = assembleSystemMessage({skills: [this], maxTokens: 4000})` and `complexity: 'simple'`. Cost charged to the tenant's account.
+
 ## 7. Out of Scope (v1)
 
 - Cross-tenant Skill sharing / marketplace (publish a Tenant Skill to others).

@@ -340,11 +340,15 @@ The user spec said "Agents above Templates, below Works" and "Skills below Plugi
 
 ### 12.2 Tabs on existing detail pages
 
-| Page                      | Existing tabs                                                                                | New tabs                  |
-| ------------------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
-| `/works/[id]`             | Overview / Activity / Items / KB / Generator / Plugins / Deploy / Settings ([`WorkTabs.tsx`](../../../apps/web/src/components/works/detail/WorkTabs.tsx)) | **Agents**, **Skills**, **Tasks** (additive at the end, before Settings) |
-| `/missions/[id]`          | Overview / Ideas / Works / Spend / Activity (shipped on develop)                              | **Agents**, **Skills**, **Tasks** |
-| `/ideas/[id]`             | Overview / Build / Activity (shipped on develop)                                              | **Agents**, **Tasks** (Skills inherited from parent Mission / Tenant) |
+**Important finding from research:** Only the Work detail page has a tab strip today ([`WorkTabs.tsx`](../../../apps/web/src/components/works/detail/WorkTabs.tsx)). Mission detail renders a single-column section layout (Overview / live runs / Ideas / Works / Spend / Activity / Clone affordance); Idea has no dedicated detail page (Ideas show as cards on Missions and `/ideas`). Adding new "tabs" to Mission/Idea pages is therefore **creating** a tab strip there for the first time.
+
+See [QUESTIONS F1](../QUESTIONS-agents-skills-tasks.md#f1--missionidea-detail-pages-dont-have-tab-strips-today) for the open choice.
+
+| Page                      | Existing structure                                                                            | Proposed change                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `/works/[id]`             | Tab strip ([`WorkTabs.tsx`](../../../apps/web/src/components/works/detail/WorkTabs.tsx)): Overview / Activity / Items / KB / Generator / Plugins / Deploy / Settings | **Append tabs**: Agents, Skills, Tasks (before Settings). No structural change.                                |
+| `/missions/[id]`          | Single-column sections (`MissionDetailClient.tsx`). No tab strip.                              | Promote to tabbed layout: "Overview" tab holds the current sections; add Agents, Skills, Tasks as new tabs.    |
+| `/ideas/[id]`             | No detail page today; Ideas render as cards in lists.                                          | Create the detail page with tabs Overview / Build / Activity / Agents / Tasks. Skills inherited from parent Mission/Tenant only — no tab. |
 
 ### 12.3 Dashboard additions
 
@@ -393,7 +397,17 @@ The existing remote-proxy callback channel from [ADR-002](../decisions/002-trigg
 | IX — Behaviour-First Specs                           | OK       | Feature specs describe user behavior; this architecture doc reserves implementation detail.                                     |
 | X — Backwards Compatibility                          | OK       | `agents:` / `skills:` sections added to `works.yml` and `mission.yml` are optional; old configs remain valid.                   |
 
-## 16. References
+## 16. Open questions
+
+The detailed open questions are consolidated in [`../QUESTIONS-agents-skills-tasks.md`](../QUESTIONS-agents-skills-tasks.md). Headlines that affect the architecture in this doc:
+
+- **Tenant control repo (v1 or v2?)** — affects §4.5. Default: defer to v2; tenant Agent files inline in DB. See [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md).
+- **Skill catalog placement** — affects §4.2 / §8. Default: in-monorepo. See [ADR-007](../decisions/007-skill-catalog-in-monorepo.md).
+- **Mission/Idea detail tab strips** — affects §12.2. Default: create the tab strip when adding the new tabs.
+- **Tenant Agent cross-Mission visibility** — affects §3. Default: yes by default.
+- **Persist Mission tick cap-hit events** — current gap on develop; small fix, decide whether to land here or separately.
+
+## 17. References
 
 - [`features/agents/spec.md`](../features/agents/spec.md) — Agents product spec.
 - [`features/agents/plan.md`](../features/agents/plan.md) — Agents implementation plan.
@@ -410,4 +424,8 @@ The existing remote-proxy callback channel from [ADR-002](../decisions/002-trigg
 - [`settings-system.md`](./settings-system.md) — 3-tier settings cascade applied to Agent provider/model choice.
 - [`trigger-integration.md`](./trigger-integration.md) — Worker dispatch and callback channel re-used by Agent heartbeats.
 - [`activity-log.md`](./activity-log.md) — Activity feed re-used and extended.
+- [`agent-prompt-assembly.md`](./agent-prompt-assembly.md) — exact prompt-assembly recipe (companion deep-dive).
+- [`../QUESTIONS-agents-skills-tasks.md`](../QUESTIONS-agents-skills-tasks.md) — open questions.
+- [`../features/user-journeys-agents-skills-tasks.md`](../features/user-journeys-agents-skills-tasks.md) — five end-to-end user stories.
+- ADRs: [006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md), [007](../decisions/007-skill-catalog-in-monorepo.md), [008](../decisions/008-tenant-control-repo-deferred-to-v2.md), [009](../decisions/009-tasks-vs-items-vs-kb-distinction.md).
 - Constitution: [`.specify/memory/constitution.md`](../../../.specify/memory/constitution.md).

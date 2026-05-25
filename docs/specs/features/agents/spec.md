@@ -258,6 +258,71 @@ agents.detail.action.archive              = "Archive"
 agents.detail.action.delete               = "Delete"
 ```
 
+## 5.2 Heartbeat semantics — what an Agent does on an idle tick
+
+When the dispatcher fires for an `active` Agent and the Agent has no pending tasks, the run is **not** a no-op. The Agent receives a synthetic user message: `"What's the next action you should take? Choose ONE."` plus the assembled system message ([`architecture/agent-prompt-assembly.md` §2](../../architecture/agent-prompt-assembly.md)). The model's response can be one of:
+
+- **Create a Task** (when `permissions.canAssignTasks = true`) — either self-assigned or assigned to another Agent within scope.
+- **Comment on an open Task** (where the Agent is an assignee/reviewer/approver) — appends a `task_chat_messages` row.
+- **Edit own MD file** (when `canEditAgentFiles = true`, max 1 file per run) — for example, append a paragraph to `SOUL.md` capturing a learning.
+- **Read scope state** (KB, activity, recent items) and **do nothing this tick** — recorded as `summary: "observed, no action"`.
+
+This is configurable via `agent.yml` field `idleBehavior: 'propose' | 'noop' | 'observe'` (default `propose`). See [QUESTIONS C1](../../QUESTIONS-agents-skills-tasks.md#c1--heartbeat-tick-semantics-what-does-an-agent-do-when-nothing-is-assigned).
+
+## 5.3 Memory model
+
+Short-term memory (within a single run): standard tool-loop messages accumulate in the in-flight conversation. Not persisted beyond the run.
+
+Long-term memory (across runs): the four MD files (`SOUL.md`, `AGENTS.md`, `HEARTBEAT.md`, `TOOLS.md`) are the durable, intentional store. The Agent may **edit** them via the `editAgentFile` tool (gated by permission + secret-scan + size cap + once-per-run cap). The platform does NOT auto-append to these files. See [`agent-prompt-assembly.md` §4](../../architecture/agent-prompt-assembly.md).
+
+Passive history (last N days): read on demand via the `getActivity({since, limit})` tool — NOT injected by default. Saves tokens on idle ticks.
+
+Cross-Agent: Agents cannot read each other's MD files. Shared knowledge flows through Tasks, KB documents, and the activity log only.
+
+## 5.4 Cost attribution on delegated tasks
+
+When Agent A creates a Task assigned to Agent B, and B's heartbeat runs the Task:
+
+- **A's cost**: only the cost of A's run that created the Task (a small AI call to draft the Task body).
+- **B's cost**: the cost of running the Task (potentially many AI calls in a tool loop).
+
+Default — see [QUESTIONS D1](../../QUESTIONS-agents-skills-tasks.md#d1--delegated-tasks-who-pays). The `plugin_usage_events` row from B's run carries `agentId=B.id` and `taskId=<task.id>`, so the Task's spend endpoint can sum B's contribution; A's contribution is queryable by `agentId=A.id`.
+
+## 5.5 Cancellation semantics
+
+When the user clicks "Cancel run" on an in-flight `agent_runs` row:
+
+1. UI calls `POST /agents/:id/runs/:runId/cancel`.
+2. Server calls `runs.cancel(triggerRunId)` (same SDK call the Work generation cancel path uses).
+3. AbortSignal propagates through `AiFacadeService` to the AI provider plugin; mid-stream call is destroyed.
+4. The run row is updated to `status='cancelled'` with the partial usage recorded (a partial `PluginUsageEvent` is still written via the existing best-effort path in `AiFacadeService`).
+5. Any file changes the Agent had committed before the cancel **stay** (no Git revert). The user can revert manually.
+6. Activity row `AGENT_HEARTBEAT_FAILED` is NOT emitted — `AGENT_RUN_CANCELLED` is used instead.
+
+## 5.6 Conflict resolution between Agent files
+
+The platform does NOT pre-resolve conflicts between SOUL.md and AGENTS.md, or between AGENTS.md and the user-task input. The model reconciles, and its response surfaces the reconciliation. The platform guarantees only the **order** of injection (SOUL first → AGENTS → HEARTBEAT/preamble → TOOLS → Skills → scope → memory → task body). Order gives the earlier segments attention-position priority. See [`agent-prompt-assembly.md` §6](../../architecture/agent-prompt-assembly.md).
+
+Permissions ALWAYS win over any file content. If `canCommitToRepo = false` but a Skill's `allowed-tools` includes `git`, the tool returns a structured error when invoked.
+
+## 5.7 Agent ↔ Agent communication: only through Tasks
+
+v1 has no Agent-to-Agent direct messaging channel. All cross-Agent collaboration goes through Tasks: an Agent assigns a Task, comments in a Task chat, mentions another Agent in a chat. This:
+
+- gives every Agent ↔ Agent interaction an audit trail (`task_chat_messages` + activity log);
+- attributes cost to the right Agent (executor pays);
+- enforces scope via the cross-scope assignment rules in [architecture §3](../../architecture/agents-skills-tasks.md);
+- avoids a new `agent_messages` table (its own auth + rate-limiting + UI surface).
+
+See [QUESTIONS B3](../../QUESTIONS-agents-skills-tasks.md#b3--agent-to-agent-communication-forced-through-tasks-or-allow-dms).
+
+## 5.8 Audit log of destructive actions
+
+Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agents-skills-tasks.md), the activity log records:
+
+- `AGENT_DELETED` — the user who archived the Agent + the timestamp + a snapshot of the Agent's last `contentHash` (so post-delete forensics is possible).
+- `AGENT_FILE_REVERTED` — if a `PUT /files/:name` is rejected by hash mismatch (optimistic concurrency); helps detect concurrent-edit collisions.
+
 ## 6. Out of Scope (v1)
 
 - An external task-tracker plugin (Linear, GitHub Issues, Jira). Interface reserved in [`task-tracking/spec.md`](../task-tracking/spec.md), not consumed.

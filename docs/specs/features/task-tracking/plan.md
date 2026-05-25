@@ -201,7 +201,48 @@ export class TaskAttachment {
 ### 3.2 Additive changes to existing entities
 
 - `plugin_usage_events` gains `taskId uuid NULL` + `(taskId, occurredAt)` index.
-- `ActivityActionType` enum strings gain the values listed in architecture §10.
+- `ActivityActionType` enum strings gain the values listed in architecture §10. Confirmed location: [`packages/agent/src/entities/activity-log.types.ts`](../../../packages/agent/src/entities/activity-log.types.ts) — a TypeScript enum; extend in place.
+
+### 3.3 Additional new entities (deepened in round 2)
+
+```typescript
+// user-task-counter.entity.ts — atomic per-user counter for the slug
+@Entity({ name: 'user_task_counter' })
+export class UserTaskCounter {
+    @PrimaryColumn('uuid') userId: string;
+    @Column({ type: 'int', default: 0 }) lastSlugNumber: number;
+    @UpdateDateColumn() updatedAt: Date;
+}
+```
+
+```typescript
+// task-watcher.entity.ts — explicit subscriptions
+@Entity({ name: 'task_watchers' })
+@Index('uq_task_watcher', ['taskId', 'userId'], { unique: true })
+export class TaskWatcher {
+    @PrimaryGeneratedColumn('uuid') id: string;
+    @Column('uuid') taskId: string;
+    @Column('uuid') userId: string;
+    @CreateDateColumn() createdAt: Date;
+}
+```
+
+```typescript
+// task-kb-mention.entity.ts — for the "Related" panel
+@Entity({ name: 'task_kb_mentions' })
+@Index('uq_task_kb_mention', ['taskId', 'kbDocumentId'], { unique: true })
+export class TaskKbMention {
+    @PrimaryGeneratedColumn('uuid') id: string;
+    @Column('uuid') taskId: string;
+    @Column('uuid') kbDocumentId: string;
+    @CreateDateColumn() createdAt: Date;
+}
+```
+
+Reserve-only columns on `tasks` (v1 always null; v2 populates):
+- `recurrenceRule: string | null`
+- `parentRecurringTaskId: uuid | null`
+- `promotedToIdeaId: uuid | null`
 
 ### 3.3 Migrations
 
@@ -285,6 +326,26 @@ Both live in `packages/tasks/src/tasks/trigger/`. Both pre-allocate an `agent_ru
 - Chat mentions are validated against the user's assignable Agents/users; unknown mentions are stripped from the stored `mentions` field but the raw text stays in `body`.
 - Secret scan on `description` + `body` writes.
 
+## 8.1 Notification wiring
+
+Reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../packages/agent/src/entities/notification.entity.ts)) which already supports `type` (INFO/WARNING/ERROR/SUCCESS), `category` (extend with `TASK`), `actionUrl`, `actionLabel`, `metadata`, `isPersistent`, `expiresAt`, `deduplicationKey`.
+
+New service `TaskNotificationService.emit(event, context)` is a thin wrapper:
+
+```typescript
+// for each recipient that has the corresponding pref enabled,
+//   insert one Notification row with deduplicationKey scoped per (taskId, eventType, day)
+//   if user has emailEnabled for this event, queue a mail send via MailService
+```
+
+Recipients computed by `TaskNotificationService.recipients(event)`:
+- `task.assigned` → newly-added human assignee.
+- `task.chat.mentioned` → mentioned humans.
+- `task.in_review` → all approvers.
+- `task.done | task.cancelled` → watchers (assignees implicit).
+
+No new transport — same in-app feed + transactional mail pipeline used by Budget Threshold and Onboarding emails.
+
 ## 9. Observability
 
 - Activity log: `TASK_CREATED`, `TASK_UPDATED`, `TASK_ASSIGNED`, `TASK_COMMENTED`, `TASK_COMPLETED` (architecture §10).
@@ -349,6 +410,22 @@ Both live in `packages/tasks/src/tasks/trigger/`. Both pre-allocate an `agent_ru
 | VIII — Plugin Counts Single Source | N/A  | No new plugin.                                                                        |
 | IX — Behaviour-First               | ✓    | Spec is behavior.                                                                     |
 | X — Backwards Compatibility        | ✓    | Pure addition.                                                                        |
+
+## 12.1 Mission/Idea detail page tab strip — additive change
+
+The current Mission detail page (`MissionDetailClient.tsx`) renders a single-column section layout (Overview / live runs / Ideas / Works / Spend / Activity). Adding new "Tasks" / "Agents" / "Skills" tabs requires **introducing the tab pattern** for the first time. Approach:
+
+1. Create a new `MissionTabs.tsx` component modeled on `WorkTabs.tsx`.
+2. Default tab "Overview" wraps the existing `MissionDetailClient` body as-is (no UX regression).
+3. New tabs are siblings.
+
+The Idea detail page does not exist today (Ideas render as cards). Creating `/ideas/[id]` with tabs is a larger Idea-feature addition that this task-tracking spec depends on. Plan to either:
+- (a) Block this feature on Ideas getting its detail page in a separate PR.
+- (b) Ship the Idea-Tasks tab on the existing Ideas list page (`/ideas`) as a per-card expansion drawer for v1.
+
+★ Recommended: (b). Smaller surface; defers the Idea detail page to its own future spec.
+
+See [QUESTIONS F1](../../QUESTIONS-agents-skills-tasks.md#f1--missionidea-detail-pages-dont-have-tab-strips-today).
 
 ## 13. References
 

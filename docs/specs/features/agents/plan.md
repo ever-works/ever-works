@@ -336,9 +336,9 @@ Rate limits: default tenant-level throttler; `/agents/:id/run-now` capped at 5 R
 | `/agents/[id]/skills`              | …                                                                                          | See Skills plan.                   |
 | `/agents/[id]/budgets`             | …                                                                                          | Per-Agent budget editor.           |
 | `/agents/[id]/settings`            | …                                                                                          | Provider, cadence, permissions, delete. |
-| `/works/[id]/agents`               | tab added under `/works/[id]/`                                                              | Lists Work-scoped + member tenant Agents. |
-| `/missions/[id]/agents`            | tab added under `/missions/[id]/`                                                           | Same shape.                        |
-| `/ideas/[id]/agents`               | tab added under `/ideas/[id]/`                                                              | Same shape.                        |
+| `/works/[id]/agents`               | tab added under `/works/[id]/` (extends existing `WorkTabs.tsx`)                            | Lists Work-scoped + member tenant Agents. |
+| `/missions/[id]/agents`            | tab added under `/missions/[id]/` — **first tab strip on Mission detail; create `MissionTabs.tsx` modeled on `WorkTabs.tsx`. Default tab "Overview" wraps the current single-column section layout.** | Same listing shape. |
+| `/ideas/[id]/agents`               | gated by Ideas getting a detail page first. **Recommended v1**: surface Agents in the per-Idea expansion drawer on `/ideas` instead. See plan §12.1 + [QUESTIONS F1](../../QUESTIONS-agents-skills-tasks.md#f1--missionidea-detail-pages-dont-have-tab-strips-today). | — |
 
 ### 6.2 Sidebar wiring
 

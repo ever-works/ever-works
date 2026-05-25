@@ -218,6 +218,82 @@ The default v1 backend stores everything in the platform's own tables. A future 
 
 Columns reuse `WorksKanbanView.tsx`'s color-token shape.
 
+## 5.2 Slug numbering scheme
+
+Each Task carries a human-readable `slug: T-<N>` where N is a **per-user** monotonic counter (e.g. user-A's first Task is `T-1`; user-B's first Task is also `T-1`). Per-user instead of platform-wide so numbers stay small and don't leak cross-tenant volume. See [QUESTIONS F2](../../QUESTIONS-agents-skills-tasks.md#f2--slug-scheme-per-user-counter-or-platform-wide).
+
+Implementation: an atomic counter row per user (`user_task_counter (userId, lastSlugNumber)`) updated transactionally on every insert. Concurrent inserts race-safe via row-level lock.
+
+## 5.3 Watchers / subscriptions
+
+A `task_watchers (taskId, userId)` join table lets a user "watch" a task they don't own/aren't assigned to. Watchers receive notifications on the events listed in §5.5. The Task's assignees, reviewers, and approvers are implicitly watchers.
+
+UI: a "Watch" button on the Task detail page (becomes "Unwatch" when set). The watcher count is shown next to the button.
+
+## 5.4 Task templates
+
+Optional v1 polish (can land in Phase 2 if time):
+
+A `task_templates` table holds reusable Task body shapes scoped to the tenant. From "+ New Task", the user can pick a template; the title, description, default labels, and default assignee Agents pre-populate. Editable before save.
+
+Catalog of starter templates (3 in v1): `bug-report`, `pr-review`, `weekly-status`.
+
+Defer if scope tight; v2 is fine.
+
+## 5.5 Notifications: which events trigger what
+
+Default-on (per-user, configurable in Settings):
+
+| Event                                                            | Channel       | Recipient                                                                     |
+| ---------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
+| Task assigned to you (human assignee added)                      | in-app + email | The newly-added user assignee                                                 |
+| Agent posted a chat message mentioning you                       | in-app + email | The mentioned human                                                           |
+| Task you're an approver on moves to `in_review`                  | in-app + email | All approvers                                                                  |
+| Task you watch transitions to `done` or `cancelled`               | in-app        | Watchers (+ assignees implicitly)                                              |
+| Approval timeout (Task in `in_review` >7d with no approval)      | in-app + email | Approvers                                                                      |
+| Sub-task you own moves to `done` and parent is now ready         | in-app        | Parent assignees                                                               |
+
+Default-off (configurable):
+- Label changes
+- Priority changes
+- Status transitions between `backlog/todo/in_progress`
+
+Implementation: reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../packages/agent/src/entities/notification.entity.ts)) with new `NotificationCategory.TASK` enum value (or `NotificationCategory.SYSTEM` if we don't want to extend the enum yet). Deduplication key `task-${taskId}-${eventType}-${day}` keeps notification floods in check.
+
+See [QUESTIONS F8](../../QUESTIONS-agents-skills-tasks.md#f8--email--push-notifications-which-events).
+
+## 5.6 Task → Idea promotion (v2)
+
+Out of scope in v1, but the `tasks` table reserves `promotedToIdeaId: uuid | null` column from day one to keep the v2 migration small. See [QUESTIONS F3](../../QUESTIONS-agents-skills-tasks.md#f3--task--idea-promotion).
+
+## 5.7 Idea → Work transition: tasks follow
+
+When a `WorkProposal` (Idea) transitions to `ACCEPTED` and its `acceptedWorkId` is set:
+
+1. The platform finds all `tasks WHERE ideaId = <ideaId> AND workId IS NULL`.
+2. Sets `workId = <acceptedWorkId>` on each. **Keeps `ideaId` set** — Tasks stay visible on both the (now-archived) Idea tab and the new Work's tab. Cleaner audit; no orphans.
+3. Emits `TASK_UPDATED` activity rows with `details.reason='idea-promoted'`.
+
+This piggybacks on the existing `WorkProposalService.acceptInternal()` flow ([researched in develop](../../architecture/agents-skills-tasks.md)). See [QUESTIONS F4](../../QUESTIONS-agents-skills-tasks.md#f4--idea--work-transition-forward-idea-scoped-tasks).
+
+## 5.8 Recurring tasks: schema reserved, runtime deferred
+
+Out of scope for v1 behavior, but the `tasks` table reserves two columns:
+- `recurrenceRule: string | null` (RFC 5545 RRULE format; e.g. `FREQ=WEEKLY;BYDAY=MO`)
+- `parentRecurringTaskId: uuid | null` (back-pointer when a recurring Task generates instances)
+
+Always null in v1. See [QUESTIONS F5](../../QUESTIONS-agents-skills-tasks.md#f5--recurring-tasks-out-of-scope-but-reserve-schema).
+
+## 5.9 "Related" auto-detection
+
+When a user types a Task description that mentions `[[kb-doc-slug]]`, the platform records the link in `task_kb_mentions(taskId, kbDocumentId)`. The KB Document's "Related tasks" panel reads this join.
+
+Tasks that mention the SAME KB doc become candidate "related" tasks — but v1 does NOT auto-create `task_relations` rows. Instead, the Task detail page's Related section shows a "Suggested" subsection populated by querying the join. The user can promote a suggestion to a real `task_relations` row.
+
+## 5.10 Description edit history
+
+v1 doesn't keep a revision history of Task descriptions. The current body is overwritten on every save. Activity log records `who + when` of each edit. See [QUESTIONS F7](../../QUESTIONS-agents-skills-tasks.md#f7--task-description-edit-history).
+
 ## 6. Out of Scope (v1)
 
 - Time tracking (estimate/spent hours). v2.
