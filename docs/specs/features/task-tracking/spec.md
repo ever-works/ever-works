@@ -364,6 +364,8 @@ Only explicit `@<user-slug>` or `@<agent-slug>` mentions trigger dispatches/noti
 
 - Plan: [`./plan.md`](./plan.md)
 - Tasks: [`./tasks.md`](./tasks.md)
+- UX spec: [`../UX-DESIGN-agents-skills-tasks.md`](../UX-DESIGN-agents-skills-tasks.md)
+- Reuse map: [`../../architecture/implementation-reuse-map.md`](../../architecture/implementation-reuse-map.md)
 - Architecture: [`../../architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md)
 - Agents: [`../agents/spec.md`](../agents/spec.md)
 - Existing Kanban: [`apps/web/src/components/works/WorksKanbanView.tsx`](../../../apps/web/src/components/works/WorksKanbanView.tsx)

@@ -751,6 +751,197 @@ Pick one term per surface:
 
 ---
 
+## P. Product / UX decisions
+
+### P1 — Starter prompts vs blank on Agent create
+
+[UX-DESIGN §4.1](./features/UX-DESIGN-agents-skills-tasks.md) proposes 6 starter agents (CEO, VP-Eng, Researcher, PR-Reviewer, Editor, Designer, Blank). Each ships with a pre-tuned `SOUL.md` / `AGENTS.md` / `HEARTBEAT.md`.
+
+- ★ **P1-a — Ship 6 starters.** Wow moment depends on them; blank Agents create cognitive load.
+- P1-b — Ship 3 starters (CEO, Researcher, Blank). Cheaper to curate well.
+- P1-c — Ship 0 starters; blank only. Highest user effort.
+
+### P2 — "Run first heartbeat now" checkbox default
+
+The create-Agent dialog has `☑ Run first heartbeat now after creating` checked by default ([UX-DESIGN §4.2](./features/UX-DESIGN-agents-skills-tasks.md)).
+
+- ★ **P2-a — Default checked.** Delivers the wow moment.
+- P2-b — Default unchecked. Risk-averse; user might be surprised by an unintended AI bill.
+
+### P3 — Default budget cap
+
+UX shows `$20 per month` default in the create dialog.
+
+- ★ **P3-a — $20/month default.** Roughly 3 weeks of daily heartbeats on a mid-tier model.
+- P3-b — $5/month default; nudge user to raise on first hit.
+- P3-c — No budget by default; surface a warning when first exceeds $5.
+
+### P4 — Onboarding announcement modal for existing tenants
+
+Existing tenants log in after release; see modal explaining the 3 new features.
+
+- ★ **P4-a — One-time modal with "Tour Agents" CTA.** Slow rollout.
+- P4-b — No modal; rely on Dashboard tile prompts. Less interruptive.
+- P4-c — Modal with split CTAs ("Tour Agents", "Tour Tasks", "Dismiss").
+
+### P5 — Notification email opt-in default
+
+For new feature events (Agent paused, Task assigned to you):
+
+- ★ **P5-a — Default ON for high-signal events** (Agent paused, Task assigned, Agent chat reply mentions you), OFF for low-signal (label changes, status churn).
+- P5-b — Default OFF for everything; user opts in explicitly.
+- P5-c — Default ON for everything; user opts out.
+
+### P6 — Mobile scope for v1
+
+- ★ **P6-a — "Functional, not delightful."** Sidebar collapses, Cards default on mobile, Kanban hidden on phone. Tiptap basic mobile support. Defer "delightful mobile" to v2.
+- P6-b — Full parity with desktop.
+- P6-c — Mobile completely out of scope; redirect to desktop.
+
+### P7 — Demo Researcher sample Agent
+
+UX proposes a "Try a sample Agent" button that creates `Demo Researcher` at tenant scope with $5 budget, manual heartbeat.
+
+- ★ **P7-a — Ship.** Risk-free way for skeptics to see what's possible.
+- P7-b — Don't ship; rely on starters in the New-Agent dialog.
+
+### P8 — "Wow moment" telemetry
+
+Tracking time-from-create to first-completed-heartbeat as a launch KPI.
+
+- ★ **P8-a — Track via PostHog `agent_first_heartbeat_completed` event with delta seconds.** Tune defaults if median > 30s.
+- P8-b — Don't track; lean on aggregate adoption metrics.
+
+---
+
+## Q. Engineering concerns
+
+### Q1 — Skill catalog process-local cache vs distributed
+
+UX-DESIGN says catalog cached in process memory. The platform uses TypeORM-backed distributed cache for most read-heavy state.
+
+- ★ **Q1-a — Process-local for catalog.** Bytes are bundled; no reason to round-trip to Redis/DB for static content. Restart-required to refresh.
+- Q1-b — Distributed cache via existing `cache_entries`. Aligns with platform posture; small overhead.
+
+### Q2 — Migration ordering safety
+
+The 7 migrations in [implementation-reuse-map §6](./architecture/implementation-reuse-map.md) order. Confirm:
+
+- ★ **Q2-a — Sequential order in named timestamps.** TypeORM applies in filename order; safe rollback per-PR.
+- Q2-b — Bundle all 7 into a single mega-migration.
+
+### Q3 — Worker NestJS bootstrap cost per heartbeat run
+
+Each `agent-heartbeat` task bootstraps Nest. With many active Agents, this multiplies.
+
+- ★ **Q3-a — Match existing pattern.** Identical cost profile to today's Work generation tasks. If per-run bootstrap becomes a bottleneck, address in a separate platform-wide optimization PR.
+- Q3-b — Long-running worker that handles many Agents in one process. New infra; defer.
+
+### Q4 — Test plan: where to mock the AI provider?
+
+- ★ **Q4-a — Mock at the `AiFacadeService` level** (existing pattern). All tests `jest.spyOn(facade, 'createChatCompletion').mockResolvedValue(canned)`.
+- Q4-b — Test against a real provider in a dedicated CI job. Costs $; covers integration.
+- Q4-c — Both: unit tests mock; one Playwright job/week hits real provider for the full happy path.
+
+### Q5 — Local dev: how to test heartbeats without Trigger.dev?
+
+- ★ **Q5-a — `POST /agents/:id/run-now` button in UI works locally** without Trigger.dev (calls the service directly).
+- Q5-b — Local `pnpm dev:trigger` runs the dev Trigger.dev server (already exists).
+- Q5-c — Both. Best UX; least friction.
+
+### Q6 — Feature flag granularity
+
+- ★ **Q6-a — Three top-level flags + sub-flags** (`FEATURE_AGENTS`, `FEATURE_SKILLS`, `FEATURE_TASK_TRACKING`, plus `FEATURE_AGENT_DRY_RUN`, etc.). Per-tenant override.
+- Q6-b — One mega-flag `FEATURE_WORKSHOP` covering all three.
+- Q6-c — No flags; default on for everyone.
+
+### Q7 — E2E test cost on CI
+
+Playwright e2e for the wow-moment flow (create → heartbeat → result) needs an AI call.
+
+- ★ **Q7-a — Mock AI in CI; one weekly job hits real provider.** $5/month total.
+- Q7-b — Mock always; never real provider in CI.
+
+### Q8 — Trigger.dev run volume cost
+
+[implementation-reuse-map §12](./architecture/implementation-reuse-map.md) estimates +525k runs/month if 100 Agents heartbeat per minute. Confirm Trigger.dev tier covers this.
+
+- ★ **Q8-a — Confirm cost before launch.** Surface to operator now so we can budget.
+- Q8-b — Cap heartbeat cadence at daily by default. Reduces volume 1440×.
+
+### Q9 — DB index pre-flight
+
+For all hot-path queries, pre-flight EXPLAIN before merge. Index list per [implementation-reuse-map §7](./architecture/implementation-reuse-map.md).
+
+- ★ **Q9-a — Pre-flight in PR review.** Reviewer asks for EXPLAIN output on any new query.
+- Q9-b — Trust the indexes; address slow queries post-launch via monitoring.
+
+### Q10 — Plugin uninstall mid-run
+
+What if a user disables their AI provider plugin while an Agent run is in flight?
+
+- ★ **Q10-a — Run completes; next run fails with `provider_error`. Auto-pause after threshold.**
+- Q10-b — Cancel the in-flight run. More disruptive.
+
+### Q11 — Hot-reload of starter Agents
+
+Agent starters are in-repo TS constants. After a deploy, do existing Agents that were created from a starter get an update if the starter's MD content changed?
+
+- ★ **Q11-a — No.** Starters are fork-once; existing Agents are immutable once created. Same posture as Skills installed copies.
+- Q11-b — Optional update-prompt like Skills catalog.
+
+---
+
+## R. Templates strategy
+
+### R1 — Unified Workshop Templates catalog
+
+See [ADR-010](./decisions/010-templates-stay-independent-for-v1.md).
+
+- ★ **R1-a — Keep templates independent for v1.** Each kind has its own service.
+- R1-b — Unify in v1 under `WorkshopTemplate` with discriminator.
+
+### R2 — Cross-link templates between catalogs
+
+User on a Mission Template page sees "This template also includes 2 Agents and 1 Skill" — should that be linked across the three catalogs?
+
+- ★ **R2-a — Yes.** Mission Template manifests already list `agents:` and `skills:` arrays; the UI surfaces them.
+- R2-b — No cross-links; each catalog stays siloed.
+
+### R3 — Should there be a "Browse all starters" page?
+
+A single page showing Mission templates + Agent starters + Skill catalog + (future) Task templates.
+
+- ★ **R3-a — No.** Each lives on its own page; cross-links per R2.
+- R3-b — Yes. New `/workshop` page with all four kinds.
+
+---
+
+## S. Open-source & self-hosted angle
+
+### S1 — Self-hosted users: same default off?
+
+Open-source self-hosted instances get all features default ON immediately (no rollout) vs. opt-in like SaaS tenants?
+
+- ★ **S1-a — Default ON for self-hosted.** They opted into the platform; no reason to gate.
+- S1-b — Same default OFF; admin enables.
+
+### S2 — Catalog skills under MIT vs more permissive?
+
+Catalog skills shipped in the platform repo inherit the platform's MIT license. Confirm this is OK for prompt content (it should be).
+
+- ★ **S2-a — MIT inherits, no separate license.**
+- S2-b — Separate LICENSE in `apps/api/src/skills/catalog/LICENSE` carving out skill content as CC-0.
+
+### S3 — Encourage community catalog contributions?
+
+Community can PR a new catalog skill against the platform repo.
+
+- ★ **S3-a — Yes, with a contribution guide.** Write `apps/api/src/skills/catalog/CONTRIBUTING.md` with the format + review criteria.
+- S3-b — Platform-curated only.
+
+---
+
 ## How to answer
 
 Reply with answers in this shape and I'll fold them in:

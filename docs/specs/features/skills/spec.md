@@ -318,6 +318,8 @@ Implementation: reuses the existing `AiFacadeService.createChatCompletion()` pat
 
 - Plan: [`./plan.md`](./plan.md)
 - Tasks: [`./tasks.md`](./tasks.md)
+- UX spec: [`../UX-DESIGN-agents-skills-tasks.md`](../UX-DESIGN-agents-skills-tasks.md)
+- Reuse map: [`../../architecture/implementation-reuse-map.md`](../../architecture/implementation-reuse-map.md)
 - Architecture: [`../../architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md)
 - Agents feature: [`../agents/spec.md`](../agents/spec.md)
 - Task-tracking feature: [`../task-tracking/spec.md`](../task-tracking/spec.md)

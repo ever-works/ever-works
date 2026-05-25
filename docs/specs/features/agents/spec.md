@@ -389,6 +389,8 @@ Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agent
 
 - Plan: [`./plan.md`](./plan.md)
 - Tasks: [`./tasks.md`](./tasks.md)
+- UX spec (PM lens): [`../UX-DESIGN-agents-skills-tasks.md`](../UX-DESIGN-agents-skills-tasks.md)
+- Implementation reuse map (engineer lens): [`../../architecture/implementation-reuse-map.md`](../../architecture/implementation-reuse-map.md)
 - Architecture: [`../../architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md)
 - Related feature: [Skills](../skills/spec.md), [Task-tracking](../task-tracking/spec.md), [Missions / Ideas / Works](../missions-ideas-works/spec.md)
 - ADR-006: [`../../decisions/006-agents-skills-tasks-as-core-not-plugins.md`](../../decisions/006-agents-skills-tasks-as-core-not-plugins.md)

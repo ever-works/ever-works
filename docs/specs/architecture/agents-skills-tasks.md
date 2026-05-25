@@ -427,7 +427,10 @@ The detailed open questions are consolidated in [`../QUESTIONS-agents-skills-tas
 - [`agent-prompt-assembly.md`](./agent-prompt-assembly.md) — exact prompt-assembly recipe (companion deep-dive).
 - [`agent-tools-catalog.md`](./agent-tools-catalog.md) — canonical tool API surface exposed to Agents.
 - [`security-agents-skills-tasks.md`](./security-agents-skills-tasks.md) — threat model and mitigations.
+- [`implementation-reuse-map.md`](./implementation-reuse-map.md) — engineer-lens map of every new piece to the platform asset it reuses.
+- [`../features/UX-DESIGN-agents-skills-tasks.md`](../features/UX-DESIGN-agents-skills-tasks.md) — PM-lens UX spec (empty states, wireframes, onboarding, microcopy).
 - [`../REVIEW-NOTES-agents-skills-tasks.md`](../REVIEW-NOTES-agents-skills-tasks.md) — round-3 critical-review notes.
+- ADR-010: [`../decisions/010-templates-stay-independent-for-v1.md`](../decisions/010-templates-stay-independent-for-v1.md) — templates strategy.
 - [`../QUESTIONS-agents-skills-tasks.md`](../QUESTIONS-agents-skills-tasks.md) — open questions.
 - [`../features/user-journeys-agents-skills-tasks.md`](../features/user-journeys-agents-skills-tasks.md) — five end-to-end user stories.
 - ADRs: [006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md), [007](../decisions/007-skill-catalog-in-monorepo.md), [008](../decisions/008-tenant-control-repo-deferred-to-v2.md), [009](../decisions/009-tasks-vs-items-vs-kb-distinction.md).
