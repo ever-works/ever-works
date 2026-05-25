@@ -1,0 +1,50 @@
+{
+	"name": "@ever-works/everworks-skills-plugin",
+	"version": "1.0.0",
+	"description": "Ever Works Skills — first-party skills-provider plugin sourcing the curated catalog from the ever-works/skills GitHub repo.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"gray-matter": "^4.0.3"
+	},
+	"devDependencies": {
+		"tsup": "^8.3.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "everworks-skills",
+			"name": "Ever Works Skills",
+			"category": "utility",
+			"capabilities": ["skills-provider"],
+			"defaultForCapabilities": ["skills-provider"]
+		}
+	}
+}

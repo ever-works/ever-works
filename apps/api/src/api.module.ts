@@ -34,6 +34,7 @@ import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
 import { AgentsModule } from './agents/agents.module';
+import { SkillsModule } from './skills/skills.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -110,6 +111,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // + AgentsController. Heartbeat dispatcher + run service land in
         // Phase 6/7.
         AgentsModule,
+        // Phase 8 — Skills read-only API + SkillsFacadeService.
+        // Write paths + bindings ship with Phase 9.
+        SkillsModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

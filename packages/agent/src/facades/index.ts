@@ -87,6 +87,9 @@ export {
 // Prompt Facade
 export { PromptFacadeService } from './prompt.facade';
 
+// Skills Facade — Agents/Skills/Tasks PR #1017, Phase 8.6 (ADR-012)
+export { SkillsFacadeService, SkillsFacadeError } from './skills.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

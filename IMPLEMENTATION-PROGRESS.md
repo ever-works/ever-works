@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 11
-- **Last tick at**: 2026-05-26 (tick 11 — Phase 8.1-8.4: Skill + SkillBinding entities + CreateSkillsTables migration + SkillRepository + SkillBindingRepository.resolveActive + tests. Plugin (8.5) + facade (8.6) + read-only API (8.7) follow next tick.)
-- **In progress now**: Phase 8 (8.1-8.4 ticked; 8.5-8.8 remaining)
+- **Last tick #**: 12
+- **Last tick at**: 2026-05-26 (tick 12 — Phase 8 complete: ISkillsProviderPlugin contract + SKILLS_PROVIDER capability + Ever Works Skills plugin (builtin fallback catalog) + SkillsFacadeService + agent-side SkillsModule + API-side SkillsModule + SkillsController read-only routes + plugin unit tests.)
+- **In progress now**: (none — next tick picks up Phase 9 Skill mutations + /skills page + Bindings tab)
 
 ---
 
@@ -141,10 +141,10 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 - [x] **8.2** Entity `skill-binding.entity.ts` — many-to-many between skills + targets with `injectIntoAgent` / `injectIntoGenerator` toggles + priority. Unique on (skillId, targetType, targetId). ✓ Tick 11
 - [x] **8.3** Migration `apps/api/src/migrations/1779978012000-CreateSkillsTables.ts` — both tables + 6 indexes via `ensureIndex` helper + FK CASCADE on userId / skillId. Idempotent. ✓ Tick 11
 - [x] **8.4** Repositories — `SkillRepository` (CRUD + scope-aware lookup + slug uniqueness check) + `SkillBindingRepository.resolveActive()` (per-target OR filter, priority-sorted, dedups by skillId so highest-priority binding wins). Unit tests at `__tests__/skill-binding.repository.spec.ts` cover the resolver's WHERE clauses, dedup, inject-toggle handling, and malformed-frontmatter safety. ✓ Tick 11
-- [ ] **8.5** **"Ever Works Skills" plugin** at `packages/plugins/everworks-skills/` per ADR-012. Reads `ever-works/skills` repo via clone+cache. `ISkillsProviderPlugin` contract.
-- [ ] **8.6** `SkillsFacadeService` resolving enabled `skills-provider` plugins; dedupe by slug.
-- [ ] **8.7** Read-only API routes (`GET /skills/catalog`, `GET /skills`, `GET /skills/:id`).
-- [ ] **8.8** Tests (don't run).
+- [x] **8.5** **"Ever Works Skills" plugin** at `packages/plugins/everworks-skills/` per ADR-012. New `ISkillsProviderPlugin` contract at `packages/plugin/src/contracts/capabilities/skills-provider.interface.ts` + new `SKILLS_PROVIDER` capability constant. v1 ships with a builtin fallback catalog (3 example skills: `cron-defaults`, `secret-handling`, `commit-message-style`) so the plugin works before the `ever-works/skills` upstream repo is created — the platform self-recovers when it appears (TODO loader noted in code). MIT-licensed per the license split. ✓ Tick 12
+- [x] **8.6** `SkillsFacadeService` at `packages/agent/src/facades/skills.facade.ts` resolving enabled `skills-provider` plugins, fanning out catalog reads, dedupe by slug (first plugin to surface a slug wins — install-order priority). Wired into `FacadesModule` + facades barrel export. ✓ Tick 12
+- [x] **8.7** Read-only API routes at `apps/api/src/skills/skills.controller.ts`: `GET /api/skills/catalog`, `GET /api/skills/catalog/:slug`, `GET /api/skills`, `GET /api/skills/:id`. Mounted via new `apps/api/src/skills/skills.module.ts` + registered in `apps/api/src/api.module.ts`. Cross-user reads 404. Agent-side `SkillsModule` exposed at `@ever-works/agent/skills` subpath (added to `package.json` exports map). ✓ Tick 12
+- [x] **8.8** Tests (don't run): `packages/plugins/everworks-skills/src/everworks-skills.plugin.spec.ts` (~9 vitest assertions: capability id, pagination, search filter, tag filter case-insensitive, getEntry hit/miss, checkForUpdates version diff). ✓ Tick 12
 
 ### Phase 9 — Skill mutations + /skills page + Bindings tab
 

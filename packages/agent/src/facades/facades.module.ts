@@ -13,6 +13,7 @@ import { OAuthFacadeService } from './oauth.facade';
 import { DeployFacadeService } from './deploy.facade';
 import { CodeEditFacadeService } from './code-edit.facade';
 import { PromptFacadeService } from './prompt.facade';
+import { SkillsFacadeService } from './skills.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -25,6 +26,7 @@ const FACADES = [
     DeployFacadeService,
     CodeEditFacadeService,
     PromptFacadeService,
+    SkillsFacadeService,
 ];
 
 /**
