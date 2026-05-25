@@ -41,6 +41,10 @@ const sidebars: SidebarsConfig = {
 			link: { type: 'doc', id: 'features/index' },
 			items: [
 				'features/creating-a-work',
+				'features/missions',
+				'features/ideas',
+				'features/mission-templates',
+				'features/budgets-and-usage',
 				'features/community-pr-processing',
 				'features/work-changelog',
 				'features/collections',

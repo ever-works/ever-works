@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils/cn';
 import { WorkAICreator } from '@/components/works/WorkAICreator';
 import { WorkManualForm } from '@/components/works/WorkManualForm';
 import { WorkImportForm } from '@/components/works/WorkImportForm';
+import { CreationBlockTrio } from '@/components/works/CreationBlockTrio';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
-import { Bot, PenLine, FolderInput, ArrowRight } from 'lucide-react';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
@@ -66,124 +66,12 @@ export default function NewWorkClient({
                     </p>
                 </div>
 
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-6">
-                    {/* AI Creation Card */}
-                    <button
-                        onClick={() => setCreationMode('ai')}
-                        className={cn(
-                            'rounded-lg p-4 text-left transition-all shadow-sm',
-                            'bg-white dark:bg-card-primary-dark',
-                            'border border-card-border dark:border-white/9',
-                            'hover:border-primary-500/50 dark:hover:border-white/20',
-                            'group relative cursor-pointer',
-                        )}
-                    >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-gray-100 dark:bg-white/5',
-                                )}
-                            >
-                                <Bot
-                                    className="w-6 h-6 text-gray-800 dark:text-gray-300"
-                                    strokeWidth={1.5}
-                                />
-                            </div>
-                        </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('ai.title')}
-                        </h3>
-                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-6">
-                            {t('ai.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
-                            <span>{t('ai.getStarted')}</span>
-                            <ArrowRight
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                strokeWidth={2}
-                            />
-                        </div>
-                    </button>
-
-                    {/* Manual Creation Card */}
-                    <button
-                        onClick={() => setCreationMode('manual')}
-                        className={cn(
-                            'rounded-lg p-4 text-left transition-all shadow-sm',
-                            'bg-white dark:bg-card-primary-dark',
-                            'border border-card-border dark:border-white/9',
-                            'hover:border-primary-500/50 dark:hover:border-white/20',
-                            'group relative cursor-pointer',
-                        )}
-                    >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-gray-100 dark:bg-white/5',
-                                )}
-                            >
-                                <PenLine
-                                    className="w-6 h-6 text-gray-800 dark:text-gray-500"
-                                    strokeWidth={1.5}
-                                />
-                            </div>
-                        </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('manual.title')}
-                        </h3>
-                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-4">
-                            {t('manual.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
-                            <span>{t('manual.configureNow')}</span>
-                            <ArrowRight
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                strokeWidth={2}
-                            />
-                        </div>
-                    </button>
-
-                    {/* Import Existing Card */}
-                    <button
-                        onClick={() => setCreationMode('import')}
-                        className={cn(
-                            'rounded-lg p-4 text-left transition-all shadow-sm',
-                            'bg-white dark:bg-card-primary-dark',
-                            'border border-card-border dark:border-white/9',
-                            'hover:border-primary-500/50 dark:hover:border-white/20',
-                            'group relative cursor-pointer',
-                        )}
-                    >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-gray-100 dark:bg-white/5',
-                                )}
-                            >
-                                <FolderInput
-                                    className="w-6 h-6 text-gray-800 dark:text-gray-500"
-                                    strokeWidth={1.5}
-                                />
-                            </div>
-                        </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('import.title')}
-                        </h3>
-                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-4">
-                            {t('import.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
-                            <span>{t('import.importNow')}</span>
-                            <ArrowRight
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                strokeWidth={2}
-                            />
-                        </div>
-                    </button>
-                </div>
+                {/* Phase 6.5 PR CC1 — extracted to a shared component
+                    so Phase 6.5 PR CC2's unified `/new` page can
+                    render the same trio with the alternate label set.
+                    Byte-identical render to the inline implementation
+                    per Decision A11. */}
+                <CreationBlockTrio onSelect={setCreationMode} />
             </div>
         );
     }

@@ -1,6 +1,11 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
-export type TemplateKind = 'website' | 'work';
+// Phase 8 PR W — `'mission'` joins the union so Mission Templates
+// (per spec §10) can live alongside the existing website/work
+// templates in the catalog. The DB column is `varchar(32)` so
+// the new value fits without a migration; PR X seeds the
+// Mission Template repos.
+export type TemplateKind = 'website' | 'work' | 'mission';
 export type TemplateSourceType = 'built_in' | 'custom';
 
 @Entity({ name: 'templates' })

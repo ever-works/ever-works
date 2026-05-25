@@ -4,7 +4,18 @@ import { useState, useTransition } from 'react';
 import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { Bot, CircleStop, Clock, ListChecks, Play, ShieldCheck } from 'lucide-react';
+import {
+    Bot,
+    CircleStop,
+    Clock,
+    ListChecks,
+    Play,
+    RotateCcw,
+    ShieldCheck,
+    Sparkles,
+    Wallet,
+    Zap,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     cancelWorkAgentGoalAction,
@@ -17,7 +28,22 @@ import type {
     WorkAgentRun,
     WorkAgentRunLog,
 } from '@/lib/api/work-agent';
-import { cn } from '@/lib/utils/cn';
+import {
+    DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+    DEFAULT_AUTOBUILD_THROTTLE,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_CADENCE_MINUTES,
+    DEFAULT_MISSION_OUTSTANDING_CAP,
+    LiveRun,
+    MoneyField,
+    NumberField,
+    StatusPill,
+    ToggleRow,
+    formatCadenceMinutes,
+    formatCapCents,
+    parseCadenceMinutes,
+    parseCapCents,
+} from '@/components/work-agent';
 
 interface WorkAgentSettingsProps {
     preferences: WorkAgentPreferences;
@@ -26,27 +52,60 @@ interface WorkAgentSettingsProps {
     logs: WorkAgentRunLog[];
 }
 
-const STATUS_STYLES: Record<string, string> = {
-    pending: 'bg-warning/10 text-warning border-warning/20',
-    queued: 'bg-warning/10 text-warning border-warning/20',
-    running: 'bg-info/10 text-info border-info/20',
-    researching: 'bg-info/10 text-info border-info/20',
-    generating: 'bg-info/10 text-info border-info/20',
-    writing: 'bg-info/10 text-info border-info/20',
-    'waiting-for-approval': 'bg-warning/10 text-warning border-warning/20',
-    completed: 'bg-success/10 text-success border-success/20',
-    canceled: 'bg-surface-secondary text-text-muted border-border/70',
-    failed: 'bg-danger/10 text-danger border-danger/20',
-};
-
 export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
     const [isSaving, startSaving] = useTransition();
+    const [isSavingAutoGen, startSavingAutoGen] = useTransition();
+    const [isSavingAutoBuild, startSavingAutoBuild] = useTransition();
+    const [isSavingAutoRetry, startSavingAutoRetry] = useTransition();
+    const [isSavingAccountBudget, startSavingAccountBudget] = useTransition();
     const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
     const [instruction, setInstruction] = useState('');
     const [dryRun, setDryRun] = useState(preferences.guardrails.dryRunByDefault);
+
+    // Phase 4 PR L — local edit state for the four promoted constants.
+    // `null` on the API field means "use platform default" — the UI
+    // shows the platform default value in the input but tracks whether
+    // the user has explicitly overridden it. On save, the override
+    // value is sent; if the user wants to clear back to default they
+    // hit "Use default" which sends null.
+    const [cadenceMinutes, setCadenceMinutes] = useState<number>(
+        parseCadenceMinutes(preferences.autoGenerateCadence) ?? DEFAULT_CADENCE_MINUTES,
+    );
+    const [batchSize, setBatchSize] = useState<number>(
+        preferences.autoGenerateBatchSize ?? DEFAULT_BATCH_SIZE,
+    );
+    const [autoBuildThrottle, setAutoBuildThrottle] = useState<number>(
+        preferences.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE,
+    );
+    const [missionCap, setMissionCap] = useState<number>(
+        preferences.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
+    );
+
+    // Phase 4 PR EE — auto-retry policy (NOT NULL on the DB side per
+    // PR 0.5 — these have hardcoded defaults in the entity, so we
+    // just mirror whatever the API returns).
+    const [maxAutoRetries, setMaxAutoRetries] = useState<number>(preferences.maxAutoRetries);
+    const [backoffSeconds, setBackoffSeconds] = useState<number>(preferences.backoffSeconds);
+    const [exponentialBackoffFactor, setExponentialBackoffFactor] = useState<number>(
+        preferences.exponentialBackoffFactor,
+    );
+
+    // Phase 4 PR EE — account-wide budget. Cap is nullable bigint
+    // (string-over-the-wire) — when null the user hasn't set an
+    // explicit account-wide guard. `allowOverage` is NOT NULL with
+    // default true on the entity side.
+    const [accountCapCents, setAccountCapCents] = useState<number>(
+        parseCapCents(preferences.accountWideMonthlyCapCents) ?? DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+    );
+    const [accountCapEnabled, setAccountCapEnabled] = useState<boolean>(
+        preferences.accountWideMonthlyCapCents !== null,
+    );
+    const [accountAllowOverage, setAccountAllowOverage] = useState<boolean>(
+        preferences.accountWideAllowOverage,
+    );
 
     const updatePreference = <K extends keyof WorkAgentPreferences>(
         key: K,
@@ -90,6 +149,140 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                 toast.success(t('toasts.goalQueued'));
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : t('toasts.goalError'));
+            }
+        });
+    };
+
+    // Phase 4 PR L — section-scoped save handlers. Each section has
+    // its own button so the user can adjust + save just the two
+    // fields they care about without re-validating the rest of the
+    // form. The save sends a tiny PATCH (just the two fields the
+    // section owns) — the server PUT endpoint treats unmentioned
+    // fields as "leave alone" per PR D's nullable3rd semantics.
+    const saveAutoGeneratePrefs = (resetToDefault: boolean) => {
+        startSavingAutoGen(async () => {
+            try {
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? { autoGenerateCadence: null, autoGenerateBatchSize: null }
+                        : {
+                              autoGenerateCadence: formatCadenceMinutes(cadenceMinutes),
+                              autoGenerateBatchSize: batchSize,
+                          },
+                );
+                setLocalPreferences(saved);
+                // After reset, refresh the displayed values to the new
+                // platform-default-driven view.
+                if (resetToDefault) {
+                    setCadenceMinutes(
+                        parseCadenceMinutes(saved.autoGenerateCadence) ?? DEFAULT_CADENCE_MINUTES,
+                    );
+                    setBatchSize(saved.autoGenerateBatchSize ?? DEFAULT_BATCH_SIZE);
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAutoBuildPrefs = (resetToDefault: boolean) => {
+        startSavingAutoBuild(async () => {
+            try {
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              autoBuildThrottlePerDay: null,
+                              missionDefaultOutstandingCap: null,
+                          }
+                        : {
+                              autoBuildThrottlePerDay: autoBuildThrottle,
+                              missionDefaultOutstandingCap: missionCap,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setAutoBuildThrottle(
+                        saved.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE,
+                    );
+                    setMissionCap(
+                        saved.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP,
+                    );
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAutoRetryPrefs = (resetToDefault: boolean) => {
+        startSavingAutoRetry(async () => {
+            try {
+                // Auto-retry fields are NOT NULL on the DB side, so
+                // "Use default" can't send literal null. Instead it
+                // snaps each value back to the entity default (PR 0.5
+                // seeds: maxAutoRetries=2, backoffSeconds=60,
+                // exponentialBackoffFactor=2.0) and sends those.
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              maxAutoRetries: 2,
+                              backoffSeconds: 60,
+                              exponentialBackoffFactor: 2,
+                          }
+                        : {
+                              maxAutoRetries,
+                              backoffSeconds,
+                              exponentialBackoffFactor,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setMaxAutoRetries(saved.maxAutoRetries);
+                    setBackoffSeconds(saved.backoffSeconds);
+                    setExponentialBackoffFactor(saved.exponentialBackoffFactor);
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
+            }
+        });
+    };
+
+    const saveAccountBudgetPrefs = (resetToDefault: boolean) => {
+        startSavingAccountBudget(async () => {
+            try {
+                // Cap: nullable. Either user enabled it (send the cents-
+                // as-string) or they want no cap (send literal null —
+                // server's nullable3rd treats that as "clear override").
+                // The reset-to-default path also nulls the cap AND
+                // restores allowOverage to its entity default (true).
+                const saved = await updateWorkAgentPreferencesAction(
+                    resetToDefault
+                        ? {
+                              accountWideMonthlyCapCents: null,
+                              accountWideAllowOverage: true,
+                          }
+                        : {
+                              accountWideMonthlyCapCents: accountCapEnabled
+                                  ? formatCapCents(accountCapCents)
+                                  : null,
+                              accountWideAllowOverage: accountAllowOverage,
+                          },
+                );
+                setLocalPreferences(saved);
+                if (resetToDefault) {
+                    setAccountCapEnabled(saved.accountWideMonthlyCapCents !== null);
+                    setAccountCapCents(
+                        parseCapCents(saved.accountWideMonthlyCapCents) ??
+                            DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+                    );
+                    setAccountAllowOverage(saved.accountWideAllowOverage);
+                }
+                toast.success(t('toasts.settingsSaved'));
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
             }
         });
     };
@@ -203,6 +396,211 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                 </div>
             </section>
 
+            <section
+                id="auto-generate-ideas"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Sparkles}
+                        title={t('sections.autoGenerateIdeas.title')}
+                        description={t('sections.autoGenerateIdeas.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-2">
+                        <NumberField
+                            label={t('fields.autoGenerateCadenceMinutes')}
+                            value={cadenceMinutes}
+                            min={1}
+                            max={1440}
+                            onChange={setCadenceMinutes}
+                        />
+                        <NumberField
+                            label={t('fields.autoGenerateBatchSize')}
+                            value={batchSize}
+                            min={1}
+                            max={20}
+                            onChange={setBatchSize}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoGeneratePrefs(false)}
+                            disabled={isSavingAutoGen}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoGeneratePrefs(true)}
+                            disabled={isSavingAutoGen}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="auto-build-works"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Zap}
+                        title={t('sections.autoBuildWorks.title')}
+                        description={t('sections.autoBuildWorks.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-2">
+                        <NumberField
+                            label={t('fields.autoBuildThrottlePerDay')}
+                            value={autoBuildThrottle}
+                            min={0}
+                            max={1000}
+                            onChange={setAutoBuildThrottle}
+                        />
+                        <NumberField
+                            label={t('fields.missionDefaultOutstandingCap')}
+                            value={missionCap}
+                            min={-1}
+                            max={1000}
+                            onChange={setMissionCap}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoBuildPrefs(false)}
+                            disabled={isSavingAutoBuild}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoBuildPrefs(true)}
+                            disabled={isSavingAutoBuild}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="auto-retry"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={RotateCcw}
+                        title={t('sections.autoRetry.title')}
+                        description={t('sections.autoRetry.description')}
+                    />
+
+                    <div className="pl-11 grid gap-3 @3xl/main:grid-cols-3">
+                        <NumberField
+                            label={t('fields.maxAutoRetries')}
+                            value={maxAutoRetries}
+                            min={0}
+                            max={5}
+                            onChange={setMaxAutoRetries}
+                        />
+                        <NumberField
+                            label={t('fields.backoffSeconds')}
+                            value={backoffSeconds}
+                            min={10}
+                            max={3600}
+                            onChange={setBackoffSeconds}
+                        />
+                        <NumberField
+                            label={t('fields.exponentialBackoffFactor')}
+                            value={exponentialBackoffFactor}
+                            min={1}
+                            max={4}
+                            step={0.1}
+                            onChange={setExponentialBackoffFactor}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAutoRetryPrefs(false)}
+                            disabled={isSavingAutoRetry}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAutoRetryPrefs(true)}
+                            disabled={isSavingAutoRetry}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="account-budgets"
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden scroll-mt-24"
+            >
+                <div className="p-5">
+                    <Header
+                        icon={Wallet}
+                        title={t('sections.accountBudgets.title')}
+                        description={t('sections.accountBudgets.description')}
+                    />
+
+                    <div className="pl-11 space-y-3">
+                        <ToggleRow
+                            label={t('fields.accountWideCapEnabled')}
+                            checked={accountCapEnabled}
+                            onChange={setAccountCapEnabled}
+                        />
+                        {accountCapEnabled && (
+                            <div className="grid gap-3 @3xl/main:grid-cols-2">
+                                <MoneyField
+                                    label={t('fields.accountWideMonthlyCap')}
+                                    cents={accountCapCents}
+                                    onChange={setAccountCapCents}
+                                />
+                            </div>
+                        )}
+                        <ToggleRow
+                            label={t('fields.accountWideAllowOverage')}
+                            checked={accountAllowOverage}
+                            onChange={setAccountAllowOverage}
+                        />
+                    </div>
+
+                    <div className="pl-11 pt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => saveAccountBudgetPrefs(false)}
+                            disabled={isSavingAccountBudget}
+                        >
+                            {t('actions.saveSection')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => saveAccountBudgetPrefs(true)}
+                            disabled={isSavingAccountBudget}
+                        >
+                            {t('actions.useDefault')}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden">
                 <div className="p-5">
                     <Header
@@ -252,37 +650,16 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             description={t('sections.liveRun.description')}
                         />
                         <div className="pl-11 space-y-3">
-                            {activeRun ? (
-                                <>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <StatusPill status={activeRun.status} />
-                                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                            {activeRun.progressPercent}%
-                                        </span>
-                                    </div>
-                                    <div className="h-2 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark overflow-hidden">
-                                        <div
-                                            className="h-full bg-primary transition-all"
-                                            style={{ width: `${activeRun.progressPercent}%` }}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <Metric
-                                            label={t('metrics.works')}
-                                            value={activeRun.summary.worksCreated}
-                                        />
-                                        <Metric
-                                            label={t('metrics.items')}
-                                            value={activeRun.summary.itemsCreated}
-                                        />
-                                    </div>
-                                    <LogList logs={logs} emptyText={t('empty.waitingForUpdate')} />
-                                </>
-                            ) : (
-                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    {t('empty.noActiveRun')}
-                                </p>
-                            )}
+                            <LiveRun
+                                activeRun={activeRun}
+                                logs={logs}
+                                labels={{
+                                    worksMetric: t('metrics.works'),
+                                    itemsMetric: t('metrics.items'),
+                                    emptyWaitingForUpdate: t('empty.waitingForUpdate'),
+                                    emptyNoActiveRun: t('empty.noActiveRun'),
+                                }}
+                            />
                         </div>
                     </div>
                 </section>
@@ -369,121 +746,6 @@ function Header({
                     {description}
                 </p>
             </div>
-        </div>
-    );
-}
-
-function ToggleRow({
-    label,
-    checked,
-    onChange,
-}: {
-    label: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-}) {
-    return (
-        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => onChange(event.target.checked)}
-                className="rounded border-border dark:border-border-dark"
-            />
-            <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                {label}
-            </span>
-        </label>
-    );
-}
-
-function NumberField({
-    label,
-    value,
-    min,
-    max,
-    onChange,
-}: {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    onChange: (value: number) => void;
-}) {
-    return (
-        <label className="space-y-1.5">
-            <span className="text-xs text-text-muted dark:text-text-muted-dark">{label}</span>
-            <input
-                type="number"
-                value={value}
-                min={min}
-                max={max}
-                onChange={(event) => onChange(Number(event.target.value))}
-                className="w-full h-9 rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark px-3 text-sm text-text dark:text-text-dark outline-none focus:ring-2 focus:ring-primary/25"
-            />
-        </label>
-    );
-}
-
-function MoneyField({
-    label,
-    cents,
-    onChange,
-}: {
-    label: string;
-    cents: number;
-    onChange: (value: number) => void;
-}) {
-    return (
-        <NumberField
-            label={label}
-            value={Math.round(cents / 100)}
-            min={0}
-            max={10_000}
-            onChange={(value) => onChange(Math.max(0, Math.round(value * 100)))}
-        />
-    );
-}
-
-function StatusPill({ status }: { status: string }) {
-    return (
-        <span
-            className={cn(
-                'shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize',
-                STATUS_STYLES[status] ?? 'bg-surface-secondary text-text-muted border-border/70',
-            )}
-        >
-            {status.replaceAll('-', ' ')}
-        </span>
-    );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="rounded-lg border border-border/60 dark:border-border-dark/60 p-2">
-            <div className="text-[11px] text-text-muted dark:text-text-muted-dark">{label}</div>
-            <div className="text-sm font-semibold text-text dark:text-text-dark">{value}</div>
-        </div>
-    );
-}
-
-function LogList({ logs, emptyText }: { logs: WorkAgentRunLog[]; emptyText: string }) {
-    if (logs.length === 0) {
-        return <p className="text-xs text-text-muted dark:text-text-muted-dark">{emptyText}</p>;
-    }
-
-    return (
-        <div className="space-y-2">
-            {logs.slice(-6).map((log) => (
-                <div key={log.id} className="rounded-lg bg-surface dark:bg-surface-dark px-3 py-2">
-                    <div className="text-[11px] uppercase text-text-muted dark:text-text-muted-dark">
-                        {log.step}
-                    </div>
-                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                        {log.message}
-                    </div>
-                </div>
-            ))}
         </div>
     );
 }

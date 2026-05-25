@@ -38,6 +38,7 @@ import {
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
+import { MissionTickService } from '@ever-works/agent/missions';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
@@ -149,6 +150,9 @@ export class TriggerInternalController implements OnModuleInit {
         // read + update WorkKnowledgeDocument rows over the internal
         // RPC channel without direct DB access from worker scope.
         private readonly workKnowledgeDocumentRepository: WorkKnowledgeDocumentRepository,
+        // Phase 3 PR J — exposed for the mission-tick Trigger.dev cron
+        // so it can drive `tickDue()` over the internal RPC channel.
+        private readonly missionTickService: MissionTickService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -176,6 +180,8 @@ export class TriggerInternalController implements OnModuleInit {
             DeployReadyPollerService: this.deployReadyPoller,
             // EW-641 — exposed for the KB mirror Trigger.dev task.
             WorkKnowledgeDocumentRepository: this.workKnowledgeDocumentRepository,
+            // Phase 3 PR J — exposed for the mission-tick cron.
+            MissionTickService: this.missionTickService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

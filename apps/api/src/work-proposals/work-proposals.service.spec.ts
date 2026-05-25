@@ -36,12 +36,27 @@ jest.mock(
             USER_REFRESH: 'user-refresh',
             DISCOVER: 'discover',
             SCHEDULED: 'scheduled',
+            USER_MANUAL: 'user-manual',
+            MISSION: 'mission',
         },
         WorkProposalStatus: {
             PENDING: 'pending',
             DISMISSED: 'dismissed',
             ACCEPTED: 'accepted',
+            QUEUED: 'queued',
+            BUILDING: 'building',
+            FAILED: 'failed',
         },
+    }),
+    { virtual: true },
+);
+
+// Phase 1 PR B — WorkProposalsApiService now injects WorkAgentService.
+// Stub the barrel for the same deep-import-chain reason as the others.
+jest.mock(
+    '@ever-works/agent/work-agent',
+    () => ({
+        WorkAgentService: class WorkAgentService {},
     }),
     { virtual: true },
 );
@@ -70,6 +85,33 @@ describe('WorkProposalsApiService', () => {
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
+        // Phase 1 PR B — WorkProposalsApiService now injects
+        // WorkAgentService for the build-from-Idea path. Stubbed
+        // with `createGoal` (build path) and `getPreferences`
+        // (Phase 1 PR D pref-driven targetCount). Returns NULL
+        // for autoGenerateBatchSize so the generator falls back
+        // to its hardcoded default.
+        const workAgent = {
+            createGoal: jest.fn().mockResolvedValue({
+                goal: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
+                run: { id: 'r1' },
+            }),
+            getPreferences: jest.fn().mockResolvedValue({
+                enabled: false,
+                autoApproveLowImpact: false,
+                dailySuggestionsEnabled: true,
+                guardrails: {},
+                autoGenerateCadence: null,
+                autoGenerateBatchSize: null,
+                autoBuildThrottlePerDay: null,
+                missionDefaultOutstandingCap: null,
+                maxAutoRetries: 2,
+                backoffSeconds: 60,
+                exponentialBackoffFactor: 2.0,
+                accountWideMonthlyCapCents: null,
+                accountWideAllowOverage: true,
+            }),
+        };
         const svc = new WorkProposalsApiService(
             research as never,
             proposals as never,
@@ -77,8 +119,9 @@ describe('WorkProposalsApiService', () => {
             users as never,
             userOrmRepo as never,
             config as never,
+            workAgent as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config };
+        return { svc, research, proposals, limits, users, userOrmRepo, config, workAgent };
     };
 
     it('queues a refresh when caps are within budget', async () => {
@@ -91,7 +134,15 @@ describe('WorkProposalsApiService', () => {
             timeoutMs: 1_800_000,
             maxSteps: 14,
         });
-        expect(proposals.generate).toHaveBeenCalledWith('u1', { source: 'user-refresh' });
+        // Phase 1 PR D — runPipeline now reads the user's
+        // autoGenerateBatchSize pref and threads it through as
+        // targetCount. The makeDeps stub returns NULL for the pref
+        // (the default), so targetCount=null reaches generate(), and
+        // the prompt builder applies its own hardcoded default (3).
+        expect(proposals.generate).toHaveBeenCalledWith('u1', {
+            source: 'user-refresh',
+            targetCount: null,
+        });
     });
 
     it('passes configured research timeout and step limits to the agent', async () => {

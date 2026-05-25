@@ -37,6 +37,22 @@ export interface WorkAgentPreferences {
     autoApproveLowImpact: boolean;
     dailySuggestionsEnabled: boolean;
     guardrails: WorkAgentGuardrails;
+    // Phase 1 PR D — promoted-constant overrides surfaced from the
+    // API. `null` = "use platform-hardcoded default" (the consumer
+    // applies its own fallback). Settings UI in Phase 4 PR L will
+    // read+write these. See spec §6.2 / §6.3.
+    autoGenerateCadence: string | null;
+    autoGenerateBatchSize: number | null;
+    autoBuildThrottlePerDay: number | null;
+    missionDefaultOutstandingCap: number | null;
+    /** Auto-retry policy (Phase 0 PR 0.5 / Phase 1 PR FF read path). */
+    maxAutoRetries: number;
+    backoffSeconds: number;
+    exponentialBackoffFactor: number;
+    /** Account-wide budget knobs (Phase 0 PR 0.6 / Phase 7 PR II read path).
+     *  Cap is a JSON-serialized bigint string; null = no cap. */
+    accountWideMonthlyCapCents: string | null;
+    accountWideAllowOverage: boolean;
 }
 
 export interface WorkAgentGoal {
@@ -87,6 +103,19 @@ export interface UpdateWorkAgentPreferencesInput extends Partial<WorkAgentGuardr
     enabled?: boolean;
     autoApproveLowImpact?: boolean;
     dailySuggestionsEnabled?: boolean;
+    // Phase 1 PR D — PATCH-like write semantics:
+    //   omit a key       → leave existing value untouched.
+    //   pass `null`      → reset to "use platform-hardcoded default".
+    //   pass a value     → user override.
+    autoGenerateCadence?: string | null;
+    autoGenerateBatchSize?: number | null;
+    autoBuildThrottlePerDay?: number | null;
+    missionDefaultOutstandingCap?: number | null;
+    maxAutoRetries?: number;
+    backoffSeconds?: number;
+    exponentialBackoffFactor?: number;
+    accountWideMonthlyCapCents?: string | null;
+    accountWideAllowOverage?: boolean;
 }
 
 export interface CreateWorkAgentGoalInput extends Partial<WorkAgentGuardrails> {

@@ -3,7 +3,11 @@ import type { PluginIcon } from '@ever-works/plugin';
 import { serverFetch, serverMutation } from './server-api';
 import { APIResponse } from './types';
 
-export type TemplateKind = 'website' | 'work';
+// Phase 8 PR W — mirrors the agent entity union (kept manually
+// in sync to avoid a runtime dep on the agent package from
+// apps/web). PR X seeds Mission Template repos; PR Y wires the
+// "Use this Template" button to pre-fill /new?type=mission.
+export type TemplateKind = 'website' | 'work' | 'mission';
 export type TemplateSourceType = 'built_in' | 'custom';
 export type TemplateOriginType = 'standard' | 'forked' | 'custom_url';
 
