@@ -16,9 +16,9 @@
 | `AgentRunLog`             | **Verbatim copy** of `WorkAgentRunLog` ([`work-agent-run-log.entity.ts`](../../packages/agent/src/entities/work-agent-run-log.entity.ts)) — only FK renamed (`runId → agent_runs.id`). | Nothing.                                                       |
 | `AgentBudget`             | Polymorphic owner already lives on `WorkBudget` ([`work-budget.entity.ts`](../../packages/agent/src/entities/work-budget.entity.ts)) — extend `BudgetOwnerType` enum in [`_types.ts`](../../packages/agent/src/entities/_types.ts) with `AGENT` + `TASK`. | Nothing schema-side; values only.                              |
 | `AgentMembership`         | Same shape as the polymorphic `(ownerType, ownerId)` columns already used by `WorkBudget`.                                  | The unique index on `(agentId, targetType, targetId)`.         |
-| `Skill`                   | Closest analog is `Template` ([`template.entity.ts`](../../packages/agent/src/entities/template.entity.ts)) — has `ownerUserId`, `sourceType` (catalog/forked/custom), `version`. | Frontmatter jsonb + content hash.                              |
+| `Skill`                   | Closest analog is `Template` ([`template.entity.ts`](../../packages/agent/src/entities/template.entity.ts)). **Owned by the `"Ever Works Skills"` plugin** (ADR-012) — entity lives in `packages/agent/src/entities/` but writes go through `SkillsFacadeService → ISkillsProviderPlugin`. | Frontmatter jsonb + content hash. |
 | `SkillBinding`            | New shape — no exact precedent. Closest is `WorkAdvancedPrompts` (one-per-Work). Multiplicity differs (many-to-many).        | The `targetType` polymorphic + `injectIntoAgent` / `injectIntoGenerator` booleans. |
-| `Task`                    | Closest analog is `WorkProposal` ([`work-proposal.entity.ts`](../../packages/agent/src/entities/work-proposal.entity.ts)) — also has status enum, priority-like field, slug. | The state machine + `parentTaskId` recursion + `requireAllApprovers`. |
+| `Task`                    | Closest analog is `WorkProposal` ([`work-proposal.entity.ts`](../../packages/agent/src/entities/work-proposal.entity.ts)) — also has status enum, priority-like field, slug. **Owned by the `"Ever Works Task Tracker"` plugin** (ADR-013); third-party `task-tracker` plugins (Linear / Jira / GitHub) replace storage but use the same DTO shape. | The state machine + `parentTaskId` recursion + `requireAllApprovers`. |
 | `TaskAssignee`            | Polymorphic shape mirrors `WorkBudget`'s owner cols. `(assigneeType, assigneeId)`.                                          | Nothing.                                                       |
 | `TaskBlocks`              | Self-referential join — same shape as `task_relations`. Cycle detection helper is the only new helper.                       | The cycle detector (runs recursive CTE).                      |
 | `TaskRelations`           | Same as the existing template-customization back-pointer pattern.                                                            | The `kind` enum field.                                         |
@@ -43,10 +43,10 @@
 | `AgentBudgetService`                 | Polymorphic delegation to existing `BudgetService.summarizeForOwner({ownerType: AGENT})` — zero new aggregation.    | Nothing.                                                                                                          |
 | `AgentScheduleDispatcherService`     | Verbatim pattern of `WorkScheduleDispatcherService` — CAS-claim via `markRunDispatched`. ([research](#references)) | Different filter (Agents not Schedules); identical claim logic.                                                    |
 | `PromptAssemblerService`             | Reads from existing `WorkAdvancedPrompts` repo + Skill resolver + activity-log queries.                             | The 11-segment assembly recipe (the one piece of code without a clear precedent).                                  |
-| `SkillCatalogService`                | Same pattern as `TemplateCatalogService` ([`template-catalog.service.ts`](../../packages/agent/src/template-catalog/template-catalog.service.ts)) — boot-time seed from TS constants + in-memory cache. | Skill-specific frontmatter validation.                                                                             |
+| **`SkillsFacadeService` + `"Ever Works Skills"` plugin** (per [ADR-012](../decisions/012-skills-as-plugin.md)) | Plugin clones [`ever-works/skills`](https://github.com/ever-works/skills) repo (per [ADR-014](../decisions/014-no-hardcoded-catalogs.md)). Facade resolves enabled `skills-provider` plugins and dedupes by slug. | `ISkillsProviderPlugin` contract; facade dedup logic.                                                              |
 | `SkillBindingService`                | Standard CRUD; reuses repository pattern.                                                                            | The `resolveActive()` priority-sorted resolver.                                                                    |
 | `SkillFileService`                   | Same branch as `AgentFileService` (Git for Mission/Work, DB-inline for Tenant).                                      | Nothing.                                                                                                           |
-| `TaskService`                        | CRUD + slug counter — analogous to `WorkProposalService`.                                                            | Slug counter atomic increment.                                                                                     |
+| **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](../decisions/013-task-tracking-as-plugin.md)) | First-party plugin uses platform DB tables via the existing `TaskRepository`. Facade routes all task operations through the active `task-tracker` plugin (one per tenant). Third-party plugins (Linear / Jira / GH Issues) proxy CRUD to their respective APIs and store side-table `task_agent_assignments` for Agent assignees when the external tracker doesn't support that. | `ITaskTrackerPlugin` contract; facade routing + side-table Agent assignment when `supportsAgentAssignees=false`. |
 | `TaskTransitionService`              | State-machine guarded transitions — closest precedent is `WorkProposalService.acceptInternal()` with its `fromStatuses` check. | The full state machine.                                                                                            |
 | `TaskChatService`                    | Polling endpoint + mention parsing — analogous to AI Conversation's `ConversationController`.                       | Mention parsing + dispatch hooks.                                                                                  |
 | `TaskNotificationService`            | Thin wrapper that calls existing `NotificationsService.create()` ([`notification.entity.ts`](../../packages/agent/src/entities/notification.entity.ts) shape). | Recipient computation logic.                                                                                       |
@@ -229,20 +229,6 @@ For a comparable feature size, this slot is ~⅓ the size of the AI Conversation
 No new infrastructure deployed (Redis, k8s, queue system, etc.).
 
 ---
-
-## 13. Feature flagging
-
-| Flag                       | Purpose                                                          | Default at launch |
-| -------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `FEATURE_AGENTS`            | Hides Agents sidebar/tabs + disables endpoints                  | `off` (per-tenant opt-in initially) |
-| `FEATURE_SKILLS`            | Hides Skills sidebar/tabs + disables endpoints                  | `off`             |
-| `FEATURE_TASK_TRACKING`     | Hides Tasks sidebar/tabs + disables endpoints                   | `off`             |
-| `FEATURE_AGENT_DRY_RUN`     | Enables the dry-run endpoint                                    | `on`              |
-| `FEATURE_AGENT_EXPORT`      | Enables `GET /agents/:id/export`                                | `on`              |
-
-Flags read from env / tenant-settings table. Wrap the new sidebar items + tab strips in `<FeatureFlag name="FEATURE_AGENTS">` per existing platform pattern.
-
-After 2-4 weeks of internal beta, flip the three primary flags to `on` by default. Individual tenants can still opt out via tenant settings.
 
 ---
 

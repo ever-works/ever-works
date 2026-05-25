@@ -23,6 +23,20 @@
 
 ---
 
+## 0. Implementation packaging (per ADR-013)
+
+**Task tracking is a plugin capability** — see [ADR-013](../../decisions/013-task-tracking-as-plugin.md). The product behavior described in this spec is unchanged for end users running the default first-party plugin; what changes from the round-1 design:
+
+- The Task CONCEPT (entity model, state machine, Agent integration, scope rules) is core.
+- Task TRACKING (storage, CRUD, list, transition, chat) is plugin-mediated via the new `task-tracker` capability.
+- The default first-party plugin: **`"Ever Works Task Tracker"`** at `packages/plugins/everworks-task-tracker/`. Stores tasks in the platform DB schema this spec defines.
+- Future community plugins: Linear Task Tracker, JIRA Task Tracker, GitHub Issues Task Tracker — replace storage backend per tenant.
+- Plugin contract: `ITaskTrackerPlugin` in `packages/plugin/src/contracts/capabilities/task-tracker.interface.ts`.
+- Facade: `TasksFacadeService` — UI and Agents talk only to the facade.
+- **One active `task-tracker` per tenant.** Unlike `skills-provider` which allows union, only one tracker owns task storage at a time.
+
+Throughout this spec, references to "the platform stores tasks" / "Task service" should be read as the **first-party `"Ever Works Task Tracker"` plugin storing tasks in the platform DB**. Task templates (`bug-report`, `pr-review`, `weekly-status`) live in **[`ever-works/task-templates`](https://github.com/ever-works/task-templates)** repo per [ADR-014](../../decisions/014-no-hardcoded-catalogs.md), bundled by the first-party plugin.
+
 ## 1. Overview
 
 A **Task** is a unit of work with rich metadata: status, priority, labels, multiple assignees (humans + Agents), reviewers, approvers, a parent task (for sub-tasks), blockers, related tasks, a description (markdown), attachments, KB-document mentions, and a flat chat thread. Tasks can be scoped to a Work, a Mission, an Idea, or stand free (tenant-scoped). They drive Agent execution (when an Agent is an assignee on a Task moving to `in_progress`, the platform dispatches an `agent-task-execute` Trigger.dev run — see [agents/spec.md S4](../agents/spec.md)).

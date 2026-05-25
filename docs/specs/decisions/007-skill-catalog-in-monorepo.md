@@ -2,7 +2,11 @@
 
 ## Status
 
-**Proposed — 2026-05-25.** Pending operator review on [QUESTIONS-agents-skills-tasks.md A2](../QUESTIONS-agents-skills-tasks.md#a2--skill-catalog-in-monorepo-or-separate-repo).
+**Superseded — 2026-05-25 by [ADR-014](./014-no-hardcoded-catalogs.md).** Operator reversed the in-monorepo decision during round 6 review. The Skill catalog is now shipped as a separate GitHub repo [`ever-works/skills`](https://github.com/ever-works/skills), consumed by the new **"Ever Works Skills" plugin** (see [ADR-012](./012-skills-as-plugin.md)). Historical record retained below.
+
+---
+
+**(Original) Proposed — 2026-05-25.** Pending operator review on [QUESTIONS-agents-skills-tasks.md A2](../QUESTIONS-agents-skills-tasks.md#a2--skill-catalog-in-monorepo-or-separate-repo).
 
 ## Date
 

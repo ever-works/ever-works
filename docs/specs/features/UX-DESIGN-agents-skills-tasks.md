@@ -82,7 +82,7 @@ On the main dashboard, three new affordances introduce the features to existing 
 ╰─────────────────────────────────────────────────────────────╯
 ```
 
-The **"Start by creating CEO Agent"** button takes the first-time user straight to the wow moment without any decisions. It creates an Agent named `CEO` at **tenant scope** using the CEO template from the [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents) template repo (default account AI provider, weekly heartbeat, sensible default permissions). After create, the user lands on `/agents/ceo` and the first heartbeat is dispatched immediately.
+The **"Start by creating CEO Agent"** button takes the first-time user straight to the wow moment without any decisions. It creates an Agent named `CEO` at **tenant scope** using the CEO template from the [`ever-works/agents`](https://github.com/ever-works/agents) template repo (default account AI provider, weekly heartbeat, sensible default permissions). After create, the user lands on `/agents/ceo` and the first heartbeat is dispatched immediately.
 
 This deliberately bypasses the multi-step create dialog: zero choices, one click, real Agent.
 
@@ -141,7 +141,7 @@ A 2-step modal. Step 1 picks a starter or "blank"; step 2 lets the user edit bef
 ╰─────────────────────────────────────────────────╯
 ```
 
-**Starters are external — they live in a separate community-friendly repo: [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents).** Each template is a folder containing `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`, optionally a `skills/` subfolder with bundled skill MD files. The 6 starters above are the curated set Ever Works ships; the community can PR additional templates (Sales Lead, Compliance Officer, Game Designer, etc.) without touching the platform repo.
+**Starters are external — they live in a separate community-friendly repo: [`ever-works/agents`](https://github.com/ever-works/agents).** Each template is a folder containing `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`, optionally a `skills/` subfolder with bundled skill MD files. The 6 starters above are the curated set Ever Works ships; the community can PR additional templates (Sales Lead, Compliance Officer, Game Designer, etc.) without touching the platform repo.
 
 When the user picks a template, the platform `git clone --depth 1` the agents repo (cached for 1h), reads the chosen folder, and **copies** the MD files into the scope's repo at `.works/agents/<chosen-slug>/`. For tenant scope without a control repo, files are written inline to DB columns (per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)). Modifications to the user's local copy never propagate back to the source repo.
 
@@ -545,7 +545,7 @@ After the user has created their Mission/Work in the existing onboarding flow, t
 │  They run on a schedule, handle tasks, and write to your     │
 │  repos. Start with one or two; you can always add more.      │
 │                                                              │
-│  Templates from ever-works/ever-works-agents:                │
+│  Templates from ever-works/agents:                │
 │                                                              │
 │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐                │
 │  │ ☑ CEO  │ │ ☑ CTO  │ │ Editor │ │ Designer│               │
@@ -565,7 +565,7 @@ After the user has created their Mission/Work in the existing onboarding flow, t
 - Default selection: **all unchecked** (user opts in deliberately; no surprise creation).
 - "Skip" is given equal visual weight to "Create" — many users will skip and that's fine.
 - If the user selects any templates, those Agents are created at tenant scope (the most flexible default; user can re-scope later from the detail page).
-- Each selected Agent's MD files are copied from `ever-works/ever-works-agents/<template>/` into the tenant's storage (DB-inline today per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)).
+- Each selected Agent's MD files are copied from `ever-works/agents/<template>/` into the tenant's storage (DB-inline today per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)).
 - If "Run first heartbeat now" stays checked, each created Agent gets one immediate run so the user sees activity on their dashboard.
 
 ### 11.2 New step: "Add Skills (optional)"

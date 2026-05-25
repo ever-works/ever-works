@@ -15,7 +15,7 @@ By the end of this spec set, the platform will have at least five "template-like
 1. **Mission Templates** — already on develop. In-repo TS constants at `packages/agent/src/missions/mission-template.config.ts`; surfaced via `TemplateCatalogService` on `/templates` page.
 2. **Website / Work Templates** — already on develop. Same `TemplateCatalogService`; users can fork.
 3. **Skill catalog** — proposed in [features/skills/spec.md](../features/skills/spec.md). In-repo MD files at `apps/api/src/skills/catalog/<slug>/<slug>.md`.
-4. **Agent templates** — proposed in [features/UX-DESIGN-agents-skills-tasks.md §4.1](../features/UX-DESIGN-agents-skills-tasks.md). Stored in a **separate community repo** [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents) — one folder per template with `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`. ~6 starters at launch (CEO, CTO, Researcher, PR-Reviewer, Editor, Designer); community can PR more. See [ADR-011](./011-agent-templates-in-separate-repo.md) for why this diverges from Skill catalog's in-monorepo posture.
+4. **Agent templates** — proposed in [features/UX-DESIGN-agents-skills-tasks.md §4.1](../features/UX-DESIGN-agents-skills-tasks.md). Stored in a **separate community repo** [`ever-works/agents`](https://github.com/ever-works/agents) — one folder per template with `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md`. ~6 starters at launch (CEO, CTO, Researcher, PR-Reviewer, Editor, Designer); community can PR more. See [ADR-011](./011-agent-templates-in-separate-repo.md) for why this diverges from Skill catalog's in-monorepo posture.
 5. **Task templates** — proposed in [features/task-tracking/spec.md §5.4](../features/task-tracking/spec.md), deferred. 3 starters envisioned (bug-report, pr-review, weekly-status).
 
 This pattern emerged organically as each feature shipped its own catalog. The natural architectural question: **should we unify them under a single "Workshop Templates" registry**?
@@ -33,22 +33,30 @@ Cons of unifying:
 
 ## Decision
 
-**For v1: keep the five template catalogs independent.** Each ships its own data store and lifecycle, matching its own semantics.
+**For v1: independent services per catalog kind, but the `/templates` page provides a unified browse experience via a kind-selector — AND each feature page (`/agents`, `/skills`, `/tasks`) also has its own templates browser scoped to its kind.** Both UIs read from the same per-kind backend services; the user can manage templates from whichever surface is convenient.
 
-Concrete arrangement:
+Per operator instruction (round 6):
+> "Such Templates can be all managed on 'Templates' page, yes. I.e. I would prefer there to add selector for many different types of templates. However, also it's best to have ability to manage separately Agent templates on Agents page, same as Skills templates (catalog) on Skills page and so on. So it's fine to have in few places."
+
+### Concrete arrangement
+
+**Backend services — independent per kind:**
 - `TemplateCatalogService` (existing) — Mission + Work Templates.
-- `SkillCatalogService` (new) — Skills only (ADR-007).
-- `AgentTemplateService` (new) — clones + caches `ever-works/ever-works-agents`, lists templates, copies a chosen template into a Mission/Work repo or DB-inline storage. Mirrors the existing Mission Template fork mechanic, not the Skill catalog install mechanic.
-- `TaskTemplateService` (new, deferred to v2) — Task templates.
+- `AgentTemplateService` (new) — clones + caches [`ever-works/agents`](https://github.com/ever-works/agents); copies a chosen template into a Mission/Work repo or DB-inline storage.
+- **`SkillsFacadeService` + `"Ever Works Skills"` plugin** (per [ADR-012](./012-skills-as-plugin.md)) — Skill catalog comes from the plugin, which reads [`ever-works/skills`](https://github.com/ever-works/skills).
+- **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](./013-task-tracking-as-plugin.md)) — Task templates come from [`ever-works/task-templates`](https://github.com/ever-works/task-templates), bundled into the first-party tracker plugin.
 
-The `/templates` page surfaces Mission + Work via the existing `TemplatesCatalog` component. Skills get their own `/skills` page. Agent starters appear inline in the New-Agent dialog. Task templates appear inline in the New-Task dialog (when v2 ships).
+**Frontend surfaces — both unified hub AND per-feature pages:**
+- **`/templates` page** — unified hub with a kind-selector (Mission / Work / Agent / Skill / Task). Tab strip or dropdown switches the visible kind. Each tab calls the relevant backend service.
+- **`/agents` page** — has its own "Browse templates" section / button surfacing Agent templates from `AgentTemplateService`.
+- **`/skills` page** — surfaces the Skill catalog from `SkillsFacadeService`.
+- **`/tasks` page / New Task dialog** — surfaces Task templates from `TasksFacadeService`.
 
-**For v2: revisit if all of:**
-- The Skill catalog grows past ~500 entries (the in-monorepo strategy starts to hurt).
-- User feedback consistently asks for a single browse experience.
-- The four kinds converge on similar lifecycle needs.
+Both surfaces are first-class — the user picks whichever flow is convenient. Implementation cost is small: shared `<TemplatesBrowser kind="..." />` React component used in all surfaces.
 
-If those conditions hit, unify under `WorkshopTemplate` with a discriminator. Until then, the cost of unification (refactor across 5 features) exceeds the benefit.
+### Why this isn't "unified into one entity"
+
+The DB-level union into a single `WorkshopTemplate` table is still rejected. The frontend hub + per-feature pages read from the same per-kind backend services — they don't share a storage shape. The UI is convergent; the data is not. This avoids the half-typed-column anti-pattern from [ADR-009 §3.3](./009-tasks-vs-items-vs-kb-distinction.md).
 
 ## Consequences
 

@@ -25,6 +25,17 @@
 
 ---
 
+## 0. Implementation packaging (per the corrected ADR-006)
+
+**Agents are a core domain concept** (entity, runtime, scope cascade, prompt assembly all stay core) — see the [partially-superseded ADR-006](../../decisions/006-agents-skills-tasks-as-core-not-plugins.md). What's pluggable:
+
+- **The Agent's execution engine** — Agent runtime delegates each AI call to whichever **agentic-pipeline plugin** is enabled (e.g. `claude-code`, `claude-managed-agent`, `agent-pipeline`, `codex`, `opencode`, `gemini`, …). Agent runtime is the orchestrator; the agentic pipeline is the worker.
+- **Skills** the Agent uses come from the `"Ever Works Skills"` plugin (or any other enabled `skills-provider`) per [ADR-012](../../decisions/012-skills-as-plugin.md).
+- **Tasks** the Agent creates/transitions/comments-on are routed through the active `task-tracker` plugin per [ADR-013](../../decisions/013-task-tracking-as-plugin.md).
+- **Agent templates** (CEO, CTO, …) come from [`ever-works/agents`](https://github.com/ever-works/agents) per [ADR-011](../../decisions/011-agent-templates-in-separate-repo.md).
+
+So the Agent entity is core; everything it touches is via plugin/facade. This matches the existing plugin-first posture of the platform.
+
 ## 1. Overview
 
 A user-defined **Agent** is a named, persistent AI worker the user creates inside Ever Works — e.g. "CEO", "VP of Engineering", "Researcher", "PR Reviewer". An Agent has an identity (`name`, optional `title`, and a `capabilities` description), an AI provider + model selection (defaulting to the user's account default), an explicit scope (Tenant, Mission, Idea, or Work), a permission set (can-create-agents, can-assign-tasks, can-spend, …), and a budget. It runs on an optional heartbeat schedule **and/or** in response to tasks assigned to it.

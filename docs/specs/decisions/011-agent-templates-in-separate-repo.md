@@ -15,17 +15,17 @@ The Agents feature ships with starter templates (CEO, CTO, Researcher, PR-Review
 Two storage strategies were considered:
 
 1. **In the platform monorepo** — `apps/api/src/agents/starters/<slug>/`, read at boot, version-locked with platform code. Same posture as **Skills catalog** (ADR-007).
-2. **In a separate GitHub repo** `ever-works/ever-works-agents` — cloned/cached at runtime, versioned independently, community-PR friendly. Same posture as **Mission Templates** (which are also external repos that get forked).
+2. **In a separate GitHub repo** `ever-works/agents` — cloned/cached at runtime, versioned independently, community-PR friendly. Same posture as **Mission Templates** (which are also external repos that get forked).
 
 The operator's instruction (round 5 review of `UX-DESIGN-agents-skills-tasks.md`):
 
-> "Default starter agents — we don't want to store them in `apps/api/src/agents/starters/<slug>/`, instead let's use separate repo `https://github.com/ever-works/ever-works-agents` for example. We can store there tons of prebuilt agents templates etc."
+> "Default starter agents — we don't want to store them in `apps/api/src/agents/starters/<slug>/`, instead let's use separate repo `https://github.com/ever-works/agents` for example. We can store there tons of prebuilt agents templates etc."
 
 This ADR records that decision.
 
 ## Decision
 
-**Agent templates live in the separate repo [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents).**
+**Agent templates live in the separate repo [`ever-works/agents`](https://github.com/ever-works/agents).**
 
 Concrete arrangement:
 
@@ -79,7 +79,7 @@ The Mission Templates infrastructure (already on develop) has exactly this shape
 
 - **Cache-first reads** — `AgentTemplateService` reads from `cache_entries` first; falls back to repo clone only when cache is empty/stale.
 - **Repo schema validation** — each template folder validated against a Zod schema on read; bad folders skipped with a warning.
-- **Pinning** — `AgentTemplateService` reads from a specific tagged release of `ever-works/ever-works-agents` (configurable env var `EVER_WORKS_AGENTS_REF`, default `main`). Platform deploys can pin to a known-good ref.
+- **Pinning** — `AgentTemplateService` reads from a specific tagged release of `ever-works/agents` (configurable env var `EVER_WORKS_AGENTS_REF`, default `main`). Platform deploys can pin to a known-good ref.
 - **Local override** — for self-hosted users who want to run without internet, `EVER_WORKS_AGENTS_PATH` env var can point at a local clone.
 
 ## Alternatives Considered
@@ -102,7 +102,7 @@ The Mission Templates infrastructure (already on develop) has exactly this shape
 
 ## Operational notes
 
-- Repo: [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents) — to be created if not yet present.
+- Repo: [`ever-works/agents`](https://github.com/ever-works/agents) — to be created if not yet present.
 - License: MIT (matches platform).
 - Top-level files: `README.md` (format + contribution guide), `LICENSE`, `.github/` workflows (lint MD + validate `agent.yml` against schema).
 - Each template folder: `agent.yml` + `SOUL.md` + `AGENTS.md` + `HEARTBEAT.md` + `TOOLS.md` (+ optional `skills/`).

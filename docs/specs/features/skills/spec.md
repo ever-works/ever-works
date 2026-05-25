@@ -21,6 +21,17 @@
 
 ---
 
+## 0. Implementation packaging (per ADR-012)
+
+**Skills are a plugin capability** — see [ADR-012](../../decisions/012-skills-as-plugin.md). The product behavior described in this spec is unchanged for end users; what changes from the round-1 design is that the catalog and CRUD layer ship as a plugin (`"Ever Works Skills"`, default first-party) rather than as in-monorepo code:
+
+- The default catalog source: **[`ever-works/skills`](https://github.com/ever-works/skills)** Git repo (per [ADR-014](../../decisions/014-no-hardcoded-catalogs.md)).
+- Plugin contract: `ISkillsProviderPlugin` in `packages/plugin/src/contracts/capabilities/skills-provider.interface.ts`.
+- Facade: `SkillsFacadeService` mirrors `AiFacadeService` — UI and Agents talk only to the facade.
+- Multiple providers can be enabled simultaneously; resolved skills come from the union, deduplicated by slug.
+
+Throughout this spec, references to "the catalog" / "catalog service" / "in-monorepo files" should be read as the **first-party `"Ever Works Skills"` plugin's content**, sourced from the `ever-works/skills` repo.
+
 ## 1. Overview
 
 A **Skill** is a markdown file shaped exactly like Anthropic Skills:

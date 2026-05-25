@@ -1,5 +1,17 @@
 # Open Questions — Agents, Skills, Tasks specs
 
+> **Round-6 status update (2026-05-25):** Operator answered several open questions inline during PR review. Resolved items:
+>
+> - **A2 (Skill catalog placement)**: separate repo [`ever-works/skills`](https://github.com/ever-works/skills) via plugin → ADR-007 superseded by [ADR-012](./decisions/012-skills-as-plugin.md) + [ADR-014](./decisions/014-no-hardcoded-catalogs.md).
+> - **R1 (Templates catalog unification)**: hybrid — `/templates` page hub with kind-selector AND per-feature page (Agents/Skills/Tasks) templates browsers. Both read from the same backend services. Updated [ADR-010](./decisions/010-templates-stay-independent-for-v1.md).
+> - **Plugin packaging of Skills + Tasks**: Skills + Task TRACKING become plugin capabilities. New [ADR-012](./decisions/012-skills-as-plugin.md) (Skills) and [ADR-013](./decisions/013-task-tracking-as-plugin.md) (Task tracking). ADR-006 partially superseded.
+> - **Feature flag scope**: dropped — features ship as launch / MVP, no per-feature flag gating.
+> - **No hardcoded catalogs**: codified in [ADR-014](./decisions/014-no-hardcoded-catalogs.md). All catalogs (Mission Templates, Agent templates, Skill catalog, Task templates) live in separate `ever-works/*` GitHub repos.
+>
+> Questions below remain open unless explicitly marked `[Resolved]`.
+
+
+
 **Status**: `Open` — for operator (Ruslan) review
 **Last updated**: 2026-05-25
 **Use**: pick an answer per question (or write your own); I'll fold the answers into the specs and update the PR.
@@ -35,7 +47,7 @@
 
 ---
 
-### A2 — Skill catalog: in-monorepo or separate repo?
+### A2 — Skill catalog: in-monorepo or separate repo? [Resolved — separate repo `ever-works/skills` via Skills plugin]
 
 **What I'm asking.** Where does the platform-shipped Skill catalog (~1000+ entries expected long-term) live?
 
@@ -753,9 +765,9 @@ Pick one term per surface:
 
 ## P. Product / UX decisions
 
-### P1 — Initial set of templates in `ever-works/ever-works-agents`
+### P1 — Initial set of templates in `ever-works/agents`
 
-Per [ADR-011](./decisions/011-agent-templates-in-separate-repo.md), Agent templates live in the separate community repo [`ever-works/ever-works-agents`](https://github.com/ever-works/ever-works-agents). What's the curated set Ever Works seeds the repo with at launch?
+Per [ADR-011](./decisions/011-agent-templates-in-separate-repo.md), Agent templates live in the separate community repo [`ever-works/agents`](https://github.com/ever-works/agents). What's the curated set Ever Works seeds the repo with at launch?
 
 - ★ **P1-a — Six**: CEO, CTO, Researcher, PR-Reviewer, Editor, Designer. Covers common founder + small-team roles.
 - P1-b — Twelve: P1-a + Sales-Lead, Product-Manager, Designer, Marketing-Writer, Compliance-Officer, Customer-Success.
@@ -802,7 +814,7 @@ For new feature events (Agent paused, Task assigned to you):
 
 ### P7 — "Start by creating CEO Agent" empty-state button
 
-The `/agents` empty state has a `[ Start by creating CEO Agent ]` quick-create button that one-clicks a tenant-scoped CEO Agent from the `ever-works/ever-works-agents` repo's CEO template.
+The `/agents` empty state has a `[ Start by creating CEO Agent ]` quick-create button that one-clicks a tenant-scoped CEO Agent from the `ever-works/agents` repo's CEO template.
 
 - ★ **P7-a — Ship.** Single-click path to the wow moment for first-time users.
 - P7-b — Don't ship; only show `[ + New Agent ]` button. User must go through the 2-step dialog every time.
@@ -851,7 +863,7 @@ Each `agent-heartbeat` task bootstraps Nest. With many active Agents, this multi
 - Q5-b — Local `pnpm dev:trigger` runs the dev Trigger.dev server (already exists).
 - Q5-c — Both. Best UX; least friction.
 
-### Q6 — Feature flag granularity
+### Q6 — Feature flag granularity [Resolved — no flags; ship as MVP]
 
 - ★ **Q6-a — Three top-level flags + sub-flags** (`FEATURE_AGENTS`, `FEATURE_SKILLS`, `FEATURE_TASK_TRACKING`, plus `FEATURE_AGENT_DRY_RUN`, etc.). Per-tenant override.
 - Q6-b — One mega-flag `FEATURE_WORKSHOP` covering all three.
@@ -885,16 +897,16 @@ What if a user disables their AI provider plugin while an Agent run is in flight
 - ★ **Q10-a — Run completes; next run fails with `provider_error`. Auto-pause after threshold.**
 - Q10-b — Cancel the in-flight run. More disruptive.
 
-### Q11 — Updates to templates in `ever-works/ever-works-agents`
+### Q11 — Updates to templates in `ever-works/agents`
 
-When `ever-works/ever-works-agents` ships a new version of (say) the CEO template, do existing user-Agents created from it get notified / updated?
+When `ever-works/agents` ships a new version of (say) the CEO template, do existing user-Agents created from it get notified / updated?
 
 - ★ **Q11-a — No.** Templates are fork-once; existing user Agents are immutable once created. The user owns their `.works/agents/ceo/` files outright; we don't re-pull. Same posture as Mission Templates today.
 - Q11-b — Optional "Update available" prompt on the Agent detail page that diff-applies the template update.
 
 ### Q12 — `EVER_WORKS_AGENTS_REF` pinning
 
-Which ref of `ever-works/ever-works-agents` does the platform read by default?
+Which ref of `ever-works/agents` does the platform read by default?
 
 - ★ **Q12-a — Latest tagged release** (`v*` ref pattern). Auto-picks up new templates as they ship; pinned to known-good versions.
 - Q12-b — `main` branch. Bleeding edge; risk of broken templates surfacing immediately.
@@ -911,7 +923,7 @@ For self-hosted / offline users:
 
 ## R. Templates strategy
 
-### R1 — Unified Workshop Templates catalog
+### R1 — Unified Workshop Templates catalog [Resolved — hybrid: unified hub AND per-feature page]
 
 See [ADR-010](./decisions/010-templates-stay-independent-for-v1.md).
 
@@ -927,7 +939,7 @@ User on a Mission Template page sees "This template also includes 2 Agents and 1
 
 ### R3 — Should there be a "Browse all templates" page?
 
-A single page showing Mission templates + Agent templates from `ever-works/ever-works-agents` + Skill catalog + (future) Task templates.
+A single page showing Mission templates + Agent templates from `ever-works/agents` + Skill catalog + (future) Task templates.
 
 - ★ **R3-a — No.** Each lives on its own page; cross-links per R2.
 - R3-b — Yes. New `/workshop` page with all four kinds.

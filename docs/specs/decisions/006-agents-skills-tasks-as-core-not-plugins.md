@@ -2,7 +2,17 @@
 
 ## Status
 
-**Accepted — Proposed (2026-05-25), pending implementation in `feat/agents`, `feat/skills`, `feat/task-tracking`.**
+**Partially superseded — 2026-05-25.**
+
+- ✅ **Agents** — decision stands. Agents (entity, runtime, scope cascade, prompt assembly) remain core. The Agent's executor still uses **agentic-pipeline plugins** (e.g. `claude-code`, `claude-managed-agent`, `agent-pipeline`, `codex`, …) for the AI execution — Agent runtime is core, the runtime's worker is a plugin choice.
+- ❌ **Skills** — superseded by [ADR-012](./012-skills-as-plugin.md). Skills are now a plugin capability with `"Ever Works Skills"` as the first-party plugin.
+- ❌ **Task tracking** — superseded by [ADR-013](./013-task-tracking-as-plugin.md). Task TRACKING (storage / CRUD) is now a plugin capability with `"Ever Works Task Tracker"` as the first-party plugin. The Task CONCEPT (entity, state machine, Agent integration) stays core.
+
+Operator's round-6 instruction reversed the "Skills/Tasks core" portions. The Skills + Task-tracking spec set retains its product behavior unchanged; only the implementation packaging moves from "core service" to "plugin capability + facade." Historical content below is retained for context.
+
+---
+
+**Original (Accepted — Proposed 2026-05-25)**, pending implementation in `feat/agents`, `feat/skills`, `feat/task-tracking`.
 
 ## Date
 
