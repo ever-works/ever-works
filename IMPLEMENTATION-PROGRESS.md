@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 9
-- **Last tick at**: 2026-05-26 (tick 9 — Phase 7.1–7.3 + 7.6: PromptAssemblerService with 11-segment recipe + per-trigger preambles + token-budget enforcement + tail-first truncation + budget-period math for all 5 intervals. 7.4 AgentRunService.execute + 7.5 BaseFacadeService extension land next tick.)
-- **In progress now**: Phase 7 (7.1–7.3 + 7.6 ticked; 7.4 + 7.5 + 7.7 remaining)
+- **Last tick #**: 10
+- **Last tick at**: 2026-05-26 (tick 10 — Phase 7 complete: AgentRunService orchestrator + BaseFacadeService.resolvePlugin agentProviderOverride param + tests. Real LLM dispatch wires in once Skill catalog Phase 9 lands.)
+- **In progress now**: (none — next tick picks up Phase 8 Skill catalog + ever-works/skills plugin)
 
 ---
 
@@ -130,8 +130,8 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 - [x] **7.1** `PromptAssemblerService.assemble(...)` — 11-segment recipe from `agent-prompt-assembly.md §2` at `packages/agent/src/agents/prompt-assembler.service.ts`. Returns `{systemMessage, userMessage, segments[], truncations[]}` so callers (and tests) can see what was emitted and what got cut. ✓ Tick 9
 - [x] **7.2** Per-trigger preamble (heartbeat / task / chat) per §2.1 — heartbeat uses `HEARTBEAT.md`; task + chat use the canonical static preambles verbatim from the spec. User message also forks: heartbeat = `"What's the next action…"`, task/chat = immediate input + conversation context (newest last). ✓ Tick 9
 - [x] **7.3** Token-budget enforcement + tail-first truncation + warning log row — char/4 estimator (Phase-7 v1), per-segment caps from the spec table (tools 1500 / skills `agent.maxSkillContextTokens` / scope-context 800 / recent-activity 1200 / recent-runs 800 / output-contract 150) + overall 12 000 system-message cap. Truncation records returned in `.truncations[]` for the caller to emit `AgentRunLog` warning rows. ✓ Tick 9
-- [ ] **7.4** `AgentRunService.execute(context)` — the orchestrator per `agent-prompt-assembly.md §8` pseudocode.
-- [ ] **7.5** Extend `BaseFacadeService.resolvePlugin` to accept `agentId` hint per `agents/plan.md §3.3`.
+- [x] **7.4** `AgentRunService.execute(context)` — the orchestrator per `agent-prompt-assembly.md §8` pseudocode at `packages/agent/src/agents/agent-run.service.ts`. v1 covers: agent-not-found short-circuit + pre-flight budget check (no-budget / unlimited / over-cap branches) + parallel loaders for recent runs + PromptAssembler call + WARN run-log rows per truncation + INFO run-log row with segment summary + AGENT_BUDGET_EXCEEDED activity on block. The actual AI dispatch + tool loop lands in the next sub-tick once Skill catalog (Phase 9) + tools (Phase 16) are live; the orchestrator shape doesn't change, only the post-assemble step. ✓ Tick 10
+- [x] **7.5** Extended `BaseFacadeService.resolvePlugin` with new optional `agentProviderOverride` arg that takes precedence over `providerOverride` per `agents/plan.md §2` ("AI provider resolution"). When an Agent has `aiProviderId` set, the caller (AgentRunService → AiFacadeService.createChatCompletion) passes it; the facade resolves through the existing cascade (registry → work-active → defaults → first enabled). No new resolution code path — same cascade with one additional anchor at the top. ✓ Tick 10
 - [x] **7.6** Multi-interval `BudgetService` aggregator (per N6 — `getCurrentPeriodStart` / `getNextPeriodStart` / `isWithinCurrentPeriod` handling hour/day/week/month/unlimited) at `packages/agent/src/agents/budget-period.ts`. ISO-8601 weeks (Monday-anchored UTC), epoch-anchored month buckets for intervalCount > 1, unlimited returns sentinel min/max Dates so callers can short-circuit. ✓ Tick 9
 - [x] **7.7** Unit tests (don't run): `__tests__/prompt-assembler.service.spec.ts` (~15 assertions: heartbeat ordering, per-trigger preambles, tail-first truncation, per-Agent `maxSkillContextTokens` override, empty segments excluded, helpers) + `__tests__/budget-period.spec.ts` (~15 assertions: hour/day/week/month/unlimited anchors + multi-count buckets + DST-safe Sunday handling + month rollover). ✓ Tick 9 (partial — 7.4/7.5 tests land with the code)
 
