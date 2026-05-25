@@ -5,6 +5,8 @@ export * from './agents.service';
 export * from './agent-file.service';
 export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
+export * from './prompt-assembler.service';
+export * from './budget-period';
 export * from './heartbeat-cron';
 export * from './types';
 // Re-export the entity types so api callers don't need a deep import.

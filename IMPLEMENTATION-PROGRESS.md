@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 8
-- **Last tick at**: 2026-05-26 (tick 8 — Phase 6a complete: AgentExportEnvelope + AgentExportService + GET /agents/:id/export + POST /agents/import + skip/overwrite/rename conflict modes + secret-scan on import + web client wrappers + server actions + activity events)
-- **In progress now**: (none — next tick picks up Phase 7 PromptAssembler + AgentRunService — HIGHEST RISK)
+- **Last tick #**: 9
+- **Last tick at**: 2026-05-26 (tick 9 — Phase 7.1–7.3 + 7.6: PromptAssemblerService with 11-segment recipe + per-trigger preambles + token-budget enforcement + tail-first truncation + budget-period math for all 5 intervals. 7.4 AgentRunService.execute + 7.5 BaseFacadeService extension land next tick.)
+- **In progress now**: Phase 7 (7.1–7.3 + 7.6 ticked; 7.4 + 7.5 + 7.7 remaining)
 
 ---
 
@@ -127,13 +127,13 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 7 — AgentRunService + PromptAssemblerService (HIGHEST RISK)
 
-- [ ] **7.1** `PromptAssemblerService.assemble(...)` — 11-segment recipe from `agent-prompt-assembly.md §2`.
-- [ ] **7.2** Per-trigger preamble (heartbeat / task / chat) per §2.1.
-- [ ] **7.3** Token-budget enforcement + tail-first truncation + warning log row.
+- [x] **7.1** `PromptAssemblerService.assemble(...)` — 11-segment recipe from `agent-prompt-assembly.md §2` at `packages/agent/src/agents/prompt-assembler.service.ts`. Returns `{systemMessage, userMessage, segments[], truncations[]}` so callers (and tests) can see what was emitted and what got cut. ✓ Tick 9
+- [x] **7.2** Per-trigger preamble (heartbeat / task / chat) per §2.1 — heartbeat uses `HEARTBEAT.md`; task + chat use the canonical static preambles verbatim from the spec. User message also forks: heartbeat = `"What's the next action…"`, task/chat = immediate input + conversation context (newest last). ✓ Tick 9
+- [x] **7.3** Token-budget enforcement + tail-first truncation + warning log row — char/4 estimator (Phase-7 v1), per-segment caps from the spec table (tools 1500 / skills `agent.maxSkillContextTokens` / scope-context 800 / recent-activity 1200 / recent-runs 800 / output-contract 150) + overall 12 000 system-message cap. Truncation records returned in `.truncations[]` for the caller to emit `AgentRunLog` warning rows. ✓ Tick 9
 - [ ] **7.4** `AgentRunService.execute(context)` — the orchestrator per `agent-prompt-assembly.md §8` pseudocode.
 - [ ] **7.5** Extend `BaseFacadeService.resolvePlugin` to accept `agentId` hint per `agents/plan.md §3.3`.
-- [ ] **7.6** Multi-interval `BudgetService` aggregator (per N6 — `getCurrentPeriodStart` / `getNextPeriodStart` handling hour/day/week/month/unlimited).
-- [ ] **7.7** Tests (don't run).
+- [x] **7.6** Multi-interval `BudgetService` aggregator (per N6 — `getCurrentPeriodStart` / `getNextPeriodStart` / `isWithinCurrentPeriod` handling hour/day/week/month/unlimited) at `packages/agent/src/agents/budget-period.ts`. ISO-8601 weeks (Monday-anchored UTC), epoch-anchored month buckets for intervalCount > 1, unlimited returns sentinel min/max Dates so callers can short-circuit. ✓ Tick 9
+- [x] **7.7** Unit tests (don't run): `__tests__/prompt-assembler.service.spec.ts` (~15 assertions: heartbeat ordering, per-trigger preambles, tail-first truncation, per-Agent `maxSkillContextTokens` override, empty segments excluded, helpers) + `__tests__/budget-period.spec.ts` (~15 assertions: hour/day/week/month/unlimited anchors + multi-count buckets + DST-safe Sunday handling + month rollover). ✓ Tick 9 (partial — 7.4/7.5 tests land with the code)
 
 ### Phase 8 — Skill catalog + entities + read-only API
 

@@ -14,6 +14,7 @@ import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
 import { AgentExportService } from './agent-export.service';
+import { PromptAssemblerService } from './prompt-assembler.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
@@ -41,6 +42,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentFileService,
 		AgentScheduleDispatcherService,
 		AgentExportService,
+		PromptAssemblerService,
 	],
 	exports: [
 		AgentRepository,
@@ -52,6 +54,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		AgentFileService,
 		AgentScheduleDispatcherService,
 		AgentExportService,
+		PromptAssemblerService,
 	],
 })
 export class AgentsModule {}
