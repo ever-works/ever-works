@@ -25,6 +25,10 @@ export enum PluginUsageCapability {
 @Index(['workId', 'capability', 'pluginId', 'occurredAt'])
 @Index(['userId', 'occurredAt'])
 @Index('idx_plugin_usage_events_owner', ['ownerType', 'ownerId'])
+// Agents/Skills/Tasks (PR #1017): per-Agent spend aggregator filter.
+// Migration `AddAgentIdToPluginUsageEvents1779978011000` adds the column +
+// index. No FK to `agents` — archiving an Agent must NOT delete audit rows.
+@Index('idx_plugin_usage_events_agent_occurred', ['agentId', 'occurredAt'])
 @Entity({ name: 'plugin_usage_events' })
 export class PluginUsageEvent {
     @PrimaryGeneratedColumn('uuid')
@@ -67,6 +71,15 @@ export class PluginUsageEvent {
 
     @Column({ type: 'json', nullable: true })
     metadata?: Record<string, any> | null;
+
+    /**
+     * Per-Agent attribution (Agents/Skills/Tasks PR #1017, agents/plan.md
+     * §3.2). Populated by `AgentRunService.execute()` when the AI call is
+     * made inside an Agent's heartbeat / task / chat run. Null for non-
+     * Agent calls (the existing Work-generator flow).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    agentId?: string | null;
 
     /**
      * Polymorphic-owner discriminator (Missions/Ideas/Works spec §8.2).
