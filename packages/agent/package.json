@@ -145,6 +145,10 @@
             "types": "./dist/missions/index.d.ts",
             "default": "./dist/missions/index.js"
         },
+        "./agents": {
+            "types": "./dist/agents/index.d.ts",
+            "default": "./dist/agents/index.js"
+        },
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"

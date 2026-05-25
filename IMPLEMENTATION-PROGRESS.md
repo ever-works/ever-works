@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 3
-- **Last tick at**: 2026-05-25 (tick 3 — Phase 2 complete)
-- **In progress now**: (none — next tick picks up Phase 3 AgentService + Controller)
+- **Last tick #**: 4
+- **Last tick at**: 2026-05-25 (tick 4 — Phase 3 complete)
+- **In progress now**: (none — next tick picks up Phase 4 AgentFileService + file endpoints)
 
 ---
 
@@ -77,11 +77,11 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 3 — AgentService + AgentsController (read-only)
 
-- [ ] **3.1** DTOs under `apps/api/src/agents/dto/` (create, update, list-query, response). class-validator + zod cross-field.
-- [ ] **3.2** `AgentService` (create, findOne, update, archive, list, validateScopeOwnership). Cross-user reads return 404.
-- [ ] **3.3** `AgentsController` with read routes + create/update/archive (no runtime in this phase).
-- [ ] **3.4** Wire `AgentsModule` into `apps/api/src/app.module.ts`.
-- [ ] **3.5** e2e tests in `apps/api/test/agents.e2e-spec.ts` (don't run).
+- [x] **3.1** DTOs under `apps/api/src/agents/dto/agent.dto.ts` — `CreateAgentDto`, `UpdateAgentDto`, `ListAgentsQueryDto`, `AgentPermissionsDto`, `AgentTargetDto`. class-validator decorators throughout (+`@Type` for class-transformer nested validation). ✓ Tick 4
+- [x] **3.2** `AgentsService` at `packages/agent/src/agents/agents.service.ts` — create / getOne / list / update / transition / pause / resume / archive / deleteHard / assertCanAssignAcrossScope. Scope-cascade validation, slug derivation + uniqueness, permission refinement (canOpenPullRequests ⇒ canCommitToRepo), 3-avatar-mode field coherence, user-transition state machine, cross-user 404. ✓ Tick 4
+- [x] **3.3** `AgentsController` at `apps/api/src/agents/agents.controller.ts` — `/api/agents` routes (list, create, get, update, archive/hard-delete via `?hard=true`, pause, resume). `@Throttle` 30/min on writes per `agents/plan.md §7.1`. `@ApiTags('agents')` + `@ApiOperation` per Decision A19 so the MCP whitelist auto-derivation picks each route up. ✓ Tick 4
+- [x] **3.4** `apps/api/src/agents/agents.module.ts` + `packages/agent/src/agents/agents.module.ts` (agent-side module). Wired into `apps/api/src/api.module.ts`. `package.json` of `@ever-works/agent` gets the new `./agents` subpath export so `@ever-works/agent/agents` resolves. ✓ Tick 4
+- [x] **3.5** Service unit tests at `packages/agent/src/agents/__tests__/agents.service.spec.ts` (~20 assertions: scope validation, slug uniqueness, permission refine, avatar pairing, status transitions, cross-scope assignment authorization). e2e scaffold at `apps/api/test/agents.e2e-spec.ts` (skipped pending shared bootstrap helper wire-up). ✓ Tick 4
 
 ### Phase 4 — AgentFileService + file endpoints
 
