@@ -109,6 +109,23 @@ export const ROUTES = {
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
+    // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
+    DASHBOARD_AGENTS: '/agents',
+    DASHBOARD_AGENT_NEW: '/agents/new',
+    DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
+    DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
+    DASHBOARD_AGENT_ACTIVITY: (id: string) => `/agents/${id}/activity`,
+    DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
+    DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
+    DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
+    DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Tasks
+    DASHBOARD_TASKS: '/tasks',
+    DASHBOARD_TASK_NEW: '/tasks/new',
+    DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
+    // Skills
+    DASHBOARD_SKILLS: '/skills',
+    DASHBOARD_SKILL: (id: string) => `/skills/${id}`,
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',

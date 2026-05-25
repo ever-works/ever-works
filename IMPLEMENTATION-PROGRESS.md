@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 5
-- **Last tick at**: 2026-05-25 (tick 5 — Phase 4 complete, except Git-mode write stubbed until Phase 6)
-- **In progress now**: (none — next tick picks up Phase 5 web UI)
+- **Last tick #**: 6
+- **Last tick at**: 2026-05-26 (tick 6 — Phase 5 complete: sidebar nav, i18n keys, /agents list + create + [id] layout + 6 tab pages + Instructions editor + Tasks/Skills placeholders + API client + server actions)
+- **In progress now**: (none — next tick picks up Phase 6 heartbeat dispatcher)
 
 ---
 
@@ -94,13 +94,15 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 5 — Web list + Instructions tab + Create dialog
 
-- [ ] **5.1** Sidebar item insertion in `DashboardSidebar.tsx` for Agents / Tasks / Skills.
-- [ ] **5.2** i18n keys per `features/agents/spec.md §5.1`.
-- [ ] **5.3** `/agents` empty-state page + populated Cards/Table list with view-mode switcher.
-- [ ] **5.4** `/agents/new` 2-step create dialog.
-- [ ] **5.5** `/agents/[id]` layout + tabs (Dashboard / Activity / Instructions / Skills / Budgets / Settings).
-- [ ] **5.6** Instructions tab — 5-pill Tiptap editor reusing `KbEditor.tsx`. 800ms autosave.
-- [ ] **5.7** `apps/web/src/lib/api/agents.ts` client wrappers.
+- [x] **5.1** Sidebar item insertion in `DashboardSidebar.tsx` for Agents / Tasks / Skills. Added Bot/ListChecks/Sparkles lucide imports + 3 nav array entries. ✓ Tick 6
+- [x] **5.2** i18n keys per `features/agents/spec.md §5.1` — `dashboard.navigation.{tasks,agents,skills}` + `dashboard.agentsPage.*` + `dashboard.tasksPage.*` + `dashboard.skillsPage.*` blocks in `apps/web/messages/en.json`. ✓ Tick 6
+- [x] **5.3** `/agents` empty-state page + populated Cards list. View-mode (Cards/Table) switcher deferred to a later sub-tick — v1 is cards-only so the page works immediately. Route constants `DASHBOARD_AGENTS/AGENT_NEW/AGENT(id)/AGENT_*` added to `apps/web/src/lib/constants.ts`. ✓ Tick 6
+- [x] **5.4** `/agents/new` 2-step create dialog (`NewAgentDialog.tsx`). Step 1 scope picker (tenant active, Mission/Work/Idea show "coming soon" since v1 only ships tenant from the +New page; scope-bound Agents land from inside the parent's detail screen in later phases). Step 2 name + optional title; auto-derives slug server-side. ✓ Tick 6
+- [x] **5.5** `/agents/[id]` layout + 6-tab strip (`AgentDetailTabs.tsx`). Layout fetches the Agent once + renders header + tabs + nested `<children>`. Each tab is a placeholder page (Dashboard summary, Activity stub, Instructions, Skills stub, Budgets stub, Settings read-only). ✓ Tick 6
+- [x] **5.6** Instructions tab — 5-pill editor (`AgentInstructionsEditor.tsx`). v1 textarea per pill; Tiptap upgrade reusing `KbEditor.tsx` deferred until the shared editor toolbar is extracted. 800ms autosave debounce + ETag conflict banner + secret/size error banner. Uses `writeAgentFileAction`. ✓ Tick 6
+- [x] **5.7** `apps/web/src/lib/api/agents.ts` client wrappers (`agentsAPI.list/get/create/update/archive/deleteHard/pause/resume/readFile/writeFile`). Server actions in `apps/web/src/app/actions/agents.ts`. ✓ Tick 6
+- [x] **5.8** Tasks + Skills sidebar nav placeholder pages so the routes resolve until Phase 9 / 12 ship the real UI. ✓ Tick 6
+- [x] **5.9** Unit test (don't run): `AgentCard.unit.spec.tsx` — name+scope rendering, initials avatar, heartbeat label states. ✓ Tick 6
 
 ### Phase 6 — Agent heartbeat dispatcher (HIGH RISK)
 

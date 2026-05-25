@@ -562,6 +562,69 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "agentsPage": {
+            "title": "Agents",
+            "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole tenant.",
+            "newAgent": "+ New Agent",
+            "empty": {
+                "title": "No Agents yet.",
+                "subtitle": "Create your first Agent to delegate recurring work. Tenant-scope Agents act across your whole account; Mission- or Work-scoped ones stay focused on a single target."
+            },
+            "card": {
+                "scopeTenant": "Tenant",
+                "scopeMission": "Mission",
+                "scopeWork": "Work",
+                "scopeIdea": "Idea",
+                "statusDraft": "Draft",
+                "statusActive": "Active",
+                "statusPaused": "Paused",
+                "statusRunning": "Running",
+                "statusError": "Error",
+                "statusArchived": "Archived",
+                "noTitle": "(no title)",
+                "noCadence": "No heartbeat",
+                "cadencePrefix": "Heartbeat:"
+            },
+            "tabs": {
+                "dashboard": "Dashboard",
+                "activity": "Activity",
+                "instructions": "Instructions",
+                "skills": "Skills",
+                "budgets": "Budgets",
+                "settings": "Settings"
+            },
+            "newDialog": {
+                "title": "New Agent",
+                "step1Title": "Pick a scope",
+                "step2Title": "Name your Agent",
+                "nameLabel": "Name",
+                "namePlaceholder": "e.g. CEO, Reviewer, Content Drafter",
+                "scopeTenantDesc": "Acts on your whole tenant",
+                "scopeMissionDesc": "Locked to one Mission",
+                "scopeWorkDesc": "Locked to one Work",
+                "scopeIdeaDesc": "Locked to one Idea",
+                "cancel": "Cancel",
+                "back": "Back",
+                "next": "Next",
+                "create": "Create Agent"
+            }
+        },
+        "tasksPage": {
+            "title": "Tasks",
+            "subtitle": "Trackable work items assigned to people or Agents.",
+            "empty": {
+                "title": "No Tasks yet.",
+                "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            }
+        },
+        "skillsPage": {
+            "title": "Skills",
+            "subtitle": "Reusable, versioned instructions Agents can pull into a run when relevant.",
+            "empty": {
+                "title": "No Skills yet.",
+                "subtitle": "Skills ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            }
+        },
         "budgetSummary": {
             "period": "{period}",
             "currentSpend": "Current spend",
@@ -3618,7 +3681,10 @@
                 "missions": "Missions",
                 "ideas": "Ideas",
                 "works": "Works",
+                "tasks": "Tasks",
+                "agents": "Agents",
                 "plugins": "Plugins",
+                "skills": "Skills",
                 "templates": "Templates",
                 "settings": "Settings"
             },
