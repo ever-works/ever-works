@@ -366,9 +366,18 @@ Schema:
 
 When the tenant has no file storage configured, the `image` radio option is disabled with a tooltip: "Upload requires storage plugin — enable in /plugins."
 
-## 5.11 Export (v1, read-only)
+## 5.11 Export AND import in v1 [N5 operator override — was ★a "export only"]
 
-`GET /agents/:id/export` returns a JSON envelope: `{meta, soulMd, agentsMd, heartbeatMd, toolsMd, agentYml}`. Sharable text snapshot. Import deferred to v2. See [QUESTIONS N5](../../QUESTIONS-agents-skills-tasks.md#n5--agent-export).
+Both directions ship in v1:
+
+- **Export**: `GET /agents/:id/export` returns a JSON envelope: `{meta, soulMd, agentsMd, heartbeatMd, toolsMd, agentYml, skillBindings, budget, avatar}`. Sharable text snapshot.
+- **Import**: `POST /agents/import` accepts the same envelope shape. Creates a new Agent at the requested scope. Conflict on `(userId, scope, slug)` resolves per `?onConflict=skip|overwrite|rename` query param (default `rename` — appends `-2`, `-3`, etc.). Image avatars in the export envelope carry the upload bytes inline (base64); on import, those are re-uploaded via the existing KB upload pipeline and re-linked.
+
+Round-tripping is byte-stable for everything except: image upload IDs (re-issued), creation timestamps (refreshed), and the slug (when renamed on conflict).
+
+Use cases: backup/restore one Agent, share an Agent with another tenant's user, migrate an Agent between scopes (export at one scope, edit envelope JSON to switch scope, import).
+
+This is **distinct from** the bulk account-transfer flow in [ADR-008](../../decisions/008-tenant-control-repo-deferred-to-v2.md), which round-trips ALL tenant data via the user's GitHub sync repo. The single-Agent export/import is faster and doesn't require GitHub auth.
 
 ## 6. Out of Scope (v1)
 

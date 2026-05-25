@@ -551,7 +551,7 @@ Existing tenants with Works (no Missions/Agents/Skills/Tasks) need to land safel
 
 ---
 
-### K4 — Should I look at the existing `mcp-atlassian` MCP integration as a precedent for "Agent talks to external service via MCP"? [Open]
+### K4 — Should I look at the existing `mcp-atlassian` MCP integration as a precedent for "Agent talks to external service via MCP"? [Answered: ★ default per recommendation]
 
 Long-shot: the platform has an MCP server (`apps/mcp/`) that already exposes Mission/Idea/Account-usage endpoints. Could an Agent use the same MCP transport to call out to external systems?
 
@@ -578,7 +578,7 @@ Should the prompt-assembly distinguish "chat message from owner of the Agent" vs
 - ★ **L2-a — No automatic distinction.** All chat messages get the same `<chat-message author="...">` wrap. The Agent's SOUL/AGENTS.md can encode "weight my owner's messages higher."
 - L2-b — Automatic trust tier: owner's messages render in `<owner-message>`; others in `<collaborator-message>`. Adds complexity; users may not need it.
 
-### L3 — Secret-scan posture by surface [Open]
+### L3 — Secret-scan posture by surface [Answered: ★ default per recommendation]
 
 Two modes proposed in [security §6](./architecture/security-agents-skills-tasks.md):
 
@@ -591,14 +591,14 @@ Confirm split, or pick uniformly:
 - L3-b — Hard-reject everywhere; explain to user inline.
 - L3-c — Redact everywhere; least friction.
 
-### L4 — Cross-tenant Agent → MCP exposure [Open]
+### L4 — Cross-tenant Agent → MCP exposure [Answered: ★ default per recommendation]
 
 When the platform's MCP server (`apps/mcp/`) eventually exposes Agent/Task tools, should the auth model be:
 
 - ★ **L4-a — Defer the question to v2** when MCP exposure ships.
 - L4-b — Lock in now: MCP only sees user-scoped resources; never cross-tenant.
 
-### L5 — Agent commit signing on GitHub [Open]
+### L5 — Agent commit signing on GitHub [Answered: ★ default per recommendation]
 
 v1: Agents commit unsigned. Should we require signing?
 
@@ -610,14 +610,14 @@ v1: Agents commit unsigned. Should we require signing?
 
 ## M. API surface
 
-### M1 — Idempotency on `POST /tasks/:id/chat` [Open]
+### M1 — Idempotency on `POST /tasks/:id/chat` [Answered: ★ default per recommendation]
 
 Should chat-post accept `Idempotency-Key` header? UI double-clicks on send are a known source of duplicate dispatches.
 
 - ★ **M1-a — Yes**. Accept `Idempotency-Key` header; if duplicate, return the existing row.
 - M1-b — No; rely on debounce in UI.
 
-### M2 — Idempotency on other POSTs [Open]
+### M2 — Idempotency on other POSTs [Answered: ★ default per recommendation]
 
 Confirm:
 - `POST /agents`, `POST /tasks`: UNIQUE constraint handles double-submit; no header needed. ★
@@ -626,28 +626,28 @@ Confirm:
 
 If you'd rather have header support on all writes, say so.
 
-### M3 — Chat pagination shape [Open]
+### M3 — Chat pagination shape [Answered: ★ default per recommendation]
 
 Existing platform uses offset pagination with `{data, meta:{total,limit,offset}}`. For task chat (reverse-chronological, "scroll up loads older"):
 
 - ★ **M3-a — Use offset for v1 with `order=desc`.** Accept the rare "insertion happens at boundary" duplicate.
 - M3-b — Introduce cursor pagination just for chat. Precedent-setting; needs an ADR.
 
-### M4 — API versioning of new endpoints [Open]
+### M4 — API versioning of new endpoints [Answered: ★ default per recommendation]
 
 Existing platform uses `/api/...` (unversioned) except `/api/v1/chat/completions` for OpenAI-compat. Confirm we follow `/api/agents`, `/api/skills`, `/api/tasks` (unversioned) per spec.
 
 - ★ **M4-a — Unversioned, matching platform.**
 - M4-b — Version under `/api/v1/agents/...` from day one to keep room.
 
-### M5 — API key access to Agent endpoints [Open]
+### M5 — API key access to Agent endpoints [Answered: ★ default per recommendation]
 
 The platform supports both JWT session + API keys. For new endpoints, accept both?
 
 - ★ **M5-a — Session-only in v1.** Adds API-key support when MCP exposure / external automation requires it.
 - M5-b — Both session + API key from day one.
 
-### M6 — `Idempotency-Key` storage / retention [Open]
+### M6 — `Idempotency-Key` storage / retention [Answered: ★ default per recommendation]
 
 If we accept `Idempotency-Key`, where do we store the request→response cache?
 
@@ -658,7 +658,7 @@ If we accept `Idempotency-Key`, where do we store the request→response cache?
 
 ## N. Operational & lifecycle
 
-### N1 — Cascade on Mission delete [Open]
+### N1 — Cascade on Mission delete [Answered: ★ default per recommendation]
 
 Today, deleting a Mission cascades to its Ideas via the existing FK. The new Agents/Tasks on that Mission cascade too. **Open question**: the Mission's `missionRepo` on GitHub stays untouched (we don't auto-delete user-owned GitHub repos). Should the UI:
 
@@ -668,7 +668,7 @@ Today, deleting a Mission cascades to its Ideas via the existing FK. The new Age
 
 Same question applies to Work delete vs `dataRepo`/`websiteRepo`. (This is somewhat orthogonal to Agents but discovered in round 3.)
 
-### N2 — Agent `pauseAfterFailures` notification channel [Open]
+### N2 — Agent `pauseAfterFailures` notification channel [Answered: ★ default per recommendation]
 
 When the threshold trips, notify via:
 
@@ -676,7 +676,7 @@ When the threshold trips, notify via:
 - N2-b — In-app only.
 - N2-c — Slack / Discord webhook (defer to v2).
 
-### N3 — Dispatcher health monitoring [Open]
+### N3 — Dispatcher health monitoring [Answered: ★ default per recommendation]
 
 The new `agent-heartbeat-dispatcher` runs every minute. If it stalls (e.g. Trigger.dev outage), how do we know?
 
@@ -684,21 +684,21 @@ The new `agent-heartbeat-dispatcher` runs every minute. If it stalls (e.g. Trigg
 - N3-b — Add a `/health/agents` endpoint that reports last tick time. Surface on admin page.
 - N3-c — PagerDuty integration. Defer.
 
-### N4 — Per-Agent dry-run mode [Open]
+### N4 — Per-Agent dry-run mode [Answered: ★ default per recommendation]
 
 A `POST /agents/:id/dry-run` would build the prompt + estimate cost + return the would-have-been-sent payload but NOT call the AI provider. Useful during onboarding.
 
 - ★ **N4-a — Ship in v1.** Cheap, valuable for prompt iteration.
 - N4-b — Defer to v2.
 
-### N5 — Agent export [Open]
+### N5 — Agent export [Answered: override — BOTH export AND import ship in v1 (was ★a "export only")]
 
 `GET /agents/:id/export` returns JSON: meta + 5 MD files. Sharable; round-trippable.
 
 - ★ **N5-a — Ship export in v1; import deferred to v2.**
 - N5-b — Skip both for v1.
 
-### N6 — `AgentBudget.intervalUnit` v1 set [Open]
+### N6 — `AgentBudget.intervalUnit` v1 set [Answered: b (operator override — keep all 5 intervalUnit values + implement multi-interval aggregator from day one)]
 
 The proposed enum was `hour | day | week | month | unlimited`. The existing `BudgetService` only aggregates calendar months. To not under-deliver, v1 supports only:
 
@@ -706,28 +706,28 @@ The proposed enum was `hour | day | week | month | unlimited`. The existing `Bud
 - N6-b — Keep all 5 values in schema; implement aggregator for all from day one.
 - N6-c — Keep enum; show an error toast if user picks unsupported value.
 
-### N7 — Concurrent file edit conflict UI [Open]
+### N7 — Concurrent file edit conflict UI [Answered: ★ default per recommendation]
 
 When `editAgentFile` (UI or Agent tool) hits `precondition_failed` due to hash mismatch:
 
 - ★ **N7-a — Toast + "Reload to see the latest" link.** Don't try auto-merge.
 - N7-b — Side-by-side merge UI. Overkill for v1.
 
-### N8 — `agent_runs` retention [Open]
+### N8 — `agent_runs` retention [Answered: ★ default per recommendation]
 
 Hot Agent at 1-min heartbeat → ~525k rows/year/Agent. Keep all?
 
 - ★ **N8-a — Keep all in v1.** Same posture as `WorkGenerationHistory`. Revisit if storage bites.
 - N8-b — Hard cap last 10k per Agent + nightly prune. Configurable.
 
-### N9 — `agent-chat-reply` dedup on burst mentions [Open]
+### N9 — `agent-chat-reply` dedup on burst mentions [Answered: ★ default per recommendation]
 
 When a user posts 5 mentions of the same agent in 30s:
 
 - ★ **N9-a — Append-to-context**: if there's an in-flight `agent-chat-reply` run for `(taskId, agentId)`, queue the new mention as additional context to that run rather than dispatching a 2nd.
 - N9-b — Dispatch each separately. Costs add up; spam-magnet.
 
-### N10 — Streaming chat response into Task chat [Open]
+### N10 — Streaming chat response into Task chat [Answered: ★ default per recommendation]
 
 When Agent replies to a chat mention:
 
@@ -735,14 +735,14 @@ When Agent replies to a chat mention:
 - N10-b — Full message at end of run. Simpler; worse UX (long pauses).
 - N10-c — End-to-end SSE from worker to browser. Best UX; new infra.
 
-### N11 — Mission tick "cap-hit" persistence (out-of-this-PR fix) [Open]
+### N11 — Mission tick "cap-hit" persistence (out-of-this-PR fix) [Answered: ★ default per recommendation]
 
 Per [G1](#g1--mission-tick-cap-hit-events-are-not-persisted-today): research found Mission tick cap-hit outcomes aren't persisted to DB today. This is a develop bug, not part of Agents/Skills/Tasks scope.
 
 - ★ **N11-a — Split into a separate PR after Agents/Skills/Tasks specs are approved.** Don't conflate.
 - N11-b — Fold into this PR set as a one-line additional activity event.
 
-### N12 — Worker bootstrap cost for many Agents [Open]
+### N12 — Worker bootstrap cost for many Agents [Answered: ★ default per recommendation]
 
 The current `mission-tick` task bootstraps NestJS on each fire. With many active Agents firing per-minute, this multiplies. Are we OK with the existing pattern, or do we want a long-running worker that bootstraps once and processes many?
 
@@ -753,7 +753,7 @@ The current `mission-tick` task bootstraps NestJS on each fire. With many active
 
 ## O. Naming / clarity (round 3 additions)
 
-### O1 — "active" overload [Open]
+### O1 — "active" overload [Answered: ★ default per recommendation]
 
 Three different meanings of "active":
 - `Agent.status = 'active'` (lifecycle)
@@ -763,14 +763,14 @@ Three different meanings of "active":
 Pick one term per surface:
 - ★ **O1-a — Lifecycle: `status` (active/paused/error/draft/archived). Skill bindings: `enabled`. Tenant Agent membership: `scope`.** Tightens copy in 3 places.
 
-### O2 — "Heartbeat" — keep or rename? [Open]
+### O2 — "Heartbeat" — keep or rename? [Answered: ★ default per recommendation]
 
 `Heartbeat` means "Agent's idle tick to decide what to do next" — risks misreading as "health check."
 
 - ★ **O2-a — Keep.** Clarify in empty-state copy.
 - O2-b — Rename to `Tick` or `Routine`.
 
-### O3 — `agent.yml` vs uppercase MD files [Open]
+### O3 — `agent.yml` vs uppercase MD files [Answered: ★ default per recommendation]
 
 - ★ **O3-a — Keep proposed convention** (yml lowercase, MD uppercase). Document once in agents/spec.md naming section.
 
@@ -778,7 +778,7 @@ Pick one term per surface:
 
 ## P. Product / UX decisions
 
-### P1 — Initial set of templates in `ever-works/agents` [Open]
+### P1 — Initial set of templates in `ever-works/agents` [Answered: a — six starters seeded in ever-works/agents repo (CEO, CTO, Researcher, PR-Reviewer, Editor, Designer)]
 
 Per [ADR-011](./decisions/011-agent-templates-in-separate-repo.md), Agent templates live in the separate community repo [`ever-works/agents`](https://github.com/ever-works/agents). What's the curated set Ever Works seeds the repo with at launch?
 
@@ -788,14 +788,14 @@ Per [ADR-011](./decisions/011-agent-templates-in-separate-repo.md), Agent templa
 
 (Community can PR additional templates after launch regardless of starting set.)
 
-### P2 — "Run first heartbeat now" checkbox default [Open]
+### P2 — "Run first heartbeat now" checkbox default [Answered: ★ default per recommendation]
 
 The create-Agent dialog has `☑ Run first heartbeat now after creating` checked by default ([UX-DESIGN §4.2](./features/UX-DESIGN-agents-skills-tasks.md)).
 
 - ★ **P2-a — Default checked.** Delivers the wow moment.
 - P2-b — Default unchecked. Risk-averse; user might be surprised by an unintended AI bill.
 
-### P3 — Default budget cap [Open]
+### P3 — Default budget cap [Answered: ★ default per recommendation]
 
 UX shows `$20 per month` default in the create dialog.
 
@@ -803,7 +803,7 @@ UX shows `$20 per month` default in the create dialog.
 - P3-b — $5/month default; nudge user to raise on first hit.
 - P3-c — No budget by default; surface a warning when first exceeds $5.
 
-### P4 — Onboarding announcement modal for existing tenants [Open]
+### P4 — Onboarding announcement modal for existing tenants [Answered: override — NO announcement modal at all; no real users yet, no need]
 
 Existing tenants log in after release; see modal explaining the 3 new features.
 
@@ -811,7 +811,7 @@ Existing tenants log in after release; see modal explaining the 3 new features.
 - P4-b — No modal; rely on Dashboard tile prompts. Less interruptive.
 - P4-c — Modal with split CTAs ("Tour Agents", "Tour Tasks", "Dismiss").
 
-### P5 — Notification email opt-in default [Open]
+### P5 — Notification email opt-in default [Answered: ★ default per recommendation]
 
 For new feature events (Agent paused, Task assigned to you):
 
@@ -819,20 +819,20 @@ For new feature events (Agent paused, Task assigned to you):
 - P5-b — Default OFF for everything; user opts in explicitly.
 - P5-c — Default ON for everything; user opts out.
 
-### P6 — Mobile scope for v1 [Open]
+### P6 — Mobile scope for v1 [Answered: ★ default per recommendation]
 
 - ★ **P6-a — "Functional, not delightful."** Sidebar collapses, Cards default on mobile, Kanban hidden on phone. Tiptap basic mobile support. Defer "delightful mobile" to v2.
 - P6-b — Full parity with desktop.
 - P6-c — Mobile completely out of scope; redirect to desktop.
 
-### P7 — "Start by creating CEO Agent" empty-state button [Open]
+### P7 — "Start by creating CEO Agent" empty-state button [Answered: ★ default per recommendation]
 
 The `/agents` empty state has a `[ Start by creating CEO Agent ]` quick-create button that one-clicks a tenant-scoped CEO Agent from the `ever-works/agents` repo's CEO template.
 
 - ★ **P7-a — Ship.** Single-click path to the wow moment for first-time users.
 - P7-b — Don't ship; only show `[ + New Agent ]` button. User must go through the 2-step dialog every time.
 
-### P8 — "Wow moment" telemetry [Open]
+### P8 — "Wow moment" telemetry [Answered: ★ default per recommendation]
 
 Tracking time-from-create to first-completed-heartbeat as a launch KPI.
 
@@ -843,34 +843,34 @@ Tracking time-from-create to first-completed-heartbeat as a launch KPI.
 
 ## Q. Engineering concerns
 
-### Q1 — Skill catalog process-local cache vs distributed [Open]
+### Q1 — Skill catalog process-local cache vs distributed [Answered: ★ default per recommendation]
 
 UX-DESIGN says catalog cached in process memory. The platform uses TypeORM-backed distributed cache for most read-heavy state.
 
 - ★ **Q1-a — Process-local for catalog.** Bytes are bundled; no reason to round-trip to Redis/DB for static content. Restart-required to refresh.
 - Q1-b — Distributed cache via existing `cache_entries`. Aligns with platform posture; small overhead.
 
-### Q2 — Migration ordering safety [Open]
+### Q2 — Migration ordering safety [Answered: ★ default per recommendation]
 
 The 7 migrations in [implementation-reuse-map §6](./architecture/implementation-reuse-map.md) order. Confirm:
 
 - ★ **Q2-a — Sequential order in named timestamps.** TypeORM applies in filename order; safe rollback per-PR.
 - Q2-b — Bundle all 7 into a single mega-migration.
 
-### Q3 — Worker NestJS bootstrap cost per heartbeat run [Open]
+### Q3 — Worker NestJS bootstrap cost per heartbeat run [Answered: ★ default per recommendation]
 
 Each `agent-heartbeat` task bootstraps Nest. With many active Agents, this multiplies.
 
 - ★ **Q3-a — Match existing pattern.** Identical cost profile to today's Work generation tasks. If per-run bootstrap becomes a bottleneck, address in a separate platform-wide optimization PR.
 - Q3-b — Long-running worker that handles many Agents in one process. New infra; defer.
 
-### Q4 — Test plan: where to mock the AI provider? [Open]
+### Q4 — Test plan: where to mock the AI provider? [Answered: ★ default per recommendation]
 
 - ★ **Q4-a — Mock at the `AiFacadeService` level** (existing pattern). All tests `jest.spyOn(facade, 'createChatCompletion').mockResolvedValue(canned)`.
 - Q4-b — Test against a real provider in a dedicated CI job. Costs $; covers integration.
 - Q4-c — Both: unit tests mock; one Playwright job/week hits real provider for the full happy path.
 
-### Q5 — Local dev: how to test heartbeats without Trigger.dev? [Open]
+### Q5 — Local dev: how to test heartbeats without Trigger.dev? [Answered: ★ default per recommendation]
 
 - ★ **Q5-a — `POST /agents/:id/run-now` button in UI works locally** without Trigger.dev (calls the service directly).
 - Q5-b — Local `pnpm dev:trigger` runs the dev Trigger.dev server (already exists).
@@ -882,42 +882,42 @@ Each `agent-heartbeat` task bootstraps Nest. With many active Agents, this multi
 - Q6-b — One mega-flag `FEATURE_WORKSHOP` covering all three.
 - Q6-c — No flags; default on for everyone.
 
-### Q7 — E2E test cost on CI [Open]
+### Q7 — E2E test cost on CI [Answered: ★ default per recommendation]
 
 Playwright e2e for the wow-moment flow (create → heartbeat → result) needs an AI call.
 
 - ★ **Q7-a — Mock AI in CI; one weekly job hits real provider.** $5/month total.
 - Q7-b — Mock always; never real provider in CI.
 
-### Q8 — Trigger.dev run volume cost [Open]
+### Q8 — Trigger.dev run volume cost [Answered: ★ default per recommendation]
 
 [implementation-reuse-map §12](./architecture/implementation-reuse-map.md) estimates +525k runs/month if 100 Agents heartbeat per minute. Confirm Trigger.dev tier covers this.
 
 - ★ **Q8-a — Confirm cost before launch.** Surface to operator now so we can budget.
 - Q8-b — Cap heartbeat cadence at daily by default. Reduces volume 1440×.
 
-### Q9 — DB index pre-flight [Open]
+### Q9 — DB index pre-flight [Answered: ★ default per recommendation]
 
 For all hot-path queries, pre-flight EXPLAIN before merge. Index list per [implementation-reuse-map §7](./architecture/implementation-reuse-map.md).
 
 - ★ **Q9-a — Pre-flight in PR review.** Reviewer asks for EXPLAIN output on any new query.
 - Q9-b — Trust the indexes; address slow queries post-launch via monitoring.
 
-### Q10 — Plugin uninstall mid-run [Open]
+### Q10 — Plugin uninstall mid-run [Answered: ★ default per recommendation]
 
 What if a user disables their AI provider plugin while an Agent run is in flight?
 
 - ★ **Q10-a — Run completes; next run fails with `provider_error`. Auto-pause after threshold.**
 - Q10-b — Cancel the in-flight run. More disruptive.
 
-### Q11 — Updates to templates in `ever-works/agents` [Open]
+### Q11 — Updates to templates in `ever-works/agents` [Answered: ★ default per recommendation]
 
 When `ever-works/agents` ships a new version of (say) the CEO template, do existing user-Agents created from it get notified / updated?
 
 - ★ **Q11-a — No.** Templates are fork-once; existing user Agents are immutable once created. The user owns their `.works/agents/ceo/` files outright; we don't re-pull. Same posture as Mission Templates today.
 - Q11-b — Optional "Update available" prompt on the Agent detail page that diff-applies the template update.
 
-### Q12 — `EVER_WORKS_AGENTS_REF` pinning [Open]
+### Q12 — `EVER_WORKS_AGENTS_REF` pinning [Answered: ★ default per recommendation]
 
 Which ref of `ever-works/agents` does the platform read by default?
 
@@ -925,7 +925,7 @@ Which ref of `ever-works/agents` does the platform read by default?
 - Q12-b — `main` branch. Bleeding edge; risk of broken templates surfacing immediately.
 - Q12-c — Hard-coded ref per platform release. Most conservative; templates evolve only with platform deploys.
 
-### Q13 — Local override for self-hosted [Open]
+### Q13 — Local override for self-hosted [Answered: ★ default per recommendation]
 
 For self-hosted / offline users:
 
@@ -943,14 +943,14 @@ See [ADR-010](./decisions/010-templates-stay-independent-for-v1.md).
 - ★ **R1-a — Keep templates independent for v1.** Each kind has its own service.
 - R1-b — Unify in v1 under `WorkshopTemplate` with discriminator.
 
-### R2 — Cross-link templates between catalogs [Open]
+### R2 — Cross-link templates between catalogs [Answered: ★ default per recommendation]
 
 User on a Mission Template page sees "This template also includes 2 Agents and 1 Skill" — should that be linked across the three catalogs?
 
 - ★ **R2-a — Yes.** Mission Template manifests already list `agents:` and `skills:` arrays; the UI surfaces them.
 - R2-b — No cross-links; each catalog stays siloed.
 
-### R3 — Should there be a "Browse all templates" page? [Open]
+### R3 — Should there be a "Browse all templates" page? [Answered: ★ default per recommendation]
 
 A single page showing Mission templates + Agent templates from `ever-works/agents` + Skill catalog + (future) Task templates.
 
@@ -961,21 +961,21 @@ A single page showing Mission templates + Agent templates from `ever-works/agent
 
 ## S. Open-source & self-hosted angle
 
-### S1 — Self-hosted users: same default off? [Open]
+### S1 — Self-hosted users: same default off? [Answered: ★ default per recommendation]
 
 Open-source self-hosted instances get all features default ON immediately (no rollout) vs. opt-in like SaaS tenants?
 
 - ★ **S1-a — Default ON for self-hosted.** They opted into the platform; no reason to gate.
 - S1-b — Same default OFF; admin enables.
 
-### S2 — Catalog skills under MIT vs more permissive? [Open]
+### S2 — Catalog skills under MIT vs more permissive? [Answered: ★ default per recommendation]
 
 Catalog skills shipped in the platform repo inherit the platform's MIT license. Confirm this is OK for prompt content (it should be).
 
 - ★ **S2-a — MIT inherits, no separate license.**
 - S2-b — Separate LICENSE in `apps/api/src/skills/catalog/LICENSE` carving out skill content as CC-0.
 
-### S3 — Encourage community catalog contributions? [Open]
+### S3 — Encourage community catalog contributions? [Answered: ★ default per recommendation]
 
 Community can PR a new catalog skill against the platform repo.
 

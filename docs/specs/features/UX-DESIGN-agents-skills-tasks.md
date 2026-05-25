@@ -602,16 +602,22 @@ Step 5 — last step before finishing onboarding:
 - Surfaces the most-popular catalog skills (curated subset of ~6) with a "Browse all" link to the full `/skills` page.
 - When a user selects skills AND has created Agents in step 4, "Auto-attach" defaults checked — saves a follow-up navigation.
 
-### 11.3 No post-onboarding announcement modal
+### 11.3 No announcement modal, no existing-user migration story [P4 + K3 — explicit]
 
-There is **no separate one-time announcement modal** for existing tenants. The features are discoverable via:
+**There is no announcement modal for existing tenants. There is no migration doc / coachmark / overlay / banner.** Per operator P4 (round 9):
 
-- New sidebar items (Agents, Tasks, Skills) visible immediately after release.
-- Dashboard empty tiles ("Agents enabled — 0 · [Get started →]").
-- A short blog post / changelog entry on the docs site.
-- The Mission/Work create flow re-runs the new wizard steps for tenants who go through it again — they see the Agents and Skills steps as new.
+> "P4 — Onboarding announcement modal for existing tenants — NO NEED THIS! WE DO NOT HAVE ANY REAL USERS YET, WE DON'T NEED SUCH THINGS!!!"
 
-Existing tenants who never re-trigger the wizard can still discover via sidebar + dashboard prompts; we do not interrupt their normal session with a modal.
+And per K3 (round 8):
+
+> "K3 — NO, we don't care much about existing users at this stage, as long as nothing broke we are fine etc."
+
+Discovery is entirely passive:
+- New sidebar items (Agents, Tasks, Skills) appear after deploy. Users see them or they don't.
+- Dashboard empty tiles ("Agents enabled — 0") for users who notice.
+- Onboarding wizard's new optional steps (§11.1 + §11.2) for any user who happens to re-run onboarding.
+
+No backwards-compat code, no migration job, no announcement infrastructure to build.
 
 ---
 

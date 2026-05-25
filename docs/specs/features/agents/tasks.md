@@ -57,6 +57,7 @@ Phases 1-3 land MVP (Agent entity + Instructions tab + heartbeat runtime). Phase
 - [ ] **T32**. Implement `AgentRunService.execute()` in `packages/agent/src/agents/agent-run.service.ts`. Phases: load context → assemble prompt → resolve provider → enforce budget → AI call → handle response (file edits, task creates) → write summary → emit activity. **Test**: unit-test each phase with mocked facade.
 - [ ] **T33**. Extend `BaseFacadeService.resolvePlugin` to accept an `agentId` hint that resolves via `agent.aiProviderId` → existing cascade. Default the call sites that don't pass `agentId` to current behavior. **Test**: facade unit tests get an additional `agentId` case.
 - [ ] **T34**. Extend `BudgetGuardService` to accept `ownerType: 'work' | 'agent'`. Reuses the polymorphic-owner SQL already in `WorkBudgetRepository`. Add `AgentBudgetRepository.findByAgentId` and `aggregateSpend(agentId, intervalStart)`.
+- [ ] **T34a**. **[N6 override]** Implement multi-interval aggregator in `BudgetService`. New helpers `getCurrentPeriodStart(intervalUnit, intervalAnchor, now)` and `getNextPeriodStart(intervalUnit, intervalAnchor, now)` handling `'hour' | 'day' | 'week' | 'month' | 'unlimited'`. `'month'` keeps the existing calendar-month-UTC semantics; `'hour' | 'day' | 'week'` roll forward from `intervalAnchor` (so an Agent created at 09:42 UTC with `intervalUnit = 'hour'` resets at 10:42, 11:42, …); `'unlimited'` returns sentinel never-reset. Aggregator queries `plugin_usage_events WHERE agentId = ? AND occurredAt >= periodStart`. **Test**: per-interval-unit aggregation correctness on synthetic event series.
 - [ ] **T35**. Wire `AgentRunService` into the internal RPC channel — add it to the `createRemoteProxy(client, 'AgentRunService')` proxy table in `apps/api/src/trigger/trigger-internal.controller.ts`.
 - [ ] **T36**. Add `POST /agents/:id/run-now` controller action. Validates the agent is `active` (or `draft` and user opted in), inserts an `agent_runs` row, calls `runs.trigger`. Returns the runId. Rate-limit 5 RPM/user.
 - [ ] **T37**. Add `POST /agents/:id/runs/:runId/cancel` → calls `runs.cancel(triggerRunId)` (same as `cancel work generation` flow). Writes `agent_runs.status='cancelled'`.
@@ -109,6 +110,19 @@ Phases 1-3 land MVP (Agent entity + Instructions tab + heartbeat runtime). Phase
 - [ ] **T62**. Insert matching `agents` + `skills` rows (status=`draft`) using the template's `.works/mission.yml` `agents`/`skills` arrays.
 - [ ] **T63**. Playwright e2e: instantiate a Mission Template that declares 2 agents → 2 `draft` agents appear in `/missions/[id]/agents`; their MD files are present in the new mission repo.
 - [ ] **T64**. Add a sample Mission Template (e.g. `ever-works/p2p-marketplace-mission-template`) with a CEO + VP-Engineering agent under `.works/agents/` and a `pr-review` skill under `.works/skills/`. Smoke-test instantiation.
+
+## Phase 6a — Single-Agent export + import [N5 operator override]
+
+> The bulk account-transfer flow lives in Phase 7. This phase adds a per-Agent quick export/import for sharing one Agent at a time without the GitHub-sync overhead.
+
+- [ ] **T64a**. DTO `AgentExportEnvelope` in `apps/api/src/agents/dto/agent-export.dto.ts` — fields per `features/agents/spec.md §5.11`. Includes optional inline base64 image bytes if avatar mode = `image`.
+- [ ] **T64b**. `AgentExportService.exportOne(agentId): AgentExportEnvelope` — assembles the envelope. Inlines image bytes via the existing KB upload repository.
+- [ ] **T64c**. Controller route `GET /agents/:id/export` returning the envelope (JSON body, `Content-Disposition: attachment; filename="agent-<slug>.json"` for browser download).
+- [ ] **T64d**. `AgentImportService.importOne(envelope, options): Agent` — validates against the Zod schema from `agent-yml-manifest-schema.md`; resolves conflict on `(userId, scope, slug)` per `?onConflict=skip|overwrite|rename` (default `rename`). Inline image bytes round-trip via existing KB upload pipeline.
+- [ ] **T64e**. Controller route `POST /agents/import?scope=...&missionId=...&onConflict=...` accepting `AgentExportEnvelope` body. Returns the created Agent.
+- [ ] **T64f**. UI: "Export" button on Agent detail page header → triggers download. "Import Agent" CTA on `/agents` list page → file picker → preview modal → confirm-and-create. Conflict-resolution radio in the modal.
+- [ ] **T64g**. Activity events `AGENT_EXPORTED`, `AGENT_IMPORTED`.
+- [ ] **T64h**. Playwright e2e: export an Agent with image avatar → re-import as `agent-2` → verify byte-equality of MD files and re-upload of image.
 
 ## Phase 7 — Account-transfer (Export / Import / GitHub Sync) extension
 

@@ -247,9 +247,14 @@ export class AgentRunLog {
 export class AgentBudget {
     @PrimaryGeneratedColumn('uuid') id: string;
     @Column('uuid') agentId: string;
-    // v1 supports only 'month' and 'unlimited' due to BudgetService aggregation constraints
-    // (see QUESTIONS N6). 'hour' | 'day' | 'week' reserved for v2.
-    @Column({ length: 16 }) intervalUnit: 'month' | 'unlimited';
+    // v1 supports all 5 intervals per operator N6 override (round 9). Implements
+    // multi-interval aggregator inside BudgetService (see tasks T34a in agents/tasks.md).
+    @Column({ length: 16 }) intervalUnit: 'hour' | 'day' | 'week' | 'month' | 'unlimited';
+
+    // Anchor timestamp for sub-month intervals. UTC. For 'month' = calendar-month boundary
+    // (ignored at write; recomputed); for 'unlimited' = null. For 'hour'/'day'/'week' =
+    // the moment the budget was created (or last reset) — periods roll forward from there.
+    @Column({ type: 'timestamp', nullable: true }) intervalAnchor?: Date | null;
     @Column({ type: 'int' }) capCents: number;
     @Column({ length: 3, default: 'usd' }) currency: string;
     @Column({ type: 'boolean', default: false }) allowOverage: boolean;
