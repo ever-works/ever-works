@@ -534,6 +534,223 @@ Long-shot: the platform has an MCP server (`apps/mcp/`) that already exposes Mis
 
 ---
 
+## L. Security & threats
+
+### L1 — Prompt-injection framing in KB document reads
+
+When an Agent's tool fetches a KB doc, we wrap the body in `<kb-document trust="user-content">` tags with a reminder to ignore embedded instructions ([security-agents-skills-tasks.md §3](./architecture/security-agents-skills-tasks.md)). How aggressive should the framing be?
+
+- ★ **L1-a — Light framing (current draft)**: wrap + single reminder line in system message.
+- L1-b — Heavy framing: wrap + reminder + post-fetch sanitization (strip lines starting with "ignore", "system:", "you are", "now do") before injection.
+- L1-c — Disable injection of any KB body for Agents that have `canCommitToRepo = true` (require explicit `getKbDocument` tool call instead of auto-injection).
+
+L1-b is invasive (false positives on legitimate content); L1-c is safest but harms UX. v1 ships L1-a; L1-c could be a per-Agent opt-in.
+
+### L2 — Trust tiers in chat messages
+
+Should the prompt-assembly distinguish "chat message from owner of the Agent" vs "chat message from a Work collaborator"?
+
+- ★ **L2-a — No automatic distinction.** All chat messages get the same `<chat-message author="...">` wrap. The Agent's SOUL/AGENTS.md can encode "weight my owner's messages higher."
+- L2-b — Automatic trust tier: owner's messages render in `<owner-message>`; others in `<collaborator-message>`. Adds complexity; users may not need it.
+
+### L3 — Secret-scan posture by surface
+
+Two modes proposed in [security §6](./architecture/security-agents-skills-tasks.md):
+
+- **Hard-reject** on agent files + skill bodies (deliberate authoring).
+- **Redact** on task descriptions + chat messages (in-the-moment input).
+
+Confirm split, or pick uniformly:
+
+- ★ **L3-a — Split as above.**
+- L3-b — Hard-reject everywhere; explain to user inline.
+- L3-c — Redact everywhere; least friction.
+
+### L4 — Cross-tenant Agent → MCP exposure
+
+When the platform's MCP server (`apps/mcp/`) eventually exposes Agent/Task tools, should the auth model be:
+
+- ★ **L4-a — Defer the question to v2** when MCP exposure ships.
+- L4-b — Lock in now: MCP only sees user-scoped resources; never cross-tenant.
+
+### L5 — Agent commit signing on GitHub
+
+v1: Agents commit unsigned. Should we require signing?
+
+- ★ **L5-a — Unsigned in v1.** Defer until user demand or compliance forces it.
+- L5-b — Use the platform's bot GPG key (need to set one up).
+- L5-c — Per-user GPG key (user uploads; we sign on their behalf).
+
+---
+
+## M. API surface
+
+### M1 — Idempotency on `POST /tasks/:id/chat`
+
+Should chat-post accept `Idempotency-Key` header? UI double-clicks on send are a known source of duplicate dispatches.
+
+- ★ **M1-a — Yes**. Accept `Idempotency-Key` header; if duplicate, return the existing row.
+- M1-b — No; rely on debounce in UI.
+
+### M2 — Idempotency on other POSTs
+
+Confirm:
+- `POST /agents`, `POST /tasks`: UNIQUE constraint handles double-submit; no header needed. ★
+- `POST /agents/:id/run-now`: rate-limit handles it; no header needed. ★
+- `POST /skills/install`: already idempotent (returns existing). ★
+
+If you'd rather have header support on all writes, say so.
+
+### M3 — Chat pagination shape
+
+Existing platform uses offset pagination with `{data, meta:{total,limit,offset}}`. For task chat (reverse-chronological, "scroll up loads older"):
+
+- ★ **M3-a — Use offset for v1 with `order=desc`.** Accept the rare "insertion happens at boundary" duplicate.
+- M3-b — Introduce cursor pagination just for chat. Precedent-setting; needs an ADR.
+
+### M4 — API versioning of new endpoints
+
+Existing platform uses `/api/...` (unversioned) except `/api/v1/chat/completions` for OpenAI-compat. Confirm we follow `/api/agents`, `/api/skills`, `/api/tasks` (unversioned) per spec.
+
+- ★ **M4-a — Unversioned, matching platform.**
+- M4-b — Version under `/api/v1/agents/...` from day one to keep room.
+
+### M5 — API key access to Agent endpoints
+
+The platform supports both JWT session + API keys. For new endpoints, accept both?
+
+- ★ **M5-a — Session-only in v1.** Adds API-key support when MCP exposure / external automation requires it.
+- M5-b — Both session + API key from day one.
+
+### M6 — `Idempotency-Key` storage / retention
+
+If we accept `Idempotency-Key`, where do we store the request→response cache?
+
+- ★ **M6-a — Reuse existing `cache_entries` table** with TTL=24h. The activity-log's `ingestEventId` partial-unique-index pattern works too if we prefer not to add a cache layer.
+- M6-b — Dedicated `idempotency_keys` table.
+
+---
+
+## N. Operational & lifecycle
+
+### N1 — Cascade on Mission delete
+
+Today, deleting a Mission cascades to its Ideas via the existing FK. The new Agents/Tasks on that Mission cascade too. **Open question**: the Mission's `missionRepo` on GitHub stays untouched (we don't auto-delete user-owned GitHub repos). Should the UI:
+
+- ★ **N1-a — Prompt the user**: "This will delete the Mission's record. The GitHub repo `<repo-url>` will NOT be deleted — visit GitHub to remove it manually."
+- N1-b — Auto-archive the GitHub repo (requires write access; might fail).
+- N1-c — Just delete the DB rows silently.
+
+Same question applies to Work delete vs `dataRepo`/`websiteRepo`. (This is somewhat orthogonal to Agents but discovered in round 3.)
+
+### N2 — Agent `pauseAfterFailures` notification channel
+
+When the threshold trips, notify via:
+
+- ★ **N2-a — In-app `Notification` row + email** (gated by `User.emailAgentAlerts` flag we'd add).
+- N2-b — In-app only.
+- N2-c — Slack / Discord webhook (defer to v2).
+
+### N3 — Dispatcher health monitoring
+
+The new `agent-heartbeat-dispatcher` runs every minute. If it stalls (e.g. Trigger.dev outage), how do we know?
+
+- ★ **N3-a — Reuse existing Sentry breadcrumbs.** Dispatcher writes a "ran" breadcrumb per tick. Sentry alert on missing breadcrumbs (existing pattern).
+- N3-b — Add a `/health/agents` endpoint that reports last tick time. Surface on admin page.
+- N3-c — PagerDuty integration. Defer.
+
+### N4 — Per-Agent dry-run mode
+
+A `POST /agents/:id/dry-run` would build the prompt + estimate cost + return the would-have-been-sent payload but NOT call the AI provider. Useful during onboarding.
+
+- ★ **N4-a — Ship in v1.** Cheap, valuable for prompt iteration.
+- N4-b — Defer to v2.
+
+### N5 — Agent export
+
+`GET /agents/:id/export` returns JSON: meta + 5 MD files. Sharable; round-trippable.
+
+- ★ **N5-a — Ship export in v1; import deferred to v2.**
+- N5-b — Skip both for v1.
+
+### N6 — `AgentBudget.intervalUnit` v1 set
+
+The proposed enum was `hour | day | week | month | unlimited`. The existing `BudgetService` only aggregates calendar months. To not under-deliver, v1 supports only:
+
+- ★ **N6-a — `month` and `unlimited` only.** Drop hour/day/week from the v1 schema. Reintroduce when there's demand + service support.
+- N6-b — Keep all 5 values in schema; implement aggregator for all from day one.
+- N6-c — Keep enum; show an error toast if user picks unsupported value.
+
+### N7 — Concurrent file edit conflict UI
+
+When `editAgentFile` (UI or Agent tool) hits `precondition_failed` due to hash mismatch:
+
+- ★ **N7-a — Toast + "Reload to see the latest" link.** Don't try auto-merge.
+- N7-b — Side-by-side merge UI. Overkill for v1.
+
+### N8 — `agent_runs` retention
+
+Hot Agent at 1-min heartbeat → ~525k rows/year/Agent. Keep all?
+
+- ★ **N8-a — Keep all in v1.** Same posture as `WorkGenerationHistory`. Revisit if storage bites.
+- N8-b — Hard cap last 10k per Agent + nightly prune. Configurable.
+
+### N9 — `agent-chat-reply` dedup on burst mentions
+
+When a user posts 5 mentions of the same agent in 30s:
+
+- ★ **N9-a — Append-to-context**: if there's an in-flight `agent-chat-reply` run for `(taskId, agentId)`, queue the new mention as additional context to that run rather than dispatching a 2nd.
+- N9-b — Dispatch each separately. Costs add up; spam-magnet.
+
+### N10 — Streaming chat response into Task chat
+
+When Agent replies to a chat mention:
+
+- ★ **N10-a — Worker writes chunks via remote-proxy `appendToChatMessage(id, chunk)`.** Polling client (5s) sees growing text. Simple; reuses polling infra.
+- N10-b — Full message at end of run. Simpler; worse UX (long pauses).
+- N10-c — End-to-end SSE from worker to browser. Best UX; new infra.
+
+### N11 — Mission tick "cap-hit" persistence (out-of-this-PR fix)
+
+Per [G1](#g1--mission-tick-cap-hit-events-are-not-persisted-today): research found Mission tick cap-hit outcomes aren't persisted to DB today. This is a develop bug, not part of Agents/Skills/Tasks scope.
+
+- ★ **N11-a — Split into a separate PR after Agents/Skills/Tasks specs are approved.** Don't conflate.
+- N11-b — Fold into this PR set as a one-line additional activity event.
+
+### N12 — Worker bootstrap cost for many Agents
+
+The current `mission-tick` task bootstraps NestJS on each fire. With many active Agents firing per-minute, this multiplies. Are we OK with the existing pattern, or do we want a long-running worker that bootstraps once and processes many?
+
+- ★ **N12-a — Match existing pattern.** Each agent-heartbeat-dispatcher tick is one bootstrap; per-Agent heartbeats are separate runs (each bootstraps). Identical cost profile to existing.
+- N12-b — Long-running worker that handles many Agents in one process. Cheaper but new infra and harder to scale across machines.
+
+---
+
+## O. Naming / clarity (round 3 additions)
+
+### O1 — "active" overload
+
+Three different meanings of "active":
+- `Agent.status = 'active'` (lifecycle)
+- `skill_bindings.injectIntoAgent = true` (the UI says "active")
+- `agent.targets = '*'` (UI says "available to all")
+
+Pick one term per surface:
+- ★ **O1-a — Lifecycle: `status` (active/paused/error/draft/archived). Skill bindings: `enabled`. Tenant Agent membership: `scope`.** Tightens copy in 3 places.
+
+### O2 — "Heartbeat" — keep or rename?
+
+`Heartbeat` means "Agent's idle tick to decide what to do next" — risks misreading as "health check."
+
+- ★ **O2-a — Keep.** Clarify in empty-state copy.
+- O2-b — Rename to `Tick` or `Routine`.
+
+### O3 — `agent.yml` vs uppercase MD files
+
+- ★ **O3-a — Keep proposed convention** (yml lowercase, MD uppercase). Document once in agents/spec.md naming section.
+
+---
+
 ## How to answer
 
 Reply with answers in this shape and I'll fold them in:

@@ -346,6 +346,18 @@ Recipients computed by `TaskNotificationService.recipients(event)`:
 
 No new transport — same in-app feed + transactional mail pipeline used by Budget Threshold and Onboarding emails.
 
+## 8.2 Rate limits per endpoint
+
+| Endpoint                        | Cap                       |
+| ------------------------------- | ------------------------- |
+| `POST /tasks`                   | 60/min/user                |
+| `PATCH /tasks/:id`              | 60/min/user                |
+| `POST /tasks/:id/transition`    | 60/min/user                |
+| `POST /tasks/:id/chat`          | 30/min/user/task           |
+| `POST /tasks/:id/attachments`   | 30/min/user                |
+
+`POST /tasks/:id/chat` accepts an optional `Idempotency-Key` header to dedupe UI double-clicks; matching key within 24h returns the existing row.
+
 ## 9. Observability
 
 - Activity log: `TASK_CREATED`, `TASK_UPDATED`, `TASK_ASSIGNED`, `TASK_COMMENTED`, `TASK_COMPLETED` (architecture §10).

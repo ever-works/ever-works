@@ -163,6 +163,16 @@ No new plugin. Skills hook into the existing `AiFacadeService` and the tool-loop
 
 Sidebar item "Skills" placed directly below "Plugins" (additive — see [agents/spec.md §5.1](../agents/spec.md#51-sidebar-i18n-keys-additive) for the i18n key already reserved).
 
+## 6.1 Rate limits per endpoint
+
+| Endpoint                       | Cap                       |
+| ------------------------------ | ------------------------- |
+| `POST /skills`                 | 30/min/user                |
+| `POST /skills/install`         | 60/min/user                |
+| `PATCH /skills/:id`            | 60/min/user (autosave)     |
+| `POST /skills/:id/bindings`    | 60/min/user                |
+| `GET /skills/catalog`          | global throttler only      |
+
 ## 7. Background Jobs
 
 None. Resolution and injection are synchronous within an AI call.

@@ -247,7 +247,9 @@ export class AgentRunLog {
 export class AgentBudget {
     @PrimaryGeneratedColumn('uuid') id: string;
     @Column('uuid') agentId: string;
-    @Column({ length: 16 }) intervalUnit: 'hour' | 'day' | 'week' | 'month' | 'unlimited';
+    // v1 supports only 'month' and 'unlimited' due to BudgetService aggregation constraints
+    // (see QUESTIONS N6). 'hour' | 'day' | 'week' reserved for v2.
+    @Column({ length: 16 }) intervalUnit: 'month' | 'unlimited';
     @Column({ type: 'int' }) capCents: number;
     @Column({ length: 3, default: 'usd' }) currency: string;
     @Column({ type: 'boolean', default: false }) allowOverage: boolean;
@@ -366,6 +368,18 @@ No new CLI commands in v1. Future addition: `ever agents list / run / pause` mir
 | `agent-chat-reply`              | one-shot, maxDuration=5m                             | Light path for inline mention reply.                                                        | Replays guarded by `chatMessageId`.                                                                                                               |
 
 All three task implementations live in `packages/tasks/src/tasks/trigger/`. Dispatcher returns task output `{ scanned: N, claimed: M, dispatched: K }` for log/metrics surfaces.
+
+## 7.1 Rate limits per endpoint
+
+Following the platform's `@nestjs/throttler` 3-tier global config with per-route override pattern:
+
+| Endpoint                          | Cap                      |
+| --------------------------------- | ------------------------ |
+| `POST /agents`                    | 30/min/user              |
+| `POST /agents/:id/run-now`        | 5/min/user               |
+| `POST /agents/:id/dry-run`        | 30/min/user              |
+| `PUT /agents/:id/files/:name`     | 60/min/user (UI typing autosave) |
+| `GET /agents/*`                    | global throttler only    |
 
 ## 8. Security & Permissions
 

@@ -294,6 +294,25 @@ Tasks that mention the SAME KB doc become candidate "related" tasks — but v1 d
 
 v1 doesn't keep a revision history of Task descriptions. The current body is overwritten on every save. Activity log records `who + when` of each edit. See [QUESTIONS F7](../../QUESTIONS-agents-skills-tasks.md#f7--task-description-edit-history).
 
+## 5.11 Cascade on delete
+
+| Event                            | Cascade                                                                                                                                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete Task                      | `task_assignees`, `task_reviewers`, `task_approvers`, `task_blocks`, `task_relations`, `task_chat_messages`, `task_attachments`, `task_watchers`, `task_kb_mentions` all CASCADE.                  |
+| Delete User                      | User's tasks CASCADE. `task_assignees(assigneeType='user', assigneeId=<id>)` rows drop; tasks they were sole assignee on stay (the task author / scope owner can re-assign).                          |
+| Delete Agent                     | `task_assignees(assigneeType='agent', assigneeId=<id>)` rows drop. Task chat messages authored by deleted Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent".                    |
+| Delete Mission / Idea / Work     | Tasks scoped to the deleted entity CASCADE. Tasks with `ideaId` AND `workId` set (after Idea→Work promotion) survive when Idea is deleted (still belong to the Work).                                 |
+
+## 5.12 `@all` / `@here` semantics
+
+Mentions like `@all` and `@here` in a `task_chat_messages.body`:
+
+- Render visually like a mention (highlighted text).
+- Do NOT trigger `agent-chat-reply` runs.
+- Do NOT generate per-user notifications (avoid spam).
+
+Only explicit `@<user-slug>` or `@<agent-slug>` mentions trigger dispatches/notifications. See [QUESTIONS — round 3 follow-up not yet promoted].
+
 ## 6. Out of Scope (v1)
 
 - Time tracking (estimate/spent hours). v2.

@@ -323,6 +323,23 @@ Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agent
 - `AGENT_DELETED` — the user who archived the Agent + the timestamp + a snapshot of the Agent's last `contentHash` (so post-delete forensics is possible).
 - `AGENT_FILE_REVERTED` — if a `PUT /files/:name` is rejected by hash mismatch (optimistic concurrency); helps detect concurrent-edit collisions.
 
+## 5.9 Cascade on delete
+
+| Event                       | Cascade                                                                                                                                                                                                                                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete Agent                | `agent_runs`, `agent_run_logs`, `agent_budget`, `agent_memberships`, `skill_bindings(targetType='agent')` all CASCADE. `task_assignees(assigneeType='agent', assigneeId=<id>)` row drops. Task chat messages authored by this Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent". |
+| Delete Mission              | Mission-scoped Agents CASCADE. The Mission's `missionRepo` on GitHub is NOT touched. UI prompts the user with a "delete GitHub repo separately" notice. See [QUESTIONS N1](../../QUESTIONS-agents-skills-tasks.md#n1--cascade-on-mission-delete).                                                  |
+| Delete Work                 | Work-scoped Agents CASCADE. `dataRepo` / `websiteRepo` on GitHub untouched (same posture as Mission delete).                                                                                                                                                                                       |
+| Delete User                 | All entities CASCADE via FK chain. Agent files stored inline (tenant scope) are removed; files in Mission/Work repos remain (the user still owns the repo on GitHub).                                                                                                                              |
+
+## 5.10 Dry-run mode
+
+`POST /agents/:id/dry-run` builds the prompt + estimates cost + returns the would-have-been-sent payload without invoking the AI provider. No `agent_runs` row written; doesn't count against budget. Useful during prompt iteration. See [QUESTIONS N4](../../QUESTIONS-agents-skills-tasks.md#n4--per-agent-dry-run-mode).
+
+## 5.11 Export (v1, read-only)
+
+`GET /agents/:id/export` returns a JSON envelope: `{meta, soulMd, agentsMd, heartbeatMd, toolsMd, agentYml}`. Sharable text snapshot. Import deferred to v2. See [QUESTIONS N5](../../QUESTIONS-agents-skills-tasks.md#n5--agent-export).
+
 ## 6. Out of Scope (v1)
 
 - An external task-tracker plugin (Linear, GitHub Issues, Jira). Interface reserved in [`task-tracking/spec.md`](../task-tracking/spec.md), not consumed.

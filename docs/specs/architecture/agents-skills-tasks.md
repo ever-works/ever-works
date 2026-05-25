@@ -425,6 +425,9 @@ The detailed open questions are consolidated in [`../QUESTIONS-agents-skills-tas
 - [`trigger-integration.md`](./trigger-integration.md) — Worker dispatch and callback channel re-used by Agent heartbeats.
 - [`activity-log.md`](./activity-log.md) — Activity feed re-used and extended.
 - [`agent-prompt-assembly.md`](./agent-prompt-assembly.md) — exact prompt-assembly recipe (companion deep-dive).
+- [`agent-tools-catalog.md`](./agent-tools-catalog.md) — canonical tool API surface exposed to Agents.
+- [`security-agents-skills-tasks.md`](./security-agents-skills-tasks.md) — threat model and mitigations.
+- [`../REVIEW-NOTES-agents-skills-tasks.md`](../REVIEW-NOTES-agents-skills-tasks.md) — round-3 critical-review notes.
 - [`../QUESTIONS-agents-skills-tasks.md`](../QUESTIONS-agents-skills-tasks.md) — open questions.
 - [`../features/user-journeys-agents-skills-tasks.md`](../features/user-journeys-agents-skills-tasks.md) — five end-to-end user stories.
 - ADRs: [006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md), [007](../decisions/007-skill-catalog-in-monorepo.md), [008](../decisions/008-tenant-control-repo-deferred-to-v2.md), [009](../decisions/009-tasks-vs-items-vs-kb-distinction.md).
