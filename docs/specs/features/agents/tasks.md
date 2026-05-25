@@ -110,7 +110,21 @@ Phases 1-3 land MVP (Agent entity + Instructions tab + heartbeat runtime). Phase
 - [ ] **T63**. Playwright e2e: instantiate a Mission Template that declares 2 agents → 2 `draft` agents appear in `/missions/[id]/agents`; their MD files are present in the new mission repo.
 - [ ] **T64**. Add a sample Mission Template (e.g. `ever-works/p2p-marketplace-mission-template`) with a CEO + VP-Engineering agent under `.works/agents/` and a `pr-review` skill under `.works/skills/`. Smoke-test instantiation.
 
-## Phase 7 — Default-on rollout
+## Phase 7 — Account-transfer (Export / Import / GitHub Sync) extension
+
+> Per [ADR-008 §"v1 REQUIREMENT — extend existing Import / Export / Sync surfaces"](../../decisions/008-tenant-control-repo-deferred-to-v2.md). Tenant-scoped Agents must round-trip through the existing `packages/agent/src/account-transfer/` flow so users on the SaaS can already back up / migrate / Git-sync their Agents in v1, ahead of the dedicated tenant-control-repo feature in v2.
+
+- [ ] **T70**. Extend `packages/agent/src/account-transfer/types.ts` with `ExportedAgent` (id, slug, scope, name, title, capabilities, aiProviderId, modelId, permissions, heartbeatCadence, MD-files inline body, `agentBudget` nested, `memberships`). Tenant-scoped agents only (Mission/Idea/Work-scoped agents live in their owning repos already).
+- [ ] **T71**. Inject `AgentRepository` / `AgentBudgetRepository` / `AgentMembershipRepository` into `AccountExportService` constructor.
+- [ ] **T72**. Implement `AccountExportService.exportAgents(userId, options)` returning `ExportedAgent[]`. Apply the existing `maskSecretSettings` posture to any secret-bearing metadata.
+- [ ] **T73**. Add `agents: ExportedAgent[]` to `AccountExportPayload`. Bump payload version (`version: 2`) per the existing versioning posture.
+- [ ] **T74**. Implement `AccountImportService` agents handler — create-or-update by `(userId, scope, slug)` UNIQUE key. Honor the existing conflict-resolution UI (skip / overwrite / merge).
+- [ ] **T75**. Update `GitHubSyncService` synced layout: write tenant agents to `agents/<slug>/agent.yml` + the 5 MD files + `agent.yml` inside the `ever-works-config` repo. Reads pull them back.
+- [ ] **T76**. Add UI affordance on `/settings/import-export` page: "Include Agents in export" checkbox (default ON for export, default ON for sync). Same shape as existing "Include works" toggles.
+- [ ] **T77**. Activity-log events `AGENT_EXPORTED`, `AGENT_IMPORTED`, `AGENT_SYNCED` emitted via the existing event chain.
+- [ ] **T78**. Round-trip Playwright test: create tenant Agent → export → reset DB → import → verify Agent state restored byte-for-byte (sans secrets).
+
+## Phase 8 — Default-on rollout
 
 - [ ] **T65**. Wire `FEATURE_AGENTS` env flag. When off, the sidebar items + tabs are hidden. When on, full surface visible.
 - [ ] **T66**. Verify the new migrations apply cleanly on a staging DB snapshot.

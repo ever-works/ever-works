@@ -26,7 +26,45 @@ Option 2 has Constitution Principle III "Source-of-Truth Repositories" working i
 
 The API surface (`GET/PUT /agents/:id/files/:name`) abstracts the storage choice — callers see the same shape whether the source is Git or DB.
 
-When v2 ships a tenant control repo concept, a **one-click "export tenant Agents to control repo" migration** offered in the UI moves these files from DB to the new repo and nulls the TEXT columns.
+### v1 REQUIREMENT — extend existing Import / Export / Sync surfaces
+
+Operator instruction (round 7):
+> "I agree for now to have it that way, but let's make sure that existing Import / Export / Sync to repo capabilities support all that in v1! I.e. we have in UI now Export / Import / Sync to GitHub repo etc, and there we can add exporting / sync of those Agents / Skills and any other tenants related records from DB into Git and back etc."
+
+The platform already has a full account-transfer surface in [`packages/agent/src/account-transfer/`](../../packages/agent/src/account-transfer/):
+
+- `AccountExportService.exportAccountData(userId)` → dumps the user's account state into an `AccountExportPayload`.
+- `AccountImportService.executeImport(...)` → applies a payload back to a user.
+- `GitHubSyncService` → pushes/pulls the payload to a per-user `<user>-ever-works-config` GitHub repo. (Constant: `SYNC_REPO_NAME = 'ever-works-config'`.)
+
+**v1 ships the deferred-control-repo gap-fill by extending this surface, NOT by introducing a parallel control-repo concept.** Specifically:
+
+1. **`AccountExportPayload` gains new fields**:
+    - `agents: ExportedAgent[]` — tenant-scoped agents only (Mission/Idea/Work-scoped agents already live in their owning repos and don't need DB→export).
+    - `skills: ExportedSkill[]` — tenant-installed catalog skills + custom user skills + their bindings.
+    - `tasks: ExportedTask[]` (optional, opt-in via export options) — tenant-scoped or all tasks, depending on user preference.
+    - `agentBudgets` / `skillBindings` / etc. — supporting metadata.
+
+2. **`AccountExportService` gets the new repositories injected** (AgentRepository, SkillRepository, SkillBindingRepository, TaskRepository) and serializes them into the payload. Same `maskSecretSettings` posture as today for any secret-bearing fields (e.g. don't export AI provider tokens that may live in Agent budget metadata).
+
+3. **`AccountImportService` gains import handlers** for each new entity type, with the same conflict-resolution UI as the existing payload sections.
+
+4. **`GitHubSyncService` requires no changes** — it routes whatever `AccountExportPayload` shape the service produces. The new fields ride along.
+
+5. **The synced repo layout** (`ever-works-config`) gains:
+    - `agents/<slug>/agent.yml` + the 5 MD files (mirrors the Mission/Work repo layout for parity).
+    - `skills/<slug>.md` for tenant skills.
+    - `tasks/<slug>.json` (only when the user opts in to task export — high-volume).
+    - `agent-bindings.yml`, `skill-bindings.yml` linking the above to their targets.
+
+When v2 ships a true dedicated tenant control repo, the migration is **rename** the existing `ever-works-config` repo (or change a setting) rather than introducing a new concept — Git history preserved, no data loss.
+
+### v1 deliverable
+
+Each of the three feature `tasks.md` files lists this extension as concrete Phase tasks; see:
+- [features/agents/tasks.md](../features/agents/tasks.md) — Phase: extend account-transfer for Agents.
+- [features/skills/tasks.md](../features/skills/tasks.md) — Phase: extend account-transfer for Skills.
+- [features/task-tracking/tasks.md](../features/task-tracking/tasks.md) — Phase: extend account-transfer for Tasks (opt-in).
 
 ## Consequences
 

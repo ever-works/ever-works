@@ -80,7 +80,22 @@ Phases mirror [plan.md §10](./plan.md#10-phased-rollout). Tasks sequential unle
 - [ ] **T46**. Add a section in `docs/specs/architecture/plugin-sdk.md` documenting the reserved capability with examples of what a future plugin (Linear, GitHub Issues) would look like.
 - [ ] **T47**. Add a no-op contract test in `packages/plugin/src/contracts/__tests__/task-tracker.spec.ts` asserting type-shape only.
 
-## Phase 7 — Default-on rollout
+## Phase 7 — Account-transfer (Export / Import / GitHub Sync) extension
+
+> Per [ADR-008](../../decisions/008-tenant-control-repo-deferred-to-v2.md). Tasks export is **opt-in** in the UI (high-volume, high-mutation; many users won't want them backed up). When opted in, all tenant-owned tasks (incl. their chat, attachments-metadata, blockers, relations, watchers) export.
+
+- [ ] **T51**. Extend `account-transfer/types.ts` with `ExportedTask` + `ExportedTaskChatMessage` + supporting types (assignees, reviewers, approvers, blockers, relations).
+- [ ] **T52**. Inject `TaskRepository` + all the task-aux repositories into `AccountExportService`.
+- [ ] **T53**. Implement `AccountExportService.exportTasks(userId, options)` returning `ExportedTask[]`. Default off; enabled by `ExportOptions.includeTasks = true`.
+- [ ] **T54**. Add `tasks?: ExportedTask[]` to `AccountExportPayload` (optional field). Bump `version`.
+- [ ] **T55**. Implement `AccountImportService.importTasks(payload, options)` — create-or-update by `(userId, slug)`. Recreate join-table rows (assignees, blockers, etc.) post-task-create.
+- [ ] **T56**. Update `GitHubSyncService` synced layout: write tasks to `tasks/<slug>.json` (JSON is friendlier than YAML for the chat list).
+- [ ] **T57**. Add UI toggle on `/settings/import-export`: "Include Tasks in export (advanced)" (default OFF — high volume warning).
+- [ ] **T58**. Activity events `TASK_EXPORTED`, `TASK_IMPORTED`, `TASK_SYNCED`.
+- [ ] **T59**. Round-trip Playwright test with a Work containing 50 tasks and 200 chat messages.
+- [ ] **T60**. Confirm with the operator: should chat messages **including authored-by-Agent rows** export? (They reference Agents that may or may not have round-tripped.) Default: yes — export with `authorType='agent'` and `authorId`; on import, if the Agent exists in the target tenant, link; otherwise render as "(unknown agent)".
+
+## Phase 8 — Default-on rollout
 
 - [ ] **T48**. Feature flag `FEATURE_TASK_TRACKING` defaulting to off.
 - [ ] **T49**. Internal beta on staging; gather "Kanban scrollbar / drag-drop weirdness" bugs.

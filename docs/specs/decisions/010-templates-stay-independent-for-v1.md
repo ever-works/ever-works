@@ -33,7 +33,10 @@ Cons of unifying:
 
 ## Decision
 
-**For v1: independent services per catalog kind, but the `/templates` page provides a unified browse experience via a kind-selector — AND each feature page (`/agents`, `/skills`, `/tasks`) also has its own templates browser scoped to its kind.** Both UIs read from the same per-kind backend services; the user can manage templates from whichever surface is convenient.
+**For v1: independent services per catalog kind. Each kind has its primary home on its feature page (`/agents`, `/skills`, `/tasks`), where the user discovers, picks, and manages templates of that kind. The `/templates` page is a BONUS unified-browse view that shows all kinds via a kind-selector — for users who want one place to scan everything.** Both surfaces read from the same per-kind backend services; the per-feature page is the primary path.
+
+Per operator instruction (round 7):
+> "ADR-010-templates-stay-independent-for-v1.md seems correct as we want separate / independent templates. We do want also to show all of them on Templates page, but it's just a bonus, while each of those types of templates also will exists in other places in UI / UX flows etc."
 
 Per operator instruction (round 6):
 > "Such Templates can be all managed on 'Templates' page, yes. I.e. I would prefer there to add selector for many different types of templates. However, also it's best to have ability to manage separately Agent templates on Agents page, same as Skills templates (catalog) on Skills page and so on. So it's fine to have in few places."
@@ -46,13 +49,15 @@ Per operator instruction (round 6):
 - **`SkillsFacadeService` + `"Ever Works Skills"` plugin** (per [ADR-012](./012-skills-as-plugin.md)) — Skill catalog comes from the plugin, which reads [`ever-works/skills`](https://github.com/ever-works/skills).
 - **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](./013-task-tracking-as-plugin.md)) — Task templates come from [`ever-works/task-templates`](https://github.com/ever-works/task-templates), bundled into the first-party tracker plugin.
 
-**Frontend surfaces — both unified hub AND per-feature pages:**
-- **`/templates` page** — unified hub with a kind-selector (Mission / Work / Agent / Skill / Task). Tab strip or dropdown switches the visible kind. Each tab calls the relevant backend service.
-- **`/agents` page** — has its own "Browse templates" section / button surfacing Agent templates from `AgentTemplateService`.
-- **`/skills` page** — surfaces the Skill catalog from `SkillsFacadeService`.
-- **`/tasks` page / New Task dialog** — surfaces Task templates from `TasksFacadeService`.
+**Frontend surfaces — per-feature page is primary; `/templates` page is the bonus all-in-one view:**
+- **Primary surfaces** (each feature page owns its template browsing):
+    - **`/agents` page** — "Browse templates" section surfacing Agent templates from `AgentTemplateService`. Also shown inline in the create-Agent dialog.
+    - **`/skills` page** — surfaces the Skill catalog from `SkillsFacadeService`. The natural place users go to install/manage skills.
+    - **`/tasks` page / New Task dialog** — surfaces Task templates from `TasksFacadeService`.
+    - **Existing `/missions/new` flow** — already lists Mission Templates (no change).
+- **Bonus surface (`/templates` page)** — unified hub with a kind-selector (Mission / Work / Agent / Skill / Task). Switches the visible kind via tab/dropdown; each tab calls the relevant backend service. Convenient for users who want one place to scan everything; not the discovery path we optimize for.
 
-Both surfaces are first-class — the user picks whichever flow is convenient. Implementation cost is small: shared `<TemplatesBrowser kind="..." />` React component used in all surfaces.
+Implementation cost is small: shared `<TemplatesBrowser kind="..." />` React component used by both primary and bonus surfaces.
 
 ### Why this isn't "unified into one entity"
 

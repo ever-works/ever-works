@@ -61,7 +61,21 @@ Phases mirror [plan.md §10](./plan.md#10-phased-rollout). Tasks sequential unle
 - [ ] **T32**. Materialize matching `skills` rows + auto-bind to template-shipped agents whose `agent.yml` references the skill slugs.
 - [ ] **T33**. E2E test: instantiate a template with 1 skill + 1 agent that uses it → both rows exist + skill is bound to that agent.
 
-## Phase 6 — Starter catalog seed
+## Phase 6 — Account-transfer (Export / Import / GitHub Sync) extension
+
+> Per [ADR-008](../../decisions/008-tenant-control-repo-deferred-to-v2.md). Tenant-installed catalog skills + custom user skills + their bindings to the user's Agents/Works/Missions must round-trip via the existing account-transfer surface.
+
+- [ ] **T38**. Extend `account-transfer/types.ts` with `ExportedSkill` (slug, ownerType, ownerId, title, description, frontmatter, instructionsMd, contentHash, version, sourceCatalogSlug, sourceCatalogVersion) + `ExportedSkillBinding` (skillSlug, targetType, targetId, injectIntoAgent, injectIntoGenerator, priority).
+- [ ] **T39**. Inject `SkillRepository` + `SkillBindingRepository` into `AccountExportService`. Implement `exportSkills(userId)` and `exportSkillBindings(userId)`.
+- [ ] **T40**. Add `skills: ExportedSkill[]` and `skillBindings: ExportedSkillBinding[]` to `AccountExportPayload`. Bump `version`.
+- [ ] **T41**. Implement `AccountImportService.importSkills(payload, options)` — create-or-update by `(ownerType, ownerId, slug)` UNIQUE key. Honor conflict-resolution.
+- [ ] **T42**. Implement `AccountImportService.importSkillBindings(payload, options)` — recreate bindings post-import, skipping any targeting an entity that didn't import successfully.
+- [ ] **T43**. Update `GitHubSyncService` synced layout: write tenant skills to `skills/<slug>.md`; bindings to `skill-bindings.yml` (one YAML doc).
+- [ ] **T44**. Add UI toggle on `/settings/import-export`: "Include Skills in export" (default ON).
+- [ ] **T45**. Activity events `SKILL_EXPORTED`, `SKILL_IMPORTED`, `SKILL_SYNCED`.
+- [ ] **T46**. Round-trip Playwright test.
+
+## Phase 7 — Starter catalog seed (renumbered from Phase 6)
 
 - [ ] **T34**. Author the 10 starter skill files at `apps/api/src/skills/catalog/<slug>/<slug>.md`: `pr-review`, `release-notes`, `kb-summarize`, `image-alt-text`, `seo-meta`, `internal-link-suggestions`, `competitive-research`, `commit-message-format`, `test-coverage-gap`, `dependency-bump-checklist`.
 - [ ] **T35**. For each, add `metadata.json` with `tags`, default `allowed-tools`, `version: "1.0.0"`.

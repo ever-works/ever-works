@@ -2,67 +2,32 @@
 
 ## Status
 
-**Superseded — 2026-05-25 by [ADR-014](./014-no-hardcoded-catalogs.md).** Operator reversed the in-monorepo decision during round 6 review. The Skill catalog is now shipped as a separate GitHub repo [`ever-works/skills`](https://github.com/ever-works/skills), consumed by the new **"Ever Works Skills" plugin** (see [ADR-012](./012-skills-as-plugin.md)). Historical record retained below.
+**Superseded — 2026-05-25.** This decision was **incorrect** and has been replaced. Reversed by operator instruction during round 6 review of PR [#1017](https://github.com/ever-works/ever-works/pull/1017).
 
----
+## The corrected decisions
 
-**(Original) Proposed — 2026-05-25.** Pending operator review on [QUESTIONS-agents-skills-tasks.md A2](../QUESTIONS-agents-skills-tasks.md#a2--skill-catalog-in-monorepo-or-separate-repo).
+The Skill catalog is **NOT** in the platform monorepo. Two superseding ADRs codify the correct architecture:
 
-## Date
+1. **[ADR-012 — Skills as plugin](./012-skills-as-plugin.md)**: Skills are a plugin capability (`skills-provider`); `"Ever Works Skills"` is the first-party plugin that supplies the default catalog.
+2. **[ADR-014 — No hardcoded catalogs](./014-no-hardcoded-catalogs.md)**: All catalogs (Skills included) live in separate `ever-works/*` GitHub repos, not in the platform monorepo. The Skill catalog repo is **[`ever-works/skills`](https://github.com/ever-works/skills)**.
 
-2026-05-25
+## Why the original decision was wrong
 
-## Context
+The original (now-superseded) reasoning argued that in-monorepo catalog storage gave "atomic versioning with code" and "smaller v1 surface." Both pros are real but overruled by stronger arguments:
 
-The new Skills feature ([features/skills/spec.md](../features/skills/spec.md)) ships a starter catalog of platform-supplied Skills (≥10 entries in v1, expected to grow to ~1000+ over time). Three places the catalog could live were considered:
+- **Platform monorepo bloat.** Skills are expected to grow into the thousands of entries; bloats `ever-works/ever-works` indefinitely.
+- **Community contribution friction.** PRs against a small focused catalog repo are dramatically easier than PRs against the platform monorepo (which gates contributions through full lint + type-check + test suites).
+- **Plugin-first architecture.** Constitution Principle I says external integrations are plugins. Skills source code shouldn't be a special case — it should be a plugin like every other capability.
+- **Per-tenant flexibility.** A plugin model lets tenants enable multiple `skills-provider` plugins simultaneously (community catalogs + Ever Works default).
 
-1. **In the platform monorepo** at `apps/api/src/skills/catalog/<slug>/<slug>.md`, read at boot.
-2. In a separate repo (`ever-works/skills-catalog`) cloned/synced at boot.
-3. DB-seeded from a one-off seeder.
+## Historical record (collapsed for transparency)
 
-The same question was answered for Mission Templates a few weeks before this feature; that decision landed in-monorepo (`packages/agent/src/missions/mission-template.config.ts`).
+The original "Proposed" content of this ADR (catalog in `apps/api/src/skills/catalog/`, MIT-licensed, in-process cache, etc.) is intentionally NOT preserved in this file — references to it elsewhere should be treated as out-of-date. The two superseding ADRs (012 + 014) are now the canonical source.
 
-## Decision
-
-**The platform Skill catalog ships in the platform monorepo** at `apps/api/src/skills/catalog/<slug>/<slug>.md`, with companion `metadata.json` files for tags + default `allowed-tools` + version.
-
-The catalog is read into memory at API boot by `SkillCatalogService` (in-process cache, no DB round-trip on hot path). New catalog entries land via normal PR review against `develop`.
-
-When a tenant installs a catalog skill, a `skills` row is created with `ownerType='tenant'`, `ownerId=userId`, `sourceCatalogSlug` + `sourceCatalogVersion` populated; the body is **copied** at install time so tenant skills don't break when the catalog evolves.
-
-## Consequences
-
-### Positive
-
-- **Atomic versioning with code.** When the API changes how it injects skill bodies, the catalog can be updated in the same PR.
-- **PR review for catalog content.** Same CodeRabbit / Codex / Sonar bot review loop as code changes.
-- **Zero new infrastructure.** No cron clone, no sync conflict, no second deploy pipeline.
-- **Consistent with Mission Templates catalog precedent.**
-- **Fast read path.** In-memory cache means `GET /skills/catalog?limit=50` is sub-50 ms.
-
-### Negative
-
-- **Repo bloat at scale.** ≥1000 markdown files in `apps/api/src/skills/catalog/` adds ~10 MB to the platform repo over time. Mitigated by: a future move to a separate repo is a one-day migration if it bites.
-- **Cross-repo PRs for community contributions.** Community contributors must PR the main platform repo to add a catalog skill. Higher friction than a dedicated skills-catalog repo. Mitigated by: catalog skills are platform-curated by default; community contributions go through tenant skills first, then get promoted.
-- **Catalog updates ship with platform releases.** A new skill can't be hotfixed independently of the platform. Mitigated by: catalog skills are immutable in tenant copies after install; only new tenants pick up new versions.
-
-## Alternatives Considered
-
-### 1. Separate `ever-works/skills-catalog` repo
-
-**Rejected for v1.** Adds infrastructure (clone-at-boot or webhook-driven sync), requires a versioning contract between catalog repo and platform code, and complicates dev setup. Worth revisiting at ~500+ skills.
-
-### 2. DB seed
-
-**Rejected.** Loses Git review, requires migrations for every catalog change, and the body is harder to diff/lint in PRs.
-
-### 3. Hybrid — in-monorepo for v1 starters; external repo for community contributions
-
-**Rejected for v1 simplicity.** Possible v2 if community contribution volume grows. Both stores would need a uniform read path; complexity not worth it yet.
+If you need the original text for archaeology, see git history: `git log -p -- docs/specs/decisions/007-skill-catalog-in-monorepo.md`.
 
 ## Related
 
-- [`007 ↔ ADR-007 (this)`](./007-skill-catalog-in-monorepo.md)
-- [`features/skills/spec.md §3.2`](../features/skills/spec.md)
-- Constitution Principle III (Source-of-Truth Repos): user-installed skills DO live in Git (per-Mission/Work repos) — only the **shipped catalog** is in-monorepo.
-- Mission Templates catalog precedent: `packages/agent/src/missions/mission-template.config.ts`
+- ADR-012 (Skills as plugin) — superseding.
+- ADR-014 (No hardcoded catalogs) — superseding.
+- Operator-facing rule: [`ever-works/workspace:knowledge/notes/2026-05-25-no-hardcoded-catalogs-rule.md`](https://github.com/ever-works/workspace/blob/develop/knowledge/notes/2026-05-25-no-hardcoded-catalogs-rule.md).
