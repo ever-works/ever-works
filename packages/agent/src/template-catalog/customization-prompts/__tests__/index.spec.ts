@@ -42,7 +42,9 @@ describe('customization prompt registry', () => {
         });
 
         it('points the agent at the compile-safe styling surface and canonical levers', () => {
-            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/apps\/web\/src\/styles\/theme\.css/);
+            expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(
+                /apps\/web\/src\/styles\/theme\.css/,
+            );
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/plain CSS/i);
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/global\.css/);
             expect(MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT).toMatch(/design tokens/i);
