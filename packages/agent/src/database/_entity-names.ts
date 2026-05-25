@@ -54,6 +54,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
+    'Mission',
     'Notification',
     'OnboardingRequest',
     'PluginUsageEvent',

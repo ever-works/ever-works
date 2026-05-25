@@ -21,6 +21,11 @@ import {
     listWebsiteTemplates,
     type WebsiteTemplateConfig,
 } from '@src/generators/website-generator/config/website-template.config';
+// Phase 8 PR X — Mission Templates catalog source.
+import {
+    listMissionTemplates,
+    type MissionTemplateConfig,
+} from '@src/missions/mission-template.config';
 import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
@@ -113,9 +118,18 @@ export class TemplateCatalogService implements OnModuleInit {
     }
 
     async seedBuiltInTemplates(): Promise<void> {
-        const builtInTemplates = listWebsiteTemplates().map((template) =>
-            this.toBuiltInWebsiteTemplateRecord(template),
-        );
+        // Phase 8 PR X — Mission Templates seed alongside the
+        // existing website templates. Two separate lists, same
+        // upsert path; the catalog reader filters by kind so the
+        // two surfaces never cross-pollute.
+        const builtInTemplates = [
+            ...listWebsiteTemplates().map((template) =>
+                this.toBuiltInWebsiteTemplateRecord(template),
+            ),
+            ...listMissionTemplates().map((template) =>
+                this.toBuiltInMissionTemplateRecord(template),
+            ),
+        ];
 
         await Promise.all(
             builtInTemplates.map((template) => this.templateRepository.upsert(template)),
@@ -753,6 +767,35 @@ export class TemplateCatalogService implements OnModuleInit {
             name: template.name,
             description: template.description,
             framework: this.inferFramework(template),
+            repositoryOwner: template.owner,
+            repositoryName: template.repo,
+            repositoryUrl: `https://github.com/${template.owner}/${template.repo}`,
+            branch: template.branch,
+            syncBranches: template.syncBranches,
+            betaBranch: template.betaBranch,
+            isActive: true,
+            metadata: {},
+        };
+    }
+
+    /**
+     * Phase 8 PR X — built-in Mission Template record. Same upsert
+     * shape as the website-template variant; the only difference
+     * is `kind: 'mission'` so the catalog reader filters them onto
+     * the Mission tab (PR W's kind-switch). Per-Mission cadence /
+     * KB seed paths / guardrails overrides live in the template
+     * repo's `.works/mission.yml` manifest (read at fork time by
+     * Phase 8 PR JJ's MissionTemplateManifestService); the catalog
+     * row itself is just a pointer to the repo.
+     */
+    private toBuiltInMissionTemplateRecord(template: MissionTemplateConfig) {
+        return {
+            id: template.id,
+            kind: 'mission' as const,
+            sourceType: 'built_in' as const,
+            name: template.name,
+            description: template.description,
+            framework: null,
             repositoryOwner: template.owner,
             repositoryName: template.repo,
             repositoryUrl: `https://github.com/${template.owner}/${template.repo}`,

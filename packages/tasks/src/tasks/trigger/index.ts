@@ -6,6 +6,7 @@ export * from './kb-embed-document.task';
 export * from './kb-mirror-document.task';
 export * from './kb-org-overlay-fanout.task';
 export * from './user-research-rerun-dispatcher.task';
+export * from './mission-tick.task';
 export * from './template-customization.task';
 export * from './work-generation.task';
 export * from './work-import.task';

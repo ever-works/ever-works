@@ -2,9 +2,10 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { WorkBudgetAlertStateRepository } from '@src/database/repositories/work-budget-alert-state.repository';
+import { BudgetOwnerType } from '@src/entities/_types';
 import { WorkBudget, WorkBudgetScope } from '@src/entities/work-budget.entity';
 import { WorkBudgetAlertThreshold } from '@src/entities/work-budget-alert-state.entity';
-import { BudgetService, BudgetEvaluation } from './budget.service';
+import { BudgetService, BudgetEvaluation, type BudgetOwnerRef } from './budget.service';
 import { BudgetExceededException } from './budget-exceeded.exception';
 import { BudgetThresholdCrossedEvent } from './budget-threshold-crossed.event';
 
@@ -39,12 +40,27 @@ export class BudgetGuardService {
         userId: string,
         capability: PluginUsageCapability,
         pluginId: string,
-        options: { estimatedCostCents?: number; now?: Date } = {},
+        options: {
+            estimatedCostCents?: number;
+            now?: Date;
+            /**
+             * Phase 7 PR T — when set, the cap-check resolves
+             * budgets via the polymorphic owner ref (e.g.
+             * `{ ownerType: 'mission', ownerId: missionId }`) so
+             * a Mission's per-Mission budget guards plugin calls
+             * spawned for that Mission. When omitted, falls back
+             * to the legacy `workId`-keyed lookup — every existing
+             * caller keeps working unchanged (NN #20).
+             */
+            owner?: BudgetOwnerRef;
+        } = {},
     ): Promise<void> {
         const now = options.now ?? new Date();
         const estimatedCostCents = Math.max(0, Math.round(options.estimatedCostCents ?? 0));
 
-        const { global, plugin } = await this.budgetService.getApplicableBudgets(workId, pluginId);
+        const { global, plugin } = options.owner
+            ? await this.budgetService.getApplicableBudgetsForOwner(options.owner, pluginId)
+            : await this.budgetService.getApplicableBudgets(workId, pluginId);
 
         const evaluations: BudgetEvaluation[] = [];
         if (global) {
