@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "項目を検索...",
                 "allCategories": "すべてのカテゴリ",
                 "showing": "{total} 項目中 {current} 項目を表示",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "検索条件に一致する項目がありません",
                 "source": "ソース",
                 "viewOnWebsite": "ウェブサイトで表示",

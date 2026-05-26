@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Öğe ara...",
                 "allCategories": "Tüm Kategoriler",
                 "showing": "{total} öğeden {current} tanesi gösteriliyor",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Arama kriterlerinize uyan öğe yok",
                 "source": "Kaynak",
                 "viewOnWebsite": "Web sitesinde görüntüle",

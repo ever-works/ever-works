@@ -20,24 +20,21 @@ export default async function WorkOverviewPage({ params }: Params) {
     const { id } = await params;
 
     let work;
-    let config = null;
-    let countRes = { items: 0, categories: 0, tags: 0, comparisons: 0 };
 
     try {
-        const [workRes, configResult, countResult] = await Promise.all([
-            workAPI.get(id),
-            workAPI.getConfig(id).catch(() => ({ config: null })),
-            workAPI
-                .getCount(id)
-                .catch(() => ({ items: 0, categories: 0, tags: 0, comparisons: 0 })),
-        ]);
-
+        const workRes = await workAPI.get(id);
         work = workRes.work;
-        config = configResult.config;
-        countRes = countResult;
     } catch {
         notFound();
     }
+
+    // Counts + config come straight off the Work payload. The API
+    // populates `configCache` / `*Count` from the data repo at
+    // generator-completion time (and lazily backfills on first read
+    // for legacy Works), so the Overview tab no longer needs a
+    // per-render `cloneOrPull()` of the data repo. See
+    // `DataGeneratorService.refreshDataCache`.
+    const config = work.configCache ?? null;
 
     const showStatusCard =
         !work.generateStatus?.status ||
@@ -52,10 +49,10 @@ export default async function WorkOverviewPage({ params }: Params) {
             {showStatusCard && <WorkStatusCard work={work} />}
 
             <WorkStats
-                itemsCount={work.itemsCount || countRes.items}
-                categoriesCount={countRes.categories}
-                tagsCount={countRes.tags}
-                comparisonsCount={countRes.comparisons || 0}
+                itemsCount={work.itemsCount ?? 0}
+                categoriesCount={work.categoriesCount ?? 0}
+                tagsCount={work.tagsCount ?? 0}
+                comparisonsCount={work.comparisonsCount ?? 0}
                 work={work}
             />
 

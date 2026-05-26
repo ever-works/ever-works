@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Поиск элементов...",
                 "allCategories": "Все категории",
                 "showing": "Показаны {current} из {total} элементов",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Нет элементов, соответствующих критериям поиска",
                 "source": "Источник",
                 "viewOnWebsite": "Просмотреть на сайте",

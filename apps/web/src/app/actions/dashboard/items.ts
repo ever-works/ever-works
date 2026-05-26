@@ -1,6 +1,7 @@
 'use server';
 
 import { itemsGeneratorAPI, SubmitItemDto, UpdateItemDto } from '@/lib/api';
+import type { Category, Collection, ItemData, Tag } from '@/lib/api';
 import { screenshotAPI } from '@/lib/api';
 import { workAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -9,6 +10,47 @@ import { ROUTES } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { WorkScheduleCadence } from '@/lib/api/enums';
+
+export type LoadItemsForListResult = {
+    items: ItemData[];
+    categories: Category[];
+    tags: Tag[];
+    collections: Collection[];
+};
+
+/**
+ * Server action that fetches the items + taxonomy needed to populate
+ * the Items tab. Splits off the page's SSR data so the route shell
+ * (title, tabs, search input) renders instantly while this slow call
+ * — which still triggers a `cloneOrPull()` of the data repo on the
+ * API side, since items live as Markdown files in git — resolves in
+ * the background and the client swaps the skeletons for real rows.
+ */
+export async function loadItemsForList(workId: string): Promise<LoadItemsForListResult> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const [itemsRes, taxonomyRes] = await Promise.all([
+        workAPI.getItems(workId).catch(() => ({ items: [] as ItemData[] })),
+        workAPI
+            .getCategoriesTags(workId)
+            .catch(() => ({ categories: [] as string[], tags: [] as string[], collections: [] as string[] })),
+    ]);
+
+    const normalize = <T extends { id: string; name: string }>(
+        raw: ReadonlyArray<string | T>,
+    ): T[] =>
+        raw.map((entry) => (typeof entry === 'string' ? ({ id: entry, name: entry } as T) : entry));
+
+    return {
+        items: itemsRes.items ?? [],
+        categories: normalize<Category>(taxonomyRes.categories ?? []),
+        tags: normalize<Tag>(taxonomyRes.tags ?? []),
+        collections: normalize<Collection>(taxonomyRes.collections ?? []),
+    };
+}
 
 export async function addItem(workId: string, data: SubmitItemDto) {
     const user = await getAuthFromCookie();

@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "Търсене на елементи...",
                 "allCategories": "Всички категории",
                 "showing": "Показани са {current} от {total} елемента",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Няма елементи, които да съответстват на критериите за търсене",
                 "source": "Източник",
                 "viewOnWebsite": "Вижте на сайта",

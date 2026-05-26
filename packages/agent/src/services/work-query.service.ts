@@ -173,6 +173,40 @@ export class WorkQueryService {
                 user,
             );
 
+            // Lazy backfill of the denormalised cache columns
+            // (configCache + counts). When a Work pre-dates the
+            // caching migration its cache is NULL on first read; we
+            // clone once here, populate, and serve straight from
+            // Postgres on every subsequent load. Strictly best-effort
+            // — `refreshDataCache` swallows errors so we never trade
+            // a working page for a transient git outage.
+            if (
+                this.shouldBackfillDataCache(work) &&
+                work.generateStatus?.status === GenerateStatusType.GENERATED
+            ) {
+                const refreshed = await this.dataGenerator.refreshDataCache(work, user);
+                if (refreshed) {
+                    if (refreshed.configCache !== null) {
+                        work.configCache = refreshed.configCache as Work['configCache'];
+                    }
+                    if (refreshed.companyWebsite !== null) {
+                        work.companyWebsite = refreshed.companyWebsite;
+                    }
+                    if (refreshed.categoriesCount !== null) {
+                        work.categoriesCount = refreshed.categoriesCount;
+                    }
+                    if (refreshed.tagsCount !== null) {
+                        work.tagsCount = refreshed.tagsCount;
+                    }
+                    if (refreshed.comparisonsCount !== null) {
+                        work.comparisonsCount = refreshed.comparisonsCount;
+                    }
+                    if (refreshed.itemsCount !== null) {
+                        work.itemsCount = refreshed.itemsCount;
+                    }
+                }
+            }
+
             // Return work with user's role
             const workWithRole: WorkWithRole = {
                 ...work,
@@ -187,6 +221,22 @@ export class WorkQueryService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'getting work');
         }
+    }
+
+    /**
+     * Should we attempt a one-shot backfill of the data-cache columns
+     * on this read? True iff the work has been generated at least once
+     * (so the data repo plausibly exists) and the cache is still
+     * empty. After the first successful backfill, every column is
+     * populated and subsequent reads short-circuit.
+     */
+    private shouldBackfillDataCache(work: Work): boolean {
+        return (
+            work.configCache == null ||
+            work.categoriesCount == null ||
+            work.tagsCount == null ||
+            work.comparisonsCount == null
+        );
     }
 
     async workExists(slug: string, user: User) {

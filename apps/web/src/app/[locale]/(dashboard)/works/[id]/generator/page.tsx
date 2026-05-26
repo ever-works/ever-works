@@ -42,18 +42,22 @@ export default async function WorkGeneratorPage({ params, searchParams }: Params
         return <GenerationProgress work={work} />;
     }
 
-    const [configRes, websiteTemplatesRes, pluginsRes] = await Promise.all([
-        workAPI.getConfig(id).catch(() => ({ config: undefined })),
+    // `config` comes from the cached `works.yml` payload on the
+    // Work entity (populated by `DataGeneratorService.refreshDataCache`),
+    // so the Generator tab opens without a git clone. The remaining
+    // two fetches are DB-only / cheap plugin metadata.
+    const [websiteTemplatesRes, pluginsRes] = await Promise.all([
         workAPI
             .getWebsiteTemplates()
             .catch((): { templates: WebsiteTemplateOption[] } => ({ templates: [] })),
         pluginsAPI.listForWork(id).catch((): { plugins: WorkPlugin[] } => ({ plugins: [] })),
     ]);
+
     return (
         <GeneratorForm
             workId={id}
             work={work}
-            config={configRes.config}
+            config={work.configCache ?? undefined}
             websiteTemplates={websiteTemplatesRes.templates}
             workPlugins={pluginsRes.plugins}
             startInProgressView={starting === '1'}

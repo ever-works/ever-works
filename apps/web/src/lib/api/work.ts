@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { serverFetch, serverMutation } from './server-api';
 import {
     GenerateStatusType,
@@ -170,6 +171,13 @@ export interface Work {
     description: string;
     owner?: string;
     website?: string;
+    /**
+     * Cached `company_website` from `.works/works.yml`. Populated by
+     * the generator and the lazy backfill in `WorkQueryService` so
+     * the Overview tab can render straight from this `Work` payload
+     * without re-fetching the config from git.
+     */
+    companyWebsite?: string | null;
     organization: boolean;
     /**
      * EW-641 Phase 2/e row 37c — owning organization id (free-form UUID,
@@ -186,6 +194,23 @@ export interface Work {
     createdAt: string;
     updatedAt: string;
     itemsCount?: number;
+    /**
+     * Denormalised counts cached from the Work's data repo (see
+     * `companyWebsite` above). The Overview tab reads these instead
+     * of calling `/works/:id/count`, which previously cloned the
+     * repo on every page load.
+     */
+    categoriesCount?: number | null;
+    tagsCount?: number | null;
+    comparisonsCount?: number | null;
+    /**
+     * Cached `.works/works.yml` payload, shaped like {@link WorkConfig}.
+     * `null` only on a brand-new Work whose data repo has not yet
+     * been populated by the lazy backfill. Consumers should treat
+     * absent / null exactly the same as today's "config not yet
+     * available".
+     */
+    configCache?: WorkConfig | null;
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
     deploymentState?: GetProjectsReadyState;
     deploymentStartedAt?: string;
@@ -553,10 +578,19 @@ export const workAPI = {
         return serverFetch<WorkStatsResponse>(`/works/stats`);
     },
 
-    // Get a work by ID
-    get: async (id: string) => {
+    // Get a work by ID.
+    //
+    // Wrapped in React.cache so the per-request work fetch is
+    // deduplicated across the parent `/works/[id]/layout.tsx` and
+    // every nested `page.tsx` (Overview, Items, Generator, …)
+    // running in the same render. Without this, layout + page each
+    // fired their own HTTP request to /works/:id — and with the new
+    // lazy-backfill path on the API side, each unmemoised duplicate
+    // could re-trigger `refreshDataCache()` redundantly on the very
+    // first read.
+    get: cache(async (id: string) => {
         return serverFetch<APIResponse<{ work: Work }>>(`/works/${id}`);
-    },
+    }),
 
     getWebsiteTemplates: async () => {
         return serverFetch<APIResponse<{ templates: WebsiteTemplateOption[] }>>(

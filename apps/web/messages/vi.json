@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Tìm kiếm mục...",
                 "allCategories": "Tất Cả Danh Mục",
                 "showing": "Đang hiển thị {current} trong {total} mục",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Không có mục nào khớp với tiêu chí tìm kiếm",
                 "source": "Nguồn",
                 "viewOnWebsite": "Xem trên trang web",

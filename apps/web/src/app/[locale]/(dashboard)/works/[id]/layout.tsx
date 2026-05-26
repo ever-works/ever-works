@@ -38,13 +38,12 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let config = null;
 
     try {
-        const [res, configRes] = await Promise.all([
-            workAPI.get(id),
-            workAPI.getConfig(id).catch(() => ({ config: null })),
-        ]);
-
+        const res = await workAPI.get(id);
         work = res.work;
-        config = configRes.config;
+        // Sourced from the cached `works.yml` payload the API
+        // populated alongside the Work row. No extra git clone
+        // needed; see `DataGeneratorService.refreshDataCache`.
+        config = work.configCache ?? null;
 
         if (work) {
             // Fetch connection info and provider list in parallel
