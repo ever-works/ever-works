@@ -48,6 +48,11 @@ export interface CreateAgentInput {
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
+    // FU-13 — per-Agent git committer identity. Both nullable; when
+    // unset, the AGENT_GIT_FACADE binding falls back to the Agent's
+    // name + a synthesized email (`<slug>@agents.ever.works`).
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface UpdateAgentInput {
@@ -65,6 +70,8 @@ export interface UpdateAgentInput {
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 /**
@@ -189,6 +196,11 @@ export class AgentsService {
             avatarIcon: avatarMode === AgentAvatarMode.ICON ? (input.avatarIcon ?? null) : null,
             avatarImageUploadId:
                 avatarMode === AgentAvatarMode.IMAGE ? (input.avatarImageUploadId ?? null) : null,
+            // FU-13 — committer identity. Empty strings normalise to
+            // null so a blank picker field doesn't accidentally persist
+            // a no-op commit identity.
+            committerName: input.committerName?.trim() ? input.committerName.trim() : null,
+            committerEmail: input.committerEmail?.trim() ? input.committerEmail.trim() : null,
         });
 
         // Materialize tenant-Agent memberships into the join table for
@@ -275,6 +287,18 @@ export class AgentsService {
             patch.avatarMode = mode;
             patch.avatarIcon = mode === AgentAvatarMode.ICON ? icon : null;
             patch.avatarImageUploadId = mode === AgentAvatarMode.IMAGE ? upload : null;
+        }
+
+        // FU-13 — committer identity (each field independent so an
+        // operator can override just the email without re-typing the
+        // name). Empty-string normalises to null.
+        if (input.committerName !== undefined) {
+            const trimmed = input.committerName?.trim() ?? '';
+            patch.committerName = trimmed.length > 0 ? trimmed : null;
+        }
+        if (input.committerEmail !== undefined) {
+            const trimmed = input.committerEmail?.trim() ?? '';
+            patch.committerEmail = trimmed.length > 0 ? trimmed : null;
         }
 
         await this.agents.updateById(id, patch);

@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
     IsArray,
     IsBoolean,
+    IsEmail,
     IsEnum,
     IsInt,
     IsNotEmpty,
@@ -146,6 +147,21 @@ export class CreateAgentDto {
     @IsOptional()
     @IsUUID()
     avatarImageUploadId?: string;
+
+    // FU-13 — per-Agent git committer identity. Both nullable; when
+    // unset, the AGENT_GIT_FACADE binding falls back to the Agent's
+    // name + a synthesized email (see entity docstring + spec).
+    @ApiProperty({ required: false, maxLength: 120 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    committerName?: string;
+
+    @ApiProperty({ required: false, maxLength: 254 })
+    @IsOptional()
+    @IsEmail()
+    @MaxLength(254)
+    committerEmail?: string;
 }
 
 export class UpdateAgentDto {
@@ -233,6 +249,19 @@ export class UpdateAgentDto {
     @IsOptional()
     @IsUUID()
     avatarImageUploadId?: string | null;
+
+    // FU-13 — committer identity (also editable post-create).
+    @ApiProperty({ required: false, maxLength: 120 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    committerName?: string | null;
+
+    @ApiProperty({ required: false, maxLength: 254 })
+    @IsOptional()
+    @IsEmail()
+    @MaxLength(254)
+    committerEmail?: string | null;
 }
 
 export class ListAgentsQueryDto {

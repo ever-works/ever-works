@@ -45,6 +45,11 @@ export interface AgentDto {
     avatarMode: AgentAvatarMode;
     avatarIcon: string | null;
     avatarImageUploadId: string | null;
+    // FU-13 — git committer identity. Surfaced on the dashboard so an
+    // operator can override the defaults (Agent.name + synthesized
+    // email) without dropping into the database.
+    committerName: string | null;
+    committerEmail: string | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -82,6 +87,8 @@ export function toAgentDto(agent: Agent): AgentDto {
         avatarMode: agent.avatarMode,
         avatarIcon: agent.avatarIcon ?? null,
         avatarImageUploadId: agent.avatarImageUploadId ?? null,
+        committerName: agent.committerName ?? null,
+        committerEmail: agent.committerEmail ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

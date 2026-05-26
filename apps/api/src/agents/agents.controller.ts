@@ -159,6 +159,8 @@ export class AgentsController {
             avatarMode: body.avatarMode,
             avatarIcon: body.avatarIcon ?? null,
             avatarImageUploadId: body.avatarImageUploadId ?? null,
+            committerName: body.committerName ?? null,
+            committerEmail: body.committerEmail ?? null,
         });
     }
 
@@ -196,6 +198,8 @@ export class AgentsController {
             avatarMode: body.avatarMode,
             avatarIcon: body.avatarIcon,
             avatarImageUploadId: body.avatarImageUploadId,
+            committerName: body.committerName,
+            committerEmail: body.committerEmail,
         });
     }
 
