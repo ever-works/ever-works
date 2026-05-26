@@ -27,7 +27,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 
 ## Future tracks (post-PR-1021)
 
-- **Email Providers** — new spec at [`docs/specs/features/email-providers/spec.md`](docs/specs/features/email-providers/spec.md). Tenant-managed inbound + outbound email addresses, multi-provider plugin contract (Mailchimp, Mailgun, Postmark, Resend, Sendgrid), per-Agent assignment, integration with the agent-run path. Closes the loop on the FU-13 `Agent.committerEmail` synthesized-domain placeholder.
+- **Email Providers** — Jira Epic [EW-650](https://evertech.atlassian.net/browse/EW-650), spec at [`docs/specs/features/email-providers/spec.md`](docs/specs/features/email-providers/spec.md). Tenant-managed inbound + outbound email addresses, multi-provider plugin contract (Mailchimp, Mailgun, Postmark, Resend, Sendgrid), per-Agent assignment, integration with the agent-run path. Closes the loop on the FU-13 `Agent.committerEmail` synthesized-domain placeholder.
 
 ## Log
 

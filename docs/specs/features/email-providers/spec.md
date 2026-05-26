@@ -3,6 +3,7 @@
 **Feature ID**: `email-providers`
 **Branch**: `feat/email-providers`
 **Status**: `Draft`
+**Jira Epic**: [EW-650](https://evertech.atlassian.net/browse/EW-650)
 **Created**: 2026-05-26
 **Last updated**: 2026-05-26
 **Owner**: Product (Ruslan)
