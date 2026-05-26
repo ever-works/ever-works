@@ -61,7 +61,10 @@ function useTypewriterPlaceholder(
             if (shown.length < target.length) {
                 timer = setTimeout(() => setShown(target.slice(0, shown.length + 1)), TYPE_MS);
             } else {
-                timer = setTimeout(() => setPhase('holding'), HOLD_TYPED_MS);
+                // Hand off to 'holding' immediately — that phase owns
+                // the full HOLD_TYPED_MS pause. Setting a HOLD_TYPED_MS
+                // here too would double-count the hold (3.6s total).
+                timer = setTimeout(() => setPhase('holding'), 0);
             }
         } else if (phase === 'holding') {
             timer = setTimeout(() => setPhase('erasing'), HOLD_TYPED_MS);
@@ -134,10 +137,13 @@ export function PromptComposer({
     const [focused, setFocused] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const trimmed = value.trim();
-    const tooLong = trimmed.length > maxLength;
-    const canSubmit = !disabled && !submitting && trimmed.length >= minLength && !tooLong;
+    // The textarea's native `maxLength={maxLength}` caps the raw value
+    // before we ever see it, so no `tooLong` guard is needed here —
+    // trimming can only shorten the string, never grow it past the cap.
+    const canSubmit = !disabled && !submitting && trimmed.length >= minLength;
 
-    const examples = placeholderExamples && placeholderExamples.length > 0 ? placeholderExamples : [];
+    const examples =
+        placeholderExamples && placeholderExamples.length > 0 ? placeholderExamples : [];
     const typed = useTypewriterPlaceholder(focused || value.length > 0, examples, placeholder);
     const effectivePlaceholder = examples.length > 0 ? typed : placeholder || '';
 

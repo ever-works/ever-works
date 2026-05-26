@@ -133,6 +133,13 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         );
     };
 
+    // Build-from-Idea handler (Phase 1 PR B `POST /me/work-proposals/:id/build`).
+    // Wired here as an explicit `Queue build` button on the FAILED
+    // and PENDING cards once we add a richer card variant. For now
+    // the existing IdeaCard's Build CTA preserves the legacy
+    // `/works/new?proposal=…` flow. This handler stays exposed so a
+    // follow-up tick can swap one for the other without touching
+    // the IdeaCard component.
     const handleQueueBuild = (id: string) => {
         startBuilding(async () => {
             try {
@@ -144,7 +151,12 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             }
         });
     };
+    // Suppress unused-var warning until a card variant calls handleQueueBuild.
     void handleQueueBuild;
+
+    // Catch-all dismiss for the per-card handler in IdeaCard; we
+    // re-export a `silent` no-op when the user manually dismisses
+    // via the card's X button (handled inside IdeaCard already).
     void dismissProposalAction;
 
     return (
