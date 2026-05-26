@@ -74,7 +74,14 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Se
 
     return (
         <div className="w-full overflow-auto">
+            {/* `key={kind}` forces a fresh mount when the user flips
+                the Mission / Work / Website pill, so the catalog's
+                local state (`templates`, default id, filter mode)
+                re-initializes from the new server-fetched list.
+                Without it, the client-side useState keeps showing
+                the previous kind's templates after navigation. */}
             <TemplatesCatalog
+                key={kind}
                 kind={kind}
                 templates={templatesData.templates}
                 defaultTemplateId={templatesData.defaultTemplateId}

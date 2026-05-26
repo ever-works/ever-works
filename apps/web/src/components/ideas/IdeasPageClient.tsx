@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Lightbulb, Send, Settings as SettingsIcon } from 'lucide-react';
+import { Lightbulb, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
@@ -12,7 +12,7 @@ import {
 } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { PromptComposer } from '@/components/common/PromptComposer';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,7 +26,7 @@ import { ROUTES } from '@/lib/constants';
 import { IdeaCard } from './IdeaCard';
 
 /**
- * Phase 5 PR N — Ideas catalog page client.
+ * Phase 5 PR N + UI polish — Ideas catalog page client.
  *
  * Renders the full list of the user's Ideas — drafted by auto-
  * generation, suggested by Discover, spawned from a Mission, and
@@ -34,42 +34,15 @@ import { IdeaCard } from './IdeaCard';
  * terminal statuses (ACCEPTED + DISMISSED, off by default) and a
  * filter-chip strip for narrowing to one specific status.
  *
- * Quick-add form at the top wires Phase 1 PR B's
- * `POST /me/work-proposals` (user-manual create) — first UI surface
- * for that endpoint. The created Idea is prepended to the local
- * state immediately (optimistic) so the user sees their typed
- * description show up as a PENDING card without round-tripping a
- * full re-fetch.
- *
- * Gears menu (Settings dropdown, top-right) deep-links to the
- * Phase 4 PR L / PR EE settings anchors so the user can jump from
- * "I want fewer auto-suggestions" → the cadence knob in a single
- * click.
- *
- * Each IdeaCard's Build CTA still routes to `/works/new?proposal=…`
- * for now (the existing Phase 0 flow). A future tick can swap that
- * for `buildIdeaAction` directly — but doing so here would change
- * IdeaCard's behavior for the dashboard preview block too, which
- * is out of PR N's scope.
+ * Quick-add at the top now uses the shared `PromptComposer`
+ * (same shape as the marketing site's landing prompt) so this
+ * page and `/missions` feel like the same primitive.
  */
 type Toggles = {
     showAccepted: boolean;
     showDismissed: boolean;
 };
 
-/**
- * Phase 5 PR P — pseudo-filter `'done'` is an alias for ACCEPTED
- * with two distinct behaviors:
- *   1. The Done chip is enabled regardless of the "Show accepted"
- *      toggle (it expresses "show my completed work" rather than
- *      "include the hidden accepted bucket in my browse view").
- *   2. While Done is active, ACCEPTED Ideas are visible even if
- *      the toggle is off — same data, different semantics.
- *
- * The chip lives at the FAR END of the filter strip with a
- * checkmark glyph to read as a celebratory/terminal state, not
- * just another filter.
- */
 type StatusFilter = 'all' | WorkProposalStatus | 'done';
 
 const ACTIONABLE_STATUSES: WorkProposalStatus[] = ['pending', 'queued', 'building', 'failed'];
@@ -83,6 +56,15 @@ const STATUS_FILTER_ORDER: StatusFilter[] = [
     'accepted',
     'dismissed',
     'done',
+];
+
+const IDEA_PLACEHOLDERS: ReadonlyArray<string> = [
+    'e.g. "A curated list of the best AI coding agents released this year"',
+    'e.g. "Landing page for my fintech startup with hero, pricing, and CTA"',
+    'e.g. "Awesome list: best React state-management libraries with benchmarks"',
+    'e.g. "Directory of MCP servers — capabilities, language, install command, source repo"',
+    'e.g. "Knowledge base for our open-source SDK with search and versioning"',
+    'e.g. "Blog about indie game development with categories for postmortems and tooling"',
 ];
 
 interface IdeasPageClientProps {
@@ -103,21 +85,12 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     const [isBuilding, startBuilding] = useTransition();
 
     const visibleIdeas = useMemo(() => {
-        // Phase 5 PR P — Done bypasses the showAccepted toggle.
-        // When Done is selected, the user is explicitly asking to
-        // see their completed Ideas — the toggle gate would be a
-        // mis-feature.
         const isDoneFilter = statusFilter === 'done';
         return ideas.filter((idea) => {
-            // Toggles gate the terminal-status surfaces — unless
-            // the Done filter is active (then accepted rows show
-            // regardless).
             if (idea.status === 'accepted' && !toggles.showAccepted && !isDoneFilter) {
                 return false;
             }
             if (idea.status === 'dismissed' && !toggles.showDismissed) return false;
-            // Filter chip narrows further. `'done'` is an alias
-            // for ACCEPTED.
             if (statusFilter === 'done' && idea.status !== 'accepted') return false;
             if (statusFilter !== 'all' && statusFilter !== 'done' && idea.status !== statusFilter) {
                 return false;
@@ -126,17 +99,12 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         });
     }, [ideas, toggles, statusFilter]);
 
-    // Per-status counts for the filter-chip badges. Computed once
-    // per render against the full set so the toggles don't reduce
-    // the chip badges out from under the user.
     const counts = useMemo(() => {
         const map = new Map<StatusFilter, number>();
         map.set('all', ideas.length);
         for (const idea of ideas) {
             map.set(idea.status, (map.get(idea.status) ?? 0) + 1);
         }
-        // Phase 5 PR P — `done` chip aliases ACCEPTED; mirror the
-        // count so the badge is meaningful.
         map.set('done', map.get('accepted') ?? 0);
         return map;
     }, [ideas]);
@@ -160,21 +128,11 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     };
 
     const handleDismissed = (id: string) => {
-        // IdeaCard's own dismiss path already calls
-        // dismissProposalAction; we just mirror the local list so
-        // the card disappears from this page without a full re-fetch.
         setIdeas((prev) =>
             prev.map((idea) => (idea.id === id ? { ...idea, status: 'dismissed' as const } : idea)),
         );
     };
 
-    // Build-from-Idea handler (Phase 1 PR B `POST /me/work-proposals/:id/build`).
-    // Wired here as an explicit `Queue build` button on the FAILED
-    // and PENDING cards once we add a richer card variant. For now
-    // the existing IdeaCard's Build CTA preserves the legacy
-    // `/works/new?proposal=…` flow. This handler is exposed so a
-    // follow-up tick can swap one for the other without touching
-    // the IdeaCard component.
     const handleQueueBuild = (id: string) => {
         startBuilding(async () => {
             try {
@@ -186,30 +144,25 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             }
         });
     };
-    // Suppress unused-var warning until a card variant calls it.
     void handleQueueBuild;
-
-    // Catch-all dismiss for the per-card handler in IdeaCard; we
-    // re-export a `silent` no-op when the user manually dismisses
-    // via the card's X button (handled inside IdeaCard already).
     void dismissProposalAction;
 
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-6">
-                <div className="flex items-start gap-3">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                        <Lightbulb className="w-4 h-4 text-warning" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                            {t('title')}
-                        </h1>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 max-w-2xl">
-                            {t('subtitle')}
-                        </p>
-                    </div>
+            {/* Header — title + subtitle take the full row width and
+                the gears menu floats to the far right so the subtitle
+                isn't truncated next to it. */}
+            <div className="flex items-start gap-3 mb-6">
+                <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
+                    <Lightbulb className="w-4 h-4 text-warning" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                        {t('subtitle')}
+                    </p>
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -217,7 +170,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className="gap-1.5"
+                            className="ml-auto shrink-0 gap-1.5"
                             aria-label={t('gears.menuLabel')}
                         >
                             <SettingsIcon className="w-4 h-4" />
@@ -274,34 +227,25 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                 </DropdownMenu>
             </div>
 
-            {/* Quick add */}
-            <div className="mb-5 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/40 dark:bg-surface-dark/30 p-3">
+            {/* Quick add — shared composer matches the marketing site. */}
+            <div className="mb-6">
                 <label
                     htmlFor="ideas-quick-add"
-                    className="text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
+                    className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-2"
                 >
                     {t('quickAdd.label')}
                 </label>
-                <div className="mt-2 flex flex-col gap-2 @3xl/main:flex-row @3xl/main:items-stretch">
-                    <Textarea
-                        id="ideas-quick-add"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        rows={2}
-                        placeholder={t('quickAdd.placeholder')}
-                        className="min-h-20 flex-1 resize-none bg-card dark:bg-card-primary-dark"
-                    />
-                    <Button
-                        type="button"
-                        size="sm"
-                        className="gap-1.5 self-stretch @3xl/main:px-4"
-                        onClick={handleQuickAdd}
-                        disabled={isCreating || draft.trim().length < 10}
-                    >
-                        <Send className="w-3.5 h-3.5" />
-                        {t('quickAdd.submit')}
-                    </Button>
-                </div>
+                <PromptComposer
+                    inputId="ideas-quick-add"
+                    value={draft}
+                    onChange={setDraft}
+                    onSubmit={handleQuickAdd}
+                    submitting={isCreating}
+                    placeholderExamples={IDEA_PLACEHOLDERS}
+                    ariaLabel={t('quickAdd.label')}
+                    submitTitle={t('quickAdd.submitTitle')}
+                    testId="ideas-quick-add"
+                />
             </div>
 
             {/* Toggles + filter chips row */}
@@ -342,10 +286,6 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                         const isActive = statusFilter === s;
                         const isTerminal = s === 'accepted' || s === 'dismissed';
                         const isDoneChip = s === 'done';
-                        // Phase 5 PR P — Done is enabled REGARDLESS of
-                        // the showAccepted toggle (different semantics:
-                        // "show me my completed work" vs. "include the
-                        // hidden accepted bucket in my browse view").
                         const isHidden =
                             (s === 'accepted' && !toggles.showAccepted) ||
                             (s === 'dismissed' && !toggles.showDismissed);
@@ -357,10 +297,6 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                                 disabled={isHidden}
                                 className={cn(
                                     'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                    // Done chip uses a success-tinted
-                                    // active/inactive palette so it
-                                    // reads as a celebratory terminal
-                                    // state, not just another filter.
                                     isDoneChip
                                         ? isActive
                                             ? 'bg-success text-white border-success'
@@ -427,11 +363,5 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     );
 }
 
-// Re-export the constant so spec-doc / a follow-up tick can
-// import it (e.g. dashboard preview wants the same default set).
 export { ACTIONABLE_STATUSES };
-
-// Re-export ROUTES alias so spec docs can deep-link to this page
-// without re-importing constants.ts. (Tiny: keeps PR N's surface
-// self-contained at a single import point.)
 export { ROUTES as IDEAS_PAGE_ROUTES };
