@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { RefreshCw, Wallet } from 'lucide-react';
-import { agentsAPI } from '@/lib/api/agents';
+import { getAgentBudgetAction } from '@/app/actions/agents';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 
@@ -38,7 +38,7 @@ export function AgentBudgetsClient({ agentId, initial }: Props) {
     const refresh = () => {
         startTransition(() => {
             void (async () => {
-                const next = await agentsAPI.getBudget(agentId);
+                const next = await getAgentBudgetAction(agentId);
                 setSnapshot(next);
             })();
         });

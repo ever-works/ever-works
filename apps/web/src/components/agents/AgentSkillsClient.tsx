@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { Sparkles, Trash2 } from 'lucide-react';
-import { agentsAPI } from '@/lib/api/agents';
-import { skillsAPI } from '@/lib/api/skills';
+import { listAgentSkillsAction } from '@/app/actions/agents';
+import { deleteBindingAction } from '@/app/actions/skills';
 import { Button } from '@/components/ui/button';
 
 interface BoundSkill {
@@ -28,8 +28,8 @@ export function AgentSkillsClient({ agentId, initial }: Props) {
         startTransition(() => {
             void (async () => {
                 try {
-                    await skillsAPI.deleteBinding(bindingId);
-                    const next = await agentsAPI.listSkills(agentId);
+                    await deleteBindingAction(bindingId);
+                    const next = await listAgentSkillsAction(agentId);
                     setRows(next.data);
                 } finally {
                     setRemovingId(null);

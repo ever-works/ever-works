@@ -120,41 +120,25 @@ const FALLBACK: Record<AstTemplateEntityType, AstTemplateEntry[]> = {
 /**
  * Returns the curated template list for an entity type.
  *
- * When the ADR-010 unified Workshop Templates catalog has shipped
- * (signalled by the `NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG` env var
- * being set to `'1'` / `'true'`), this hits the server endpoint
- * `/api/agent-templates?entity=<entity>`. Otherwise it returns the
- * hand-curated fallback list so the Templates routes render with
- * real content even before the catalog lands.
+ * Safe to import from both server and client components — no
+ * `server-only` modules are pulled in. The ADR-010 unified Workshop
+ * Templates catalog swap path lives behind a separate server action
+ * (`listAstTemplatesFromCatalogAction` — TBA) so the client bundle
+ * can keep importing this file freely.
  *
- * FU-11 — call signature is stable across both code paths so the
- * three route pages + NewAgentDialog / NewTaskForm pre-fill hook
- * stay unchanged.
+ * FU-11 — call signature is stable; when the catalog ships, route
+ * pages (server components) can opt into the action path while
+ * client pre-fill hooks keep using these constants.
+ *
+ * Post-CI fix (2026-05-26): the earlier env-flag + lazy import
+ * approach broke the Next.js webpack build — webpack still traced
+ * into `./server-api` even though the import was dynamic, because
+ * its target is statically determinable. Keeping this isomorphic
+ * pure-data path avoids the bundle pollution; the catalog-swap path
+ * moves to a dedicated server action when ADR-010 lands.
  */
 export async function listAstTemplates(entity: AstTemplateEntityType): Promise<AstTemplateEntry[]> {
-    if (isAdr010Enabled()) {
-        try {
-            // Lazy import to avoid pulling `getAuthAccessCookie` into
-            // the client bundle when the flag is off. The server-only
-            // path applies only when this module is imported from a
-            // server component / server action.
-            const { serverFetch } = await import('./server-api');
-            return await serverFetch<AstTemplateEntry[]>(
-                `/agent-templates?entity=${encodeURIComponent(entity)}`,
-            );
-        } catch {
-            // Catalog endpoint is wired but currently unreachable —
-            // surface the fallback so the page still renders. Operator
-            // sees the same content as before flag-on.
-            return FALLBACK[entity] ?? [];
-        }
-    }
     return FALLBACK[entity] ?? [];
-}
-
-function isAdr010Enabled(): boolean {
-    const flag = process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG;
-    return flag === '1' || flag === 'true';
 }
 
 /**

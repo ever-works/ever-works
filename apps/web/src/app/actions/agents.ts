@@ -83,3 +83,36 @@ export async function importAgentAction(
     revalidatePath('/agents');
     return res;
 }
+
+// FU-2 / FU-4 post-CI fix: client-side surfaces on `/agents/[id]/*`
+// can't reach `agentsAPI` directly — it imports `'server-only'`. These
+// thin actions wrap the runtime endpoints (listRuns / listSkills /
+// getBudget / runNow / cancelRun) so the AgentActivityClient /
+// AgentSkillsClient / AgentBudgetsClient client components stay clean.
+
+export async function listAgentRunsAction(
+    id: string,
+    opts: { limit?: number; offset?: number } = {},
+) {
+    return agentsAPI.listRuns(id, opts);
+}
+
+export async function listAgentSkillsAction(id: string) {
+    return agentsAPI.listSkills(id);
+}
+
+export async function getAgentBudgetAction(id: string) {
+    return agentsAPI.getBudget(id);
+}
+
+export async function runAgentNowAction(id: string) {
+    const res = await agentsAPI.runNow(id);
+    revalidatePath(`/agents/${id}/activity`);
+    return res;
+}
+
+export async function cancelAgentRunAction(id: string, runId: string) {
+    const res = await agentsAPI.cancelRun(id, runId);
+    revalidatePath(`/agents/${id}/activity`);
+    return res;
+}

@@ -7,14 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
-import { agentsAPI } from '@/lib/api/agents';
-import { missionsAPI } from '@/lib/api/missions';
-import { workProposalsAPI } from '@/lib/api/work-proposals';
-import { workAPI } from '@/lib/api/work';
 import {
     createBindingAction,
     deleteBindingAction,
     deleteSkillAction,
+    loadBindingTargetOptionsAction,
     updateSkillAction,
 } from '@/app/actions/skills';
 
@@ -331,24 +328,13 @@ function SkillBindingTargetPicker({
         setLoadError(null);
         void (async () => {
             try {
-                let next: Option[] = [];
-                if (targetType === 'agent') {
-                    const res = await agentsAPI.list({ limit: 100 });
-                    next = (res.data ?? []).map((a) => ({
-                        id: a.id,
-                        label: `${a.name} (${a.slug})`,
-                    }));
-                } else if (targetType === 'mission') {
-                    const res = await missionsAPI.list();
-                    next = (res ?? []).map((m) => ({ id: m.id, label: m.title }));
-                } else if (targetType === 'idea') {
-                    const res = await workProposalsAPI.list(['pending', 'accepted']);
-                    next = (res ?? []).map((p) => ({ id: p.id, label: p.title }));
-                } else if (targetType === 'work') {
-                    const res = await workAPI.getAll({ limit: 100 });
-                    const works = (res?.works ?? []) as Array<{ id: string; name: string }>;
-                    next = works.map((w) => ({ id: w.id, label: w.name }));
-                }
+                // FU-8 post-CI fix: route through a server action
+                // instead of importing the server-only API clients
+                // (`agentsAPI` / `missionsAPI` / `workProposalsAPI` /
+                // `workAPI`) directly. Importing them here pulls
+                // `import 'server-only'` into the client bundle and
+                // breaks the Next.js build.
+                const next = await loadBindingTargetOptionsAction(targetType);
                 if (!cancelled) setOptions(next);
             } catch (err) {
                 if (!cancelled) {

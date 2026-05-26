@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { agentsAPI } from '@/lib/api/agents';
+import { cancelAgentRunAction, listAgentRunsAction } from '@/app/actions/agents';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 
@@ -40,7 +40,7 @@ export function AgentActivityClient({ agentId, initial }: Props) {
     const refresh = (offset: number) => {
         startTransition(() => {
             void (async () => {
-                const next = await agentsAPI.listRuns(agentId, { limit: meta.limit, offset });
+                const next = await listAgentRunsAction(agentId, { limit: meta.limit, offset });
                 setRows(next.data);
                 setMeta(next.meta);
             })();
@@ -52,7 +52,7 @@ export function AgentActivityClient({ agentId, initial }: Props) {
         startTransition(() => {
             void (async () => {
                 try {
-                    await agentsAPI.cancelRun(agentId, runId);
+                    await cancelAgentRunAction(agentId, runId);
                     refresh(meta.offset);
                 } finally {
                     setCancellingId(null);

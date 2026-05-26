@@ -104,3 +104,52 @@ export async function deleteBindingAction(bindingId: string): Promise<{ deleted:
     revalidatePath('/skills');
     return res;
 }
+
+/**
+ * FU-8 post-CI fix: the binding-target picker on `SkillDetailClient`
+ * (a `'use client'` component) needs the user's Agents / Missions /
+ * Ideas / Works to populate the dropdown. Importing the API clients
+ * (`agentsAPI` / `missionsAPI` / `workProposalsAPI` / `workAPI`)
+ * directly from a client component pulls their `import 'server-only'`
+ * declarations into the client bundle and breaks the Next.js build:
+ *
+ *   x You're importing a module that depends on "server-only".
+ *     This API is only available in Server Components in the App
+ *     Router, but you are using it in the Pages Router.
+ *
+ * This server action wraps the four lookups so the client component
+ * gets the data it needs without dragging server-only modules across
+ * the boundary.
+ */
+export async function loadBindingTargetOptionsAction(
+    targetType: SkillBindingTargetType,
+): Promise<Array<{ id: string; label: string }>> {
+    if (targetType === 'tenant') return [];
+    // Lazy-import the server-only API clients so this action stays
+    // pruned of paths that won't run for the targetType in hand.
+    if (targetType === 'agent') {
+        const { agentsAPI } = await import('@/lib/api/agents');
+        const res = await agentsAPI.list({ limit: 100 });
+        return (res.data ?? []).map((a) => ({
+            id: a.id,
+            label: `${a.name} (${a.slug})`,
+        }));
+    }
+    if (targetType === 'mission') {
+        const { missionsAPI } = await import('@/lib/api/missions');
+        const res = await missionsAPI.list();
+        return (res ?? []).map((m) => ({ id: m.id, label: m.title }));
+    }
+    if (targetType === 'idea') {
+        const { workProposalsAPI } = await import('@/lib/api/work-proposals');
+        const res = await workProposalsAPI.list(['pending', 'accepted']);
+        return (res ?? []).map((p) => ({ id: p.id, label: p.title }));
+    }
+    if (targetType === 'work') {
+        const { workAPI } = await import('@/lib/api/work');
+        const res = await workAPI.getAll({ limit: 100 });
+        const works = (res?.works ?? []) as Array<{ id: string; name: string }>;
+        return works.map((w) => ({ id: w.id, label: w.name }));
+    }
+    return [];
+}
