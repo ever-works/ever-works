@@ -291,9 +291,9 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         it('rolls back the queued AgentRun when enqueue throws (codex P1 fix)', async () => {
             agentRuns.createQueued.mockResolvedValueOnce({ id: runId });
             taskExecuteDispatcher.enqueue.mockRejectedValueOnce(new Error('trigger.dev down'));
-            await expect(
-                controller.assignTask(auth, agentId, { taskId }),
-            ).rejects.toBeInstanceOf(InternalServerErrorException);
+            await expect(controller.assignTask(auth, agentId, { taskId })).rejects.toBeInstanceOf(
+                InternalServerErrorException,
+            );
             expect(agentRuns.markFailed).toHaveBeenCalledWith(
                 runId,
                 expect.stringContaining('enqueue-failed'),

@@ -37,13 +37,13 @@ This spec defines the tenant-level Email Addresses surface, the plugin contract 
 
 ## 1. Personas + use cases
 
-| Persona | Use case |
-|---|---|
+| Persona  | Use case                                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Operator | Registers `pm@acme.com` as an outbound address backed by Postmark; assigns it to the "Project Manager" Agent so its standups land in inboxes that look human. |
-| Operator | Registers `support@acme.com` as an inbound address backed by Mailgun routes; assigns it to a "Support Triage" Agent so incoming emails become Tasks. |
-| Agent | Sends a daily summary to a Task's watchers from its assigned outbound address. The commit author email on its git commits matches. |
-| Agent | Receives a reply on its inbound address, parses it as a chat message on the originating Task, posts back. |
-| Operator | A provider has an outage. Drains traffic to a secondary provider on the same address without touching Agent configuration. |
+| Operator | Registers `support@acme.com` as an inbound address backed by Mailgun routes; assigns it to a "Support Triage" Agent so incoming emails become Tasks.          |
+| Agent    | Sends a daily summary to a Task's watchers from its assigned outbound address. The commit author email on its git commits matches.                            |
+| Agent    | Receives a reply on its inbound address, parses it as a chat message on the originating Task, posts back.                                                     |
+| Operator | A provider has an outage. Drains traffic to a secondary provider on the same address without touching Agent configuration.                                    |
 
 ---
 
@@ -56,10 +56,10 @@ A new sub-page under Settings → Integrations:
 - **Outbound addresses** list. Each row: `address` · `provider` · `fromName?` · `verified?` · `defaultForReplies?` · per-row spend rollup · "Edit" / "Disable" / "Remove".
 - **Inbound addresses** list. Same shape minus `fromName` + `defaultForReplies`; gains `routingRule` (regex over subject/from for routing into Mission/Idea/Work/Task scopes).
 - **Add address** wizard:
-  - Step 1: pick direction (Outbound / Inbound / Both).
-  - Step 2: pick provider (filtered by capability — see §3.1).
-  - Step 3: address + provider-specific settings (domain, sending-domain DNS check, webhook URL the operator must register at the provider, etc.).
-  - Step 4: verification — outbound sends a confirmation email; inbound asks the user to send a test email to the address.
+    - Step 1: pick direction (Outbound / Inbound / Both).
+    - Step 2: pick provider (filtered by capability — see §3.1).
+    - Step 3: address + provider-specific settings (domain, sending-domain DNS check, webhook URL the operator must register at the provider, etc.).
+    - Step 4: verification — outbound sends a confirmation email; inbound asks the user to send a test email to the address.
 - **Bulk-import** from existing provider account (Postmark / Resend / Sendgrid API — list addresses already configured at the provider and offer to claim them).
 
 ### 2.2 Per-Agent assignment
@@ -101,15 +101,15 @@ Manifest `everworks.plugin` block:
 
 ```json
 {
-    "id": "postmark",
-    "name": "Postmark",
-    "category": "email-provider",
-    "capabilities": ["email-outbound", "email-inbound"],
-    "settings": {
-        "apiKey": { "type": "string", "x-secret": true, "x-envVar": "POSTMARK_API_KEY" },
-        "defaultSenderDomain": { "type": "string" },
-        "inboundStreamId": { "type": "string", "optional": true }
-    }
+	"id": "postmark",
+	"name": "Postmark",
+	"category": "email-provider",
+	"capabilities": ["email-outbound", "email-inbound"],
+	"settings": {
+		"apiKey": { "type": "string", "x-secret": true, "x-envVar": "POSTMARK_API_KEY" },
+		"defaultSenderDomain": { "type": "string" },
+		"inboundStreamId": { "type": "string", "optional": true }
+	}
 }
 ```
 
@@ -117,35 +117,32 @@ Manifest `everworks.plugin` block:
 
 ```typescript
 interface IEmailOutboundPlugin extends IPlugin {
-    sendEmail(input: EmailSendInput, options: EmailOptions): Promise<EmailSendResult>;
-    verifyAddress(address: string, options: EmailOptions): Promise<EmailVerification>;
-    listDeliveryEvents(
-        filter: EmailEventFilter,
-        options: EmailOptions,
-    ): AsyncGenerator<EmailDeliveryEvent>;
+	sendEmail(input: EmailSendInput, options: EmailOptions): Promise<EmailSendResult>;
+	verifyAddress(address: string, options: EmailOptions): Promise<EmailVerification>;
+	listDeliveryEvents(filter: EmailEventFilter, options: EmailOptions): AsyncGenerator<EmailDeliveryEvent>;
 }
 
 interface EmailSendInput {
-    from: string; // canonical address (tenant-registered)
-    fromName?: string;
-    to: readonly string[];
-    cc?: readonly string[];
-    bcc?: readonly string[];
-    subject: string;
-    bodyText: string;
-    bodyHtml?: string;
-    replyTo?: string;
-    attachments?: readonly EmailAttachment[];
-    metadata?: Record<string, string>; // forwarded to provider tags
-    /** Idempotency key for retries — required when called from agent-run path. */
-    messageRef: string;
+	from: string; // canonical address (tenant-registered)
+	fromName?: string;
+	to: readonly string[];
+	cc?: readonly string[];
+	bcc?: readonly string[];
+	subject: string;
+	bodyText: string;
+	bodyHtml?: string;
+	replyTo?: string;
+	attachments?: readonly EmailAttachment[];
+	metadata?: Record<string, string>; // forwarded to provider tags
+	/** Idempotency key for retries — required when called from agent-run path. */
+	messageRef: string;
 }
 
 interface EmailSendResult {
-    provider: string;
-    providerMessageId: string;
-    accepted: readonly string[]; // RFC 5321 mailbox addresses the provider accepted
-    rejected: readonly { address: string; reason: string }[];
+	provider: string;
+	providerMessageId: string;
+	accepted: readonly string[]; // RFC 5321 mailbox addresses the provider accepted
+	rejected: readonly { address: string; reason: string }[];
 }
 ```
 
@@ -153,35 +150,32 @@ interface EmailSendResult {
 
 ```typescript
 interface IEmailInboundPlugin extends IPlugin {
-    /**
-     * Server-side webhook handler exposed at `/api/email/inbound/:pluginId`.
-     * The platform decodes provider-specific webhook payloads (Mailgun
-     * signed forms, Postmark JSON, Sendgrid Event Webhook, etc.) into a
-     * canonical `EmailInboundMessage` shape.
-     */
-    parseInboundWebhook(
-        rawBody: Buffer,
-        headers: Record<string, string>,
-    ): Promise<EmailInboundMessage>;
-    /**
-     * Verify a webhook signature so a third party can't spoof inbound mail.
-     * MUST throw on signature mismatch.
-     */
-    verifyWebhookSignature(rawBody: Buffer, headers: Record<string, string>): void;
+	/**
+	 * Server-side webhook handler exposed at `/api/email/inbound/:pluginId`.
+	 * The platform decodes provider-specific webhook payloads (Mailgun
+	 * signed forms, Postmark JSON, Sendgrid Event Webhook, etc.) into a
+	 * canonical `EmailInboundMessage` shape.
+	 */
+	parseInboundWebhook(rawBody: Buffer, headers: Record<string, string>): Promise<EmailInboundMessage>;
+	/**
+	 * Verify a webhook signature so a third party can't spoof inbound mail.
+	 * MUST throw on signature mismatch.
+	 */
+	verifyWebhookSignature(rawBody: Buffer, headers: Record<string, string>): void;
 }
 
 interface EmailInboundMessage {
-    provider: string;
-    providerMessageId: string;
-    from: string;
-    to: readonly string[];
-    subject: string;
-    bodyText: string;
-    bodyHtml?: string;
-    attachments?: readonly EmailAttachment[];
-    receivedAt: Date;
-    /** Provider-specific metadata (spam score, DKIM result, etc.) */
-    metadata: Record<string, unknown>;
+	provider: string;
+	providerMessageId: string;
+	from: string;
+	to: readonly string[];
+	subject: string;
+	bodyText: string;
+	bodyHtml?: string;
+	attachments?: readonly EmailAttachment[];
+	receivedAt: Date;
+	/** Provider-specific metadata (spam score, DKIM result, etc.) */
+	metadata: Record<string, unknown>;
 }
 ```
 
@@ -259,6 +253,7 @@ email_messages
 ### 5.1 Outbound
 
 A new Agent tool `sendEmail` registers when:
+
 - the Agent has at least one outbound `agent_email_assignments` row, AND
 - `permissions.canCallExternalTools` is true (mirrors searchWeb/screenshot/extractContent gate)
 
@@ -278,6 +273,7 @@ Spec gap: how do we attribute multi-recipient inbound mail (e.g. one email lands
 ### 5.3 Per-Agent commit identity (FU-13 closing loop)
 
 When the AGENT_GIT_FACADE binding looks up the Agent's `committerEmail`:
+
 - if set to a tenant-registered outbound email → use as-is.
 - if set to a free-form string → use as-is (operator opt-in to deliver to wherever they want).
 - if null → synthesize `<slug>@agents.ever.works` (today's behaviour from FU-13).
@@ -290,13 +286,13 @@ The Email Addresses dropdown on the Agent identity panel offers the registered a
 
 Each provider lands as its own plugin under `packages/plugins/<name>/`:
 
-| Plugin | Capabilities | Auth | Notes |
-|---|---|---|---|
-| `mailchimp-transactional` | outbound + inbound | API key + webhook secret | Inbound via Mandrill webhooks; outbound via Mandrill Send API |
-| `mailgun` | outbound + inbound | API key + signing-key (webhook signature) + sending domain | Inbound via "Routes" → HTTP POST to our webhook |
-| `postmark` | outbound + inbound | server token + inbound webhook secret | Inbound via Postmark Inbound Streams |
-| `resend` | outbound only (v1) | API key | Resend's inbound is in private beta — add when GA |
-| `sendgrid` | outbound + inbound | API key + Event Webhook signing | Inbound Parse Webhook |
+| Plugin                    | Capabilities       | Auth                                                       | Notes                                                         |
+| ------------------------- | ------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `mailchimp-transactional` | outbound + inbound | API key + webhook secret                                   | Inbound via Mandrill webhooks; outbound via Mandrill Send API |
+| `mailgun`                 | outbound + inbound | API key + signing-key (webhook signature) + sending domain | Inbound via "Routes" → HTTP POST to our webhook               |
+| `postmark`                | outbound + inbound | server token + inbound webhook secret                      | Inbound via Postmark Inbound Streams                          |
+| `resend`                  | outbound only (v1) | API key                                                    | Resend's inbound is in private beta — add when GA             |
+| `sendgrid`                | outbound + inbound | API key + Event Webhook signing                            | Inbound Parse Webhook                                         |
 
 Plus a fallback `local-smtp` plugin for dev / self-host that wraps `nodemailer` with no inbound (no public webhook).
 

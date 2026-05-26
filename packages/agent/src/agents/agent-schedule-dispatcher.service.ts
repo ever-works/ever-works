@@ -211,9 +211,8 @@ export class AgentScheduleDispatcherService {
         // path. Otherwise default agents would silently 200 with
         // `outcome: skipped, reason: already-claimed` while no run
         // was actually in flight.
-        let priorClaim: Awaited<
-            ReturnType<typeof this.agentRepository.tryClaimForManualRun>
-        > = null;
+        let priorClaim: Awaited<ReturnType<typeof this.agentRepository.tryClaimForManualRun>> =
+            null;
         let createdRun: { id: string } | null = null;
         let enqueueSucceeded = false;
         try {

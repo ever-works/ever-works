@@ -231,9 +231,7 @@ export class AgentRepository {
             .andWhere('status = :prior', { prior: priorStatus })
             .execute();
 
-        return (result.affected ?? 0) > 0
-            ? { priorNextHeartbeatAt: priorNext, priorStatus }
-            : null;
+        return (result.affected ?? 0) > 0 ? { priorNextHeartbeatAt: priorNext, priorStatus } : null;
     }
 
     /**

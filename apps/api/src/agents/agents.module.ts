@@ -288,10 +288,7 @@ import { AgentsController } from './agents.controller';
         {
             provide: AGENT_GIT_FACADE,
             inject: [GitFacadeService, AgentRepository],
-            useFactory: (
-                git: GitFacadeService,
-                agents: AgentRepository,
-            ): AgentGitFacade => ({
+            useFactory: (git: GitFacadeService, agents: AgentRepository): AgentGitFacade => ({
                 async commitToRepo({ userId, agentId, workId, message, files, branch }) {
                     const agent = await agents.findById(agentId);
                     if (!agent) {
@@ -331,17 +328,12 @@ import { AgentsController } from './agents.controller';
                         email: committerEmail,
                     } as any);
                     await git
-                        .push(
-                            { dir, force: false },
-                            { providerId, userId, workId } as any,
-                        )
+                        .push({ dir, force: false }, { providerId, userId, workId } as any)
                         .catch((err: Error) => {
                             // Don't swallow push failures silently — the
                             // model needs to know its commit didn't reach
                             // the remote so it can retry or escalate.
-                            throw new Error(
-                                `commitToRepo: push failed (${err.message ?? err}).`,
-                            );
+                            throw new Error(`commitToRepo: push failed (${err.message ?? err}).`);
                         });
                     return {
                         sha: sha ?? null,
@@ -349,16 +341,7 @@ import { AgentsController } from './agents.controller';
                         filesChanged: files?.length ?? 0,
                     };
                 },
-                async openPullRequest({
-                    userId,
-                    agentId,
-                    workId,
-                    title,
-                    body,
-                    head,
-                    base,
-                    draft,
-                }) {
+                async openPullRequest({ userId, agentId, workId, title, body, head, base, draft }) {
                     void agentId;
                     const providerId = 'github';
                     const pr = await git.createPullRequest(
