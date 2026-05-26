@@ -103,6 +103,40 @@ describe('DeployFacadeService', () => {
         });
     });
 
+    describe('ever-works deploy provider alias', () => {
+        it('resolves deployProvider=ever-works through the k8s plugin and settings', async () => {
+            const { service, registry, settingsService } = createService({
+                deployProvider: 'ever-works',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+            });
+
+            await expect(
+                service.isConfigured({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBe(true);
+
+            const resolved = await service.getPluginAndTokenAndSettings({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(registry.get).toHaveBeenCalledWith('k8s');
+            expect(settingsService.getResolvedSettings).toHaveBeenCalledWith('k8s', {
+                userId: 'user-1',
+                workId: 'work-1',
+                includeSecrets: true,
+            });
+            expect(settingsService.getSettings).toHaveBeenCalledWith('k8s', {
+                userId: 'user-1',
+                workId: 'work-1',
+                includeSecrets: true,
+            });
+            expect(resolved.plugin.id).toBe('k8s');
+            expect(resolved.token).toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
+            expect(resolved.work.deployProvider).toBe('ever-works');
+        });
+    });
+
     describe('EW-616 platform-managed kubeconfig sentinel', () => {
         it('returns the sentinel for k8s + clusterSource=k8s-works when no kubeconfig is saved', async () => {
             const { service } = createService({

@@ -21,6 +21,7 @@ This ADR captures the new direction for Skills specifically. (Task tracking gets
 **Skills are a plugin capability.** The platform defines a new plugin category `skills-provider` with the contract `ISkillsProviderPlugin`. The first-party plugin **"Ever Works Skills"** is the default `skills-provider`, shipping the platform's curated catalog from the [`ever-works/skills`](https://github.com/ever-works/skills) repo (per [ADR-014](./014-no-hardcoded-catalogs.md)).
 
 Future community plugins can implement the same capability — e.g.:
+
 - An "Anthropic Skills" plugin loading from Anthropic's catalog format.
 - An "AWS Q Developer Skills" plugin loading from AWS's catalog.
 - A "Custom Skill Library" plugin loading from a self-hosted Git URL.
@@ -44,32 +45,32 @@ Defined in `packages/plugin/src/contracts/capabilities/skills-provider.interface
 
 ```typescript
 export interface SkillCatalogEntry {
-    slug: string;
-    title: string;
-    description: string;
-    frontmatter: SkillFrontmatter;
-    body: string;
-    version: string;
-    tags: string[];
-    sourceUrl?: string;          // link to the canonical source
+	slug: string;
+	title: string;
+	description: string;
+	frontmatter: SkillFrontmatter;
+	body: string;
+	version: string;
+	tags: string[];
+	sourceUrl?: string; // link to the canonical source
 }
 
 export interface ISkillsProviderPlugin extends IPlugin {
-    readonly providerName: string;
+	readonly providerName: string;
 
-    /** List all available catalog entries (paginated). */
-    listEntries(options: { limit: number; offset: number; tags?: string[]; search?: string }): Promise<{
-        entries: SkillCatalogEntry[];
-        total: number;
-    }>;
+	/** List all available catalog entries (paginated). */
+	listEntries(options: { limit: number; offset: number; tags?: string[]; search?: string }): Promise<{
+		entries: SkillCatalogEntry[];
+		total: number;
+	}>;
 
-    /** Fetch one entry by slug. */
-    getEntry(slug: string): Promise<SkillCatalogEntry | null>;
+	/** Fetch one entry by slug. */
+	getEntry(slug: string): Promise<SkillCatalogEntry | null>;
 
-    /** Optional: signal that the catalog has updated. */
-    checkForUpdates?(installedVersions: Record<string, string>): Promise<{
-        updated: { slug: string; oldVersion: string; newVersion: string }[];
-    }>;
+	/** Optional: signal that the catalog has updated. */
+	checkForUpdates?(installedVersions: Record<string, string>): Promise<{
+		updated: { slug: string; oldVersion: string; newVersion: string }[];
+	}>;
 }
 ```
 
@@ -83,17 +84,20 @@ Lives at `packages/plugins/everworks-skills/`. `package.json` `everworks.plugin`
 
 ```json
 {
-    "id": "everworks-skills",
-    "name": "Ever Works Skills",
-    "category": "skills-provider",
-    "capabilities": ["skills-provider"],
-    "defaultForCapabilities": ["skills-provider"],
-    "visibility": "public",
-    "settingsSchema": { /* repo ref, local path override, refresh interval */ }
+	"id": "everworks-skills",
+	"name": "Ever Works Skills",
+	"category": "skills-provider",
+	"capabilities": ["skills-provider"],
+	"defaultForCapabilities": ["skills-provider"],
+	"visibility": "public",
+	"settingsSchema": {
+		/* repo ref, local path override, refresh interval */
+	}
 }
 ```
 
 Implementation:
+
 - On `onLoad()`, clones [`ever-works/skills`](https://github.com/ever-works/skills) (`--depth 1`) to a tmp dir; reads all `.md` files; parses frontmatter; caches the parsed result.
 - Settings (per [`settings-system.md`](../architecture/settings-system.md)): `repoRef` (default `latest`), `localPath` (optional, for self-hosted/offline), `cacheTtlSeconds` (default 3600).
 - `listEntries`, `getEntry`, `checkForUpdates` read from the cache, refreshing on TTL expiry.

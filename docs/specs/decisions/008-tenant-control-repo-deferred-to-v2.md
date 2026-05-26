@@ -29,6 +29,7 @@ The API surface (`GET/PUT /agents/:id/files/:name`) abstracts the storage choice
 ### v1 REQUIREMENT — extend existing Import / Export / Sync surfaces
 
 Operator instruction (round 7):
+
 > "I agree for now to have it that way, but let's make sure that existing Import / Export / Sync to repo capabilities support all that in v1! I.e. we have in UI now Export / Import / Sync to GitHub repo etc, and there we can add exporting / sync of those Agents / Skills and any other tenants related records from DB into Git and back etc."
 
 The platform already has a full account-transfer surface in [`packages/agent/src/account-transfer/`](../../packages/agent/src/account-transfer/):
@@ -62,6 +63,7 @@ When v2 ships a true dedicated tenant control repo, the migration is **rename** 
 ### v1 deliverable
 
 Each of the three feature `tasks.md` files lists this extension as concrete Phase tasks; see:
+
 - [features/agents/tasks.md](../features/agents/tasks.md) — Phase: extend account-transfer for Agents.
 - [features/skills/tasks.md](../features/skills/tasks.md) — Phase: extend account-transfer for Skills.
 - [features/task-tracking/tasks.md](../features/task-tracking/tasks.md) — Phase: extend account-transfer for Tasks (opt-in).

@@ -49,12 +49,12 @@ Even though Task storage is core, a **future** plugin capability `task-tracker` 
 ```typescript
 // packages/plugin/src/contracts/capabilities/task-tracker.interface.ts
 export interface IExternalTaskTrackerPlugin extends IPlugin {
-    listTasks(filter): Promise<ExternalTaskDto[]>;
-    createTask(input): Promise<ExternalTaskDto>;
-    updateTask(id, patch): Promise<ExternalTaskDto>;
-    deleteTask(id): Promise<void>;
-    listChat(taskId): Promise<ExternalChatDto[]>;
-    postChat(taskId, body): Promise<ExternalChatDto>;
+	listTasks(filter): Promise<ExternalTaskDto[]>;
+	createTask(input): Promise<ExternalTaskDto>;
+	updateTask(id, patch): Promise<ExternalTaskDto>;
+	deleteTask(id): Promise<void>;
+	listChat(taskId): Promise<ExternalChatDto[]>;
+	postChat(taskId, body): Promise<ExternalChatDto>;
 }
 ```
 

@@ -12,22 +12,22 @@
 
 ## 1. Tool surface
 
-| Tool name             | Purpose                                                                                  | Permission gate                                        | Cost                                  |
-| --------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------- |
-| `createTask`          | Create a task scoped to the Agent's scope                                                | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row           |
-| `commentOnTask`       | Append a chat message on a Task the Agent participates in                                | (none — Agent must be assignee/reviewer/approver)       | 1 DB write + 1 activity row + maybe AI dispatch (if mention) |
-| `transitionTask`      | Move a Task's status                                                                     | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row           |
-| `editAgentFile`       | Edit one of the Agent's own MD files                                                     | `permissions.canEditAgentFiles`                         | 1 Git commit OR 1 DB row + 1 activity row |
-| `commitToRepo`        | Write arbitrary file(s) to the scope's repo                                              | `permissions.canCommitToRepo`                           | N Git commits + N activity rows       |
-| `openPullRequest`     | Open a PR against the scope's repo (escalation over commit)                              | `permissions.canCommitToRepo` AND `canOpenPullRequests` | 1 PR + 1 activity row                  |
-| `createSubAgent`      | Create a new Agent within the parent's scope                                             | `permissions.canCreateAgents` AND scope cascade rules   | 1 DB write + 1 Git commit (if Git-mode) + 1 activity row |
-| `getActivity`         | Read recent activity log rows for this Agent's scope                                     | (none — always allowed)                                  | 1 DB read; capped output               |
-| `getMissionState`     | Read state summary of a Mission the Agent has access to                                  | (none — must be in Agent's scope)                       | 1 DB read                              |
-| `getKbDocument`       | Read a KB document body by slug                                                          | (none — must be in Agent's scope)                       | 1 DB read                              |
-| `getSkillBody`        | Fetch the full body of a Skill (progressive disclosure)                                  | (none — must be in active set for this Agent)           | 1 DB or Git read                       |
-| `searchWeb`           | Web search via the active search plugin                                                  | `permissions.canCallExternalTools` AND plugin enabled   | 1 plugin call + 1 PluginUsageEvent     |
-| `screenshot`          | Capture a screenshot of a URL via the active screenshot plugin                           | same                                                     | same                                  |
-| `extractContent`      | Extract content from a URL via the content-extractor plugin                              | same                                                     | same                                  |
+| Tool name         | Purpose                                                        | Permission gate                                         | Cost                                                         |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| `createTask`      | Create a task scoped to the Agent's scope                      | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row                                  |
+| `commentOnTask`   | Append a chat message on a Task the Agent participates in      | (none — Agent must be assignee/reviewer/approver)       | 1 DB write + 1 activity row + maybe AI dispatch (if mention) |
+| `transitionTask`  | Move a Task's status                                           | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row                                  |
+| `editAgentFile`   | Edit one of the Agent's own MD files                           | `permissions.canEditAgentFiles`                         | 1 Git commit OR 1 DB row + 1 activity row                    |
+| `commitToRepo`    | Write arbitrary file(s) to the scope's repo                    | `permissions.canCommitToRepo`                           | N Git commits + N activity rows                              |
+| `openPullRequest` | Open a PR against the scope's repo (escalation over commit)    | `permissions.canCommitToRepo` AND `canOpenPullRequests` | 1 PR + 1 activity row                                        |
+| `createSubAgent`  | Create a new Agent within the parent's scope                   | `permissions.canCreateAgents` AND scope cascade rules   | 1 DB write + 1 Git commit (if Git-mode) + 1 activity row     |
+| `getActivity`     | Read recent activity log rows for this Agent's scope           | (none — always allowed)                                 | 1 DB read; capped output                                     |
+| `getMissionState` | Read state summary of a Mission the Agent has access to        | (none — must be in Agent's scope)                       | 1 DB read                                                    |
+| `getKbDocument`   | Read a KB document body by slug                                | (none — must be in Agent's scope)                       | 1 DB read                                                    |
+| `getSkillBody`    | Fetch the full body of a Skill (progressive disclosure)        | (none — must be in active set for this Agent)           | 1 DB or Git read                                             |
+| `searchWeb`       | Web search via the active search plugin                        | `permissions.canCallExternalTools` AND plugin enabled   | 1 plugin call + 1 PluginUsageEvent                           |
+| `screenshot`      | Capture a screenshot of a URL via the active screenshot plugin | same                                                    | same                                                         |
+| `extractContent`  | Extract content from a URL via the content-extractor plugin    | same                                                    | same                                                         |
 
 The first eight are **platform tools** — implemented in `AgentToolService` and don't go through the plugin facade. The last three are **plugin tools** — proxied to existing facade services (Search, Screenshot, Content-Extractor) and inherit those plugins' rate limits and errors.
 
@@ -37,18 +37,19 @@ Every tool either returns its success shape (see per-tool sections below) OR a s
 
 ```typescript
 type ToolError = {
-    error: {
-        code: 'permission_denied'
-            | 'not_found'
-            | 'validation_failed'
-            | 'budget_exceeded'
-            | 'rate_limited'
-            | 'precondition_failed'
-            | 'provider_error'
-            | 'internal_error';
-        message: string;                  // human-readable; safe for the AI to relay
-        details?: Record<string, unknown>;
-    };
+	error: {
+		code:
+			| 'permission_denied'
+			| 'not_found'
+			| 'validation_failed'
+			| 'budget_exceeded'
+			| 'rate_limited'
+			| 'precondition_failed'
+			| 'provider_error'
+			| 'internal_error';
+		message: string; // human-readable; safe for the AI to relay
+		details?: Record<string, unknown>;
+	};
 };
 ```
 
@@ -143,13 +144,21 @@ output: { sha: string; branch: string };
 
 ```typescript
 input: {
-    files: { path: string; content: string; mode: 'add' | 'modify' | 'delete' }[];
-    branchName: string;                      // new branch
-    title: string;
-    body: string;                            // PR description
-    targetRepo: 'data' | 'website' | 'mission';
+	files: {
+		path: string;
+		content: string;
+		mode: 'add' | 'modify' | 'delete';
+	}
+	[];
+	branchName: string; // new branch
+	title: string;
+	body: string; // PR description
+	targetRepo: 'data' | 'website' | 'mission';
 }
-output: { prUrl: string; prNumber: number };
+output: {
+	prUrl: string;
+	prNumber: number;
+}
 ```
 
 **Side-effects**: create branch + N file changes + 1 PR + 1 `activity_log` (new type `AGENT_OPENED_PR`).
@@ -198,16 +207,28 @@ output: {
 ### 3.9 `getMissionState`
 
 ```typescript
-input: { missionSlugOrId: string };
+input: {
+	missionSlugOrId: string;
+}
 output: {
-    id: string;
-    title: string;
-    description: string;
-    status: 'active' | 'paused' | 'completed' | 'failed';
-    ideas: { open: number; queued: number; building: number; done: number; failed: number };
-    worksCount: number;
-    spend: { currentSpendCents: number; capCents: number | null; periodEnd: string };
-};
+	id: string;
+	title: string;
+	description: string;
+	status: 'active' | 'paused' | 'completed' | 'failed';
+	ideas: {
+		open: number;
+		queued: number;
+		building: number;
+		done: number;
+		failed: number;
+	}
+	worksCount: number;
+	spend: {
+		currentSpendCents: number;
+		capCents: number | null;
+		periodEnd: string;
+	}
+}
 ```
 
 **Side-effects**: none.
@@ -259,19 +280,19 @@ tools.push(getActivity, getMissionState, getKbDocument, getSkillBody);
 
 // 2. Permission-gated platform tools
 if (agent.permissions.canAssignTasks) tools.push(createTask, transitionTask);
-tools.push(commentOnTask);  // gated at call-time by Agent's task participation
+tools.push(commentOnTask); // gated at call-time by Agent's task participation
 if (agent.permissions.canEditAgentFiles) tools.push(editAgentFile);
 if (agent.permissions.canCommitToRepo) {
-    tools.push(commitToRepo);
-    if (agent.permissions.canOpenPullRequests) tools.push(openPullRequest);
+	tools.push(commitToRepo);
+	if (agent.permissions.canOpenPullRequests) tools.push(openPullRequest);
 }
 if (agent.permissions.canCreateAgents) tools.push(createSubAgent);
 
 // 3. Plugin tools (only when external calls allowed AND plugin enabled in scope)
 if (agent.permissions.canCallExternalTools) {
-    if (await isPluginEnabled(agent, 'search'))            tools.push(searchWeb);
-    if (await isPluginEnabled(agent, 'screenshot'))        tools.push(screenshot);
-    if (await isPluginEnabled(agent, 'content-extractor')) tools.push(extractContent);
+	if (await isPluginEnabled(agent, 'search')) tools.push(searchWeb);
+	if (await isPluginEnabled(agent, 'screenshot')) tools.push(screenshot);
+	if (await isPluginEnabled(agent, 'content-extractor')) tools.push(extractContent);
 }
 
 return tools;
@@ -282,6 +303,7 @@ The exact `ToolDefinition` shape matches the LangChain tool format already in us
 ## 5. Telemetry per tool call
 
 Every tool invocation emits one row in `agent_run_logs` with:
+
 - `step = 'tool:<toolName>'`
 - `level = INFO | WARN | ERROR`
 - `message = '<short summary or error code>'`

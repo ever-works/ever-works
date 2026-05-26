@@ -1,6 +1,7 @@
 # Open Questions — Agents, Skills, Tasks specs
 
 > **Round-9 status update (2026-05-25) — design set locked.** Operator answered all remaining questions. Most defaulted to the ★ recommendation; explicit round-9 overrides:
+>
 > - **N5 override** — BOTH export AND import for Agents ship in v1 (was ★a = export only). New phase 6a (T64a-T64h) in `agents/tasks.md` for the per-Agent envelope + controller + UI + e2e. Distinct from the bulk account-transfer flow in ADR-008.
 > - **N6 override** — Keep all 5 `AgentBudget.intervalUnit` values in v1 + implement multi-interval aggregator. Reversed round-6 narrowing in `agents/plan.md §3.1`; new task T34a covers the `getCurrentPeriodStart` / `getNextPeriodStart` helpers handling hour/day/week/month/unlimited with anchored rolling periods.
 > - **P1** — 6 starters seeded in [`ever-works/agents`](https://github.com/ever-works/agents) repo at launch: CEO, CTO, Researcher, PR-Reviewer, Editor, Designer.
@@ -10,6 +11,7 @@
 ---
 
 > **Round-8 status update (2026-05-25):** Operator answered the bulk of A-L sections inline. The `[Answered: X]` tag now appears on each resolved question with the chosen option. Where the answer overrode my ★ recommendation OR triggered substantive spec changes, the change is noted in the relevant feature spec / plan / tasks file with a back-reference to this question. Major substantive impacts from round-8 answers:
+>
 > - **F4-b** (reversed my F4-a): Tasks created on an Idea do NOT follow to a Work when the Idea is accepted. Idea-level tasks (validity checks, marketing efforts, etc.) stay on the Idea.
 > - **F5** (operator override): Recurring tasks MUST ship in v1 (was Out of Scope). New Trigger.dev cron task; full plan in `task-tracking/plan.md`.
 > - **F3 clarification**: Tasks ≠ Ideas. Ideas are spec/PM "Epic"-ish abstractions (auto-generated, droppable, never bugs); Tasks are implementation-level work units. Added to `task-tracking/spec.md §1` and ADR-009.
@@ -32,13 +34,12 @@
 >
 > Questions below remain open unless explicitly marked `[Resolved]`.
 
-
-
 **Status**: `Open` — for operator (Ruslan) review
 **Last updated**: 2026-05-25
 **Use**: pick an answer per question (or write your own); I'll fold the answers into the specs and update the PR.
 
 > **How this file is organised.** Questions are grouped by topic, not by spec file. Each question has:
+>
 > - **What I'm asking** — one sentence.
 > - **Why it matters** — why the answer changes the design.
 > - **Options** — concrete choices with the trade-off.
@@ -58,11 +59,13 @@
 **Why it matters.** Affects scope of v1 — control-repo support means ≥1 new feature (signup hook, repo scaffolding, migration UI). Also affects Constitution III (source-of-truth in Git) — DB-only is a deviation.
 
 **Options.**
+
 - ★ **A1-a — Defer.** v1 stores tenant Agent MD files inline in DB TEXT columns (5 columns per agent). Offer a one-click "export to control repo" migration in v2 when control repo lands.
 - A1-b — Ship in v1. Adds 1-2 weeks of work but no deviation from Constitution III.
 - A1-c — Force users to choose a scope (Mission or Work) for every Agent; no tenant scope in v1.
 
 **Where it shows up.**
+
 - `features/agents/spec.md §3.6` FR-23, §8 Q1
 - `architecture/agents-skills-tasks.md §4.5`
 - ADR-008 (drafted in this round, defaults to A1-a).
@@ -76,6 +79,7 @@
 **Why it matters.** Affects how new skills get reviewed/merged, build-time impact, atomic versioning with code.
 
 **Options.**
+
 - ★ **A2-a — In-monorepo** under `apps/api/src/skills/catalog/<slug>/<slug>.md`. Fastest to ship; atomic version with code; same model as Mission Templates catalog already on develop (`packages/agent/src/missions/mission-template.config.ts`).
 - A2-b — Separate `ever-works/skills-catalog` repo, mounted at boot. Lower friction for community PRs; need a sync mechanism + version pinning.
 - A2-c — DB-seeded from a one-off seeder. Easy to mutate at runtime; loses Git review.
@@ -87,6 +91,7 @@
 ### A3 — `.works/` subfolder names: confirm naming. [Answered: a]
 
 **What I'm asking.** The new per-Agent folder structure I propose:
+
 ```
 .works/agents/<agent-slug>/
     agent.yml
@@ -97,9 +102,11 @@
     skills/
         <skill-slug>.md
 ```
+
 Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, not `agent.json`).
 
 **Options.**
+
 - ★ **A3-a — Keep as proposed.** `agent.yml` lowercased to match `mission.yml` and `works.yml` precedent.
 - A3-b — Rename `AGENTS.md` to something less collision-prone (e.g. `ROLE.md`) since "AGENTS.md" already exists in the repo as a meta-doc for AI agents. Could confuse new contributors.
 - A3-c — Drop one of the four MD files (e.g. merge `TOOLS.md` into `agent.yml`).
@@ -117,6 +124,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** `permissions.canCreateAgents` lets an Agent spawn child Agents. Should there be a parallel `canDeleteAgents`?
 
 **Options.**
+
 - ★ **B1-a — No.** Only humans can delete Agents. Lower blast radius; an Agent can be promoted/paused/archived but not destroyed by another Agent.
 - B1-b — Yes, but only for child Agents it created (via parent FK).
 - B1-c — Yes, full delete capability gated by a separate permission.
@@ -130,6 +138,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Cross-scope data visibility for an Agent that's a member of multiple targets.
 
 **Options.**
+
 - ★ **B2-a — Yes, by default.** A tenant Agent is "trusted across its memberships" — it can read KB / activity / spend across all its targets in the same run.
 - B2-b — No, per-run scoping. When a tenant Agent runs in the context of Mission A, it only sees Mission A's KB during that run. Crisp blast-radius; needs explicit context-handoff mechanism.
 - B2-c — Per-skill permission (e.g. Skill X says "cross-mission read OK"; Skill Y says "single-mission only").
@@ -143,6 +152,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Should Agents be able to chat with each other directly, or always via a Task they share?
 
 **Options.**
+
 - ★ **B3-a — Force through Tasks.** v1 has no Agent ↔ Agent DM channel. If CEO wants to ping VP-Engineering, CEO creates a Task assigning VP-Engineering. Auditable, scoped, gated by `canAssignTasks`.
 - B3-b — Allow DMs via a new `agent_messages` table.
 - B3-c — Allow DMs but only within scope (Tenant Agents can DM other Tenant Agents; Mission Agents can DM siblings).
@@ -156,6 +166,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** `WorkMember` roles today: OWNER, MANAGER, EDITOR, VIEWER. Does VIEWER see the Agents tab on Work detail?
 
 **Options.**
+
 - ★ **B4-a — Yes, read-only.** VIEWERs see Agents and their runs but can't create, pause, or assign tasks.
 - B4-b — No. Agents are only visible to OWNER/MANAGER/EDITOR.
 
@@ -170,6 +181,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** When the cron fires and the Agent has no pending tasks/chats, what should the run do?
 
 **Options.**
+
 - ★ **C1-a — Read AGENTS.md + HEARTBEAT.md + recent activity + scope state, ask the AI for next action.** Action menu includes: create a task (for itself or another Agent), comment in a chat, edit own file, do nothing. Maps to the "what's the next thing I should do given my role?" question.
 - C1-b — No-op unless an explicit task is pending. Heartbeat just polls and exits cheaply.
 - C1-c — Configurable per-Agent via an `idleBehavior` enum (`noop | propose | self-improve`).
@@ -183,6 +195,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** When user clicks "Cancel run", what gets cancelled?
 
 **Options.**
+
 - ★ **C2-a — Best-effort cancel.** Call `runs.cancel(triggerRunId)` (same as Work generation cancel); AbortSignal propagates; mid-stream call is destroyed; partial usage still recorded.
 - C2-b — Wait for AI call to finish, then mark `cancelled` after the response arrives. Safer (no partial state) but slow.
 - C2-c — Hard kill the Trigger.dev run; in-flight call may still complete server-side.
@@ -196,6 +209,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Hot-running Agents (1-minute heartbeat) generate ~525k rows/year. Retention policy?
 
 **Options.**
+
 - ★ **C3-a — Keep all by default; ship a daily-rollup table later if it bites.** Same posture as `WorkGenerationHistory` today (kept indefinitely, no rollup). Defer the rollup until we see real load.
 - C3-b — Hard cap last N=10000 per Agent; older rows pruned by a nightly job.
 - C3-c — Configurable per-Agent.
@@ -209,6 +223,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** When an Agent crosses `pauseAfterFailures` and goes to `error` status, how is the user told?
 
 **Options.**
+
 - ★ **C4-a — In-app `Notification` row + optional email** (gated by existing `User.emailBudgetAlerts`-style flag, new flag `emailAgentAlerts`). Use the `Notification` entity already on develop with `category: SYSTEM` (or new `category: AGENT`).
 - C4-b — In-app only.
 - C4-c — Slack/Discord/webhook in addition (defer to v2).
@@ -224,6 +239,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** CEO Agent assigns a Task to VP-Engineering Agent. VP-Engineering's heartbeat runs the Task and makes paid AI calls. Whose `agent_budgets` row is debited?
 
 **Options.**
+
 - ★ **D1-a — The executing Agent's budget** (VP-Engineering in the example). Same as today: cost attributes to the entity making the call.
 - D1-b — Split: half to CEO, half to VP-Engineering. Confusing accounting; reject.
 - D1-c — Configurable per-Task via `paidBy: agentId` field; defaults to executing Agent.
@@ -239,6 +255,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **Context.** Existing `WorkBudget` resets on the **first day of each calendar month at 00:00 UTC** (research confirmed in `BudgetService.getCurrentPeriodStart`).
 
 **Options.**
+
 - ★ **D2-a — Match existing: calendar month UTC.** Consistent across Work / Mission / Idea / Agent budgets; one mental model.
 - D2-b — Rolling 30-day per Agent. More complex; small UX benefit.
 - D2-c — Configurable per Agent (calendar or rolling).
@@ -254,6 +271,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Before an AI call, we estimate cost (rough token count × model price). If the estimate is above the remaining budget, do we block?
 
 **Options.**
+
 - ★ **D3-a — Block when `(estimated + currentSpend) > cap` and `allowOverage = false`.** Same as `BudgetGuardService` does for Works today.
 - D3-b — Always allow the call; settle after with overage warning. Friendlier UX, but risks blowing past cap.
 - D3-c — Stricter: block when `currentSpend > 0.95 * cap`, regardless of estimate.
@@ -267,6 +285,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 ### E1 — Auto-attach: should new tenant-installed skills auto-attach to ALL the user's Agents? [Answered: a]
 
 **Options.**
+
 - ★ **E1-a — No.** Explicit attachment per Agent. Otherwise prompt budget gets noisy fast.
 - E1-b — Yes by default; user can opt out per Agent.
 - E1-c — Per-skill flag `defaultAttachOnInstall: boolean`.
@@ -278,6 +297,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 ### E2 — Skill catalog updates: auto-pull new version, or always manual? [Answered: a]
 
 **Options.**
+
 - ★ **E2-a — Always manual.** Catalog version bumps surface an "Update available" badge; user clicks to update each instance.
 - E2-b — Auto-update minor versions; manual for major.
 - E2-c — Per-skill setting `autoUpdate: 'never' | 'minor' | 'all'`.
@@ -289,6 +309,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 ### E3 — `allowed-tools` frontmatter: enforce as ACL or descriptive only? [Answered: a]
 
 **Options.**
+
 - ★ **E3-a — Descriptive only in v1.** Real ACL stays in Agent's `TOOLS.md` + `permissions.canCallExternalTools`. Skills HINT, don't enforce.
 - E3-b — Enforce: when the model invokes a tool not in the skill's allowed-tools, the tool-loop rejects it.
 - E3-c — Configurable per Agent.
@@ -300,6 +321,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 ### E4 — Skill composition: can a skill reference another skill? [Answered: a]
 
 **Options.**
+
 - ★ **E4-a — Not in v1.** Skills are flat; no `extends:` / `includes:` field. Keeps the resolver simple.
 - E4-b — Allow `extends: <slug>` (single-level only) in frontmatter; resolver injects parent first.
 - E4-c — Full DAG-style `includes: [<slugs>]` with cycle detection.
@@ -311,6 +333,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 ### E5 — Skill localization: how is description shown in user's language? [Answered: a]
 
 **Options.**
+
 - ★ **E5-a — English only in v1.** Catalog skills ship English-only; tenant skills are whatever the user writes.
 - E5-b — Per-locale frontmatter fields (`description.en`, `description.fr`, …).
 - E5-c — Separate sibling files (`pr-review.md`, `pr-review.fr.md`).
@@ -326,6 +349,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Confirm finding: research shows Mission detail is a single-column layout with sections (no tabs), and Idea has no dedicated detail page at all. My specs assumed both had tab strips.
 
 **Options.**
+
 - ★ **F1-a — Add the tab strip when adding the new tabs.** Promote Mission detail to a tabbed layout (Overview as default tab + new Agents/Skills/Tasks tabs). Create an Idea detail page from scratch with tabs.
 - F1-b — Add new sections to existing single-column layout (no tabs). Page gets long but no UX change.
 - F1-c — Mixed: add tabs to Mission detail; defer Idea detail to v2 (no Agents/Tasks tabs on Ideas in v1).
@@ -339,6 +363,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Task slugs like `T-12345`. Per-user (each user starts at T-1), or platform-wide (globally unique)?
 
 **Options.**
+
 - ★ **F2-a — Per-user counter.** Cleaner numbers per user; aligns with single-user-tenant posture today; no cross-user leakage.
 - F2-b — Platform-wide. Globally unique slugs; easier debug; bad UX (T-485923 from day 1).
 - F2-c — Per-scope counters (per Work / per Mission), e.g. `WK-1234/T-12`.
@@ -352,6 +377,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** A Task grows in scope and looks more like an Idea. Promote it?
 
 **Options.**
+
 - ★ **F3-a — Not in v1.** Defer. v1 just has "linked from" relations.
 - F3-b — Allow promotion: a `promoteToIdea(taskId)` endpoint creates a `WorkProposal` row with the Task's content; the Task is marked done with a `promotedToIdeaId` back-pointer.
 
@@ -364,6 +390,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Idea X has 3 tasks scoped to it. User accepts the Idea → Work Y is created. Do the tasks follow?
 
 **Options.**
+
 - ★ **F4-a — Yes, automatically.** When `WorkProposal.acceptedWorkId` is set, the platform reassigns `tasks` where `ideaId = X` to `workId = Y` AND keeps `ideaId = X` for trace. The tasks now appear on both the Idea tab and the Work tab.
 - F4-b — No — tasks stay on the Idea. Cleaner audit, worse UX (tasks orphan once Idea is done).
 - F4-c — Prompt the user at acceptance time.
@@ -377,6 +404,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** v1 is OOS for recurring tasks. Do we reserve schema columns now to keep the v2 migration small?
 
 **Options.**
+
 - ★ **F5-a — Reserve.** Add `recurrenceRule: string | null` (RFC 5545 RRULE format) + `parentRecurringTaskId: uuid | null` columns on `tasks` from day one. Always null in v1.
 - F5-b — Don't reserve. Migrate when we add recurring.
 
@@ -389,6 +417,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Should users be able to "watch" a task they're not assigned to (to get notifications on status changes / chat)?
 
 **Options.**
+
 - ★ **F6-a — Yes, ship in v1.** Adds a `task_watchers` join table. Cheap; users will want this immediately.
 - F6-b — No, defer.
 
@@ -401,6 +430,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** When a user edits the description of a Task, should we keep the history (like KB documents do)?
 
 **Options.**
+
 - ★ **F7-a — No.** v1: description is mutable, no audit. Activity log captures the user + timestamp of the edit; the content is overwritten.
 - F7-b — Yes. New `task_description_revisions` table. Same shape as `kb_history`.
 - F7-c — Last N revisions only (e.g. last 10).
@@ -414,6 +444,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Pick the v1 set.
 
 **Options.** (multi-pick is fine)
+
 - ★ Default ON: Task assigned to you (human assignee), Agent replied to a chat you @-mentioned, Approver: you're an approver on a Task that just transitioned to in_review.
 - ★ Default OFF: Task status changes you don't own, Task labels changed, Sub-task added.
 - ★ Configurable in user settings: master switch + per-event toggles.
@@ -429,6 +460,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** Research confirmed the "outstanding ≥ cap, skipping" outcome is returned from the Trigger.dev task but **not persisted to DB**. Should we persist it?
 
 **Options.**
+
 - ★ **G1-a — Persist as an activity log row** of new type `MISSION_TICK_SKIPPED_CAP`. Surfaces in the Mission's Activity feed. Fixes the gap.
 - G1-b — Leave it Trigger.dev-only. Operators check Trigger.dev dashboard.
 
@@ -441,6 +473,7 @@ Confirm the four MD filenames AND that we want `agent.yml` (not `metadata.yml`, 
 **What I'm asking.** v1 ships `GET /tasks/:id/spend` as an on-demand `SUM(costCents) WHERE taskId = ...` query. For hot tasks that's fine. For dashboards summing across hundreds of tasks, we may want a rollup table.
 
 **Options.**
+
 - ★ **G2-a — On-demand only in v1.** Add rollup only if dashboard latency bites.
 - G2-b — Nightly rollup table from day one.
 
@@ -457,6 +490,7 @@ Current proposal (after `Works`): `Tasks`, `Agents`, `Templates`, `Plugins`, `Sk
 Your spec said: "Agents above Templates, below Works", "Skills below Plugins", "Tasks below Works". Confirm:
 
 **Options.**
+
 - ★ **H1-a — `Tasks`, `Agents` between Works and Templates** (current draft).
 - H1-b — `Agents`, `Tasks` (swap — Agents above Tasks).
 - H1-c — Group: `Works`, `Tasks`, then collapsible `Workshop` group containing `Agents` + `Skills`. More buckets, fewer flat items.
@@ -466,6 +500,7 @@ Your spec said: "Agents above Templates, below Works", "Skills below Plugins", "
 ### H2 — Cards / Table / Kanban order on `/tasks` [Answered: a]
 
 **Options.**
+
 - ★ **H2-a — Default Cards, toggle order Cards → Table → Kanban.** Same default as `/works`.
 - H2-b — Default Kanban (most users will want it).
 - H2-c — Remember last-used per session via localStorage (already planned).
@@ -504,6 +539,7 @@ Confirm these are out of scope for v1 (we can still add them post-merge of these
 ### J1 — "Agent" overload [Answered: a]
 
 The project already has:
+
 - `packages/agent/` — the core logic package (named `@ever-works/agent`).
 - `apps/api/src/work-agent/` — the autonomous "Work Agent" engine that turns Goals into Ideas.
 - The Discord `ever_works_ai` bot session is called an "agent" internally.
@@ -511,6 +547,7 @@ The project already has:
 Now we're adding **user-defined Agents** as a first-class entity. Risk: "agent" used in 4+ meanings inside one codebase.
 
 **Options.**
+
 - ★ **J1-a — Keep "Agent" for the user-defined entity** (operator's original word). Disambiguate in code with prefixes: `Agent` (new entity), `WorkAgent*` (existing), `@ever-works/agent` (package). In docs, refer to the existing engine as the "Work Agent" verbatim.
 - J1-b — Rename the new entity to something else (e.g. `Worker`, `Crewmate`, `Persona`). Painful but reduces overload.
 - J1-c — Rename the old "Work Agent" engine to e.g. `WorkPlanner`. Bigger refactor but cleanest.
@@ -523,12 +560,12 @@ Now we're adding **user-defined Agents** as a first-class entity. Risk: "agent" 
 
 If `AGENTS.md` collides too much with the project-level meta-doc convention, possible renames:
 
-| Current | Alternative                                              |
-| ------- | -------------------------------------------------------- |
-| AGENTS.md  | ROLE.md, RESPONSIBILITIES.md, ABOUT.md, CHARTER.md    |
-| SOUL.md    | VOICE.md, IDENTITY.md, PERSONA.md                     |
-| HEARTBEAT.md | LOOP.md, IDLE.md, ROUTINE.md, TICK.md               |
-| TOOLS.md   | (probably keep)                                         |
+| Current      | Alternative                                        |
+| ------------ | -------------------------------------------------- |
+| AGENTS.md    | ROLE.md, RESPONSIBILITIES.md, ABOUT.md, CHARTER.md |
+| SOUL.md      | VOICE.md, IDENTITY.md, PERSONA.md                  |
+| HEARTBEAT.md | LOOP.md, IDLE.md, ROUTINE.md, TICK.md              |
+| TOOLS.md     | (probably keep)                                    |
 
 ★ Recommendation: **keep all four as-is**. They're memorable; users will quickly understand the convention.
 
@@ -629,6 +666,7 @@ Should chat-post accept `Idempotency-Key` header? UI double-clicks on send are a
 ### M2 — Idempotency on other POSTs [Answered: ★ default per recommendation]
 
 Confirm:
+
 - `POST /agents`, `POST /tasks`: UNIQUE constraint handles double-submit; no header needed. ★
 - `POST /agents/:id/run-now`: rate-limit handles it; no header needed. ★
 - `POST /skills/install`: already idempotent (returns existing). ★
@@ -765,11 +803,13 @@ The current `mission-tick` task bootstraps NestJS on each fire. With many active
 ### O1 — "active" overload [Answered: ★ default per recommendation]
 
 Three different meanings of "active":
+
 - `Agent.status = 'active'` (lifecycle)
 - `skill_bindings.injectIntoAgent = true` (the UI says "active")
 - `agent.targets = '*'` (UI says "available to all")
 
 Pick one term per surface:
+
 - ★ **O1-a — Lifecycle: `status` (active/paused/error/draft/archived). Skill bindings: `enabled`. Tenant Agent membership: `scope`.** Tightens copy in 3 places.
 
 ### O2 — "Heartbeat" — keep or rename? [Answered: ★ default per recommendation]

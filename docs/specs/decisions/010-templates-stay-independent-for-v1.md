@@ -21,12 +21,14 @@ By the end of this spec set, the platform will have at least five "template-like
 This pattern emerged organically as each feature shipped its own catalog. The natural architectural question: **should we unify them under a single "Workshop Templates" registry**?
 
 Pros of unifying:
+
 - Single mental model for users browsing for starters.
 - One UI surface (`/templates` already has tabs by kind via TemplatesCatalog kind-switch, recent PR W) — could host all five.
 - Shared lifecycle: versioning, installed-vs-available pattern, "Update available" prompt.
 - Shared catalog repo path (potentially out-of-monorepo if the Skill catalog grows past 1k entries).
 
 Cons of unifying:
+
 - Each kind has different semantics: Mission Templates are FORKED (cloned repo), Skills are INSTALLED (copied bytes), Agents are SCAFFOLDED (copied files into existing repo), Task templates are PREFILLED (form pre-population). Forcing them through one interface either (a) creates an awkward union type that handles all four poorly, or (b) collapses real differences.
 - Mission Templates and Work Templates already share infra; adding 3 more kinds means a larger refactor.
 - Each catalog has a different governance model: Mission Templates are curated by Ever Works team; Skills will likely accept community PRs; Agent starters are platform-controlled.
@@ -36,20 +38,24 @@ Cons of unifying:
 **For v1: independent services per catalog kind. Each kind has its primary home on its feature page (`/agents`, `/skills`, `/tasks`), where the user discovers, picks, and manages templates of that kind. The `/templates` page is a BONUS unified-browse view that shows all kinds via a kind-selector — for users who want one place to scan everything.** Both surfaces read from the same per-kind backend services; the per-feature page is the primary path.
 
 Per operator instruction (round 7):
+
 > "ADR-010-templates-stay-independent-for-v1.md seems correct as we want separate / independent templates. We do want also to show all of them on Templates page, but it's just a bonus, while each of those types of templates also will exists in other places in UI / UX flows etc."
 
 Per operator instruction (round 6):
+
 > "Such Templates can be all managed on 'Templates' page, yes. I.e. I would prefer there to add selector for many different types of templates. However, also it's best to have ability to manage separately Agent templates on Agents page, same as Skills templates (catalog) on Skills page and so on. So it's fine to have in few places."
 
 ### Concrete arrangement
 
 **Backend services — independent per kind:**
+
 - `TemplateCatalogService` (existing) — Mission + Work Templates.
 - `AgentTemplateService` (new) — clones + caches [`ever-works/agents`](https://github.com/ever-works/agents); copies a chosen template into a Mission/Work repo or DB-inline storage.
 - **`SkillsFacadeService` + `"Ever Works Skills"` plugin** (per [ADR-012](./012-skills-as-plugin.md)) — Skill catalog comes from the plugin, which reads [`ever-works/skills`](https://github.com/ever-works/skills).
 - **`TasksFacadeService` + `"Ever Works Task Tracker"` plugin** (per [ADR-013](./013-task-tracking-as-plugin.md)) — Task templates come from [`ever-works/tasks`](https://github.com/ever-works/tasks), bundled into the first-party tracker plugin.
 
 **Frontend surfaces — per-feature page is primary; `/templates` page is the bonus all-in-one view:**
+
 - **Primary surfaces** (each feature page owns its template browsing):
     - **`/agents` page** — "Browse templates" section surfacing Agent templates from `AgentTemplateService`. Also shown inline in the create-Agent dialog.
     - **`/skills` page** — surfaces the Skill catalog from `SkillsFacadeService`. The natural place users go to install/manage skills.

@@ -232,11 +232,12 @@ export class OAuthService {
 
         const config = await this.getOAuthConfig(providerId);
         const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
+        const user = await this.oauthFacade.getAuthenticatedUser(providerId, token.accessToken);
 
         await this.pluginSettingsService.updateUserSettings(
             providerId,
             userId,
-            { readPackagesPat: token.accessToken },
+            { readPackagesPat: token.accessToken, readPackagesPatOwner: user.username },
             { secretKeys: ['readPackagesPat'] },
         );
 

@@ -41,18 +41,18 @@ Throughout this spec, references to "the platform stores tasks" / "Task service"
 
 Common point of confusion: Tasks and Ideas are **both** unit-of-work abstractions in the Mission → Idea → Work hierarchy, but they live at different levels and serve different purposes. Conflating them will lead users + AI agents astray when they're deciding "should this be an Idea or a Task?"
 
-| Aspect              | Idea                                                                                                                       | Task                                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **What it is**      | A proposal to build something (a Work). Higher-level. PM-flavored.                                                          | A unit of work to be done. Lower-level. Engineering-flavored.                                                  |
-| **Closest PM term** | "Epic" — but even that is not a true match. An Idea is an _exploratory proposal_, not a planned tranche of work.            | "Story" / "Issue" / "Ticket" / "Action item" — pick your tool's word.                                          |
-| **Origin**          | **Auto-generated** by the Work Agent from a Goal, or proposed by a Mission tick, or typed by the user via "+ Add Idea".    | Created by a human, an Agent, or a Generator. Always intentional and specific.                                  |
-| **Lifecycle**       | One-shot. Pending → Queued → Building → Done (or Dismissed / Failed). After Done, the Idea is archived.                    | Mutable. Status flows backlog → todo → in_progress → done / blocked / cancelled with reversals allowed.        |
-| **Bug-ish content** | **Never**. Ideas are about NEW things — new Works to build, new directions to explore.                                    | Frequently. Bugs, refactors, audits, follow-ups — anything you'd put in a tracker.                              |
-| **Droppability**    | **High** — operator quote: _"We can create 'idea' and drop it very easy."_ No commitment.                                 | Lower — once created, Tasks usually flow to a terminal state (done / cancelled).                                |
-| **Cardinality up**  | 1 Mission → many Ideas.                                                                                                    | 1 Idea OR 1 Work OR 1 Mission → many Tasks. Tasks can also live at tenant scope (no parent).                   |
-| **Cardinality down**| 1 Idea → 0..N Works. _(One Idea can spawn a mobile-app Work AND a website Work AND a landing-page Work, all from the same Idea.)_ | 1 Task → 0..N sub-Tasks.                                                                                       |
-| **Storage**         | `work_proposals` DB table (existing).                                                                                       | `tasks` DB table (new; via the "Ever Works Task Tracker" plugin per ADR-013).                                  |
-| **AI behavior**     | Generators propose Ideas. Approval gates exist (`autoBuildWorks`).                                                          | Agents execute Tasks. No approval gates by default.                                                              |
+| Aspect               | Idea                                                                                                                              | Task                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **What it is**       | A proposal to build something (a Work). Higher-level. PM-flavored.                                                                | A unit of work to be done. Lower-level. Engineering-flavored.                                           |
+| **Closest PM term**  | "Epic" — but even that is not a true match. An Idea is an _exploratory proposal_, not a planned tranche of work.                  | "Story" / "Issue" / "Ticket" / "Action item" — pick your tool's word.                                   |
+| **Origin**           | **Auto-generated** by the Work Agent from a Goal, or proposed by a Mission tick, or typed by the user via "+ Add Idea".           | Created by a human, an Agent, or a Generator. Always intentional and specific.                          |
+| **Lifecycle**        | One-shot. Pending → Queued → Building → Done (or Dismissed / Failed). After Done, the Idea is archived.                           | Mutable. Status flows backlog → todo → in_progress → done / blocked / cancelled with reversals allowed. |
+| **Bug-ish content**  | **Never**. Ideas are about NEW things — new Works to build, new directions to explore.                                            | Frequently. Bugs, refactors, audits, follow-ups — anything you'd put in a tracker.                      |
+| **Droppability**     | **High** — operator quote: _"We can create 'idea' and drop it very easy."_ No commitment.                                         | Lower — once created, Tasks usually flow to a terminal state (done / cancelled).                        |
+| **Cardinality up**   | 1 Mission → many Ideas.                                                                                                           | 1 Idea OR 1 Work OR 1 Mission → many Tasks. Tasks can also live at tenant scope (no parent).            |
+| **Cardinality down** | 1 Idea → 0..N Works. _(One Idea can spawn a mobile-app Work AND a website Work AND a landing-page Work, all from the same Idea.)_ | 1 Task → 0..N sub-Tasks.                                                                                |
+| **Storage**          | `work_proposals` DB table (existing).                                                                                             | `tasks` DB table (new; via the "Ever Works Task Tracker" plugin per ADR-013).                           |
+| **AI behavior**      | Generators propose Ideas. Approval gates exist (`autoBuildWorks`).                                                                | Agents execute Tasks. No approval gates by default.                                                     |
 
 ### Concrete rules
 
@@ -74,64 +74,64 @@ The default v1 backend stores everything in the platform's own tables. A future 
 ### 2.1 Primary scenarios
 
 **S1 — Create a tenant-scoped task.**
-*Given* a signed-in user on the new `/tasks` sidebar page,
-*When* they click "+ New Task", fill `title`, set `priority='p1'`, add label `"investor"`, and save,
-*Then* a `tasks` row is created (no missionId/workId/ideaId), `TASK_CREATED` activity row emitted.
+_Given_ a signed-in user on the new `/tasks` sidebar page,
+_When_ they click "+ New Task", fill `title`, set `priority='p1'`, add label `"investor"`, and save,
+_Then_ a `tasks` row is created (no missionId/workId/ideaId), `TASK_CREATED` activity row emitted.
 
 **S2 — Create a task scoped to a Work.**
-*Given* the user on `/works/<id>` Tasks tab clicking "+ New Task",
-*When* they save,
-*Then* the task is created with `workId=<id>` and appears on the Work's Tasks tab AND on the global `/tasks` page filtered by Work.
+_Given_ the user on `/works/<id>` Tasks tab clicking "+ New Task",
+_When_ they save,
+_Then_ the task is created with `workId=<id>` and appears on the Work's Tasks tab AND on the global `/tasks` page filtered by Work.
 
 **S3 — Assign humans + Agents.**
-*Given* a Task being edited,
-*When* the user adds `@self` (a User) and `@ceo` (an Agent) to assignees,
-*Then* two `task_assignees` rows are created (assigneeType=user vs agent). Both names render with distinct icons.
+_Given_ a Task being edited,
+_When_ the user adds `@self` (a User) and `@ceo` (an Agent) to assignees,
+_Then_ two `task_assignees` rows are created (assigneeType=user vs agent). Both names render with distinct icons.
 
 **S4 — Status flow.**
-*Given* a Task in `todo` with the CEO Agent as assignee,
-*When* the user moves it to `in_progress` (either by drag-drop on the kanban or status select),
-*Then* `TASK_UPDATED` activity row emitted, AND because an Agent is assigned, the platform dispatches an `agent-task-execute` Trigger.dev run. Agent posts progress messages into the Task's chat.
+_Given_ a Task in `todo` with the CEO Agent as assignee,
+_When_ the user moves it to `in_progress` (either by drag-drop on the kanban or status select),
+_Then_ `TASK_UPDATED` activity row emitted, AND because an Agent is assigned, the platform dispatches an `agent-task-execute` Trigger.dev run. Agent posts progress messages into the Task's chat.
 
 **S5 — Parent + sub-tasks.**
-*Given* a Task "Launch v1",
-*When* the user clicks "+ Subtask" and adds 3 sub-tasks,
-*Then* three new `tasks` rows are created with `parentTaskId=<parent>`. The parent's progress badge shows `2/3` when 2 sub-tasks are done.
+_Given_ a Task "Launch v1",
+_When_ the user clicks "+ Subtask" and adds 3 sub-tasks,
+_Then_ three new `tasks` rows are created with `parentTaskId=<parent>`. The parent's progress badge shows `2/3` when 2 sub-tasks are done.
 
 **S6 — Blockers.**
-*Given* a Task being edited,
-*When* the user adds "Blocked by: Task #42",
-*Then* a `task_blocks(taskId=<this>, blockedByTaskId=42)` row is created. The Task gets status `blocked` (auto-cascaded) until #42 is `done`.
+_Given_ a Task being edited,
+_When_ the user adds "Blocked by: Task #42",
+_Then_ a `task_blocks(taskId=<this>, blockedByTaskId=42)` row is created. The Task gets status `blocked` (auto-cascaded) until #42 is `done`.
 
 **S7 — Chat with attachment + mention.**
-*Given* a Task open on its detail page,
-*When* a user types `@vp-engineering can you review docs/spec.md?` and uploads `screenshot.png`,
-*Then* a `task_chat_messages` row is inserted with `mentions=[{type:'agent',slug:'vp-engineering'}]` and `attachments=[{uploadId:<id>}]`. An `agent-chat-reply` run is dispatched. Activity row `TASK_COMMENTED` emitted.
+_Given_ a Task open on its detail page,
+_When_ a user types `@vp-engineering can you review docs/spec.md?` and uploads `screenshot.png`,
+_Then_ a `task_chat_messages` row is inserted with `mentions=[{type:'agent',slug:'vp-engineering'}]` and `attachments=[{uploadId:<id>}]`. An `agent-chat-reply` run is dispatched. Activity row `TASK_COMMENTED` emitted.
 
 **S8 — Reviewers + Approvers.**
-*Given* a Task moving from `in_progress` to `in_review`,
-*When* a reviewer marks "Reviewed" or an approver marks "Approved",
-*Then* the row is annotated; the parent Task transitions to `done` only when ALL approvers have approved (configurable via `requireAllApprovers` setting on the task — default true).
+_Given_ a Task moving from `in_progress` to `in_review`,
+_When_ a reviewer marks "Reviewed" or an approver marks "Approved",
+_Then_ the row is annotated; the parent Task transitions to `done` only when ALL approvers have approved (configurable via `requireAllApprovers` setting on the task — default true).
 
 **S9 — Kanban view.**
-*Given* the user opens `/tasks` and switches to Kanban,
-*When* the data loads,
-*Then* tasks render in columns by status (backlog, todo, in_progress, in_review, blocked, done). The component reuses `WorksKanbanView.tsx`'s column-config + card pattern (see Spec §5).
+_Given_ the user opens `/tasks` and switches to Kanban,
+_When_ the data loads,
+_Then_ tasks render in columns by status (backlog, todo, in_progress, in_review, blocked, done). The component reuses `WorksKanbanView.tsx`'s column-config + card pattern (see Spec §5).
 
 **S10 — Tasks scoped to a Mission shown on Mission Tasks tab.**
-*Given* a Mission with 5 attached tasks,
-*When* the user opens `/missions/<id>` Tasks tab,
-*Then* the tab shows those 5 tasks with the same Cards/Table/Kanban toggle as the global page.
+_Given_ a Mission with 5 attached tasks,
+_When_ the user opens `/missions/<id>` Tasks tab,
+_Then_ the tab shows those 5 tasks with the same Cards/Table/Kanban toggle as the global page.
 
 **S11 — Dashboard "Recent Tasks".**
-*Given* the user on `/` dashboard,
-*When* the page loads,
-*Then* below the existing "Recent Works" preview block, a "Recent Tasks" block shows the latest 5 tasks the user owns or is assigned to, with "View all (N)" link.
+_Given_ the user on `/` dashboard,
+_When_ the page loads,
+_Then_ below the existing "Recent Works" preview block, a "Recent Tasks" block shows the latest 5 tasks the user owns or is assigned to, with "View all (N)" link.
 
 **S12 — KB document mention inside Task description.**
-*Given* the user typing the Task description in Tiptap,
-*When* they type `[[Investor brief]]` (matched against the KB),
-*Then* it renders as a wikilink — same WikiLinkExtension reused from `KbEditor.tsx`.
+_Given_ the user typing the Task description in Tiptap,
+_When_ they type `[[Investor brief]]` (matched against the KB),
+_Then_ it renders as a wikilink — same WikiLinkExtension reused from `KbEditor.tsx`.
 
 ### 2.2 Edge cases & failures
 
@@ -233,28 +233,28 @@ The default v1 backend stores everything in the platform's own tables. A future 
 
 ## 5. Key Entities & Domain Concepts
 
-| Concept                | Definition                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Task**               | Row in `tasks`; one or zero scope ids; rich metadata.                                                                  |
-| **TaskAssignee**       | Polymorphic link to a User or an Agent.                                                                                |
-| **TaskBlocker**        | Row in `task_blocks`; cycle-checked.                                                                                   |
-| **TaskRelation**       | Row in `task_relations` with `kind ∈ {related, duplicates, follow-up}`.                                                |
-| **TaskChat**           | Flat list of `task_chat_messages`; no threading.                                                                       |
-| **TaskAttachment**     | FK from `task_attachments` to `work_knowledge_upload`.                                                                  |
-| **Task scope**         | At most one of {missionId, ideaId, workId}; null means tenant-only.                                                    |
-| **External tracker**   | Future plugin path; v1 reserves `IExternalTaskTrackerPlugin` interface but doesn't consume.                            |
+| Concept              | Definition                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| **Task**             | Row in `tasks`; one or zero scope ids; rich metadata.                                       |
+| **TaskAssignee**     | Polymorphic link to a User or an Agent.                                                     |
+| **TaskBlocker**      | Row in `task_blocks`; cycle-checked.                                                        |
+| **TaskRelation**     | Row in `task_relations` with `kind ∈ {related, duplicates, follow-up}`.                     |
+| **TaskChat**         | Flat list of `task_chat_messages`; no threading.                                            |
+| **TaskAttachment**   | FK from `task_attachments` to `work_knowledge_upload`.                                      |
+| **Task scope**       | At most one of {missionId, ideaId, workId}; null means tenant-only.                         |
+| **External tracker** | Future plugin path; v1 reserves `IExternalTaskTrackerPlugin` interface but doesn't consume. |
 
 ### 5.1 Kanban column mapping
 
-| Column      | Status set covered                          |
-| ----------- | ------------------------------------------- |
-| Backlog     | `backlog`                                   |
-| To do       | `todo`                                      |
-| In progress | `in_progress`                               |
-| In review   | `in_review`                                 |
-| Blocked     | `blocked`                                   |
-| Done        | `done`                                      |
-| Cancelled   | `cancelled` (optionally hidden by default)  |
+| Column      | Status set covered                         |
+| ----------- | ------------------------------------------ |
+| Backlog     | `backlog`                                  |
+| To do       | `todo`                                     |
+| In progress | `in_progress`                              |
+| In review   | `in_review`                                |
+| Blocked     | `blocked`                                  |
+| Done        | `done`                                     |
+| Cancelled   | `cancelled` (optionally hidden by default) |
 
 Columns reuse `WorksKanbanView.tsx`'s color-token shape.
 
@@ -284,16 +284,17 @@ Defer if scope tight; v2 is fine.
 
 Default-on (per-user, configurable in Settings):
 
-| Event                                                            | Channel       | Recipient                                                                     |
-| ---------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
-| Task assigned to you (human assignee added)                      | in-app + email | The newly-added user assignee                                                 |
-| Agent posted a chat message mentioning you                       | in-app + email | The mentioned human                                                           |
-| Task you're an approver on moves to `in_review`                  | in-app + email | All approvers                                                                  |
-| Task you watch transitions to `done` or `cancelled`               | in-app        | Watchers (+ assignees implicitly)                                              |
-| Approval timeout (Task in `in_review` >7d with no approval)      | in-app + email | Approvers                                                                      |
-| Sub-task you own moves to `done` and parent is now ready         | in-app        | Parent assignees                                                               |
+| Event                                                       | Channel        | Recipient                         |
+| ----------------------------------------------------------- | -------------- | --------------------------------- |
+| Task assigned to you (human assignee added)                 | in-app + email | The newly-added user assignee     |
+| Agent posted a chat message mentioning you                  | in-app + email | The mentioned human               |
+| Task you're an approver on moves to `in_review`             | in-app + email | All approvers                     |
+| Task you watch transitions to `done` or `cancelled`         | in-app         | Watchers (+ assignees implicitly) |
+| Approval timeout (Task in `in_review` >7d with no approval) | in-app + email | Approvers                         |
+| Sub-task you own moves to `done` and parent is now ready    | in-app         | Parent assignees                  |
 
 Default-off (configurable):
+
 - Label changes
 - Priority changes
 - Status transitions between `backlog/todo/in_progress`
@@ -320,6 +321,7 @@ So the model is:
 - **Work-level tasks**: implementation, refinement, deployment, anything specific to one of the Works that came out of the Idea.
 
 When an Idea is accepted and a Work is created, the platform:
+
 1. Sets `acceptedWorkId` on the WorkProposal (existing behavior).
 2. **Does NOT touch any `tasks` rows.** Idea-level tasks remain on the Idea.
 3. The new Work starts with zero tasks; users / Agents create Work-level tasks fresh.
@@ -356,6 +358,7 @@ On each tick of the new dispatcher, when `nextOccurrenceAt <= now`:
 ### Dispatcher
 
 New Trigger.dev cron task `task-recurrence-dispatcher`:
+
 - Cadence: `* * * * *` (every minute UTC) — matches Mission tick precedent.
 - CAS-claim per template via `tasks.casClaimRecurrence(taskId, expectedNextOccurrenceAt)` (atomic UPDATE WHERE).
 - Each fire batches up to 200 due templates.
@@ -390,12 +393,12 @@ v1 doesn't keep a revision history of Task descriptions. The current body is ove
 
 ## 5.11 Cascade on delete
 
-| Event                            | Cascade                                                                                                                                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Delete Task                      | `task_assignees`, `task_reviewers`, `task_approvers`, `task_blocks`, `task_relations`, `task_chat_messages`, `task_attachments`, `task_watchers`, `task_kb_mentions` all CASCADE.                  |
-| Delete User                      | User's tasks CASCADE. `task_assignees(assigneeType='user', assigneeId=<id>)` rows drop; tasks they were sole assignee on stay (the task author / scope owner can re-assign).                          |
-| Delete Agent                     | `task_assignees(assigneeType='agent', assigneeId=<id>)` rows drop. Task chat messages authored by deleted Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent".                    |
-| Delete Mission / Idea / Work     | Tasks scoped to the deleted entity CASCADE. Tasks with `ideaId` AND `workId` set (after Idea→Work promotion) survive when Idea is deleted (still belong to the Work).                                 |
+| Event                        | Cascade                                                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete Task                  | `task_assignees`, `task_reviewers`, `task_approvers`, `task_blocks`, `task_relations`, `task_chat_messages`, `task_attachments`, `task_watchers`, `task_kb_mentions` all CASCADE. |
+| Delete User                  | User's tasks CASCADE. `task_assignees(assigneeType='user', assigneeId=<id>)` rows drop; tasks they were sole assignee on stay (the task author / scope owner can re-assign).      |
+| Delete Agent                 | `task_assignees(assigneeType='agent', assigneeId=<id>)` rows drop. Task chat messages authored by deleted Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent". |
+| Delete Mission / Idea / Work | Tasks scoped to the deleted entity CASCADE. Tasks with `ideaId` AND `workId` set (after Idea→Work promotion) survive when Idea is deleted (still belong to the Work).             |
 
 ## 5.12 `@all` / `@here` semantics
 
