@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
+import { agentsAPI } from '@/lib/api/agents';
+import { missionsAPI } from '@/lib/api/missions';
+import { workProposalsAPI } from '@/lib/api/work-proposals';
+import { workAPI } from '@/lib/api/work';
 import {
     createBindingAction,
     deleteBindingAction,
@@ -188,6 +192,10 @@ function BindingsPanel({
                 <Link2 className="w-4 h-4 text-info" />
                 Bindings
             </h2>
+            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                A binding makes this Skill available to the chosen target. Lower priority numbers
+                win when multiple bindings overlap — priority 1 = highest precedence.
+            </p>
             {sorted.length === 0 ? (
                 <p className="text-xs text-text-muted">No bindings yet. Add one below.</p>
             ) : (
@@ -246,15 +254,14 @@ function BindingsPanel({
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
-                        Target ID {targetType === 'tenant' ? '(not needed)' : '(required)'}
+                        {targetType === 'tenant'
+                            ? 'Target (auto-filled)'
+                            : `Pick a ${targetType}`}
                     </label>
-                    <input
-                        type="text"
+                    <SkillBindingTargetPicker
+                        targetType={targetType}
                         value={targetId}
-                        onChange={(e) => setTargetId(e.target.value)}
-                        disabled={targetType === 'tenant'}
-                        placeholder={targetType === 'tenant' ? 'auto' : 'uuid'}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
+                        onChange={setTargetId}
                     />
                 </div>
                 <div>
@@ -278,6 +285,129 @@ function BindingsPanel({
                 </p>
             )}
         </section>
+    );
+}
+
+/**
+ * FU-8 — searchable target picker. Replaces the raw UUID textbox with
+ * a dropdown that loads the user's own entities for the chosen
+ * targetType. Tenant scope auto-fills (no picker needed); agent /
+ * mission / idea / work load via the existing list endpoints.
+ *
+ * Falls back to a plain text input when the list endpoint isn't
+ * available or returns nothing — operators with paginated lists
+ * larger than the first page can still paste a UUID directly.
+ */
+function SkillBindingTargetPicker({
+    targetType,
+    value,
+    onChange,
+}: {
+    targetType: SkillBindingTargetType;
+    value: string;
+    onChange: (v: string) => void;
+}) {
+    type Option = { id: string; label: string };
+    const [options, setOptions] = useState<Option[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [filter, setFilter] = useState('');
+
+    useEffect(() => {
+        if (targetType === 'tenant') {
+            setOptions([]);
+            onChange('');
+            return;
+        }
+        let cancelled = false;
+        setLoading(true);
+        setLoadError(null);
+        void (async () => {
+            try {
+                let next: Option[] = [];
+                if (targetType === 'agent') {
+                    const res = await agentsAPI.list({ limit: 100 });
+                    next = (res.data ?? []).map((a) => ({
+                        id: a.id,
+                        label: `${a.name} (${a.slug})`,
+                    }));
+                } else if (targetType === 'mission') {
+                    const res = await missionsAPI.list();
+                    next = (res ?? []).map((m) => ({ id: m.id, label: m.title }));
+                } else if (targetType === 'idea') {
+                    const res = await workProposalsAPI.list(['pending', 'accepted']);
+                    next = (res ?? []).map((p) => ({ id: p.id, label: p.title }));
+                } else if (targetType === 'work') {
+                    const res = await workAPI.getAll({ limit: 100 });
+                    const works = (res?.works ?? []) as Array<{ id: string; name: string }>;
+                    next = works.map((w) => ({ id: w.id, label: w.name }));
+                }
+                if (!cancelled) setOptions(next);
+            } catch (err) {
+                if (!cancelled) {
+                    setLoadError(err instanceof Error ? err.message : 'Failed to load options');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [targetType, onChange]);
+
+    if (targetType === 'tenant') {
+        return (
+            <input
+                type="text"
+                value=""
+                disabled
+                placeholder="auto"
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
+            />
+        );
+    }
+
+    const filtered = filter.trim().length === 0
+        ? options
+        : options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
+
+    if (loadError || options.length === 0) {
+        return (
+            <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={loadError ? 'paste a uuid' : `no ${targetType}s — paste uuid`}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-1">
+            <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={`Search ${targetType}s`}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                disabled={loading}
+            />
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                size={Math.min(5, Math.max(2, filtered.length + 1))}
+            >
+                <option value="">— pick a {targetType} —</option>
+                {filtered.map((o) => (
+                    <option key={o.id} value={o.id}>
+                        {o.label}
+                    </option>
+                ))}
+            </select>
+        </div>
     );
 }
 

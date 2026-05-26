@@ -14,7 +14,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 
 - [x] FU-6 · i18n Tasks/Skills/Templates components — new `dashboard.tasksPage.{list,newDialog,detail,recurring,status}`, `.skillsPage.{list,detail}`, `.templatesPage.*` keys in `apps/web/messages/en.json`. Threaded `useTranslations` through TasksList (filter labels, status select, empty state) and TaskDetailClient (Move to, transition labels, conversation, draft placeholder, Post button). Non-en locales fall back to en via next-intl per existing convention.
 - [x] FU-7 · Recurring picker friendly controls — added time-of-day (emits `BYHOUR`/`BYMINUTE`), weekday multi-select for Weekly (emits `BYDAY=MO,...`), day-of-month for Monthly (emits `BYMONTHDAY=`), timezone with browser-tz default + datalist suggestions. Client-side rule validation (FREQ check + non-empty BYDAY for Weekly); Save disabled when invalid.
-- [ ] FU-8 · Skills binding picker UI
+- [x] FU-8 · Skills binding picker UI — replaced the raw UUID textbox with `SkillBindingTargetPicker`. Tenant auto-fills; agent/mission/idea/work load entries via `agentsAPI.list` / `missionsAPI.list` / `workProposalsAPI.list` / `workAPI.getAll` (up to 100 each), with a search filter + sized listbox. Added explanatory copy on the bindings panel. Falls back to a paste-uuid input when the list endpoint errors or returns nothing.
 - [ ] FU-9 · Kanban drag-and-drop transitions
 - [ ] FU-10 · GitHub-sync v2 toggles UI
 - [ ] FU-11 · Templates browser content swap to ADR-010 catalog
