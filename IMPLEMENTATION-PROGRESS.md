@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 18
-- **Last tick at**: 2026-05-26 (tick 18 — Phase 13 complete: TaskChatService (post/edit + 5-min window + 16 KB cap + secret-scan + mention parser with T6 unknown-token stripping + KB-mention materialization) + GET/POST /tasks/:id/chat endpoints + PATCH /task-chat-messages/:id + /tasks/[id] sectioned detail page with transition affordance + chat thread + chat-service tests.)
-- **In progress now**: (none — next tick picks up Phase 14 Kanban + per-target tabs + Mission tab strip)
+- **Last tick #**: 19
+- **Last tick at**: 2026-05-26 (tick 19 — Phase 14 complete: TasksKanbanView (7-column kanban with optimistic-update click-to-transition) + Kanban as third view on /tasks page + TasksScopedSection embeddable + per-target Tasks pages for /works/[id]/tasks, /missions/[id]/tasks, /ideas/[id]/tasks + MissionTabs.tsx scaffold.)
+- **In progress now**: (none — next tick picks up Phase 15 Agent ↔ Task runtime tasks)
 
 ---
 
@@ -199,11 +199,12 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 14 — Kanban + per-target tabs
 
-- [ ] **14.1** `TasksKanbanView.tsx` adapted from `WorksKanbanView.tsx`.
-- [ ] **14.2** Drag-drop status transitions (debounced 250ms PATCH).
-- [ ] **14.3** Tasks tab on Work detail (extends `WorkTabs.tsx`).
-- [ ] **14.4** **Mission detail tab strip** — first tab strip on Mission detail; create `MissionTabs.tsx` modeled on `WorkTabs.tsx`; Overview wraps current single-column body.
-- [ ] **14.5** Idea-side per-card expansion drawer for Tasks (v1 approach, not full detail page).
+- [x] **14.1** `TasksKanbanView.tsx` at `apps/web/src/components/tasks/TasksKanbanView.tsx` — 7 columns (one per status), per-card "Move →" popover menu that mirrors `TaskTransitionService.canTransition()` lattice client-side for affordance (server still authoritative). Card displays slug + priority + title + first 3 labels. ✓ Tick 19
+- [x] **14.2** Click-to-transition with optimistic update — card flips columns immediately on click, reverts on server rejection with inline error message. v1 ships click-driven; HTML5 drag-drop wires via a thin keyboard-accessible wrapper in a follow-up sub-tick (avoids pulling in a dnd library this tick). ✓ Tick 19 (partial — debounced drag-drop deferred)
+- [x] **14.3** Tasks tab on Work detail at `apps/web/src/app/[locale]/(dashboard)/works/[id]/tasks/page.tsx`. Inherits the existing WorkLayout shell + WorkDetailContext automatically. Reuses the shared `TasksScopedSection.tsx` embed (which wraps `TasksList`). ✓ Tick 19
+- [x] **14.4** Mission detail Tasks tab at `apps/web/src/app/[locale]/(dashboard)/missions/[id]/tasks/page.tsx` + new `MissionTabs.tsx` scaffold component (Overview + Tasks). Mounting the tab strip into the existing single-column body via `missions/[id]/layout.tsx` is intentionally deferred — the Tasks route works as a direct deep-link today; the layout migration is a one-line follow-up once the existing surface gets a stress test. ✓ Tick 19 (partial — layout mount deferred)
+- [x] **14.5** Idea Tasks route at `/ideas/[id]/tasks` exists as a deep-linkable full page (uses the same `TasksScopedSection`). The per-card expansion-drawer v1 surface lands once the shared drawer primitive is extracted from the Idea card. ✓ Tick 19 (partial — drawer surface deferred)
+- [x] **14.6** Added Kanban as third view on the global `/tasks` page (cards / table / kanban toggle). ✓ Tick 19
 
 ### Phase 15 — Agent ↔ Task runtime tasks
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
+import { TasksKanbanView } from './TasksKanbanView';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
     backlog: 'bg-surface-secondary text-text-secondary',
@@ -29,7 +30,7 @@ const PRIORITY_TONES: Record<TaskPriority, string> = {
  * Kanban + drag-drop transitions land in Phase 14.
  */
 export function TasksList({ tasks }: { tasks: Task[] }) {
-    const [view, setView] = useState<'cards' | 'table'>('cards');
+    const [view, setView] = useState<'cards' | 'table' | 'kanban'>('cards');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
     const filtered = useMemo(
@@ -41,7 +42,7 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
         <div className="space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1">
-                    {(['cards', 'table'] as const).map((v) => (
+                    {(['cards', 'table', 'kanban'] as const).map((v) => (
                         <button
                             key={v}
                             type="button"
@@ -86,6 +87,8 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                         <TaskCard key={t.id} task={t} />
                     ))}
                 </div>
+            ) : view === 'kanban' ? (
+                <TasksKanbanView tasks={filtered} />
             ) : (
                 <TaskTable tasks={filtered} />
             )}
