@@ -15,6 +15,7 @@ import {
     type JsonSchema,
     type DeviceAuthStatus,
     type PluginManifest,
+    type ResolvedSettings,
     isDeviceAuthProvider,
     toPluginSettingsSchemaProperty,
     PLUGIN_CAPABILITIES,
@@ -353,7 +354,9 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {
+            includeConnectionStatus: true,
+        });
     }
 
     async getPluginDeviceAuthStatus(pluginId: string, userId: string): Promise<DeviceAuthStatus> {
@@ -446,7 +449,9 @@ export class PluginOperationsService {
         await this.userPluginRepository.save(userPlugin);
         this.logger.log(`Plugin "${pluginId}" enabled for user "${userId}"`);
 
-        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {
+            includeConnectionStatus: true,
+        });
     }
 
     /**
@@ -502,7 +507,9 @@ export class PluginOperationsService {
 
         this.logger.log(`Plugin "${pluginId}" disabled for user "${userId}"`);
 
-        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {
+            includeConnectionStatus: true,
+        });
     }
 
     /**
@@ -588,7 +595,9 @@ export class PluginOperationsService {
         await this.userPluginRepository.save(userPlugin);
         this.logger.log(`Plugin "${pluginId}" settings updated for user "${userId}"`);
 
-        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {
+            includeConnectionStatus: true,
+        });
     }
 
     /**
@@ -1273,13 +1282,43 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         userPlugin: UserPluginEntity | null | undefined,
         userId: string,
+        options: { includeConnectionStatus?: boolean } = {},
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
-        const [resolvedSettings, connectionStatus, models] = await Promise.all([
-            this.getResolvedDisplaySettings(registered, userId),
-            this.getConnectionStatus(registered, userId),
-            this.getProviderModelSummaries(registered, { userId }),
-        ]);
+
+        // Fan out the two independent reads in parallel:
+        //   (1) resolve the user-scope settings (used for the display
+        //       + model-summary projections); skipped entirely if the
+        //       plugin has no schema AND isn't an AI provider.
+        //   (2) probe the connection status — only on opt-in
+        //       (detail endpoint + post-mutation responses); the
+        //       LIST path skips this so the dashboard doesn't fan
+        //       out to ~39 external providers per page load.
+        //
+        // The previous shape ran (1) and (2) sequentially when both
+        // were needed, regressing detail-endpoint latency from
+        // `max(T_resolve, T_probe)` to `T_resolve + T_probe`. Putting
+        // them back inside a single `Promise.all` restores the
+        // original concurrency on the opt-in path while preserving
+        // the list-path savings (the probe is `Promise.resolve(undefined)`
+        // when `includeConnectionStatus` is false, so no extra work).
+        const schema = registered.plugin.settingsSchema;
+        const needsResolved = !!schema?.properties || this.hasAiProviderCapability(registered);
+        const resolvedP = needsResolved
+            ? this.settingsService.getResolvedSettings(registered.plugin.id, { userId })
+            : Promise.resolve(undefined);
+        const connectionStatusP = options.includeConnectionStatus
+            ? this.getConnectionStatus(registered, userId)
+            : Promise.resolve(undefined);
+
+        const [resolved, connectionStatus] = await Promise.all([resolvedP, connectionStatusP]);
+
+        const resolvedSettings = resolved
+            ? this.projectDisplaySettings(registered, resolved)
+            : undefined;
+        const models = resolved
+            ? this.projectProviderModelSummaries(registered, resolved)
+            : undefined;
 
         if (!resolvedSettings && !connectionStatus && !models) {
             return response;
@@ -1291,6 +1330,28 @@ export class PluginOperationsService {
             connectionStatus,
             models,
         };
+    }
+
+    private hasAiProviderCapability(registered: RegisteredPlugin): boolean {
+        return registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER);
+    }
+
+    /**
+     * Public entry point for the new
+     * `GET /plugins/:pluginId/connection-status` endpoint. Runs the
+     * same probe `toUserPluginResponseWithResolvedSettings` used to
+     * run eagerly for every plugin in the list response, but only
+     * for the one plugin the caller asks about.
+     */
+    async getPluginConnectionStatus(
+        pluginId: string,
+        userId: string,
+    ): Promise<PluginConnectionStatus | undefined> {
+        const registered = this.pluginRegistryService.get(pluginId);
+        if (!registered) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        return this.getConnectionStatus(registered, userId);
     }
 
     private async getConnectionStatus(
@@ -1403,6 +1464,26 @@ export class PluginOperationsService {
             userId,
         });
 
+        return this.projectDisplaySettings(registered, resolved);
+    }
+
+    /**
+     * Pure projection from already-resolved settings to the visible
+     * "display settings" shape returned on the list response. Same
+     * masking + filtering rules as `getResolvedDisplaySettings` but
+     * synchronous and takes the resolve result as a parameter, so
+     * the list path can resolve once and share between
+     * `projectProviderModelSummaries` and this.
+     */
+    private projectDisplaySettings(
+        registered: RegisteredPlugin,
+        resolved: ResolvedSettings,
+    ): Record<string, unknown> | undefined {
+        const schema = registered.plugin.settingsSchema;
+        if (!schema?.properties) {
+            return undefined;
+        }
+
         const displaySettings: Record<string, unknown> = {};
 
         for (const [key, propSchema] of Object.entries(schema.properties)) {
@@ -1472,7 +1553,7 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         options: { userId: string; workId?: string },
     ): Promise<WorkPluginResponse['models']> {
-        if (!registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+        if (!this.hasAiProviderCapability(registered)) {
             return undefined;
         }
 
@@ -1481,6 +1562,22 @@ export class PluginOperationsService {
             workId: options.workId,
         });
 
+        return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
+    }
+
+    /**
+     * Pure projection from already-resolved settings to the
+     * provider-model summary used on the list response. Exists so
+     * the list path can resolve user-scope settings once and feed
+     * both `projectDisplaySettings` + this without re-querying.
+     */
+    private projectProviderModelSummaries(
+        registered: RegisteredPlugin,
+        resolved: ResolvedSettings,
+    ): WorkPluginResponse['models'] {
+        if (!this.hasAiProviderCapability(registered)) {
+            return undefined;
+        }
         return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
     }
 

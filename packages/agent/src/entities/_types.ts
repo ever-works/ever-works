@@ -22,6 +22,13 @@ export enum BudgetOwnerType {
     WORK = 'work',
     IDEA = 'idea',
     MISSION = 'mission',
+    /**
+     * Per-Agent budgets (Agents/Skills/Tasks spec — ADR-013 + agents/plan.md
+     * §3.1). Owner = `agents.id`. Aggregator added in
+     * `BudgetService.getCurrentPeriodStart/getNextPeriodStart` handling all
+     * 5 `intervalUnit` values per operator N6 override.
+     */
+    AGENT = 'agent',
 }
 
 /**

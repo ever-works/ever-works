@@ -20,6 +20,9 @@ export interface GitHubSettings {
 	 * for customer-owned GitHub orgs (cells B and D of the deploy matrix,
 	 * see EW-615). */
 	readonly readPackagesPatClassic?: string;
+	/** GitHub login that owns the read-packages PAT. Used as
+	 * REGISTRY_USERNAME by Kubernetes deploy workflows. */
+	readonly readPackagesPatOwner?: string;
 }
 
 export interface GitHubWorkflow {

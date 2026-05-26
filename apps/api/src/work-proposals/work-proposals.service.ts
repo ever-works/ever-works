@@ -3,8 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
 import { User, type WorkProposal } from '@ever-works/agent/entities';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
 import {
+    DEFAULT_MAX_PENDING_WORK_PROPOSALS,
     UserResearchService,
     UserResearchLimitsService,
     UserResearchRateLimitedError,
@@ -26,6 +28,8 @@ export interface ScheduledBatchSummary {
 
 const SCHEDULED_RERUN_BATCH_SIZE = 20;
 const SCHEDULED_RERUN_STALE_DAYS = 30;
+const PIPELINE_LOCK_TTL_MS = 2 * 60 * 60 * 1000;
+const PIPELINE_LOCK_KEY_PREFIX = 'work-proposals:pipeline';
 
 @Injectable()
 export class WorkProposalsApiService {
@@ -40,6 +44,7 @@ export class WorkProposalsApiService {
         @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
         private readonly config: ConfigService,
         private readonly workAgent: WorkAgentService,
+        private readonly taskLockService?: DistributedTaskLockService,
     ) {}
 
     async list(
@@ -199,13 +204,18 @@ export class WorkProposalsApiService {
     async getRefreshStatus(userId: string): Promise<{
         researching: boolean;
         canRefresh: boolean;
-        refreshDisabledReason?: 'rate-limited';
+        refreshDisabledReason?: 'rate-limited' | 'at-limit';
     }> {
-        const researching = this.inFlight.has(userId);
+        const researching = await this.isPipelineRunning(userId);
         const canRun = await this.limits.canRun(userId);
         if (!canRun) {
             return { researching, canRefresh: false, refreshDisabledReason: 'rate-limited' };
         }
+
+        if (await this.hasReachedPendingProposalLimit(userId)) {
+            return { researching, canRefresh: false, refreshDisabledReason: 'at-limit' };
+        }
+
         return { researching, canRefresh: true };
     }
 
@@ -244,9 +254,13 @@ export class WorkProposalsApiService {
     async refresh(
         userId: string,
         source: WorkProposalSource = WorkProposalSource.USER_REFRESH,
-    ): Promise<{ status: 'queued' | 'rate-limited'; error?: string }> {
-        if (this.inFlight.has(userId)) {
+    ): Promise<{ status: 'queued' | 'rate-limited' | 'at-limit'; error?: string }> {
+        if (await this.isPipelineRunning(userId)) {
             return { status: 'queued', error: 'already in flight' };
+        }
+
+        if (await this.hasReachedPendingProposalLimit(userId)) {
+            return { status: 'at-limit', error: 'pending proposal limit reached' };
         }
 
         try {
@@ -259,7 +273,7 @@ export class WorkProposalsApiService {
         }
 
         this.inFlight.add(userId);
-        void this.runPipeline(userId, source).finally(() => this.inFlight.delete(userId));
+        void this.runPipelineLocked(userId, source).finally(() => this.inFlight.delete(userId));
         return { status: 'queued' };
     }
 
@@ -318,6 +332,52 @@ export class WorkProposalsApiService {
         return summary;
     }
 
+    private getPipelineLockKey(userId: string): string {
+        return PIPELINE_LOCK_KEY_PREFIX + ':' + userId;
+    }
+
+    private async isPipelineRunning(userId: string): Promise<boolean> {
+        if (this.inFlight.has(userId)) return true;
+        return (await this.taskLockService?.isLocked(this.getPipelineLockKey(userId))) ?? false;
+    }
+
+    private getMaxPendingProposals(): number {
+        const raw = this.config.get<string | number>(
+            'WORK_PROPOSALS_MAX_PENDING',
+            DEFAULT_MAX_PENDING_WORK_PROPOSALS,
+        );
+        const value = Number(raw);
+        return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_PENDING_WORK_PROPOSALS;
+    }
+
+    private async hasReachedPendingProposalLimit(userId: string): Promise<boolean> {
+        const pending = await this.proposals.countPending(userId).catch(() => 0);
+        return pending >= this.getMaxPendingProposals();
+    }
+
+    private async runPipelineLocked(userId: string, source: WorkProposalSource): Promise<void> {
+        if (!this.taskLockService) {
+            await this.runPipeline(userId, source);
+            return;
+        }
+
+        const result = await this.taskLockService.runExclusive(
+            this.getPipelineLockKey(userId),
+            async () => this.runPipeline(userId, source),
+            {
+                ttlMs: PIPELINE_LOCK_TTL_MS,
+                onLocked: () =>
+                    this.logger.debug(
+                        `Skipping work-proposals pipeline for ${userId}; another instance holds the lock`,
+                    ),
+            },
+        );
+
+        if (!result.acquired) {
+            return;
+        }
+    }
+
     private getPositiveNumberConfig(key: string, fallback: number): number {
         const raw = this.config.get<string | number>(key, fallback);
         const value = Number(raw);
@@ -337,12 +397,9 @@ export class WorkProposalsApiService {
                 );
                 return;
             }
-            // Phase 1 PR D — read the user's autoGenerateBatchSize pref
-            // (Phase 0 PR 0.4 column) and pass it through to the
-            // generator. NULL on the column → prompt builder applies
-            // its own hardcoded default (3). Wrapped in catch because
-            // pref-fetch failures must not block proposal generation —
-            // we just fall back to the default.
+            // Phase 1 PR D - read the user's autoGenerateBatchSize pref
+            // and pass it through to the generator. Preference failures
+            // must not block proposal generation.
             let targetCount: number | null = null;
             try {
                 const prefs = await this.workAgent.getPreferences(userId);
@@ -353,7 +410,12 @@ export class WorkProposalsApiService {
                 );
             }
 
-            const generated = await this.proposals.generate(userId, { source, targetCount });
+            const generated = await this.proposals.generate(userId, {
+                source,
+                suppressLowConfidence: source !== WorkProposalSource.AUTO_SIGNUP,
+                maxPendingProposals: this.getMaxPendingProposals(),
+                targetCount,
+            });
             this.logger.log(
                 `Work-proposals pipeline finished for ${userId}: status=${generated.status}, count=${generated.proposals.length}, target=${targetCount ?? 'default'}`,
             );

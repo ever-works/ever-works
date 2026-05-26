@@ -61,6 +61,16 @@ const PROVISION_STRIP_PATHS: readonly string[] = [
     'apps/web-e2e',
 ];
 
+// The only files a customization is allowed to commit. theme.css is plain CSS
+// loaded after the framework styles; restricting the commit to it guarantees the
+// fork keeps compiling regardless of which agent provider ran or how it misbehaved.
+const CUSTOMIZATION_ALLOWED_PATHS: readonly string[] = ['apps/web/src/styles/theme.css'];
+
+// Tailwind directives that throw when used in theme.css (it is not the Tailwind
+// entry file). Standard CSS at-rules (@media, @supports, @font-face, @import) are fine.
+const FORBIDDEN_THEME_AT_RULES =
+    /@(?:apply|tailwind|theme|source|reference|plugin|config|utility|custom-variant|variant)\b/i;
+
 export interface CreateAndStartCustomizationInput {
     baseTemplateId: string;
     name: string;
@@ -377,10 +387,12 @@ export class TemplateCustomizationService {
                 gitOptions,
             );
 
+            await this.assertThemeCssWired(workspaceDir);
+
             const composedPrompt = `${basePrompt}\n\n# User customization request\n\n${record.prompt.trim()}\n`;
 
             const edit = await this.codeEditFacade.execute(
-                { workspaceDir, prompt: composedPrompt },
+                { workspaceDir, prompt: composedPrompt, allowedPaths: CUSTOMIZATION_ALLOWED_PATHS },
                 {
                     userId: record.userId,
                     providerId: record.providerId ?? undefined,
@@ -392,15 +404,25 @@ export class TemplateCustomizationService {
             if (!edit.success) {
                 throw new Error(edit.error ?? edit.summary ?? 'Agent edit failed');
             }
-            if (edit.filesChanged.length === 0) {
-                throw new Error('Agent produced no file changes; nothing to commit.');
+
+            const { allowed, rejected } = this.partitionChangedPaths(edit.filesChanged);
+            if (rejected.length > 0) {
+                this.logger.warn(
+                    `Customization ${record.id}: discarding ${rejected.length} out-of-scope change(s) to keep the fork compiling: ${rejected.join(', ')}`,
+                );
             }
+            if (allowed.length === 0) {
+                throw new Error(
+                    `Agent made no changes to the compile-safe styling surface (${CUSTOMIZATION_ALLOWED_PATHS.join(', ')}); nothing safe to commit.`,
+                );
+            }
+            await this.assertThemeCssCompiles(workspaceDir, allowed);
 
             await this.customizationRepository.updateById(record.id, {
                 status: TemplateCustomizationStatus.PUSHING,
             });
 
-            await this.gitFacade.addAll(GIT_PROVIDER_ID, workspaceDir);
+            await this.gitFacade.add(GIT_PROVIDER_ID, workspaceDir, allowed);
             await this.gitFacade.commit(
                 GIT_PROVIDER_ID,
                 workspaceDir,
@@ -721,6 +743,49 @@ export class TemplateCustomizationService {
         if (summary) lines.push('', `Agent summary: ${summary}`);
         lines.push('', `Template customization: ${record.id}`);
         return lines.join('\n');
+    }
+
+    private partitionChangedPaths(filesChanged: readonly { path: string }[]): {
+        allowed: string[];
+        rejected: string[];
+    } {
+        const allowed: string[] = [];
+        const rejected: string[] = [];
+        for (const change of filesChanged) {
+            const normalized = change.path.replace(/\\/g, '/');
+            if (CUSTOMIZATION_ALLOWED_PATHS.includes(normalized)) {
+                allowed.push(normalized);
+            } else {
+                rejected.push(normalized);
+            }
+        }
+        return { allowed, rejected };
+    }
+
+    private async assertThemeCssWired(workspaceDir: string): Promise<void> {
+        const layoutPath = path.join(workspaceDir, 'apps/web/src/layouts/BaseLayout.astro');
+        const layout = await fs.readFile(layoutPath, 'utf8').catch(() => null);
+        if (layout === null || !layout.includes('styles/theme.css')) {
+            throw new Error(
+                'Fork is not migrated for customization: apps/web/src/layouts/BaseLayout.astro does not import styles/theme.css, so styling edits would not load. Sync this template from its base before customizing.',
+            );
+        }
+    }
+
+    private async assertThemeCssCompiles(
+        workspaceDir: string,
+        allowedPaths: readonly string[],
+    ): Promise<void> {
+        for (const rel of allowedPaths) {
+            if (!rel.endsWith('theme.css')) continue;
+            const css = await fs.readFile(path.join(workspaceDir, rel), 'utf8').catch(() => '');
+            const match = FORBIDDEN_THEME_AT_RULES.exec(css);
+            if (match) {
+                throw new Error(
+                    `${rel} contains a Tailwind directive ("${match[0]}") that would break the build; theme.css must be plain CSS.`,
+                );
+            }
+        }
     }
 
     private isTerminal(status: TemplateCustomizationStatus): boolean {

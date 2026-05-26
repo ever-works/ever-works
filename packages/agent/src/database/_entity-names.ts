@@ -44,6 +44,13 @@
 
 export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
+    // Agents/Skills/Tasks (PR #1019) ──
+    'Agent',
+    'AgentBudget',
+    'AgentMembership',
+    'AgentRun',
+    'AgentRunLog',
+    // ───────────────────────────────
     'ApiKey',
     'AuthAccount',
     'AuthSession',
@@ -59,12 +66,29 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'OnboardingRequest',
     'PluginUsageEvent',
     'RefreshToken',
+    // Skills family (PR #1019) ──
+    'Skill',
+    'SkillBinding',
+    // ───────────────────────────
     'SubscriptionPlan',
+    // Tasks family (PR #1019) ──
+    'Task',
+    'TaskApprover',
+    'TaskAssignee',
+    'TaskAttachment',
+    'TaskBlock',
+    'TaskChatMessage',
+    'TaskKbMention',
+    'TaskRelation',
+    'TaskReviewer',
+    'TaskWatcher',
+    // ──────────────────────────
     'Template',
     'TemplateCustomization',
     'UsageLedgerEntry',
     'User',
     'UserSubscription',
+    'UserTaskCounter',
     'UserTemplatePreference',
     'WebhookDelivery',
     'WebhookSubscription',

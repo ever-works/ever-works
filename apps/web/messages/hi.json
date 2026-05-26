@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "आइटम खोजें...",
                 "allCategories": "सभी श्रेणियाँ",
                 "showing": "{total} में से {current} आइटम दिखा रहे हैं",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "आपके खोज मानदंड से मेल खाने वाले कोई आइटम नहीं",
                 "source": "स्रोत",
                 "viewOnWebsite": "वेबसाइट पर देखें",
@@ -3077,7 +3078,19 @@
                     "legalNote": "नोट:",
                     "legalDescription": "अनुसंधान मोड स्रोत रिपॉजिटरी को केवल इनपुट डेटा के रूप में उपयोग करता है। अंतिम संग्रह मुख्य रूप से नव खोजे गए आइटमों से बनेगा जिनमें मूल, एआई-उत्पन्न विवरण होंगे। स्रोत सामग्री को शब्दशः कॉपी नहीं किया जाता।",
                     "importButton": "आयात और अनुसंधान शुरू करें",
-                    "importingButton": "अनुसंधान पाइपलाइन शुरू हो रही है..."
+                    "importingButton": "अनुसंधान पाइपलाइन शुरू हो रही है...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "रिपॉजिटरी विश्लेषण करें",
                 "importButton": "कार्य आयात करें",

@@ -24,6 +24,9 @@ import {
     LayoutTemplate,
     Lightbulb,
     Target,
+    Bot,
+    ListChecks,
+    Sparkles,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -116,8 +119,12 @@ export function DashboardSidebar({
             href: ROUTES.DASHBOARD_WORKS,
             icon: FolderClosed,
         },
+        // Agents/Skills/Tasks PR #1017 — Phase 5.
+        { name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
+        { name: t('navigation.agents'), href: ROUTES.DASHBOARD_AGENTS, icon: Bot },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+        { name: t('navigation.skills'), href: ROUTES.DASHBOARD_SKILLS, icon: Sparkles },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];

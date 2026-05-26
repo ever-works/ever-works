@@ -50,6 +50,18 @@ describe('AccountController', () => {
     });
 
     describe('exportData', () => {
+        // FU-10 (post-merge fix 2026-05-26): the controller now forwards
+        // the v2-tail toggles (`includeAgents` / `includeSkills` /
+        // `includeTasks` / `includeTaskChat`) alongside `includeSecrets`.
+        // Each defaults to `false` when the query string omits them, so
+        // the assertions widen to the full bag.
+        const defaultV2Toggles = {
+            includeAgents: false,
+            includeSkills: false,
+            includeTasks: false,
+            includeTaskChat: false,
+        };
+
         it('passes includeSecrets=true when query is "true"', async () => {
             exportService.exportAccountData.mockResolvedValue({ payload: true } as any);
 
@@ -57,6 +69,7 @@ describe('AccountController', () => {
 
             expect(exportService.exportAccountData).toHaveBeenCalledWith('user-1', {
                 includeSecrets: true,
+                ...defaultV2Toggles,
             });
             expect(result).toEqual({ payload: true });
         });
@@ -70,12 +83,15 @@ describe('AccountController', () => {
 
             expect(exportService.exportAccountData).toHaveBeenNthCalledWith(1, 'user-1', {
                 includeSecrets: false,
+                ...defaultV2Toggles,
             });
             expect(exportService.exportAccountData).toHaveBeenNthCalledWith(2, 'user-1', {
                 includeSecrets: false,
+                ...defaultV2Toggles,
             });
             expect(exportService.exportAccountData).toHaveBeenNthCalledWith(3, 'user-1', {
                 includeSecrets: false,
+                ...defaultV2Toggles,
             });
         });
     });

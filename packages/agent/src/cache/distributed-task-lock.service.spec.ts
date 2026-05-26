@@ -43,6 +43,24 @@ describe('DistributedTaskLockService', () => {
         jest.useRealTimers();
     });
 
+    describe('isLocked', () => {
+        it('returns true when a non-expired lock exists', async () => {
+            cacheEntryRepository.findOne.mockResolvedValue({ key: 'task-lock:foo' });
+
+            await expect(service.isLocked('foo')).resolves.toBe(true);
+            expect(cacheEntryRepository.findOne).toHaveBeenCalledWith({
+                where: { key: 'task-lock:foo', expiresAt: expect.any(Object) },
+                select: ['key'],
+            });
+        });
+
+        it('returns false when no non-expired lock exists', async () => {
+            cacheEntryRepository.findOne.mockResolvedValue(null);
+
+            await expect(service.isLocked('foo')).resolves.toBe(false);
+        });
+    });
+
     describe('runExclusive — happy path', () => {
         it('acquires the lock, runs fn, and releases on success', async () => {
             const fn = jest.fn().mockResolvedValue('computed');

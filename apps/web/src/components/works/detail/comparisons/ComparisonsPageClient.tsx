@@ -46,6 +46,8 @@ import {
     saveComparisonAiConfig,
     getAiProviderModels,
     listComparisons,
+    loadComparisonItems,
+    type ComparisonPairItem,
 } from '@/app/actions/dashboard/comparisons';
 import { ComparisonGenerationProgress } from './ComparisonGenerationProgress';
 
@@ -53,7 +55,6 @@ interface ComparisonsPageClientProps {
     workId: string;
     websiteUrl: string | null;
     initialComparisons: ComparisonData[];
-    items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
     initialAiConfig: { provider: string | null; model: string | null; extendedAnalysis?: boolean };
 }
@@ -62,10 +63,31 @@ export function ComparisonsPageClient({
     workId,
     websiteUrl,
     initialComparisons,
-    items,
     availableProviders,
     initialAiConfig,
 }: ComparisonsPageClientProps) {
+    // Items power the manual pair-selector + the "Generate Next"
+    // enable check. They're fetched client-side because the API call
+    // clones the data repo and used to block the whole page from
+    // rendering. `null` = still loading; `[]` = loaded, none found.
+    const [items, setItems] = useState<ComparisonPairItem[] | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        loadComparisonItems(workId)
+            .then((result) => {
+                if (!cancelled) setItems(result);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error('Failed to load comparison items:', err);
+                setItems([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [workId]);
+    const itemsList: ComparisonPairItem[] = items ?? [];
+    const isLoadingItems = items === null;
     const t = useTranslations('dashboard.workDetail.comparisons');
     const [comparisons, setComparisons] = useState<ComparisonData[]>(initialComparisons);
     const [isPending, startTransition] = useTransition();
@@ -133,17 +155,17 @@ export function ComparisonsPageClient({
         };
     }, [initialAiConfig.provider]);
 
-    const selectedItemAObj = items.find((item) => item.slug === selectedItemA) ?? null;
-    const selectedItemBObj = items.find((item) => item.slug === selectedItemB) ?? null;
+    const selectedItemAObj = itemsList.find((item) => item.slug === selectedItemA) ?? null;
+    const selectedItemBObj = itemsList.find((item) => item.slug === selectedItemB) ?? null;
     const selectedProviderOption =
         availableProviders.find((provider) => provider.id === aiProvider) ?? null;
     const selectedProviderConfigured = selectedProviderOption?.configured ?? true;
 
-    const filteredItemsA = items
+    const filteredItemsA = itemsList
         .filter((item) => item.slug !== selectedItemB)
         .filter((item) => queryA === '' || item.name.toLowerCase().includes(queryA.toLowerCase()));
 
-    const filteredItemsB = items
+    const filteredItemsB = itemsList
         .filter((item) => item.slug !== selectedItemA)
         .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
@@ -336,7 +358,7 @@ export function ComparisonsPageClient({
                         variant="secondary"
                         size="sm"
                         onClick={() => setShowManualForm(!showManualForm)}
-                        disabled={isBusy || items.length < 2}
+                        disabled={isBusy || isLoadingItems || itemsList.length < 2}
                     >
                         {t('actions.compareItems')}
                     </Button>

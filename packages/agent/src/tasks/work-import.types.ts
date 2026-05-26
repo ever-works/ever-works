@@ -16,6 +16,7 @@ export type WorkImportPayload = {
     options?: {
         createMissingRepos?: boolean;
         enableSync?: boolean;
+        reuseSourceRepositoryAsMain?: boolean;
     };
     providers?: ProvidersDto;
     enrichmentConfig?: ImportEnrichmentConfigDto;

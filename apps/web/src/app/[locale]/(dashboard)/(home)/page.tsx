@@ -7,14 +7,25 @@ import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import { missionsAPI } from '@/lib/api/missions';
 import { usageAPI } from '@/lib/api/usage';
+// Phase 18.1 — Agent + Task count fetches for the new Dashboard
+// tiles. `limit: 1` because we only need `meta.total`; the data array
+// isn't rendered (server-side hint at the API tier — same posture as
+// the existing Work stats fetch).
+import { agentsAPI } from '@/lib/api/agents';
+import { tasksAPI } from '@/lib/api/tasks';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
     return { title: t('dashboard') };
 }
 
-export default async function Dashboard() {
+interface DashboardPageProps {
+    searchParams: Promise<{ newUser?: string }>;
+}
+
+export default async function Dashboard({ searchParams }: DashboardPageProps) {
     const [
+        { newUser },
         user,
         worksResponse,
         statsResponse,
@@ -23,7 +34,16 @@ export default async function Dashboard() {
         missions,
         allIdeas,
         accountWide,
+        // Phase 18.1 — Agent + Task counts + 5 most-recent in-flight
+        // Tasks. All catch-defended so a flaky endpoint shows zeros
+        // instead of breaking the home page.
+        agentsTotal,
+        agentsActive,
+        tasksInProgress,
+        tasksBlocked,
+        recentTasks,
     ] = await Promise.all([
+        searchParams,
         getAuthFromCookie(),
         getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
             success: false,
@@ -35,26 +55,31 @@ export default async function Dashboard() {
             totalWorks: 0,
             totalItems: 0,
             activeWebsites: 0,
-            // Phase 2 PR F — new Dashboard tiles. Catch-fallback must
-            // include these so the type-narrowed branch below doesn't
-            // see undefined.
             totalMissions: 0,
             totalIdeas: 0,
         })),
         workProposalsAPI.list(['pending']).catch(() => []),
         workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
-        // Phase 6 PR S — Missions preview block needs the user's
-        // Mission list + every Idea across all statuses (used
-        // client-side to derive per-Mission counters without N+1
-        // round-trips).
         missionsAPI.list().catch(() => []),
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'])
             .catch(() => []),
-        // Phase 7 PR II — account-wide spend for the 6th
-        // dashboard tile. Catch-defended so a flaky usage
-        // endpoint surfaces $0 instead of 500ing the page.
         usageAPI.accountWide().catch(() => null),
+        agentsAPI
+            .list({ limit: 1 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
+        agentsAPI
+            .list({ status: 'active', limit: 1 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
+        tasksAPI
+            .list({ status: ['todo', 'in_progress', 'in_review'] as any, limit: 1 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
+        tasksAPI
+            .list({ status: 'blocked' as any, limit: 1 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
+        tasksAPI
+            .list({ status: ['todo', 'in_progress', 'in_review', 'blocked'] as any, limit: 5 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 5, offset: 0 } })),
     ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
@@ -71,10 +96,17 @@ export default async function Dashboard() {
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}
+            autoStartProposals={newUser === 'true' && proposals.length === 0}
             initialMissions={missions}
             initialAllIdeas={allIdeas}
             monthSpendCents={accountWide?.currentSpendCents ?? 0}
             monthSpendCurrency={accountWide?.currency ?? 'usd'}
+            // Phase 18.1 — Dashboard grid mount.
+            agentsTotal={agentsTotal.meta.total}
+            agentsActive={agentsActive.meta.total}
+            tasksInProgress={tasksInProgress.meta.total}
+            tasksBlocked={tasksBlocked.meta.total}
+            initialRecentTasks={recentTasks.data ?? []}
         />
     );
 }

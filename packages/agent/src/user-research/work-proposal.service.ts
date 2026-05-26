@@ -71,7 +71,12 @@ import {
 } from '../entities/work-proposal.entity';
 
 export interface GenerateProposalsResult {
-    status: 'generated' | 'skipped-no-profile' | 'skipped-low-confidence' | 'error';
+    status:
+        | 'generated'
+        | 'skipped-no-profile'
+        | 'skipped-low-confidence'
+        | 'skipped-at-limit'
+        | 'error';
     proposals: WorkProposal[];
     tokensUsed: number;
     error?: string;
@@ -82,30 +87,49 @@ export interface GenerateProposalsOptions {
     generationRunId?: string;
     /** Suppress generation when confidence is 'low'. Default true. */
     suppressLowConfidence?: boolean;
+    /** Maximum pending proposals a user can have. Default: WORK_PROPOSALS_MAX_PENDING or 6. */
+    maxPendingProposals?: number;
     /**
-     * Phase 1 PR D — number of Ideas to ask the model for. Caller
-     * (WorkProposalsApiService) passes `user.autoGenerateBatchSize`
-     * (Phase 0 PR 0.4 column). When omitted / null the prompt
-     * builder applies its own hardcoded default
-     * (DEFAULT_PROPOSALS_PER_TICK = 3). Clamped to 1-20.
+     * Phase 1 PR D - number of Ideas to ask the model for. Caller
+     * (WorkProposalsApiService) passes user.autoGenerateBatchSize.
+     * When omitted / null the prompt builder applies its own default.
+     * Clamped to 1-20 by the prompt builder.
      */
     targetCount?: number | null;
     /**
-     * Phase 3 PR J — Mission-scoped generation context. When set,
-     * the prompt asks the model to bias every generated Idea
-     * toward the Mission's Goal description (and KB excerpts when
-     * supplied). Spawned Ideas should be persisted with
-     * `missionId = <mission.id>` by the caller (Mission tick
-     * worker), so this option carries the prompt-side payload
-     * separate from the FK-side wiring.
+     * Phase 3 PR J - Mission-scoped generation context. When set,
+     * the prompt asks the model to bias every generated Idea toward
+     * the Mission's goal description and KB excerpts.
      */
     missionContext?: MissionContext;
     /**
-     * Phase 1 PR C — when set, the FK on every persisted Idea
-     * gets this value (`source = MISSION` callers pass this so
-     * the Idea is back-linked to the spawning Mission).
+     * Phase 1 PR C - when set, the FK on every persisted Idea gets
+     * this value; MISSION callers pass this for the back-link.
      */
     missionId?: string;
+}
+
+export const DEFAULT_MAX_PENDING_WORK_PROPOSALS = 6;
+
+const DUPLICATE_TITLE_OVERLAP_THRESHOLD = 0.8;
+const DUPLICATE_TITLE_JACCARD_THRESHOLD = 0.5;
+const STOP_WORDS = new Set(['a', 'an', 'and', 'for', 'from', 'in', 'of', 'the', 'to', 'with']);
+
+function positiveIntegerFromEnv(key: string, fallback: number): number {
+    const raw = process.env[key];
+    if (raw === undefined || raw.trim() === '') return fallback;
+    const value = Number(raw);
+    return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function resolveMaxPendingProposals(override?: number): number {
+    if (Number.isInteger(override) && override > 0) return override;
+    return positiveIntegerFromEnv('WORK_PROPOSALS_MAX_PENDING', DEFAULT_MAX_PENDING_WORK_PROPOSALS);
+}
+
+interface ProposalFingerprint {
+    key: string;
+    tokens: Set<string>;
 }
 
 @Injectable()
@@ -143,6 +167,16 @@ export class WorkProposalService {
         if (suppress && profile.confidence === 'low') {
             this.logger.log(`Skipping proposal generation for ${userId}: confidence=low`);
             return { status: 'skipped-low-confidence', proposals: [], tokensUsed: 0 };
+        }
+
+        const maxPendingProposals = resolveMaxPendingProposals(opts.maxPendingProposals);
+        const pendingCount = await this.repo.countPendingByUser(userId).catch(() => 0);
+        const availableSlots = Math.max(0, maxPendingProposals - pendingCount);
+        if (availableSlots <= 0) {
+            this.logger.log(
+                `Skipping proposal generation for ${userId}: pending proposal limit reached (${pendingCount}/${maxPendingProposals})`,
+            );
+            return { status: 'skipped-at-limit', proposals: [], tokensUsed: 0 };
         }
 
         const existingWorks = await this.works.findByUser(userId).catch(() => []);
@@ -281,22 +315,22 @@ export class WorkProposalService {
             missionId: opts.missionId,
         }));
 
-        const existingKeys = new Set(
-            existingProposals.flatMap((proposal) => [
-                this.proposalKey(proposal.slugSuggestion),
-                this.proposalKey(proposal.title),
-            ]),
+        const existingFingerprints = existingProposals.flatMap((proposal) =>
+            this.proposalFingerprints(proposal.slugSuggestion, proposal.title),
         );
-        const seenKeys = new Set<string>();
+        const seenFingerprints: ProposalFingerprint[] = [];
         const uniqueInputs = inputs.filter((proposal) => {
-            const keys = [
-                this.proposalKey(proposal.slugSuggestion),
-                this.proposalKey(proposal.title),
-            ];
-            if (keys.some((key) => existingKeys.has(key) || seenKeys.has(key))) {
+            const fingerprints = this.proposalFingerprints(proposal.slugSuggestion, proposal.title);
+            if (
+                fingerprints.some(
+                    (fingerprint) =>
+                        this.hasSimilarFingerprint(fingerprint, existingFingerprints) ||
+                        this.hasSimilarFingerprint(fingerprint, seenFingerprints),
+                )
+            ) {
                 return false;
             }
-            keys.forEach((key) => seenKeys.add(key));
+            seenFingerprints.push(...fingerprints);
             return true;
         });
 
@@ -306,11 +340,18 @@ export class WorkProposalService {
             );
         }
 
-        if (uniqueInputs.length === 0) {
+        const cappedInputs = uniqueInputs.slice(0, availableSlots);
+        if (cappedInputs.length < uniqueInputs.length) {
+            this.logger.log(
+                `Proposal generation for ${userId}: capped ${uniqueInputs.length - cappedInputs.length} proposal(s) at pending limit ${maxPendingProposals}`,
+            );
+        }
+
+        if (cappedInputs.length === 0) {
             return { status: 'generated', proposals: [], tokensUsed };
         }
 
-        const saved = await this.repo.bulkInsert(uniqueInputs);
+        const saved = await this.repo.bulkInsert(cappedInputs);
 
         this.logger.log(
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
@@ -325,6 +366,49 @@ export class WorkProposalService {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
+    }
+
+    private proposalFingerprints(slugSuggestion: string, title: string): ProposalFingerprint[] {
+        const seen = new Set<string>();
+        return [slugSuggestion, title]
+            .map((value) => this.proposalKey(value))
+            .filter((key) => key.length > 0)
+            .filter((key) => {
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .map((key) => ({ key, tokens: this.proposalTokens(key) }));
+    }
+
+    private proposalTokens(key: string): Set<string> {
+        return new Set(key.split('-').filter((token) => token && !STOP_WORDS.has(token)));
+    }
+
+    private hasSimilarFingerprint(
+        candidate: ProposalFingerprint,
+        existing: ProposalFingerprint[],
+    ): boolean {
+        return existing.some((fingerprint) => this.areSimilarFingerprints(candidate, fingerprint));
+    }
+
+    private areSimilarFingerprints(a: ProposalFingerprint, b: ProposalFingerprint): boolean {
+        if (a.key === b.key) return true;
+
+        const minTokenCount = Math.min(a.tokens.size, b.tokens.size);
+        if (minTokenCount < 2) return false;
+
+        if (a.key.includes(b.key) || b.key.includes(a.key)) return true;
+
+        const intersection = [...a.tokens].filter((token) => b.tokens.has(token)).length;
+        const union = new Set([...a.tokens, ...b.tokens]).size;
+        const overlap = intersection / minTokenCount;
+        const jaccard = intersection / union;
+
+        return (
+            overlap >= DUPLICATE_TITLE_OVERLAP_THRESHOLD &&
+            jaccard >= DUPLICATE_TITLE_JACCARD_THRESHOLD
+        );
     }
 
     async list(

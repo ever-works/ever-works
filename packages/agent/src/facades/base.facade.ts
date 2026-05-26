@@ -291,23 +291,36 @@ export abstract class BaseFacadeService {
         return result;
     }
 
-    // Resolve plugin: providerOverride > work active > defaultForCapabilities > first enabled
+    // Resolve plugin:
+    //   agentProviderOverride > providerOverride > work active > defaultForCapabilities > first enabled
+    //
+    // Agents/Skills/Tasks PR #1017 — Phase 7.5. `agentProviderOverride`
+    // is the Agent-row override (agents/plan.md §2 "AI provider
+    // resolution"). When an Agent has `aiProviderId` set, that
+    // provider wins ahead of the per-Work active selection — matching
+    // FR-6/7/8 ("the Agent's pinned model is the source of truth for
+    // its own runs"). The caller (AgentRunService) is responsible for
+    // loading the Agent row and passing `agent.aiProviderId` here; we
+    // intentionally do NOT inject AgentRepository into the facade
+    // package to avoid a circular dep.
     protected async resolvePlugin<T extends IPlugin>(
         providerOverride?: string,
         userId?: string,
         workId?: string,
+        agentProviderOverride?: string,
     ): Promise<T> {
-        if (providerOverride) {
-            const registered = this.registry.get(providerOverride);
+        const effectiveOverride = agentProviderOverride ?? providerOverride;
+        if (effectiveOverride) {
+            const registered = this.registry.get(effectiveOverride);
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'loaded'
             ) {
-                const isEnabled = await this.isPluginEnabled(providerOverride, workId, userId);
+                const isEnabled = await this.isPluginEnabled(effectiveOverride, workId, userId);
                 if (isEnabled) return registered.plugin as T;
             }
-            throw new ProviderNotFoundError(providerOverride, this.CAPABILITY);
+            throw new ProviderNotFoundError(effectiveOverride, this.CAPABILITY);
         }
 
         if (workId) {

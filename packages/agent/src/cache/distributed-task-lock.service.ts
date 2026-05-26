@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { CacheEntry } from '../entities/cache.entity';
 
 interface RunExclusiveOptions {
@@ -71,6 +71,14 @@ export class DistributedTaskLockService {
             clearInterval(heartbeat);
             await this.release(key, token);
         }
+    }
+
+    async isLocked(key: string): Promise<boolean> {
+        const existingLock = await this.cacheEntryRepository.findOne({
+            where: { key: this.buildKey(key), expiresAt: MoreThan(Date.now()) },
+            select: ['key'],
+        });
+        return Boolean(existingLock);
     }
 
     private buildKey(key: string): string {

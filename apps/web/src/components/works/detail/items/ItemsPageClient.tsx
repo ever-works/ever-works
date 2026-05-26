@@ -9,6 +9,7 @@ import {
     SourceValidationSettingsDto,
 } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
+import { ItemsListSkeleton } from './ItemsListSkeleton';
 import { AddItemModal } from './AddItemModal';
 import { ItemsExportButton } from './ItemsExportButton';
 import { ItemsImportButton } from './ItemsImportButton';
@@ -23,29 +24,18 @@ import { TagsTab } from './TagsTab';
 import { CollectionsTab } from './CollectionsTab';
 import { SourceValidationSettingsCard } from './SourceValidationSettingsCard';
 import { ItemsEmptyState } from './ItemsEmptyState';
-import { checkScreenshotAvailability } from '@/app/actions/dashboard/items';
+import { checkScreenshotAvailability, loadItemsForList } from '@/app/actions/dashboard/items';
 import { ItemsProvider } from './ItemsContext';
 import type { ProviderOption } from '@/lib/api/types-only';
 
 type TabType = 'items' | 'categories' | 'tags' | 'collections' | 'sourceHealth';
 
 interface ItemsPageClientProps {
-    items: ItemData[];
     workId: string;
-    categories?: Category[];
-    tags?: Tag[];
-    collections?: Collection[];
     sourceValidationSettings?: SourceValidationSettingsDto | null;
 }
 
-export function ItemsPageClient({
-    items,
-    workId,
-    categories: initialCategories = [],
-    tags: initialTags = [],
-    collections: initialCollections = [],
-    sourceValidationSettings,
-}: ItemsPageClientProps) {
+export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageClientProps) {
     const t = useTranslations('dashboard.workDetail.items');
     const permissions = useWorkPermissions();
     const { work } = useWorkDetail();
@@ -58,6 +48,54 @@ export function ItemsPageClient({
     );
     const navRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
+
+    // Items + taxonomy are loaded lazily on mount so the page shell
+    // (title, tabs, search input, sticky actions) paints instantly
+    // while the API clones the data repo in the background. The
+    // result is keyed by `workId` so switching Works while a fetch
+    // is in flight still shows skeletons (instead of the previous
+    // Work's items) until the new fetch resolves — without needing
+    // a setState-in-effect reset.
+    type LoadedItems = {
+        workId: string;
+        items: ItemData[];
+        categories: Category[];
+        tags: Tag[];
+        collections: Collection[];
+        error: string | null;
+    };
+    const [loaded, setLoaded] = useState<LoadedItems | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        loadItemsForList(workId)
+            .then((result) => {
+                if (cancelled) return;
+                setLoaded({ workId, ...result, error: null });
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error('Failed to load items:', err);
+                setLoaded({
+                    workId,
+                    items: [],
+                    categories: [],
+                    tags: [],
+                    collections: [],
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [workId]);
+
+    const isLoadingItems = loaded?.workId !== workId;
+    const items: ItemData[] | null = isLoadingItems ? null : loaded!.items;
+    const initialCategories: Category[] = isLoadingItems ? [] : loaded!.categories;
+    const initialTags: Tag[] = isLoadingItems ? [] : loaded!.tags;
+    const initialCollections: Collection[] = isLoadingItems ? [] : loaded!.collections;
+    const itemsLoadError: string | null = isLoadingItems ? null : loaded!.error;
 
     useLayoutEffect(() => {
         const nav = navRef.current;
@@ -83,7 +121,7 @@ export function ItemsPageClient({
     // Get unique categories from existing items for the Add Item modal
     const categoryNames = Array.from(
         new Set(
-            items
+            (items ?? [])
                 .map((item) => getCategoryName(item.category))
                 .filter((category): category is string => Boolean(category)),
         ),
@@ -198,36 +236,66 @@ export function ItemsPageClient({
             </div>
 
             {/* Tab Content */}
+            {activeTab === 'items' && isLoadingItems && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('loadingFromRepo')}
+                        </p>
+                    </div>
+                    <ItemsListSkeleton />
+                </div>
+            )}
             {activeTab === 'items' &&
-                (items.length === 0 ? (
+                !isLoadingItems &&
+                !itemsLoadError &&
+                (items!.length === 0 ? (
                     <ItemsEmptyState workId={workId} />
                 ) : (
-                    <ItemsList items={items} addItemRef={addItemRef} />
+                    <ItemsList items={items!} addItemRef={addItemRef} />
                 ))}
 
+            {activeTab === 'items' && itemsLoadError && (
+                <div className="mt-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
+                    <p className="text-sm text-red-800 dark:text-red-200">{itemsLoadError}</p>
+                </div>
+            )}
+
+            {/*
+             * `key={loaded?.workId ?? 'pending'}` forces a remount of
+             * each taxonomy tab when items finish loading. Without
+             * this, `CategoriesTab` / `TagsTab` / `CollectionsTab`
+             * each call `useState(initialX)` and snapshot the empty
+             * array on first render — they would never observe the
+             * real taxonomy when it arrives, leaving the tab stuck
+             * blank until the user navigated away and back.
+             */}
             {activeTab === 'categories' && (
                 <CategoriesTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialCategories={initialCategories}
-                    items={items}
+                    items={items ?? []}
                     canEdit={permissions.canEdit}
                 />
             )}
 
             {activeTab === 'tags' && (
                 <TagsTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialTags={initialTags}
-                    items={items}
+                    items={items ?? []}
                     canEdit={permissions.canEdit}
                 />
             )}
 
             {activeTab === 'collections' && (
                 <CollectionsTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialCollections={initialCollections}
-                    items={items}
+                    items={items ?? []}
                     canEdit={permissions.canEdit}
                 />
             )}

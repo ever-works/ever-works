@@ -24,6 +24,11 @@ const sidebars: SidebarsConfig = {
 				'architecture/caching',
 				'architecture/events-deep-dive',
 				'architecture/dependency-injection',
+				// Agents/Skills/Tasks PR #1017 — reference for the 6 new
+				// Nest injection tokens (dispatchers, post-processors,
+				// git facade, plugin-tools facade) operators bind to
+				// custom adapters.
+				'architecture/agent-injection-tokens',
 				'architecture/module-system',
 				'architecture/middleware-pipeline',
 				'architecture/configuration-management',
@@ -72,6 +77,11 @@ const sidebars: SidebarsConfig = {
 				'api/index',
 				'api/authentication',
 				'api/works',
+				// Agents/Skills/Tasks PR #1017 — Phase 20.2 reference
+				// pages for the 3 new feature families.
+				'api/agents',
+				'api/skills',
+				'api/tasks',
 				'api/ai-conversation',
 				'api/deployment',
 				'api/other-modules',

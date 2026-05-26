@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "항목 검색...",
                 "allCategories": "모든 카테고리",
                 "showing": "{total}개 항목 중 {current}개 표시 중",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "검색 조건에 맞는 항목이 없습니다",
                 "source": "소스",
                 "viewOnWebsite": "웹사이트에서 보기",
@@ -3077,7 +3078,19 @@
                     "legalNote": "참고:",
                     "legalDescription": "연구 모드는 소스 저장소를 입력 데이터로만 사용합니다. 최종 컬렉션은 주로 새로 발견된 항목과 원본 AI 생성 설명으로 구성됩니다. 소스 콘텐츠는 그대로 복사되지 않습니다.",
                     "importButton": "가져오기 & 연구 시작",
-                    "importingButton": "연구 파이프라인 시작 중..."
+                    "importingButton": "연구 파이프라인 시작 중...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "저장소 분석",
                 "importButton": "워크 가져오기",

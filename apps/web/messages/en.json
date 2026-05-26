@@ -503,8 +503,8 @@
                 "refresh": "Suggest more"
             },
             "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
+                "title": "Generating ideas",
+                "subtitle": "Personalized suggestions will appear here as soon as they are ready."
             },
             "empty": {
                 "title": "No ideas right now.",
@@ -560,6 +560,164 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "Agents",
+            "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole tenant.",
+            "newAgent": "+ New Agent",
+            "empty": {
+                "title": "No Agents yet.",
+                "subtitle": "Create your first Agent to delegate recurring work. Tenant-scope Agents act across your whole account; Mission- or Work-scoped ones stay focused on a single target."
+            },
+            "card": {
+                "scopeTenant": "Tenant",
+                "scopeMission": "Mission",
+                "scopeWork": "Work",
+                "scopeIdea": "Idea",
+                "statusDraft": "Draft",
+                "statusActive": "Active",
+                "statusPaused": "Paused",
+                "statusRunning": "Running",
+                "statusError": "Error",
+                "statusArchived": "Archived",
+                "noTitle": "(no title)",
+                "noCadence": "No heartbeat",
+                "cadencePrefix": "Heartbeat:"
+            },
+            "tabs": {
+                "dashboard": "Dashboard",
+                "activity": "Activity",
+                "instructions": "Instructions",
+                "skills": "Skills",
+                "budgets": "Budgets",
+                "settings": "Settings"
+            },
+            "newDialog": {
+                "title": "New Agent",
+                "step1Title": "Pick a scope",
+                "step2Title": "Name your Agent",
+                "nameLabel": "Name",
+                "namePlaceholder": "e.g. CEO, Reviewer, Content Drafter",
+                "scopeTenantDesc": "Acts on your whole tenant",
+                "scopeMissionDesc": "Locked to one Mission",
+                "scopeWorkDesc": "Locked to one Work",
+                "scopeIdeaDesc": "Locked to one Idea",
+                "cancel": "Cancel",
+                "back": "Back",
+                "next": "Next",
+                "create": "Create Agent"
+            }
+        },
+        "tasksPage": {
+            "title": "Tasks",
+            "subtitle": "Trackable work items assigned to people or Agents.",
+            "empty": {
+                "title": "No Tasks yet.",
+                "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "list": {
+                "newTask": "+ New Task",
+                "kanban": "Kanban",
+                "list": "List",
+                "filter": {
+                    "status": "Status",
+                    "priority": "Priority",
+                    "label": "Label",
+                    "all": "All"
+                }
+            },
+            "newDialog": {
+                "title": "Create a new Task",
+                "name": "Title",
+                "namePlaceholder": "Add a task title",
+                "description": "Description",
+                "descriptionPlaceholder": "Add context (optional)",
+                "priority": "Priority",
+                "labels": "Labels",
+                "labelsPlaceholder": "comma-separated",
+                "cancel": "Cancel",
+                "create": "Create"
+            },
+            "detail": {
+                "moveTo": "Move to",
+                "noTransitions": "No transitions available.",
+                "conversation": "Conversation",
+                "noMessages": "No messages yet.",
+                "post": "Post",
+                "draftPlaceholder": "Write a message. Use @agent-slug to ping an Agent.",
+                "attachments": "Attachments",
+                "fileCount": "{count, plural, one {1 file} other {# files}}",
+                "dropFiles": "Drag & drop a file here or",
+                "browse": "Browse",
+                "uploading": "Uploading…",
+                "detach": "Detach",
+                "labels": "Labels",
+                "edited": "edited"
+            },
+            "recurring": {
+                "section": "Recurring schedule",
+                "promoteToRecurring": "Promote to recurring",
+                "demote": "Demote to one-off",
+                "daily": "Daily",
+                "weekly": "Weekly",
+                "monthly": "Monthly",
+                "custom": "Custom RRULE",
+                "timeOfDay": "Time of day",
+                "dayOfWeek": "Day of week",
+                "dayOfMonth": "Day of month",
+                "timezone": "Timezone",
+                "save": "Save schedule"
+            },
+            "status": {
+                "backlog": "Backlog",
+                "todo": "To do",
+                "in_progress": "In progress",
+                "in_review": "In review",
+                "blocked": "Blocked",
+                "done": "Done",
+                "cancelled": "Cancelled"
+            }
+        },
+        "skillsPage": {
+            "title": "Skills",
+            "subtitle": "Reusable, versioned instructions Agents can pull into a run when relevant.",
+            "empty": {
+                "title": "No Skills yet.",
+                "subtitle": "Skills ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "list": {
+                "newSkill": "+ New Skill",
+                "filter": {
+                    "scope": "Scope",
+                    "all": "All"
+                }
+            },
+            "detail": {
+                "instructions": "Instructions",
+                "bindings": "Bindings",
+                "bindingHelper": "Bind this Skill to an Agent, Mission, Idea, or Work. Priority 1 = highest precedence.",
+                "addBinding": "+ Add binding",
+                "removeBinding": "Remove",
+                "targetType": "Bind to",
+                "priority": "Priority",
+                "agent": "Agent",
+                "mission": "Mission",
+                "idea": "Idea",
+                "work": "Work",
+                "tenant": "Tenant"
+            }
+        },
+        "templatesPage": {
+            "title": "Templates",
+            "subtitle": "Pre-built starting points for Agents, Skills, and Tasks.",
+            "empty": "No templates available yet.",
+            "useTemplate": "Use template",
+            "browse": "Browse templates",
+            "entity": {
+                "agent": "Agent",
+                "skill": "Skill",
+                "task": "Task"
             }
         },
         "budgetSummary": {
@@ -1889,6 +2047,7 @@
                 "searchPlaceholder": "Search items...",
                 "allCategories": "All Categories",
                 "showing": "Showing {current} of {total} items",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "No items match your search criteria",
                 "source": "Source",
                 "viewOnWebsite": "View on website",
@@ -3366,7 +3525,19 @@
                     "legalNote": "Note:",
                     "legalDescription": "Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.",
                     "importButton": "Start Import & Research",
-                    "importingButton": "Starting research pipeline..."
+                    "importingButton": "Starting research pipeline...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Analyze Repository",
                 "importButton": "Import Work",
@@ -3606,7 +3777,10 @@
                 "missions": "Missions",
                 "ideas": "Ideas",
                 "works": "Works",
+                "tasks": "Tasks",
+                "agents": "Agents",
                 "plugins": "Plugins",
+                "skills": "Skills",
                 "templates": "Templates",
                 "settings": "Settings"
             },

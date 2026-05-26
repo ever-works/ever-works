@@ -27,6 +27,7 @@ class StubRateLimitedError extends Error {
 jest.mock(
     '@ever-works/agent/user-research',
     () => ({
+        DEFAULT_MAX_PENDING_WORK_PROPOSALS: 6,
         UserResearchRateLimitedError: StubRateLimitedError,
         UserResearchService: class {},
         WorkProposalService: class {},
@@ -69,6 +70,7 @@ describe('WorkProposalsApiService', () => {
     const makeDeps = () => {
         const research = { research: jest.fn().mockResolvedValue({ status: 'completed' }) };
         const proposals = {
+            countPending: jest.fn().mockResolvedValue(0),
             generate: jest.fn().mockResolvedValue({ status: 'generated', proposals: [] }),
             list: jest.fn().mockResolvedValue([]),
             dismiss: jest.fn().mockResolvedValue(true),
@@ -85,12 +87,6 @@ describe('WorkProposalsApiService', () => {
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
-        // Phase 1 PR B — WorkProposalsApiService now injects
-        // WorkAgentService for the build-from-Idea path. Stubbed
-        // with `createGoal` (build path) and `getPreferences`
-        // (Phase 1 PR D pref-driven targetCount). Returns NULL
-        // for autoGenerateBatchSize so the generator falls back
-        // to its hardcoded default.
         const workAgent = {
             createGoal: jest.fn().mockResolvedValue({
                 goal: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
@@ -112,6 +108,13 @@ describe('WorkProposalsApiService', () => {
                 accountWideAllowOverage: true,
             }),
         };
+        const taskLock = {
+            isLocked: jest.fn().mockResolvedValue(false),
+            runExclusive: jest.fn(async (_key: string, fn: () => Promise<void>) => ({
+                acquired: true,
+                result: await fn(),
+            })),
+        };
         const svc = new WorkProposalsApiService(
             research as never,
             proposals as never,
@@ -120,8 +123,19 @@ describe('WorkProposalsApiService', () => {
             userOrmRepo as never,
             config as never,
             workAgent as never,
+            taskLock as never,
         );
-        return { svc, research, proposals, limits, users, userOrmRepo, config, workAgent };
+        return {
+            svc,
+            research,
+            proposals,
+            limits,
+            users,
+            userOrmRepo,
+            config,
+            workAgent,
+            taskLock,
+        };
     };
 
     it('queues a refresh when caps are within budget', async () => {
@@ -134,15 +148,41 @@ describe('WorkProposalsApiService', () => {
             timeoutMs: 1_800_000,
             maxSteps: 14,
         });
-        // Phase 1 PR D — runPipeline now reads the user's
-        // autoGenerateBatchSize pref and threads it through as
-        // targetCount. The makeDeps stub returns NULL for the pref
-        // (the default), so targetCount=null reaches generate(), and
-        // the prompt builder applies its own hardcoded default (3).
         expect(proposals.generate).toHaveBeenCalledWith('u1', {
             source: 'user-refresh',
+            suppressLowConfidence: true,
+            maxPendingProposals: 6,
             targetCount: null,
         });
+    });
+
+    it('allows low-confidence proposals for auto-signup runs', async () => {
+        const { svc, proposals } = makeDeps();
+
+        await svc.refresh('u1', 'auto-signup' as never);
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(proposals.generate).toHaveBeenCalledWith('u1', {
+            source: 'auto-signup',
+            suppressLowConfidence: false,
+            maxPendingProposals: 6,
+            targetCount: null,
+        });
+    });
+
+    it('runs refresh pipelines through the distributed per-user lock', async () => {
+        const { svc, taskLock } = makeDeps();
+
+        await svc.refresh('u1');
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(taskLock.runExclusive).toHaveBeenCalledWith(
+            'work-proposals:pipeline:u1',
+            expect.any(Function),
+            expect.objectContaining({ ttlMs: 7_200_000 }),
+        );
     });
 
     it('passes configured research timeout and step limits to the agent', async () => {
@@ -160,6 +200,16 @@ describe('WorkProposalsApiService', () => {
             timeoutMs: 600_000,
             maxSteps: 14,
         });
+    });
+
+    it('returns at-limit before spending research tokens when pending proposals are full', async () => {
+        const { svc, proposals, research } = makeDeps();
+        proposals.countPending.mockResolvedValue(6);
+
+        const result = await svc.refresh('u1');
+
+        expect(result.status).toBe('at-limit');
+        expect(research.research).not.toHaveBeenCalled();
     });
 
     it('returns rate-limited when cap is exceeded', async () => {
@@ -183,6 +233,27 @@ describe('WorkProposalsApiService', () => {
         await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
             researching: false,
             canRefresh: true,
+        });
+    });
+
+    it('getRefreshStatus reports researching=true when another instance holds the pipeline lock', async () => {
+        const { svc, taskLock } = makeDeps();
+        taskLock.isLocked.mockResolvedValue(true);
+
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: true,
+            canRefresh: true,
+        });
+    });
+
+    it('getRefreshStatus reports canRefresh=false when pending proposal limit is reached', async () => {
+        const { svc, proposals } = makeDeps();
+        proposals.countPending.mockResolvedValue(6);
+
+        await expect(svc.getRefreshStatus('u1')).resolves.toEqual({
+            researching: false,
+            canRefresh: false,
+            refreshDisabledReason: 'at-limit',
         });
     });
 

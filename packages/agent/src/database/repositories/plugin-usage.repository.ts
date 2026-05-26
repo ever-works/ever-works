@@ -134,6 +134,34 @@ export class PluginUsageRepository {
         return Number(row?.total ?? 0);
     }
 
+    /**
+     * Tasks feature — Phase 15.7. Per-Task spend rollup. Caller
+     * filters by `since` (defaults to "all-time") + optional
+     * `currency`. Returns the total cost in cents for usage events
+     * attributed to the Task via the `taskId` column added by the
+     * Phase-11 migration.
+     */
+    async getTotalSpendCentsForTask(
+        taskId: string,
+        opts: { since?: Date; until?: Date; currency?: string } = {},
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.taskId = :taskId', { taskId });
+        if (opts.since) {
+            qb.andWhere('e.occurredAt >= :since', { since: opts.since });
+        }
+        if (opts.until) {
+            qb.andWhere('e.occurredAt < :until', { until: opts.until });
+        }
+        if (opts.currency) {
+            qb.andWhere('e.currency = :currency', { currency: opts.currency });
+        }
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
     async getSpendByPlugin(
         workId: string,
         periodStart: Date,

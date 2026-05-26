@@ -344,4 +344,31 @@ export const config = {
             return process.env.PLATFORM_ENCRYPTION_KEY || '';
         },
     },
+
+    // Agents/Skills/Tasks PR #1017 — Phase 6. Per-Agent heartbeat
+    // dispatcher tunables. Defaults are conservative: the cron
+    // fires every minute (cheapest if no Agents are due, matches
+    // mission-tick), batches at 25 Agents per tick, and pauses an
+    // Agent after 3 consecutive failures.
+    agents: {
+        dispatcherEnabled() {
+            return process.env.AGENTS_DISPATCHER_ENABLED !== 'false';
+        },
+        getDispatchIntervalMinutes() {
+            const raw = parseInt(process.env.AGENT_DISPATCH_INTERVAL_MINUTES || '1', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 1;
+        },
+        getMaxBatch() {
+            const raw = parseInt(process.env.AGENT_DISPATCH_MAX_BATCH || '25', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 25;
+        },
+        getStuckTimeoutMinutes() {
+            const raw = parseInt(process.env.AGENT_STUCK_TIMEOUT_MINUTES || '60', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 60;
+        },
+        getMaxRunDurationSeconds() {
+            const raw = parseInt(process.env.AGENT_MAX_RUN_DURATION_SECONDS || '1800', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 1800;
+        },
+    },
 };

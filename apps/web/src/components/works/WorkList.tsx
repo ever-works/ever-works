@@ -64,7 +64,7 @@ export function WorkList({
                     </h2>
 
                     <Link
-                        href={ROUTES.DASHBOARD_WORKS_NEW}
+                        href={ROUTES.DASHBOARD_NEW}
                         className={cn(
                             'px-4 py-2 rounded-lg font-medium transition-colors inline-flex items-center gap-2',
                             'bg-primary-500 hover:bg-primary-700 text-white',

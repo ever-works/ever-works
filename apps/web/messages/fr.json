@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "Rechercher des éléments...",
                 "allCategories": "Toutes les catégories",
                 "showing": "Affichage de {current} sur {total} éléments",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Aucun élément ne correspond à vos critères de recherche",
                 "source": "Source",
                 "viewOnWebsite": "Voir sur le site web",
@@ -3141,7 +3142,19 @@
                     "legalNote": "Note :",
                     "legalDescription": "Le mode recherche utilise le dépôt source uniquement comme données d'entrée. La collection finale consistera principalement en éléments nouvellement découverts avec des descriptions originales générées par IA. Le contenu source n'est pas copié tel quel.",
                     "importButton": "Démarrer l'import & recherche",
-                    "importingButton": "Démarrage du pipeline de recherche..."
+                    "importingButton": "Démarrage du pipeline de recherche...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Analyser le dépôt",
                 "importButton": "Importer l'travail",

@@ -33,7 +33,7 @@ describe('OAuthService', () => {
         findConnectedProviderAccount: jest.Mock;
         upsertProviderAccount: jest.Mock;
     };
-    let pluginSettingsService: { getSettings: jest.Mock };
+    let pluginSettingsService: { getSettings: jest.Mock; updateUserSettings: jest.Mock };
     let service: OAuthService;
 
     beforeEach(() => {
@@ -51,7 +51,10 @@ describe('OAuthService', () => {
             findConnectedProviderAccount: jest.fn(),
             upsertProviderAccount: jest.fn().mockResolvedValue(undefined),
         };
-        pluginSettingsService = { getSettings: jest.fn() };
+        pluginSettingsService = {
+            getSettings: jest.fn(),
+            updateUserSettings: jest.fn().mockResolvedValue(undefined),
+        };
         service = new OAuthService(
             oauthFacade as unknown as OAuthFacadeService,
             authAccountRepository as unknown as AuthAccountRepository,
@@ -523,6 +526,69 @@ describe('OAuthService', () => {
                 'invalid_grant',
             );
             expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('handleReadPackagesOAuthCallback', () => {
+        const validSettings = { clientId: 'cid', clientSecret: 'csecret' };
+
+        beforeEach(() => {
+            pluginSettingsService.getSettings.mockResolvedValue(validSettings);
+            oauthFacade.exchangeCodeForToken.mockResolvedValue({
+                accessToken: 'packages-token',
+                tokenType: 'Bearer',
+                scope: 'read:packages write:packages',
+            });
+            oauthFacade.getAuthenticatedUser.mockResolvedValue({
+                id: 'oauth-id',
+                username: 'octocat',
+                email: 'octo@example.com',
+            });
+        });
+
+        it('stores the read-packages token and its GitHub owner login in plugin settings', async () => {
+            const result = await service.handleReadPackagesOAuthCallback(
+                'user-1',
+                'github',
+                'code-abc',
+                'state-xyz',
+            );
+
+            expect(oauthFacade.exchangeCodeForToken).toHaveBeenCalledWith(
+                'github',
+                'code-abc',
+                expect.objectContaining({ clientId: 'cid', clientSecret: 'csecret' }),
+            );
+            expect(oauthFacade.getAuthenticatedUser).toHaveBeenCalledWith(
+                'github',
+                'packages-token',
+            );
+            expect(pluginSettingsService.updateUserSettings).toHaveBeenCalledWith(
+                'github',
+                'user-1',
+                { readPackagesPat: 'packages-token', readPackagesPatOwner: 'octocat' },
+                { secretKeys: ['readPackagesPat'] },
+            );
+            expect(result).toEqual({ providerId: 'github', connected: true });
+        });
+
+        it('still stores the read-packages token when resolving the GitHub owner fails', async () => {
+            oauthFacade.getAuthenticatedUser.mockRejectedValueOnce(new Error('rate limited'));
+
+            const result = await service.handleReadPackagesOAuthCallback(
+                'user-1',
+                'github',
+                'code-abc',
+                'state-xyz',
+            );
+
+            expect(pluginSettingsService.updateUserSettings).toHaveBeenCalledWith(
+                'github',
+                'user-1',
+                { readPackagesPat: 'packages-token', readPackagesPatOwner: '' },
+                { secretKeys: ['readPackagesPat'] },
+            );
+            expect(result).toEqual({ providerId: 'github', connected: true });
         });
     });
 });

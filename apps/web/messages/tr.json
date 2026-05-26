@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Öğe ara...",
                 "allCategories": "Tüm Kategoriler",
                 "showing": "{total} öğeden {current} tanesi gösteriliyor",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Arama kriterlerinize uyan öğe yok",
                 "source": "Kaynak",
                 "viewOnWebsite": "Web sitesinde görüntüle",
@@ -3077,7 +3078,19 @@
                     "legalNote": "Not:",
                     "legalDescription": "Araştırma modu kaynak deposunu sadece girdi verisi olarak kullanır. Son koleksiyon esas olarak yeni keşfedilen öğelerden oluşur, orijinal AI üretimi açıklamalı. Kaynak içerik birebir kopyalanmaz.",
                     "importButton": "İçe Aktar & Araştırmayı Başlat",
-                    "importingButton": "Araştırma hattı başlatılıyor..."
+                    "importingButton": "Araştırma hattı başlatılıyor...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Depoyu Analiz Et",
                 "importButton": "İş İçe Aktar",

@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "Търсене на елементи...",
                 "allCategories": "Всички категории",
                 "showing": "Показани са {current} от {total} елемента",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Няма елементи, които да съответстват на критериите за търсене",
                 "source": "Източник",
                 "viewOnWebsite": "Вижте на сайта",
@@ -3141,7 +3142,19 @@
                     "legalNote": "Забележка:",
                     "legalDescription": "Режимът Проучване използва изходното хранилище само като входни данни. Крайната колекция ще се състои основно от новооткрити елементи с оригинални, генерирани от AI описания. Съдържанието от източника не се копира буквално.",
                     "importButton": "Започни импорт & проучване",
-                    "importingButton": "Стартиране на процеса за проучване..."
+                    "importingButton": "Стартиране на процеса за проучване...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Анализирай хранилището",
                 "importButton": "Импортирай работа",

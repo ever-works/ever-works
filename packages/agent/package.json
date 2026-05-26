@@ -145,6 +145,18 @@
             "types": "./dist/missions/index.d.ts",
             "default": "./dist/missions/index.js"
         },
+        "./agents": {
+            "types": "./dist/agents/index.d.ts",
+            "default": "./dist/agents/index.js"
+        },
+        "./skills": {
+            "types": "./dist/skills/index.d.ts",
+            "default": "./dist/skills/index.js"
+        },
+        "./tasks-domain": {
+            "types": "./dist/tasks-domain/index.d.ts",
+            "default": "./dist/tasks-domain/index.js"
+        },
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
@@ -169,6 +181,7 @@
         "mysql2": "^3.14",
         "pg": "^8.16",
         "reflect-metadata": "^0.2",
+        "rrule": "^2.8.1",
         "rxjs": "^7.8"
     },
     "peerDependenciesMeta": {

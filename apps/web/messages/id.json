@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Cari item...",
                 "allCategories": "Semua Kategori",
                 "showing": "Menampilkan {current} dari {total} item",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Tidak ada item yang cocok dengan kriteria pencarian Anda",
                 "source": "Sumber",
                 "viewOnWebsite": "Lihat di situs web",
@@ -3077,7 +3078,19 @@
                     "legalNote": "Catatan:",
                     "legalDescription": "Mode riset hanya menggunakan repositori sumber sebagai data input. Koleksi akhir terutama terdiri dari item baru yang ditemukan dengan deskripsi asli yang dihasilkan AI. Konten sumber tidak disalin secara harfiah.",
                     "importButton": "Mulai Impor & Riset",
-                    "importingButton": "Memulai pipeline riset..."
+                    "importingButton": "Memulai pipeline riset...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Analisis Repositori",
                 "importButton": "Impor Karya",

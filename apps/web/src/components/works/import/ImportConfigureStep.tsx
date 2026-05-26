@@ -19,9 +19,19 @@ import type {
     ImportEnrichmentConfig,
     ImportSourceType,
 } from '@/lib/api/types-only';
-import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
+import {
+    Upload,
+    CheckCircle2,
+    FileText,
+    Database,
+    ArrowLeft,
+    Sparkles,
+    GitFork,
+    LinkIcon,
+} from 'lucide-react';
 
 type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
+type AwesomeReadmeImportMode = 'clone' | 'reuse_source';
 
 interface ImportConfigureStepProps {
     analysisResult: AnalyzeRepositoryResponseDto | null;
@@ -34,6 +44,8 @@ interface ImportConfigureStepProps {
     onSyncChange: (sync: boolean) => void;
     restoreWorksConfig: boolean;
     onRestoreWorksConfigChange: (restore: boolean) => void;
+    awesomeReadmeImportMode: AwesomeReadmeImportMode;
+    onAwesomeReadmeImportModeChange: (mode: AwesomeReadmeImportMode) => void;
     gitProvider?: string;
     isPending: boolean;
     owner: string;
@@ -66,6 +78,8 @@ export function ImportConfigureStep({
     onSyncChange,
     restoreWorksConfig,
     onRestoreWorksConfigChange,
+    awesomeReadmeImportMode,
+    onAwesomeReadmeImportModeChange,
     gitProvider,
     isPending,
     owner,
@@ -365,6 +379,65 @@ export function ImportConfigureStep({
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-3">
+                        <div>
+                            <h3 className="font-medium text-text dark:text-text-dark">
+                                {t('research.mainRepository.title')}
+                            </h3>
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                                {t('research.mainRepository.description')}
+                            </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => onAwesomeReadmeImportModeChange('clone')}
+                                disabled={isPending}
+                                className={cn(
+                                    'flex items-start gap-3 rounded-lg border p-4 text-left transition-all',
+                                    'bg-card dark:bg-card-primary-dark/30',
+                                    awesomeReadmeImportMode === 'clone'
+                                        ? 'border-primary shadow-sm'
+                                        : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',
+                                    isPending && 'opacity-50 cursor-not-allowed',
+                                )}
+                            >
+                                <GitFork className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                                <span>
+                                    <span className="block text-sm font-medium text-text dark:text-text-dark">
+                                        {t('research.mainRepository.clone.title')}
+                                    </span>
+                                    <span className="mt-1 block text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('research.mainRepository.clone.description')}
+                                    </span>
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onAwesomeReadmeImportModeChange('reuse_source')}
+                                disabled={isPending}
+                                className={cn(
+                                    'flex items-start gap-3 rounded-lg border p-4 text-left transition-all',
+                                    'bg-card dark:bg-card-primary-dark/30',
+                                    awesomeReadmeImportMode === 'reuse_source'
+                                        ? 'border-primary shadow-sm'
+                                        : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',
+                                    isPending && 'opacity-50 cursor-not-allowed',
+                                )}
+                            >
+                                <LinkIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                                <span>
+                                    <span className="block text-sm font-medium text-text dark:text-text-dark">
+                                        {t('research.mainRepository.reuse.title')}
+                                    </span>
+                                    <span className="mt-1 block text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('research.mainRepository.reuse.description')}
+                                    </span>
+                                </span>
+                            </button>
                         </div>
                     </div>
 

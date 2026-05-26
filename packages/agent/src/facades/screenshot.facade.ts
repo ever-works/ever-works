@@ -80,6 +80,9 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
             await this.pluginUsageService?.record({
                 workId: facadeOptions.workId,
                 userId: facadeOptions.userId,
+                // Phase 15.6 — Agent/Task attribution propagation.
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.SCREENSHOT,
                 units: 1,

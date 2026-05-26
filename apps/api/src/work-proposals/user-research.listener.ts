@@ -16,6 +16,10 @@ export class UserResearchListener {
 
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async onUserConfirmed(event: UserConfirmedEvent): Promise<void> {
+        await this.dispatchSignupResearch(event.user.id);
+    }
+
+    private async dispatchSignupResearch(userId: string): Promise<void> {
         const enabled = this.config.get<string | boolean>('USER_RESEARCH_ENABLED', true);
         const isEnabled = typeof enabled === 'string' ? enabled !== 'false' : !!enabled;
         if (!isEnabled) {
@@ -24,28 +28,23 @@ export class UserResearchListener {
         }
 
         try {
-            const existing = await this.proposals.list(event.user.id, [
+            const existing = await this.proposals.list(userId, [
                 WorkProposalStatus.PENDING,
                 WorkProposalStatus.ACCEPTED,
                 WorkProposalStatus.DISMISSED,
             ]);
             if (existing.length > 0) {
                 this.logger.debug(
-                    `Skipping auto-signup user research for ${event.user.id}; proposals already exist`,
+                    `Skipping auto-signup user research for ${userId}; proposals already exist`,
                 );
                 return;
             }
 
-            const result = await this.proposals.refresh(
-                event.user.id,
-                WorkProposalSource.AUTO_SIGNUP,
-            );
-            this.logger.log(
-                `User research dispatched for ${event.user.id} (status=${result.status})`,
-            );
+            const result = await this.proposals.refresh(userId, WorkProposalSource.AUTO_SIGNUP);
+            this.logger.log(`User research dispatched for ${userId} (status=${result.status})`);
         } catch (err) {
             this.logger.warn(
-                `Failed to dispatch user research for ${event.user.id}: ${(err as Error).message}`,
+                `Failed to dispatch user research for ${userId}: ${(err as Error).message}`,
             );
         }
     }
