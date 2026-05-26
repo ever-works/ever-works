@@ -25,6 +25,14 @@ export function GitHubSync() {
     const [pullPreview, setPullPreview] = useState<ImportPreview | null>(null);
     const [showPullImport, setShowPullImport] = useState(false);
     const [includeSecrets, setIncludeSecrets] = useState(false);
+    // FU-10 — v2 payload toggles. Same shape as DataManagement (export
+    // form) so the user sees identical affordances across the two
+    // surfaces. Each defaults off — pre-existing v1 syncs keep the
+    // payload they always had until the user opts in.
+    const [includeAgents, setIncludeAgents] = useState(false);
+    const [includeSkills, setIncludeSkills] = useState(false);
+    const [includeTasks, setIncludeTasks] = useState(false);
+    const [includeTaskChat, setIncludeTaskChat] = useState(false);
 
     const loadStatus = () => {
         startTransition(() => {
@@ -80,7 +88,15 @@ export function GitHubSync() {
     const handlePush = () => {
         startTransition(() => {
             void (async () => {
-                const result = await pushToGitHub({ includeSecrets });
+                const result = await pushToGitHub({
+                    includeSecrets,
+                    includeAgents,
+                    includeSkills,
+                    includeTasks,
+                    // Chat threads bloat the payload — gate on includeTasks too
+                    // so toggling Tasks off doesn't leak the chat-only setting.
+                    includeTaskChat: includeTasks && includeTaskChat,
+                });
                 if (result.success) {
                     toast.success(t('pushSuccess'));
                     loadStatus();
@@ -304,6 +320,74 @@ export function GitHubSync() {
                         <span>{t('secretsWarning')}</span>
                     </div>
                 )}
+
+                {/* FU-10 — v2 payload tail toggles. Same affordances as
+                    the local-export form in DataManagement.tsx so the
+                    user encounters identical surfaces across export +
+                    sync. */}
+                <fieldset className="mt-4 pt-3 border-t border-border/40 dark:border-border-dark/40 space-y-1.5">
+                    <legend className="text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-1">
+                        Additional sections (v2 payload)
+                    </legend>
+                    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group">
+                        <input
+                            type="checkbox"
+                            checked={includeAgents}
+                            onChange={(e) => setIncludeAgents(e.target.checked)}
+                            className="rounded border-border dark:border-border-dark"
+                        />
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                            Include Agents
+                        </span>
+                    </label>
+                    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group ml-3">
+                        <input
+                            type="checkbox"
+                            checked={includeSkills}
+                            onChange={(e) => setIncludeSkills(e.target.checked)}
+                            className="rounded border-border dark:border-border-dark"
+                        />
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                            Include Skills (+ bindings)
+                        </span>
+                    </label>
+                    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group ml-3">
+                        <input
+                            type="checkbox"
+                            checked={includeTasks}
+                            onChange={(e) => {
+                                setIncludeTasks(e.target.checked);
+                                if (!e.target.checked) setIncludeTaskChat(false);
+                            }}
+                            className="rounded border-border dark:border-border-dark"
+                        />
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                            Include Tasks
+                        </span>
+                    </label>
+                    <label
+                        className={`inline-flex items-center gap-2.5 select-none group ml-8 ${
+                            includeTasks ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                        }`}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={includeTasks && includeTaskChat}
+                            disabled={!includeTasks}
+                            onChange={(e) => setIncludeTaskChat(e.target.checked)}
+                            className="rounded border-border dark:border-border-dark"
+                        />
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                            Include Task chat threads
+                        </span>
+                    </label>
+                    {includeTaskChat && includeTasks && (
+                        <p className="text-[11px] text-text-muted dark:text-text-muted-dark pl-8 leading-relaxed">
+                            Chat threads bloat the payload — only enable when you actually need
+                            them.
+                        </p>
+                    )}
+                </fieldset>
             </div>
 
             {/* Actions */}
