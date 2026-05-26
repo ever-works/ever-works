@@ -4,9 +4,10 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import type { Task, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
+import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
 import { postTaskChatAction, transitionTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
+import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
     backlog: 'bg-surface-secondary text-text-secondary',
@@ -42,9 +43,11 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
 export function TaskDetailClient({
     task,
     initialChat,
+    initialAttachments = [],
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
+    initialAttachments?: TaskAttachmentRow[];
 }) {
     const [messages, setMessages] = useState(initialChat);
     const [currentStatus, setCurrentStatus] = useState<TaskStatus>(task.status);
@@ -159,6 +162,11 @@ export function TaskDetailClient({
                 between transitions and conversation so it's
                 discoverable without dominating the page. */}
             <TaskRecurringSection task={task} />
+
+            {/* FU-5 — Attachments. Mounted between transitions and
+                conversation so file context is visible alongside chat
+                without dominating the page. */}
+            <TaskAttachmentsSection taskId={task.id} initial={initialAttachments} />
 
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">

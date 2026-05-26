@@ -8,7 +8,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 - [x] FU-2 · 6 missing Agents API controller routes — `run-now`, `runs`, `runs/:runId/cancel`, `skills`, `budget`, `assign-task`. Throttled per plan §7.1, activity-logged, cross-user 404 via `agentsService.getOne`. New repo methods (`AgentRunRepository.countByAgent` / `cancel` / `findByIdAndUser`) + `AgentScheduleDispatcherService.dispatchOne` + 2 new ActivityActionType values
 - [x] FU-3 · Mission/Work/Idea-scoped Agent creation entry points — `NewAgentDialog` now accepts a `pinned` prop that skips step 1 and forwards `missionId`/`workId`/`ideaId` to the API. New routes `/missions/[id]/agents/new`, `/works/[id]/agents/new`, `/ideas/[id]/agents/new`. Entry points: Agents tab on MissionTabs, "+New Agent" button in WorkHeader, Bot button on IdeaCard.
 - [x] FU-4 · 3 placeholder Agent-detail tabs — `activity`/`skills`/`budgets` pages now server-fetch via FU-2 endpoints + client components (`AgentActivityClient`, `AgentSkillsClient`, `AgentBudgetsClient`). Activity supports cancel-on-row + pagination. Skills supports remove-binding via existing `DELETE /api/skill-bindings/:id`. Budgets renders a progress bar with cap-aware coloring.
-- [ ] FU-5 · Attachment UI on Task detail
+- [x] FU-5 · Attachment UI on Task detail — `TaskAttachmentsSection.tsx` mounted between transitions and conversation. Drag-drop file picker uploads via new `/api/uploads` Next.js proxy → `POST /api/tasks/:id/attachments`. List shows filename, size, attached-at, with detach affordance. `attachUploadAction` / `detachAttachmentAction` server actions.
 
 ## Tier 2
 

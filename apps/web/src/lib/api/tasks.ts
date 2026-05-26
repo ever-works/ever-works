@@ -215,7 +215,50 @@ export const tasksAPI = {
             wrapInData: false,
         });
     },
+
+    // FU-5 — attachments.
+    async listAttachments(id: string): Promise<TaskAttachmentRow[]> {
+        return serverFetch<TaskAttachmentRow[]>(`/tasks/${id}/attachments`, { method: 'GET' });
+    },
+
+    async addAttachment(id: string, uploadId: string): Promise<TaskAttachmentRow> {
+        return serverMutation<TaskAttachmentRow>({
+            endpoint: `/tasks/${id}/attachments`,
+            data: { uploadId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async removeAttachment(id: string, attachmentId: string): Promise<{ removed: boolean }> {
+        return serverMutation<{ removed: boolean }>({
+            endpoint: `/tasks/${id}/attachments/${attachmentId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
+
+/**
+ * FU-5 — Task attachment row as surfaced by
+ * `GET /api/tasks/:id/attachments`. Mirrors the `TaskAttachment`
+ * entity columns + the joined upload metadata the service returns so
+ * the UI doesn't need a second hop.
+ */
+export interface TaskAttachmentRow {
+    id: string;
+    taskId: string;
+    uploadId: string;
+    createdAt: string;
+    upload?: {
+        id: string;
+        filename: string;
+        contentType: string;
+        sizeBytes: number;
+        downloadUrl?: string;
+    } | null;
+}
 
 export interface TaskChatMention {
     type: 'user' | 'agent' | 'kb';
