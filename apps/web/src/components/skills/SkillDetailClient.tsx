@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -140,6 +141,7 @@ function BindingsPanel({
     skillId: string;
     initialBindings: SkillBinding[];
 }) {
+    const t = useTranslations('dashboard.skillsPage.detail');
     const [bindings, setBindings] = useState(initialBindings);
     const [targetType, setTargetType] = useState<SkillBindingTargetType>('tenant');
     const [targetId, setTargetId] = useState('');
@@ -190,11 +192,10 @@ function BindingsPanel({
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
             <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
                 <Link2 className="w-4 h-4 text-info" />
-                Bindings
+                {t('bindings')}
             </h2>
             <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                A binding makes this Skill available to the chosen target. Lower priority numbers
-                win when multiple bindings overlap — priority 1 = highest precedence.
+                {t('bindingHelper')}
             </p>
             {sorted.length === 0 ? (
                 <p className="text-xs text-text-muted">No bindings yet. Add one below.</p>

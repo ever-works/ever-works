@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { ListChecks } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ type CreateTaskFn = (input: {
  * primitive, the surrounding context wires the picker UIs).
  */
 export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
+    const t = useTranslations('dashboard.tasksPage.newDialog');
     const router = useRouter();
     const searchParams = useSearchParams();
     const [title, setTitle] = useState('');
@@ -92,16 +94,18 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-info/10 border border-info/20 flex items-center justify-center">
                     <ListChecks className="w-4 h-4 text-info" />
                 </div>
-                <h1 className="text-xl font-semibold text-text dark:text-text-dark">New Task</h1>
+                <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h1>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="block text-xs text-text-secondary mb-1">Title</label>
+                    <label className="block text-xs text-text-secondary mb-1">{t('name')}</label>
                     <input
                         type="text"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="e.g. Write the migration"
+                        placeholder={t('namePlaceholder')}
                         maxLength={200}
                         autoFocus
                         className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
@@ -109,18 +113,21 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 </div>
                 <div>
                     <label className="block text-xs text-text-secondary mb-1">
-                        Description (optional)
+                        {t('description')}
                     </label>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={5}
+                        placeholder={t('descriptionPlaceholder')}
                         className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
                     />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs text-text-secondary mb-1">Priority</label>
+                        <label className="block text-xs text-text-secondary mb-1">
+                            {t('priority')}
+                        </label>
                         <select
                             value={priority}
                             onChange={(e) => setPriority(e.target.value as TaskPriority)}
@@ -135,13 +142,13 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     </div>
                     <div>
                         <label className="block text-xs text-text-secondary mb-1">
-                            Labels (comma-separated)
+                            {t('labels')}
                         </label>
                         <input
                             type="text"
                             value={labelsRaw}
                             onChange={(e) => setLabelsRaw(e.target.value)}
-                            placeholder="frontend, urgent"
+                            placeholder={t('labelsPlaceholder')}
                             className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
                         />
                     </div>
@@ -153,10 +160,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 )}
                 <div className="flex items-center justify-end gap-2">
                     <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button type="submit" size="sm" disabled={pending || !title.trim()}>
-                        {pending ? '…' : 'Create Task'}
+                        {pending ? '…' : t('create')}
                     </Button>
                 </div>
             </form>

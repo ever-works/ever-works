@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -66,10 +67,11 @@ export function SkillsPageClient({
 }
 
 function InstalledList({ installed }: { installed: Skill[] }) {
+    const t = useTranslations('dashboard.skillsPage');
     if (installed.length === 0) {
         return (
             <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                No Skills installed at this scope yet.
+                {t('empty.title')}
             </div>
         );
     }

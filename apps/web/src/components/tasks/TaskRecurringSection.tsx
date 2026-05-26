@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Repeat, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Task } from '@/lib/api/tasks';
@@ -27,13 +28,6 @@ import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/
 
 type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
 
-const FREQUENCY_LABEL: Record<Frequency, string> = {
-    DAILY: 'Every day',
-    WEEKLY: 'Every week',
-    MONTHLY: 'Every month',
-    CUSTOM: 'Custom RRULE',
-};
-
 export function TaskRecurringSection({ task }: { task: Task }) {
     if (task.isRecurring) {
         return <ActivePanel task={task} />;
@@ -42,6 +36,7 @@ export function TaskRecurringSection({ task }: { task: Task }) {
 }
 
 function ActivePanel({ task }: { task: Task }) {
+    const t = useTranslations('dashboard.tasksPage.recurring');
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +62,7 @@ function ActivePanel({ task }: { task: Task }) {
         <section className="rounded-xl border border-info/30 bg-info/5 p-5 space-y-3">
             <h2 className="text-sm font-medium text-info flex items-center gap-2">
                 <Repeat className="w-4 h-4" />
-                Recurring template
+                {t('section')}
             </h2>
             <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-1 text-xs">
                 <dt className="text-text-muted">Rule</dt>
@@ -114,7 +109,7 @@ function ActivePanel({ task }: { task: Task }) {
                     className="text-danger gap-1.5"
                 >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {pending ? '…' : 'Stop recurring'}
+                    {pending ? '…' : t('demote')}
                 </Button>
             </div>
             {error && (
@@ -147,6 +142,7 @@ function detectBrowserTimezone(): string {
 }
 
 function InactivePanel({ task }: { task: Task }) {
+    const t = useTranslations('dashboard.tasksPage.recurring');
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
@@ -229,19 +225,26 @@ function InactivePanel({ task }: { task: Task }) {
         });
     };
 
+    const FREQUENCY_LABEL: Record<Frequency, string> = {
+        DAILY: t('daily'),
+        WEEKLY: t('weekly'),
+        MONTHLY: t('monthly'),
+        CUSTOM: t('custom'),
+    };
+
     if (!open) {
         return (
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-2">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
                     <Repeat className="w-4 h-4 text-text-muted" />
-                    Recurrence
+                    {t('section')}
                 </h2>
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
                     This Task does not repeat. Promote it to a recurring template to spawn fresh
                     instances on a schedule.
                 </p>
                 <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-                    Make recurring
+                    {t('promoteToRecurring')}
                 </Button>
             </section>
         );
@@ -251,7 +254,7 @@ function InactivePanel({ task }: { task: Task }) {
         <section className="rounded-xl border border-info/30 bg-info/5 p-5 space-y-3">
             <h2 className="text-sm font-medium text-info flex items-center gap-2">
                 <Repeat className="w-4 h-4" />
-                Make recurring
+                {t('promoteToRecurring')}
             </h2>
             <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-3">
                 <div>
@@ -271,7 +274,7 @@ function InactivePanel({ task }: { task: Task }) {
                 {frequency === 'CUSTOM' && (
                     <div>
                         <label className="block text-[10px] text-text-muted mb-1">
-                            Custom RRULE
+                            {t('custom')}
                         </label>
                         <input
                             type="text"
@@ -285,7 +288,7 @@ function InactivePanel({ task }: { task: Task }) {
                 {frequency !== 'CUSTOM' && (
                     <div>
                         <label className="block text-[10px] text-text-muted mb-1">
-                            Time of day (HH:MM)
+                            {t('timeOfDay')}
                         </label>
                         <input
                             type="time"
@@ -298,7 +301,7 @@ function InactivePanel({ task }: { task: Task }) {
                 {frequency === 'WEEKLY' && (
                     <div className="@md/main:col-span-2">
                         <label className="block text-[10px] text-text-muted mb-1">
-                            Day(s) of week
+                            {t('dayOfWeek')}
                         </label>
                         <div className="flex flex-wrap gap-1">
                             {DAYS_OF_WEEK.map((d) => {
@@ -324,7 +327,7 @@ function InactivePanel({ task }: { task: Task }) {
                 {frequency === 'MONTHLY' && (
                     <div>
                         <label className="block text-[10px] text-text-muted mb-1">
-                            Day of month (1–31)
+                            {t('dayOfMonth')}
                         </label>
                         <input
                             type="number"
@@ -338,7 +341,9 @@ function InactivePanel({ task }: { task: Task }) {
                 )}
                 {frequency !== 'CUSTOM' && (
                     <div>
-                        <label className="block text-[10px] text-text-muted mb-1">Timezone</label>
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            {t('timezone')}
+                        </label>
                         <input
                             type="text"
                             value={timezone}
@@ -391,7 +396,7 @@ function InactivePanel({ task }: { task: Task }) {
             </div>
             <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleSave} disabled={pending || !isValidRule}>
-                    {pending ? '…' : 'Save'}
+                    {pending ? '…' : t('save')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
                     Cancel

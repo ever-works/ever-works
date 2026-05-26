@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { BookOpen, ClipboardList, Code2, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
@@ -29,6 +30,7 @@ export function AstTemplatesBrowser({
     entity: AstTemplateEntityType;
     entries: AstTemplateEntry[];
 }) {
+    const t = useTranslations('dashboard.templatesPage');
     const [filter, setFilter] = useState<string | null>(null);
 
     const categories = useMemo(() => {
@@ -47,11 +49,7 @@ export function AstTemplatesBrowser({
     if (entries.length === 0) {
         return (
             <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                <p>
-                    No templates available for {entity}s yet. The unified Workshop Templates catalog
-                    (ADR-010) is still on a separate branch — once it merges, this page will
-                    populate automatically.
-                </p>
+                <p>{t('empty')}</p>
             </div>
         );
     }
@@ -105,6 +103,7 @@ function TemplateCard({
     entry: AstTemplateEntry;
     entity: AstTemplateEntityType;
 }) {
+    const t = useTranslations('dashboard.templatesPage');
     // Post-rebase lint fix: `react-hooks/no-component-creation-during-render`
     // doesn't like capturing a component constructor into a local var via
     // a switch and then rendering it as JSX. Render the icon inline via
@@ -162,12 +161,12 @@ function TemplateCard({
                 {newHref ? (
                     <Link href={newHref}>
                         <Button size="sm" variant="primary">
-                            Use template
+                            {t('useTemplate')}
                         </Button>
                     </Link>
                 ) : (
                     <Button size="sm" variant="ghost" disabled title="Not yet wired">
-                        Use template
+                        {t('useTemplate')}
                     </Button>
                 )}
             </div>
