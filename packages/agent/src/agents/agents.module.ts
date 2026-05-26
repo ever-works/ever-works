@@ -16,6 +16,7 @@ import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.serv
 import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
+import { AgentToolService } from './agent-tool.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
 
@@ -49,6 +50,7 @@ import { SkillsModule } from '../skills/skills.module';
 		AgentExportService,
 		PromptAssemblerService,
 		AgentRunService,
+		AgentToolService,
 	],
 	exports: [
 		AgentRepository,
@@ -62,6 +64,7 @@ import { SkillsModule } from '../skills/skills.module';
 		AgentExportService,
 		PromptAssemblerService,
 		AgentRunService,
+		AgentToolService,
 	],
 })
 export class AgentsModule {}

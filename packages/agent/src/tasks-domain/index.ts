@@ -7,6 +7,7 @@ export * from './tasks.service';
 export * from './task-transition.service';
 export * from './task-chat.service';
 export * from './task-dispatcher';
+export * from './agent-task-tools';
 export {
 	Task,
 	TaskPriority,

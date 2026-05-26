@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 20
-- **Last tick at**: 2026-05-26 (tick 20 — Phase 15 complete: agent-task-execute + agent-chat-reply Trigger.dev tasks + dispatcher tokens + dispatch hooks in TaskTransitionService (→ in_progress fan-out) and TaskChatService (@agent mention fan-out) + production trigger adapters in packages/tasks + GET /tasks/:id/spend rollup endpoint + dispatch-hook tests.)
-- **In progress now**: (none — next tick picks up Phase 16 Tools surface)
+- **Last tick #**: 21
+- **Last tick at**: 2026-05-26 (tick 21 — Phase 16 partial: AgentToolService + descriptor surface for editAgentFile (with once-per-file-per-run cap) + createSubAgent (always DRAFT + all permissions false) + getSkillBody re-export + getActivity/getKbDocument placeholders + Tasks-side buildAgentTaskTools (createTask/commentOnTask/transitionTask) + tool tests. commitToRepo/openPullRequest + plugin pass-through tools follow next tick.)
+- **In progress now**: Phase 16 (16.1-16.4 + 16.5 + 16.8 + 16.9 partial ticked; 16.6 + 16.7 + 16.10 remaining)
 
 ---
 
@@ -220,16 +220,17 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 16 — Tools surface wired to Agent runs (HIGH RISK)
 
-- [ ] **16.1** `AgentToolService.resolveAllowedTools(agent)` per `agent-tools-catalog.md §4`.
-- [ ] **16.2** `createTask` tool (gated by canAssignTasks).
-- [ ] **16.3** `commentOnTask` tool.
-- [ ] **16.4** `transitionTask` tool.
-- [ ] **16.5** `editAgentFile` tool (path validation, secret scan, hash check, once-per-run).
-- [ ] **16.6** `commitToRepo` tool.
-- [ ] **16.7** `openPullRequest` tool.
-- [ ] **16.8** `createSubAgent` tool (sub-Agents always created in `draft`, permissions all false).
-- [ ] **16.9** `getActivity` / `getMissionState` / `getKbDocument` / `getSkillBody` tools.
-- [ ] **16.10** Plugin pass-through tools (searchWeb / screenshot / extractContent).
+- [x] **16.1** `AgentToolService.resolveAllowedTools(agent, runContext)` at `packages/agent/src/agents/agent-tool.service.ts`. Returns the per-run descriptor list. Permissions denylist wins; `runContext.editsThisRunByFile` is the once-per-file-per-run cap state. ✓ Tick 21
+- [x] **16.2** `createTask` tool lives in `tasks-domain/agent-task-tools.ts` (`buildAgentTaskTools()` factory) — gated by `permissions.canAssignTasks`. Inherits the actor's mission/idea/work scope. createdByType='agent', createdById=actor.id. ✓ Tick 21
+- [x] **16.3** `commentOnTask` tool — always allowed (commenting is communication, not delegation). Posts via `TaskChatService.post` with `authorType='agent'`. Server-side mention parser still strips unknown @/[[]] tokens. ✓ Tick 21
+- [x] **16.4** `transitionTask` tool — moves a Task; the TaskTransitionService state-machine + blocker/approver gates still apply. `force=true` overrides the approver gate (not blocker). ✓ Tick 21
+- [x] **16.5** `editAgentFile` tool — gated by `permissions.canEditAgentFiles`; reuses `AgentFileService.write` (which already enforces path-allow-list + secret-scan + 64 KB cap + ETag). Adds the once-per-file-per-run frequency cap that hammers a tool-loop bug into an actionable error rather than a runaway loop. ✓ Tick 21
+- [ ] **16.6** `commitToRepo` tool — wires once `GitFacadeService.commit()` is reachable from the agent package without a circular dep. The descriptor + permission gate are stubbed in `agent-tool.service.ts` (commented TODO).
+- [ ] **16.7** `openPullRequest` tool — same deferral as 16.6.
+- [x] **16.8** `createSubAgent` tool — gated by `permissions.canCreateAgents`. Sub-Agent inherits the actor's scope verbatim (Mission-scoped → Mission-scoped sub-Agent on the same Mission). Always created in DRAFT with **ALL** permissions FALSE — explicit user grant required (security §6). ✓ Tick 21
+- [x] **16.9** `getSkillBody` re-exported from Phase 10.3 helper; `getActivity` + `getKbDocument` ship as placeholder descriptors documenting the surface — real implementations wire when the activity log + KB read surfaces are reachable from this package. `getMissionState` deferred alongside the Missions-domain wiring next tick. ✓ Tick 21 (partial)
+- [ ] **16.10** Plugin pass-through tools (searchWeb / screenshot / extractContent) — wire once the facade surfaces are injected into `AiFacadeService.assembleTools()` (the actual tool-loop wrapper). Stubs in `agent-tool.service.ts` show the intended shape.
+- [x] **16.11** Tests (don't run): `__tests__/agent-tool.service.spec.ts` (~10 assertions: always-on placeholders / getSkillBody when bindings wired / editAgentFile gate / createSubAgent gate / once-per-file cap rejects 2nd same-file edit + allows different file / createSubAgent always DRAFT + all-false perms / inherits actor scope / name required). ✓ Tick 21
 
 ### Phase 17 — Recurring tasks (F5 override)
 
