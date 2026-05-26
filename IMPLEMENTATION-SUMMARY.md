@@ -135,7 +135,7 @@ on top of the 41 implementation ticks. Headline fixes:
 - **I8**: `AgentExportService.exportOne` runs `assertNoSecrets` on every file body BEFORE serializing the envelope.
 - **I9**: Renamed `…SourceSlug` fields to `…SourceId` (they carry UUIDs, not slugs).
 - **I10**: Trigger.dev dispatcher adapters pass `idempotencyKey` so double-fires are deduped at the runner.
-- **I11**: `PUT /agents/:id/files/:name` throttle tightened to 30/min per spec §7.1.
+- **I11**: `PUT /agents/:id/files/:name` throttle confirmed at 60/min per plan §7.1 (Tick 42 originally tightened to 30/min based on a mis-read; Tick 45 reverted to 60/min after re-reading the "UI typing autosave" rationale in the plan).
 - **I13**: `TaskNotificationService.emit` is now actually invoked — `task_assigned` on `addAssignee`, `task_status_changed` + `task_blocked` on transition.
 - **I14**: SkillDetailClient delete-redirect uses `useRouter().push()` so the locale prefix is preserved.
 - **I15**: AgentInstructionsEditor `dirty` flag allows saving an intentionally-cleared file body.
@@ -145,6 +145,39 @@ on top of the 41 implementation ticks. Headline fixes:
 The previously-listed "Phase 14.4 / 17.8 / 18.1" follow-ups are removed
 from this list — they were already in the branch but stale-noted as
 deferred.
+
+## Tick 43 — second-pass corrections (4 bugs my own Tick 42 introduced)
+
+- **NEW-1**: `AgentRepository` import path was wrong (`/agents` vs `/database`) — TS build break. Fixed in tasks.controller.ts + task-chat.controller.ts.
+- **NEW-2**: `AgentsModule` was missing from `apps/api/src/tasks/tasks.module.ts` imports — Nest boot failure. Added.
+- **NEW-DB**: `nextSlug` raw SQL referenced a nonexistent `createdAt` column on `user_task_counter`. Removed from both pg + sqlite branches.
+- **NEW-domain**: `removeBlocker` was calling the wrong helper (`autoUnblockResolvedTasks(taskId)` looks for tasks blocked BY the arg; needed `recheckUnblockFor(taskId)` for the dependent-side). Added the new helper + rewired the call site.
+- Minor cleanups: dropped redundant `as any` casts in `createSubAgent` fallback; `applyEnvelopeToExisting` refreshes avatar fields; one stale `toHaveBeenCalledWith` assertion in `github-sync.service.spec.ts` switched to `objectContaining`.
+
+## Tick 44 — third-pass corrections (stale tests + 4 semantic gaps + 4 new tests)
+
+- 2 stale test assertions would have failed `pnpm test` immediately: `task-notification.service.spec.ts` C7 dedup-key assertion + `task-chat.service.spec.ts` `updateBody` assertion. Both updated to match the post-tick-42 service signatures.
+- `task_blocked` notification now populates `blockerTaskId` from `findOpenBlockers` so the C7 dedup discriminator distinguishes repeat block events (previously all firings collapsed to the literal "blocked").
+- `task_recurrence_fired` emit wired into `TaskRecurrenceDispatcherService` after a successful spawn (the enum branch was dead code).
+- `TasksService.addBlocker` catches unique-violation on `(taskId, blockedByTaskId)` and surfaces 409 ConflictException instead of bubbling 500.
+- Migration `ensureIndex` helper now drops + recreates when an existing index has a different column-set (so a dev env that ran an in-development version with the old `uq_tasks_slug` global-unique shape self-corrects to the per-user shape on next run).
+- 4 new regression tests: C7 dedup discriminator differs between firings; C11 dispatcher calls `releaseAfterRun` on enqueue failure + does NOT call when claim returned null; I3 chat edit re-parsed mentions persist + KB mentions re-materialize; I17 DRAFT→ACTIVE computes first cadence slot.
+
+## Tick 45 — fourth-pass corrections (3 CRITICAL + 4 HIGH)
+
+- **DI scoping CRITICAL** — api-side TasksModule + AgentsModule now `@Global()` so the 6 injection tokens (dispatchers + post-processors + plugin facade) actually reach consumers in the agent-package modules. Without this, all Phase-15 dispatch + post-processor surfaces silently no-opped in production despite passing unit tests.
+- **Templates dead-end CRITICAL** — NewAgentDialog + NewTaskForm now read `?from=<slug>` query param and pre-fill name/title/description/labels from the fallback catalog. "Use template" actually populates the create form now.
+- **Avatar overwrite HIGH** — `applyEnvelopeToExisting` now applies the same `safeAvatarMode` normalization as the create path (cross-tenant image-upload references fall back to INITIALS).
+- **pushToGitHub v2 toggles HIGH** — account controller body widened + web action signature widened so the GitHubSyncService v2 subdir layout is actually reachable from the API surface.
+- **Custom Skills unreachable HIGH** — new `CustomSection` component on `/skills` with inline "+ New Skill" form (tenant scope by default). Previously the Custom tab was forever empty because the only install path forced `sourceCatalogSlug`.
+- **64-hop parent cycle cap MEDIUM** — now throws BadRequestException on overflow instead of silent pass.
+- **file-write throttle MEDIUM** — reverted from 30/min to 60/min per plan §7.1.
+
+## Tick 46 — fifth-pass cosmetic corrections (after a clean review)
+
+- `accountTransferAPI.pushToGitHub` client signature widened to mirror the controller's full toggle set (previously narrow → object-literal callers would have hit TS excess-property errors).
+- `docs/architecture/agent-injection-tokens.md` gained a "Binding posture" note about the `@Global()` requirement on the api-side modules that provide the tokens.
+- This file (IMPLEMENTATION-SUMMARY.md) refreshed to reflect ticks 43–46 (previously stopped at Tick 42).
 
 ## Remaining post-merge follow-ups
 

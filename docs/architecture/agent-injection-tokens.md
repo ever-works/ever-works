@@ -292,6 +292,28 @@ indirection. This means:
   "production wired" means.
 - Operators can swap any token without touching the agent package.
 
+### `@Global()` is REQUIRED on api-side modules that bind these tokens
+
+The api-side `TasksModule` and `AgentsModule` (the ones that bind the
+6 tokens via `useFactory`) are both declared `@Global()`. **This is
+load-bearing — do not remove the decorator.**
+
+The reason: the consumers (`TaskTransitionService`, `TaskChatService`,
+`AgentRunService`, `AgentToolService`) live in the imported
+agent-package modules (`TasksDomainModule`, agent-side `AgentsModule`).
+NestJS's module isolation rule is *providers from a parent module are
+NOT visible to services in an imported child module's DI scope*.
+Without `@Global()` the `@Optional() @Inject(TOKEN)` calls silently
+resolve to `undefined` in production — every unit test still passes
+(each binds tokens locally in its `TestingModule`), but the entire
+Phase-15 dispatch + post-processor + plugin-tools surfaces no-op at
+runtime with no error message.
+
+When you write your own override binding, put it in a module that
+already imports (or IS) the global api-side module — OR mark your
+custom module `@Global()` so the token reaches consumers regardless of
+import direction.
+
 ## Test posture
 
 Each consumer ships with unit tests that verify the consumer's
