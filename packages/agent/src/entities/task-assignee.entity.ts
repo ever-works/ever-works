@@ -29,7 +29,7 @@ export class TaskAssignee {
     @JoinColumn({ name: 'taskId' })
     task?: Task;
 
-    @Column({ length: 8 })
+    @Column({ type: 'varchar', length: 8 })
     assigneeType: TaskActorType;
 
     @Column({ type: 'uuid' })

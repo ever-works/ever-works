@@ -41,7 +41,7 @@ export class TaskChatMessage {
     @JoinColumn({ name: 'taskId' })
     task?: Task;
 
-    @Column({ length: 8 })
+    @Column({ type: 'varchar', length: 8 })
     authorType: TaskActorType;
 
     @Column({ type: 'uuid' })

@@ -30,7 +30,7 @@ export class AgentMembership {
     @Column('uuid')
     agentId: string;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     targetType: AgentMembershipTargetType;
 
     @Column('uuid', { nullable: true })

@@ -21,10 +21,10 @@ export class AgentRunLog {
     @Column('uuid')
     runId: string;
 
-    @Column({ length: 8 })
+    @Column({ type: 'varchar', length: 8 })
     level: 'INFO' | 'WARN' | 'ERROR';
 
-    @Column({ length: 80 })
+    @Column({ type: 'varchar', length: 80 })
     step: string;
 
     @Column({ type: 'text' })

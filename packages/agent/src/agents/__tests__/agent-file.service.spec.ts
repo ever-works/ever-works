@@ -98,11 +98,17 @@ describe('AgentFileService', () => {
             );
         });
 
-        it('throws Phase-6-stub error on Mission-scoped Agent with no inline body', async () => {
+        it('returns DB-inline body for Mission-scoped Agent with no inline data (FU-14 fallback)', async () => {
+            // FU-14 (post-PR-1019 follow-up) eliminated the
+            // "Git-mode lands in Phase 6" throw — Mission/Idea/Work-
+            // scoped Agents now fall back to DB-inline storage when
+            // their scope repo isn't wired. Read returns the (empty)
+            // inline body with storage='db'.
             repo.findByIdAndUser.mockResolvedValueOnce(
                 makeAgent({ scope: AgentScope.MISSION, missionId: 'm1' }),
             );
-            await expect(svc.read('u1', 'a1', 'SOUL.md')).rejects.toThrow(/Git-mode file storage/);
+            const res = await svc.read('u1', 'a1', 'SOUL.md');
+            expect(res).toEqual({ name: 'SOUL.md', body: '', hash: '', storage: 'db' });
         });
     });
 

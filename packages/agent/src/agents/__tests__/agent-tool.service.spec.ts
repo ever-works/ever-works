@@ -121,7 +121,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
                 unknown
             >;
             expect('error' in second).toBe(true);
-            expect((second as any).error).toMatch(/once per file per run/);
+            expect((second as any).error).toMatch(/already edited once in this run/);
         });
 
         it('allows edits to DIFFERENT files in the same run', async () => {

@@ -5,7 +5,7 @@ describe('secret-scan', () => {
         const cases: Array<[string, string, string]> = [
             ['OpenAI-style sk- key', 'use sk-abc123xyz9876543 to call', 'generic'],
             ['Bearer header', 'Authorization: Bearer abcdefghijklmno', 'generic'],
-            ['AWS access key id', 'AKIAABCDEFGHIJ1234567', 'aws_access_key'],
+            ['AWS access key id', 'AKIAABCDEFGHIJ123456', 'aws_access_key'],
             [
                 'GitHub PAT classic',
                 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -35,7 +35,7 @@ describe('secret-scan', () => {
         });
 
         it('returns multiple matches across patterns', () => {
-            const body = 'sk-abc123xyz98765 and also AKIAABCDEFGHIJ1234567';
+            const body = 'sk-abc123xyz98765 and also AKIAABCDEFGHIJ123456';
             const hits = scanForSecrets(body);
             expect(hits.length).toBeGreaterThanOrEqual(2);
         });
@@ -43,7 +43,7 @@ describe('secret-scan', () => {
 
     describe('containsSecret', () => {
         it('boolean truthy on any hit', () => {
-            expect(containsSecret('AKIAABCDEFGHIJ1234567')).toBe(true);
+            expect(containsSecret('AKIAABCDEFGHIJ123456')).toBe(true);
         });
         it('boolean false on clean body', () => {
             expect(containsSecret('## My Agent\nNo secrets here.')).toBe(false);
@@ -55,7 +55,7 @@ describe('secret-scan', () => {
 
     describe('assertNoSecrets', () => {
         it('throws on secret with pattern + sample in message', () => {
-            expect(() => assertNoSecrets('use AKIAABCDEFGHIJ1234567 here')).toThrow(
+            expect(() => assertNoSecrets('use AKIAABCDEFGHIJ123456 here')).toThrow(
                 /aws_access_key/,
             );
         });
@@ -86,7 +86,7 @@ describe('secret-scan', () => {
     describe('redactSecrets', () => {
         it('replaces matched spans with [redacted secret] and counts', () => {
             const { cleaned, redactions } = redactSecrets(
-                'use sk-abc123xyz98765 and AKIAABCDEFGHIJ1234567',
+                'use sk-abc123xyz98765 and AKIAABCDEFGHIJ123456',
             );
             expect(redactions).toBe(2);
             expect(cleaned).toContain('[redacted secret]');

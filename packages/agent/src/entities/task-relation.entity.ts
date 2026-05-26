@@ -32,7 +32,7 @@ export class TaskRelation {
     @Column({ type: 'uuid' })
     relatedTaskId: string;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     kind: TaskRelationKind;
 
     @CreateDateColumn()

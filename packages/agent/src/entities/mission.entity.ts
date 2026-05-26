@@ -92,7 +92,7 @@ export class Mission {
      * editable by the user. See spec §1.3 "Title" + the shared titler
      * service (PR I).
      */
-    @Column({ length: 200 })
+    @Column({ type: 'varchar', length: 200 })
     title: string;
 
     /**

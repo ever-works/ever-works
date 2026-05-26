@@ -47,10 +47,10 @@ export class AgentRun {
     @Column('uuid')
     userId: string;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     triggerKind: AgentRunTriggerKind;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     status: AgentRunStatus;
 
     /** Trigger.dev run id; used to call `runs.cancel(...)` on user-initiated cancel. */

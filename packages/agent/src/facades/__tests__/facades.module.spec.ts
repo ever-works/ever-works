@@ -10,6 +10,9 @@ import { OAuthFacadeService } from '../oauth.facade';
 import { DeployFacadeService } from '../deploy.facade';
 import { CodeEditFacadeService } from '../code-edit.facade';
 import { PromptFacadeService } from '../prompt.facade';
+// PR #1019 (Skills + Tasks) — two new facades.
+import { SkillsFacadeService } from '../skills.facade';
+import { TasksFacadeService } from '../tasks.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -32,6 +35,9 @@ describe('FacadesModule + barrel re-exports', () => {
         DeployFacadeService,
         CodeEditFacadeService,
         PromptFacadeService,
+        // PR #1019 — Skills + Tasks facades.
+        SkillsFacadeService,
+        TasksFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -178,6 +184,11 @@ describe('FacadesModule + barrel re-exports', () => {
                     'ScreenshotFacadeService',
                     'SearchFacadeError',
                     'SearchFacadeService',
+                    // PR #1019 — Skills + Tasks facades.
+                    'SkillsFacadeError',
+                    'SkillsFacadeService',
+                    'TasksFacadeError',
+                    'TasksFacadeService',
                 ].sort(),
             );
         });

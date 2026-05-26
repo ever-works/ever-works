@@ -44,7 +44,7 @@ export class SkillBinding {
     @JoinColumn({ name: 'skillId' })
     skill?: Skill;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     targetType: SkillBindingTargetType;
 
     @Column({ type: 'uuid', nullable: true })

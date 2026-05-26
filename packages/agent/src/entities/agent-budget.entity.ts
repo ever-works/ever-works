@@ -57,7 +57,7 @@ export class AgentBudget {
     @Column({ type: 'int' })
     capCents: number;
 
-    @Column({ length: 3, default: 'usd' })
+    @Column({ type: 'varchar', length: 3, default: 'usd' })
     currency: string;
 
     /**

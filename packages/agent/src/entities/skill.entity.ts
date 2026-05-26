@@ -52,16 +52,16 @@ export class Skill {
     @JoinColumn({ name: 'userId' })
     user?: User;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     ownerType: SkillOwnerType;
 
     @Column('uuid')
     ownerId: string;
 
-    @Column({ length: 80 })
+    @Column({ type: 'varchar', length: 80 })
     slug: string;
 
-    @Column({ length: 120 })
+    @Column({ type: 'varchar', length: 120 })
     title: string;
 
     @Column({ type: 'text' })
@@ -73,7 +73,7 @@ export class Skill {
     @Column({ type: 'text' })
     instructionsMd: string;
 
-    @Column({ length: 64 })
+    @Column({ type: 'varchar', length: 64 })
     contentHash: string;
 
     @Column({ type: 'varchar', length: 200, nullable: true })

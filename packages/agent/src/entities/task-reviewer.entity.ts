@@ -30,7 +30,7 @@ export class TaskReviewer {
     @JoinColumn({ name: 'taskId' })
     task?: Task;
 
-    @Column({ length: 8 })
+    @Column({ type: 'varchar', length: 8 })
     reviewerType: TaskActorType;
 
     @Column({ type: 'uuid' })

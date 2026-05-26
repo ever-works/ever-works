@@ -70,10 +70,10 @@ export class Task {
     @JoinColumn({ name: 'userId' })
     user?: User;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     slug: string;
 
-    @Column({ length: 200 })
+    @Column({ type: 'varchar', length: 200 })
     title: string;
 
     @Column({ type: 'text', nullable: true })
@@ -103,7 +103,7 @@ export class Task {
     @Column({ type: 'uuid', nullable: true })
     parentTaskId?: string | null;
 
-    @Column({ length: 16 })
+    @Column({ type: 'varchar', length: 16 })
     createdByType: TaskActorType;
 
     @Column({ type: 'uuid' })

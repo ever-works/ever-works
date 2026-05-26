@@ -39,7 +39,8 @@ module.exports = {
         // file (not a folder with index), separated from `helpers/index.ts` so
         // its `node:net`/`node:dns` imports stay out of the client bundle.
         // Map BEFORE the catch-all `helpers` rule below so the regex order matters.
-        '^@ever-works/plugin/helpers/ssrf-guard$': '<rootDir>/../../../packages/plugin/src/helpers/ssrf-guard.ts',
+        '^@ever-works/plugin/helpers/ssrf-guard$':
+            '<rootDir>/../../../packages/plugin/src/helpers/ssrf-guard.ts',
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../../packages/plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../../packages/contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../../packages/contracts/src/$1/index.ts',
@@ -49,8 +50,7 @@ module.exports = {
         // EW-637 — storage plugins source-mapped for tests.
         '^@ever-works/local-fs-plugin$':
             '<rootDir>/../../../packages/plugins/local-fs/src/index.ts',
-        '^@ever-works/aws-s3-plugin$':
-            '<rootDir>/../../../packages/plugins/aws-s3/src/index.ts',
+        '^@ever-works/aws-s3-plugin$': '<rootDir>/../../../packages/plugins/aws-s3/src/index.ts',
         '^@ever-works/minio-plugin$': '<rootDir>/../../../packages/plugins/minio/src/index.ts',
         '^@ever-works/github-storage-plugin$':
             '<rootDir>/../../../packages/plugins/github-storage/src/index.ts',
