@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { listAstTemplates, getAstTemplate } from './agent-templates';
 
 /**
@@ -61,5 +62,59 @@ describe('agent-templates fallback catalog', () => {
         expect(taskOnly?.slug).toBe('bug-triage');
         const sameSlugUnderAgent = await getAstTemplate('agent', 'bug-triage');
         expect(sameSlugUnderAgent).toBeNull();
+    });
+});
+
+/**
+ * FU-11 — ADR-010 catalog branch. When the env flag flips on, the
+ * helper switches from the fallback constants to a server fetch
+ * against `/api/agent-templates?entity=<entity>`. These tests mock
+ * the lazy-imported `serverFetch` to confirm the wiring without
+ * needing the real backend.
+ */
+describe('agent-templates ADR-010 catalog branch', () => {
+    const prevFlag = process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG;
+
+    afterEach(() => {
+        vi.resetModules();
+        if (prevFlag === undefined) {
+            delete process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG;
+        } else {
+            process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG = prevFlag;
+        }
+    });
+
+    it('hits the API endpoint when the flag is on', async () => {
+        process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG = '1';
+        const fakeRows = [
+            { slug: 'remote-pm', title: 'Remote PM', description: 'From the catalog.' },
+        ];
+        vi.doMock('./server-api', () => ({
+            serverFetch: vi.fn().mockResolvedValue(fakeRows),
+        }));
+        const { listAstTemplates: list } = await import('./agent-templates');
+        const out = await list('agent');
+        expect(out).toEqual(fakeRows);
+    });
+
+    it('falls back to constants when the API throws', async () => {
+        process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG = '1';
+        vi.doMock('./server-api', () => ({
+            serverFetch: vi.fn().mockRejectedValue(new Error('catalog 503')),
+        }));
+        const { listAstTemplates: list } = await import('./agent-templates');
+        const out = await list('agent');
+        expect(out.length).toBeGreaterThan(0);
+        expect(out.some((e) => e.slug === 'starter-pm')).toBe(true);
+    });
+
+    it('keeps using the fallback when the flag is off', async () => {
+        delete process.env.NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG;
+        const serverFetchMock = vi.fn().mockResolvedValue([{ slug: 'unused' }]);
+        vi.doMock('./server-api', () => ({ serverFetch: serverFetchMock }));
+        const { listAstTemplates: list } = await import('./agent-templates');
+        const out = await list('agent');
+        expect(serverFetchMock).not.toHaveBeenCalled();
+        expect(out.some((e) => e.slug === 'starter-pm')).toBe(true);
     });
 });
