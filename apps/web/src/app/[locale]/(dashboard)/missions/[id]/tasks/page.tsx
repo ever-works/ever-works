@@ -5,17 +5,12 @@ import { TasksScopedSection } from '@/components/tasks/TasksScopedSection';
 export const metadata: Metadata = { title: 'Tasks' };
 
 /**
- * Tasks feature — Phase 14.4 partial. Tasks tab under
+ * Tasks feature — Phase 14.4. Tasks tab under
  * /missions/[id]/tasks. Filters the global list by `missionId`.
  *
- * The Mission detail page currently lives as a single-column body
- * (`missions/[id]/page.tsx` — Phase 6 PR Q). Phase 14.4 calls for
- * a proper MissionTabs.tsx strip with an Overview tab wrapping the
- * existing single-column body + new Tasks tab. That extraction
- * lands once the shared work-detail layout primitive is reused for
- * Mission scope — for v1 this Tasks page works as a direct route
- * (linkable from the Mission card) and the layout migration is a
- * follow-up sub-tick.
+ * The MissionTabs strip is mounted by `missions/[id]/layout.tsx`
+ * (tick 38), so Overview and Tasks both inherit the navigation
+ * automatically — this page only needs to render its Tasks content.
  */
 export default async function MissionTasksTabPage({
     params,

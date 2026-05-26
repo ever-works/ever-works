@@ -5,20 +5,13 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 
 /**
- * Mission tab strip — Tasks Phase 14.4 scaffold.
+ * Mission tab strip — Tasks Phase 14.4.
  *
- * v1 surfaces Overview + Tasks tabs. The existing Mission detail
- * page (`missions/[id]/page.tsx`) is the Overview content; the
- * Tasks tab routes to `/missions/[id]/tasks` (Phase 14 partial).
- *
- * Wiring this strip into the actual `/missions/[id]/layout.tsx`
- * is intentionally deferred — the existing single-column body is
- * stable, and dropping the strip above it touches the work-proposals
- * relationship UI. Component is here so the per-target route can
- * link to it, and the layout migration is a one-line follow-up.
- *
- * (When the layout migration lands, mount this component above the
- * children in `missions/[id]/layout.tsx`.)
+ * Surfaces Overview + Tasks tabs across the Mission detail surface.
+ * Overview content lives at `missions/[id]/page.tsx`; the Tasks tab
+ * routes to `/missions/[id]/tasks`. The strip is mounted by
+ * `missions/[id]/layout.tsx` so both routes inherit the navigation
+ * automatically (tick 38).
  */
 const TABS = [
 	{ key: 'overview' as const, label: 'Overview', route: (id: string) => ROUTES.DASHBOARD_MISSION(id) },
