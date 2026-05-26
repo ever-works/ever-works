@@ -119,13 +119,19 @@ export const ROUTES = {
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
+    DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',
     DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
+    // Phase 18.6 — Tasks templates browser (ADR-010 scaffold).
+    DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
     // Skills
     DASHBOARD_SKILLS: '/skills',
     DASHBOARD_SKILL: (id: string) => `/skills/${id}`,
+    // Phase 18.6 — Skills templates browser (ADR-010 scaffold).
+    DASHBOARD_SKILL_TEMPLATES: '/skills/templates',
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
