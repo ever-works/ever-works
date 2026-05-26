@@ -1,8 +1,24 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+	BadRequestException,
+	ConflictException,
+	Inject,
+	Injectable,
+	Logger,
+	Optional,
+} from '@nestjs/common';
 import { TaskStatus } from '../entities/task.entity';
 import type { Task } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
-import { TaskBlockRepository, TaskApproverRepository } from '../database/repositories/task-side.repositories';
+import {
+	TaskAssigneeRepository,
+	TaskBlockRepository,
+	TaskApproverRepository,
+} from '../database/repositories/task-side.repositories';
+import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import {
+	AGENT_TASK_EXECUTE_DISPATCHER,
+	type AgentTaskExecuteDispatcher,
+} from './task-dispatcher';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -60,6 +76,11 @@ export class TaskTransitionService {
 		private readonly tasks: TaskRepository,
 		private readonly blocks: TaskBlockRepository,
 		private readonly approvers: TaskApproverRepository,
+		@Optional() private readonly assignees?: TaskAssigneeRepository,
+		@Optional() private readonly runs?: AgentRunRepository,
+		@Optional()
+		@Inject(AGENT_TASK_EXECUTE_DISPATCHER)
+		private readonly dispatcher?: AgentTaskExecuteDispatcher,
 	) {}
 
 	/**
@@ -110,7 +131,51 @@ export class TaskTransitionService {
 		if (!refreshed) {
 			throw new ConflictException(`Task ${task.id} vanished after transition.`);
 		}
+
+		// Phase 15.3 dispatch hook: any → in_progress fans out to
+		// `agent-task-execute` for every Agent assignee. Dedup key is
+		// `${taskId}:${agentId}:${generation}` where `generation` is
+		// the `recurrenceOccurredCount + 1` on the parent template (or
+		// just `1` for non-recurring tasks) — keeps a rapid status
+		// flip-flop from double-firing the same Agent.
+		if (to === TaskStatus.IN_PROGRESS && this.dispatcher && this.assignees) {
+			void this.fanOutAgentExecutions(refreshed).catch((err) =>
+				this.logger.warn(`Agent fan-out failed for task ${refreshed.id}: ${err}`),
+			);
+		}
 		return refreshed;
+	}
+
+	private async fanOutAgentExecutions(task: Task): Promise<void> {
+		if (!this.dispatcher || !this.assignees) return;
+		const agentAssignees = await this.assignees.findAgentAssignees(task.id);
+		if (agentAssignees.length === 0) return;
+		const generation = (task.recurrenceOccurredCount ?? 0) + 1;
+		for (const assignee of agentAssignees) {
+			const dedupKey = `${task.id}:${assignee.assigneeId}:${generation}`;
+			try {
+				// Pre-create a queued AgentRun row so the worker can find
+				// it via findInFlightForTaskAgent (T6 chat-dedup posture).
+				if (this.runs) {
+					await this.runs.createQueued({
+						agentId: assignee.assigneeId,
+						userId: task.userId,
+						triggerKind: 'task',
+						taskId: task.id,
+					});
+				}
+				await this.dispatcher.enqueue({
+					agentId: assignee.assigneeId,
+					userId: task.userId,
+					taskId: task.id,
+					dedupKey,
+				});
+			} catch (err) {
+				this.logger.warn(
+					`Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${err}`,
+				);
+			}
+		}
 	}
 
 	private async findOpenBlockers(taskId: string): Promise<string[]> {

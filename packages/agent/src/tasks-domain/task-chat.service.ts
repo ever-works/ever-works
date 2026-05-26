@@ -1,6 +1,7 @@
 import {
 	BadRequestException,
 	ForbiddenException,
+	Inject,
 	Injectable,
 	Logger,
 	NotFoundException,
@@ -11,11 +12,16 @@ import {
 	TaskKbMentionRepository,
 } from '../database/repositories/task-side.repositories';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import type { TaskChatMessage } from '../entities/task-chat-message.entity';
 import type { TaskActorType } from '../entities/task.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
+import {
+	AGENT_CHAT_REPLY_DISPATCHER,
+	type AgentChatReplyDispatcher,
+} from './task-dispatcher';
 
 /**
  * Tasks feature — Phase 13.2.
@@ -68,6 +74,10 @@ export class TaskChatService {
 		private readonly messages: TaskChatMessageRepository,
 		private readonly kbMentions: TaskKbMentionRepository,
 		@Optional() private readonly activityLog?: ActivityLogService,
+		@Optional() private readonly runs?: AgentRunRepository,
+		@Optional()
+		@Inject(AGENT_CHAT_REPLY_DISPATCHER)
+		private readonly chatDispatcher?: AgentChatReplyDispatcher,
 	) {}
 
 	async list(
@@ -117,6 +127,45 @@ export class TaskChatService {
 				mentions: mentions.records.map((m) => m.slug ?? m.id ?? null),
 			},
 		});
+
+		// Phase 15.4 dispatch hook: for every @agent mention that
+		// resolved, fan out an agent-chat-reply Trigger.dev run. Dedup
+		// key is `${taskId}:${agentId}:${messageId}` — T6 chat-dedup
+		// posture also enforced inside the trigger via
+		// findInFlightForTaskAgent.
+		if (this.chatDispatcher) {
+			const agentMentions = mentions.records.filter(
+				(m): m is { type: 'agent'; id: string; slug?: string } =>
+					m.type === 'agent' && typeof m.id === 'string',
+			);
+			for (const mention of agentMentions) {
+				const dedupKey = `${task.id}:${mention.id}:${row.id}`;
+				void (async () => {
+					try {
+						if (this.runs) {
+							await this.runs.createQueued({
+								agentId: mention.id,
+								userId,
+								triggerKind: 'chat',
+								taskId: task.id,
+								chatMessageId: row.id,
+							});
+						}
+						await this.chatDispatcher!.enqueue({
+							agentId: mention.id,
+							userId,
+							taskId: task.id,
+							triggeringMessageId: row.id,
+							dedupKey,
+						});
+					} catch (err) {
+						this.logger.warn(
+							`Failed to dispatch agent-chat-reply for ${mention.id}: ${err}`,
+						);
+					}
+				})();
+			}
+		}
 		return row;
 	}
 

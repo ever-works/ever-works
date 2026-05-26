@@ -23,6 +23,7 @@ import {
 	type TaskActorType,
 	type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
+import { PluginUsageRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
@@ -53,6 +54,7 @@ export class TasksController {
 	constructor(
 		private readonly service: TasksService,
 		private readonly chat: TaskChatService,
+		private readonly pluginUsage: PluginUsageRepository,
 	) {}
 
 	@Get()
@@ -314,6 +316,26 @@ export class TasksController {
 			offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
 		});
 		return { data: messages };
+	}
+
+	@Get(':id/spend')
+	@ApiOperation({ summary: 'Per-Task spend rollup in cents.' })
+	@HttpCode(HttpStatus.OK)
+	async spend(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Query('since') since?: string,
+		@Query('until') until?: string,
+		@Query('currency') currency?: string,
+	) {
+		// Cross-user ownership check — 404 if Task doesn't belong to user.
+		await this.service.getOne(auth.userId, id);
+		const totalCents = await this.pluginUsage.getTotalSpendCentsForTask(id, {
+			since: since ? new Date(since) : undefined,
+			until: until ? new Date(until) : undefined,
+			currency,
+		});
+		return { taskId: id, totalCents, currency: currency ?? 'usd' };
 	}
 
 	@Post(':id/chat')

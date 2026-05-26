@@ -28,6 +28,7 @@ import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { AgentsModule } from '../agents/agents.module';
 
 /**
  * Tasks feature — Phases 11 + 12 + 13.
@@ -52,6 +53,11 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 			UserTaskCounter,
 		]),
 		ActivityLogModule,
+		// Phase 15 — TaskTransitionService + TaskChatService consume
+		// AgentRunRepository to pre-create queued AgentRun rows before
+		// fanning out the agent-task-execute / agent-chat-reply
+		// Trigger.dev runs. AgentsModule exports AgentRunRepository.
+		AgentsModule,
 	],
 	providers: [
 		TaskRepository,

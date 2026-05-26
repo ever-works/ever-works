@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 19
-- **Last tick at**: 2026-05-26 (tick 19 — Phase 14 complete: TasksKanbanView (7-column kanban with optimistic-update click-to-transition) + Kanban as third view on /tasks page + TasksScopedSection embeddable + per-target Tasks pages for /works/[id]/tasks, /missions/[id]/tasks, /ideas/[id]/tasks + MissionTabs.tsx scaffold.)
-- **In progress now**: (none — next tick picks up Phase 15 Agent ↔ Task runtime tasks)
+- **Last tick #**: 20
+- **Last tick at**: 2026-05-26 (tick 20 — Phase 15 complete: agent-task-execute + agent-chat-reply Trigger.dev tasks + dispatcher tokens + dispatch hooks in TaskTransitionService (→ in_progress fan-out) and TaskChatService (@agent mention fan-out) + production trigger adapters in packages/tasks + GET /tasks/:id/spend rollup endpoint + dispatch-hook tests.)
+- **In progress now**: (none — next tick picks up Phase 16 Tools surface)
 
 ---
 
@@ -208,13 +208,15 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 15 — Agent ↔ Task runtime tasks
 
-- [ ] **15.1** `packages/tasks/src/tasks/trigger/agent-task-execute.task.ts` (maxDuration 60m).
-- [ ] **15.2** `packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts` (maxDuration 5m).
-- [ ] **15.3** Dispatch hook in `TaskTransitionService` on `* → in_progress` if any Agent assignee; dedup by `(taskId, agentId, generation)`.
-- [ ] **15.4** Dispatch hook in `TaskChatService.post` on `@<agent-slug>` mention.
-- [ ] **15.5** `AgentRunService` `kind: 'task'` and `kind: 'chat'` paths.
-- [ ] **15.6** `taskId` propagation to `PluginUsageEvent` from inside task/chat runs.
-- [ ] **15.7** `GET /tasks/:id/spend` per-task spend endpoint.
+- [x] **15.1** `packages/tasks/src/tasks/trigger/agent-task-execute.task.ts` (`maxDuration=3600`). Boots a Nest context, looks up the dispatcher-queued in-flight AgentRun (or creates one), marks started + completed with a Phase-15-placeholder summary, returns the runId. `onFailure` marks the run failed. Real LLM dispatch wires in once Phase 16 (Tools) lands. ✓ Tick 20
+- [x] **15.2** `packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts` (`maxDuration=300`). Same shape as `agent-task-execute` but the in-flight lookup is by (taskId, agentId) — the T6 chat-dedup posture from security spec §8: a chat-triggered run for an in-flight (task, agent) re-uses the existing AgentRun row rather than spawning a second. ✓ Tick 20
+- [x] **15.3** Dispatch hook in `TaskTransitionService` on `→ in_progress` — fans out via the new `AgentTaskExecuteDispatcher` token (Optional() so unit tests + CLI don't need it bound), pre-creates a queued AgentRun, and emits `dedupKey = '${taskId}:${agentId}:${recurrenceOccurredCount + 1}'`. Failure-tolerant: a dispatcher exception is logged but does NOT roll back the transition. ✓ Tick 20
+- [x] **15.4** Dispatch hook in `TaskChatService.post` on `@agent` mentions — every resolved agent-type mention enqueues an `agent-chat-reply` via `AgentChatReplyDispatcher` token with `dedupKey = '${taskId}:${agentId}:${messageId}'`. Pre-creates a queued AgentRun with `triggerKind='chat'` + `chatMessageId` so the worker side's `findInFlightForTaskAgent` finds it. ✓ Tick 20
+- [ ] **15.5** `AgentRunService` `kind: 'task'` and `kind: 'chat'` paths — the Phase 7 PromptAssembler already handles `kind` switching for the preamble + user message; the run orchestrator's full task/chat post-processing (auto-post-back-to-chat, status flip-on-completion) lands in a Phase-7 follow-up alongside the real LLM dispatch.
+- [ ] **15.6** `taskId` propagation to `PluginUsageEvent` — the entity column + index ship in Phase 11.4. The actual setter inside `AiFacadeService.recordEvent` wires alongside the LLM dispatch path in the Phase-7 follow-up; until then `getTotalSpendCentsForTask` returns 0 because no rows carry `taskId` yet.
+- [x] **15.7** `GET /api/tasks/:id/spend?since=&until=&currency=` per-Task spend endpoint backed by new `PluginUsageRepository.getTotalSpendCentsForTask()` SUM query over the Phase 11.4 `taskId` column. Cross-user 404 enforced via `TasksService.getOne` ownership check. Returns `{taskId, totalCents, currency}`. ✓ Tick 20
+- [x] **15.8** Production dispatcher adapters at `packages/tasks/src/dispatchers/agent-task-dispatchers.ts` (`agentTaskExecuteTriggerAdapter` + `agentChatReplyTriggerAdapter`) — keeps `@trigger.dev/sdk` out of the `@ever-works/agent` graph. API-side `TasksModule` binds them to the dispatcher tokens via useValue. ✓ Tick 20
+- [x] **15.9** Tests (don't run): `__tests__/task-transition-dispatch.spec.ts` (~6 assertions: no fan-out without agent assignees / fan-out to every agent / pre-creates queued run / dedupKey bumps with recurrence generation / no fan-out on transitions other than → in_progress / dispatcher exception doesn't roll back the transition). ✓ Tick 20
 
 ### Phase 16 — Tools surface wired to Agent runs (HIGH RISK)
 

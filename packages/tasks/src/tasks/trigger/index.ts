@@ -9,6 +9,8 @@ export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
+export * from './agent-task-execute.task';
+export * from './agent-chat-reply.task';
 export * from './template-customization.task';
 export * from './work-generation.task';
 export * from './work-import.task';

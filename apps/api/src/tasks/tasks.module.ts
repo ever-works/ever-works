@@ -1,21 +1,36 @@
 import { Module } from '@nestjs/common';
-import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import {
+	TasksDomainModule,
+	AGENT_TASK_EXECUTE_DISPATCHER,
+	AGENT_CHAT_REPLY_DISPATCHER,
+} from '@ever-works/agent/tasks-domain';
+import { DatabaseModule } from '@ever-works/agent/database';
+import {
+	agentTaskExecuteTriggerAdapter,
+	agentChatReplyTriggerAdapter,
+} from '@ever-works/trigger-tasks';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
 
 /**
- * Tasks feature — Phases 12 + 13. API-side module. Imports the
- * agent-side data module (which carries TasksService +
- * TaskTransitionService + TaskChatService) and mounts both
- * controllers:
+ * Tasks feature — Phases 12 + 13 + 15. API-side module.
  *
- *   - TasksController         — /api/tasks/* (CRUD + transitions +
- *                               members + per-task chat list + post)
- *   - TaskChatController      — PATCH /api/task-chat-messages/:id
- *                               (5-min edit window)
+ *   - TasksDomainModule   — TasksService + TaskTransitionService +
+ *                           TaskChatService + repositories
+ *   - DatabaseModule      — PluginUsageRepository for the Phase-15
+ *                           per-Task spend rollup endpoint
+ *   - dispatcher tokens   — bind the production Trigger.dev adapters
+ *                           so * → in_progress and @agent chat
+ *                           mentions fan out to agent-task-execute /
+ *                           agent-chat-reply runs.
  */
 @Module({
-	imports: [TasksDomainModule],
+	imports: [TasksDomainModule, DatabaseModule],
 	controllers: [TasksController, TaskChatController],
+	providers: [
+		{ provide: AGENT_TASK_EXECUTE_DISPATCHER, useValue: agentTaskExecuteTriggerAdapter },
+		{ provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
+	],
+	exports: [AGENT_TASK_EXECUTE_DISPATCHER, AGENT_CHAT_REPLY_DISPATCHER],
 })
 export class TasksModule {}
