@@ -217,6 +217,44 @@ describe('AgentsService', () => {
 			await expect(svc.transition('u1', 'a1', AgentStatus.ACTIVE)).resolves.toBeDefined();
 		});
 
+		it('Review-fix I17: activating a draft Agent with a cron cadence computes the FIRST cadence slot (not "now")', async () => {
+			// `0 9 * * *` (every day 09:00 UTC). The first slot from
+			// any non-09:00 moment is the next 09:00. We assert
+			// nextHeartbeatAt is in the future, not "now-ish".
+			agents.findByIdAndUser.mockResolvedValueOnce(
+				makeAgent({ status: AgentStatus.DRAFT, heartbeatCadence: '0 9 * * *' }),
+			);
+			agents.transitionStatus.mockResolvedValueOnce(true);
+			agents.findById.mockResolvedValueOnce(makeAgent({ status: AgentStatus.ACTIVE }));
+
+			const before = Date.now();
+			await svc.transition('u1', 'a1', AgentStatus.ACTIVE);
+			const call = agents.updateById.mock.calls.find(
+				(c: any) => c[1]?.nextHeartbeatAt instanceof Date,
+			);
+			expect(call).toBeDefined();
+			const next = call![1].nextHeartbeatAt as Date;
+			// Could be later today or tomorrow's 09:00. Always > now.
+			expect(next.getTime()).toBeGreaterThan(before);
+			// And it must be on a 09:00 UTC boundary.
+			expect(next.getUTCHours()).toBe(9);
+			expect(next.getUTCMinutes()).toBe(0);
+		});
+
+		it('Review-fix I17: manual cadence skips nextHeartbeatAt update entirely', async () => {
+			agents.findByIdAndUser.mockResolvedValueOnce(
+				makeAgent({ status: AgentStatus.DRAFT, heartbeatCadence: 'manual' }),
+			);
+			agents.transitionStatus.mockResolvedValueOnce(true);
+			agents.findById.mockResolvedValueOnce(makeAgent({ status: AgentStatus.ACTIVE }));
+
+			await svc.transition('u1', 'a1', AgentStatus.ACTIVE);
+			const heartbeatUpdate = agents.updateById.mock.calls.find(
+				(c: any) => c[1]?.nextHeartbeatAt !== undefined,
+			);
+			expect(heartbeatUpdate).toBeUndefined();
+		});
+
 		it('forbids draft → paused', async () => {
 			agents.findByIdAndUser.mockResolvedValueOnce(makeAgent({ status: AgentStatus.DRAFT }));
 			await expect(svc.transition('u1', 'a1', AgentStatus.PAUSED)).rejects.toThrow(

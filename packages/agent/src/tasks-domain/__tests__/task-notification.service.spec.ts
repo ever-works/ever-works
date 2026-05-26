@@ -69,15 +69,43 @@ describe('TaskNotificationService', () => {
 		);
 	});
 
-	it('attaches a dedupKey scoped to (task, event)', async () => {
+	it('attaches a dedupKey scoped to (task, event, discriminator)', async () => {
+		// Review-fix C7 (and second-pass test sync): the dedup key
+		// now includes a per-event discriminator so a second event of
+		// the same type isn't silently swallowed. For task_mentioned
+		// the discriminator is actorAgentSlug || actorUserId || ''.
+		// Pass an actor here so the discriminator is non-empty.
 		await svc.emit(
 			'task_mentioned',
-			{ taskId: 't1', taskSlug: 'T-1', taskTitle: 'Hi' },
+			{ taskId: 't1', taskSlug: 'T-1', taskTitle: 'Hi', actorAgentSlug: 'ceo' },
 			['u'],
 		);
 		expect(notifications.create).toHaveBeenCalledWith(
-			expect.objectContaining({ deduplicationKey: 'task:t1:task_mentioned' }),
+			expect.objectContaining({ deduplicationKey: 'task:t1:task_mentioned:ceo' }),
 		);
+	});
+
+	it('discriminator differs between two firings of the same event-type so neither is silently dedupped', async () => {
+		// Review-fix C7 — regression: previously dedup key was
+		// constant per (task, event), so a second status_changed
+		// (e.g. todo→in_progress, then in_progress→done) got
+		// swallowed by NotificationService.create's existing-row
+		// dedup. Now the from→to pair distinguishes them.
+		await svc.emit(
+			'task_status_changed',
+			{ taskId: 't1', taskSlug: 'T-1', taskTitle: 'Hi', fromStatus: 'todo', toStatus: 'in_progress' },
+			['u'],
+		);
+		await svc.emit(
+			'task_status_changed',
+			{ taskId: 't1', taskSlug: 'T-1', taskTitle: 'Hi', fromStatus: 'in_progress', toStatus: 'done' },
+			['u'],
+		);
+		const keys = notifications.create.mock.calls.map(
+			(c: any) => c[0]?.deduplicationKey,
+		);
+		expect(keys).toContain('task:t1:task_status_changed:todo->in_progress');
+		expect(keys).toContain('task:t1:task_status_changed:in_progress->done');
 	});
 
 	it('swallows a single recipient failure and continues', async () => {

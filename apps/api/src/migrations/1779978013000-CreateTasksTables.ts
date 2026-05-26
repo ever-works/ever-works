@@ -377,12 +377,23 @@ export class CreateTasksTables1779978013000 implements MigrationInterface {
 		isUnique = false,
 	): Promise<void> {
 		const table = await queryRunner.getTable(tableName);
-		const exists = table?.indices.some((idx) => idx.name === indexName);
-		if (!exists) {
-			await queryRunner.createIndex(
-				tableName,
-				new TableIndex({ name: indexName, columnNames, isUnique }),
-			);
+		const existing = table?.indices.find((idx) => idx.name === indexName);
+		if (existing) {
+			// Third-pass fix: when the index already exists, only keep
+			// it if column-set matches. Otherwise drop + recreate so
+			// a deploy that ran an in-development version of this
+			// migration with the old (`['slug']`) shape gets corrected
+			// to the new (`['userId','slug']`) shape on next run.
+			const sameColumns =
+				existing.columnNames.length === columnNames.length &&
+				existing.columnNames.every((c, i) => c === columnNames[i]) &&
+				(existing.isUnique ?? false) === isUnique;
+			if (sameColumns) return;
+			await queryRunner.dropIndex(tableName, indexName);
 		}
+		await queryRunner.createIndex(
+			tableName,
+			new TableIndex({ name: indexName, columnNames, isUnique }),
+		);
 	}
 }

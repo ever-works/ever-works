@@ -16,6 +16,9 @@ describe('TaskChatService', () => {
 			findById: jest.fn(),
 			create: jest.fn(),
 			updateBody: jest.fn().mockResolvedValue(undefined),
+			// Review-fix I3 (test sync): service now calls this on edit
+			// instead of updateBody so re-parsed mentions persist.
+			updateBodyAndMentions: jest.fn().mockResolvedValue(undefined),
 		};
 		kbMentions = { add: jest.fn().mockResolvedValue({}) };
 		activity = { log: jest.fn().mockResolvedValue(undefined) };
@@ -158,7 +161,7 @@ describe('TaskChatService', () => {
 			await expect(svc.edit('u1', 'm1', 'edit')).rejects.toThrow(/Edit window has expired/);
 		});
 
-		it('happy path — within window, persists new body', async () => {
+		it('happy path — within window, persists new body + re-parsed mentions', async () => {
 			messages.findById
 				.mockResolvedValueOnce({
 					id: 'm1',
@@ -170,8 +173,42 @@ describe('TaskChatService', () => {
 				.mockResolvedValueOnce({ id: 'm1', body: 'new', editedAt: new Date() });
 			tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
 			const out = await svc.edit('u1', 'm1', 'new');
-			expect(messages.updateBody).toHaveBeenCalledWith('m1', 'new');
+			// Review-fix I3: service now uses updateBodyAndMentions so
+			// the mentions JSON column stays honest if the user removed
+			// a mention mid-edit. Passing `null` for empty mention sets.
+			expect(messages.updateBodyAndMentions).toHaveBeenCalledWith('m1', 'new', null);
 			expect(out.body).toBe('new');
+		});
+
+		it('persists re-parsed mention records on edit + re-materializes KB mentions', async () => {
+			// Review-fix I3 regression. Edit with a known @agent + [[kb]]
+			// — the new body's mention parser output is what should be
+			// persisted to `mentions`, and the kbMentions table is
+			// re-added (unique-violation safely swallowed).
+			messages.findById
+				.mockResolvedValueOnce({
+					id: 'm1',
+					taskId: 't1',
+					authorType: 'user',
+					authorId: 'u1',
+					createdAt: new Date(Date.now() - 30_000),
+				})
+				.mockResolvedValueOnce({ id: 'm1', body: 'hi @ceo see [[runbook]]', editedAt: new Date() });
+			tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+			const lookups = {
+				ownedAgentSlugs: new Map([['ceo', 'a1']]),
+				knownKbSlugs: new Map([['runbook', 'kb1']]),
+			};
+			await svc.edit('u1', 'm1', 'hi @ceo see [[runbook]]', lookups);
+			expect(messages.updateBodyAndMentions).toHaveBeenCalledWith(
+				'm1',
+				'hi @ceo see [[runbook]]',
+				expect.arrayContaining([
+					expect.objectContaining({ type: 'agent', id: 'a1' }),
+					expect.objectContaining({ type: 'kb', id: 'kb1' }),
+				]),
+			);
+			expect(kbMentions.add).toHaveBeenCalledWith('t1', 'kb1');
 		});
 	});
 

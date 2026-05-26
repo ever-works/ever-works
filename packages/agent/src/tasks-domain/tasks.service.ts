@@ -393,7 +393,21 @@ export class TasksService {
 		if (!blocker) {
 			throw new BadRequestException(`Blocking Task ${blockedByTaskId} not found.`);
 		}
-		const row = await this.blocks.add(taskId, blockedByTaskId);
+		// Third-pass fix: catch the unique-violation on
+		// `(taskId, blockedByTaskId)` so a concurrent duplicate-add
+		// surfaces as 409 instead of 500.
+		let row;
+		try {
+			row = await this.blocks.add(taskId, blockedByTaskId);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			if (/unique|duplicate|UNIQUE/i.test(message)) {
+				throw new ConflictException(
+					`Task ${taskId} is already blocked by ${blockedByTaskId}.`,
+				);
+			}
+			throw err;
+		}
 		await this.logActivity({
 			userId,
 			taskId,

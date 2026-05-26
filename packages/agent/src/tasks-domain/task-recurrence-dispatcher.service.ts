@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { UserTaskCounterRepository } from '../database/repositories/task-side.repositories';
 import { computeNextOccurrence, cloneRecurringTaskAsInstance } from './recurrence';
+import { TaskNotificationService } from './task-notification.service';
 
 export interface RecurrenceDispatchEntry {
 	templateId: string;
@@ -45,6 +46,11 @@ export class TaskRecurrenceDispatcherService {
 	constructor(
 		private readonly tasks: TaskRepository,
 		private readonly counter: UserTaskCounterRepository,
+		// Third-pass fix: emit `task_recurrence_fired` after a successful
+		// spawn so the dead enum branch in TaskNotificationService is
+		// actually reachable. Optional() — when unbound (unit tests),
+		// spawn still completes.
+		@Optional() private readonly notifications?: TaskNotificationService,
 	) {}
 
 	async dispatchDue(limit = 50, now: Date = new Date()): Promise<RecurrenceDispatchSummary> {
@@ -106,6 +112,25 @@ export class TaskRecurrenceDispatcherService {
 					instanceSlug: instance.slug,
 					nextOccurrenceAt: nextSlot?.toISOString() ?? null,
 				});
+
+				// Third-pass fix: in-app notification for the spawned
+				// instance. Discriminator uses recurrenceOccurredCount
+				// (advanced by casClaimRecurrence) so consecutive
+				// occurrences don't dedup-collapse. Best-effort.
+				if (this.notifications) {
+					void this.notifications
+						.emit(
+							'task_recurrence_fired',
+							{
+								taskId: instance.id,
+								taskSlug: instance.slug,
+								taskTitle: instance.title,
+								occurrenceCount: (template.recurrenceOccurredCount ?? 0) + 1,
+							},
+							[template.userId],
+						)
+						.catch(() => undefined);
+				}
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
 				this.logger.error(

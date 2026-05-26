@@ -169,6 +169,13 @@ export class TaskTransitionService {
 		// on every transition, `task_blocked` when the destination is
 		// `blocked`. Best-effort — emit failures log inside
 		// TaskNotificationService and don't bubble.
+		//
+		// Third-pass fix: populate `blockerTaskId` on `task_blocked`
+		// so the C7 dedup discriminator distinguishes repeat blocks
+		// of the same Task (e.g. blocked → unblocked → blocked).
+		// Without this the discriminator falls back to toStatus
+		// ("blocked") and every repeat firing collapses to the same
+		// dedup key, silently swallowed by NotificationService.
 		if (this.notifications) {
 			void this.notifications
 				.emit('task_status_changed', {
@@ -180,15 +187,24 @@ export class TaskTransitionService {
 				})
 				.catch(() => undefined);
 			if (to === TaskStatus.BLOCKED) {
-				void this.notifications
-					.emit('task_blocked', {
-						taskId: refreshed.id,
-						taskSlug: refreshed.slug,
-						taskTitle: refreshed.title,
-						fromStatus: from,
-						toStatus: to,
-					})
-					.catch(() => undefined);
+				void (async () => {
+					try {
+						const openBlockerIds = await this.findOpenBlockers(refreshed.id);
+						await this.notifications!.emit('task_blocked', {
+							taskId: refreshed.id,
+							taskSlug: refreshed.slug,
+							taskTitle: refreshed.title,
+							fromStatus: from,
+							toStatus: to,
+							// Distinguishes repeat block events; absent only
+							// when the Task is blocked with zero open blockers
+							// (rare race window during a block-add transaction).
+							blockerTaskId: openBlockerIds[0],
+						});
+					} catch (err) {
+						this.logger.warn(`task_blocked emit failed for ${refreshed.id}: ${err}`);
+					}
+				})();
 			}
 		}
 

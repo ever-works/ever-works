@@ -63,6 +63,10 @@ describe('AgentScheduleDispatcherService', () => {
 			tryClaimForRun: jest.fn(),
 			findStuckRunning: jest.fn().mockResolvedValue([]),
 			updateById: jest.fn().mockResolvedValue(undefined),
+			// Review-fix C11: dispatcher releases the CAS claim on
+			// enqueue failure so the Agent doesn't stay stuck in RUNNING
+			// until the 30-min recovery sweep.
+			releaseAfterRun: jest.fn().mockResolvedValue(undefined),
 		};
 		runRepo = {
 			createQueued: jest.fn().mockResolvedValue({ id: 'run-1' }),
@@ -122,6 +126,32 @@ describe('AgentScheduleDispatcherService', () => {
 		expect(summary.failed).toBe(1);
 		expect(summary.entries[0].outcome).toBe('failed');
 		expect(summary.entries[0].message).toMatch(/Trigger\.dev down/);
+	});
+
+	it('Review-fix C11: releases the CAS claim when enqueue fails after a successful claim', async () => {
+		const agent = makeAgent();
+		const originalNext = agent.nextHeartbeatAt;
+		agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+		agentRepo.tryClaimForRun.mockResolvedValueOnce(originalNext);
+		trigger.enqueue.mockRejectedValueOnce(new Error('queue full'));
+
+		await svc.dispatchDue(trigger);
+
+		expect(agentRepo.releaseAfterRun).toHaveBeenCalledWith(
+			agent.id,
+			originalNext,
+			'dispatch-failed',
+		);
+	});
+
+	it('Review-fix C11: does NOT call releaseAfterRun when tryClaimForRun returned null (we never claimed)', async () => {
+		const agent = makeAgent();
+		agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+		agentRepo.tryClaimForRun.mockResolvedValueOnce(null);
+
+		await svc.dispatchDue(trigger);
+
+		expect(agentRepo.releaseAfterRun).not.toHaveBeenCalled();
 	});
 
 	it('recovers stuck-running Agents by resetting status + computing fresh nextHeartbeatAt', async () => {
