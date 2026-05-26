@@ -8,6 +8,8 @@ export * from './task-transition.service';
 export * from './task-chat.service';
 export * from './task-dispatcher';
 export * from './agent-task-tools';
+export * from './recurrence';
+export * from './task-recurrence-dispatcher.service';
 export {
 	Task,
 	TaskPriority,

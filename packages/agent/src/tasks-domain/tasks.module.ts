@@ -27,6 +27,7 @@ import {
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
+import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 
@@ -74,6 +75,7 @@ import { AgentsModule } from '../agents/agents.module';
 		TaskTransitionService,
 		TasksService,
 		TaskChatService,
+		TaskRecurrenceDispatcherService,
 	],
 	exports: [
 		TaskRepository,
@@ -90,6 +92,7 @@ import { AgentsModule } from '../agents/agents.module';
 		TaskTransitionService,
 		TasksService,
 		TaskChatService,
+		TaskRecurrenceDispatcherService,
 	],
 })
 export class TasksDomainModule {}

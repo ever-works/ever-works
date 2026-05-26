@@ -40,6 +40,7 @@ import {
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
 import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -161,6 +162,8 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly agentScheduleDispatcherService: AgentScheduleDispatcherService,
         private readonly agentRepositoryRef: AgentRepository,
         private readonly agentRunRepositoryRef: AgentRunRepository,
+        // Phase 17 — recurring Task dispatcher.
+        private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -195,6 +198,8 @@ export class TriggerInternalController implements OnModuleInit {
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,
+            // Phase 17 — recurring Task dispatcher.
+            TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

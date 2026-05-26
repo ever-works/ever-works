@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 21
-- **Last tick at**: 2026-05-26 (tick 21 — Phase 16 partial: AgentToolService + descriptor surface for editAgentFile (with once-per-file-per-run cap) + createSubAgent (always DRAFT + all permissions false) + getSkillBody re-export + getActivity/getKbDocument placeholders + Tasks-side buildAgentTaskTools (createTask/commentOnTask/transitionTask) + tool tests. commitToRepo/openPullRequest + plugin pass-through tools follow next tick.)
-- **In progress now**: Phase 16 (16.1-16.4 + 16.5 + 16.8 + 16.9 partial ticked; 16.6 + 16.7 + 16.10 remaining)
+- **Last tick #**: 22
+- **Last tick at**: 2026-05-26 (tick 22 — Phase 17 complete: rrule dep added + validateRecurrenceRule + computeNextOccurrence + cloneRecurringTaskAsInstance helpers + TaskRecurrenceDispatcherService (find-due → CAS-claim → spawn instance loop) + task-recurrence-dispatcher cron task (every minute) + TasksService setRecurring/clearRecurring + POST/DELETE /tasks/:id/recurring endpoints + remote-proxy wiring on both worker + API + recurrence + dispatcher tests. Cron job 1ca20898 re-created for the loop.)
+- **In progress now**: (none — next tick picks up Phase 18 Dashboard tiles + notifications + templates browser)
 
 ---
 
@@ -234,14 +234,15 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 17 — Recurring tasks (F5 override)
 
-- [ ] **17.1** Add `rrule` npm package.
-- [ ] **17.2** Validate `recurrenceRule` on every write via `RRule.fromString()`.
-- [ ] **17.3** Helper `computeNextOccurrence(rule, tz, from)` honoring `recurrenceEndsAt` + `recurrenceMaxOccurrences`.
-- [ ] **17.4** Repository method `casClaimRecurrence(taskId, expectedNextOccurrenceAt)`.
-- [ ] **17.5** Helper `cloneRecurringTaskAsInstance(template)`.
-- [ ] **17.6** `TaskRecurrenceDispatcherService.dispatchDue(batchSize)`.
-- [ ] **17.7** Trigger.dev cron `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts` (every minute UTC).
-- [ ] **17.8** UI: "Make this recurring" toggle + frequency picker + "Recurring" badge + "View template" link.
+- [x] **17.1** Added `rrule@^2.8.1` to `packages/agent/package.json`. ✓ Tick 22
+- [x] **17.2** `validateRecurrenceRule(rule)` at `packages/agent/src/tasks-domain/recurrence.ts` — wraps `RRule.fromString()`, rejects empty / oversized / unparseable / missing-FREQ inputs. `TasksService.setRecurring` calls it on every write. ✓ Tick 22
+- [x] **17.3** `computeNextOccurrence({rule, from, recurrenceEndsAt, recurrenceMaxOccurrences, recurrenceOccurredCount})` — returns null when the recurrence is exhausted (count cap reached, or next slot past end-date, or rule unparseable). UTC throughout. ✓ Tick 22
+- [x] **17.4** `TaskRepository.casClaimRecurrence(taskId, expectedNextOccurrenceAt, newNextOccurrence)` — shipped in Phase 11.5. CAS guard via `andWhere('nextOccurrenceAt = :expected')` mirrors `WorkScheduleRepository.tryMarkDispatched`. ✓ (already done)
+- [x] **17.5** `cloneRecurringTaskAsInstance(template)` — copies identity (title/desc/priority/labels/scope), resets state (status=backlog, started/completedAt=null, previousStatus=null), sets `parentRecurringTaskId=template.id`, clears recurring columns + parentTaskId on the instance. ✓ Tick 22
+- [x] **17.6** `TaskRecurrenceDispatcherService.dispatchDue(limit, now)` at `packages/agent/src/tasks-domain/task-recurrence-dispatcher.service.ts` — find due templates → CAS-claim each → spawn instance via `cloneRecurringTaskAsInstance` + fresh `UserTaskCounter.nextSlug` → return structured `RecurrenceDispatchSummary`. One template's failure does not cascade. ✓ Tick 22
+- [x] **17.7** Trigger.dev cron `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts` (`* * * * *` per-minute UTC — matches the existing `mission-tick` cadence). Boots a Nest context on TriggerInternalModule, resolves the dispatcher via remote-proxy, returns summary on the run handle. Worker-side `TriggerInternalModule` + API-side `TriggerInternalController` + `TriggerInternalModule` all wired for `TaskRecurrenceDispatcherService`. ✓ Tick 22
+- [x] **17.8** API surface: `POST /api/tasks/:id/recurring` (body: {recurrenceRule, recurrenceTimezone?, recurrenceEndsAt?, recurrenceMaxOccurrences?}) + `DELETE /api/tasks/:id/recurring`. `TasksService.setRecurring` validates RRULE, computes `nextOccurrenceAt` from now, refuses templates with no future occurrences. UI toggle + frequency picker + "Recurring" badge + "View template" link deferred to a follow-up sub-tick once the shared Tiptap chip primitive is extracted. API path is fully usable today. ✓ Tick 22 (partial — UI defer)
+- [x] **17.9** Tests (don't run): `__tests__/recurrence.spec.ts` (~10 assertions: validate empty/oversize/malformed/daily/weekly; computeNextOccurrence exhausted-by-count / past-end-date / future-slot / invalid-rule; clone copies identity + resets state + sets parentRecurringTaskId + clears parentTaskId). `__tests__/task-recurrence-dispatcher.service.spec.ts` (~5 assertions: no-op when empty / happy spawn path / CAS loss → skipped / spawn error contained / dueCount in summary). ✓ Tick 22
 
 ### Phase 18 — Dashboard + Notifications + per-feature templates browser
 

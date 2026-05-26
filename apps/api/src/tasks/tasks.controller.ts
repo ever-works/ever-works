@@ -167,6 +167,45 @@ export class TasksController {
 		return this.service.remove(auth.userId, id);
 	}
 
+	@Post(':id/recurring')
+	@ApiOperation({
+		summary:
+			'Make this Task recurring (or update its rule). Body: {recurrenceRule (RFC 5545 RRULE), recurrenceTimezone?, recurrenceEndsAt?, recurrenceMaxOccurrences?}.',
+	})
+	@HttpCode(HttpStatus.OK)
+	@Throttle({ default: { limit: 30, ttl: 60_000 } })
+	async setRecurring(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body()
+		body: {
+			recurrenceRule: string;
+			recurrenceTimezone?: string;
+			recurrenceEndsAt?: string;
+			recurrenceMaxOccurrences?: number;
+		},
+	) {
+		if (!body?.recurrenceRule) {
+			throw new BadRequestException('recurrenceRule is required.');
+		}
+		return this.service.setRecurring(auth.userId, id, {
+			recurrenceRule: body.recurrenceRule,
+			recurrenceTimezone: body.recurrenceTimezone,
+			recurrenceEndsAt: body.recurrenceEndsAt ? new Date(body.recurrenceEndsAt) : null,
+			recurrenceMaxOccurrences: body.recurrenceMaxOccurrences ?? null,
+		});
+	}
+
+	@Delete(':id/recurring')
+	@ApiOperation({ summary: 'Stop recurrence on a template. Existing spawned instances are kept.' })
+	@HttpCode(HttpStatus.OK)
+	async clearRecurring(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		return this.service.clearRecurring(auth.userId, id);
+	}
+
 	@Post(':id/transition')
 	@ApiOperation({ summary: 'State-machine transition.' })
 	@HttpCode(HttpStatus.OK)

@@ -25,6 +25,7 @@ import { TaskTransitionService } from './task-transition.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
 
 export interface CreateTaskInput {
 	title: string;
@@ -170,6 +171,67 @@ export class TasksService {
 			details: { slug: task.slug },
 		});
 		return { deleted: true };
+	}
+
+	/**
+	 * Phase 17.2 — make a Task recurring (or update its rule).
+	 * Validates the RRULE, computes the initial `nextOccurrenceAt`,
+	 * and flips the recurring columns. The Task row stays as the
+	 * TEMPLATE; the dispatcher spawns instances pointing back via
+	 * `parentRecurringTaskId`.
+	 */
+	async setRecurring(
+		userId: string,
+		id: string,
+		input: {
+			recurrenceRule: string;
+			recurrenceTimezone?: string;
+			recurrenceEndsAt?: Date | null;
+			recurrenceMaxOccurrences?: number | null;
+		},
+	): Promise<Task> {
+		const task = await this.getOne(userId, id);
+		const check = validateRecurrenceRule(input.recurrenceRule);
+		if (!check.valid) throw new BadRequestException(check.reason);
+
+		const next = computeNextOccurrence({
+			rule: input.recurrenceRule,
+			from: new Date(),
+			recurrenceEndsAt: input.recurrenceEndsAt ?? null,
+			recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
+			recurrenceOccurredCount: 0,
+		});
+		if (!next) {
+			throw new BadRequestException(
+				'recurrenceRule yields no future occurrences — refusing to mark as recurring.',
+			);
+		}
+
+		await this.tasks.updateById(id, {
+			isRecurring: true,
+			recurrenceRule: input.recurrenceRule,
+			recurrenceTimezone: input.recurrenceTimezone ?? 'UTC',
+			nextOccurrenceAt: next,
+			recurrenceEndsAt: input.recurrenceEndsAt ?? null,
+			recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
+		});
+		const refreshed = (await this.tasks.findById(id)) as Task;
+		void task;
+		return refreshed;
+	}
+
+	/** Phase 17.2 — turn off recurrence on a template. Existing
+	 * spawned instances are untouched. */
+	async clearRecurring(userId: string, id: string): Promise<Task> {
+		await this.getOne(userId, id);
+		await this.tasks.updateById(id, {
+			isRecurring: false,
+			recurrenceRule: null,
+			nextOccurrenceAt: null,
+			recurrenceEndsAt: null,
+			recurrenceMaxOccurrences: null,
+		});
+		return (await this.tasks.findById(id)) as Task;
 	}
 
 	async transition(
