@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "חפש פריטים...",
                 "allCategories": "כל הקטגוריות",
                 "showing": "מציג {current} מתוך {total} פריטים",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "אין פריטים התואמים את קריטריוני החיפוש",
                 "source": "מקור",
                 "viewOnWebsite": "הצג באתר",

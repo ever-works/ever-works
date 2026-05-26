@@ -21,6 +21,39 @@ export async function listComparisons(workId: string) {
     }
 }
 
+export type ComparisonPairItem = {
+    slug: string;
+    name: string;
+    category: string | string[];
+};
+
+/**
+ * Server action used by `ComparisonsPageClient` to populate the
+ * Item A / Item B comboboxes (and gate the "Generate Next" button)
+ * client-side. Split off the SSR fetch so the rest of the
+ * Comparisons tab — comparison cards, AI provider settings, list
+ * controls — paints immediately while the items list (which still
+ * requires cloning the data repo) loads in the background.
+ */
+export async function loadComparisonItems(workId: string): Promise<ComparisonPairItem[]> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const itemsRes = await workAPI.getItems(workId);
+        return (itemsRes?.items ?? []).map((item) => ({
+            slug: item.slug ?? '',
+            name: item.name,
+            category: item.category as string | string[],
+        }));
+    } catch (error) {
+        console.error('Load comparison items error:', error);
+        return [];
+    }
+}
+
 export async function getRemainingComparisonCount(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {

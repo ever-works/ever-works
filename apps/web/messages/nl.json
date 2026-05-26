@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Zoek items…",
                 "allCategories": "Alle categorieën",
                 "showing": "Weergeven {current} van {total} items",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Geen items die overeenkomen met je zoekcriteria",
                 "source": "Bron",
                 "viewOnWebsite": "Bekijk op website",

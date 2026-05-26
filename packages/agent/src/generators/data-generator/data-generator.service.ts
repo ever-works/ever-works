@@ -66,6 +66,20 @@ export type GenerationStats = {
     changelog?: ReturnType<typeof buildWorkChangelog>;
 };
 
+/**
+ * Snapshot of the cache columns `refreshDataCache` populated on the
+ * Work row. Each field is `null` when the corresponding read off the
+ * data repo failed (e.g. missing YAML, transient git error).
+ */
+export type RefreshedDataCache = {
+    configCache: IDataConfig | null;
+    companyWebsite: string | null;
+    categoriesCount: number | null;
+    tagsCount: number | null;
+    comparisonsCount: number | null;
+    itemsCount: number | null;
+};
+
 const getWorkDefaultDataConfig = (work: Work): Partial<IDataConfig> => ({
     company_name: work.name || work.slug,
 });
@@ -600,6 +614,12 @@ export class DataGeneratorService {
                 itemsCount: pipelineResult.outputs.items.length + existingData.existingItems.length,
             });
 
+            // Refresh the denormalised cache columns (counts + parsed
+            // config) so the Overview / Generator dashboard tabs can
+            // render straight from Postgres on the next page load,
+            // without re-cloning the data repo we just pushed to.
+            await this.refreshDataCache(work, user);
+
             // Persist domain type if detected and not manually set
             if (pipelineResult.outputs.domainAnalysis && !work.domainTypeManuallySet) {
                 await this.workOperations.updateWork(work.id, {
@@ -983,6 +1003,79 @@ export class DataGeneratorService {
     }
 
     /**
+     * Repopulate the denormalised cache columns on `works` (counts +
+     * full parsed `.works/works.yml`) from the current state of the
+     * data repo. One clone, four parallel reads, one DB write.
+     *
+     * Called from:
+     *   - the generator's final step (after items push) so freshly
+     *     generated Works land with the cache primed,
+     *   - `updateWebsiteSettings` after a YAML edit is pushed so the
+     *     cache stays in sync with the just-saved config, and
+     *   - `WorkQueryService.getWork` as a lazy backfill when the
+     *     cache columns are still NULL on an existing Work.
+     *
+     * Errors are swallowed (logged) — the cache is best-effort and
+     * read paths must still tolerate NULL columns (e.g. a brand-new
+     * Work whose data repo doesn't exist yet, or a transient git
+     * outage). Returns `null` in that case.
+     */
+    async refreshDataCache(work: Work, user: User): Promise<RefreshedDataCache | null> {
+        try {
+            const data = await this.repositoryData(work, user);
+
+            const [configResult, categoriesResult, tagsResult, itemsResult, comparisonsResult] =
+                await Promise.allSettled([
+                    data.getConfig(),
+                    data.getCategories(),
+                    data.getTags(),
+                    data.countItems(),
+                    data.countComparisons(),
+                ]);
+
+            const configCache = configResult.status === 'fulfilled' ? configResult.value : null;
+            const categoriesCount =
+                categoriesResult.status === 'fulfilled' ? categoriesResult.value.length : null;
+            const tagsCount = tagsResult.status === 'fulfilled' ? tagsResult.value.length : null;
+            const itemsCount = itemsResult.status === 'fulfilled' ? itemsResult.value : null;
+            const comparisonsCount =
+                comparisonsResult.status === 'fulfilled' ? comparisonsResult.value : null;
+
+            const update: Partial<Work> = {};
+            if (configCache !== null) {
+                update.configCache = configCache as unknown as Work['configCache'];
+                if (typeof configCache.company_website === 'string') {
+                    update.companyWebsite = configCache.company_website;
+                }
+            }
+            if (categoriesCount !== null) update.categoriesCount = categoriesCount;
+            if (tagsCount !== null) update.tagsCount = tagsCount;
+            if (comparisonsCount !== null) update.comparisonsCount = comparisonsCount;
+            if (itemsCount !== null) update.itemsCount = itemsCount;
+
+            if (Object.keys(update).length > 0) {
+                await this.workOperations.updateWork(work.id, update);
+            }
+
+            return {
+                configCache: (update.configCache ?? null) as IDataConfig | null,
+                companyWebsite: update.companyWebsite ?? null,
+                categoriesCount: update.categoriesCount ?? null,
+                tagsCount: update.tagsCount ?? null,
+                comparisonsCount: update.comparisonsCount ?? null,
+                itemsCount: update.itemsCount ?? null,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Failed to refresh data cache for work ${work.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * Returns a lightweight snapshot of the data repository for sync purposes.
      * Uses the shared repositoryData() helper to respect cloning/pulling patterns.
      */
@@ -1106,6 +1199,10 @@ export class DataGeneratorService {
         );
 
         this.logger.log(`Successfully updated website settings for work ${work.slug}`);
+
+        // Keep the denormalised cache (configCache, companyWebsite,
+        // counts) in sync with the YAML we just pushed.
+        await this.refreshDataCache(work, user);
     }
 
     private async repositoryData(work: Work, user: User) {
@@ -1852,6 +1949,10 @@ export class DataGeneratorService {
             await this.workOperations.updateWork(work.id, {
                 itemsCount: existingItems.length + newItemsCount,
             });
+
+            // Refresh the denormalised cache so the Overview / Generator
+            // tabs see the synced counts without re-cloning the repo.
+            await this.refreshDataCache(work, user);
 
             const stats: GenerationStats = {
                 newItemsCount,

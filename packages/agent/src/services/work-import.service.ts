@@ -662,6 +662,13 @@ export class WorkImportService {
                 }),
             ]);
 
+            // Prime the denormalised cache columns (categoriesCount,
+            // tagsCount, comparisonsCount, configCache,
+            // companyWebsite) so the Overview tab can render straight
+            // from Postgres on the next page load instead of cloning
+            // the freshly-imported data repo. Best-effort.
+            await this.dataGenerator.refreshDataCache(work, user);
+
             await this.generationHistoryRepository.updateEntry(history.id, {
                 status: GenerateStatusType.GENERATED,
                 finishedAt: endTime,

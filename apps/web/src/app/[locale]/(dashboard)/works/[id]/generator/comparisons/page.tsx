@@ -16,7 +16,6 @@ export default async function WorkComparisonsPage({ params }: Params) {
     const { id } = await params;
 
     let comparisons: ComparisonData[] = [];
-    let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
     let websiteUrl: string | null = null;
 
     const defaultAiConfig = {
@@ -33,24 +32,21 @@ export default async function WorkComparisonsPage({ params }: Params) {
     let aiConfig = defaultAiConfig;
 
     try {
-        const [workRes, comparisonsRes, itemsRes, aiConfigRes] = await Promise.all([
+        // Items are intentionally dropped from this SSR call —
+        // `workAPI.getItems()` clones the data repo and was
+        // dominating the Comparisons tab's load time. The client
+        // fetches them lazily via `loadComparisonItems()` so the
+        // existing comparison cards + AI provider settings + tab
+        // chrome paint instantly.
+        const [workRes, comparisonsRes, aiConfigRes] = await Promise.all([
             workAPI.get(id).catch(() => null),
             workAPI.getComparisons(id).catch(() => []),
-            workAPI.getItems(id).catch(() => null),
             getComparisonAiConfig(id),
         ]);
 
         comparisons = comparisonsRes ?? [];
         aiConfig = aiConfigRes;
         websiteUrl = workRes?.work?.website ?? null;
-
-        if (itemsRes?.items) {
-            items = itemsRes.items.map((item) => ({
-                slug: item.slug ?? '',
-                name: item.name,
-                category: item.category as string | string[],
-            }));
-        }
     } catch (error) {
         console.error('Failed to fetch comparisons:', error);
     }
@@ -60,7 +56,6 @@ export default async function WorkComparisonsPage({ params }: Params) {
             workId={id}
             websiteUrl={websiteUrl}
             initialComparisons={comparisons}
-            items={items}
             availableProviders={aiConfig.availableProviders}
             initialAiConfig={aiConfig.currentConfig}
         />

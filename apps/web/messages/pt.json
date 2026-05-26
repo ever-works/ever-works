@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Pesquisar itens...",
                 "allCategories": "Todas as Categorias",
                 "showing": "Mostrando {current} de {total} itens",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Nenhum item corresponde aos critérios de pesquisa",
                 "source": "Fonte",
                 "viewOnWebsite": "Ver no site",

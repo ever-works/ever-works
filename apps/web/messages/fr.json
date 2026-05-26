@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "Rechercher des éléments...",
                 "allCategories": "Toutes les catégories",
                 "showing": "Affichage de {current} sur {total} éléments",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Aucun élément ne correspond à vos critères de recherche",
                 "source": "Source",
                 "viewOnWebsite": "Voir sur le site web",

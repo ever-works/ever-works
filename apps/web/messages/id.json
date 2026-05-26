@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Cari item...",
                 "allCategories": "Semua Kategori",
                 "showing": "Menampilkan {current} dari {total} item",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Tidak ada item yang cocok dengan kriteria pencarian Anda",
                 "source": "Sumber",
                 "viewOnWebsite": "Lihat di situs web",

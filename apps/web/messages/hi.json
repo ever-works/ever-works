@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "आइटम खोजें...",
                 "allCategories": "सभी श्रेणियाँ",
                 "showing": "{total} में से {current} आइटम दिखा रहे हैं",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "आपके खोज मानदंड से मेल खाने वाले कोई आइटम नहीं",
                 "source": "स्रोत",
                 "viewOnWebsite": "वेबसाइट पर देखें",

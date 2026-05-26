@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "البحث عن عناصر...",
                 "allCategories": "جميع الفئات",
                 "showing": "عرض {current} من {total} عنصر",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "لا توجد عناصر تطابق معايير البحث الخاصة بك",
                 "source": "المصدر",
                 "viewOnWebsite": "عرض على الموقع",

@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "항목 검색...",
                 "allCategories": "모든 카테고리",
                 "showing": "{total}개 항목 중 {current}개 표시 중",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "검색 조건에 맞는 항목이 없습니다",
                 "source": "소스",
                 "viewOnWebsite": "웹사이트에서 보기",

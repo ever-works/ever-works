@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Cerca elementi...",
                 "allCategories": "Tutte le Categorie",
                 "showing": "Visualizzazione di {current} su {total} elementi",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Nessun elemento corrisponde ai criteri di ricerca",
                 "source": "Sorgente",
                 "viewOnWebsite": "Visualizza sul sito web",

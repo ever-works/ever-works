@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Пошук елементів...",
                 "allCategories": "Усі категорії",
                 "showing": "Показую {current} з {total} елементів",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Жоден елемент не відповідає критеріям пошуку",
                 "source": "Джерело",
                 "viewOnWebsite": "Переглянути на сайті",
