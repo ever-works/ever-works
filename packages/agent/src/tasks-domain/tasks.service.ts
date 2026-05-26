@@ -16,6 +16,7 @@ import { TaskRepository, type ListTasksFilter } from '../database/repositories/t
 import {
 	TaskAssigneeRepository,
 	TaskApproverRepository,
+	TaskAttachmentRepository,
 	TaskReviewerRepository,
 	TaskBlockRepository,
 	TaskRelationRepository,
@@ -65,6 +66,7 @@ export class TasksService {
 		private readonly counter: UserTaskCounterRepository,
 		private readonly transitions: TaskTransitionService,
 		@Optional() private readonly activityLog?: ActivityLogService,
+		@Optional() private readonly attachments?: TaskAttachmentRepository,
 	) {}
 
 	async list(userId: string, filter: ListTasksFilter = {}): Promise<{ rows: Task[]; total: number }> {
@@ -340,6 +342,40 @@ export class TasksService {
 			throw new BadRequestException(`Related Task ${relatedTaskId} not found.`);
 		}
 		return this.relations.add(taskId, relatedTaskId, kind);
+	}
+
+	// ── Phase 13.5 — attachments ──────────────────────────────────
+
+	async listAttachments(userId: string, taskId: string) {
+		await this.getOne(userId, taskId);
+		if (!this.attachments) return [];
+		return this.attachments.findByTaskId(taskId);
+	}
+
+	/**
+	 * Attach an existing `work_knowledge_upload` row to a Task. The
+	 * upload itself flows through the existing KB upload pipeline
+	 * (the user uploads once, then attaches the resulting uploadId
+	 * to a Task / KB doc / etc.). Cross-user 404 enforced on the
+	 * Task; the uploadId is taken as-is — ownership validation of
+	 * the upload row lives in the existing KB upload service.
+	 */
+	async addAttachment(userId: string, taskId: string, uploadId: string) {
+		await this.getOne(userId, taskId);
+		if (!uploadId) throw new BadRequestException('uploadId is required.');
+		if (!this.attachments) {
+			throw new BadRequestException('Attachment repository not wired in this context.');
+		}
+		return this.attachments.add(taskId, uploadId);
+	}
+
+	async removeAttachment(userId: string, taskId: string, attachmentId: string) {
+		await this.getOne(userId, taskId);
+		if (!this.attachments) {
+			throw new BadRequestException('Attachment repository not wired in this context.');
+		}
+		await this.attachments.remove(attachmentId);
+		return { deleted: true } as const;
 	}
 
 	// ── internals ─────────────────────────────────────────────────

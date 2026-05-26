@@ -292,6 +292,43 @@ export class TasksController {
 		return this.service.removeBlocker(auth.userId, id, blockId);
 	}
 
+	@Get(':id/attachments')
+	@ApiOperation({ summary: 'List Task attachments (FK pointers to work_knowledge_upload rows).' })
+	@HttpCode(HttpStatus.OK)
+	async listAttachments(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		return this.service.listAttachments(auth.userId, id);
+	}
+
+	@Post(':id/attachments')
+	@ApiOperation({
+		summary:
+			'Attach an existing work_knowledge_upload to this Task. Upload via the existing KB pipeline first; pass the resulting uploadId here.',
+	})
+	@HttpCode(HttpStatus.CREATED)
+	@Throttle({ default: { limit: 60, ttl: 60_000 } })
+	async addAttachment(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: { uploadId: string },
+	) {
+		if (!body?.uploadId) throw new BadRequestException('uploadId is required.');
+		return this.service.addAttachment(auth.userId, id, body.uploadId);
+	}
+
+	@Delete(':id/attachments/:attachmentId')
+	@ApiOperation({ summary: 'Detach an attachment (the upload row itself is preserved).' })
+	@HttpCode(HttpStatus.OK)
+	async removeAttachment(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+	) {
+		return this.service.removeAttachment(auth.userId, id, attachmentId);
+	}
+
 	@Post(':id/relations')
 	@ApiOperation({ summary: 'Add a related/duplicates/follow-up edge.' })
 	@HttpCode(HttpStatus.CREATED)
