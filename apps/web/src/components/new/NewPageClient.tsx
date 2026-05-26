@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { BookOpen, Files, Globe, Lightbulb, Plus, Star, Target } from 'lucide-react';
+import {
+    ArrowRight,
+    BookOpen,
+    Files,
+    FolderInput,
+    Globe,
+    Lightbulb,
+    PenLine,
+    Star,
+    Target,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -10,7 +20,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import { CreationBlockTrio } from '@/components/works/CreationBlockTrio';
 import { createMissionAction } from '@/app/actions/dashboard/missions';
 import { createIdeaAction } from '@/app/actions/dashboard/work-proposals';
 
@@ -211,8 +220,8 @@ export function NewPageClient({
                         onClick={submit}
                         disabled={!canSubmit || submitting}
                     >
-                        <Plus className="w-3.5 h-3.5" />
                         {t('submit')}
+                        <ArrowRight className="w-3.5 h-3.5" />
                     </Button>
                 </div>
                 {selectedChip === null && (
@@ -227,30 +236,42 @@ export function NewPageClient({
                 )}
             </div>
 
-            {/* Or-divider + reused CreationBlockTrio in unified mode for
-                users who want the per-mode flows directly. PR CC1
-                already shipped the trio with the alternate label set. */}
-            <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border/60 dark:bg-border-dark/60" />
-                <span className="text-xs uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
+                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('or')}
-                </span>
-                <div className="flex-1 h-px bg-border/60 dark:bg-border-dark/60" />
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => {
+                            const params = new URLSearchParams({ mode: 'manual' });
+                            if (prompt.trim().length > 0) {
+                                params.set('prompt', prompt.trim().slice(0, 4000));
+                            }
+                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
+                        }}
+                    >
+                        <PenLine className="w-3.5 h-3.5" />
+                        {t('cards.manual.title')}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => {
+                            const params = new URLSearchParams({ mode: 'import' });
+                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
+                        }}
+                    >
+                        <FolderInput className="w-3.5 h-3.5" />
+                        {t('cards.import.title')}
+                    </Button>
+                </div>
             </div>
-            <CreationBlockTrio
-                labelSet="unified"
-                onSelect={(mode) => {
-                    // The trio's mode → /works/new mapping mirrors the
-                    // existing per-mode AI/manual/import flow. Carries
-                    // the prompt forward if the user typed one but
-                    // hadn't yet picked a chip.
-                    const params = new URLSearchParams({ mode });
-                    if (prompt.trim().length > 0) {
-                        params.set('prompt', prompt.trim().slice(0, 4000));
-                    }
-                    router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
-                }}
-            />
         </div>
     );
 }
