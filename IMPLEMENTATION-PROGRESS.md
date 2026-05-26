@@ -43,8 +43,8 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 38
-- **Last tick at**: 2026-05-26 (tick 38 — Phase 14.4 layout mount: new `apps/web/src/app/[locale]/(dashboard)/missions/[id]/layout.tsx` mounts the `MissionTabs` strip across both `/missions/[id]` (Overview) and `/missions/[id]/tasks` (Tasks). The strip component was shipped tick 19 but its mount was deferred on a "single-column body stability" concern that has since been resolved — the Tasks tab has been live as a direct deep-link for the full feature-set lifetime without regressing the Overview body. Hoisting the strip into the layout fixes the actual discovery gap: previously a user on Overview had no visible affordance to find Tasks. Stale "scaffold" / "follow-up" comments removed from both MissionTabs.tsx and the Tasks tab page.tsx.)
+- **Last tick #**: 39
+- **Last tick at**: 2026-05-26 (tick 39 — operator-reference docs: new `docs/architecture/agent-injection-tokens.md` documents the 6 new Nest injection tokens this branch introduces (`AGENT_TASK_EXECUTE_DISPATCHER`, `AGENT_CHAT_REPLY_DISPATCHER`, `AGENT_RUN_CHAT_BACK_POSTER`, `AGENT_RUN_TASK_FINISHER`, `AGENT_GIT_FACADE`, `AGENT_PLUGIN_TOOLS_FACADE`). Includes: contract signature per token, current consumer, default binding (or "unbound" status), suggested override patterns, and an opening section on the architectural posture (why tokens, not direct imports). Cross-links to the 3 spec files that validate the wiring. Migration sub-section shows how to wrap an existing in-house service via a thin `useFactory` adapter — the recommended path for operators who had bespoke implementations pre-PR-1017. With this doc the post-merge operator-binding work has a single discoverable reference.)
 - **In progress now**: Working through deferred sub-items post-Phase-20. All 20 main phases done; remaining unticked items below are post-merge polish that the loop can knock out incrementally.
 
 ---
