@@ -17,7 +17,12 @@ vi.mock('@/i18n/navigation', () => ({
             {children}
         </a>
     ),
+    useRouter: () => ({ push: vi.fn() }),
 }));
+vi.mock('@/app/actions/dashboard/missions', () => ({
+    createMissionAction: vi.fn(),
+}));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { MissionsList } from './MissionsList';
 import type { Mission } from '@/lib/api/missions';
@@ -42,31 +47,32 @@ function mkMission(id: string, overrides: Partial<Mission> = {}): Mission {
     };
 }
 
-describe('MissionsList (Phase 6 PR Q)', () => {
+describe('MissionsList (Phase 6 PR Q + quick-add)', () => {
     it('renders header title + subtitle', () => {
         render(<MissionsList missions={[]} />);
         expect(screen.getByText('title')).toBeTruthy();
         expect(screen.getByText('subtitle')).toBeTruthy();
     });
 
-    it('renders the top-right "+ New Mission" button linking to /new?type=mission', () => {
+    it('renders the inline quick-add composer on the /missions page', () => {
         const { container } = render(<MissionsList missions={[]} />);
-        const newMissionLinks = Array.from(container.querySelectorAll('a[href]')).filter((a) =>
-            (a as HTMLAnchorElement).textContent?.includes('newMission'),
-        );
-        expect(newMissionLinks.length).toBeGreaterThan(0);
-        // All "+ New Mission" links point at /new?type=mission so Phase
-        // 6.5 PR CC2's `/new` page can read the type query param to
-        // pre-fill the chip selection.
-        for (const a of newMissionLinks) {
-            expect((a as HTMLAnchorElement).getAttribute('href')).toBe('/new?type=mission');
-        }
+        const textarea = container.querySelector('textarea');
+        expect(textarea).not.toBeNull();
+        // Label points at the quick-add input.
+        const label = container.querySelector('label[for="missions-quick-add"]');
+        expect(label).not.toBeNull();
     });
 
-    it('renders the empty-state surface when no Missions exist', () => {
-        render(<MissionsList missions={[]} />);
+    it('renders the empty-state surface when no Missions exist with a /new?type=mission escape hatch', () => {
+        const { container } = render(<MissionsList missions={[]} />);
         expect(screen.getByText('empty.title')).toBeTruthy();
         expect(screen.getByText('empty.subtitle')).toBeTruthy();
+        // The empty state still keeps a secondary link to /new for the
+        // chip-aware flow (sidebar's "+ New" target).
+        const openNewLinks = Array.from(container.querySelectorAll('a[href]')).filter(
+            (a) => (a as HTMLAnchorElement).getAttribute('href') === '/new?type=mission',
+        );
+        expect(openNewLinks.length).toBeGreaterThan(0);
     });
 
     it('renders one MissionCard per Mission and no empty-state when missions present', () => {
@@ -78,11 +84,9 @@ describe('MissionsList (Phase 6 PR Q)', () => {
         expect(screen.queryByText('empty.title')).toBeNull();
     });
 
-    it('NO large quick-add form is rendered (Phase 6.5 PR CC2 owns /new)', () => {
-        const { container } = render(<MissionsList missions={[]} />);
-        // Quick-add would be a textarea — the catalog page must not
-        // ship one per spec §5.5 PR Q. The /missions page is browse-
-        // and-detail; creation goes through /new.
-        expect(container.querySelector('textarea')).toBeNull();
+    it('keeps the quick-add composer visible after Missions exist (single entry point)', () => {
+        const missions = ['a'].map((id) => mkMission(id));
+        const { container } = render(<MissionsList missions={missions} />);
+        expect(container.querySelector('textarea')).not.toBeNull();
     });
 });

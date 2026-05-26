@@ -880,7 +880,7 @@ export function TemplatesCatalog({
     return (
         <div className="w-full">
             <div className="mb-8 flex flex-col gap-4 @lg/main:flex-row @lg/main:items-start @lg/main:justify-between">
-                <div>
+                <div className="min-w-0">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                         {t('title')}
                     </h1>
@@ -895,23 +895,19 @@ export function TemplatesCatalog({
                     <KindSwitcher current={kind} />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary/10 text-primary border border-primary/20 max-w-[220px]">
+                {/* UI polish — Built-in / Custom counts are already
+                    rendered in the filter row below (with the same
+                    counts wired to the active filter), so we don't
+                    double-print them here. Only the Active-default
+                    chip remains in this header — it carries unique
+                    information (which template new Works start from)
+                    and the long template name fits comfortably on one
+                    line. */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary/10 text-primary border border-primary/20 max-w-[260px]">
                         <Star className="w-3 h-3 fill-current shrink-0" />
                         <span className="truncate">
                             {activeDefaultTemplate?.name || t('stats.none')}
-                        </span>
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-surface dark:bg-white/5 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
-                        {t('stats.builtInLabel')}
-                        <span className="font-semibold text-text dark:text-text-dark">
-                            {builtInCount}
-                        </span>
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-surface dark:bg-white/5 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
-                        {t('stats.customLabel')}
-                        <span className="font-semibold text-text dark:text-text-dark">
-                            {customCount}
                         </span>
                     </span>
                 </div>
