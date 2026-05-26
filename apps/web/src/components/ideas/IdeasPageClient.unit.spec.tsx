@@ -111,9 +111,23 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             mkIdea({ id: 'b1', status: 'building' }),
             mkIdea({ id: 'a1', status: 'accepted' }),
         ];
-        const { container } = render(<IdeasPageClient initialIdeas={ideas} />);
-        // 8 chips total ('all' + 6 statuses + 'done' alias, Phase 5 PR P).
-        expect(container.querySelectorAll('button.rounded-full')).toHaveLength(8);
+        render(<IdeasPageClient initialIdeas={ideas} />);
+        // Locate filter chips via their i18n key text — the PromptComposer
+        // submit button is also `rounded-full` so we can't just count
+        // `button.rounded-full` anymore.
+        const filterChipKeys = [
+            'all',
+            'pending',
+            'queued',
+            'building',
+            'failed',
+            'accepted',
+            'dismissed',
+            'done',
+        ];
+        for (const key of filterChipKeys) {
+            expect(screen.getByText(`filters.${key}`)).toBeTruthy();
+        }
         // 'all' badge shows total count (5), pending shows (2).
         expect(screen.getByText('filters.all').parentElement?.textContent).toMatch(/5/);
         expect(screen.getByText('filters.pending').parentElement?.textContent).toMatch(/2/);
@@ -130,11 +144,16 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         expect(screen.queryByText('Idea p1')).toBeNull();
     });
 
-    it('quick-add disabled until description >= 10 chars', () => {
-        render(<IdeasPageClient initialIdeas={[]} />);
-        const addBtn = screen.getByText('quickAdd.submit').closest('button')!;
+    it('quick-add submit disabled until description >= 10 chars', () => {
+        const { container } = render(<IdeasPageClient initialIdeas={[]} />);
+        const textarea = container.querySelector(
+            'textarea[data-testid="ideas-quick-add"]',
+        ) as HTMLTextAreaElement;
+        const addBtn = container.querySelector(
+            'button[data-testid="ideas-quick-add-submit"]',
+        ) as HTMLButtonElement;
+        expect(addBtn).toBeTruthy();
         expect(addBtn.disabled).toBe(true);
-        const textarea = screen.getByPlaceholderText('quickAdd.placeholder');
         fireEvent.change(textarea, { target: { value: 'too short' } });
         expect(addBtn.disabled).toBe(true);
         fireEvent.change(textarea, { target: { value: 'A long enough idea description' } });
@@ -145,12 +164,19 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         createIdeaMock.mockClear();
         const newIdea = mkIdea({ id: 'new-1', status: 'pending' });
         createIdeaMock.mockResolvedValueOnce(newIdea);
-        render(<IdeasPageClient initialIdeas={[mkIdea({ id: 'old', status: 'pending' })]} />);
-        const textarea = screen.getByPlaceholderText('quickAdd.placeholder');
+        const { container } = render(
+            <IdeasPageClient initialIdeas={[mkIdea({ id: 'old', status: 'pending' })]} />,
+        );
+        const textarea = container.querySelector(
+            'textarea[data-testid="ideas-quick-add"]',
+        ) as HTMLTextAreaElement;
         fireEvent.change(textarea, {
             target: { value: 'My freshly typed Idea, longer than ten chars' },
         });
-        fireEvent.click(screen.getByText('quickAdd.submit'));
+        const addBtn = container.querySelector(
+            'button[data-testid="ideas-quick-add-submit"]',
+        ) as HTMLButtonElement;
+        fireEvent.click(addBtn);
         expect(createIdeaMock).toHaveBeenCalledWith({
             description: 'My freshly typed Idea, longer than ten chars',
         });
