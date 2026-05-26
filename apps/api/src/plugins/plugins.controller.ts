@@ -111,7 +111,9 @@ export class PluginsController {
     async getPluginConnectionStatus(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('pluginId') pluginId: string,
-    ): Promise<{ connectionStatus: Awaited<ReturnType<PluginOperationsService['getPluginConnectionStatus']>> }> {
+    ): Promise<{
+        connectionStatus: Awaited<ReturnType<PluginOperationsService['getPluginConnectionStatus']>>;
+    }> {
         const connectionStatus = await this.pluginsService.getPluginConnectionStatus(
             pluginId,
             auth.userId,
