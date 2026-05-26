@@ -24,18 +24,16 @@ import {
 	TaskKbMentionRepository,
 	UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
+import { TaskTransitionService } from './task-transition.service';
+import { TasksService } from './tasks.service';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
- * Tasks feature — Phase 11.
+ * Tasks feature — Phase 11 + 12.
  *
- * Agent-side module that owns the Tasks family data surface.
- * Service layer (TasksService, TaskTransitionService, TaskChatService)
- * lands in Phase 12. The "Ever Works Task Tracker" plugin binds to
- * this module's `TaskRepository` via the platform's plugin bootstrap.
- *
- * Module is named `tasks-domain` on disk (and not `tasks`) to avoid
- * confusion with `packages/tasks/` which is the Trigger.dev jobs
- * package — they're orthogonal concerns sharing the same word.
+ * Agent-side module that owns the Tasks family data surface +
+ * the service layer (TasksService + TaskTransitionService).
+ * TaskChatService lands in Phase 13.
  */
 @Module({
 	imports: [
@@ -52,6 +50,7 @@ import {
 			TaskKbMention,
 			UserTaskCounter,
 		]),
+		ActivityLogModule,
 	],
 	providers: [
 		TaskRepository,
@@ -65,6 +64,8 @@ import {
 		TaskWatcherRepository,
 		TaskKbMentionRepository,
 		UserTaskCounterRepository,
+		TaskTransitionService,
+		TasksService,
 	],
 	exports: [
 		TaskRepository,
@@ -78,6 +79,8 @@ import {
 		TaskWatcherRepository,
 		TaskKbMentionRepository,
 		UserTaskCounterRepository,
+		TaskTransitionService,
+		TasksService,
 	],
 })
 export class TasksDomainModule {}

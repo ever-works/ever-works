@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 16
-- **Last tick at**: 2026-05-26 (tick 16 — Phase 11 complete: TaskRepository (with cycle detector + casClaimRecurrence + findDueRecurringTemplates) + 10 side repos + UserTaskCounter atomic slug sequence + ITaskTrackerPlugin contract + TASK_TRACKER capability + Ever Works Task Tracker plugin (DB-shim) + TasksFacadeService + TasksDomainModule + cycle-detector tests.)
-- **In progress now**: (none — next tick picks up Phase 12 TasksController + /tasks list page)
+- **Last tick #**: 17
+- **Last tick at**: 2026-05-26 (tick 17 — Phase 12 complete: TaskTransitionService state machine + TasksService (CRUD + slug gen + activity events) + TasksController + 6 task activity-enum values + agent-side module wiring + API-side module + api.module registration + real /tasks list page (cards+table view toggle + status filter) + /tasks/new form + tasks API client + server actions + state-machine tests.)
+- **In progress now**: (none — next tick picks up Phase 13 Task detail page + chat)
 
 ---
 
@@ -178,14 +178,14 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 12 — TasksController + /tasks list page
 
-- [ ] **12.1** State machine `TaskTransitionService`.
-- [ ] **12.2** Slug generator + atomic counter.
-- [ ] **12.3** DTOs + CRUD endpoints (create, list with filters, update, transition, assignees/reviewers/approvers/blockers/relations).
-- [ ] **12.4** Activity events.
-- [ ] **12.5** Sidebar Tasks route wired.
-- [ ] **12.6** `/tasks` list page (Cards + Table).
-- [ ] **12.7** `/tasks/new` create form.
-- [ ] **12.8** Tests.
+- [x] **12.1** State machine `TaskTransitionService` at `packages/agent/src/tasks-domain/task-transition.service.ts` — full backlog/todo/in_progress/in_review/blocked/done/cancelled lattice + side effects (startedAt on first in_progress / completedAt on done / previousStatus stash on blocked / clear on unblock) + blocker-gate + approver-gate (force=true overrides approver but not blocker — those are integrity). ✓ Tick 17
+- [x] **12.2** Slug generator wired through `UserTaskCounterRepository.nextSlug()` (Phase 11.5) — `TasksService.create` calls it to produce `T-<n>` slugs with atomic increment + INSERT-on-missing fallback for race-safety. ✓ Tick 17
+- [x] **12.3** Controller routes shipped: `GET /api/tasks` (status/priority/scope/label/search filters, paginated), `POST /api/tasks`, `GET /api/tasks/:id`, `PATCH /api/tasks/:id`, `DELETE /api/tasks/:id`, `POST /api/tasks/:id/transition`, `POST /api/tasks/:id/assignees` + `DELETE`, `POST /api/tasks/:id/reviewers`, `POST /api/tasks/:id/approvers`, `POST /api/tasks/:id/blocks` + `DELETE`, `POST /api/tasks/:id/relations`. Throttled per `task-tracking/plan.md §6.1`. ✓ Tick 17
+- [x] **12.4** Activity events: `TASK_CREATED` / `TASK_UPDATED` / `TASK_DELETED` / `TASK_TRANSITIONED` / `TASK_ASSIGNEE_ADDED` / `TASK_ASSIGNEE_REMOVED` / `TASK_BLOCKER_ADDED` emitted by `TasksService`. Extended `ActivityActionType` enum with the 6 missing values. ✓ Tick 17
+- [x] **12.5** Sidebar Tasks route already wired in Phase 5 — no change needed. ✓
+- [x] **12.6** `/tasks` list page rewritten as real cards/table view with view-mode toggle + status filter. Server-fetches the user's Tasks with defensive `.catch()` so partial backend failure still renders empty-state. `TasksList` client component handles view switching + filtering. Kanban + per-target tabs land in Phase 14. ✓ Tick 17
+- [x] **12.7** `/tasks/new` form (`NewTaskForm.tsx`) — title + description + priority + labels. Scope/assignees/parent/recurring chips deferred to a follow-up sub-tick. ✓ Tick 17
+- [x] **12.8** State-machine unit tests at `__tests__/task-transition.service.spec.ts` (~10 assertions: canTransition lattice + illegal-jump rejection + startedAt/completedAt/previousStatus side effects + blocker gate + approver gate + force=true override semantics). ✓ Tick 17
 
 ### Phase 13 — Task detail page + chat
 

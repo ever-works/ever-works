@@ -3,6 +3,8 @@
 // `@ever-works/agent/tasks` which is the Trigger.dev jobs subpath
 // — this module owns the per-Task DB entities + repositories.
 export * from './tasks.module';
+export * from './tasks.service';
+export * from './task-transition.service';
 export {
 	Task,
 	TaskPriority,
