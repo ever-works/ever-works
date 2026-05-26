@@ -180,14 +180,14 @@ export class Agent {
     @Column('uuid', { nullable: true })
     workId?: string | null;
 
-    @Column({ length: 120 })
+    @Column({ type: 'varchar', length: 120 })
     name: string;
 
     /** Kebab-case derived from `name`; unique per scope (see composite index). */
-    @Column({ length: 80 })
+    @Column({ type: 'varchar', length: 80 })
     slug: string;
 
-    @Column({ length: 200, nullable: true })
+    @Column({ type: 'varchar', length: 200, nullable: true })
     title?: string | null;
 
     @Column({ type: 'text', nullable: true })
@@ -196,10 +196,10 @@ export class Agent {
     // ── AI provider routing ──
     // null = use account default per the existing AiFacadeService cascade.
 
-    @Column({ length: 100, nullable: true })
+    @Column({ type: 'varchar', length: 100, nullable: true })
     aiProviderId?: string | null;
 
-    @Column({ length: 100, nullable: true })
+    @Column({ type: 'varchar', length: 100, nullable: true })
     modelId?: string | null;
 
     @Column({ type: 'int', default: 4000 })
@@ -238,7 +238,7 @@ export class Agent {
     @Column({ type: 'timestamp', nullable: true })
     lastRunAt?: Date | null;
 
-    @Column({ length: 16, nullable: true })
+    @Column({ type: 'varchar', length: 16, nullable: true })
     lastRunStatus?: string | null;
 
     @Column({ type: 'int', default: 0 })
@@ -253,7 +253,7 @@ export class Agent {
     avatarMode: AgentAvatarMode;
 
     /** Lucide icon name; populated only when `avatarMode = 'icon'`. */
-    @Column({ length: 64, nullable: true })
+    @Column({ type: 'varchar', length: 64, nullable: true })
     avatarIcon?: string | null;
 
     /**
@@ -285,7 +285,7 @@ export class Agent {
     agentYml?: string | null;
 
     /** sha256 of the canonical 5-file concatenation; used for ETag / optimistic concurrency. */
-    @Column({ length: 64, nullable: true })
+    @Column({ type: 'varchar', length: 64, nullable: true })
     contentHash?: string | null;
 
     // ── FU-13 — git committer identity ──

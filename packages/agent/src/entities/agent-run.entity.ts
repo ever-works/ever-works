@@ -53,7 +53,7 @@ export class AgentRun {
     status: AgentRunStatus;
 
     /** Trigger.dev run id; used to call `runs.cancel(...)` on user-initiated cancel. */
-    @Column({ length: 64, nullable: true })
+    @Column({ type: 'varchar', length: 64, nullable: true })
     triggerRunId?: string | null;
 
     @Column({ type: 'timestamp', nullable: true })
