@@ -232,14 +232,14 @@ export class OAuthService {
 
         const config = await this.getOAuthConfig(providerId);
         const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
-        let readPackagesPatOwner: string | undefined;
+        let readPackagesPatOwner = '';
 
         try {
             const user = await this.oauthFacade.getAuthenticatedUser(providerId, token.accessToken);
             readPackagesPatOwner = user.username;
         } catch (error) {
             this.logger.warn(
-                `Stored read-packages token for user ${userId} on plugin ${providerId}, but failed to resolve token owner:`,
+                `Exchanged read-packages token for user ${userId} on plugin ${providerId}, but failed to resolve token owner:`,
                 error,
             );
         }
@@ -247,10 +247,7 @@ export class OAuthService {
         await this.pluginSettingsService.updateUserSettings(
             providerId,
             userId,
-            {
-                readPackagesPat: token.accessToken,
-                ...(readPackagesPatOwner ? { readPackagesPatOwner } : {}),
-            },
+            { readPackagesPat: token.accessToken, readPackagesPatOwner },
             { secretKeys: ['readPackagesPat'] },
         );
 

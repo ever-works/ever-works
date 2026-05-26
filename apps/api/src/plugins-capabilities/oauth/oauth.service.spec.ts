@@ -585,7 +585,7 @@ describe('OAuthService', () => {
             expect(pluginSettingsService.updateUserSettings).toHaveBeenCalledWith(
                 'github',
                 'user-1',
-                { readPackagesPat: 'packages-token' },
+                { readPackagesPat: 'packages-token', readPackagesPatOwner: '' },
                 { secretKeys: ['readPackagesPat'] },
             );
             expect(result).toEqual({ providerId: 'github', connected: true });
