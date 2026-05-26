@@ -129,7 +129,17 @@ export class Task {
     @Column({ type: 'varchar', length: 200, nullable: true })
     recurrenceRule?: string | null;
 
-    @Column({ type: 'varchar', length: 64, nullable: true, default: "'UTC'" })
+    // `default: 'UTC'` (not `"'UTC'"`) — TypeORM auto-quotes string
+    // defaults for varchar columns, matching the convention used by
+    // every other string default in the entity layer (`'usd'`,
+    // `'pending'`, `'local'`, …). The previously-shipped embedded-
+    // quote form passed through Postgres correctly as `DEFAULT 'UTC'`
+    // but better-sqlite3's TypeORM driver emitted `DEFAULT UTC`
+    // (unquoted), so sqlite parsed `UTC` as an identifier and the
+    // CLI's `synchronize` step crashed with `near "UTC": syntax
+    // error`. That broke `apps/internal-cli`'s lint-and-test step on
+    // every PR open against `develop` since PR #1019.
+    @Column({ type: 'varchar', length: 64, nullable: true, default: 'UTC' })
     recurrenceTimezone?: string | null;
 
     @PortableDateColumn({ nullable: true })
