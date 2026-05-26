@@ -126,23 +126,86 @@ function ActivePanel({ task }: { task: Task }) {
     );
 }
 
+const DAYS_OF_WEEK = [
+    { value: 'MO', label: 'Mon' },
+    { value: 'TU', label: 'Tue' },
+    { value: 'WE', label: 'Wed' },
+    { value: 'TH', label: 'Thu' },
+    { value: 'FR', label: 'Fri' },
+    { value: 'SA', label: 'Sat' },
+    { value: 'SU', label: 'Sun' },
+] as const;
+
+type DayOfWeek = (typeof DAYS_OF_WEEK)[number]['value'];
+
+function detectBrowserTimezone(): string {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+        return 'UTC';
+    }
+}
+
 function InactivePanel({ task }: { task: Task }) {
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
     const [endsAt, setEndsAt] = useState('');
     const [maxOccurrences, setMaxOccurrences] = useState('');
+    // FU-7 — friendly RRULE controls. Defaults match the original
+    // single-frequency picker behaviour: 9:00, Monday-only for Weekly,
+    // 1st-of-month for Monthly, browser timezone if available.
+    const [timeOfDay, setTimeOfDay] = useState('09:00');
+    const [daysOfWeek, setDaysOfWeek] = useState<DayOfWeek[]>(['MO']);
+    const [dayOfMonth, setDayOfMonth] = useState('1');
+    const [timezone, setTimezone] = useState<string>(() => detectBrowserTimezone());
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
     const ruleString = useMemo(() => {
         if (frequency === 'CUSTOM') return customRule.trim();
-        return `FREQ=${frequency}`;
-    }, [frequency, customRule]);
+        const parts: string[] = [`FREQ=${frequency}`];
+        // Parse HH:MM → BYHOUR + BYMINUTE. Skip when blank.
+        const match = /^(\d{1,2}):(\d{2})$/.exec(timeOfDay.trim());
+        if (match) {
+            const hour = Math.min(23, Math.max(0, parseInt(match[1], 10) || 0));
+            const minute = Math.min(59, Math.max(0, parseInt(match[2], 10) || 0));
+            parts.push(`BYHOUR=${hour}`, `BYMINUTE=${minute}`);
+        }
+        if (frequency === 'WEEKLY' && daysOfWeek.length > 0) {
+            parts.push(`BYDAY=${daysOfWeek.join(',')}`);
+        }
+        if (frequency === 'MONTHLY' && dayOfMonth.trim().length > 0) {
+            const d = Math.min(31, Math.max(1, parseInt(dayOfMonth, 10) || 1));
+            parts.push(`BYMONTHDAY=${d}`);
+        }
+        return parts.join(';');
+    }, [frequency, customRule, timeOfDay, daysOfWeek, dayOfMonth]);
+
+    const isValidRule = useMemo(() => {
+        // Lightweight client-side check — fully validated server-side
+        // via the `rrule` package on `TasksService.setRecurring`.
+        if (!ruleString) return false;
+        if (!/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY|HOURLY|MINUTELY|SECONDLY)/.test(ruleString)) {
+            return false;
+        }
+        if (frequency === 'WEEKLY' && daysOfWeek.length === 0) return false;
+        return true;
+    }, [ruleString, frequency, daysOfWeek]);
+
+    const toggleDay = (day: DayOfWeek) => {
+        setDaysOfWeek((prev) =>
+            prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+        );
+    };
 
     const handleSave = () => {
-        if (!ruleString) {
-            setError('A recurrence rule is required.');
+        if (!isValidRule) {
+            setError(
+                frequency === 'WEEKLY' && daysOfWeek.length === 0
+                    ? 'Pick at least one weekday.'
+                    : 'A valid recurrence rule is required.',
+            );
             return;
         }
         setError(null);
@@ -151,6 +214,7 @@ function InactivePanel({ task }: { task: Task }) {
                 try {
                     await setTaskRecurringAction(task.id, {
                         recurrenceRule: ruleString,
+                        recurrenceTimezone: timezone || undefined,
                         recurrenceEndsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
                         recurrenceMaxOccurrences:
                             maxOccurrences.trim().length > 0
@@ -218,6 +282,83 @@ function InactivePanel({ task }: { task: Task }) {
                         />
                     </div>
                 )}
+                {frequency !== 'CUSTOM' && (
+                    <div>
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            Time of day (HH:MM)
+                        </label>
+                        <input
+                            type="time"
+                            value={timeOfDay}
+                            onChange={(e) => setTimeOfDay(e.target.value)}
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        />
+                    </div>
+                )}
+                {frequency === 'WEEKLY' && (
+                    <div className="@md/main:col-span-2">
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            Day(s) of week
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                            {DAYS_OF_WEEK.map((d) => {
+                                const active = daysOfWeek.includes(d.value);
+                                return (
+                                    <button
+                                        key={d.value}
+                                        type="button"
+                                        onClick={() => toggleDay(d.value)}
+                                        className={`text-[11px] px-2 h-7 rounded border transition-colors ${
+                                            active
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border/60 dark:border-border-dark/60 text-text-secondary hover:text-text'
+                                        }`}
+                                    >
+                                        {d.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                {frequency === 'MONTHLY' && (
+                    <div>
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            Day of month (1–31)
+                        </label>
+                        <input
+                            type="number"
+                            value={dayOfMonth}
+                            onChange={(e) => setDayOfMonth(e.target.value)}
+                            min={1}
+                            max={31}
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        />
+                    </div>
+                )}
+                {frequency !== 'CUSTOM' && (
+                    <div>
+                        <label className="block text-[10px] text-text-muted mb-1">Timezone</label>
+                        <input
+                            type="text"
+                            value={timezone}
+                            onChange={(e) => setTimezone(e.target.value)}
+                            placeholder="UTC"
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                            list="task-tz-suggestions"
+                        />
+                        <datalist id="task-tz-suggestions">
+                            <option value="UTC" />
+                            <option value="America/New_York" />
+                            <option value="America/Los_Angeles" />
+                            <option value="Europe/London" />
+                            <option value="Europe/Berlin" />
+                            <option value="Asia/Tokyo" />
+                            <option value="Asia/Singapore" />
+                            <option value="Australia/Sydney" />
+                        </datalist>
+                    </div>
+                )}
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
                         Ends (optional)
@@ -246,9 +387,12 @@ function InactivePanel({ task }: { task: Task }) {
             </div>
             <div className="text-[11px] text-text-muted font-mono">
                 Rule preview: {ruleString || '(empty)'}
+                {!isValidRule && ruleString && (
+                    <span className="text-danger ml-2">· invalid</span>
+                )}
             </div>
             <div className="flex items-center gap-2">
-                <Button size="sm" onClick={handleSave} disabled={pending}>
+                <Button size="sm" onClick={handleSave} disabled={pending || !isValidRule}>
                     {pending ? '…' : 'Save'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
