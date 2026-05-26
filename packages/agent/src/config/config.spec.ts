@@ -690,6 +690,10 @@ describe('agent/config', () => {
         it('exposes the full set of config groups', () => {
             const keys = Object.keys(config).sort();
             expect(keys).toEqual([
+                // PR #1019 — Agents/Skills/Tasks feature added `agents.*`
+                // config group (heartbeat dispatcher gates, stuck-timeout,
+                // max batch size, etc.). Pinned alphabetically here.
+                'agents',
                 'billing',
                 'branding',
                 'database',

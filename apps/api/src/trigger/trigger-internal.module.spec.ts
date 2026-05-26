@@ -36,6 +36,15 @@ jest.mock('../data-sync/data-sync.module', () => ({
 jest.mock('@ever-works/agent/missions', () => ({
     MissionsModule: class MissionsModule {},
 }));
+// FU-2 post-CI fix: trigger-internal.module imports AgentsModule +
+// TasksDomainModule (added by PR #1019). Stub them to avoid pulling
+// the entity transitive imports under jest.
+jest.mock('@ever-works/agent/agents', () => ({
+    AgentsModule: class AgentsModule {},
+}));
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TasksDomainModule: class TasksDomainModule {},
+}));
 jest.mock('./trigger-internal.controller', () => ({
     TriggerInternalController: class TriggerInternalController {},
 }));

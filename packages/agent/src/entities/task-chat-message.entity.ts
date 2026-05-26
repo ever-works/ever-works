@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
+import { PortableDateColumn } from './_types';
 
 export interface TaskChatMention {
     type: 'user' | 'agent' | 'kb';
@@ -55,7 +56,7 @@ export class TaskChatMessage {
     @Column({ type: 'simple-json', nullable: true })
     attachments?: TaskChatAttachmentRef[] | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     editedAt?: Date | null;
 
     @CreateDateColumn()

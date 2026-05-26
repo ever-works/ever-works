@@ -8,6 +8,7 @@ import {
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
+import { PortableDateColumn } from './_types';
 
 export type TaskReviewState = 'pending' | 'requested-changes' | 'approved';
 
@@ -38,7 +39,7 @@ export class TaskReviewer {
     @Column({ type: 'varchar', length: 24, default: "'pending'" })
     reviewState: TaskReviewState;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     reviewedAt?: Date | null;
 
     @CreateDateColumn()

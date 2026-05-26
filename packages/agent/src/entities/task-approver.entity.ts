@@ -8,6 +8,7 @@ import {
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
+import { PortableDateColumn } from './_types';
 
 export type TaskApprovalState = 'pending' | 'approved' | 'rejected';
 
@@ -38,7 +39,7 @@ export class TaskApprover {
     @Column({ type: 'varchar', length: 16, default: "'pending'" })
     approvalState: TaskApprovalState;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     approvedAt?: Date | null;
 
     @CreateDateColumn()

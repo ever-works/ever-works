@@ -139,7 +139,11 @@ export class AgentsService {
         this.validateScopeOwnership(input);
 
         const slug = slugifyText(input.name);
-        if (!slug) {
+        // `slugifyText('---')` returns `-` (dash), not the empty string,
+        // because slug preservation keeps dashes. We need at least one
+        // alphanumeric character in the resulting slug — a slug that's
+        // pure punctuation is useless for routing / DB lookup.
+        if (!slug || !/[a-z0-9]/i.test(slug)) {
             throw new BadRequestException(
                 'Agent name must contain at least one alphanumeric character.',
             );
@@ -227,7 +231,7 @@ export class AgentsService {
 
         if (input.name !== undefined) {
             const slug = slugifyText(input.name);
-            if (!slug) {
+            if (!slug || !/[a-z0-9]/i.test(slug)) {
                 throw new BadRequestException(
                     'Agent name must contain at least one alphanumeric character.',
                 );

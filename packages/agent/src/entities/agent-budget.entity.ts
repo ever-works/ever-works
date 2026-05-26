@@ -6,6 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Per-Agent spending interval (agents/spec.md §3.4, operator N6 override
@@ -50,7 +51,7 @@ export class AgentBudget {
      * = 'hour'` ⇒ resets at 10:42, 11:42, …). NULL for `month` (calendar
      * boundary) and `unlimited`.
      */
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     intervalAnchor?: Date | null;
 
     @Column({ type: 'int' })

@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PortableDateColumn } from './_types';
 
 /**
  * Agent scope (agents/spec.md §3.6 / architecture/agents-skills-tasks.md §3).
@@ -232,10 +233,13 @@ export class Agent {
     @Column({ type: 'varchar', length: 16, default: AgentIdleBehavior.PROPOSE })
     idleBehavior: AgentIdleBehavior;
 
-    @Column({ type: 'timestamp', nullable: true })
+    // H-17: `type: 'timestamp'` is Postgres-only and breaks integration
+    // specs that boot under better-sqlite3. `PortableDateColumn` lets
+    // TypeORM pick the right column type per dialect.
+    @PortableDateColumn({ nullable: true })
     nextHeartbeatAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     lastRunAt?: Date | null;
 
     @Column({ type: 'varchar', length: 16, nullable: true })

@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * What kicked off this run.
@@ -56,10 +57,10 @@ export class AgentRun {
     @Column({ type: 'varchar', length: 64, nullable: true })
     triggerRunId?: string | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     startedAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     finishedAt?: Date | null;
 
     @Column({ type: 'int', nullable: true })

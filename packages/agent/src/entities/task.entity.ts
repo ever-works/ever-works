@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PortableDateColumn } from './_types';
 
 /**
  * Tasks feature — Phase 11.1 (`features/task-tracking/plan.md §3.1` +
@@ -111,10 +112,10 @@ export class Task {
     @Column({ type: 'boolean', default: true })
     requireAllApprovers: boolean;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     startedAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     completedAt?: Date | null;
 
     // Reserve-only column — populated in v2 when "promote Task → Idea" lands.
@@ -131,10 +132,10 @@ export class Task {
     @Column({ type: 'varchar', length: 64, nullable: true, default: "'UTC'" })
     recurrenceTimezone?: string | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     nextOccurrenceAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     recurrenceEndsAt?: Date | null;
 
     @Column({ type: 'int', nullable: true })
