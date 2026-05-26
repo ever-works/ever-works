@@ -24,6 +24,9 @@ export const ImportSourceTypeEnum = {
 
 export type ImportSourceTypeEnum = (typeof ImportSourceTypeEnum)[keyof typeof ImportSourceTypeEnum];
 
+const AWESOME_README_IMPORT_MODES = ['clone', 'reuse_source'] as const;
+type AwesomeReadmeImportMode = (typeof AWESOME_README_IMPORT_MODES)[number];
+
 export class ImportEnrichmentConfigDto {
     @IsOptional()
     @IsNumber()
@@ -82,6 +85,10 @@ export class ImportWorkDto {
 
     @IsIn(IMPORT_SOURCE_TYPES)
     sourceType: ImportSourceType;
+
+    @IsOptional()
+    @IsIn(AWESOME_README_IMPORT_MODES)
+    awesomeReadmeImportMode?: AwesomeReadmeImportMode;
 
     @IsString()
     @IsNotEmpty()

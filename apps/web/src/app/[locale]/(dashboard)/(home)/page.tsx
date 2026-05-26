@@ -13,8 +13,13 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('dashboard') };
 }
 
-export default async function Dashboard() {
+interface DashboardPageProps {
+    searchParams: Promise<{ newUser?: string }>;
+}
+
+export default async function Dashboard({ searchParams }: DashboardPageProps) {
     const [
+        { newUser },
         user,
         worksResponse,
         statsResponse,
@@ -24,6 +29,7 @@ export default async function Dashboard() {
         allIdeas,
         accountWide,
     ] = await Promise.all([
+        searchParams,
         getAuthFromCookie(),
         getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
             success: false,
@@ -35,25 +41,15 @@ export default async function Dashboard() {
             totalWorks: 0,
             totalItems: 0,
             activeWebsites: 0,
-            // Phase 2 PR F — new Dashboard tiles. Catch-fallback must
-            // include these so the type-narrowed branch below doesn't
-            // see undefined.
             totalMissions: 0,
             totalIdeas: 0,
         })),
         workProposalsAPI.list(['pending']).catch(() => []),
         workProposalsAPI.status().catch(() => ({ researching: false, canRefresh: true }) as const),
-        // Phase 6 PR S — Missions preview block needs the user's
-        // Mission list + every Idea across all statuses (used
-        // client-side to derive per-Mission counters without N+1
-        // round-trips).
         missionsAPI.list().catch(() => []),
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'])
             .catch(() => []),
-        // Phase 7 PR II — account-wide spend for the 6th
-        // dashboard tile. Catch-defended so a flaky usage
-        // endpoint surfaces $0 instead of 500ing the page.
         usageAPI.accountWide().catch(() => null),
     ]);
 
@@ -71,6 +67,7 @@ export default async function Dashboard() {
             initialProposals={proposals}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}
+            autoStartProposals={newUser === 'true' && proposals.length === 0}
             initialMissions={missions}
             initialAllIdeas={allIdeas}
             monthSpendCents={accountWide?.currentSpendCents ?? 0}

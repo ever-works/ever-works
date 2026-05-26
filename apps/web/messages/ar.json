@@ -3141,7 +3141,19 @@
                     "legalNote": "ملاحظة:",
                     "legalDescription": "وضع البحث يستخدم المستودع المصدر كبيانات إدخال فقط. ستتكون المجموعة النهائية بشكل أساسي من عناصر مكتشفة حديثًا مع وصفات أصلية مولدة بالذكاء الاصطناعي. لا يتم نسخ محتوى المصدر حرفيًا.",
                     "importButton": "بدء الاستيراد والبحث",
-                    "importingButton": "بدء خط أنابيب البحث..."
+                    "importingButton": "بدء خط أنابيب البحث...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "تحليل المستودع",
                 "importButton": "استيراد العمل",

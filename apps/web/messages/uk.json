@@ -3077,7 +3077,19 @@
                     "legalNote": "Примітка:",
                     "legalDescription": "Режим дослідження використовує вихідний репозиторій лише як вхідні дані. Остаточна колекція складатиметься переважно з нововиявлених елементів з оригінальними, згенерованими ШІ описами. Контент джерела не копіюється дослівно.",
                     "importButton": "Розпочати імпорт та дослідження",
-                    "importingButton": "Запуск конвеєра дослідження..."
+                    "importingButton": "Запуск конвеєра дослідження...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Аналізувати репозиторій",
                 "importButton": "Імпортувати робота",

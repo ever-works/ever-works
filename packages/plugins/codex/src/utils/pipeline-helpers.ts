@@ -3,12 +3,6 @@ import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'node:crypto';
 
-// Internal joins use native `path` so absolute paths on Windows (drive
-// letters) resolve correctly for fs ops. We normalize the return values
-// (env-var-visible strings) to POSIX form so cross-platform tests stay
-// stable. Node accepts forward slashes on Windows for fs APIs.
-const toPosix = (p: string): string => p.replace(/\\/g, '/');
-
 import type { PluginSettings } from '@ever-works/plugin';
 import { createPipelineRuntimeHelpers } from '@ever-works/plugin';
 
@@ -16,6 +10,12 @@ import type { CodexStepId } from '../types.js';
 import { CODEX_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
 export { getManagedCodexHome, resolveCodexHome } from './codex-home.js';
+
+// Internal joins use native `path` so absolute paths on Windows (drive
+// letters) resolve correctly for fs ops. We normalize the return values
+// (env-var-visible strings) to POSIX form so cross-platform tests stay
+// stable. Node accepts forward slashes on Windows for fs APIs.
+const toPosix = (p: string): string => p.replace(/\\/g, '/');
 
 export const DEVICE_AUTH_AUTH_JSON_SETTING = 'deviceAuthAuthJson';
 

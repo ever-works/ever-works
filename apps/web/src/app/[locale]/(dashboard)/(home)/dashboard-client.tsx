@@ -25,10 +25,11 @@ interface DashboardClientProps {
     initialProposals: WorkProposal[];
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
-    /** Phase 6 PR S — Missions preview block. */
+    autoStartProposals: boolean;
+    /** Phase 6 PR S - Missions preview block. */
     initialMissions: Mission[];
     initialAllIdeas: WorkProposal[];
-    /** Phase 7 PR II — account-wide spend for the 6th dashboard tile. */
+    /** Phase 7 PR II - account-wide spend for the 6th dashboard tile. */
     monthSpendCents?: number;
     monthSpendCurrency?: string;
 }
@@ -44,6 +45,7 @@ export default function DashboardClient({
     initialProposals,
     initiallyResearching,
     initiallyCanRefresh,
+    autoStartProposals,
     initialMissions,
     initialAllIdeas,
     monthSpendCents = 0,
@@ -84,6 +86,7 @@ export default function DashboardClient({
                 initiallyResearching={initiallyResearching}
                 initiallyCanRefresh={initiallyCanRefresh}
                 username={user.username}
+                autoStart={autoStartProposals}
             />
 
             <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Loader2, Plus, RefreshCw, Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -27,8 +27,8 @@ import { cn } from '@/lib/utils/cn';
 import { IdeaCard } from '@/components/ideas';
 
 const POLL_INTERVAL_MS = 2_500;
-const POLL_MAX_MS = 120_000;
-/** Spec §3 + PR O — dashboard preview block caps at 3 IdeaCards.
+const POLL_MAX_MS = 10 * 60_000;
+/** Spec §3 + PR O - dashboard preview block caps at 3 IdeaCards.
  *  The full list lives at /ideas (PR N). */
 const PREVIEW_CARD_LIMIT = 3;
 
@@ -37,6 +37,7 @@ interface WorkProposalsSectionProps {
     initiallyResearching: boolean;
     initiallyCanRefresh: boolean;
     username?: string;
+    autoStart?: boolean;
 }
 
 export function WorkProposalsSection({
@@ -44,6 +45,7 @@ export function WorkProposalsSection({
     initiallyResearching,
     initiallyCanRefresh,
     username,
+    autoStart = false,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
@@ -53,6 +55,7 @@ export function WorkProposalsSection({
     const [canRefresh, setCanRefresh] = useState(initiallyCanRefresh);
     const [pendingRefresh, startRefreshTransition] = useTransition();
     const [refreshError, setRefreshError] = useState<string | null>(null);
+    const autoStartAttempted = useRef(false);
 
     // Phase 5 PR O — quick-add inline (collapsible).
     const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -107,12 +110,37 @@ export function WorkProposalsSection({
         };
     }, [refreshListAndStatus, researching]);
 
-    // Phase 5 PR O — lazy-loader for the new toggle-driven statuses.
-    // Mirrors the /ideas page's "include accepted / include
-    // dismissed" toggles but limited to those two buckets at a
-    // time so the dashboard payload stays small. Results are
-    // merged into the existing local list (de-dup by id) so the
-    // PENDING rows from the SSR fetch aren't replaced.
+    const queueRefresh = useCallback(async () => {
+        try {
+            const result = await refreshProposalsAction();
+            if (result.status === 'queued') {
+                setResearching(true);
+                window.setTimeout(() => {
+                    void refreshListAndStatus().catch(() => undefined);
+                }, 1_000);
+            } else if (result.status === 'rate-limited') {
+                setRefreshError(t('errors.rateLimited'));
+                setCanRefresh(false);
+                setResearching(false);
+            } else if (result.status === 'at-limit') {
+                setCanRefresh(false);
+                setResearching(false);
+            }
+        } catch {
+            setRefreshError(t('errors.generic'));
+            setResearching(false);
+        }
+    }, [refreshListAndStatus, t]);
+
+    useEffect(() => {
+        if (!autoStart || autoStartAttempted.current || proposals.length > 0) return;
+        autoStartAttempted.current = true;
+        setRefreshError(null);
+        setResearching(true);
+        void queueRefresh();
+    }, [autoStart, proposals.length, queueRefresh]);
+
+    // Phase 5 PR O - lazy-loader for the new toggle-driven statuses.
     const loadStatuses = useCallback(async (statuses: WorkProposalStatus[]) => {
         try {
             const rows = await listProposalsAction(statuses);
@@ -122,7 +150,7 @@ export function WorkProposalsSection({
                 return Array.from(byId.values());
             });
         } catch {
-            // Silent — empty toggle just renders nothing extra. The
+            // Silent - empty toggle just renders nothing extra. The
             // user can refresh the page if they want a retry.
         }
     }, []);
@@ -145,20 +173,7 @@ export function WorkProposalsSection({
     const handleRefresh = () => {
         setRefreshError(null);
         startRefreshTransition(async () => {
-            try {
-                const result = await refreshProposalsAction();
-                if (result.status === 'queued') {
-                    setResearching(true);
-                    window.setTimeout(() => {
-                        void refreshListAndStatus().catch(() => undefined);
-                    }, 1_000);
-                } else if (result.status === 'rate-limited') {
-                    setRefreshError(t('errors.rateLimited'));
-                    setCanRefresh(false);
-                }
-            } catch {
-                setRefreshError(t('errors.generic'));
-            }
+            await queueRefresh();
         });
     };
 
@@ -389,7 +404,14 @@ export function WorkProposalsSection({
                 <div className="rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <div className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{t('researching.title')}</span>
+                        <span>
+                            {t('researching.title')}
+                            <span aria-hidden="true" className="inline-flex w-5 justify-start">
+                                <span className="animate-pulse">.</span>
+                                <span className="animate-pulse [animation-delay:160ms]">.</span>
+                                <span className="animate-pulse [animation-delay:320ms]">.</span>
+                            </span>
+                        </span>
                     </div>
                     <p className="mt-1 text-xs">{t('researching.subtitle')}</p>
                 </div>

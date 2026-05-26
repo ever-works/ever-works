@@ -3077,7 +3077,19 @@
                     "legalNote": "Примечание:",
                     "legalDescription": "Режим исследования использует исходный репозиторий только как входные данные. Итоговая коллекция будет состоять преимущественно из вновь обнаруженных элементов с оригинальными описаниями, сгенерированными ИИ. Контент источника не копируется дословно.",
                     "importButton": "Начать импорт и исследование",
-                    "importingButton": "Запуск пайплайна исследования..."
+                    "importingButton": "Запуск пайплайна исследования...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Анализировать репозиторий",
                 "importButton": "Импортировать работа",

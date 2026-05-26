@@ -3077,7 +3077,19 @@
                     "legalNote": "Lưu Ý:",
                     "legalDescription": "Chế độ nghiên cứu chỉ dùng kho nguồn làm dữ liệu đầu vào. Bộ sưu tập cuối cùng sẽ chủ yếu gồm các mục mới phát hiện với mô tả gốc do AI tạo. Nội dung nguồn không được sao chép nguyên văn.",
                     "importButton": "Bắt Đầu Nhập & Nghiên Cứu",
-                    "importingButton": "Đang bắt đầu đường ống nghiên cứu..."
+                    "importingButton": "Đang bắt đầu đường ống nghiên cứu...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Phân Tích Kho",
                 "importButton": "Nhập Công Việc",

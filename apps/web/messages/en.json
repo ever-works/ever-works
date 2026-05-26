@@ -503,8 +503,8 @@
                 "refresh": "Suggest more"
             },
             "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
+                "title": "Generating ideas",
+                "subtitle": "Personalized suggestions will appear here as soon as they are ready."
             },
             "empty": {
                 "title": "No ideas right now.",
@@ -3366,7 +3366,19 @@
                     "legalNote": "Note:",
                     "legalDescription": "Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.",
                     "importButton": "Start Import & Research",
-                    "importingButton": "Starting research pipeline..."
+                    "importingButton": "Starting research pipeline...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Analyze Repository",
                 "importButton": "Import Work",

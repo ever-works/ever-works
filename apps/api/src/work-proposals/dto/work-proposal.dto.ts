@@ -227,8 +227,8 @@ export class BuildWorkProposalResponseDto {
 }
 
 export class RefreshResponseDto {
-    @ApiProperty({ enum: ['queued', 'rate-limited'] })
-    status: 'queued' | 'rate-limited';
+    @ApiProperty({ enum: ['queued', 'rate-limited', 'at-limit'] })
+    status: 'queued' | 'rate-limited' | 'at-limit';
 
     @ApiProperty({ required: false })
     error?: string;

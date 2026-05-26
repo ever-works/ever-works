@@ -3141,7 +3141,19 @@
                     "legalNote": "Nota:",
                     "legalDescription": "El modo investigación usa el repositorio fuente solo como datos de entrada. La colección final consistirá principalmente en elementos recién descubiertos con descripciones originales generadas por IA. El contenido fuente no se copia verbatim.",
                     "importButton": "Iniciar Importar & Investigación",
-                    "importingButton": "Iniciando pipeline de investigación..."
+                    "importingButton": "Iniciando pipeline de investigación...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Analizar Repositorio",
                 "importButton": "Importar Trabajo",

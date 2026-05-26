@@ -3141,7 +3141,19 @@
                     "legalNote": "הערה:",
                     "legalDescription": "מצב מחקר משתמש במאגר המקור רק כנתוני קלט. האוסף הסופי יתבסס בעיקר על פריטים חדשים גילויים עם תיאורים מקוריים שנוצרו על ידי AI. תוכן המקור אינו מועתק מילה במילה.",
                     "importButton": "התחל ייבוא ומחקר",
-                    "importingButton": "מתחיל צינור מחקר..."
+                    "importingButton": "מתחיל צינור מחקר...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "נתח מאגר",
                 "importButton": "ייבא עבודה",

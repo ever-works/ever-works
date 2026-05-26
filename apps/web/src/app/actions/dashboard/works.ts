@@ -660,6 +660,7 @@ export async function importWork(data: ImportWorkRequest) {
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
         sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config']),
+        awesomeReadmeImportMode: z.enum(['clone', 'reuse_source']).optional(),
         name: z
             .string()
             .min(1, t('name.required'))
@@ -716,6 +717,7 @@ export async function importWork(data: ImportWorkRequest) {
         const result = await workAPI.importWork({
             sourceUrl: validation.data.sourceUrl,
             sourceType: validation.data.sourceType,
+            awesomeReadmeImportMode: validation.data.awesomeReadmeImportMode,
             name: validation.data.name,
             organization,
             owner: owner || undefined,
