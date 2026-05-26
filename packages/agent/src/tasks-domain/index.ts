@@ -10,6 +10,7 @@ export * from './task-dispatcher';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';
+export * from './task-notification.service';
 export {
 	Task,
 	TaskPriority,

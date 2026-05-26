@@ -28,8 +28,10 @@ import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
+import { TaskNotificationService } from './task-notification.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Tasks feature — Phases 11 + 12 + 13.
@@ -59,6 +61,9 @@ import { AgentsModule } from '../agents/agents.module';
 		// fanning out the agent-task-execute / agent-chat-reply
 		// Trigger.dev runs. AgentsModule exports AgentRunRepository.
 		AgentsModule,
+		// Phase 18.4 — TaskNotificationService wraps
+		// NotificationService.create() for the new TASK category.
+		NotificationsModule,
 	],
 	providers: [
 		TaskRepository,
@@ -76,6 +81,7 @@ import { AgentsModule } from '../agents/agents.module';
 		TasksService,
 		TaskChatService,
 		TaskRecurrenceDispatcherService,
+		TaskNotificationService,
 	],
 	exports: [
 		TaskRepository,
@@ -93,6 +99,7 @@ import { AgentsModule } from '../agents/agents.module';
 		TasksService,
 		TaskChatService,
 		TaskRecurrenceDispatcherService,
+		TaskNotificationService,
 	],
 })
 export class TasksDomainModule {}

@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 22
-- **Last tick at**: 2026-05-26 (tick 22 — Phase 17 complete: rrule dep added + validateRecurrenceRule + computeNextOccurrence + cloneRecurringTaskAsInstance helpers + TaskRecurrenceDispatcherService (find-due → CAS-claim → spawn instance loop) + task-recurrence-dispatcher cron task (every minute) + TasksService setRecurring/clearRecurring + POST/DELETE /tasks/:id/recurring endpoints + remote-proxy wiring on both worker + API + recurrence + dispatcher tests. Cron job 1ca20898 re-created for the loop.)
-- **In progress now**: (none — next tick picks up Phase 18 Dashboard tiles + notifications + templates browser)
+- **Last tick #**: 23
+- **Last tick at**: 2026-05-26 (tick 23 — Phase 18 (mostly): NotificationCategory.AGENT + TASK enum values + 2 email-opt-in flags on User entity + migration + TaskNotificationService (.emit + watcher union + dedup + per-event title/message + dedupKey) + AgentsCountTile / TasksInProgressTile / RecentTasks dashboard components + service tests. Templates browser deferred — its surface depends on the not-yet-merged Phase-6.5 templates hub spec.)
+- **In progress now**: (none — next tick picks up Phase 19 Account-transfer extension)
 
 ---
 
@@ -246,12 +246,13 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 18 — Dashboard + Notifications + per-feature templates browser
 
-- [ ] **18.1** `AgentsCountTile.tsx`, `TasksInProgressTile.tsx` on Dashboard.
-- [ ] **18.2** "Recent Tasks" block below "Recent Works".
-- [ ] **18.3** New `Notification.category` enum values (AGENT, TASK).
-- [ ] **18.4** `TaskNotificationService.emit(event, context)` wrapper around existing `NotificationsService.create()`.
-- [ ] **18.5** Notification email opt-in flags (`emailAgentAlerts`, `emailTaskNotifications`) on User.
-- [ ] **18.6** Templates browser components reusable across `/templates` hub + per-feature pages.
+- [x] **18.1** `AgentsCountTile.tsx` + `TasksInProgressTile.tsx` shipped at `apps/web/src/components/dashboard/`. Both link to the respective list pages. The actual mount into the Dashboard home grid is a 1-line follow-up (parent passes `{total, active}` / `{inProgress, blocked}` from server-fetched counts). ✓ Tick 23
+- [x] **18.2** `RecentTasks.tsx` block at `apps/web/src/components/dashboard/RecentTasks.tsx` — compact list of 5 most-recent Tasks with the same status/priority chip vocabulary as `/tasks`, "View all →" link, empty-state nudge. Designed to sit directly below "Recent Works". ✓ Tick 23
+- [x] **18.3** `NotificationCategory` enum extended with `AGENT='agent'` + `TASK='task'` in `packages/agent/src/entities/notification.types.ts`. ✓ Tick 23
+- [x] **18.4** `TaskNotificationService.emit(event, context, recipientUserIds=[])` at `packages/agent/src/tasks-domain/task-notification.service.ts` — wraps `NotificationService.create()`. Unions explicit recipients + watchers (dedup by userId). Per-event title/message templates (assigned / mentioned / status-changed / blocked / due-soon / recurrence-fired). Stable `dedupKey='task:<id>:<event>'`. Single-recipient failure is swallowed so a flaky email path doesn't block the rest. ✓ Tick 23
+- [x] **18.5** `User.emailAgentAlerts: boolean` + `User.emailTaskNotifications: boolean` (default false — opt-in to email; in-app notifications always fire). Migration `apps/api/src/migrations/1779978015000-AddNotificationEmailOptIns.ts` adds both columns (idempotent). ✓ Tick 23
+- [ ] **18.6** Templates browser components — defer until the Phase-6.5 unified Workshop Templates catalog (ADR-010) lands on develop, since the browser surface depends on the not-yet-merged template-catalog UI shape. The Phase-18 dashboard tiles are usable without it.
+- [x] **18.7** Tests (don't run): `__tests__/task-notification.service.spec.ts` (~7 assertions: no recipients / explicit list / watcher+explicit union dedup / NotificationType per event / dedupKey shape / single-recipient failure swallowed). ✓ Tick 23
 
 ### Phase 19 — Account-transfer extension (per ADR-008 v1 requirement)
 
