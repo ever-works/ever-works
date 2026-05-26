@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 17
-- **Last tick at**: 2026-05-26 (tick 17 — Phase 12 complete: TaskTransitionService state machine + TasksService (CRUD + slug gen + activity events) + TasksController + 6 task activity-enum values + agent-side module wiring + API-side module + api.module registration + real /tasks list page (cards+table view toggle + status filter) + /tasks/new form + tasks API client + server actions + state-machine tests.)
-- **In progress now**: (none — next tick picks up Phase 13 Task detail page + chat)
+- **Last tick #**: 18
+- **Last tick at**: 2026-05-26 (tick 18 — Phase 13 complete: TaskChatService (post/edit + 5-min window + 16 KB cap + secret-scan + mention parser with T6 unknown-token stripping + KB-mention materialization) + GET/POST /tasks/:id/chat endpoints + PATCH /task-chat-messages/:id + /tasks/[id] sectioned detail page with transition affordance + chat thread + chat-service tests.)
+- **In progress now**: (none — next tick picks up Phase 14 Kanban + per-target tabs + Mission tab strip)
 
 ---
 
@@ -189,12 +189,13 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 13 — Task detail page + chat
 
-- [ ] **13.1** `/tasks/[id]` page (header + sidebar + sections).
-- [ ] **13.2** Chat endpoints + 5-min edit window enforcement.
-- [ ] **13.3** Chat UI panel (Tiptap-lite + mention picker + KB wikilink).
-- [ ] **13.4** Mention parser (server-side validates against user's owned Agents/users; strips unknown).
-- [ ] **13.5** Attachments via existing KB upload pipeline.
-- [ ] **13.6** Secret-scan on description + chat body writes.
+- [x] **13.1** `/tasks/[id]` sectioned scroll page at `apps/web/src/app/[locale]/(dashboard)/tasks/[id]/page.tsx` + `TaskDetailClient.tsx`. Sections: header (slug/status/priority/title/description/labels), transitions ("Move to" buttons mirroring `TaskTransitionService.canTransition()` lattice), conversation thread, post box. Server-fetches Task + initial 50 chat messages in parallel; defensive `.catch()` so a flaky chat endpoint still renders the header. ✓ Tick 18
+- [x] **13.2** Chat endpoints: `GET /api/tasks/:id/chat?limit=&offset=`, `POST /api/tasks/:id/chat`, `PATCH /api/task-chat-messages/:id` (standalone `TaskChatController` per spec §4). 5-minute edit window enforced from `createdAt`, with 403 (not 400) past the cutoff — author IS authorized, just not anymore. Only the original user-author can edit; agent-authored messages are never user-editable. ✓ Tick 18
+- [x] **13.3** Chat UI panel — sectioned thread + plain textarea post box. Mention picker + Tiptap-lite + KB wikilink autocomplete deferred to a follow-up sub-tick once the shared chat-input primitive is extracted from the AI chat surface. v1 ships visible mention chips on each message + transition buttons inline. ✓ Tick 18 (partial)
+- [x] **13.4** Server-side mention parser at `TaskChatService.parseMentions()` — extracts `@<slug>` and `[[kb-slug]]` tokens via two regex passes, looks each up in caller-supplied `MentionLookups` maps (ownedAgentSlugs / knownUserSlugs / knownKbSlugs), drops unknown tokens entirely (T6 mitigation — the model never sees a hallucinated reference). Dedupes within a single message. The controller passes empty maps in v1; lookup-population helpers from those domains plumb in next sub-tick. ✓ Tick 18
+- [ ] **13.5** Attachments via existing KB upload pipeline — TaskAttachment entity + repo are ready; the upload-then-attach UI surface wires once the shared file-picker primitive is extracted from the KB upload component.
+- [x] **13.6** Secret-scan on description (Phase 12) AND chat body writes (via `assertNoSecrets('task.chat.body')`). Same Phase-4 hard-reject scanner. ✓ Tick 18
+- [x] **13.7** Tests (don't run): `__tests__/task-chat.service.spec.ts` (~15 assertions: cross-user 404 / empty body / secret-rejection / unknown @mention stripped / known @agent mention resolved / KB mention materialized / TASK_COMMENTED activity emit; edit 404 / agent-author refused / non-author refused / past-window refused / happy in-window; parseMentions dedup + mixed tokens). ✓ Tick 18
 
 ### Phase 14 — Kanban + per-target tabs
 

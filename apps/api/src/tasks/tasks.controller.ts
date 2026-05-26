@@ -17,6 +17,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
 	TasksService,
+	TaskChatService,
 	TaskStatus,
 	TaskPriority,
 	type TaskActorType,
@@ -49,7 +50,10 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 @ApiTags('tasks')
 @Controller('api/tasks')
 export class TasksController {
-	constructor(private readonly service: TasksService) {}
+	constructor(
+		private readonly service: TasksService,
+		private readonly chat: TaskChatService,
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: 'List my Tasks (filter by status/priority/scope/label/search).' })
@@ -292,5 +296,56 @@ export class TasksController {
 		if (value !== 'user' && value !== 'agent') {
 			throw new BadRequestException(`Invalid actor type: ${value}`);
 		}
+	}
+
+	// ── Phase 13 — chat ───────────────────────────────────────────
+
+	@Get(':id/chat')
+	@ApiOperation({ summary: 'Paginated chat thread for a Task.' })
+	@HttpCode(HttpStatus.OK)
+	async listChat(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Query('limit') limit?: string,
+		@Query('offset') offset?: string,
+	) {
+		const messages = await this.chat.list(auth.userId, id, {
+			limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
+			offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
+		});
+		return { data: messages };
+	}
+
+	@Post(':id/chat')
+	@ApiOperation({
+		summary: 'Post a chat message. Server parses @mentions + [[kb]] tokens and drops unknown ones.',
+	})
+	@HttpCode(HttpStatus.CREATED)
+	@Throttle({ default: { limit: 60, ttl: 60_000 } })
+	async postChat(
+		@CurrentUser() auth: AuthenticatedUser,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: { body: string; attachments?: { uploadId: string }[] },
+	) {
+		if (typeof body?.body !== 'string') {
+			throw new BadRequestException('body is required.');
+		}
+		// v1: empty mention-lookup maps — `parseMentions` strips all
+		// `@<slug>` / `[[kb]]` tokens. The lookup-population work
+		// (load owned Agent slugs + workspace user slugs + reachable
+		// KB docs) lands in a follow-up sub-tick once the helper
+		// surface from those domains is extracted. Hard rule today:
+		// mentions never bleed into the model.
+		return this.chat.post(
+			auth.userId,
+			{
+				taskId: id,
+				authorType: 'user',
+				authorId: auth.userId,
+				body: body.body,
+				attachments: body.attachments,
+			},
+			{},
+		);
 	}
 }

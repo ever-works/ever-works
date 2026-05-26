@@ -1,7 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { tasksAPI, type Task, type TaskPriority, type TaskStatus } from '@/lib/api/tasks';
+import {
+    tasksAPI,
+    type Task,
+    type TaskChatMessage,
+    type TaskPriority,
+    type TaskStatus,
+} from '@/lib/api/tasks';
 
 export async function createTaskAction(input: {
     title: string;
@@ -36,4 +42,14 @@ export async function transitionTaskAction(id: string, to: TaskStatus, force = f
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
     return task;
+}
+
+export async function postTaskChatAction(taskId: string, body: string): Promise<TaskChatMessage> {
+    const message = await tasksAPI.postChat(taskId, body);
+    revalidatePath(`/tasks/${taskId}`);
+    return message;
+}
+
+export async function editTaskChatAction(messageId: string, body: string): Promise<TaskChatMessage> {
+    return tasksAPI.editChat(messageId, body);
 }

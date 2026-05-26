@@ -26,14 +26,15 @@ import {
 } from '../database/repositories/task-side.repositories';
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
+import { TaskChatService } from './task-chat.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 /**
- * Tasks feature — Phase 11 + 12.
+ * Tasks feature — Phases 11 + 12 + 13.
  *
  * Agent-side module that owns the Tasks family data surface +
- * the service layer (TasksService + TaskTransitionService).
- * TaskChatService lands in Phase 13.
+ * the service layer (TasksService + TaskTransitionService +
+ * TaskChatService).
  */
 @Module({
 	imports: [
@@ -66,6 +67,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		UserTaskCounterRepository,
 		TaskTransitionService,
 		TasksService,
+		TaskChatService,
 	],
 	exports: [
 		TaskRepository,
@@ -81,6 +83,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 		UserTaskCounterRepository,
 		TaskTransitionService,
 		TasksService,
+		TaskChatService,
 	],
 })
 export class TasksDomainModule {}

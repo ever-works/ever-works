@@ -136,4 +136,52 @@ export const tasksAPI = {
             wrapInData: false,
         });
     },
+
+    async listChat(id: string, opts: { limit?: number; offset?: number } = {}) {
+        const params = new URLSearchParams();
+        if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+        if (opts.offset !== undefined) params.set('offset', String(opts.offset));
+        const qs = params.toString();
+        return serverFetch<{ data: TaskChatMessage[] }>(
+            `/tasks/${id}/chat${qs ? `?${qs}` : ''}`,
+            { method: 'GET' },
+        );
+    },
+
+    async postChat(id: string, body: string, attachments?: { uploadId: string }[]) {
+        return serverMutation<TaskChatMessage>({
+            endpoint: `/tasks/${id}/chat`,
+            data: { body, attachments },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async editChat(messageId: string, body: string) {
+        return serverMutation<TaskChatMessage>({
+            endpoint: `/task-chat-messages/${messageId}`,
+            data: { body },
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
 };
+
+export interface TaskChatMention {
+    type: 'user' | 'agent' | 'kb';
+    id?: string;
+    slug?: string;
+}
+
+export interface TaskChatMessage {
+    id: string;
+    taskId: string;
+    authorType: TaskActorType;
+    authorId: string;
+    body: string;
+    mentions: TaskChatMention[] | null;
+    attachments: { uploadId: string }[] | null;
+    editedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
