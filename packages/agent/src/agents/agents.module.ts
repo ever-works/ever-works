@@ -17,6 +17,7 @@ import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { SkillsModule } from '../skills/skills.module';
 
 /**
  * Agents/Skills/Tasks — Phase 3 (PR #1017 specs). The agent-side
@@ -32,6 +33,9 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 	imports: [
 		TypeOrmModule.forFeature([Agent, AgentRun, AgentRunLog, AgentBudget, AgentMembership]),
 		ActivityLogModule,
+		// Phase 10 — AgentRunService resolves active skills via
+		// SkillBindingRepository before assembling the prompt.
+		SkillsModule,
 	],
 	providers: [
 		AgentRepository,

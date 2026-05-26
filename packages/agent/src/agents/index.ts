@@ -7,6 +7,7 @@ export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
+export * from './agent-tools-skill';
 export * from './budget-period';
 export * from './heartbeat-cron';
 export * from './types';

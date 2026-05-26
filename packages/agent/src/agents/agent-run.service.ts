@@ -4,10 +4,12 @@ import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
+import { SkillBindingRepository, type ResolvedSkill } from '../database/repositories/skill-binding.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import {
 	PromptAssemblerService,
+	estimateTokens,
 	type AssembledPrompt,
 	type AgentRunKind,
 } from './prompt-assembler.service';
@@ -77,6 +79,7 @@ export class AgentRunService {
 		private readonly runLogs: AgentRunLogRepository,
 		private readonly budgets: AgentBudgetRepository,
 		private readonly assembler: PromptAssemblerService,
+		@Optional() private readonly skillBindings?: SkillBindingRepository,
 		@Optional() private readonly activityLog?: ActivityLogService,
 	) {}
 
@@ -113,14 +116,25 @@ export class AgentRunService {
 			return { runId: context.runId, status: 'budget-blocked', budgetCheck };
 		}
 
-		// 2. Load assembly inputs in parallel. v1 ships with the cheap
-		// inputs only (recent runs + activity). Skill resolution + scope
-		// description loaders land alongside Phase 9 (Skills) and Phase
-		// 14 (Mission tab strip wiring respectively).
-		const [recentRuns, recentActivityRows] = await Promise.all([
+		// 2. Load assembly inputs in parallel. Phase 10 adds Skills
+		// resolution alongside the cheap inputs. Scope-description
+		// loaders land in Phase 14 (Mission tab strip).
+		const [recentRuns, recentActivityRows, resolvedSkills] = await Promise.all([
 			this.runs.findByAgent(agent.id, 5, 0).catch(() => []),
 			this.findRecentActivityForAgent(agent.userId, agent.id).catch(() => []),
+			this.resolveSkillsForRun(agent).catch(() => []),
 		]);
+
+		// 2a. Priority-based drop on the skills bundle when its
+		// combined token count exceeds the per-Agent budget. Skills
+		// are already priority-sorted (lower = higher); we keep the
+		// front of the array and drop from the back, emitting one
+		// WARN run-log row per dropped Skill (spec §10.4 + plan §10).
+		const skillsForPrompt = this.selectSkillsWithinBudget(
+			resolvedSkills,
+			agent.maxSkillContextTokens ?? 4000,
+			context.runId,
+		);
 
 		// 3. Assemble the system + user messages per the 11-segment recipe.
 		const prompt = this.assembler.assemble({
@@ -128,7 +142,7 @@ export class AgentRunService {
 			kind: context.kind,
 			immediateInput: context.immediateInput ?? undefined,
 			conversationContext: context.conversationContext,
-			skills: [], // Phase 9 wires SkillBindingRepository.resolveActive
+			skills: skillsForPrompt,
 			scopeContext: context.scopeContext ?? null,
 			advancedPrompts: null, // Phase 7.5+ wires WorkAdvancedPrompts on Work-scoped Agents
 			recentActivity: recentActivityRows,
@@ -139,6 +153,18 @@ export class AgentRunService {
 			})),
 			outputSchemaName: context.outputSchemaName,
 		});
+
+		// 3a. SKILL_INVOKED activity — one row per Skill that made it
+		// into the system message (spec §10.5).
+		for (const s of skillsForPrompt) {
+			void this.logActivity({
+				userId: agent.userId,
+				agentId: agent.id,
+				skillId: undefined,
+				actionType: ActivityActionType.SKILL_INVOKED,
+				details: { skillSlug: s.slug, priority: s.priority, runId: context.runId },
+			});
+		}
 
 		// 4. Record any prompt-assembly truncations as WARN run-log
 		// rows per spec §2 ("Truncation events emit an AgentRunLog row
@@ -257,10 +283,81 @@ export class AgentRunService {
 		return [];
 	}
 
+	/**
+	 * Skills feature — Phase 10.2. Resolve active skills for this
+	 * Agent run from the binding table. Returns an empty array when
+	 * the skill-bindings repository is not wired (unit-test mode).
+	 */
+	private async resolveSkillsForRun(
+		agent: Agent,
+	): Promise<Array<{ slug: string; body: string; priority: number }>> {
+		if (!this.skillBindings) return [];
+		const rows: ResolvedSkill[] = await this.skillBindings.resolveActive({
+			userId: agent.userId,
+			agentId: agent.id,
+			workId: agent.workId ?? undefined,
+			missionId: agent.missionId ?? undefined,
+			ideaId: agent.ideaId ?? undefined,
+			forAgentRun: true,
+		});
+		return rows.map(({ binding, skill }) => ({
+			slug: skill.slug,
+			body: skill.instructionsMd,
+			priority: binding.priority,
+		}));
+	}
+
+	/**
+	 * Skills feature — Phase 10.4. Greedy fit-into-budget — keep
+	 * skills in priority order (lower = higher) until the next one
+	 * would push the bundle over the per-Agent
+	 * `maxSkillContextTokens` cap. Each dropped skill emits a
+	 * WARN AgentRunLog row.
+	 *
+	 * Token-count uses the same char/4 v1 estimator as PromptAssembler
+	 * so the upstream cap math stays consistent.
+	 */
+	private selectSkillsWithinBudget(
+		resolved: Array<{ slug: string; body: string; priority: number }>,
+		capTokens: number,
+		runId: string,
+	): Array<{ slug: string; body: string; priority: number }> {
+		if (resolved.length === 0) return [];
+		const sorted = [...resolved].sort((a, b) => a.priority - b.priority);
+		const kept: typeof sorted = [];
+		let used = 0;
+		for (const skill of sorted) {
+			const cost = estimateTokens(skill.body);
+			if (used + cost <= capTokens) {
+				kept.push(skill);
+				used += cost;
+			} else {
+				void this.runLogs
+					?.append({
+						runId,
+						level: 'WARN',
+						step: 'skill-injection',
+						message: `Skill "${skill.slug}" dropped — would exceed maxSkillContextTokens (${capTokens}).`,
+						metadata: {
+							skillSlug: skill.slug,
+							priority: skill.priority,
+							skillTokens: cost,
+							usedTokens: used,
+							capTokens,
+						},
+					})
+					.catch(() => undefined);
+			}
+		}
+		return kept;
+	}
+
 	private async logActivity(args: {
 		userId: string;
 		agentId: string;
+		skillId?: string;
 		actionType: ActivityActionType;
+		details?: Record<string, unknown>;
 	}): Promise<void> {
 		if (!this.activityLog) return;
 		try {
@@ -269,8 +366,9 @@ export class AgentRunService {
 				action: args.actionType,
 				actionType: args.actionType,
 				status: ActivityStatus.SUCCESS,
-				resourceType: 'agent',
-				resourceId: args.agentId,
+				resourceType: args.skillId ? 'skill' : 'agent',
+				resourceId: args.skillId ?? args.agentId,
+				details: args.details,
 			});
 		} catch (err) {
 			this.logger.warn(`Failed to log activity ${args.actionType}: ${err}`);

@@ -67,6 +67,7 @@ describe('AgentRunService', () => {
 	let assembler: PromptAssemblerService;
 	let svc: AgentRunService;
 
+	let skillBindings: any;
 	beforeEach(() => {
 		agents = { findById: jest.fn() };
 		runs = {
@@ -75,9 +76,10 @@ describe('AgentRunService', () => {
 		};
 		runLogs = { append: jest.fn().mockResolvedValue(undefined) };
 		budgets = { findByAgentId: jest.fn().mockResolvedValue(null) };
+		skillBindings = { resolveActive: jest.fn().mockResolvedValue([]) };
 		activity = { log: jest.fn().mockResolvedValue(undefined) };
 		assembler = new PromptAssemblerService();
-		svc = new AgentRunService(agents, runs, runLogs, budgets, assembler, activity);
+		svc = new AgentRunService(agents, runs, runLogs, budgets, assembler, skillBindings, activity);
 	});
 
 	it('returns agent-not-found when the Agent is missing', async () => {
@@ -190,5 +192,52 @@ describe('AgentRunService', () => {
 		});
 		expect(result.prompt?.userMessage).toContain('Write the migration.');
 		expect(result.prompt?.systemMessage).toContain('You are working on a specific Task');
+	});
+
+	describe('Phase 10 — skill injection', () => {
+		it('resolves bound skills via SkillBindingRepository and includes them in the prompt', async () => {
+			agents.findById.mockResolvedValueOnce(makeAgent());
+			skillBindings.resolveActive.mockResolvedValueOnce([
+				{
+					binding: { priority: 50 },
+					skill: { id: 's1', slug: 'cron-defaults', instructionsMd: '# UTC always' },
+				},
+			]);
+			const result = await svc.execute({
+				runId: 'r1',
+				agentId: 'a1',
+				userId: 'u1',
+				kind: 'heartbeat',
+			});
+			expect(result.prompt?.systemMessage).toContain('cron-defaults');
+			expect(result.prompt?.systemMessage).toContain('UTC always');
+			expect(activity.log).toHaveBeenCalledWith(
+				expect.objectContaining({ actionType: 'skill_invoked' }),
+			);
+		});
+
+		it('drops lowest-priority skills when bundle exceeds maxSkillContextTokens + emits WARN log', async () => {
+			agents.findById.mockResolvedValueOnce(makeAgent({ maxSkillContextTokens: 100 }));
+			const longBody = 'word '.repeat(1_000); // ~1250 tokens
+			skillBindings.resolveActive.mockResolvedValueOnce([
+				{ binding: { priority: 50 }, skill: { id: 'a', slug: 'high-pri', instructionsMd: '# short' } },
+				{ binding: { priority: 200 }, skill: { id: 'b', slug: 'low-pri', instructionsMd: longBody } },
+			]);
+			const result = await svc.execute({
+				runId: 'r1',
+				agentId: 'a1',
+				userId: 'u1',
+				kind: 'heartbeat',
+			});
+			expect(result.prompt?.systemMessage).toContain('high-pri');
+			expect(result.prompt?.systemMessage).not.toContain('low-pri');
+			expect(runLogs.append).toHaveBeenCalledWith(
+				expect.objectContaining({
+					level: 'WARN',
+					step: 'skill-injection',
+					message: expect.stringMatching(/low-pri/),
+				}),
+			);
+		});
 	});
 });

@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 13
-- **Last tick at**: 2026-05-26 (tick 13 — Phase 9 complete: SkillsService (CRUD + install-from-catalog + bindings CRUD) + Skills controller write paths + SkillBindingsController + web /skills 3-section page (Installed/Available/Custom) + skills API client + server actions + service unit tests.)
-- **In progress now**: (none — next tick picks up Phase 10 Skill injection into AI calls)
+- **Last tick #**: 14
+- **Last tick at**: 2026-05-26 (tick 14 — Phase 10 complete: AgentRunService resolves bound skills via SkillBindingRepository + priority-sorted greedy budget-drop with WARN log + SKILL_INVOKED activity emission + getSkillBody tool helper + auto-register predicate + tests.)
+- **In progress now**: (none — next tick picks up Phase 11 Tasks family of entities + Ever Works Task Tracker plugin)
 
 ---
 
@@ -156,12 +156,12 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 10 — Skill injection into AI calls
 
-- [ ] **10.1** `SkillBindingRepository.resolveActive()` priority-sorted resolver.
-- [ ] **10.2** `AiFacadeService.assembleSystemMessage()` extension calling resolver.
-- [ ] **10.3** `getSkillBody` tool auto-registration when bound skills present.
-- [ ] **10.4** Priority-based drop on budget exceeded + log warning row.
-- [ ] **10.5** `SKILL_INVOKED` activity row.
-- [ ] **10.6** Tests.
+- [x] **10.1** `SkillBindingRepository.resolveActive()` priority-sorted resolver — shipped in Phase 8.4. ✓ Tick 11
+- [x] **10.2** `AgentRunService` now resolves active skills via `SkillBindingRepository.resolveActive({userId, agentId, workId, missionId, ideaId, forAgentRun:true})` and passes the resolved bundle to `PromptAssemblerService.assemble({skills})`. Implemented inside the orchestrator (not on the AiFacade) because Skills feed the system-message recipe, not the raw chat-completion call — keeps the assembler authoritative per `agent-prompt-assembly.md §2`. ✓ Tick 14
+- [x] **10.3** `getSkillBody` tool helper at `packages/agent/src/agents/agent-tools-skill.ts` — `createGetSkillBodyTool(skills, bindings, context)` factory returns a stable tool descriptor with `name/description/parameters/invoke`. Auto-register predicate `shouldRegisterSkillTool(resolved)` returns true iff any skill is bound. Cross-user isolation baked into the tool itself (always calls `findByIdAndUser`). Wires into the tool surface in Phase 16. ✓ Tick 14
+- [x] **10.4** Priority-based drop on `maxSkillContextTokens` exceeded via `AgentRunService.selectSkillsWithinBudget()` — greedy fit in priority order (lower = higher), drops dropped skills emit WARN `AgentRunLog` rows at `step='skill-injection'` with `{skillSlug, priority, skillTokens, usedTokens, capTokens}`. ✓ Tick 14
+- [x] **10.5** `SKILL_INVOKED` activity row — one per skill that made it into the system message; details carry `{skillSlug, priority, runId}`. ✓ Tick 14
+- [x] **10.6** Tests (don't run): `__tests__/agent-tools-skill.spec.ts` (~6 assertions: shouldRegisterSkillTool branch, descriptor shape, error paths, happy path) + extended `__tests__/agent-run.service.spec.ts` with two new specs (resolved-skills-in-prompt + budget-drop emits WARN). ✓ Tick 14
 
 ### Phase 11 — Tasks family of entities (as "Ever Works Task Tracker" plugin per ADR-013)
 
