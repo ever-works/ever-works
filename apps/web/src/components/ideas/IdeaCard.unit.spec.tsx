@@ -8,6 +8,14 @@ vi.mock('next-intl', () => ({
 const routerPushMock = vi.fn();
 vi.mock('@/i18n/navigation', () => ({
     useRouter: () => ({ push: routerPushMock }),
+    // FU-3 added a `Link` import for the "+ New Agent" affordance on
+    // each card. Stub it as a plain anchor so the existing render
+    // assertions stay byte-identical except for the new chip.
+    Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+        <a href={href} {...rest}>
+            {children}
+        </a>
+    ),
 }));
 
 const dismissProposalMock = vi.fn();
@@ -323,29 +331,75 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               Picks adjacent to the user accepting Claude Code
               "
             </p>
-            <button
-              class="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-primary hover:bg-primary-hover"
-              type="button"
+            <div
+              class="mt-auto flex items-center gap-2"
             >
-              actions.accept
-              <svg
-                aria-hidden="true"
-                class="lucide lucide-chevron-right w-4 h-4"
-                fill="none"
-                height="24"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-                width="24"
-                xmlns="http://www.w3.org/2000/svg"
+              <button
+                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-primary hover:bg-primary-hover"
+                type="button"
               >
-                <path
-                  d="m9 18 6-6-6-6"
-                />
-              </svg>
-            </button>
+                actions.accept
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-chevron-right w-4 h-4"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="m9 18 6-6-6-6"
+                  />
+                </svg>
+              </button>
+              <a
+                class="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md border border-border dark:border-border-dark px-2.5 py-2 text-xs font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                href="/ideas/prop-1/agents/new"
+                title="Create a new Idea-scoped Agent"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-bot w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 8V4H8"
+                  />
+                  <rect
+                    height="12"
+                    rx="2"
+                    width="16"
+                    x="4"
+                    y="8"
+                  />
+                  <path
+                    d="M2 14h2"
+                  />
+                  <path
+                    d="M20 14h2"
+                  />
+                  <path
+                    d="M15 13v2"
+                  />
+                  <path
+                    d="M9 13v2"
+                  />
+                </svg>
+              </a>
+            </div>
           </div>
         `);
     });

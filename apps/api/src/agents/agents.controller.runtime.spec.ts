@@ -1,3 +1,50 @@
+// Short-circuit the transitive `@ever-works/agent/*` import chain so
+// the test doesn't pull `@src/entities` (which only resolves inside
+// apps/api) through `packages/agent/src/database/repositories/...`.
+// Mirrors the pattern used by `account/account.controller.spec.ts`.
+jest.mock('@ever-works/agent/agents', () => ({
+    __esModule: true,
+    AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
+    AGENT_FILE_NAMES: ['SOUL.md', 'AGENTS.md', 'HEARTBEAT.md', 'TOOLS.md', 'agent.yml'],
+    AgentScope: {
+        TENANT: 'tenant',
+        MISSION: 'mission',
+        IDEA: 'idea',
+        WORK: 'work',
+    },
+    AgentStatus: {
+        DRAFT: 'draft',
+        ACTIVE: 'active',
+        PAUSED: 'paused',
+        ERROR: 'error',
+        ARCHIVED: 'archived',
+    },
+    AgentIdleBehavior: { PROPOSE: 'propose', SLEEP: 'sleep', SELF_IMPROVE: 'self-improve' },
+    AgentAvatarMode: { INITIALS: 'initials', ICON: 'icon', IMAGE: 'image' },
+    AGENT_PERMISSIONS_DEFAULT: {},
+    AgentsService: class {},
+    AgentFileService: class {},
+    AgentExportService: class {},
+    AgentScheduleDispatcherService: class {},
+    AgentRunRepository: class {},
+    SkillBindingRepository: class {},
+    PluginUsageRepository: class {},
+}));
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    __esModule: true,
+    AGENT_TASK_EXECUTE_DISPATCHER: 'AGENT_TASK_EXECUTE_DISPATCHER',
+    TasksService: class {},
+}));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    __esModule: true,
+    ActivityActionType: {
+        AGENT_RUN_TRIGGERED: 'agent_run_triggered',
+        AGENT_RUN_CANCELLED: 'agent_run_cancelled',
+        AGENT_TASK_ASSIGNED: 'agent_task_assigned',
+    },
+    ActivityStatus: { COMPLETED: 'completed' },
+}));
+
 import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { AgentsController } from './agents.controller';
 
