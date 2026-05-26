@@ -34,9 +34,11 @@ export async function loadItemsForList(workId: string): Promise<LoadItemsForList
 
     const [itemsRes, taxonomyRes] = await Promise.all([
         workAPI.getItems(workId).catch(() => ({ items: [] as ItemData[] })),
-        workAPI
-            .getCategoriesTags(workId)
-            .catch(() => ({ categories: [] as string[], tags: [] as string[], collections: [] as string[] })),
+        workAPI.getCategoriesTags(workId).catch(() => ({
+            categories: [] as string[],
+            tags: [] as string[],
+            collections: [] as string[],
+        })),
     ]);
 
     const normalize = <T extends { id: string; name: string }>(
