@@ -1,18 +1,23 @@
+import { notFound } from 'next/navigation';
+import { agentsAPI } from '@/lib/api/agents';
+import { AgentSkillsClient } from '@/components/agents/AgentSkillsClient';
+
+type Params = Promise<{ id: string; locale: string }>;
+
 /**
- * Agents/Skills/Tasks PR #1017 — Phase 5 placeholder. The Skills
- * tab lists installed bindings (`SkillBinding`) for this Agent
- * and lets the user attach/detach skills. Wires up once the
- * Skills feature ships in Phase 9.
+ * Agents/Skills/Tasks PR #1019 follow-up — FU-4.
+ *
+ * Per-Agent skill bindings list. Server-fetches the resolved bindings
+ * via `agentsAPI.listSkills()` and renders the bound Skills with
+ * priority + a "remove binding" affordance (calls
+ * `DELETE /api/skill-bindings/:id` via the existing skills client).
  */
-export default function AgentSkillsPage() {
-    return (
-        <div className="p-6 max-w-screen-2xl mx-auto">
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-2">Skills</h2>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    Per-Agent skill bindings ship with the Skills feature in a later phase.
-                </p>
-            </section>
-        </div>
-    );
+export default async function AgentSkillsPage({ params }: { params: Params }) {
+    const { id } = await params;
+    const agent = await agentsAPI.get(id);
+    if (!agent) notFound();
+
+    const initial = await agentsAPI.listSkills(id).catch(() => ({ data: [] }));
+
+    return <AgentSkillsClient agentId={id} initial={initial} />;
 }

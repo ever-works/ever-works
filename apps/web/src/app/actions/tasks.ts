@@ -102,3 +102,21 @@ export async function clearTaskRecurringAction(id: string): Promise<Task> {
     revalidatePath(`/tasks/${id}`);
     return task;
 }
+
+// FU-5 — attachment server actions. The actual upload (multipart →
+// /api/uploads) happens client-side via the proxy route at
+// `apps/web/src/app/api/uploads/route.ts`; once the client has the
+// returned uploadId, it calls `attachUploadAction` to wire it into the
+// Task via the existing `POST /api/tasks/:id/attachments` endpoint.
+
+export async function attachUploadAction(taskId: string, uploadId: string) {
+    const row = await tasksAPI.addAttachment(taskId, uploadId);
+    revalidatePath(`/tasks/${taskId}`);
+    return row;
+}
+
+export async function detachAttachmentAction(taskId: string, attachmentId: string) {
+    const res = await tasksAPI.removeAttachment(taskId, attachmentId);
+    revalidatePath(`/tasks/${taskId}`);
+    return res;
+}

@@ -24,6 +24,13 @@ import {
     type AgentRunOutcome,
     type AgentRunTaskFinisher,
 } from './agent-run-post-processor';
+import { AgentToolService, type AgentToolDescriptor } from './agent-tool.service';
+import {
+    AGENT_AI_DISPATCH_FACADE,
+    type AgentAiDispatchFacade,
+    type AgentAiMessage,
+    type AgentAiToolCall,
+} from './agent-ai-dispatch-facade';
 
 export interface AgentRunContext {
     runId: string;
@@ -64,9 +71,19 @@ export interface AgentRunBudgetCheck {
 
 export interface AgentRunExecuteResult {
     runId: string;
-    status: 'assembled' | 'budget-blocked' | 'agent-not-found';
+    status: 'assembled' | 'budget-blocked' | 'agent-not-found' | 'dispatched' | 'dispatch-failed';
     prompt?: AssembledPrompt;
     budgetCheck?: AgentRunBudgetCheck;
+    /** Set when the LLM-dispatch path ran end-to-end. */
+    outcome?: AgentRunOutcome;
+    /** Set when the LLM-dispatch path ran end-to-end. */
+    finalizeResult?: {
+        status: 'completed' | 'failed';
+        postedMessageId?: string;
+        finishedTaskStatus?: string;
+    };
+    /** Number of model round-trips the tool loop performed (1 = no tool calls). */
+    toolLoopIterations?: number;
 }
 
 /**
@@ -107,6 +124,15 @@ export class AgentRunService {
         @Optional()
         @Inject(AGENT_RUN_TASK_FINISHER)
         private readonly taskFinisher?: AgentRunTaskFinisher,
+        // FU-1 — LLM dispatch + tool loop. Both injections are optional
+        // so existing unit-test constructor calls (which omit them) keep
+        // working — the path falls back to the assemble-only behaviour
+        // documented above. Production binding lives in the api-side
+        // `AgentsModule` (see `apps/api/src/agents/agents.module.ts`).
+        @Optional() private readonly toolService?: AgentToolService,
+        @Optional()
+        @Inject(AGENT_AI_DISPATCH_FACADE)
+        private readonly aiDispatch?: AgentAiDispatchFacade,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -214,12 +240,7 @@ export class AgentRunService {
                 .catch(() => undefined);
         }
 
-        // 5. v1 stops here — the actual AI call + tool loop lands in
-        // the follow-up sub-tick once Skill catalog + Tools surface are
-        // live. Caller (the Trigger.dev heartbeat / task / chat task)
-        // receives the assembled prompt + budget check and can decide
-        // to invoke AiFacadeService.createChatCompletion() directly
-        // while this orchestrator's full surface is being built out.
+        // 5. Prompt-assembly INFO row.
         await this.runLogs
             .append({
                 runId: context.runId,
@@ -235,12 +256,373 @@ export class AgentRunService {
             })
             .catch(() => undefined);
 
+        // 6. FU-1 — LLM dispatch. When the AI dispatch facade isn't
+        // bound (unit-test mode, or operator hasn't wired it yet),
+        // fall back to the assemble-only return so callers can drive
+        // the AI call themselves. Production binds the facade in
+        // api-side AgentsModule via AGENT_AI_DISPATCH_FACADE.
+        if (!this.aiDispatch) {
+            return {
+                runId: context.runId,
+                status: 'assembled',
+                prompt,
+                budgetCheck,
+            };
+        }
+
+        const dispatchResult = await this.runToolLoop(context, agent, prompt);
+        if (dispatchResult.errored) {
+            const finalizeResult = await this.finalize(context, {
+                errored: true,
+                errorMessage: dispatchResult.errorMessage,
+            });
+            return {
+                runId: context.runId,
+                status: 'dispatch-failed',
+                prompt,
+                budgetCheck,
+                outcome: {
+                    errored: true,
+                    errorMessage: dispatchResult.errorMessage,
+                },
+                finalizeResult,
+                toolLoopIterations: dispatchResult.iterations,
+            };
+        }
+
+        const finalizeResult = await this.finalize(context, dispatchResult.outcome);
         return {
             runId: context.runId,
-            status: 'assembled',
+            status: 'dispatched',
             prompt,
             budgetCheck,
+            outcome: dispatchResult.outcome,
+            finalizeResult,
+            toolLoopIterations: dispatchResult.iterations,
         };
+    }
+
+    /**
+     * FU-1 — tool-loop wrapper around `AgentAiDispatchFacade.dispatch`.
+     *
+     * Capped at `TOOL_LOOP_MAX_ITERATIONS` round-trips. Each iteration:
+     *   1. Call dispatch with the running message list.
+     *   2. Log an INFO `ai-dispatch` row capturing usage / finish reason.
+     *   3. If the assistant emitted tool calls, look each one up in
+     *      the resolved descriptor set, invoke it, append a `tool`
+     *      message with the JSON-stringified result, and loop.
+     *   4. Otherwise return the assistant text as the final reply.
+     *
+     * `errored: true` surfaces both AI-provider exceptions and the
+     * cap-hit (loop ran out without a stop) — the caller marks the
+     * run failed and skips side effects.
+     */
+    private async runToolLoop(
+        context: AgentRunContext,
+        agent: Agent,
+        prompt: AssembledPrompt,
+    ): Promise<{
+        errored: boolean;
+        errorMessage?: string;
+        outcome: AgentRunOutcome;
+        iterations: number;
+    }> {
+        const TOOL_LOOP_MAX_ITERATIONS = 10;
+        const editsThisRunByFile = new Set<string>();
+        const baseDescriptors: AgentToolDescriptor[] = this.toolService
+            ? this.toolService.resolveAllowedTools(agent, {
+                  runId: context.runId,
+                  editsThisRunByFile,
+              })
+            : [];
+        // Virtual transitionTask descriptor — only exposed on `task`
+        // kind runs. It captures the model's transition intent rather
+        // than doing the transition itself (that runs through
+        // `finalize()` → AGENT_RUN_TASK_FINISHER so it observes the
+        // state-machine + force semantics).
+        let capturedFinishStatus: AgentRunOutcome['taskFinishStatus'] = null;
+        let capturedForce = false;
+        const toolDescriptors: AgentToolDescriptor[] =
+            context.kind === 'task'
+                ? [
+                      ...baseDescriptors,
+                      this.buildTransitionTaskTool((status, force) => {
+                          capturedFinishStatus = status;
+                          capturedForce = force;
+                      }),
+                  ]
+                : baseDescriptors;
+        const toolDefs = toolDescriptors.map((d) => ({
+            name: d.name,
+            description: d.description,
+            parameters: d.parameters as unknown as Record<string, unknown>,
+        }));
+        const descriptorByName = new Map(toolDescriptors.map((d) => [d.name, d]));
+
+        const messages: AgentAiMessage[] = [
+            { role: 'system', content: prompt.systemMessage },
+            { role: 'user', content: prompt.userMessage },
+        ];
+
+        let iterations = 0;
+        let assistantText: string | null = null;
+        let lastFinishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null = null;
+        // FU-1 review fix (greptile P2): track whether the last round
+        // emitted tool calls. Some providers (notably Anthropic's older
+        // tool-use beta + a few self-hosted gateways) leave
+        // `finishReason` as null when tool calls are present, which made
+        // the cap-hit check fall through and the orchestrator return a
+        // partial outcome. Using the toolCalls.length signal directly is
+        // provider-agnostic.
+        let lastRoundHadToolCalls = false;
+
+        try {
+            while (iterations < TOOL_LOOP_MAX_ITERATIONS) {
+                iterations += 1;
+                const round = await this.aiDispatch!.dispatch({
+                    messages,
+                    tools: toolDefs.length > 0 ? toolDefs : undefined,
+                    model: agent.modelId ?? undefined,
+                    facadeOptions: {
+                        userId: context.userId,
+                        workId: agent.workId ?? undefined,
+                        agentId: agent.id,
+                        taskId: context.taskId ?? undefined,
+                        providerOverride: agent.aiProviderId ?? undefined,
+                    },
+                });
+
+                lastFinishReason = round.finishReason;
+                lastRoundHadToolCalls = round.toolCalls.length > 0;
+                assistantText = round.text;
+
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: 'INFO',
+                        step: 'ai-dispatch',
+                        message: `Round ${iterations}: ${round.toolCalls.length} tool call(s), finishReason=${round.finishReason ?? 'n/a'}.`,
+                        metadata: {
+                            iteration: iterations,
+                            model: round.model,
+                            finishReason: round.finishReason,
+                            toolCallCount: round.toolCalls.length,
+                            promptTokens: round.usage?.promptTokens,
+                            completionTokens: round.usage?.completionTokens,
+                            totalTokens: round.usage?.totalTokens,
+                        },
+                    })
+                    .catch(() => undefined);
+
+                if (round.toolCalls.length === 0) {
+                    break;
+                }
+
+                messages.push({
+                    role: 'assistant',
+                    content: round.text ?? '',
+                    toolCalls: round.toolCalls,
+                });
+
+                for (const call of round.toolCalls) {
+                    const result = await this.invokeTool(context.runId, descriptorByName, call);
+                    messages.push({
+                        role: 'tool',
+                        toolCallId: call.id,
+                        name: call.name,
+                        content: JSON.stringify(result),
+                    });
+                }
+            }
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            this.logger.warn(`AI dispatch failed for run ${context.runId}: ${errorMessage}`);
+            await this.runLogs
+                .append({
+                    runId: context.runId,
+                    level: 'ERROR',
+                    step: 'ai-dispatch',
+                    message: `AI dispatch errored: ${errorMessage}`,
+                    metadata: { iteration: iterations, errorName: (err as Error)?.name },
+                })
+                .catch(() => undefined);
+            return {
+                errored: true,
+                errorMessage,
+                outcome: { errored: true, errorMessage },
+                iterations,
+            };
+        }
+
+        if (
+            iterations >= TOOL_LOOP_MAX_ITERATIONS &&
+            (lastFinishReason === 'tool_calls' || lastRoundHadToolCalls)
+        ) {
+            const errorMessage = `Tool loop hit cap (${TOOL_LOOP_MAX_ITERATIONS} iterations) without a stop (finishReason=${lastFinishReason ?? 'null'}).`;
+            await this.runLogs
+                .append({
+                    runId: context.runId,
+                    level: 'ERROR',
+                    step: 'ai-dispatch',
+                    message: errorMessage,
+                    metadata: { iteration: iterations, cap: TOOL_LOOP_MAX_ITERATIONS },
+                })
+                .catch(() => undefined);
+            return {
+                errored: true,
+                errorMessage,
+                outcome: { errored: true, errorMessage },
+                iterations,
+            };
+        }
+
+        const outcome = this.parseOutcome(
+            context.kind,
+            assistantText,
+            capturedFinishStatus,
+            capturedForce,
+        );
+        return { errored: false, outcome, iterations };
+    }
+
+    /**
+     * FU-1 — virtual `transitionTask` tool. Exposed on `task`-kind
+     * runs so the model has a structured way to declare "this Task
+     * is done / blocked / in_review / cancelled". The capture
+     * callback stores the intent on the closure; the real transition
+     * happens via `finalize()` → AGENT_RUN_TASK_FINISHER so blocker /
+     * approver gates apply uniformly across the heartbeat / chat /
+     * task paths.
+     */
+    private buildTransitionTaskTool(
+        capture: (status: 'done' | 'in_review' | 'blocked' | 'cancelled', force: boolean) => void,
+    ): AgentToolDescriptor<
+        { to: 'done' | 'in_review' | 'blocked' | 'cancelled'; force?: boolean },
+        { captured: true; to: string }
+    > {
+        return {
+            name: 'transitionTask',
+            description:
+                'Mark the originating Task done / in_review / blocked / cancelled. Use this when you have finished the work (or determined you cannot continue) — the platform records your intent and the transition runs through the state machine post-run. `force` overrides approver gate only (not blocker).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    to: {
+                        type: 'string',
+                        description: 'Target status: done | in_review | blocked | cancelled.',
+                    },
+                    force: {
+                        type: 'boolean',
+                        description: 'Override approver gate (not blocker). Default false.',
+                    },
+                },
+                required: ['to'],
+            },
+            invoke: async (args) => {
+                if (!args?.to) {
+                    return { error: 'transitionTask: `to` is required.' } as { error: string };
+                }
+                if (!['done', 'in_review', 'blocked', 'cancelled'].includes(args.to)) {
+                    return {
+                        error: `transitionTask: \`to\` must be done | in_review | blocked | cancelled (got ${args.to}).`,
+                    } as { error: string };
+                }
+                capture(args.to, args.force ?? false);
+                return { captured: true, to: args.to };
+            },
+        };
+    }
+
+    private async invokeTool(
+        runId: string,
+        descriptorByName: Map<string, AgentToolDescriptor>,
+        call: AgentAiToolCall,
+    ): Promise<unknown> {
+        const descriptor = descriptorByName.get(call.name);
+        if (!descriptor) {
+            await this.runLogs
+                .append({
+                    runId,
+                    level: 'WARN',
+                    step: 'tool-invocation',
+                    message: `Tool "${call.name}" requested by the model is not in the allow-list.`,
+                    metadata: { toolName: call.name, callId: call.id },
+                })
+                .catch(() => undefined);
+            return { error: `tool "${call.name}" is not available to this Agent.` };
+        }
+        try {
+            const result = await descriptor.invoke(call.args as never);
+            const isError = result && typeof result === 'object' && 'error' in (result as object);
+            await this.runLogs
+                .append({
+                    runId,
+                    level: isError ? 'WARN' : 'INFO',
+                    step: 'tool-invocation',
+                    message: `Invoked tool "${call.name}"${isError ? ' (returned error)' : ''}.`,
+                    metadata: { toolName: call.name, callId: call.id },
+                })
+                .catch(() => undefined);
+            return result;
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            await this.runLogs
+                .append({
+                    runId,
+                    level: 'WARN',
+                    step: 'tool-invocation',
+                    message: `Tool "${call.name}" threw: ${errorMessage}`,
+                    metadata: { toolName: call.name, callId: call.id },
+                })
+                .catch(() => undefined);
+            return { error: errorMessage };
+        }
+    }
+
+    /**
+     * FU-1 — parse the assistant's final response into an
+     * `AgentRunOutcome`. Stays intentionally lenient: when the model
+     * didn't emit a tool call to transition the task or didn't give a
+     * usable reply body, the corresponding side effect simply doesn't
+     * fire (rather than failing the whole run).
+     *
+     * The protocol the prompt assembler asks the model to honor:
+     *   - chat:      natural-language reply text → `replyBody`
+     *   - task:      natural-language progress note + optional
+     *                `transitionTask` tool call (handled inline in the
+     *                tool loop, not here) → status sets `taskFinishStatus`
+     *   - heartbeat: free-form note → `summary`
+     *
+     * The `summary` is always extracted as the first non-empty line of
+     * the assistant text so the AgentRun row gets a useful one-liner
+     * regardless of kind.
+     */
+    private parseOutcome(
+        kind: AgentRunKind,
+        assistantText: string | null,
+        capturedFinishStatus: AgentRunOutcome['taskFinishStatus'],
+        capturedForce: boolean,
+    ): AgentRunOutcome {
+        const text = (assistantText ?? '').trim();
+        const firstLine =
+            text.length > 0 ? (text.split('\n').find((l) => l.trim().length > 0) ?? null) : null;
+        const summary =
+            firstLine && firstLine.length > 200 ? firstLine.slice(0, 200).trim() + '…' : firstLine;
+
+        if (kind === 'chat') {
+            return {
+                summary,
+                replyBody: text.length > 0 ? text : null,
+            };
+        }
+        if (kind === 'task') {
+            return {
+                summary,
+                taskFinishStatus: capturedFinishStatus,
+                force: capturedForce,
+            };
+        }
+        return { summary };
     }
 
     /**

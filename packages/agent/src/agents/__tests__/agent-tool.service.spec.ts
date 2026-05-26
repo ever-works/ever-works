@@ -111,9 +111,15 @@ describe('AgentToolService.resolveAllowedTools', () => {
                 { runId: 'r1', editsThisRunByFile: new Set() },
             );
             const tool = tools.find((t) => t.name === 'editAgentFile')!;
-            const first = (await tool.invoke({ name: 'SOUL.md', body: '# v1' })) as Record<string, unknown>;
+            const first = (await tool.invoke({ name: 'SOUL.md', body: '# v1' })) as Record<
+                string,
+                unknown
+            >;
             expect('newHash' in first && first.newHash).toBe('h');
-            const second = (await tool.invoke({ name: 'SOUL.md', body: '# v2' })) as Record<string, unknown>;
+            const second = (await tool.invoke({ name: 'SOUL.md', body: '# v2' })) as Record<
+                string,
+                unknown
+            >;
             expect('error' in second).toBe(true);
             expect((second as any).error).toMatch(/once per file per run/);
         });
@@ -128,8 +134,14 @@ describe('AgentToolService.resolveAllowedTools', () => {
                 ctx,
             );
             const tool = tools.find((t) => t.name === 'editAgentFile')!;
-            const first = (await tool.invoke({ name: 'SOUL.md', body: '# soul' })) as Record<string, unknown>;
-            const second = (await tool.invoke({ name: 'TOOLS.md', body: '# tools' })) as Record<string, unknown>;
+            const first = (await tool.invoke({ name: 'SOUL.md', body: '# soul' })) as Record<
+                string,
+                unknown
+            >;
+            const second = (await tool.invoke({ name: 'TOOLS.md', body: '# tools' })) as Record<
+                string,
+                unknown
+            >;
             expect('newHash' in first).toBe(true);
             expect('newHash' in second).toBe(true);
         });

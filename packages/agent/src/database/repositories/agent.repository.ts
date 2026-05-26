@@ -191,6 +191,50 @@ export class AgentRepository {
     }
 
     /**
+     * FU-2 (post-review) — manual run-now variant. Permissive about
+     * `nextHeartbeatAt` (manual agents may have no scheduled heartbeat)
+     * and accepts ACTIVE *or* ERROR (operator hitting "Run now" on a
+     * failed agent is the canonical retry path). Still atomic via CAS
+     * on the status column so two concurrent run-now calls cannot
+     * double-fire.
+     *
+     * Returns a marker `{ priorNextHeartbeatAt, priorStatus }` so the
+     * release-on-failure path can restore the Agent to its prior shape
+     * verbatim. `null` means another worker beat us.
+     */
+    async tryClaimForManualRun(
+        agentId: string,
+    ): Promise<{ priorNextHeartbeatAt: Date | null; priorStatus: AgentStatus } | null> {
+        const agent = await this.repository.findOne({
+            where: { id: agentId },
+            select: ['id', 'nextHeartbeatAt', 'status'],
+        });
+        if (!agent) return null;
+        if (agent.status !== AgentStatus.ACTIVE && agent.status !== AgentStatus.ERROR) {
+            return null;
+        }
+
+        const priorNext = agent.nextHeartbeatAt;
+        const priorStatus = agent.status;
+        const claimedAt = new Date();
+
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({
+                status: AgentStatus.RUNNING,
+                lastRunAt: claimedAt,
+                nextHeartbeatAt: null,
+                updatedAt: claimedAt,
+            })
+            .where('id = :id', { id: agentId })
+            .andWhere('status = :prior', { prior: priorStatus })
+            .execute();
+
+        return (result.affected ?? 0) > 0 ? { priorNextHeartbeatAt: priorNext, priorStatus } : null;
+    }
+
+    /**
      * Release the Agent back to `active` after a successful run, with
      * the computed `nextHeartbeatAt`. Resets errorCount + sets
      * lastRunStatus.
@@ -205,6 +249,25 @@ export class AgentRepository {
             nextHeartbeatAt,
             lastRunStatus,
             errorCount: 0,
+        });
+    }
+
+    /**
+     * FU-2 (post-review) — release path for manual run-now failures.
+     * Restores the Agent to the priorStatus + priorNextHeartbeatAt
+     * captured at claim time so an ERROR-status Agent doesn't get
+     * silently promoted to ACTIVE just because the user clicked
+     * "Run now" and the trigger failed.
+     */
+    async releaseAfterManualRunFailure(
+        agentId: string,
+        prior: { priorStatus: AgentStatus; priorNextHeartbeatAt: Date | null },
+        lastRunStatus: string,
+    ): Promise<void> {
+        await this.repository.update(agentId, {
+            status: prior.priorStatus,
+            nextHeartbeatAt: prior.priorNextHeartbeatAt,
+            lastRunStatus,
         });
     }
 

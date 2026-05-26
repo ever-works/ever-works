@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -10,6 +11,7 @@ import {
     createBindingAction,
     deleteBindingAction,
     deleteSkillAction,
+    loadBindingTargetOptionsAction,
     updateSkillAction,
 } from '@/app/actions/skills';
 
@@ -136,6 +138,7 @@ function BindingsPanel({
     skillId: string;
     initialBindings: SkillBinding[];
 }) {
+    const t = useTranslations('dashboard.skillsPage.detail');
     const [bindings, setBindings] = useState(initialBindings);
     const [targetType, setTargetType] = useState<SkillBindingTargetType>('tenant');
     const [targetId, setTargetId] = useState('');
@@ -186,8 +189,11 @@ function BindingsPanel({
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
             <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
                 <Link2 className="w-4 h-4 text-info" />
-                Bindings
+                {t('bindings')}
             </h2>
+            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                {t('bindingHelper')}
+            </p>
             {sorted.length === 0 ? (
                 <p className="text-xs text-text-muted">No bindings yet. Add one below.</p>
             ) : (
@@ -246,15 +252,12 @@ function BindingsPanel({
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
-                        Target ID {targetType === 'tenant' ? '(not needed)' : '(required)'}
+                        {targetType === 'tenant' ? 'Target (auto-filled)' : `Pick a ${targetType}`}
                     </label>
-                    <input
-                        type="text"
+                    <SkillBindingTargetPicker
+                        targetType={targetType}
                         value={targetId}
-                        onChange={(e) => setTargetId(e.target.value)}
-                        disabled={targetType === 'tenant'}
-                        placeholder={targetType === 'tenant' ? 'auto' : 'uuid'}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
+                        onChange={setTargetId}
                     />
                 </div>
                 <div>
@@ -278,6 +281,128 @@ function BindingsPanel({
                 </p>
             )}
         </section>
+    );
+}
+
+/**
+ * FU-8 — searchable target picker. Replaces the raw UUID textbox with
+ * a dropdown that loads the user's own entities for the chosen
+ * targetType. Tenant scope auto-fills (no picker needed); agent /
+ * mission / idea / work load via the existing list endpoints.
+ *
+ * Falls back to a plain text input when the list endpoint isn't
+ * available or returns nothing — operators with paginated lists
+ * larger than the first page can still paste a UUID directly.
+ */
+function SkillBindingTargetPicker({
+    targetType,
+    value,
+    onChange,
+}: {
+    targetType: SkillBindingTargetType;
+    value: string;
+    onChange: (v: string) => void;
+}) {
+    type Option = { id: string; label: string };
+    const [options, setOptions] = useState<Option[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [filter, setFilter] = useState('');
+    // FU-8 review fix (greptile P2): stash `onChange` in a ref so the
+    // effect doesn't re-fire (or worse, infinite-loop) when a parent
+    // passes an inline arrow function. The effect should only re-run
+    // on `targetType` changes — the callback identity is incidental.
+    const onChangeRef = useRef(onChange);
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
+
+    useEffect(() => {
+        if (targetType === 'tenant') {
+            setOptions([]);
+            onChangeRef.current('');
+            return;
+        }
+        let cancelled = false;
+        setLoading(true);
+        setLoadError(null);
+        void (async () => {
+            try {
+                // FU-8 post-CI fix: route through a server action
+                // instead of importing the server-only API clients
+                // (`agentsAPI` / `missionsAPI` / `workProposalsAPI` /
+                // `workAPI`) directly. Importing them here pulls
+                // `import 'server-only'` into the client bundle and
+                // breaks the Next.js build.
+                const next = await loadBindingTargetOptionsAction(targetType);
+                if (!cancelled) setOptions(next);
+            } catch (err) {
+                if (!cancelled) {
+                    setLoadError(err instanceof Error ? err.message : 'Failed to load options');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetType]);
+
+    if (targetType === 'tenant') {
+        return (
+            <input
+                type="text"
+                value=""
+                disabled
+                placeholder="auto"
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
+            />
+        );
+    }
+
+    const filtered =
+        filter.trim().length === 0
+            ? options
+            : options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
+
+    if (loadError || options.length === 0) {
+        return (
+            <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={loadError ? 'paste a uuid' : `no ${targetType}s — paste uuid`}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-1">
+            <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={`Search ${targetType}s`}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                disabled={loading}
+            />
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                size={Math.min(5, Math.max(2, filtered.length + 1))}
+            >
+                <option value="">— pick a {targetType} —</option>
+                {filtered.map((o) => (
+                    <option key={o.id} value={o.id}>
+                        {o.label}
+                    </option>
+                ))}
+            </select>
+        </div>
     );
 }
 

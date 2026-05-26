@@ -26,11 +26,21 @@ export async function generateMetadata({
  */
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const [task, chat] = await Promise.all([
+    const [task, chat, attachments] = await Promise.all([
         tasksAPI.get(id),
         tasksAPI.listChat(id, { limit: 50 }).catch(() => ({ data: [] as TaskChatMessage[] })),
+        // FU-5 — list initial attachments alongside the chat thread so
+        // the detail page hydrates in one round-trip and the panel
+        // renders without a client-side flash of "no attachments".
+        tasksAPI.listAttachments(id).catch(() => []),
     ]);
     if (!task) notFound();
 
-    return <TaskDetailClient task={task} initialChat={chat.data ?? []} />;
+    return (
+        <TaskDetailClient
+            task={task}
+            initialChat={chat.data ?? []}
+            initialAttachments={attachments}
+        />
+    );
 }

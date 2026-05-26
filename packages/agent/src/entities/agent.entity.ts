@@ -288,6 +288,23 @@ export class Agent {
     @Column({ length: 64, nullable: true })
     contentHash?: string | null;
 
+    // ── FU-13 — git committer identity ──
+    // When an Agent commits to a Work's git repo via `AGENT_GIT_FACADE`,
+    // these columns populate the commit author. Both nullable: when
+    // unset, the binding falls back to the Agent's name (committerName)
+    // + a synthesized email (`<slug>@agents.ever.works`) or the User's
+    // primary email. Operator can override either independently —
+    // e.g. set just `committerEmail` to a real inbox (managed via the
+    // forthcoming Email Providers surface — see
+    // docs/specs/features/email-providers/spec.md) so commit emails
+    // route back to a working address.
+
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    committerName?: string | null;
+
+    @Column({ type: 'varchar', length: 254, nullable: true })
+    committerEmail?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

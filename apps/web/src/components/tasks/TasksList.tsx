@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
@@ -30,6 +31,8 @@ const PRIORITY_TONES: Record<TaskPriority, string> = {
  * Kanban + drag-drop transitions land in Phase 14.
  */
 export function TasksList({ tasks }: { tasks: Task[] }) {
+    const t = useTranslations('dashboard.tasksPage');
+    const tStatus = useTranslations('dashboard.tasksPage.status');
     const [view, setView] = useState<'cards' | 'table' | 'kanban'>('cards');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
@@ -63,14 +66,14 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                     onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
                     className="text-xs px-2.5 py-1 rounded border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark text-text dark:text-text-dark"
                 >
-                    <option value="all">All statuses</option>
-                    <option value="backlog">Backlog</option>
-                    <option value="todo">Todo</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="in_review">In review</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="done">Done</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="all">{t('list.filter.all')}</option>
+                    <option value="backlog">{tStatus('backlog')}</option>
+                    <option value="todo">{tStatus('todo')}</option>
+                    <option value="in_progress">{tStatus('in_progress')}</option>
+                    <option value="in_review">{tStatus('in_review')}</option>
+                    <option value="blocked">{tStatus('blocked')}</option>
+                    <option value="done">{tStatus('done')}</option>
+                    <option value="cancelled">{tStatus('cancelled')}</option>
                 </select>
                 <span className="text-xs text-text-muted ml-auto">
                     {filtered.length} of {tasks.length}
@@ -79,7 +82,9 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
 
             {filtered.length === 0 ? (
                 <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                    No Tasks {statusFilter === 'all' ? 'yet' : `in status "${statusFilter}"`}.
+                    {statusFilter === 'all'
+                        ? t('empty.title')
+                        : `${t('empty.title')} (${tStatus(statusFilter)})`}
                 </div>
             ) : view === 'cards' ? (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">

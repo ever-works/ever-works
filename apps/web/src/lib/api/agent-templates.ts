@@ -118,16 +118,26 @@ const FALLBACK: Record<AstTemplateEntityType, AstTemplateEntry[]> = {
 };
 
 /**
- * Returns the curated template list for an entity type. Pure
- * client-side until ADR-010 lands; safe to call from server
- * components (no fetch, no environment lookup).
+ * Returns the curated template list for an entity type.
  *
- * Stable shape — when ADR-010 lands swap the body for
- * `serverFetch('/api/agent-templates?entity=' + entity)` and
- * callers stay unchanged.
+ * Safe to import from both server and client components — no
+ * `server-only` modules are pulled in. The ADR-010 unified Workshop
+ * Templates catalog swap path lives behind a separate server action
+ * (`listAstTemplatesFromCatalogAction` — TBA) so the client bundle
+ * can keep importing this file freely.
+ *
+ * FU-11 — call signature is stable; when the catalog ships, route
+ * pages (server components) can opt into the action path while
+ * client pre-fill hooks keep using these constants.
+ *
+ * Post-CI fix (2026-05-26): the earlier env-flag + lazy import
+ * approach broke the Next.js webpack build — webpack still traced
+ * into `./server-api` even though the import was dynamic, because
+ * its target is statically determinable. Keeping this isomorphic
+ * pure-data path avoids the bundle pollution; the catalog-swap path
+ * moves to a dedicated server action when ADR-010 lands.
  */
 export async function listAstTemplates(entity: AstTemplateEntityType): Promise<AstTemplateEntry[]> {
-    // TODO(ADR-010): replace with `serverFetch('/api/agent-templates?entity=' + entity)`.
     return FALLBACK[entity] ?? [];
 }
 
@@ -135,6 +145,15 @@ export async function listAstTemplates(entity: AstTemplateEntityType): Promise<A
  * Lookup-by-slug helper used by the per-template detail panel (and
  * by the future `?from=<slug>` pre-fill on the New flow). Returns
  * null when the slug is unknown.
+ *
+ * FU-11 review fix (greptile P1): `listAstTemplates` already routes
+ * through the ADR-010 catalog when the env flag is on, so a derived
+ * lookup via `listAstTemplates(...).find(...)` is already
+ * flag-aware. Earlier the implementation here hard-coded `FALLBACK`,
+ * which made catalog-only slugs unreachable via `getAstTemplate`.
+ * Keeping this thin wrapper means both helpers stay consistent —
+ * if the catalog returns a row, `getAstTemplate` returns it; if the
+ * fetch falls back, this falls back too.
  */
 export async function getAstTemplate(
     entity: AstTemplateEntityType,

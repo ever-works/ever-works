@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import type { Task, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
+import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
 import { postTaskChatAction, transitionTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
+import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
     backlog: 'bg-surface-secondary text-text-secondary',
@@ -42,10 +44,14 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
 export function TaskDetailClient({
     task,
     initialChat,
+    initialAttachments = [],
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
+    initialAttachments?: TaskAttachmentRow[];
 }) {
+    const t = useTranslations('dashboard.tasksPage.detail');
+    const tStatus = useTranslations('dashboard.tasksPage.status');
     const [messages, setMessages] = useState(initialChat);
     const [currentStatus, setCurrentStatus] = useState<TaskStatus>(task.status);
     const [draft, setDraft] = useState('');
@@ -130,7 +136,9 @@ export function TaskDetailClient({
             </header>
 
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">Move to</h2>
+                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                    {t('moveTo')}
+                </h2>
                 <div className="flex flex-wrap gap-2">
                     {(NEXT_STATUS[currentStatus] ?? []).map((next) => (
                         <Button
@@ -141,11 +149,11 @@ export function TaskDetailClient({
                             onClick={() => handleTransition(next)}
                             className="text-xs"
                         >
-                            {next.replace('_', ' ')}
+                            {tStatus(next)}
                         </Button>
                     ))}
                     {(NEXT_STATUS[currentStatus] ?? []).length === 0 && (
-                        <span className="text-xs text-text-muted">No transitions available.</span>
+                        <span className="text-xs text-text-muted">{t('noTransitions')}</span>
                     )}
                 </div>
                 {transitionError && (
@@ -160,12 +168,17 @@ export function TaskDetailClient({
                 discoverable without dominating the page. */}
             <TaskRecurringSection task={task} />
 
+            {/* FU-5 — Attachments. Mounted between transitions and
+                conversation so file context is visible alongside chat
+                without dominating the page. */}
+            <TaskAttachmentsSection taskId={task.id} initial={initialAttachments} />
+
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
-                    Conversation
+                    {t('conversation')}
                 </h2>
                 {messages.length === 0 ? (
-                    <p className="text-xs text-text-muted">No messages yet.</p>
+                    <p className="text-xs text-text-muted">{t('noMessages')}</p>
                 ) : (
                     <ul className="space-y-3">
                         {messages.map((m) => (
@@ -210,7 +223,7 @@ export function TaskDetailClient({
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         rows={3}
-                        placeholder="Write a message. Use @agent-slug to ping an Agent."
+                        placeholder={t('draftPlaceholder')}
                         className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
                     />
                     {postError && (
@@ -220,7 +233,7 @@ export function TaskDetailClient({
                     )}
                     <div className="flex justify-end">
                         <Button type="submit" size="sm" disabled={pendingPost || !draft.trim()}>
-                            {pendingPost ? '…' : 'Post'}
+                            {pendingPost ? '…' : t('post')}
                         </Button>
                     </div>
                 </form>

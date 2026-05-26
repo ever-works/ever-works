@@ -178,6 +178,99 @@ export class AgentScheduleDispatcherService {
     }
 
     /**
+     * FU-2 — one-shot heartbeat dispatch for a single Agent. Bypasses
+     * the `nextHeartbeatAt` schedule entirely (the controller's
+     * "Run now" affordance). Still CAS-claims the Agent so two
+     * concurrent run-now calls can't double-fire.
+     *
+     * Returns either the queued AgentRun id (success) or a structured
+     * `{ skipped: true, reason }` so the controller can surface the
+     * outcome to the user instead of swallowing a 500.
+     */
+    async dispatchOne(
+        trigger: AgentHeartbeatTrigger,
+        agentId: string,
+    ): Promise<
+        | { outcome: 'dispatched'; runId: string }
+        | { outcome: 'skipped'; reason: 'already-claimed' | 'agent-missing' | 'inactive' }
+        | { outcome: 'failed'; message: string }
+    > {
+        const agent = await this.agentRepository.findById(agentId);
+        if (!agent) {
+            return { outcome: 'skipped', reason: 'agent-missing' };
+        }
+        if (agent.status !== AgentStatus.ACTIVE && agent.status !== AgentStatus.ERROR) {
+            return { outcome: 'skipped', reason: 'inactive' };
+        }
+
+        // FU-2 review fix (codex P1): manual run-now must work for
+        // agents with no scheduled heartbeat (default manual-cadence)
+        // and for ERROR-status agents (operator retry path). Use the
+        // manual-variant claim that doesn't require `nextHeartbeatAt`
+        // and that preserves prior status for the release-on-failure
+        // path. Otherwise default agents would silently 200 with
+        // `outcome: skipped, reason: already-claimed` while no run
+        // was actually in flight.
+        let priorClaim: Awaited<ReturnType<typeof this.agentRepository.tryClaimForManualRun>> =
+            null;
+        let createdRun: { id: string } | null = null;
+        let enqueueSucceeded = false;
+        try {
+            priorClaim = await this.agentRepository.tryClaimForManualRun(agent.id);
+            if (!priorClaim) {
+                return { outcome: 'skipped', reason: 'already-claimed' };
+            }
+
+            const run = await this.agentRunRepository.createQueued({
+                agentId: agent.id,
+                userId: agent.userId,
+                triggerKind: 'manual',
+            });
+            createdRun = run ?? null;
+            const handle = await trigger.enqueue({
+                agentId: agent.id,
+                userId: agent.userId,
+                scheduledFor: priorClaim.priorNextHeartbeatAt ?? new Date(),
+            });
+            enqueueSucceeded = true;
+            return { outcome: 'dispatched', runId: run?.id ?? handle.runId };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`run-now dispatch failed for ${agent.id}: ${message}`);
+            // FU-2 review fix (greptile P1): if the AgentRun row was
+            // created but the trigger enqueue failed, the row would be
+            // stuck in `queued` forever (stuck-run sweeper only resets
+            // RUNNING). Mark it failed so re-runs aren't blocked.
+            if (createdRun && !enqueueSucceeded) {
+                try {
+                    await this.agentRunRepository.markFailed(
+                        createdRun.id,
+                        `dispatch-failed: ${message}`,
+                    );
+                } catch (failErr) {
+                    this.logger.warn(
+                        `Failed to mark orphan AgentRun ${createdRun.id} failed: ${failErr}`,
+                    );
+                }
+            }
+            if (priorClaim && !enqueueSucceeded) {
+                try {
+                    await this.agentRepository.releaseAfterManualRunFailure(
+                        agent.id,
+                        priorClaim,
+                        'dispatch-failed',
+                    );
+                } catch (releaseErr) {
+                    this.logger.warn(
+                        `Failed to release CAS claim for ${agent.id} after run-now failure: ${releaseErr}`,
+                    );
+                }
+            }
+            return { outcome: 'failed', message };
+        }
+    }
+
+    /**
      * Sweep Agents that are stuck in RUNNING past the stuck-timeout
      * window and reset them to ACTIVE with a fresh nextHeartbeatAt
      * computed from their cadence. The worker may have died mid-run;

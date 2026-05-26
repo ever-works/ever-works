@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { listAstTemplates, getAstTemplate } from './agent-templates';
 
 /**
@@ -63,3 +64,15 @@ describe('agent-templates fallback catalog', () => {
         expect(sameSlugUnderAgent).toBeNull();
     });
 });
+
+/**
+ * FU-11 post-CI fix (2026-05-26): the earlier env-flag + lazy server
+ * fetch broke the Next.js webpack build (webpack traced through the
+ * `await import('./server-api')` because the target was statically
+ * determinable, dragging `server-only` into the client bundle).
+ * `listAstTemplates` is now isomorphic pure-data; the ADR-010
+ * catalog-swap path moves to a dedicated server action when the
+ * unified Workshop Templates catalog ships. This spec block is
+ * preserved as a doc-comment so the rollback is visible to future
+ * readers.
+ */

@@ -74,6 +74,8 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
 export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
     const [tasks, setTasks] = useState(initialTasks);
     const [errors, setErrors] = useState<Record<string, string | null>>({});
+    const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+    const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
 
     const columns = useMemo(() => {
         const out: Record<TaskStatus, Task[]> = {
@@ -116,34 +118,83 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
 
     return (
         <div className="grid grid-flow-col auto-cols-[260px] gap-3 overflow-x-auto pb-4">
-            {COLUMN_ORDER.map((status) => (
-                <div
-                    key={status}
-                    className={`rounded-lg border ${COLUMN_TONES[status]} p-3 flex flex-col gap-2 min-h-[200px]`}
-                >
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-text dark:text-text-dark">
-                            {COLUMN_LABELS[status]}
-                        </span>
-                        <span className="text-text-muted">{columns[status].length}</span>
+            {COLUMN_ORDER.map((status) => {
+                const isDropActive = dropTargetStatus === status && draggingTaskId !== null;
+                return (
+                    <div
+                        key={status}
+                        onDragOver={(e) => {
+                            // FU-9 — only highlight columns the drag is
+                            // allowed to drop into so users get an
+                            // immediate visual signal for illegal moves.
+                            if (!draggingTaskId) return;
+                            const src = tasks.find((t) => t.id === draggingTaskId);
+                            if (!src) return;
+                            if (src.status === status) return;
+                            if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
+                            e.preventDefault();
+                            setDropTargetStatus(status);
+                        }}
+                        onDragLeave={(e) => {
+                            // Only clear if the leave is truly out of the column,
+                            // not just hovering into a child element.
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            if (
+                                e.clientX < rect.left ||
+                                e.clientX > rect.right ||
+                                e.clientY < rect.top ||
+                                e.clientY > rect.bottom
+                            ) {
+                                setDropTargetStatus((prev) => (prev === status ? null : prev));
+                            }
+                        }}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            const taskId =
+                                draggingTaskId ?? e.dataTransfer.getData('text/x-task-id');
+                            setDropTargetStatus(null);
+                            setDraggingTaskId(null);
+                            if (!taskId) return;
+                            const src = tasks.find((t) => t.id === taskId);
+                            if (!src || src.status === status) return;
+                            if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
+                            handleMove(taskId, status);
+                        }}
+                        className={`rounded-lg border ${COLUMN_TONES[status]} p-3 flex flex-col gap-2 min-h-[200px] transition-shadow ${
+                            isDropActive
+                                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                : ''
+                        }`}
+                    >
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium text-text dark:text-text-dark">
+                                {COLUMN_LABELS[status]}
+                            </span>
+                            <span className="text-text-muted">{columns[status].length}</span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {columns[status].map((task) => (
+                                <KanbanCard
+                                    key={task.id}
+                                    task={task}
+                                    onMove={(to) => handleMove(task.id, to)}
+                                    error={errors[task.id] ?? null}
+                                    onDragStart={() => setDraggingTaskId(task.id)}
+                                    onDragEnd={() => {
+                                        setDraggingTaskId(null);
+                                        setDropTargetStatus(null);
+                                    }}
+                                />
+                            ))}
+                            {columns[status].length === 0 && (
+                                <p className="text-[11px] text-text-muted italic text-center py-4">
+                                    empty
+                                </p>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                        {columns[status].map((task) => (
-                            <KanbanCard
-                                key={task.id}
-                                task={task}
-                                onMove={(to) => handleMove(task.id, to)}
-                                error={errors[task.id] ?? null}
-                            />
-                        ))}
-                        {columns[status].length === 0 && (
-                            <p className="text-[11px] text-text-muted italic text-center py-4">
-                                empty
-                            </p>
-                        )}
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -152,17 +203,41 @@ function KanbanCard({
     task,
     onMove,
     error,
+    onDragStart,
+    onDragEnd,
 }: {
     task: Task;
     onMove: (to: TaskStatus) => void;
     error: string | null;
+    onDragStart?: () => void;
+    onDragEnd?: () => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [pending, startTransition] = useTransition();
+    const [dragging, setDragging] = useState(false);
     const targets = NEXT_STATUS[task.status] ?? [];
 
     return (
-        <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-xs">
+        <div
+            draggable
+            onDragStart={(e) => {
+                // FU-9 — HTML5 drag-drop. dataTransfer fallback supports
+                // the rare case where parent state didn't track the
+                // drag (e.g. drop fired before onDragStart's React
+                // setState committed — drop reads from dataTransfer).
+                e.dataTransfer.setData('text/x-task-id', task.id);
+                e.dataTransfer.effectAllowed = 'move';
+                setDragging(true);
+                onDragStart?.();
+            }}
+            onDragEnd={() => {
+                setDragging(false);
+                onDragEnd?.();
+            }}
+            className={`rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-xs transition-opacity cursor-grab active:cursor-grabbing ${
+                dragging ? 'opacity-50' : ''
+            }`}
+        >
             <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-text-muted">
                 <Link href={ROUTES.DASHBOARD_TASK(task.id)} className="hover:text-text">
                     {task.slug}

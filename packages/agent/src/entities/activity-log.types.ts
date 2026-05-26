@@ -105,6 +105,9 @@ export enum ActivityActionType {
     AGENT_HEARTBEAT_COMPLETED = 'agent_heartbeat_completed',
     AGENT_HEARTBEAT_FAILED = 'agent_heartbeat_failed',
     AGENT_RUN_CANCELLED = 'agent_run_cancelled',
+    // FU-2 — manual run-now / assign-task affordances on the controller.
+    AGENT_RUN_TRIGGERED = 'agent_run_triggered',
+    AGENT_TASK_ASSIGNED = 'agent_task_assigned',
     AGENT_FILE_EDITED = 'agent_file_edited',
     AGENT_FILE_REVERTED = 'agent_file_reverted',
     AGENT_FILE_EDIT_FAILED = 'agent_file_edit_failed',
