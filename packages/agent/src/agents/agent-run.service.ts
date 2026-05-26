@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -17,6 +17,13 @@ import {
 	getCurrentPeriodStart,
 	getNextPeriodStart,
 } from './budget-period';
+import {
+	AGENT_RUN_CHAT_BACK_POSTER,
+	AGENT_RUN_TASK_FINISHER,
+	type AgentRunChatBackPoster,
+	type AgentRunOutcome,
+	type AgentRunTaskFinisher,
+} from './agent-run-post-processor';
 
 export interface AgentRunContext {
 	runId: string;
@@ -31,6 +38,19 @@ export interface AgentRunContext {
 	scopeContext?: string | null;
 	/** Caller-supplied schema name for the OUTPUT CONTRACT segment. */
 	outputSchemaName?: string;
+	/**
+	 * Originating Task — supplied for `task` and `chat` kinds. The
+	 * Phase-15.5 `finalize()` path routes auto-reply posts and
+	 * status-flip transitions back to this Task. Heartbeat runs leave
+	 * this null/undefined.
+	 */
+	taskId?: string | null;
+	/**
+	 * Originating chat message — supplied for `chat` kinds. Reserved
+	 * for the LLM-dispatch path so the worker can tie its reply to
+	 * the triggering message (T6 chat-dedup posture).
+	 */
+	chatMessageId?: string | null;
 }
 
 export interface AgentRunBudgetCheck {
@@ -81,6 +101,12 @@ export class AgentRunService {
 		private readonly assembler: PromptAssemblerService,
 		@Optional() private readonly skillBindings?: SkillBindingRepository,
 		@Optional() private readonly activityLog?: ActivityLogService,
+		@Optional()
+		@Inject(AGENT_RUN_CHAT_BACK_POSTER)
+		private readonly chatBackPoster?: AgentRunChatBackPoster,
+		@Optional()
+		@Inject(AGENT_RUN_TASK_FINISHER)
+		private readonly taskFinisher?: AgentRunTaskFinisher,
 	) {}
 
 	async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -213,6 +239,184 @@ export class AgentRunService {
 			prompt,
 			budgetCheck,
 		};
+	}
+
+	/**
+	 * Agents/Skills/Tasks PR #1017 — Phase 15.5.
+	 *
+	 * Post-process a completed Agent run. Called by the dispatch path
+	 * after the LLM round-trip finishes (or by tests that simulate
+	 * one). Three kind-specific side effects:
+	 *
+	 *  - `chat`: when `outcome.replyBody` is non-empty, posts that as
+	 *    an agent-authored chat message back to the originating Task
+	 *    via the `AgentRunChatBackPoster` token (bound to
+	 *    `TaskChatService` in the platform module).
+	 *  - `task`: when `outcome.taskFinishStatus` is set, flips the
+	 *    Task status via the `AgentRunTaskFinisher` token (bound to
+	 *    `TasksService.transition`). The transition still runs through
+	 *    `TaskTransitionService`, so blocker/approver gates apply.
+	 *  - `heartbeat`: no-op — heartbeat outcomes feed back into the
+	 *    Agent's own HEARTBEAT.md only, which the orchestrator handles
+	 *    on the file-edit path.
+	 *
+	 * The AgentRun row itself is always marked completed (or failed
+	 * when `outcome.errored`). Side-effect failures are logged as WARN
+	 * `AgentRunLog` rows but do NOT mark the run failed — the LLM
+	 * already did its work, the auto-followup is best-effort.
+	 */
+	async finalize(
+		context: AgentRunContext,
+		outcome: AgentRunOutcome,
+	): Promise<{ runId: string; status: 'completed' | 'failed'; postedMessageId?: string; finishedTaskStatus?: string }> {
+		const summary = outcome.summary ?? null;
+
+		if (outcome.errored) {
+			await this.runs.markFailed(context.runId, outcome.errorMessage ?? 'Agent run errored').catch(() => undefined);
+			return { runId: context.runId, status: 'failed' };
+		}
+
+		await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
+
+		let postedMessageId: string | undefined;
+		let finishedTaskStatus: string | undefined;
+
+		// Kind-specific side effects. Best-effort — a chat-back failure
+		// or transition rejection does not unwind the LLM work.
+		if (context.kind === 'chat' && outcome.replyBody && outcome.replyBody.trim().length > 0) {
+			postedMessageId = await this.tryPostChatReply(context, outcome.replyBody);
+		}
+		if (context.kind === 'task' && outcome.taskFinishStatus) {
+			finishedTaskStatus = await this.tryFinishTask(
+				context,
+				outcome.taskFinishStatus,
+				outcome.force ?? false,
+			);
+		}
+
+		return {
+			runId: context.runId,
+			status: 'completed',
+			postedMessageId,
+			finishedTaskStatus,
+		};
+	}
+
+	private async tryPostChatReply(
+		context: AgentRunContext,
+		body: string,
+	): Promise<string | undefined> {
+		const taskId = context.taskId ?? undefined;
+		if (!this.chatBackPoster) {
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: 'chat-back poster not bound — skipping auto-reply post.',
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
+		if (!taskId) {
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: 'chat-kind run has no taskId — skipping auto-reply post.',
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
+		try {
+			const result = await this.chatBackPoster.postReply({
+				userId: context.userId,
+				taskId,
+				agentId: context.agentId,
+				body,
+			});
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'INFO',
+					step: 'post-process',
+					message: `Posted chat-back reply ${result.messageId}.`,
+					metadata: { messageId: result.messageId, taskId },
+				})
+				.catch(() => undefined);
+			return result.messageId;
+		} catch (err) {
+			this.logger.warn(`Chat-back post failed for run ${context.runId}: ${err}`);
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: `Chat-back post failed: ${err instanceof Error ? err.message : String(err)}`,
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
+	}
+
+	private async tryFinishTask(
+		context: AgentRunContext,
+		to: 'done' | 'in_review' | 'blocked' | 'cancelled',
+		force: boolean,
+	): Promise<string | undefined> {
+		const taskId = context.taskId ?? undefined;
+		if (!this.taskFinisher) {
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: 'task finisher not bound — skipping status flip.',
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
+		if (!taskId) {
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: 'task-kind run has no taskId — skipping status flip.',
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
+		try {
+			const result = await this.taskFinisher.finishTask({
+				userId: context.userId,
+				taskId,
+				to,
+				force,
+			});
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'INFO',
+					step: 'post-process',
+					message: `Transitioned Task ${taskId} to ${result.status}.`,
+					metadata: { taskId, to: result.status, force },
+				})
+				.catch(() => undefined);
+			return result.status;
+		} catch (err) {
+			this.logger.warn(`Task-finish failed for run ${context.runId}: ${err}`);
+			await this.runLogs
+				.append({
+					runId: context.runId,
+					level: 'WARN',
+					step: 'post-process',
+					message: `Task-finish failed: ${err instanceof Error ? err.message : String(err)}`,
+				})
+				.catch(() => undefined);
+			return undefined;
+		}
 	}
 
 	/**
