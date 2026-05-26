@@ -1,18 +1,25 @@
+import { notFound } from 'next/navigation';
+import { agentsAPI } from '@/lib/api/agents';
+import { AgentActivityClient } from '@/components/agents/AgentActivityClient';
+
+type Params = Promise<{ id: string; locale: string }>;
+
 /**
- * Agents/Skills/Tasks PR #1017 — Phase 5 placeholder. The real
- * Activity tab wires the ActivityLog filtered to subjectType=Agent
- * + subjectId=this Agent's id. Lands once the per-Agent activity
- * filter ships alongside the heartbeat dispatcher.
+ * Agents/Skills/Tasks PR #1019 follow-up — FU-4.
+ *
+ * Per-Agent activity feed. Server-fetches the most recent runs via
+ * `agentsAPI.listRuns()` (paginated by the FU-2 endpoint added on the
+ * api-side controller) and renders the compact list with event-type
+ * chips + cancel affordance for queued/running rows.
  */
-export default function AgentActivityPage() {
-    return (
-        <div className="p-6 max-w-screen-2xl mx-auto">
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-2">Activity</h2>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    Per-Agent activity feed is coming in a later phase.
-                </p>
-            </section>
-        </div>
-    );
+export default async function AgentActivityPage({ params }: { params: Params }) {
+    const { id } = await params;
+    const agent = await agentsAPI.get(id);
+    if (!agent) notFound();
+
+    const initial = await agentsAPI
+        .listRuns(id, { limit: 25, offset: 0 })
+        .catch(() => ({ data: [], meta: { total: 0, limit: 25, offset: 0 } }));
+
+    return <AgentActivityClient agentId={id} initial={initial} />;
 }

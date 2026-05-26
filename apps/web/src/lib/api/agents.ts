@@ -324,4 +324,72 @@ export const agentsAPI = {
             wrapInData: false,
         });
     },
+
+    // FU-2 + FU-4 — runtime surfaces.
+    async listRuns(
+        id: string,
+        opts: { limit?: number; offset?: number } = {},
+    ): Promise<{
+        data: Array<{
+            id: string;
+            status: string;
+            triggerKind: string;
+            startedAt: string | null;
+            finishedAt: string | null;
+            durationMs: number | null;
+            summary: string | null;
+            errorMessage: string | null;
+            taskId: string | null;
+            createdAt: string;
+        }>;
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const params = new URLSearchParams();
+        if (opts.limit) params.set('limit', String(opts.limit));
+        if (opts.offset) params.set('offset', String(opts.offset));
+        const qs = params.toString();
+        return serverFetch(`/agents/${id}/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    },
+
+    async listSkills(id: string): Promise<{
+        data: Array<{
+            bindingId: string;
+            priority: number;
+            targetType: string;
+            skill: { id: string; slug: string; title: string; version: string };
+        }>;
+    }> {
+        return serverFetch(`/agents/${id}/skills`, { method: 'GET' });
+    },
+
+    async getBudget(id: string): Promise<{
+        currentSpendCents: number;
+        capCents: number | null;
+        periodStart: string;
+        periodEnd: string;
+        currency: string;
+    }> {
+        return serverFetch(`/agents/${id}/budget`, { method: 'GET' });
+    },
+
+    async runNow(id: string): Promise<{ outcome: string; runId?: string; reason?: string }> {
+        return serverMutation({
+            endpoint: `/agents/${id}/run-now`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async cancelRun(
+        id: string,
+        runId: string,
+    ): Promise<{ cancelled: boolean; previousStatus?: string }> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/cancel`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
 };
