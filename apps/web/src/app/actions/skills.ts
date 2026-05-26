@@ -39,6 +39,12 @@ export async function installCatalogSkillAction(input: {
 
 export async function createCustomSkillAction(input: {
     ownerType: SkillOwnerType;
+    /**
+     * PASS-4 review fix: ownerId can be empty for tenant scope —
+     * we derive it from the auth cookie server-side. Callers that
+     * already know the ownerId (e.g. binding to a specific Mission)
+     * keep passing it explicitly.
+     */
     ownerId: string;
     title: string;
     description: string;
@@ -46,7 +52,11 @@ export async function createCustomSkillAction(input: {
     frontmatter?: SkillFrontmatter;
     slug?: string;
 }): Promise<Skill> {
-    const skill = await skillsAPI.create(input);
+    const ownerId =
+        input.ownerType === 'tenant' && !input.ownerId
+            ? await getCurrentUserId()
+            : input.ownerId;
+    const skill = await skillsAPI.create({ ...input, ownerId });
     revalidatePath('/skills');
     return skill;
 }

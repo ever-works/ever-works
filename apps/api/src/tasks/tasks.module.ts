@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import {
 	TasksDomainModule,
 	AGENT_TASK_EXECUTE_DISPATCHER,
@@ -30,6 +30,15 @@ import { TaskChatController } from './task-chat.controller';
  *                           mentions fan out to agent-task-execute /
  *                           agent-chat-reply runs.
  */
+// PASS-4 review fix (CRITICAL): @Global() is required so the
+// dispatcher tokens (provided HERE in api-side TasksModule) actually
+// reach the consumers (TaskTransitionService + TaskChatService in
+// the imported TasksDomainModule). NestJS doesn't propagate providers
+// from a child module up into the imported module's DI scope —
+// without @Global() the @Optional() @Inject(AGENT_*_DISPATCHER) in
+// the agent-package services would silently resolve to undefined,
+// breaking the entire Phase 15.3 / 15.4 dispatch fan-out.
+@Global()
 @Module({
 	imports: [TasksDomainModule, DatabaseModule, AgentsModule],
 	controllers: [TasksController, TaskChatController],

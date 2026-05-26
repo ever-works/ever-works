@@ -169,7 +169,18 @@ export async function configureSyncRepo(config: { repoFullName?: string; createN
     }
 }
 
-export async function pushToGitHub(options: { includeSecrets?: boolean } = {}) {
+// PASS-4 review fix (HIGH): widen the action signature with the v2-tail
+// toggles. Without this no UI surface could ever push Tasks via GitHub
+// sync — the toggles silently defaulted in GitHubSyncService.
+export async function pushToGitHub(
+    options: {
+        includeSecrets?: boolean;
+        includeAgents?: boolean;
+        includeSkills?: boolean;
+        includeTasks?: boolean;
+        includeTaskChat?: boolean;
+    } = {},
+) {
     await ensureAuth();
     try {
         await accountTransferAPI.pushToGitHub(options);

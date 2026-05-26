@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { ListChecks } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskPriority } from '@/lib/api/tasks';
+// PASS-4 review fix (CRITICAL): templates dead end. Pre-fill from
+// ?from=<slug> when the user clicked "Use template" on /tasks/templates.
+import { listAstTemplates } from '@/lib/api/agent-templates';
 
 type CreateTaskFn = (input: {
     title: string;
@@ -22,12 +26,40 @@ type CreateTaskFn = (input: {
  */
 export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<TaskPriority>('p3');
     const [labelsRaw, setLabelsRaw] = useState('');
+    const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+
+    // PASS-4 fix: read ?from=<slug> and pre-fill title + description
+    // + labels (tags carry over from the template entry). Without
+    // this the "Use template" button on /tasks/templates landed on
+    // a blank form.
+    useEffect(() => {
+        const from = searchParams?.get('from');
+        if (!from || templateSlug === from) return;
+        void (async () => {
+            try {
+                const all = await listAstTemplates('task');
+                const entry = all.find((e) => e.slug === from);
+                if (entry) {
+                    setTemplateSlug(from);
+                    if (!title) setTitle(entry.title);
+                    if (!description && entry.description) setDescription(entry.description);
+                    if (!labelsRaw && entry.tags && entry.tags.length > 0) {
+                        setLabelsRaw(entry.tags.join(', '));
+                    }
+                }
+            } catch {
+                // Best-effort.
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

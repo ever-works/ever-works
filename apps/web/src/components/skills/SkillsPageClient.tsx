@@ -1,12 +1,12 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
-import { installCatalogSkillAction } from '@/app/actions/skills';
+import { createCustomSkillAction, installCatalogSkillAction } from '@/app/actions/skills';
 
 type Section = 'installed' | 'available' | 'custom';
 
@@ -61,7 +61,9 @@ export function SkillsPageClient({
             {section === 'available' && (
                 <CatalogList entries={catalog} installedSlugs={installedSlugs} />
             )}
-            {section === 'custom' && <InstalledList installed={customSkills} />}
+            {section === 'custom' && (
+                <CustomSection skills={customSkills} userIdHintAvailable={false} />
+            )}
         </div>
     );
 }
@@ -183,6 +185,128 @@ function CatalogCard({
                     {error}
                 </p>
             )}
+        </div>
+    );
+}
+
+/**
+ * PASS-4 review fix (CRITICAL UX): the Custom section was previously
+ * unreachable — InstalledList just showed "No Skills installed at
+ * this scope yet" with no CTA. Now exposes an inline "+ New Skill"
+ * form that creates a hand-authored Skill at tenant scope. Body is
+ * a tiny starter Markdown; the user can flesh it out via the
+ * detail-page autosave editor (`/skills/[id]`).
+ */
+function CustomSection({
+    skills,
+    userIdHintAvailable: _,
+}: {
+    skills: Skill[];
+    userIdHintAvailable: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+
+    const handleCreate = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title.trim()) {
+            setError('Title is required.');
+            return;
+        }
+        setError(null);
+        startTransition(() => {
+            void (async () => {
+                try {
+                    // Tenant-scope by default. The action's getCurrentUserId
+                    // helper reads the auth cookie and supplies ownerId.
+                    const created = await createCustomSkillAction({
+                        ownerType: 'tenant',
+                        ownerId: '', // server-side action resolves via getAuthFromCookie
+                        title: title.trim(),
+                        description: description.trim() || `Custom Skill: ${title.trim()}`,
+                        instructionsMd: `# ${title.trim()}\n\n${description.trim() || '_Describe what this Skill teaches your Agent..._'}\n`,
+                    });
+                    router.push(ROUTES.DASHBOARD_SKILL(created.id));
+                } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Failed to create Skill');
+                }
+            })();
+        });
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    Hand-authored Skills you wrote yourself — not installed from a plugin
+                    catalog. {skills.length} {skills.length === 1 ? 'Skill' : 'Skills'}.
+                </p>
+                {!open && (
+                    <Button size="sm" variant="primary" onClick={() => setOpen(true)} className="gap-1.5">
+                        <Plus className="w-3.5 h-3.5" />
+                        New Skill
+                    </Button>
+                )}
+            </div>
+
+            {open && (
+                <form
+                    onSubmit={handleCreate}
+                    className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3"
+                >
+                    <h3 className="text-sm font-medium text-text dark:text-text-dark">
+                        New custom Skill
+                    </h3>
+                    <div>
+                        <label className="block text-[10px] text-text-muted mb-1">Title</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="e.g. Code review checklist"
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            Description (optional)
+                        </label>
+                        <input
+                            type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="One-liner. Body goes on the detail page."
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button type="submit" size="sm" disabled={pending}>
+                            {pending ? '…' : 'Create'}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setOpen(false)}
+                            disabled={pending}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                    {error && (
+                        <p className="text-xs text-danger" role="alert">
+                            {error}
+                        </p>
+                    )}
+                </form>
+            )}
+
+            <InstalledList installed={skills} />
         </div>
     );
 }

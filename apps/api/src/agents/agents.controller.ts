@@ -218,10 +218,10 @@ export class AgentsController {
 			'Replace one Agent definition file body. Optimistic concurrency: pass `expectedHash` to guard against concurrent edits.',
 	})
 	@HttpCode(HttpStatus.OK)
-	// Review-fix I11: spec §7.1 calls for 30/min on write paths
-	// (file writes are heavier than typical CRUD — secret-scan +
-	// hash recompute on every call).
-	@Throttle({ default: { limit: 30, ttl: 60_000 } })
+	// PASS-4 review fix: plan §7.1 documents 60/min for PUT /:id/files/:name
+	// ("UI typing autosave" rationale). Tick-42 I11 mis-read the spec and
+	// tightened to 30; reverting to match the plan + docs/api/agents.md.
+	@Throttle({ default: { limit: 60, ttl: 60_000 } })
 	async writeFile(
 		@CurrentUser() auth: AuthenticatedUser,
 		@Param('id', ParseUUIDPipe) id: string,

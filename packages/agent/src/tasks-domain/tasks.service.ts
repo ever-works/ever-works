@@ -128,12 +128,22 @@ export class TasksService {
 			if (!parent) {
 				throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
 			}
-			// Walk parent chain to detect pre-existing cyclic data
-			// (defensive — bounded at 64 hops to avoid runaway loops).
+			// Walk parent chain to detect pre-existing cyclic data.
+			// PASS-4 fix: 64-hop cap now THROWS on overflow instead
+			// of silent pass — a chain deeper than 64 is either
+			// pathological or actually cyclic somewhere out of reach,
+			// and either way we should refuse rather than silently
+			// proceed (the previous behavior would have inserted into
+			// a chain we couldn't fully validate).
 			let cursor: string | null = parent.parentTaskId ?? null;
 			const seen = new Set<string>([input.parentTaskId]);
 			let hops = 0;
-			while (cursor && hops < 64) {
+			while (cursor) {
+				if (hops >= 64) {
+					throw new BadRequestException(
+						`Parent Task chain exceeds depth 64; refusing to add child for safety. Re-anchor the chain closer to the root before retrying.`,
+					);
+				}
 				if (seen.has(cursor)) {
 					throw new BadRequestException(
 						`Parent Task ${input.parentTaskId} is on an existing cycle; reparent it first.`,

@@ -100,7 +100,19 @@ export class AccountController {
     @HttpCode(HttpStatus.OK)
     async pushToGitHub(
         @CurrentUser() auth: AuthenticatedUser,
-        @Body() body: { includeSecrets?: boolean },
+        // PASS-4 review fix (HIGH): widen the body so callers can
+        // toggle the v2-tail sections. Previously the controller
+        // only accepted `includeSecrets`, so the v2 subdir layout
+        // in GitHubSyncService never actually fired from the API
+        // surface — the toggles silently defaulted.
+        @Body()
+        body: {
+            includeSecrets?: boolean;
+            includeAgents?: boolean;
+            includeSkills?: boolean;
+            includeTasks?: boolean;
+            includeTaskChat?: boolean;
+        },
     ) {
         await this.syncService.pushToGitHub(auth.userId, body);
         return { status: 'success' };

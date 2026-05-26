@@ -447,6 +447,17 @@ export class AgentExportService {
 			toolsMd: envelope.files.toolsMd ?? null,
 			agentYml: envelope.files.agentYml ?? null,
 		};
+		// PASS-4 review fix (HIGH): apply the same safeAvatarMode
+		// normalization used on the create path. Cross-tenant image
+		// uploads from a different user's tenant aren't visible to
+		// THIS user — falling back to INITIALS prevents a dangling
+		// reference. The second-pass fix added the avatar fields to
+		// the patch but bypassed this guard.
+		const safeAvatarMode =
+			envelope.avatar.mode === AgentAvatarMode.IMAGE &&
+			envelope.avatar.imageUploadId === null
+				? AgentAvatarMode.INITIALS
+				: envelope.avatar.mode;
 		const patch: Partial<Agent> = {
 			name: envelope.identity.name,
 			title: envelope.identity.title,
@@ -465,14 +476,10 @@ export class AgentExportService {
 			toolsMd: files.toolsMd,
 			agentYml: files.agentYml,
 			contentHash: computeContentHash(files),
-			// Second-pass fix: avatar fields were previously dropped on
-			// overwrite — the original Agent's avatar lingered after
-			// an import that should have rewritten it. The envelope
-			// already carries safe values (cross-tenant image upload
-			// ids are normalized to INITIALS by importOne earlier).
-			avatarMode: envelope.avatar.mode,
-			avatarIcon: envelope.avatar.icon,
-			avatarImageUploadId: envelope.avatar.imageUploadId,
+			avatarMode: safeAvatarMode,
+			avatarIcon: safeAvatarMode === AgentAvatarMode.ICON ? envelope.avatar.icon : null,
+			avatarImageUploadId:
+				safeAvatarMode === AgentAvatarMode.IMAGE ? envelope.avatar.imageUploadId : null,
 		};
 		await this.agents.updateById(target.id, patch);
 	}

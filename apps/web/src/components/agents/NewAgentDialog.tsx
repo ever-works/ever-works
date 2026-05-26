@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Bot, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { AgentScope, CreateAgentInput } from '@/lib/api/agents';
+// PASS-4 review fix (CRITICAL): templates browser was a dead end —
+// "Use template" routed to /agents/new?from=<slug> but the dialog
+// never read searchParams. Pre-fill name + title from the fallback
+// template catalog so the templates flow has an actual on-ramp into
+// Agent creation.
+import { listAstTemplates } from '@/lib/api/agent-templates';
 
 type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
 
@@ -26,12 +33,42 @@ type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
 export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) {
     const t = useTranslations('dashboard.agentsPage.newDialog');
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [step, setStep] = useState<1 | 2>(1);
     const [scope, setScope] = useState<AgentScope>('tenant');
     const [name, setName] = useState('');
     const [title, setTitle] = useState('');
+    const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+
+    // PASS-4 review fix: pre-fill from ?from=<slug> when the user
+    // clicked "Use template" on /agents/templates. We pre-populate
+    // name + title and skip Step 1 so the user lands in step 2 with
+    // the template's identity already filled in. The template body
+    // (SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md / agent.yml)
+    // gets pre-loaded by the future ADR-010 catalog merge — for now
+    // we just carry the identity so the templates flow isn't a
+    // dead end.
+    useEffect(() => {
+        const from = searchParams?.get('from');
+        if (!from || templateSlug === from) return;
+        void (async () => {
+            try {
+                const all = await listAstTemplates('agent');
+                const entry = all.find((e) => e.slug === from);
+                if (entry) {
+                    setTemplateSlug(from);
+                    if (!name) setName(entry.title);
+                    if (!title && entry.description) setTitle(entry.description.slice(0, 80));
+                    setStep(2);
+                }
+            } catch {
+                // Best-effort — fall back to a blank form.
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const scopeChoices: Array<{ value: AgentScope; label: string; desc: string; disabled?: boolean }> = [
         { value: 'tenant', label: t('scopeTenantDesc'), desc: t('scopeTenantDesc') },

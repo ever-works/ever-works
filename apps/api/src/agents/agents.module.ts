@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import {
 	AgentsModule as AgentAgentsModule,
 	AGENT_RUN_CHAT_BACK_POSTER,
@@ -55,6 +55,15 @@ import { AgentsController } from './agents.controller';
  * threads `agentId` + optional `taskId` onto `FacadeOptions` so the
  * Phase 15.6 attribution lands on every resulting `PluginUsageEvent`.
  */
+// PASS-4 review fix (CRITICAL): @Global() is required for the same
+// reason as TasksModule — the post-processor + plugin-tools-facade
+// token bindings live HERE in api-side AgentsModule, but the
+// consumers (AgentRunService.finalize, AgentToolService) live in
+// the imported `AgentAgentsModule`. Without @Global() those
+// @Optional() @Inject() calls would silently resolve to undefined
+// in production, breaking Phase 15.5 + Phase 16.10 surfaces despite
+// every unit test passing.
+@Global()
 @Module({
 	imports: [AgentAgentsModule, TasksDomainModule, FacadesModule, AuthModule],
 	controllers: [AgentsController],
