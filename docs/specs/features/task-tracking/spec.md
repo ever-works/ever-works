@@ -167,7 +167,7 @@ _Then_ it renders as a wikilink — same WikiLinkExtension reused from `KbEditor
 ### 3.2 Lifecycle
 
 - **FR-7** Status enum: `backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled`.
-- **FR-8** Status transitions: `backlog → todo → in_progress → in_review → done`. `* → blocked` and `blocked → previous` allowed. `* → cancelled` allowed. `done → *` is rejected unless the user has admin perms (out of v1 scope).
+- **FR-8** Status transitions: `backlog → todo → in_progress → in_review → done`. `* → blocked` and `blocked → previous` allowed. `* → cancelled` allowed. `done → *` is rejected **except** `done → in_progress`, which is permitted as a soft re-open path for cases where a Task was closed by mistake or new information surfaced after completion. The soft re-open is the only post-`done` transition; everything else (`done → todo`, `done → in_review`, `done → blocked`, etc.) stays rejected. Users should prefer filing a new Task when the re-opened work is genuinely separate scope. (Carve-out resolved 2026-05-26 in [PR #1021](https://github.com/ever-works/ever-works/pull/1021) as FU-12 — implementation in `TaskTransitionService.ALLOWED[done] = ['in_progress']` matches this spec.)
 - **FR-9** When a Task with active blockers tries to move to `in_progress`, the system MUST reject the transition with `409 Conflict — has unresolved blockers`.
 - **FR-10** When all blockers for a `blocked` Task are `done`, the Task MUST auto-transition back to its prior status (stored in `previousStatus` column on the row).
 - **FR-11** On `done` transition: if any approvers are configured, the system MUST require all approvers' `approved=true` row before allowing `done`. Configurable per-task via `requireAllApprovers`.

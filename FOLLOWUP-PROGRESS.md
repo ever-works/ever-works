@@ -21,7 +21,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 
 ## Tier 3 (operator decisions — partially resolved 2026-05-26)
 
-- [ ] FU-12 · Transition lattice `done → in_progress` divergence — still awaiting operator pick between (a) spec carve-out or (b) tightening `ALLOWED[DONE]`.
+- [x] FU-12 · Transition lattice `done → in_progress` divergence — operator picked Option A (spec carve-out). FR-8 in `docs/specs/features/task-tracking/spec.md` updated to acknowledge the soft re-open. Code unchanged.
 - [x] FU-13 · Operator-binding for `AGENT_GIT_FACADE` — added per-Agent `committerName`/`committerEmail` columns + migration; bound the token in api-side AgentsModule using User's OAuth token via existing `GitFacadeService.commit/.createPullRequest`; updated injection-tokens doc with the canonical adapter.
 - [x] FU-14 · Phase 4 Git-mode AgentFileService writes — added `GitFacadeService.getRepoDir(scope, scopeId)` that resolves Work scopes via `WorkRepository.findById` + `cloneOrPull`, returns null for Mission/Idea (no repo in current data model); removed "Git-mode lands in Phase 6" throws so non-tenant Agents fall back to DB-inline cleanly.
 
