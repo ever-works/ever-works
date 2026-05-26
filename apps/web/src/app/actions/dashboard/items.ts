@@ -35,9 +35,9 @@ export async function loadItemsForList(workId: string): Promise<LoadItemsForList
     const [itemsRes, taxonomyRes] = await Promise.all([
         workAPI.getItems(workId).catch(() => ({ items: [] as ItemData[] })),
         workAPI.getCategoriesTags(workId).catch(() => ({
-            categories: [] as string[],
-            tags: [] as string[],
-            collections: [] as string[],
+            categories: [] as Array<string | Category>,
+            tags: [] as Array<string | Tag>,
+            collections: [] as Array<string | Collection>,
         })),
     ]);
 

@@ -248,6 +248,7 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
             )}
             {activeTab === 'items' &&
                 !isLoadingItems &&
+                !itemsLoadError &&
                 (items!.length === 0 ? (
                     <ItemsEmptyState workId={workId} />
                 ) : (
@@ -260,8 +261,18 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
                 </div>
             )}
 
+            {/*
+             * `key={loaded?.workId ?? 'pending'}` forces a remount of
+             * each taxonomy tab when items finish loading. Without
+             * this, `CategoriesTab` / `TagsTab` / `CollectionsTab`
+             * each call `useState(initialX)` and snapshot the empty
+             * array on first render — they would never observe the
+             * real taxonomy when it arrives, leaving the tab stuck
+             * blank until the user navigated away and back.
+             */}
             {activeTab === 'categories' && (
                 <CategoriesTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialCategories={initialCategories}
                     items={items ?? []}
@@ -271,6 +282,7 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
 
             {activeTab === 'tags' && (
                 <TagsTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialTags={initialTags}
                     items={items ?? []}
@@ -280,6 +292,7 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
 
             {activeTab === 'collections' && (
                 <CollectionsTab
+                    key={loaded?.workId ?? 'pending'}
                     workId={workId}
                     initialCollections={initialCollections}
                     items={items ?? []}

@@ -225,18 +225,20 @@ export class WorkQueryService {
 
     /**
      * Should we attempt a one-shot backfill of the data-cache columns
-     * on this read? True iff the work has been generated at least once
-     * (so the data repo plausibly exists) and the cache is still
-     * empty. After the first successful backfill, every column is
-     * populated and subsequent reads short-circuit.
+     * on this read? Gated on `configCache` alone, not on any of the
+     * count columns. Reason: `refreshDataCache` writes each column
+     * independently from its own `Promise.allSettled` slot — so if a
+     * single read (e.g. `countComparisons()` on a Work with no
+     * comparisons folder) consistently rejects, that one count stays
+     * NULL forever even after the rest are populated. Triggering on
+     * `configCache == null` instead means once the YAML snapshot has
+     * been written at least once, the page is unblocked regardless
+     * of which sibling reads failed — and a per-read failure can be
+     * retried by an explicit refresh path, not by silently
+     * re-cloning the repo on every page load.
      */
     private shouldBackfillDataCache(work: Work): boolean {
-        return (
-            work.configCache == null ||
-            work.categoriesCount == null ||
-            work.tagsCount == null ||
-            work.comparisonsCount == null
-        );
+        return work.configCache == null;
     }
 
     async workExists(slug: string, user: User) {
