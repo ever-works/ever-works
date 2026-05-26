@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import { AgentScope } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
@@ -6,6 +6,12 @@ import { AgentFileService } from './agent-file.service';
 import { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { createGetSkillBodyTool } from './agent-tools-skill';
+import {
+	AGENT_GIT_FACADE,
+	type AgentGitFacade,
+	type AgentCommitToRepoResult,
+	type AgentOpenPullRequestResult,
+} from './agent-git-facade';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -60,6 +66,9 @@ export class AgentToolService {
 		@Optional() private readonly skills?: SkillRepository,
 		@Optional() private readonly bindings?: SkillBindingRepository,
 		@Optional() private readonly files?: AgentFileService,
+		@Optional()
+		@Inject(AGENT_GIT_FACADE)
+		private readonly git?: AgentGitFacade,
 	) {}
 
 	/**
@@ -108,6 +117,26 @@ export class AgentToolService {
 		// createSubAgent — gated by permissions.canCreateAgents.
 		if (agent.permissions?.canCreateAgents) {
 			tools.push(this.buildCreateSubAgentTool(agent));
+		}
+
+		// Phase 16.6 — commitToRepo. Gated by permissions.canCommitToRepo
+		// + the AGENT_GIT_FACADE token being bound by the platform.
+		// Mission/Idea/Tenant-scoped Agents can't commit because there's
+		// no implicit Work; the tool still exposes the descriptor but
+		// rejects at invoke time with a clear "scope-not-Work" error so
+		// the model receives an actionable response instead of a missing
+		// tool. Work-scoped Agents pass through to the adapter.
+		if (agent.permissions?.canCommitToRepo && this.git) {
+			tools.push(this.buildCommitToRepoTool(agent));
+		}
+
+		// Phase 16.7 — openPullRequest. Permission chain enforced at the
+		// service layer (Phase 3.2): canOpenPullRequests ⇒ canCommitToRepo
+		// so the model can never produce a PR without an associated
+		// commit permission grant. We still gate the descriptor on the
+		// granular flag.
+		if (agent.permissions?.canOpenPullRequests && this.git) {
+			tools.push(this.buildOpenPullRequestTool(agent));
 		}
 
 		// getActivity + getKbDocument — placeholders that document the
@@ -231,6 +260,133 @@ export class AgentToolService {
 						avatarImageUploadId: null,
 					});
 					return { id: created.id, slug: created.slug };
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		};
+	}
+
+	private buildCommitToRepoTool(
+		agent: Agent,
+	): AgentToolDescriptor<
+		{ message: string; files?: { path: string; body: string }[]; branch?: string },
+		AgentCommitToRepoResult
+	> {
+		return {
+			name: 'commitToRepo',
+			description:
+				"Commit a batch of file edits to the active Work's git repo. Requires Work scope on this Agent + canCommitToRepo permission. Pass a clear commit message and optional file edits to stage. Returns the resulting commit SHA, target branch, and number of files changed. The adapter resolves the provider + repo + committer identity from the Work's git settings.",
+			parameters: {
+				type: 'object',
+				properties: {
+					message: {
+						type: 'string',
+						description: 'Commit message. Should be agent-authored and reference what changed.',
+					},
+					files: {
+						type: 'string',
+						description:
+							'Optional JSON array of {path, body} objects to stage before committing. When omitted, commits whatever the previous tool calls already staged.',
+					},
+					branch: {
+						type: 'string',
+						description: "Branch name to commit against. Defaults to the Work's main branch.",
+					},
+				},
+				required: ['message'],
+			},
+			invoke: async (args) => {
+				if (!args?.message || args.message.trim().length === 0) {
+					return { error: 'message is required.' };
+				}
+				if (agent.scope !== AgentScope.WORK || !agent.workId) {
+					return {
+						error: 'commitToRepo: this Agent is not Work-scoped — no implicit repo target. Re-create the Agent with scope=work on a Work that has git settings.',
+					};
+				}
+				if (!this.git) {
+					return {
+						error: 'commitToRepo: git facade is not bound in this runtime. Ask the operator to wire AGENT_GIT_FACADE.',
+					};
+				}
+				try {
+					return await this.git.commitToRepo({
+						userId: agent.userId,
+						agentId: agent.id,
+						workId: agent.workId,
+						message: args.message,
+						files: args.files,
+						branch: args.branch,
+					});
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		};
+	}
+
+	private buildOpenPullRequestTool(
+		agent: Agent,
+	): AgentToolDescriptor<
+		{ title: string; body: string; head: string; base?: string; draft?: boolean },
+		AgentOpenPullRequestResult
+	> {
+		return {
+			name: 'openPullRequest',
+			description:
+				"Open a Pull Request on the active Work's git repo. Requires Work scope on this Agent + canOpenPullRequests permission (which transitively requires canCommitToRepo). Provide title, body, head branch (the branch you committed to), and optional base + draft flag. Returns the PR number, URL, and state.",
+			parameters: {
+				type: 'object',
+				properties: {
+					title: {
+						type: 'string',
+						description: 'PR title — should match conventional-commit style when the Work uses it.',
+					},
+					body: {
+						type: 'string',
+						description: 'PR body — markdown is fine. Summarize what changed and why.',
+					},
+					head: {
+						type: 'string',
+						description: 'Branch name containing the commits.',
+					},
+					base: {
+						type: 'string',
+						description: "Optional base branch. Defaults to the Work's default branch.",
+					},
+					draft: {
+						type: 'string',
+						description: 'Optional flag — open as a draft PR. Default false.',
+					},
+				},
+				required: ['title', 'body', 'head'],
+			},
+			invoke: async (args) => {
+				if (!args?.title || !args?.body || !args?.head) {
+					return { error: 'title, body, and head are required.' };
+				}
+				if (agent.scope !== AgentScope.WORK || !agent.workId) {
+					return {
+						error: 'openPullRequest: this Agent is not Work-scoped — no implicit repo target.',
+					};
+				}
+				if (!this.git) {
+					return {
+						error: 'openPullRequest: git facade is not bound in this runtime. Ask the operator to wire AGENT_GIT_FACADE.',
+					};
+				}
+				try {
+					return await this.git.openPullRequest({
+						userId: agent.userId,
+						agentId: agent.id,
+						workId: agent.workId,
+						title: args.title,
+						body: args.body,
+						head: args.head,
+						base: args.base,
+						draft: args.draft,
+					});
 				} catch (err) {
 					return { error: err instanceof Error ? err.message : String(err) };
 				}

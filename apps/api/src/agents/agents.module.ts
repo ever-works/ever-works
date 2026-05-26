@@ -6,6 +6,15 @@ import {
 	type AgentRunChatBackPoster,
 	type AgentRunTaskFinisher,
 } from '@ever-works/agent/agents';
+
+// Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
+// The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
+// is deliberately LEFT UNBOUND in v1. Binding it activates the two
+// tools for Agents with the matching permissions; the adapter
+// implementation resolves the Work's git provider settings + auth via
+// `GitFacadeService.commit()` / `.createPullRequest()`. Operators wire
+// it post-merge when their git provider setup is stable. Leaving it
+// unbound keeps the model from seeing tools that would fail mysteriously.
 import {
 	TasksDomainModule,
 	TaskChatService,
