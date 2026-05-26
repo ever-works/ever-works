@@ -98,6 +98,27 @@ export class PluginsController {
         return this.pluginsService.listPluginModels(pluginId, auth.userId);
     }
 
+    @Get('plugins/:pluginId/connection-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Probe a single plugin connection status on demand',
+        description:
+            'Returns the same `PluginConnectionStatus` shape the list endpoint used to embed eagerly per plugin. Use this from settings drawers / "test connection" buttons so the list endpoint can stay fast (the list response no longer fans out to every external provider on every page load).',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Plugin connection status' })
+    @ApiResponse({ status: 404, description: 'Plugin not found' })
+    async getPluginConnectionStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ): Promise<{ connectionStatus: Awaited<ReturnType<PluginOperationsService['getPluginConnectionStatus']>> }> {
+        const connectionStatus = await this.pluginsService.getPluginConnectionStatus(
+            pluginId,
+            auth.userId,
+        );
+        return { connectionStatus };
+    }
+
     @Get('plugins/:pluginId')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
