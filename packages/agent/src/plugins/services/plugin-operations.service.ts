@@ -1286,39 +1286,38 @@ export class PluginOperationsService {
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
 
-        // Resolve the user-scope settings ONCE and feed both display +
-        // model-summary projections off the same payload. The old
-        // implementation called `settingsService.getResolvedSettings`
-        // twice (in `getResolvedDisplaySettings` AND
-        // `getProviderModelSummaries`), doubling the per-plugin DB
-        // round-trip on every list response.
+        // Fan out the two independent reads in parallel:
+        //   (1) resolve the user-scope settings (used for the display
+        //       + model-summary projections); skipped entirely if the
+        //       plugin has no schema AND isn't an AI provider.
+        //   (2) probe the connection status — only on opt-in
+        //       (detail endpoint + post-mutation responses); the
+        //       LIST path skips this so the dashboard doesn't fan
+        //       out to ~39 external providers per page load.
+        //
+        // The previous shape ran (1) and (2) sequentially when both
+        // were needed, regressing detail-endpoint latency from
+        // `max(T_resolve, T_probe)` to `T_resolve + T_probe`. Putting
+        // them back inside a single `Promise.all` restores the
+        // original concurrency on the opt-in path while preserving
+        // the list-path savings (the probe is `Promise.resolve(undefined)`
+        // when `includeConnectionStatus` is false, so no extra work).
         const schema = registered.plugin.settingsSchema;
-        const resolved =
-            schema?.properties || this.hasAiProviderCapability(registered)
-                ? await this.settingsService.getResolvedSettings(registered.plugin.id, { userId })
-                : undefined;
+        const needsResolved = !!schema?.properties || this.hasAiProviderCapability(registered);
+        const resolvedP = needsResolved
+            ? this.settingsService.getResolvedSettings(registered.plugin.id, { userId })
+            : Promise.resolve(undefined);
+        const connectionStatusP = options.includeConnectionStatus
+            ? this.getConnectionStatus(registered, userId)
+            : Promise.resolve(undefined);
+
+        const [resolved, connectionStatus] = await Promise.all([resolvedP, connectionStatusP]);
 
         const resolvedSettings = resolved
             ? this.projectDisplaySettings(registered, resolved)
             : undefined;
         const models = resolved
             ? this.projectProviderModelSummaries(registered, resolved)
-            : undefined;
-
-        // `connectionStatus` is the expensive bit — it fans out to
-        // external providers (Anthropic, OpenAI, Tavily, GitHub
-        // OAuth, …) per plugin and can dominate dashboard latency
-        // when computed for the full ~39-plugin list on every page
-        // load. The web UI has no list-page surface for this field
-        // (no "Connected / Not configured" badge on any list page),
-        // so list callers default to opting out. Detail endpoints +
-        // post-mutation responses (enable / disable / settings
-        // update) opt in so a saved-token confirmation can still
-        // come back fresh, and the new
-        // `GET /plugins/:pluginId/connection-status` endpoint serves
-        // any explicit on-demand probe (e.g. settings drawer).
-        const connectionStatus = options.includeConnectionStatus
-            ? await this.getConnectionStatus(registered, userId)
             : undefined;
 
         if (!resolvedSettings && !connectionStatus && !models) {
