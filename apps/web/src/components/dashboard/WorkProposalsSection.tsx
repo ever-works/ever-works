@@ -236,18 +236,21 @@ export function WorkProposalsSection({
                     </h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Phase 5 PR O — `+ Add` quick-add toggle */}
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setQuickAddOpen((v) => !v)}
-                        aria-expanded={quickAddOpen}
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        {tPage('quickAdd.submit')}
-                    </Button>
+                    {/* Phase 5 PR O — quick-add trigger. Hidden while the form is open
+                        so the header and form don't show duplicate Add controls. */}
+                    {!quickAddOpen && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setQuickAddOpen(true)}
+                            aria-expanded={quickAddOpen}
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            {tPage('quickAdd.submit')}
+                        </Button>
+                    )}
 
                     {/* Phase 5 PR O — gears dropdown linking to settings anchors */}
                     <DropdownMenu>

@@ -120,7 +120,7 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         expect(routerPushMock).toHaveBeenCalledWith('/ideas');
     });
 
-    it('Submit with chip=website routes to /works/new with kind + prompt query params', () => {
+    it('Submit with chip=website routes to the Work wizard with mode + kind + prompt query params', () => {
         routerPushMock.mockClear();
         render(<NewPageClient initialType="website" />);
         fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
@@ -130,6 +130,7 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         expect(routerPushMock).toHaveBeenCalledTimes(1);
         const href = routerPushMock.mock.calls[0][0] as string;
         expect(href.startsWith('/works/new?')).toBe(true);
+        expect(href).toContain('mode=ai');
         expect(href).toContain('kind=website');
         // URLSearchParams encodes spaces as `+`, not `%20`.
         expect(href).toContain('prompt=Landing+page+for+my+SaaS+launch');
@@ -191,17 +192,10 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         });
     });
 
-    it('CreationBlockTrio renders below the chip strip with labelSet="unified"', () => {
-        const { container } = render(<NewPageClient />);
-        // Unified label set: title key is "dashboard.newPage.cards.ai.title"
-        // (vs. legacy "dashboard.workCreation.ai.title").
-        expect(screen.getByText('dashboard.newPage.cards.ai.title')).toBeTruthy();
+    it('renders compact manual/import shortcuts instead of a second Work card chooser', () => {
+        render(<NewPageClient />);
+        expect(screen.queryByText('dashboard.newPage.cards.ai.title')).toBeNull();
         expect(screen.getByText('dashboard.newPage.cards.manual.title')).toBeTruthy();
         expect(screen.getByText('dashboard.newPage.cards.import.title')).toBeTruthy();
-        // Three mode-card buttons (no aria-pressed on these).
-        const modeButtons = Array.from(container.querySelectorAll('button:not([aria-pressed])'));
-        // At least 3 (Submit + 3 mode buttons). The Submit also lacks
-        // aria-pressed but is the only non-trio button.
-        expect(modeButtons.length).toBeGreaterThanOrEqual(4);
     });
 });

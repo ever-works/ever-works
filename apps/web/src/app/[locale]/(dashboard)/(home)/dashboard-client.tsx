@@ -115,7 +115,7 @@ export default function DashboardClient({
                             action={{
                                 label: t('works.empty.action'),
                                 onClick: () => {
-                                    router.push(ROUTES.DASHBOARD_WORKS_NEW);
+                                    router.push(ROUTES.DASHBOARD_NEW);
                                 },
                             }}
                         />

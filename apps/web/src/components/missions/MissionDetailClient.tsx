@@ -313,12 +313,11 @@ export function MissionDetailClient({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                         {canRunNow && (
                             <Button
                                 type="button"
                                 size="sm"
-                                variant="secondary"
                                 className="gap-1.5"
                                 onClick={runNow}
                                 disabled={pendingRunNow}
@@ -452,7 +451,7 @@ export function MissionDetailClient({
 
             {/* Guardrails section (placeholder for v1; sparse-override
                 editor lands in a follow-up tick). */}
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+            <section className="rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 p-4">
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark mb-1">
                     {t('sections.guardrails')}
                 </h2>
@@ -474,7 +473,7 @@ export function MissionDetailClient({
                 before the data wires through, and the layout
                 doesn't reshuffle later. */}
             <div className="grid gap-6 @3xl/main:grid-cols-2">
-                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                <section className="rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <Activity className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                         <h2 className="text-sm font-semibold text-text dark:text-text-dark">
@@ -485,7 +484,7 @@ export function MissionDetailClient({
                         {t('activity.empty')}
                     </p>
                 </section>
-                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                <section className="rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 p-4">
                     <div className="flex items-center gap-2 mb-3">
                         <BarChart3 className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                         <h2 className="text-sm font-semibold text-text dark:text-text-dark">
@@ -511,7 +510,7 @@ export function MissionDetailClient({
             {/* Live runs section (Decision A15 — LIST shape, not single
                 run). v1 lists nothing because Mission ticks don't yet
                 produce queryable run records; PR J / PR GG wires it. */}
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+            <section className="rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 p-4">
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark mb-2">
                     {t('sections.liveRuns')}
                 </h2>
@@ -521,7 +520,7 @@ export function MissionDetailClient({
             </section>
 
             {/* Ideas list section */}
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+            <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4">
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark mb-3">
                     {t('sections.ideas')} ({ideas.length})
                 </h2>
@@ -539,7 +538,7 @@ export function MissionDetailClient({
             </section>
 
             {/* Related Works section */}
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+            <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4">
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark mb-3">
                     {t('sections.relatedWorks')} ({acceptedWorkLinks.length})
                 </h2>
@@ -569,7 +568,7 @@ export function MissionDetailClient({
                 source Mission are NOT duplicated during Clone — this
                 panel surfaces them as read-only references. */}
             {mission.sourceMissionId && (
-                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+                <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4">
                     <div className="flex items-center gap-2 mb-1">
                         <GitFork className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                         <h2 className="text-sm font-semibold text-text dark:text-text-dark">
