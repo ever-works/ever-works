@@ -28,6 +28,7 @@ interface WorkAICreatorProps {
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
     proposal?: WorkProposal;
+    initialPrompt?: string;
 }
 
 export function WorkAICreator({
@@ -36,8 +37,9 @@ export function WorkAICreator({
     deployProvider,
     websiteTemplates,
     proposal,
+    initialPrompt,
 }: WorkAICreatorProps) {
-    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? '');
+    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? initialPrompt ?? '');
     const [workName, setWorkName] = useState(proposal?.title ?? '');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');

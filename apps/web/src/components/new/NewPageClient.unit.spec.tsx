@@ -120,7 +120,7 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         expect(routerPushMock).toHaveBeenCalledWith('/ideas');
     });
 
-    it('Submit with chip=website routes to /works/new with kind + prompt query params', () => {
+    it('Submit with chip=website routes to the Work wizard with mode + kind + prompt query params', () => {
         routerPushMock.mockClear();
         render(<NewPageClient initialType="website" />);
         fireEvent.change(screen.getByPlaceholderText('dashboard.newPage.promptPlaceholder'), {
@@ -130,6 +130,7 @@ describe('NewPageClient (Phase 6.5 PR CC2)', () => {
         expect(routerPushMock).toHaveBeenCalledTimes(1);
         const href = routerPushMock.mock.calls[0][0] as string;
         expect(href.startsWith('/works/new?')).toBe(true);
+        expect(href).toContain('mode=ai');
         expect(href).toContain('kind=website');
         // URLSearchParams encodes spaces as `+`, not `%20`.
         expect(href).toContain('prompt=Landing+page+for+my+SaaS+launch');

@@ -14,6 +14,8 @@ import NewWorkClient from './new-work-client';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
+import { ROUTES } from '@/lib/constants';
+import type { CreationMode } from '@/components/works/CreationBlockTrio';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -26,11 +28,24 @@ export interface ProviderWithConnection {
 }
 
 interface NewWorkPageProps {
-    searchParams: Promise<{ proposal?: string }>;
+    searchParams: Promise<{ proposal?: string; mode?: string; prompt?: string; kind?: string }>;
 }
 
+const VALID_CREATION_MODES: CreationMode[] = ['ai', 'manual', 'import'];
+
 export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
-    const { proposal: proposalId } = await searchParams;
+    const params = await searchParams;
+    const proposalId = params.proposal;
+    const initialPrompt = (params.prompt ?? '').trim().slice(0, 4000);
+    const initialMode = (VALID_CREATION_MODES as string[]).includes(params.mode ?? '')
+        ? (params.mode as CreationMode)
+        : initialPrompt.length > 0
+          ? 'ai'
+          : null;
+
+    if (!proposalId && !initialMode) {
+        redirect(ROUTES.DASHBOARD_NEW);
+    }
     const user = await getAuthFromCookie();
 
     // Defense: rendering with `user!` (non-null assertion) crashes the page
@@ -114,6 +129,8 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             defaultDeployProviderId={defaultDeployProviderId}
             websiteTemplates={websiteTemplates}
             proposal={proposal}
+            initialMode={initialMode}
+            initialPrompt={initialPrompt}
         />
     );
 }

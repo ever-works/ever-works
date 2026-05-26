@@ -139,6 +139,7 @@ export function NewPageClient({
                 // so this is forward-compatible — the wiring lands
                 // when the AI Creator reads `kind` (follow-up tick).
                 const params = new URLSearchParams({
+                    mode: 'ai',
                     kind: selectedChip,
                     prompt: description.slice(0, 4000),
                 });

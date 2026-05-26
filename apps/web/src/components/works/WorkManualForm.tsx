@@ -26,6 +26,7 @@ interface WorkManualFormProps {
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
     proposal?: WorkProposal;
+    initialDescription?: string;
 }
 
 export function WorkManualForm({
@@ -35,6 +36,7 @@ export function WorkManualForm({
     deployProvider,
     websiteTemplates,
     proposal,
+    initialDescription,
 }: WorkManualFormProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -44,7 +46,7 @@ export function WorkManualForm({
     const [formData, setFormData] = useState<CreateWorkDto>({
         slug: proposal?.slugSuggestion ?? '',
         name: proposal?.title ?? '',
-        description: proposal?.description ?? '',
+        description: proposal?.description ?? initialDescription ?? '',
         organization: false,
         owner: '',
         websiteTemplateId: '',
