@@ -30,12 +30,34 @@ type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
  * phases. Picking a non-tenant scope here surfaces a "coming
  * soon" hint so the user knows where to find it.
  */
-export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) {
+export interface NewAgentDialogPinnedScope {
+    scope: Exclude<AgentScope, 'tenant'>;
+    missionId?: string;
+    ideaId?: string;
+    workId?: string;
+    /** Optional parent name to show in step 2 instead of the bare scope. */
+    parentLabel?: string;
+}
+
+export function NewAgentDialog({
+    createAgent,
+    pinned,
+}: {
+    createAgent: CreateAgentFn;
+    /**
+     * FU-3 — when set, the scope picker (step 1) is skipped and the
+     * scope-bound ids are forwarded to `createAgent`. Used by the
+     * `/missions/[id]/agents/new`, `/works/[id]/agents/new`, and
+     * `/ideas/[id]/agents/new` routes so the user lands directly on
+     * step 2 with the parent already chosen.
+     */
+    pinned?: NewAgentDialogPinnedScope;
+}) {
     const t = useTranslations('dashboard.agentsPage.newDialog');
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [step, setStep] = useState<1 | 2>(1);
-    const [scope, setScope] = useState<AgentScope>('tenant');
+    const [step, setStep] = useState<1 | 2>(pinned ? 2 : 1);
+    const [scope, setScope] = useState<AgentScope>(pinned?.scope ?? 'tenant');
     const [name, setName] = useState('');
     const [title, setTitle] = useState('');
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
@@ -70,6 +92,11 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
+    // FU-3 — non-tenant scopes are now reachable from the parent
+    // detail screens (Mission tab strip, Work layout, Idea detail).
+    // Each of those routes mounts the dialog with `pinned` set, which
+    // skips Step 1 entirely. The tenant-only `/agents/new` page still
+    // exposes only the tenant option here.
     const scopeChoices: Array<{
         value: AgentScope;
         label: string;
@@ -97,6 +124,11 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
                         scope,
                         name: name.trim(),
                         title: title.trim() || null,
+                        // FU-3 — when the dialog is pinned to a parent
+                        // entity, forward the matching id to the API.
+                        missionId: pinned?.missionId,
+                        workId: pinned?.workId,
+                        ideaId: pinned?.ideaId,
                     });
                     router.push(ROUTES.DASHBOARD_AGENT(created.id));
                 } catch (err) {
@@ -160,6 +192,22 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
 
             {step === 2 && (
                 <section>
+                    {pinned && (
+                        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            <span className="font-medium text-text dark:text-text-dark capitalize">
+                                {pinned.scope}
+                            </span>{' '}
+                            scope
+                            {pinned.parentLabel ? (
+                                <>
+                                    {' — '}
+                                    <span className="font-medium text-text dark:text-text-dark">
+                                        {pinned.parentLabel}
+                                    </span>
+                                </>
+                            ) : null}
+                        </div>
+                    )}
                     <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
                         {t('step2Title')}
                     </h2>
@@ -189,15 +237,26 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
                         </p>
                     )}
                     <div className="flex items-center justify-between gap-2 mt-6">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStep(1)}
-                            className="gap-1.5"
-                        >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                            {t('back')}
-                        </Button>
+                        {pinned ? (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.back()}
+                                className="gap-1.5"
+                            >
+                                {t('cancel')}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStep(1)}
+                                className="gap-1.5"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                {t('back')}
+                            </Button>
+                        )}
                         <Button size="sm" onClick={handleSubmit} disabled={pending || !name.trim()}>
                             {pending ? '…' : t('create')}
                         </Button>

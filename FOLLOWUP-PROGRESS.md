@@ -6,7 +6,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 
 - [x] FU-1 · LLM dispatch in `AgentRunService.execute` — token-based facade (`AGENT_AI_DISPATCH_FACADE`), tool loop capped at 10 iterations, virtual `transitionTask` capture tool on `task` runs, INFO/WARN/ERROR run-log rows for `ai-dispatch` + `tool-invocation`, finalize() routes chat-back + task-finish
 - [x] FU-2 · 6 missing Agents API controller routes — `run-now`, `runs`, `runs/:runId/cancel`, `skills`, `budget`, `assign-task`. Throttled per plan §7.1, activity-logged, cross-user 404 via `agentsService.getOne`. New repo methods (`AgentRunRepository.countByAgent` / `cancel` / `findByIdAndUser`) + `AgentScheduleDispatcherService.dispatchOne` + 2 new ActivityActionType values
-- [ ] FU-3 · Mission/Work/Idea-scoped Agent creation entry points
+- [x] FU-3 · Mission/Work/Idea-scoped Agent creation entry points — `NewAgentDialog` now accepts a `pinned` prop that skips step 1 and forwards `missionId`/`workId`/`ideaId` to the API. New routes `/missions/[id]/agents/new`, `/works/[id]/agents/new`, `/ideas/[id]/agents/new`. Entry points: Agents tab on MissionTabs, "+New Agent" button in WorkHeader, Bot button on IdeaCard.
 - [ ] FU-4 · 3 placeholder Agent-detail tabs
 - [ ] FU-5 · Attachment UI on Task detail
 

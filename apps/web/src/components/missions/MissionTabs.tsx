@@ -24,12 +24,21 @@ const TABS = [
         label: 'Tasks',
         route: (id: string) => `${ROUTES.DASHBOARD_MISSION(id)}/tasks`,
     },
+    // FU-3 — Agents tab routes to the scope-pinned new-agent page. A
+    // listing route (`/missions/[id]/agents`) will follow; for now the
+    // tab is a direct on-ramp to "+ New mission-scoped Agent".
+    {
+        key: 'agents' as const,
+        label: 'Agents',
+        route: (id: string) => `${ROUTES.DASHBOARD_MISSION(id)}/agents/new`,
+    },
 ];
 
 export function MissionTabs({ missionId }: { missionId: string }) {
     const pathname = usePathname() ?? '';
     const overviewPath = ROUTES.DASHBOARD_MISSION(missionId);
     const tasksPath = `${overviewPath}/tasks`;
+    const agentsPath = `${overviewPath}/agents`;
 
     return (
         <nav className="border-b border-border/60 dark:border-border-dark/60 px-6">
@@ -39,7 +48,9 @@ export function MissionTabs({ missionId }: { missionId: string }) {
                     const isActive =
                         tab.key === 'overview'
                             ? pathname.endsWith(overviewPath)
-                            : pathname.endsWith(tasksPath);
+                            : tab.key === 'tasks'
+                              ? pathname.endsWith(tasksPath)
+                              : pathname.includes(agentsPath);
                     return (
                         <li key={tab.key}>
                             <Link

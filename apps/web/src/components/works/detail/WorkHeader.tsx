@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
 import { WorkMemberRole, WorkScheduleStatus } from '@/lib/api/enums';
-import { Link as IconLink, Users, Cog, Github, Clock, AlertTriangle } from 'lucide-react';
+import { Link as IconLink, Users, Cog, Github, Clock, AlertTriangle, Bot } from 'lucide-react';
 import { useWorkDetail, useWorkPermissions } from './WorkDetailContext';
 import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
 import { Link, usePathname } from '@/i18n/navigation';
@@ -149,17 +149,29 @@ export function WorkHeader({ work }: WorkHeaderProps) {
                         </div>
                     </div>
 
-                    {/* External link */}
-                    {externalWebsiteUrl && (
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* FU-3 — direct on-ramp to a Work-scoped Agent. */}
                         <Link
-                            href={externalWebsiteUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 rounded-lg border border-border dark:border-border-dark p-2 text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                            href={`/works/${work.id}/agents/new`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border dark:border-border-dark px-3 h-8 text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                            title="Create a new Work-scoped Agent"
                         >
-                            <IconLink className="w-4 h-4" />
+                            <Bot className="w-3.5 h-3.5" />
+                            New Agent
                         </Link>
-                    )}
+
+                        {/* External link */}
+                        {externalWebsiteUrl && (
+                            <Link
+                                href={externalWebsiteUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-lg border border-border dark:border-border-dark p-2 text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                            >
+                                <IconLink className="w-4 h-4" />
+                            </Link>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
