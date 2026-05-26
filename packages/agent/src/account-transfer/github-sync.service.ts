@@ -308,12 +308,20 @@ export class GitHubSyncService {
     }
 
     private writeExportFiles(dir: string, payload: AccountExportPayload): void {
-        // Write manifest
+        // Phase 19.5 — manifest carries the v2 tail counts when present
+        // so a pull-side reader can decide which subdirs to walk
+        // without crawling the whole tree first.
+        const agents = payload.data.agents ?? [];
+        const skills = payload.data.skills ?? [];
+        const tasks = payload.data.tasks ?? [];
         const manifest = {
             version: payload.version,
             syncedAt: new Date().toISOString(),
             workCount: payload.data.works.length,
             includesSecrets: payload.includesSecrets,
+            agentCount: agents.length,
+            skillCount: skills.length,
+            taskCount: tasks.length,
         };
         this.writeJsonFile(path.join(dir, 'manifest.json'), manifest);
 
@@ -383,6 +391,50 @@ export class GitHubSyncService {
             }
             if (comparisons && comparisons.length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'comparisons.json'), comparisons);
+            }
+        }
+
+        // Phase 19.5 — Agents/Skills/Tasks v2 tail. Each section
+        // becomes its own subdir for cleaner diffs in the sync repo:
+        // an Agent SOUL.md edit shows up as a single-file diff instead
+        // of a json-blob rewrite. One json file per row, slug-keyed
+        // (slugs are unique within (ownerType, ownerId) so cross-tenant
+        // collisions are not a concern for the sync repo's
+        // single-tenant layout).
+        if (agents.length > 0) {
+            const agentsDir = path.join(dir, 'agents');
+            fs.mkdirSync(agentsDir, { recursive: true });
+            for (const agent of agents) {
+                const safeName = path.basename(agent.identity.slug);
+                if (safeName !== agent.identity.slug) {
+                    this.logger.warn(`Skipping agent with invalid slug: ${agent.identity.slug}`);
+                    continue;
+                }
+                this.writeJsonFile(path.join(agentsDir, `${safeName}.json`), agent);
+            }
+        }
+        if (skills.length > 0) {
+            const skillsDir = path.join(dir, 'skills');
+            fs.mkdirSync(skillsDir, { recursive: true });
+            for (const skill of skills) {
+                const safeName = path.basename(skill.slug);
+                if (safeName !== skill.slug) {
+                    this.logger.warn(`Skipping skill with invalid slug: ${skill.slug}`);
+                    continue;
+                }
+                this.writeJsonFile(path.join(skillsDir, `${safeName}.json`), skill);
+            }
+        }
+        if (tasks.length > 0) {
+            const tasksDir = path.join(dir, 'tasks');
+            fs.mkdirSync(tasksDir, { recursive: true });
+            for (const task of tasks) {
+                const safeName = path.basename(task.slug);
+                if (safeName !== task.slug) {
+                    this.logger.warn(`Skipping task with invalid slug: ${task.slug}`);
+                    continue;
+                }
+                this.writeJsonFile(path.join(tasksDir, `${safeName}.json`), task);
             }
         }
     }
@@ -455,18 +507,63 @@ export class GitHubSyncService {
                 }
             }
 
+            // Phase 19.5 — Agents/Skills/Tasks v2 tail. Read whichever
+            // subdirs are present; missing subdir => empty array (which
+            // collapses to `undefined` on the payload via the filter
+            // below, keeping v1 envelopes shaped exactly as before).
+            const agents = this.readJsonDir(path.join(dir, 'agents'));
+            const skills = this.readJsonDir(path.join(dir, 'skills'));
+            const tasks = this.readJsonDir(path.join(dir, 'tasks'));
+
+            const inferredVersion: 1 | 2 =
+                agents.length > 0 || skills.length > 0 || tasks.length > 0 ? 2 : 1;
+
             return {
-                version: manifest.version || 1,
+                version: (manifest.version === 2 ? 2 : inferredVersion) as 1 | 2,
                 exportedAt: manifest.syncedAt || new Date().toISOString(),
                 includesSecrets: manifest.includesSecrets || false,
                 data: {
                     profile,
                     works,
                     userPlugins,
+                    ...(agents.length > 0 ? { agents } : {}),
+                    ...(skills.length > 0 ? { skills } : {}),
+                    ...(tasks.length > 0 ? { tasks } : {}),
                 },
             };
         } catch {
             return null;
+        }
+    }
+
+    /**
+     * Phase 19.5 helper — reads every `*.json` file in a directory and
+     * returns the parsed objects. Returns empty array when the dir is
+     * missing or unreadable. Filenames are NOT trusted — slug uniqueness
+     * is re-validated on import.
+     */
+    private readJsonDir(dirPath: string): any[] {
+        if (!fs.existsSync(dirPath)) return [];
+        try {
+            const rows: any[] = [];
+            const names = fs
+                .readdirSync(dirPath, { withFileTypes: true })
+                .filter((d) => d.isFile() && d.name.endsWith('.json'))
+                .map((d) => d.name)
+                .sort();
+            for (const name of names) {
+                try {
+                    const parsed = this.readJsonFile(path.join(dirPath, name));
+                    if (parsed) rows.push(parsed);
+                } catch (err) {
+                    this.logger.warn(
+                        `Failed to parse ${name} in ${dirPath}: ${err instanceof Error ? err.message : err}`,
+                    );
+                }
+            }
+            return rows;
+        } catch {
+            return [];
         }
     }
 

@@ -166,13 +166,29 @@ export interface ExportedUserPlugin {
 }
 
 export interface AccountExportPayload {
-    version: 1;
+    /**
+     * Payload version. v1 = profile + works + userPlugins only.
+     * v2 = same plus optional `agents`, `skills`, `tasks` tail (per
+     * Phase 19 / ADR-008 v1 requirement). Stays at 1 when the v2 tail
+     * arrays are absent or empty so v1 readers can still parse the
+     * envelope.
+     */
+    version: 1 | 2;
     exportedAt: string;
     includesSecrets: boolean;
     data: {
         profile: ExportedProfile;
         works: ExportedWork[];
         userPlugins: ExportedUserPlugin[];
+        /**
+         * Phase 19 — v2 payload tail. Populated by
+         * `AgentsSkillsTasksExportService.exportTail()` when the user
+         * opts into the corresponding sections on the
+         * `/settings/import-export` page. Empty/absent on v1 payloads.
+         */
+        agents?: import('./agents-skills-tasks-types').ExportedAgent[];
+        skills?: import('./agents-skills-tasks-types').ExportedSkill[];
+        tasks?: import('./agents-skills-tasks-types').ExportedTask[];
     };
 }
 
