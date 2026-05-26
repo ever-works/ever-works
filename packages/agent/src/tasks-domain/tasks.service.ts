@@ -406,13 +406,15 @@ export class TasksService {
 	async removeBlocker(userId: string, taskId: string, blockId: string) {
 		await this.getOne(userId, taskId);
 		await this.blocks.remove(blockId);
-		// Review-fix I1: removing a blocker may unblock the dependent
-		// Task (FR-10). The transition service walks the chain and
-		// best-effort restores any blocked Task whose blockers are
-		// now all resolved. Fire-and-forget — keeps the explicit
-		// `removeBlocker` response shape and doesn't add latency to
-		// the explicit user action.
-		void this.transitions.autoUnblockResolvedTasks(taskId).catch(() => undefined);
+		// Review-fix I1 (second-pass NEW-bug corrected): removing a
+		// block row may unblock the DEPENDENT task (`taskId` itself).
+		// The previous call used `autoUnblockResolvedTasks(taskId)`,
+		// which interprets the arg as the BLOCKER and looks for tasks
+		// blocked BY it — wrong direction. Now uses the dedicated
+		// `recheckUnblockFor(taskId)` helper that handles the
+		// single-task case correctly. Fire-and-forget — keeps the
+		// `removeBlocker` response shape unchanged.
+		void this.transitions.recheckUnblockFor(taskId).catch(() => undefined);
 		return { deleted: true } as const;
 	}
 

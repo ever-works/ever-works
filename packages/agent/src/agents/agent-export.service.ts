@@ -465,6 +465,14 @@ export class AgentExportService {
 			toolsMd: files.toolsMd,
 			agentYml: files.agentYml,
 			contentHash: computeContentHash(files),
+			// Second-pass fix: avatar fields were previously dropped on
+			// overwrite — the original Agent's avatar lingered after
+			// an import that should have rewritten it. The envelope
+			// already carries safe values (cross-tenant image upload
+			// ids are normalized to INITIALS by importOne earlier).
+			avatarMode: envelope.avatar.mode,
+			avatarIcon: envelope.avatar.icon,
+			avatarImageUploadId: envelope.avatar.imageUploadId,
 		};
 		await this.agents.updateById(target.id, patch);
 	}

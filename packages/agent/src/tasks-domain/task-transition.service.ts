@@ -263,23 +263,42 @@ export class TaskTransitionService {
 		const blockedTaskIds = await this.blocks.findTasksBlockedBy(blockerTaskId).catch(() => []);
 		const unblocked: string[] = [];
 		for (const blockedTaskId of blockedTaskIds) {
-			const blocked = await this.tasks.findById(blockedTaskId).catch(() => null);
-			if (!blocked || blocked.status !== TaskStatus.BLOCKED) continue;
-			const openBlockers = await this.findOpenBlockers(blockedTaskId);
-			if (openBlockers.length > 0) continue;
-			const restoreTo = blocked.previousStatus ?? TaskStatus.TODO;
-			try {
-				// Re-enter transition() so blocker/approver gates + side
-				// effects (previousStatus clear, startedAt set) all fire
-				// consistently with a user-driven move.
-				await this.transition(blocked, restoreTo, { force: false });
+			if (await this.tryUnblockSingleTask(blockedTaskId)) {
 				unblocked.push(blockedTaskId);
-			} catch (err) {
-				this.logger.warn(
-					`autoUnblock failed for task ${blockedTaskId} (restore→${restoreTo}): ${err}`,
-				);
 			}
 		}
 		return { unblocked };
+	}
+
+	/**
+	 * Second-pass fix: the `removeBlocker` path needs the OPPOSITE
+	 * lookup direction from `autoUnblockResolvedTasks`. There, the
+	 * blocker resolves → look for everything it was blocking. Here,
+	 * the dependent task just lost a blocker → check whether it has
+	 * any blockers left, and if not, restore. Public so
+	 * `TasksService.removeBlocker` can call it directly.
+	 */
+	async recheckUnblockFor(taskId: string): Promise<boolean> {
+		return this.tryUnblockSingleTask(taskId);
+	}
+
+	private async tryUnblockSingleTask(taskId: string): Promise<boolean> {
+		const blocked = await this.tasks.findById(taskId).catch(() => null);
+		if (!blocked || blocked.status !== TaskStatus.BLOCKED) return false;
+		const openBlockers = await this.findOpenBlockers(taskId);
+		if (openBlockers.length > 0) return false;
+		const restoreTo = blocked.previousStatus ?? TaskStatus.TODO;
+		try {
+			// Re-enter transition() so blocker/approver gates + side
+			// effects (previousStatus clear, startedAt set) all fire
+			// consistently with a user-driven move.
+			await this.transition(blocked, restoreTo, { force: false });
+			return true;
+		} catch (err) {
+			this.logger.warn(
+				`autoUnblock failed for task ${taskId} (restore→${restoreTo}): ${err}`,
+			);
+			return false;
+		}
 	}
 }

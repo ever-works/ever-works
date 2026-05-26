@@ -11,7 +11,8 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TaskChatService } from '@ever-works/agent/tasks-domain';
-import { AgentRepository } from '@ever-works/agent/agents';
+// Review-fix I5 (second-pass NEW-1 corrected): repository class lives under database barrel.
+import { AgentRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 

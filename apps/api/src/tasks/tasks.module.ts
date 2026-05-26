@@ -5,6 +5,12 @@ import {
 	AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
 import { DatabaseModule } from '@ever-works/agent/database';
+// Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
+// AgentRepository so the TasksController + TaskChatController can
+// inject it for mention-lookup population. Without this import the
+// controllers would fail to instantiate at boot with an "argument
+// AgentRepository is not available" Nest error.
+import { AgentsModule } from '@ever-works/agent/agents';
 import {
 	agentTaskExecuteTriggerAdapter,
 	agentChatReplyTriggerAdapter,
@@ -25,7 +31,7 @@ import { TaskChatController } from './task-chat.controller';
  *                           agent-chat-reply runs.
  */
 @Module({
-	imports: [TasksDomainModule, DatabaseModule],
+	imports: [TasksDomainModule, DatabaseModule, AgentsModule],
 	controllers: [TasksController, TaskChatController],
 	providers: [
 		{ provide: AGENT_TASK_EXECUTE_DISPATCHER, useValue: agentTaskExecuteTriggerAdapter },

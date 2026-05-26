@@ -24,12 +24,13 @@ import {
 	type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
 import { PluginUsageRepository } from '@ever-works/agent/database';
-// Review-fix I5: populate the postChat `lookups.ownedAgentSlugs`
-// map so the mention parser can resolve `@<slug>` tokens to real
-// Agent ids; resolved agent mentions then drive the chat-dispatch
-// fan-out (TaskChatService:136-168) — without this map, human
-// comments never trigger `agent-chat-reply`.
-import { AgentRepository } from '@ever-works/agent/agents';
+// Review-fix I5 (second-pass NEW-1 corrected): populate the postChat
+// `lookups.ownedAgentSlugs` map so the mention parser can resolve
+// `@<slug>` tokens to real Agent ids; resolved agent mentions then
+// drive the chat-dispatch fan-out (TaskChatService:136-168). The
+// repository class lives under `@ever-works/agent/database` (the
+// agents barrel re-exports services + module only).
+import { AgentRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 

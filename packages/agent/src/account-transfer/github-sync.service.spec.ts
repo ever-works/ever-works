@@ -361,9 +361,14 @@ describe('GitHubSyncService', () => {
 
             await service.pushToGitHub('user-1');
 
-            expect(mocks.exportService.exportAccountData).toHaveBeenCalledWith('user-1', {
-                includeSecrets: true,
-            });
+            // Review-fix C3 (second-pass NEW-3): pushToGitHub now also
+            // forwards the v2-tail toggles. Use objectContaining so the
+            // assertion focuses on `includeSecrets` (the original intent
+            // of this spec) without coupling to the v2 defaults.
+            expect(mocks.exportService.exportAccountData).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({ includeSecrets: true }),
+            );
         });
 
         it('writes manifest.json + profile.json + plugins/user-plugins.json + per-work files', async () => {

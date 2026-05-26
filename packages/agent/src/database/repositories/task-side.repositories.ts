@@ -271,10 +271,14 @@ export class UserTaskCounterRepository {
 		// equivalent ON CONFLICT DO UPDATE clause is honored
 		// identically by both drivers in TypeORM's raw query path.
 		const driverType = this.repo.manager.connection.options.type;
+		// NOTE (second-pass fix): the `user_task_counter` entity +
+		// migration declare only userId / lastSlugNumber / updatedAt —
+		// no `createdAt` column. Earlier draft referenced it and would
+		// have failed at runtime. SQL below now matches the schema.
 		if (driverType === 'postgres' || driverType === 'cockroachdb') {
 			const rows = await this.repo.query(
-				`INSERT INTO user_task_counter ("userId", "lastSlugNumber", "createdAt", "updatedAt")
-				 VALUES ($1, 1, now(), now())
+				`INSERT INTO user_task_counter ("userId", "lastSlugNumber", "updatedAt")
+				 VALUES ($1, 1, now())
 				 ON CONFLICT ("userId") DO UPDATE
 					 SET "lastSlugNumber" = user_task_counter."lastSlugNumber" + 1,
 						 "updatedAt" = now()
@@ -285,8 +289,8 @@ export class UserTaskCounterRepository {
 		}
 		// SQLite path — same shape, lowercase column names.
 		const rows = await this.repo.query(
-			`INSERT INTO user_task_counter (userId, lastSlugNumber, createdAt, updatedAt)
-			 VALUES (?, 1, datetime('now'), datetime('now'))
+			`INSERT INTO user_task_counter (userId, lastSlugNumber, updatedAt)
+			 VALUES (?, 1, datetime('now'))
 			 ON CONFLICT(userId) DO UPDATE
 				 SET lastSlugNumber = user_task_counter.lastSlugNumber + 1,
 					 updatedAt = datetime('now')

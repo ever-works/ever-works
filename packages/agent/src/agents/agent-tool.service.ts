@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent, AgentPermissions } from '../entities/agent.entity';
-import { AgentScope, AgentStatus, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
+import { AgentAvatarMode, AgentScope, AgentStatus, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentFileService } from './agent-file.service';
 import { AgentsService } from './agents.service';
@@ -307,14 +307,16 @@ export class AgentToolService {
 						aiProviderId: actor.aiProviderId ?? null,
 						modelId: actor.modelId ?? null,
 						maxSkillContextTokens: 4000,
-						status: AgentStatus.DRAFT as any,
+						// Second-pass fix: drop the redundant `as any` casts —
+						// the enum values are well-typed.
+						status: AgentStatus.DRAFT,
 						permissions: { ...AGENT_PERMISSIONS_DEFAULT } as AgentPermissions,
 						targets: null,
 						heartbeatCadence: null,
 						idleBehavior: actor.idleBehavior,
 						pauseAfterFailures: 3,
 						errorCount: 0,
-						avatarMode: 'initials' as any,
+						avatarMode: AgentAvatarMode.INITIALS,
 						avatarIcon: null,
 						avatarImageUploadId: null,
 					});
