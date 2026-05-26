@@ -109,6 +109,29 @@ export const ROUTES = {
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
+    // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
+    DASHBOARD_AGENTS: '/agents',
+    DASHBOARD_AGENT_NEW: '/agents/new',
+    DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
+    DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
+    DASHBOARD_AGENT_ACTIVITY: (id: string) => `/agents/${id}/activity`,
+    DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
+    DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
+    DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
+    DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
+    DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
+    // Tasks
+    DASHBOARD_TASKS: '/tasks',
+    DASHBOARD_TASK_NEW: '/tasks/new',
+    DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
+    // Phase 18.6 — Tasks templates browser (ADR-010 scaffold).
+    DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
+    // Skills
+    DASHBOARD_SKILLS: '/skills',
+    DASHBOARD_SKILL: (id: string) => `/skills/${id}`,
+    // Phase 18.6 — Skills templates browser (ADR-010 scaffold).
+    DASHBOARD_SKILL_TEMPLATES: '/skills/templates',
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',

@@ -12,6 +12,11 @@ import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import type { Mission } from '@/lib/api/missions';
+// Phase 18.1 — Dashboard grid mount.
+import { AgentsCountTile } from '@/components/dashboard/AgentsCountTile';
+import { TasksInProgressTile } from '@/components/dashboard/TasksInProgressTile';
+import { RecentTasks } from '@/components/dashboard/RecentTasks';
+import type { Task } from '@/lib/api/tasks';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -32,6 +37,17 @@ interface DashboardClientProps {
     /** Phase 7 PR II - account-wide spend for the 6th dashboard tile. */
     monthSpendCents?: number;
     monthSpendCurrency?: string;
+    /**
+     * Phase 18.1 — Agents/Skills/Tasks dashboard tiles. All counts
+     * default to 0 so the props remain backwards-compatible if a
+     * page-level fetch fails — the tiles just show zeros instead of
+     * disappearing.
+     */
+    agentsTotal?: number;
+    agentsActive?: number;
+    tasksInProgress?: number;
+    tasksBlocked?: number;
+    initialRecentTasks?: Task[];
 }
 
 export default function DashboardClient({
@@ -50,6 +66,11 @@ export default function DashboardClient({
     initialAllIdeas,
     monthSpendCents = 0,
     monthSpendCurrency = 'usd',
+    agentsTotal = 0,
+    agentsActive = 0,
+    tasksInProgress = 0,
+    tasksBlocked = 0,
+    initialRecentTasks = [],
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -75,6 +96,16 @@ export default function DashboardClient({
                 monthSpendCents={monthSpendCents}
                 monthSpendCurrency={monthSpendCurrency}
             />
+
+            {/* Phase 18.1 — Agents/Skills/Tasks tiles. Sit between the
+                StatsOverview row and the Missions preview so the home
+                page reads: stats → AST tiles → Missions → Works.
+                Counts come from `meta.total` of the page-level
+                list({limit:1}) fetches (cheap). */}
+            <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4 mt-6">
+                <AgentsCountTile total={agentsTotal} active={agentsActive} />
+                <TasksInProgressTile inProgress={tasksInProgress} blocked={tasksBlocked} />
+            </div>
 
             {/* Phase 6 PR S — Missions preview ABOVE Ideas so the home
                 page reads Missions → Ideas → Works in the same
@@ -122,6 +153,16 @@ export default function DashboardClient({
                     )}
                 </div>
             </div>
+
+            {/* Phase 18.2 — Recent Tasks block sits directly below
+                Recent Works per spec §18.2. Hidden when there are
+                no in-flight Tasks AND no Works (empty new-user state
+                already has its own empty CTA from EmptyState above). */}
+            {(initialRecentTasks.length > 0 || hasWorks) && (
+                <div className="mt-8">
+                    <RecentTasks tasks={initialRecentTasks} />
+                </div>
+            )}
         </div>
     );
 }

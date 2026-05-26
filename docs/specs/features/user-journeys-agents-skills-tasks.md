@@ -15,7 +15,7 @@
 **Day 1 — discovers Agents:**
 
 1. Aleksei opens the platform, sees a new "Agents" sidebar item with a `New` badge. Clicks.
-2. Empty state explains: *"Agents are AI workers you can name and put to work alongside your Works. Try creating a "Content Writer" Agent to draft blog posts on a schedule."*
+2. Empty state explains: _"Agents are AI workers you can name and put to work alongside your Works. Try creating a "Content Writer" Agent to draft blog posts on a schedule."_
 3. He clicks `+ New Agent`. The dialog mirrors the Work create dialog:
     - Name: `Content Writer`
     - Title: `Blog content lead`
@@ -47,11 +47,11 @@
 
 1. From `/missions/<id>` (now with a new tab strip), she clicks the new `Agents` tab.
 2. Empty. She clicks `+ New Agent`.
-3. Name `CEO`. Capabilities: *"You are the CEO of Cats Business Worldwide. Your job: make sure every Idea and Work ladders up to dominating the worldwide cat industry. Set direction. Delegate."*
+3. Name `CEO`. Capabilities: _"You are the CEO of Cats Business Worldwide. Your job: make sure every Idea and Work ladders up to dominating the worldwide cat industry. Set direction. Delegate."_
 4. Scope: `Mission — cats-business-mission`. AI provider: `Anthropic claude-sonnet-4-6`.
 5. Heartbeat: `0 8 * * *` (daily 8am).
 6. Permissions: `Can create Agents: ON`, `Can assign tasks: ON`. Everything else default off.
-7. Create. Lands on `/agents/ceo`. She edits `SOUL.md` from the Instructions tab to add: *"Be terse. Use bullet points. Never write more than 200 words at a time."*
+7. Create. Lands on `/agents/ceo`. She edits `SOUL.md` from the Instructions tab to add: _"Be terse. Use bullet points. Never write more than 200 words at a time."_
 8. Saves. Commit lands in `<missionRepo>/.works/agents/ceo/SOUL.md`.
 
 **Day 2 — CEO Agent creates a VP-Engineering:**
@@ -66,9 +66,9 @@
 
 1. CEO's next heartbeat creates a Task: `Pick a screenshot plugin for the directory (currently using local; investigate ScreenshotOne vs Urlbox)`. Assignee: VP-Engineering. Scope: Work `cats-directory`. Priority p2.
 2. Task transitions to `in_progress` immediately (since VP-Eng is an Agent assignee). VP-Engineering's heartbeat runs sooner (it's listed in the task's wait queue, not the normal 10am Mon slot).
-3. VP-Engineering's run reads the screenshot plugin manifests, queries pricing pages via the existing `search` plugin, posts a chat reply: *"ScreenshotOne is $19/mo for 5k shots; Urlbox is $29 but supports our cookie-banner workaround. Recommend ScreenshotOne. Want me to switch the Work's plugin?"*
+3. VP-Engineering's run reads the screenshot plugin manifests, queries pricing pages via the existing `search` plugin, posts a chat reply: _"ScreenshotOne is $19/mo for 5k shots; Urlbox is $29 but supports our cookie-banner workaround. Recommend ScreenshotOne. Want me to switch the Work's plugin?"_
 4. Maya replies in the chat: `@vp-engineering yes, switch it`.
-5. VP-Engineering's `agent-chat-reply` run picks up the message, calls the `togglePlugin` tool (gated by `canCommitToRepo`), opens a PR against the Work's data repo, posts back: *"PR #43 opened. Will switch on merge."*
+5. VP-Engineering's `agent-chat-reply` run picks up the message, calls the `togglePlugin` tool (gated by `canCommitToRepo`), opens a PR against the Work's data repo, posts back: _"PR #43 opened. Will switch on merge."_
 
 **What worked**: Hierarchy clicks for Maya — she sees CEO → VP-Eng → Task → Work flow without code. Tasks chat IS the collaboration medium.
 **What we need to verify**: The "sub-agent auto-created in draft" friction is good (not bad) — Maya wants control over what gets activated. Also: when CEO's run cost is debited to CEO's budget but VP-Eng's task work is debited to VP-Eng's budget, is the breakdown clear in the Mission spend tile?
@@ -83,7 +83,7 @@
 
 1. From `/agents`, Devi creates `PR-Reviewer` agent.
 2. Scope: `Tenant — available to all`. AI provider: account default. Heartbeat: `manual` (no cron).
-3. Capabilities: *"Review pull requests opened against any of my Works. Post inline comments. Use the pr-review skill for the standard rubric."*
+3. Capabilities: _"Review pull requests opened against any of my Works. Post inline comments. Use the pr-review skill for the standard rubric."_
 4. Permissions: `Can call external tools: ON`, `Can commit to repo: OFF` (we don't want auto-fixes).
 5. Devi opens the new `/skills` page, sees `pr-review` in the Available section. Clicks Install. Then on `/agents/pr-reviewer/skills`, attaches the now-installed `pr-review` skill to this Agent.
 6. Status flipped to `active` but no cron — runs only on event.
@@ -129,7 +129,7 @@
 **Setup:**
 
 1. From `/agents`, creates `Tenant-CEO` agent. Scope: `Tenant — all 3 Missions`.
-2. Capabilities: *"You're the CEO across all my businesses. Look at all three Missions weekly. Flag the one with worst momentum. Suggest one concrete next step per Mission."*
+2. Capabilities: _"You're the CEO across all my businesses. Look at all three Missions weekly. Flag the one with worst momentum. Suggest one concrete next step per Mission."_
 3. Heartbeat: `0 9 * * MON` (weekly Monday 9am).
 4. Permissions: `Can assign tasks: ON`, everything else off.
 

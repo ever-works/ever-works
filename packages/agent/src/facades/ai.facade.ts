@@ -173,6 +173,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         await this.pluginUsageService?.record({
             workId: facadeOptions.workId,
             userId: facadeOptions.userId,
+            // Phase 15.6 — Agent/Task attribution propagation.
+            agentId: facadeOptions.agentId,
+            taskId: facadeOptions.taskId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -353,6 +356,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         await this.pluginUsageService?.record({
             workId: facadeOptions.workId,
             userId: facadeOptions.userId,
+            // Phase 15.6 — Agent/Task attribution propagation.
+            agentId: facadeOptions.agentId,
+            taskId: facadeOptions.taskId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -424,6 +430,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                     ?.record({
                         workId: facadeOptions.workId,
                         userId: facadeOptions.userId,
+                        // Phase 15.6 — Agent/Task attribution propagation.
+                        agentId: facadeOptions.agentId,
+                        taskId: facadeOptions.taskId,
                         pluginId: plugin.id,
                         capability: PluginUsageCapability.AI,
                         units: chunkCount,
@@ -499,6 +508,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             await this.pluginUsageService?.record({
                 workId: facadeOptions.workId,
                 userId: facadeOptions.userId,
+                // Phase 15.6 — Agent/Task attribution propagation.
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.AI,
                 units,

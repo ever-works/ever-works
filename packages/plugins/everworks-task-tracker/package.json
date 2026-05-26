@@ -1,0 +1,53 @@
+{
+	"name": "@ever-works/everworks-task-tracker-plugin",
+	"version": "1.0.0",
+	"description": "Ever Works Task Tracker — first-party task-tracker plugin backing the platform's own DB-stored Tasks family.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"tsup": "^8.3.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "everworks-task-tracker",
+			"name": "Ever Works Task Tracker",
+			"category": "utility",
+			"capabilities": [
+				"task-tracker"
+			],
+			"defaultForCapabilities": [
+				"task-tracker"
+			]
+		}
+	}
+}

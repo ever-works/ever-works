@@ -10,11 +10,11 @@
 
 Three new first-class concepts are added to the platform **in addition to** the existing Mission → Idea → Work → Artifact lifecycle (see [`features/missions-ideas-works/spec.md`](../features/missions-ideas-works/spec.md)):
 
-| Concept   | One-line definition                                                                                                                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Concept   | One-line definition                                                                                                                                                                                                                                                                      |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Agent** | A named, persistent, AI-driven worker the user creates (e.g. "CEO", "VP of Engineering"). Has a model + provider, optional capabilities description, a budget, a permission set, and a scope (tenant / Mission / Idea / Work). Runs on a heartbeat and/or in response to assigned tasks. |
-| **Skill** | A reusable, markdown-defined capability ("how to do X") that can be attached to an Agent or injected into a Generator. Lives in a hierarchy: platform catalog → tenant install → Mission/Idea/Work install → per-Agent skill. Same triggering shape as Anthropic Skills.   |
-| **Task**  | A unit of work with status, priority, assignees (humans **and** Agents), parent/sub-tasks, blockers, reviewers, approvers, an activity log, and a flat chat. Tasks can be created by humans, by Agents, or by Generator/Mission runs.                                     |
+| **Skill** | A reusable, markdown-defined capability ("how to do X") that can be attached to an Agent or injected into a Generator. Lives in a hierarchy: platform catalog → tenant install → Mission/Idea/Work install → per-Agent skill. Same triggering shape as Anthropic Skills.                 |
+| **Task**  | A unit of work with status, priority, assignees (humans **and** Agents), parent/sub-tasks, blockers, reviewers, approvers, an activity log, and a flat chat. Tasks can be created by humans, by Agents, or by Generator/Mission runs.                                                    |
 
 These three concepts are **core domain concepts**, not plugins. They **use** the existing plugin system (AI providers, Git providers, search providers, etc.) but are not themselves implemented as plugins. This is recorded as a design decision in [ADR-006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md).
 
@@ -22,15 +22,15 @@ The current platform already has a **platform-managed** "Work Agent" — `WorkAg
 
 ## 2. Cross-cutting goals
 
-| #     | Goal                                                                                                                                                                                                            |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **G1** | **Additive only**. Every existing surface — sidebar, Work/Mission/Idea detail pages, generators, plugins page, dashboard — keeps its current behavior. New tabs/pages/buttons are added; nothing is removed or renamed. (Project [NN #20](file:///C:/Coding/Workspace/AGENTS.md).) |
-| **G2** | **Reuse plugins, don't replace them.** Agents pick an AI provider plugin the same way a Work generator does today — via `AiFacadeService` with `providerOverride` resolution. Agents pick a Git provider via `GitFacadeService` the same way. |
+| #      | Goal                                                                                                                                                                                                                                                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **G1** | **Additive only**. Every existing surface — sidebar, Work/Mission/Idea detail pages, generators, plugins page, dashboard — keeps its current behavior. New tabs/pages/buttons are added; nothing is removed or renamed. (Project [NN #20](file:///C:/Coding/Workspace/AGENTS.md).)                                  |
+| **G2** | **Reuse plugins, don't replace them.** Agents pick an AI provider plugin the same way a Work generator does today — via `AiFacadeService` with `providerOverride` resolution. Agents pick a Git provider via `GitFacadeService` the same way.                                                                       |
 | **G3** | **Repo is the source of truth for definitions.** Agent definitions (`AGENTS.md`, `SOUL.md`, `HEARTBEAT.md`, `TOOLS.md`, `agent.yml`) and Skill definitions (`<skill>.md`) live in Git repos and are mirrored to DB for fast read. Same posture as Works' source-of-truth GitHub repos (Constitution Principle III). |
-| **G4** | **Modular**. New tab on Work page = its own folder under `apps/web/src/app/[locale]/(dashboard)/works/[id]/agents/`. Same for Mission/Idea. New API module lives at `apps/api/src/agents/`, with companion modules for `skills/` and `tasks/`. |
-| **G5** | **Cost-aware**. Every AI call an Agent makes records a `PluginUsageEvent` already today; the new `AgentBudget` reuses the existing polymorphic-owner pattern that landed for `work_budgets` (`packages/agent/src/budgets/`) so per-Agent budgets enforce the same way. |
-| **G6** | **Observable**. Every Agent run, every Task transition, every Skill invocation lands in `ActivityLog` ([`packages/agent/src/entities/activity-log.entity.ts`](../../../packages/agent/src/entities/activity-log.entity.ts)) with new action types, surfaced in the live Activity feed. |
-| **G7** | **Trigger.dev for long-running work.** Agent heartbeats and Task execution that drive AI calls run as Trigger.dev tasks via the existing dispatcher pattern (see [`trigger-integration.md`](./trigger-integration.md)). |
+| **G4** | **Modular**. New tab on Work page = its own folder under `apps/web/src/app/[locale]/(dashboard)/works/[id]/agents/`. Same for Mission/Idea. New API module lives at `apps/api/src/agents/`, with companion modules for `skills/` and `tasks/`.                                                                      |
+| **G5** | **Cost-aware**. Every AI call an Agent makes records a `PluginUsageEvent` already today; the new `AgentBudget` reuses the existing polymorphic-owner pattern that landed for `work_budgets` (`packages/agent/src/budgets/`) so per-Agent budgets enforce the same way.                                              |
+| **G6** | **Observable**. Every Agent run, every Task transition, every Skill invocation lands in `ActivityLog` ([`packages/agent/src/entities/activity-log.entity.ts`](../../../packages/agent/src/entities/activity-log.entity.ts)) with new action types, surfaced in the live Activity feed.                              |
+| **G7** | **Trigger.dev for long-running work.** Agent heartbeats and Task execution that drive AI calls run as Trigger.dev tasks via the existing dispatcher pattern (see [`trigger-integration.md`](./trigger-integration.md)).                                                                                             |
 
 ## 3. Scoping and ownership cascade
 
@@ -45,12 +45,12 @@ Tenant (user) ──┬── Mission ──┬── Idea ──┐
 (Tenant-scoped Agent)
 ```
 
-| Scope            | What it sees                                                                                                                                  | Where its definition lives                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Tenant**       | Any of the user's Missions, Ideas, Works. May be linked to multiple targets via `AgentMembership` (many-to-many).                             | In the user's "control" repo (see §4.5) or DB-only if user has no control repo yet.              |
-| **Mission**      | The Mission, its Ideas, and the Works derived from them.                                                                                       | `<missionRepo>/.works/agents/<agent-slug>/` — same repo the Mission entity already points at via `Mission.missionRepo` ([`mission.entity.ts`](../../../packages/agent/src/entities/mission.entity.ts)). |
-| **Idea**         | The Idea and (if/when accepted) its derived Work. Idea-scoped Agents are usually short-lived: drafting, reviewing, refining the proposal.     | Inside the parent Mission's repo under `.works/ideas/<idea-id>/agents/<agent-slug>/`, OR (if Idea has no Mission) in the Idea's own scratch path. See §4.5. |
-| **Work**         | The Work, its data repo, its website repo, its items, KB, generators.                                                                          | `<workDataRepo>/.works/agents/<agent-slug>/` — same data repo `works.yml` lives in.              |
+| Scope       | What it sees                                                                                                                              | Where its definition lives                                                                                                                                                                              |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tenant**  | Any of the user's Missions, Ideas, Works. May be linked to multiple targets via `AgentMembership` (many-to-many).                         | In the user's "control" repo (see §4.5) or DB-only if user has no control repo yet.                                                                                                                     |
+| **Mission** | The Mission, its Ideas, and the Works derived from them.                                                                                  | `<missionRepo>/.works/agents/<agent-slug>/` — same repo the Mission entity already points at via `Mission.missionRepo` ([`mission.entity.ts`](../../../packages/agent/src/entities/mission.entity.ts)). |
+| **Idea**    | The Idea and (if/when accepted) its derived Work. Idea-scoped Agents are usually short-lived: drafting, reviewing, refining the proposal. | Inside the parent Mission's repo under `.works/ideas/<idea-id>/agents/<agent-slug>/`, OR (if Idea has no Mission) in the Idea's own scratch path. See §4.5.                                             |
+| **Work**    | The Work, its data repo, its website repo, its items, KB, generators.                                                                     | `<workDataRepo>/.works/agents/<agent-slug>/` — same data repo `works.yml` lives in.                                                                                                                     |
 
 Agents may be **promoted** (Idea-scoped → Mission-scoped, Mission-scoped → Tenant-scoped) but not demoted. Promotion preserves the agent's `id`, conversation history, budget ledger, and skill bindings.
 
@@ -60,12 +60,12 @@ Agents may be **promoted** (Idea-scoped → Mission-scoped, Mission-scoped → T
 
 **Task assignment rules.** An Agent can only assign tasks to other Agents that fall within its scope:
 
-| Assigning agent's scope | Assignable targets                                                                            |
-| ----------------------- | --------------------------------------------------------------------------------------------- |
-| Tenant                  | Any other Agent the assigning user owns (Tenant, Mission, Idea, Work).                        |
-| Mission                 | Agents on the same Mission, its Ideas, or its Works. **Not** other Missions.                  |
-| Idea                    | Agents on the same Idea, or the Idea's parent Mission (if shared), or the Idea's Work.        |
-| Work                    | Agents on the same Work only.                                                                  |
+| Assigning agent's scope | Assignable targets                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| Tenant                  | Any other Agent the assigning user owns (Tenant, Mission, Idea, Work).                 |
+| Mission                 | Agents on the same Mission, its Ideas, or its Works. **Not** other Missions.           |
+| Idea                    | Agents on the same Idea, or the Idea's parent Mission (if shared), or the Idea's Work. |
+| Work                    | Agents on the same Work only.                                                          |
 
 Permission to assign at all is gated by the agent's `permissions.canAssignTasks` flag (see §5).
 
@@ -75,23 +75,23 @@ Permission to assign at all is gated by the agent's `permissions.canAssignTasks`
 
 All entities live under `packages/agent/src/entities/`. Each ships with a forward-only TypeORM migration in `apps/api/src/migrations/` (Constitution Principle V).
 
-| Table                         | Purpose                                                                                                                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agents`                      | The user-defined Agent. Columns: id, userId, scope (enum), missionId?, ideaId?, workId?, name, title, capabilities (text), aiProviderId?, modelId?, status (enum), permissions (jsonb), targets (jsonb), heartbeatCadence (cron or `manual`), nextHeartbeatAt, lastRunAt, lastRunStatus, errorCount, pauseAfterFailures, createdAt, updatedAt. |
-| `agent_memberships`           | M:N link from a tenant- or mission-scoped Agent to Missions/Ideas/Works. Polymorphic `ownerType` + `ownerId`, reusing the polymorphic-owner shape from the existing `work_budgets` table. |
-| `agent_runs`                  | One row per heartbeat or task-driven execution. Status (queued/running/completed/failed/cancelled), triggerKind (heartbeat/manual/task/event), startedAt, finishedAt, durationMs, errorMessage, summary, triggerRunId (Trigger.dev run id). |
-| `agent_run_logs`              | Per-run structured log lines (level / step / message / metadata). Same shape as `work_agent_run_logs` ([`packages/agent/src/entities/work-agent-run-log.entity.ts`](../../../packages/agent/src/entities/work-agent-run-log.entity.ts)) but FK to `agent_runs.id`. |
-| `agent_budgets`               | Per-Agent budget. Owner = Agent. Columns: id, agentId, intervalUnit (hour/day/week/month/unlimited), capCents, currency, allowOverage, intervalAnchor. Reuses the polymorphic-owner pattern from `work_budgets`. |
-| `skills`                      | A skill definition (slug, title, description, instructionsMd, frontmatter, scope, ownerType, ownerId, contentHash, sourcePath). Hierarchy enforced by ownerType+ownerId; uniqueness on (slug, ownerType, ownerId). |
-| `skill_bindings`              | Many-to-many: which skills are attached to which Agent. Also used for binding Tenant/Mission skills to a Work/Mission/Idea so Generators can inject them. Polymorphic `targetType` + `targetId`. |
-| `tasks`                       | The task entity. See §4.4 + [features/task-tracking/plan.md §3](../features/task-tracking/plan.md) for full schema. |
-| `task_assignees`              | M:N link from a Task to Users **or** Agents. Polymorphic assigneeType ∈ {user, agent}. |
-| `task_blocks`                 | M:N: `taskId` is blocked by `blockedByTaskId`. |
-| `task_reviewers`              | Same shape as `task_assignees` but for reviewers. |
-| `task_approvers`              | Same shape as `task_assignees` but for approvers. |
-| `task_attachments`            | File attachments stored via the existing KB upload path ([`packages/agent/src/entities/work-knowledge-upload.entity.ts`](../../../packages/agent/src/entities/work-knowledge-upload.entity.ts)) but FK to Task. |
-| `task_chat_messages`          | Flat chat log per Task. authorType ∈ {user, agent}, authorId, body, mentions (jsonb), attachments (jsonb), createdAt. No threading. |
-| `task_relations`              | M:N "related to": `taskId` ↔ `relatedTaskId`, with relation kind (related, duplicates, follow-up). |
+| Table                | Purpose                                                                                                                                                                                                                                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents`             | The user-defined Agent. Columns: id, userId, scope (enum), missionId?, ideaId?, workId?, name, title, capabilities (text), aiProviderId?, modelId?, status (enum), permissions (jsonb), targets (jsonb), heartbeatCadence (cron or `manual`), nextHeartbeatAt, lastRunAt, lastRunStatus, errorCount, pauseAfterFailures, createdAt, updatedAt. |
+| `agent_memberships`  | M:N link from a tenant- or mission-scoped Agent to Missions/Ideas/Works. Polymorphic `ownerType` + `ownerId`, reusing the polymorphic-owner shape from the existing `work_budgets` table.                                                                                                                                                      |
+| `agent_runs`         | One row per heartbeat or task-driven execution. Status (queued/running/completed/failed/cancelled), triggerKind (heartbeat/manual/task/event), startedAt, finishedAt, durationMs, errorMessage, summary, triggerRunId (Trigger.dev run id).                                                                                                    |
+| `agent_run_logs`     | Per-run structured log lines (level / step / message / metadata). Same shape as `work_agent_run_logs` ([`packages/agent/src/entities/work-agent-run-log.entity.ts`](../../../packages/agent/src/entities/work-agent-run-log.entity.ts)) but FK to `agent_runs.id`.                                                                             |
+| `agent_budgets`      | Per-Agent budget. Owner = Agent. Columns: id, agentId, intervalUnit (hour/day/week/month/unlimited), capCents, currency, allowOverage, intervalAnchor. Reuses the polymorphic-owner pattern from `work_budgets`.                                                                                                                               |
+| `skills`             | A skill definition (slug, title, description, instructionsMd, frontmatter, scope, ownerType, ownerId, contentHash, sourcePath). Hierarchy enforced by ownerType+ownerId; uniqueness on (slug, ownerType, ownerId).                                                                                                                             |
+| `skill_bindings`     | Many-to-many: which skills are attached to which Agent. Also used for binding Tenant/Mission skills to a Work/Mission/Idea so Generators can inject them. Polymorphic `targetType` + `targetId`.                                                                                                                                               |
+| `tasks`              | The task entity. See §4.4 + [features/task-tracking/plan.md §3](../features/task-tracking/plan.md) for full schema.                                                                                                                                                                                                                            |
+| `task_assignees`     | M:N link from a Task to Users **or** Agents. Polymorphic assigneeType ∈ {user, agent}.                                                                                                                                                                                                                                                         |
+| `task_blocks`        | M:N: `taskId` is blocked by `blockedByTaskId`.                                                                                                                                                                                                                                                                                                 |
+| `task_reviewers`     | Same shape as `task_assignees` but for reviewers.                                                                                                                                                                                                                                                                                              |
+| `task_approvers`     | Same shape as `task_assignees` but for approvers.                                                                                                                                                                                                                                                                                              |
+| `task_attachments`   | File attachments stored via the existing KB upload path ([`packages/agent/src/entities/work-knowledge-upload.entity.ts`](../../../packages/agent/src/entities/work-knowledge-upload.entity.ts)) but FK to Task.                                                                                                                                |
+| `task_chat_messages` | Flat chat log per Task. authorType ∈ {user, agent}, authorId, body, mentions (jsonb), attachments (jsonb), createdAt. No threading.                                                                                                                                                                                                            |
+| `task_relations`     | M:N "related to": `taskId` ↔ `relatedTaskId`, with relation kind (related, duplicates, follow-up).                                                                                                                                                                                                                                             |
 
 ### 4.2 What is NOT stored in DB
 
@@ -165,14 +165,14 @@ Each Agent carries a `permissions` JSON column. Values default conservatively to
 
 ```typescript
 interface AgentPermissions {
-    canCreateAgents: boolean; // may create new Agents within its scope
-    canAssignTasks: boolean; // may assign tasks to other Agents within its scope
-    canEditSkills: boolean; // may edit/add skills (own + shared in scope)
-    canEditAgentFiles: boolean; // may edit own SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md
-    canSpend: boolean; // may make paid AI calls (off ⇒ heartbeats no-op; useful for dry-run agents)
-    canCommitToRepo: boolean; // may write files to the scope's repo (MD content, item updates, etc.)
-    canOpenPullRequests: boolean; // may open PRs against the scope's repo (escalation over canCommitToRepo)
-    canCallExternalTools: boolean; // gate for the future per-tool ACL in TOOLS.md
+	canCreateAgents: boolean; // may create new Agents within its scope
+	canAssignTasks: boolean; // may assign tasks to other Agents within its scope
+	canEditSkills: boolean; // may edit/add skills (own + shared in scope)
+	canEditAgentFiles: boolean; // may edit own SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md
+	canSpend: boolean; // may make paid AI calls (off ⇒ heartbeats no-op; useful for dry-run agents)
+	canCommitToRepo: boolean; // may write files to the scope's repo (MD content, item updates, etc.)
+	canOpenPullRequests: boolean; // may open PRs against the scope's repo (escalation over canCommitToRepo)
+	canCallExternalTools: boolean; // gate for the future per-tool ACL in TOOLS.md
 }
 ```
 
@@ -184,14 +184,14 @@ Permissions are evaluated server-side on **every** AI call, task assignment, ski
 
 A user-defined Agent has one of these statuses, stored as a string enum on `agents.status`:
 
-| Status      | Meaning                                                                                                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `draft`     | Agent created but never run. Heartbeat dispatcher skips it.                                                   |
-| `active`    | Heartbeat dispatcher considers it on each tick. Available to receive tasks from other Agents and humans.      |
-| `running`   | An `agent_run` row is currently in flight for this Agent. Transitional — the dispatcher CAS-claims this state. |
-| `paused`    | User-paused. Dispatcher skips. Existing in-flight runs continue.                                              |
-| `error`     | Last terminal run failed and `errorCount` has crossed the `pauseAfterFailures` threshold. UI shows a banner.   |
-| `archived`  | Soft-deleted by user. Hidden from active list; row kept for audit/cost history.                                |
+| Status     | Meaning                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------- |
+| `draft`    | Agent created but never run. Heartbeat dispatcher skips it.                                                    |
+| `active`   | Heartbeat dispatcher considers it on each tick. Available to receive tasks from other Agents and humans.       |
+| `running`  | An `agent_run` row is currently in flight for this Agent. Transitional — the dispatcher CAS-claims this state. |
+| `paused`   | User-paused. Dispatcher skips. Existing in-flight runs continue.                                               |
+| `error`    | Last terminal run failed and `errorCount` has crossed the `pauseAfterFailures` threshold. UI shows a banner.   |
+| `archived` | Soft-deleted by user. Hidden from active list; row kept for audit/cost history.                                |
 
 Status transitions are documented in [features/agents/spec.md §3](../features/agents/spec.md).
 
@@ -283,22 +283,22 @@ Full Task design in [features/task-tracking/spec.md](../features/task-tracking/s
 
 New `ActivityActionType` enum values, all using the existing `activity_log` table ([`packages/agent/src/entities/activity-log.entity.ts`](../../../packages/agent/src/entities/activity-log.entity.ts)):
 
-| Type                            | When emitted                                                              |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| `AGENT_CREATED`                 | User creates an Agent.                                                    |
-| `AGENT_PAUSED` / `AGENT_RESUMED`| User changes status.                                                      |
-| `AGENT_HEARTBEAT_STARTED`       | Trigger.dev kicked off a heartbeat run.                                   |
-| `AGENT_HEARTBEAT_COMPLETED`     | Run reached `completed`.                                                  |
-| `AGENT_HEARTBEAT_FAILED`        | Run reached `failed`.                                                     |
-| `AGENT_FILE_EDITED`             | SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md edited (committed to repo). |
-| `AGENT_BUDGET_EXCEEDED`         | Heartbeat or task execution refused due to budget cap.                    |
-| `SKILL_INSTALLED`               | User installed a platform catalog skill at any scope.                     |
-| `SKILL_ATTACHED_TO_AGENT`       | User attached a Skill to an Agent (binding row created).                  |
-| `SKILL_INVOKED`                 | An AI call's response shows the model used a specific skill.              |
-| `TASK_CREATED` / `TASK_UPDATED` | Task transitions.                                                          |
-| `TASK_ASSIGNED`                 | A user or Agent became an assignee.                                       |
-| `TASK_COMMENTED`                | A `task_chat_messages` row was inserted.                                  |
-| `TASK_COMPLETED`                | Status moved to `done`.                                                   |
+| Type                             | When emitted                                                              |
+| -------------------------------- | ------------------------------------------------------------------------- |
+| `AGENT_CREATED`                  | User creates an Agent.                                                    |
+| `AGENT_PAUSED` / `AGENT_RESUMED` | User changes status.                                                      |
+| `AGENT_HEARTBEAT_STARTED`        | Trigger.dev kicked off a heartbeat run.                                   |
+| `AGENT_HEARTBEAT_COMPLETED`      | Run reached `completed`.                                                  |
+| `AGENT_HEARTBEAT_FAILED`         | Run reached `failed`.                                                     |
+| `AGENT_FILE_EDITED`              | SOUL.md / AGENTS.md / HEARTBEAT.md / TOOLS.md edited (committed to repo). |
+| `AGENT_BUDGET_EXCEEDED`          | Heartbeat or task execution refused due to budget cap.                    |
+| `SKILL_INSTALLED`                | User installed a platform catalog skill at any scope.                     |
+| `SKILL_ATTACHED_TO_AGENT`        | User attached a Skill to an Agent (binding row created).                  |
+| `SKILL_INVOKED`                  | An AI call's response shows the model used a specific skill.              |
+| `TASK_CREATED` / `TASK_UPDATED`  | Task transitions.                                                         |
+| `TASK_ASSIGNED`                  | A user or Agent became an assignee.                                       |
+| `TASK_COMMENTED`                 | A `task_chat_messages` row was inserted.                                  |
+| `TASK_COMPLETED`                 | Status moved to `done`.                                                   |
 
 The `details` JSON column carries event-specific payloads. Live activity feed (poll-based today, [`apps/web/src/components/works/detail/activity/ActivityFeedClient.tsx`](../../../apps/web/src/components/works/detail/activity/ActivityFeedClient.tsx)) gets new icon mappings — additive on the existing `FeedRow` switch.
 
@@ -306,13 +306,13 @@ The `details` JSON column carries event-specific payloads. Live activity feed (p
 
 The platform already has a `WorkAgentGoal`/`WorkAgentRun` system that **autonomously generates Ideas** from a user-provided Goal ([`packages/agent/src/entities/work-agent-goal.entity.ts`](../../../packages/agent/src/entities/work-agent-goal.entity.ts), `apps/api/src/work-agent/`). Mission ticks also use this engine to spawn child Ideas. Crucially:
 
-| Aspect                | Existing "Work Agent" (platform-managed)                              | New "Agent" (user-defined)                                                            |
-| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| **Identity**          | Anonymous; there is exactly one Work Agent per user.                  | Named (e.g. "CEO"); user creates many.                                                |
-| **Persistence**       | Runs are stateless; only Goal + Preference rows persist.              | Persistent entity; has files, budget, history, conversation across runs.              |
-| **What it does**      | Proposes Ideas, plans Work creation, requires user approval.          | Anything its prompt + skills + tools enable — drafts, reviews, code, content, chat.   |
-| **Where its prompts live** | Hardcoded in the API service code.                                | Markdown files in the scope's Git repo.                                               |
-| **Cardinality scope** | One per user.                                                          | Many per user, scoped to Tenant/Mission/Idea/Work.                                    |
+| Aspect                     | Existing "Work Agent" (platform-managed)                     | New "Agent" (user-defined)                                                          |
+| -------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| **Identity**               | Anonymous; there is exactly one Work Agent per user.         | Named (e.g. "CEO"); user creates many.                                              |
+| **Persistence**            | Runs are stateless; only Goal + Preference rows persist.     | Persistent entity; has files, budget, history, conversation across runs.            |
+| **What it does**           | Proposes Ideas, plans Work creation, requires user approval. | Anything its prompt + skills + tools enable — drafts, reviews, code, content, chat. |
+| **Where its prompts live** | Hardcoded in the API service code.                           | Markdown files in the scope's Git repo.                                             |
+| **Cardinality scope**      | One per user.                                                | Many per user, scoped to Tenant/Mission/Idea/Work.                                  |
 
 The two coexist permanently. The Work Agent stays as the **default** way the platform turns a Goal into Ideas and Ideas into Works. User-defined Agents are the **optional, advanced** layer that does more specialized work.
 
@@ -344,11 +344,11 @@ The user spec said "Agents above Templates, below Works" and "Skills below Plugi
 
 See [QUESTIONS F1](../QUESTIONS-agents-skills-tasks.md#f1--missionidea-detail-pages-dont-have-tab-strips-today) for the open choice.
 
-| Page                      | Existing structure                                                                            | Proposed change                                                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `/works/[id]`             | Tab strip ([`WorkTabs.tsx`](../../../apps/web/src/components/works/detail/WorkTabs.tsx)): Overview / Activity / Items / KB / Generator / Plugins / Deploy / Settings | **Append tabs**: Agents, Skills, Tasks (before Settings). No structural change.                                |
-| `/missions/[id]`          | Single-column sections (`MissionDetailClient.tsx`). No tab strip.                              | Promote to tabbed layout: "Overview" tab holds the current sections; add Agents, Skills, Tasks as new tabs.    |
-| `/ideas/[id]`             | No detail page today; Ideas render as cards in lists.                                          | Create the detail page with tabs Overview / Build / Activity / Agents / Tasks. Skills inherited from parent Mission/Tenant only — no tab. |
+| Page             | Existing structure                                                                                                                                                   | Proposed change                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `/works/[id]`    | Tab strip ([`WorkTabs.tsx`](../../../apps/web/src/components/works/detail/WorkTabs.tsx)): Overview / Activity / Items / KB / Generator / Plugins / Deploy / Settings | **Append tabs**: Agents, Skills, Tasks (before Settings). No structural change.                                                           |
+| `/missions/[id]` | Single-column sections (`MissionDetailClient.tsx`). No tab strip.                                                                                                    | Promote to tabbed layout: "Overview" tab holds the current sections; add Agents, Skills, Tasks as new tabs.                               |
+| `/ideas/[id]`    | No detail page today; Ideas render as cards in lists.                                                                                                                | Create the detail page with tabs Overview / Build / Activity / Agents / Tasks. Skills inherited from parent Mission/Tenant only — no tab. |
 
 ### 12.3 Dashboard additions
 
@@ -367,11 +367,11 @@ A new tab "Skills" on the Work detail page (between Generator and Plugins per th
 
 Three new Trigger.dev tasks, all modeled on the shipped `work-schedule-dispatcher` (see [`trigger-integration.md` §10](./trigger-integration.md)).
 
-| Task ID                          | Kind | Cadence                  | What it does                                                                                                    |
-| -------------------------------- | ---- | ------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `agent-heartbeat-dispatcher`     | cron | every `AGENT_DISPATCH_INTERVAL_MINUTES` minutes (default 1) | Polls due Agents (`status='active'` AND `nextHeartbeatAt <= now()`), CAS-claims, dispatches `agent-heartbeat` runs. |
-| `agent-heartbeat`                | one-shot, 30 min max | dispatched | Single Agent's heartbeat tick — load context, call AI, write changes, emit activity.                                        |
-| `agent-task-execute`             | one-shot, 1 hour max | dispatched | One Agent working on one Task — load context, call AI, post chat message, transition Task if instructed.                    |
+| Task ID                      | Kind                 | Cadence                                                     | What it does                                                                                                        |
+| ---------------------------- | -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `agent-heartbeat-dispatcher` | cron                 | every `AGENT_DISPATCH_INTERVAL_MINUTES` minutes (default 1) | Polls due Agents (`status='active'` AND `nextHeartbeatAt <= now()`), CAS-claims, dispatches `agent-heartbeat` runs. |
+| `agent-heartbeat`            | one-shot, 30 min max | dispatched                                                  | Single Agent's heartbeat tick — load context, call AI, write changes, emit activity.                                |
+| `agent-task-execute`         | one-shot, 1 hour max | dispatched                                                  | One Agent working on one Task — load context, call AI, post chat message, transition Task if instructed.            |
 
 The existing remote-proxy callback channel from [ADR-002](../decisions/002-trigger-worker-callback-channel.md) is reused unchanged — the worker calls `POST /internal/trigger/remote/call` with `x-trigger-secret` and `AgentService`/`TaskService` are exposed via `createRemoteProxy()`.
 
@@ -384,18 +384,18 @@ The existing remote-proxy callback channel from [ADR-002](../decisions/002-trigg
 
 ## 15. Constitution gates
 
-| Principle                                            | Status   | Notes                                                                                                                          |
-| ---------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| I — Plugin-First                                     | OK       | Agents/Skills/Tasks are not new plugin categories. They USE AI/Git/search plugins. A future `task-tracker` capability is reserved (§9). |
-| II — Capability-Driven Resolution                    | OK       | Agent picks AI provider via `AiFacadeService.resolvePlugin` (no hardcoded provider ID).                                         |
-| III — Source-of-Truth Repositories                   | OK       | Agent/Skill definitions live in Git; DB stores only metadata + content hash + last-known body cache.                            |
-| IV — Background Work via Trigger.dev                 | OK       | Heartbeat dispatcher + per-Agent + per-Task tasks shipped.                                                                       |
-| V — Forward-Only Migrations                          | OK       | Every new table ships with an additive TypeORM migration in the same PR.                                                        |
-| VI — Tests Prerequisite                              | OK       | Agent service unit tests (Jest), Skill resolver unit tests, Task chat E2E (Playwright), plugin contract test for `task-tracker`. |
-| VII — Secret Hygiene                                 | OK       | Agents do not store their own credentials; they reuse plugin settings via the existing 3-tier cascade.                          |
-| VIII — Plugin Counts Single Source                   | N/A      | No new plugin shipped in v1.                                                                                                     |
-| IX — Behaviour-First Specs                           | OK       | Feature specs describe user behavior; this architecture doc reserves implementation detail.                                     |
-| X — Backwards Compatibility                          | OK       | `agents:` / `skills:` sections added to `works.yml` and `mission.yml` are optional; old configs remain valid.                   |
+| Principle                            | Status | Notes                                                                                                                                   |
+| ------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| I — Plugin-First                     | OK     | Agents/Skills/Tasks are not new plugin categories. They USE AI/Git/search plugins. A future `task-tracker` capability is reserved (§9). |
+| II — Capability-Driven Resolution    | OK     | Agent picks AI provider via `AiFacadeService.resolvePlugin` (no hardcoded provider ID).                                                 |
+| III — Source-of-Truth Repositories   | OK     | Agent/Skill definitions live in Git; DB stores only metadata + content hash + last-known body cache.                                    |
+| IV — Background Work via Trigger.dev | OK     | Heartbeat dispatcher + per-Agent + per-Task tasks shipped.                                                                              |
+| V — Forward-Only Migrations          | OK     | Every new table ships with an additive TypeORM migration in the same PR.                                                                |
+| VI — Tests Prerequisite              | OK     | Agent service unit tests (Jest), Skill resolver unit tests, Task chat E2E (Playwright), plugin contract test for `task-tracker`.        |
+| VII — Secret Hygiene                 | OK     | Agents do not store their own credentials; they reuse plugin settings via the existing 3-tier cascade.                                  |
+| VIII — Plugin Counts Single Source   | N/A    | No new plugin shipped in v1.                                                                                                            |
+| IX — Behaviour-First Specs           | OK     | Feature specs describe user behavior; this architecture doc reserves implementation detail.                                             |
+| X — Backwards Compatibility          | OK     | `agents:` / `skills:` sections added to `works.yml` and `mission.yml` are optional; old configs remain valid.                           |
 
 ## 16. Open questions
 

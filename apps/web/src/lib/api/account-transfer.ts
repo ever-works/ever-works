@@ -39,7 +39,19 @@ export const accountTransferAPI = {
             wrapInData: false,
         }),
 
-    pushToGitHub: async (data: { includeSecrets?: boolean } = {}) =>
+    // PASS-5 review fix: widen the client signature to match the
+    // server-side controller (post-tick-45) so future callers writing
+    // object literals with v2 toggles don't hit a TS excess-property
+    // error.
+    pushToGitHub: async (
+        data: {
+            includeSecrets?: boolean;
+            includeAgents?: boolean;
+            includeSkills?: boolean;
+            includeTasks?: boolean;
+            includeTaskChat?: boolean;
+        } = {},
+    ) =>
         serverMutation<{ status: string }>({
             endpoint: '/account/sync/push',
             data,

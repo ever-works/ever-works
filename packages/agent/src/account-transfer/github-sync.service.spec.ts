@@ -361,9 +361,14 @@ describe('GitHubSyncService', () => {
 
             await service.pushToGitHub('user-1');
 
-            expect(mocks.exportService.exportAccountData).toHaveBeenCalledWith('user-1', {
-                includeSecrets: true,
-            });
+            // Review-fix C3 (second-pass NEW-3): pushToGitHub now also
+            // forwards the v2-tail toggles. Use objectContaining so the
+            // assertion focuses on `includeSecrets` (the original intent
+            // of this spec) without coupling to the v2 defaults.
+            expect(mocks.exportService.exportAccountData).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({ includeSecrets: true }),
+            );
         });
 
         it('writes manifest.json + profile.json + plugins/user-plugins.json + per-work files', async () => {
@@ -783,6 +788,251 @@ describe('GitHubSyncService', () => {
             expect(payload.data.works[0].slug).toBe('a');
             expect(payload.data.works[0].items).toEqual([{ name: 'i1' }]);
             expect(payload.data.userPlugins).toEqual([{ pluginId: 'p1' }]);
+        });
+    });
+
+    /**
+     * Phase 19.5 — Agents/Skills/Tasks v2 tail subdir layout.
+     *
+     * The v2 payload tail (`data.agents` / `data.skills` / `data.tasks`)
+     * writes one json file per row under top-level `agents/` /
+     * `skills/` / `tasks/` subdirs. One file per row keeps git diffs
+     * clean — an Agent SOUL.md edit is a single-file diff instead of
+     * a json-blob rewrite. The manifest carries the per-section counts
+     * + `version:2` so a pull-side reader can short-circuit when a
+     * section is empty.
+     */
+    describe('v2 tail subdir layout (Phase 19.5)', () => {
+        function makeV2Payload(over: any = {}) {
+            return {
+                version: 2,
+                exportedAt: '2026-05-08T00:00:00.000Z',
+                includesSecrets: false,
+                data: {
+                    profile: { username: 'octo', email: 'o@e.com' },
+                    works: [],
+                    userPlugins: [],
+                    agents: [],
+                    skills: [],
+                    tasks: [],
+                    ...over.data,
+                },
+            };
+        }
+
+        it('writes one json file per Agent under agents/ keyed by identity.slug', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.exportService.exportAccountData.mockResolvedValue(
+                makeV2Payload({
+                    data: {
+                        agents: [
+                            { __kind: 'agent', identity: { slug: 'ceo', name: 'CEO' } },
+                            { __kind: 'agent', identity: { slug: 'devops', name: 'DevOps' } },
+                        ],
+                    },
+                }),
+            );
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+            mocks.gitFacade.getStatus.mockResolvedValue([{ file: 'agents/ceo.json' }]);
+
+            await service.pushToGitHub('user-1');
+
+            const writtenPaths = fsMocks.writeFileSync.mock.calls.map((c) => c[0]);
+            expect(writtenPaths).toEqual(
+                expect.arrayContaining([
+                    expect.stringMatching(/agents[\\/]ceo\.json$/),
+                    expect.stringMatching(/agents[\\/]devops\.json$/),
+                ]),
+            );
+        });
+
+        it('manifest carries v2 counts when the tail has rows', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.exportService.exportAccountData.mockResolvedValue(
+                makeV2Payload({
+                    data: {
+                        agents: [{ __kind: 'agent', identity: { slug: 'ceo' } }],
+                        skills: [{ __kind: 'skill', slug: 'cron-defaults' }],
+                        tasks: [
+                            { __kind: 'task', slug: 'T-1' },
+                            { __kind: 'task', slug: 'T-2' },
+                        ],
+                    },
+                }),
+            );
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+            mocks.gitFacade.getStatus.mockResolvedValue([{ file: 'manifest.json' }]);
+
+            await service.pushToGitHub('user-1');
+
+            const manifestCall = fsMocks.writeFileSync.mock.calls.find((c) =>
+                /manifest\.json$/.test(c[0] as string),
+            );
+            expect(manifestCall).toBeDefined();
+            const manifest = JSON.parse(manifestCall![1] as string);
+            expect(manifest.version).toBe(2);
+            expect(manifest.agentCount).toBe(1);
+            expect(manifest.skillCount).toBe(1);
+            expect(manifest.taskCount).toBe(2);
+        });
+
+        it('skips agents/skills/tasks subdir entirely when the array is empty (v1-compatible)', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.exportService.exportAccountData.mockResolvedValue(makePayload()); // v1, no tail
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+            mocks.gitFacade.getStatus.mockResolvedValue([{ file: 'manifest.json' }]);
+
+            await service.pushToGitHub('user-1');
+
+            const writtenPaths = fsMocks.writeFileSync.mock.calls.map((c) => c[0] as string);
+            expect(writtenPaths.find((p) => /agents[\\/]/.test(p))).toBeUndefined();
+            expect(writtenPaths.find((p) => /skills[\\/]/.test(p))).toBeUndefined();
+            expect(writtenPaths.find((p) => /^[^.]*tasks[\\/]/.test(p))).toBeUndefined();
+        });
+
+        it('blocks v2-tail rows with traversal-shaped slugs (path.basename mismatch → skip)', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.exportService.exportAccountData.mockResolvedValue(
+                makeV2Payload({
+                    data: {
+                        agents: [{ __kind: 'agent', identity: { slug: '../escape' } }],
+                        skills: [{ __kind: 'skill', slug: '../sneaky' }],
+                        tasks: [{ __kind: 'task', slug: '../also-bad' }],
+                    },
+                }),
+            );
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+            mocks.gitFacade.getStatus.mockResolvedValue([]);
+
+            await service.pushToGitHub('user-1');
+
+            const writtenPaths = fsMocks.writeFileSync.mock.calls.map((c) => c[0] as string);
+            expect(writtenPaths.find((p) => /escape\.json$/.test(p))).toBeUndefined();
+            expect(writtenPaths.find((p) => /sneaky\.json$/.test(p))).toBeUndefined();
+            expect(writtenPaths.find((p) => /also-bad\.json$/.test(p))).toBeUndefined();
+        });
+
+        it('readExportFiles walks agents/ + skills/ + tasks/ subdirs and surfaces v2 tail', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+
+            // Manifest signals v2 + counts.
+            const fileTree: Record<string, any> = {
+                '/tmp/clone/manifest.json': {
+                    version: 2,
+                    syncedAt: '2026-05-08T00:00:00.000Z',
+                    includesSecrets: false,
+                    agentCount: 1,
+                    skillCount: 1,
+                    taskCount: 1,
+                },
+                '/tmp/clone/profile.json': { username: 'octo', email: 'o@e.com' },
+                '/tmp/clone/plugins/user-plugins.json': [],
+                '/tmp/clone/agents/ceo.json': { __kind: 'agent', identity: { slug: 'ceo' } },
+                '/tmp/clone/skills/cron.json': { __kind: 'skill', slug: 'cron' },
+                '/tmp/clone/tasks/T-1.json': { __kind: 'task', slug: 'T-1' },
+            };
+            fsMocks.existsSync.mockImplementation(
+                (p: any) =>
+                    p in fileTree ||
+                    p === '/tmp/clone/agents' ||
+                    p === '/tmp/clone/skills' ||
+                    p === '/tmp/clone/tasks' ||
+                    p === '/tmp/clone/works',
+            );
+            fsMocks.readFileSync.mockImplementation((p: any) =>
+                p in fileTree ? JSON.stringify(fileTree[p]) : '',
+            );
+            fsMocks.readdirSync.mockImplementation((p: any, opts: any) => {
+                const withTypes = opts && opts.withFileTypes;
+                const entries =
+                    p === '/tmp/clone/agents'
+                        ? [{ name: 'ceo.json', isFile: () => true, isDirectory: () => false }]
+                        : p === '/tmp/clone/skills'
+                          ? [{ name: 'cron.json', isFile: () => true, isDirectory: () => false }]
+                          : p === '/tmp/clone/tasks'
+                            ? [{ name: 'T-1.json', isFile: () => true, isDirectory: () => false }]
+                            : p === '/tmp/clone/works'
+                              ? []
+                              : [];
+                return withTypes ? entries : entries.map((e: any) => e.name);
+            });
+            mocks.importService.previewImport.mockResolvedValue({});
+
+            await service.pullFromGitHub('user-1');
+
+            const payload = mocks.importService.previewImport.mock.calls[0][1];
+            expect(payload.version).toBe(2);
+            expect(payload.data.agents).toEqual([{ __kind: 'agent', identity: { slug: 'ceo' } }]);
+            expect(payload.data.skills).toEqual([{ __kind: 'skill', slug: 'cron' }]);
+            expect(payload.data.tasks).toEqual([{ __kind: 'task', slug: 'T-1' }]);
+        });
+
+        it('readExportFiles infers v2 from presence of tail subdirs when manifest still says version=1', async () => {
+            const { service, mocks } = makeService();
+            mocks.syncConfigRepository.findByUser.mockResolvedValue({
+                repoOwner: 'me',
+                repoName: 'cfg',
+                includeSecrets: false,
+            });
+            mocks.userRepository.findById.mockResolvedValue({ username: 'octo', email: 'o@e.com' });
+
+            const fileTree: Record<string, any> = {
+                '/tmp/clone/manifest.json': {
+                    version: 1, // stale — but tail subdirs exist
+                    syncedAt: '2026-05-08T00:00:00.000Z',
+                    includesSecrets: false,
+                },
+                '/tmp/clone/profile.json': { username: 'octo', email: 'o@e.com' },
+                '/tmp/clone/plugins/user-plugins.json': [],
+                '/tmp/clone/agents/ceo.json': { __kind: 'agent', identity: { slug: 'ceo' } },
+            };
+            fsMocks.existsSync.mockImplementation(
+                (p: any) => p in fileTree || p === '/tmp/clone/agents',
+            );
+            fsMocks.readFileSync.mockImplementation((p: any) =>
+                p in fileTree ? JSON.stringify(fileTree[p]) : '',
+            );
+            fsMocks.readdirSync.mockImplementation((p: any, opts: any) => {
+                const withTypes = opts && opts.withFileTypes;
+                const entries =
+                    p === '/tmp/clone/agents'
+                        ? [{ name: 'ceo.json', isFile: () => true, isDirectory: () => false }]
+                        : [];
+                return withTypes ? entries : entries.map((e: any) => e.name);
+            });
+            mocks.importService.previewImport.mockResolvedValue({});
+
+            await service.pullFromGitHub('user-1');
+
+            const payload = mocks.importService.previewImport.mock.calls[0][1];
+            expect(payload.version).toBe(2); // inferred from tail presence
+            expect(payload.data.agents).toHaveLength(1);
         });
     });
 });

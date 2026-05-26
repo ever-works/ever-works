@@ -39,6 +39,9 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
+import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
@@ -153,6 +156,14 @@ export class TriggerInternalController implements OnModuleInit {
         // Phase 3 PR J — exposed for the mission-tick Trigger.dev cron
         // so it can drive `tickDue()` over the internal RPC channel.
         private readonly missionTickService: MissionTickService,
+        // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
+        // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
+        // one-shot worker over the internal RPC channel.
+        private readonly agentScheduleDispatcherService: AgentScheduleDispatcherService,
+        private readonly agentRepositoryRef: AgentRepository,
+        private readonly agentRunRepositoryRef: AgentRunRepository,
+        // Phase 17 — recurring Task dispatcher.
+        private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -182,6 +193,13 @@ export class TriggerInternalController implements OnModuleInit {
             WorkKnowledgeDocumentRepository: this.workKnowledgeDocumentRepository,
             // Phase 3 PR J — exposed for the mission-tick cron.
             MissionTickService: this.missionTickService,
+            // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
+            // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
+            AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
+            AgentRepository: this.agentRepositoryRef,
+            AgentRunRepository: this.agentRunRepositoryRef,
+            // Phase 17 — recurring Task dispatcher.
+            TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

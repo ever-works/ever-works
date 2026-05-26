@@ -13,6 +13,15 @@ export type RecordPluginUsageInput = {
     modelId?: string | null;
     requestId?: string | null;
     metadata?: Record<string, unknown> | null;
+    /**
+     * Agents/Skills/Tasks PR #1017 — Phase 15.6. Attribution columns
+     * that ride alongside the existing (workId, userId) pair. When the
+     * call originates from an Agent run, `agentId` lets the per-Agent
+     * budget rollup work; for `task` and `chat` kind runs, `taskId`
+     * feeds the per-Task spend endpoint.
+     */
+    agentId?: string | null;
+    taskId?: string | null;
 };
 
 /**
@@ -30,7 +39,15 @@ export class PluginUsageService {
     constructor(private readonly repository: PluginUsageRepository) {}
 
     async record(input: RecordPluginUsageInput): Promise<PluginUsageEvent | null> {
-        if (!input.workId || !input.userId) {
+        // Agent-initiated calls (e.g. heartbeat with no Work scope) can
+        // legitimately have no workId. They still want the row so the
+        // per-Agent + per-Task spend rollups work — fall back to a
+        // sentinel only when even agentId is missing.
+        if (!input.userId) {
+            return null;
+        }
+        if (!input.workId && !input.agentId && !input.taskId) {
+            // No scope anchor at all — system-initiated call, skip.
             return null;
         }
 
@@ -46,6 +63,9 @@ export class PluginUsageService {
                 modelId: input.modelId ?? null,
                 requestId: input.requestId ?? null,
                 metadata: input.metadata ?? null,
+                // Phase 15.6 — propagate Agent/Task attribution when set.
+                agentId: input.agentId ?? null,
+                taskId: input.taskId ?? null,
             });
         } catch (error) {
             this.logger.warn(

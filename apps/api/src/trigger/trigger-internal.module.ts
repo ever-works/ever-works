@@ -5,6 +5,8 @@ import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
+import { AgentsModule } from '@ever-works/agent/agents';
+import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 
@@ -29,6 +31,17 @@ import { DataSyncModule } from '../data-sync/data-sync.module';
         // packages/tasks) can call tickDue() each minute without
         // direct DB access from worker scope.
         MissionsModule,
+        // Agents/Skills/Tasks PR #1017 — Phase 6. Exposes
+        // AgentScheduleDispatcherService + AgentRepository +
+        // AgentRunRepository through the remote-proxy controller so
+        // the agent-heartbeat dispatcher + worker can drive them
+        // without direct DB access from worker scope.
+        AgentsModule,
+        // Agents/Skills/Tasks PR #1017 — Phase 17. Exposes
+        // TaskRecurrenceDispatcherService through the remote-proxy
+        // controller so the task-recurrence-dispatcher cron task
+        // can drive `dispatchDue()` over the internal RPC channel.
+        TasksDomainModule,
     ],
     controllers: [TriggerInternalController],
 })

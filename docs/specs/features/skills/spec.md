@@ -66,44 +66,44 @@ Authoring of Skills happens in the same Tiptap editor used for KB documents. Ski
 ### 2.1 Primary scenarios
 
 **S1 — Install a platform-catalog skill at tenant level.**
-*Given* a user on `/skills` page seeing the platform catalog,
-*When* they click "Install" on the `pr-review` skill,
-*Then* a `skills` row with `ownerType='tenant'`, `ownerId=userId`, `slug='pr-review'`, `contentHash=<copy>` is created, `SKILL_INSTALLED` activity row emitted, and the skill appears in the "Installed" section of the page.
+_Given_ a user on `/skills` page seeing the platform catalog,
+_When_ they click "Install" on the `pr-review` skill,
+_Then_ a `skills` row with `ownerType='tenant'`, `ownerId=userId`, `slug='pr-review'`, `contentHash=<copy>` is created, `SKILL_INSTALLED` activity row emitted, and the skill appears in the "Installed" section of the page.
 
 **S2 — Author a custom Skill at tenant level.**
-*Given* a user clicking "+ New Skill",
-*When* they fill `name`, `description`, body, optional `allowed-tools`,
-*Then* the skill is saved (DB-only for tenant scope today), `SKILL_INSTALLED` row emitted.
+_Given_ a user clicking "+ New Skill",
+_When_ they fill `name`, `description`, body, optional `allowed-tools`,
+_Then_ the skill is saved (DB-only for tenant scope today), `SKILL_INSTALLED` row emitted.
 
 **S3 — Attach a Skill to one Agent.**
-*Given* a user on `/agents/<id>/skills`,
-*When* they toggle the `pr-review` skill on,
-*Then* a `skill_bindings(skillId, targetType='agent', targetId=agentId, injectIntoAgent=true)` row is created. Activity row `SKILL_ATTACHED_TO_AGENT` emitted.
+_Given_ a user on `/agents/<id>/skills`,
+_When_ they toggle the `pr-review` skill on,
+_Then_ a `skill_bindings(skillId, targetType='agent', targetId=agentId, injectIntoAgent=true)` row is created. Activity row `SKILL_ATTACHED_TO_AGENT` emitted.
 
 **S4 — Inject a Skill into a Work generator.**
-*Given* a user on the new **Skills tab** of a Work detail page (between Generator and Plugins),
-*When* they enable the `pr-review` skill there,
-*Then* `skill_bindings(skillId, targetType='work', targetId=workId, injectIntoGenerator=true)` is created. The next Work generation includes the skill's frontmatter description (and a body excerpt) in the system message.
+_Given_ a user on the new **Skills tab** of a Work detail page (between Generator and Plugins),
+_When_ they enable the `pr-review` skill there,
+_Then_ `skill_bindings(skillId, targetType='work', targetId=workId, injectIntoGenerator=true)` is created. The next Work generation includes the skill's frontmatter description (and a body excerpt) in the system message.
 
 **S5 — Skill body request on demand.**
-*Given* an Agent run where the model determines it needs the full body of `pr-review`,
-*When* the model calls a `getSkillBody({slug})` tool,
-*Then* the full body is returned in the next message, `SKILL_INVOKED` activity row emitted with `details: {agentId, skillSlug, source: 'on-demand'}`.
+_Given_ an Agent run where the model determines it needs the full body of `pr-review`,
+_When_ the model calls a `getSkillBody({slug})` tool,
+_Then_ the full body is returned in the next message, `SKILL_INVOKED` activity row emitted with `details: {agentId, skillSlug, source: 'on-demand'}`.
 
 **S6 — Mission Template ships a skill.**
-*Given* a Mission Template repo whose `.works/mission.yml` declares `skills: [{slug: 'pr-review', path: '.works/skills/pr-review.md'}]`,
-*When* a user instantiates a Mission from it,
-*Then* the file is copied into the new mission repo, a `skills(ownerType='mission', ownerId=missionId)` row is created. The skill is auto-bound to every Agent that ships with the template (per its agent.yml `skills:` list).
+_Given_ a Mission Template repo whose `.works/mission.yml` declares `skills: [{slug: 'pr-review', path: '.works/skills/pr-review.md'}]`,
+_When_ a user instantiates a Mission from it,
+_Then_ the file is copied into the new mission repo, a `skills(ownerType='mission', ownerId=missionId)` row is created. The skill is auto-bound to every Agent that ships with the template (per its agent.yml `skills:` list).
 
 **S7 — Edit a Tenant Skill that has no control repo.**
-*Given* a tenant skill stored DB-only,
-*When* the user opens the body in the Tiptap editor and saves changes,
-*Then* the DB row body is updated, content-hash recomputed.
+_Given_ a tenant skill stored DB-only,
+_When_ the user opens the body in the Tiptap editor and saves changes,
+_Then_ the DB row body is updated, content-hash recomputed.
 
 **S8 — Edit a Mission Skill (Git mode).**
-*Given* a Mission skill at `<missionRepo>/.works/skills/pr-review.md`,
-*When* the user saves edits,
-*Then* `GitFacadeService.commit()` writes the file; the `skills.contentHash` is updated to the new sha256; `SKILL_FILE_EDITED` activity row emitted.
+_Given_ a Mission skill at `<missionRepo>/.works/skills/pr-review.md`,
+_When_ the user saves edits,
+_Then_ `GitFacadeService.commit()` writes the file; the `skills.contentHash` is updated to the new sha256; `SKILL_FILE_EDITED` activity row emitted.
 
 ### 2.2 Edge cases & failures
 
@@ -210,14 +210,14 @@ Authoring of Skills happens in the same Tiptap editor used for KB documents. Ski
 
 ## 5. Key Entities & Domain Concepts
 
-| Concept            | Definition                                                                                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Skill**          | Markdown file with frontmatter (name/description/allowed-tools) + body. Reusable AI capability.                                                                          |
-| **Skill Catalog**  | Read-only repo-shipped collection at `apps/api/src/skills/catalog/`. Source of truth for "Available" tab.                                                                |
-| **SkillBinding**   | Row attaching a Skill to a target (agent/work/mission/idea/tenant) with `injectIntoAgent` and/or `injectIntoGenerator` booleans + priority.                              |
-| **Active set**     | The de-duplicated, priority-resolved list of Skills available to a given AI call.                                                                                       |
-| **Progressive disclosure** | Default injection mode: description + body excerpt only; full body fetched on demand via `getSkillBody` tool.                                                    |
-| **maxSkillContextTokens** | Per-Agent (default 4000) / per-Generator (default 2000) token budget for the assembled `## Skills` section.                                                       |
+| Concept                    | Definition                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Skill**                  | Markdown file with frontmatter (name/description/allowed-tools) + body. Reusable AI capability.                                             |
+| **Skill Catalog**          | Read-only repo-shipped collection at `apps/api/src/skills/catalog/`. Source of truth for "Available" tab.                                   |
+| **SkillBinding**           | Row attaching a Skill to a target (agent/work/mission/idea/tenant) with `injectIntoAgent` and/or `injectIntoGenerator` booleans + priority. |
+| **Active set**             | The de-duplicated, priority-resolved list of Skills available to a given AI call.                                                           |
+| **Progressive disclosure** | Default injection mode: description + body excerpt only; full body fetched on demand via `getSkillBody` tool.                               |
+| **maxSkillContextTokens**  | Per-Agent (default 4000) / per-Generator (default 2000) token budget for the assembled `## Skills` section.                                 |
 
 ## 6. `works.yml` / `mission.yml` schema additions
 
@@ -257,10 +257,10 @@ name: pr-review
 description: Review a pull request and post inline comments.
 allowed-tools: [github, semgrep]
 examples:
-    - input: "PR adds a new SQL query without prepared statements."
-      output: "P0 SQL-injection risk; flag inline with severity P0."
-    - input: "PR renames a variable for clarity."
-      output: "No findings; approve without comment."
+    - input: 'PR adds a new SQL query without prepared statements.'
+      output: 'P0 SQL-injection risk; flag inline with severity P0.'
+    - input: 'PR renames a variable for clarity.'
+      output: 'No findings; approve without comment.'
 ---
 ```
 

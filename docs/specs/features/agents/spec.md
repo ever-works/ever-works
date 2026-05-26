@@ -49,49 +49,49 @@ Agent definitions — the four markdown files `SOUL.md`, `AGENTS.md`, `HEARTBEAT
 ### 2.1 Primary scenarios
 
 **S1 — Create a tenant-scoped CEO Agent (Given/When/Then).**
-*Given* a signed-in user who has at least one Mission and one Work,
-*When* they navigate to the new sidebar item "Agents", click "+ New Agent", fill `name = "CEO"`, `title = "Chief Executive"`, `capabilities = "You're the CEO. Make sure every Mission has a clear roadmap and each Idea ladders up to a goal."`, accept the default AI provider, leave scope on "Tenant — available to all", and click "Create",
-*Then* the user is redirected to `/agents/ceo`, the Agent appears in `status='draft'`, and an `AGENT_CREATED` activity log entry is emitted.
+_Given_ a signed-in user who has at least one Mission and one Work,
+_When_ they navigate to the new sidebar item "Agents", click "+ New Agent", fill `name = "CEO"`, `title = "Chief Executive"`, `capabilities = "You're the CEO. Make sure every Mission has a clear roadmap and each Idea ladders up to a goal."`, accept the default AI provider, leave scope on "Tenant — available to all", and click "Create",
+_Then_ the user is redirected to `/agents/ceo`, the Agent appears in `status='draft'`, and an `AGENT_CREATED` activity log entry is emitted.
 
 **S2 — Switch CEO Agent to active with a daily heartbeat.**
-*Given* the CEO Agent in `draft`,
-*When* the user opens the Agent's Dashboard tab and clicks "Start", then sets `Heartbeat cadence = "0 9 * * *"` (daily 9am UTC) and clicks "Save",
-*Then* the Agent transitions to `active`, `nextHeartbeatAt` is set to the next 9am UTC, and an `AGENT_RESUMED` entry is logged.
+_Given_ the CEO Agent in `draft`,
+_When_ the user opens the Agent's Dashboard tab and clicks "Start", then sets `Heartbeat cadence = "0 9 * * *"` (daily 9am UTC) and clicks "Save",
+_Then_ the Agent transitions to `active`, `nextHeartbeatAt` is set to the next 9am UTC, and an `AGENT_RESUMED` entry is logged.
 
 **S3 — Heartbeat tick runs.**
-*Given* the CEO Agent is `active` and `nextHeartbeatAt` is in the past,
-*When* the Trigger.dev cron `agent-heartbeat-dispatcher` fires,
-*Then* the dispatcher CAS-claims the agent row (sets `status='running'`, writes a new `agent_runs` row), enqueues a Trigger.dev run, the agent's prompt + bound skills + recent activity are assembled, an AI call is made via `AiFacadeService`, a `PluginUsageEvent` is recorded, and on success the run row reaches `completed` with a `summary` field populated. `AGENT_HEARTBEAT_STARTED` and `AGENT_HEARTBEAT_COMPLETED` activity rows are emitted. `nextHeartbeatAt` is rescheduled.
+_Given_ the CEO Agent is `active` and `nextHeartbeatAt` is in the past,
+_When_ the Trigger.dev cron `agent-heartbeat-dispatcher` fires,
+_Then_ the dispatcher CAS-claims the agent row (sets `status='running'`, writes a new `agent_runs` row), enqueues a Trigger.dev run, the agent's prompt + bound skills + recent activity are assembled, an AI call is made via `AiFacadeService`, a `PluginUsageEvent` is recorded, and on success the run row reaches `completed` with a `summary` field populated. `AGENT_HEARTBEAT_STARTED` and `AGENT_HEARTBEAT_COMPLETED` activity rows are emitted. `nextHeartbeatAt` is rescheduled.
 
 **S4 — Agent creates a task for another Agent.**
-*Given* the CEO Agent has `permissions.canAssignTasks = true` and there is another tenant-scoped Agent "VP-Engineering",
-*When* during a heartbeat tick the CEO Agent's AI response calls the `createTask` tool with `{title, assigneeAgentIds: ["vp-engineering"], priority: "p1"}`,
-*Then* a new `tasks` row is created with `createdByType='agent'`, `createdById='ceo'`, a `task_assignees` row links VP-Engineering, and `TASK_CREATED` + `TASK_ASSIGNED` activity rows are emitted.
+_Given_ the CEO Agent has `permissions.canAssignTasks = true` and there is another tenant-scoped Agent "VP-Engineering",
+_When_ during a heartbeat tick the CEO Agent's AI response calls the `createTask` tool with `{title, assigneeAgentIds: ["vp-engineering"], priority: "p1"}`,
+_Then_ a new `tasks` row is created with `createdByType='agent'`, `createdById='ceo'`, a `task_assignees` row links VP-Engineering, and `TASK_CREATED` + `TASK_ASSIGNED` activity rows are emitted.
 
 **S5 — Mission-scoped Agent gets attached to one Mission only.**
-*Given* a Mission "Cats Business" and the user creating a new Agent "Catnip Researcher" with `scope='mission'` and `missionId=<cats-business-id>`,
-*When* the Agent is created,
-*Then* its prompt files are written to `<missionRepo>/.works/agents/catnip-researcher/` via `GitFacadeService.commit()`, and the Agent is visible only inside `/missions/<id>/agents` (NOT on the tenant `/agents` list unless the user toggles "show all scopes").
+_Given_ a Mission "Cats Business" and the user creating a new Agent "Catnip Researcher" with `scope='mission'` and `missionId=<cats-business-id>`,
+_When_ the Agent is created,
+_Then_ its prompt files are written to `<missionRepo>/.works/agents/catnip-researcher/` via `GitFacadeService.commit()`, and the Agent is visible only inside `/missions/<id>/agents` (NOT on the tenant `/agents` list unless the user toggles "show all scopes").
 
 **S6 — Budget cap blocks an AI call.**
-*Given* the CEO Agent has `AgentBudget(intervalUnit='day', capCents=500, allowOverage=false)` and today's spend is already $4.95,
-*When* a heartbeat tick is about to call the AI provider with estimated cost > 5c,
-*Then* `BudgetGuardService.checkBudget(ownerType='agent', ownerId=ceo.id, estimatedCostCents)` returns blocked, the run is short-circuited to `status='failed'` with `errorMessage='Budget exceeded'`, an `AGENT_BUDGET_EXCEEDED` activity row is emitted, and the dispatcher does NOT auto-pause (it'll try again tomorrow when the interval resets).
+_Given_ the CEO Agent has `AgentBudget(intervalUnit='day', capCents=500, allowOverage=false)` and today's spend is already $4.95,
+_When_ a heartbeat tick is about to call the AI provider with estimated cost > 5c,
+_Then_ `BudgetGuardService.checkBudget(ownerType='agent', ownerId=ceo.id, estimatedCostCents)` returns blocked, the run is short-circuited to `status='failed'` with `errorMessage='Budget exceeded'`, an `AGENT_BUDGET_EXCEEDED` activity row is emitted, and the dispatcher does NOT auto-pause (it'll try again tomorrow when the interval resets).
 
 **S7 — Agent edits its own SOUL.md.**
-*Given* the CEO Agent has `permissions.canEditAgentFiles = true`,
-*When* during a tick the AI response uses the `editAgentFile` tool to update `SOUL.md`,
-*Then* the file is written via `GitFacadeService.commit()` to the scope's repo, the `agents.contentHash` column is updated, an `AGENT_FILE_EDITED` activity row is emitted with the diff in `details`.
+_Given_ the CEO Agent has `permissions.canEditAgentFiles = true`,
+_When_ during a tick the AI response uses the `editAgentFile` tool to update `SOUL.md`,
+_Then_ the file is written via `GitFacadeService.commit()` to the scope's repo, the `agents.contentHash` column is updated, an `AGENT_FILE_EDITED` activity row is emitted with the diff in `details`.
 
 **S8 — Mention an Agent in a Task chat.**
-*Given* a Task with two assignees (a human user and an Agent), and a human typing `@ceo can you review this?` in the Task chat,
-*When* the message is posted,
-*Then* a `task_chat_messages` row is inserted, an `agent-chat-reply` Trigger.dev run is dispatched targeting the CEO Agent, and within ~10s a new `task_chat_messages` row from the Agent appears with `authorType='agent'`.
+_Given_ a Task with two assignees (a human user and an Agent), and a human typing `@ceo can you review this?` in the Task chat,
+_When_ the message is posted,
+_Then_ a `task_chat_messages` row is inserted, an `agent-chat-reply` Trigger.dev run is dispatched targeting the CEO Agent, and within ~10s a new `task_chat_messages` row from the Agent appears with `authorType='agent'`.
 
 **S9 — Mission Template ships with pre-defined Agents.**
-*Given* a Mission Template repo whose `.works/mission.yml` declares `agents: [{slug: 'founder', path: '.works/agents/founder'}]` and contains `.works/agents/founder/SOUL.md` + siblings,
-*When* a user instantiates a Mission from that template via the "Use this Template" button,
-*Then* the Mission scaffolder copies the `.works/agents/` subtree into the new `<slug>-mission` repo and creates a matching `agents` row + `agent_runs` queue entry (in `draft`) so the user finds the Founder Agent ready to start.
+_Given_ a Mission Template repo whose `.works/mission.yml` declares `agents: [{slug: 'founder', path: '.works/agents/founder'}]` and contains `.works/agents/founder/SOUL.md` + siblings,
+_When_ a user instantiates a Mission from that template via the "Use this Template" button,
+_Then_ the Mission scaffolder copies the `.works/agents/` subtree into the new `<slug>-mission` repo and creates a matching `agents` row + `agent_runs` queue entry (in `draft`) so the user finds the Founder Agent ready to start.
 
 ### 2.2 Edge cases & failures
 
@@ -226,16 +226,16 @@ Numbered, atomic, testable. `MUST` / `SHOULD` / `MUST NOT` per Spec Kit conventi
 
 ## 5. Key Entities & Domain Concepts
 
-| Concept                | One-line definition                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Agent**              | A named, persistent, user-defined AI worker scoped to Tenant / Mission / Idea / Work. Backed by `agents` row + Git files.                                    |
-| **AgentScope**         | Enum {`tenant`, `mission`, `idea`, `work`} on `agents.scope` constraining where the Agent appears and what it can act on.                                    |
-| **AgentMembership**    | Row linking a tenant- or mission-scoped Agent to a specific Mission/Idea/Work it's allowed to operate on. Polymorphic ownerType + ownerId.                   |
-| **AgentRun**           | One execution of a heartbeat / task / chat reply. Reaches a terminal state (`completed` / `failed` / `cancelled`).                                            |
-| **AgentBudget**        | Per-Agent spending cap with interval (hour/day/week/month/unlimited). Re-uses the same `BudgetGuardService` cascade as `WorkBudget`.                          |
-| **AgentPermissions**   | JSON object on `agents.permissions` gating tool calls (createTask, editAgentFile, commitToRepo, canCreateAgents, …).                                          |
-| **Agent files**        | The five canonical files `SOUL.md`, `AGENTS.md`, `HEARTBEAT.md`, `TOOLS.md`, `agent.yml`. Live in the scope's Git repo (or inline for Tenant DB-only mode).   |
-| **Heartbeat tick**     | A scheduled execution of an Agent driven by `agent-heartbeat-dispatcher` cron + the per-Agent `heartbeatCadence`. The Agent's "what would you do next?" loop. |
+| Concept              | One-line definition                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent**            | A named, persistent, user-defined AI worker scoped to Tenant / Mission / Idea / Work. Backed by `agents` row + Git files.                                     |
+| **AgentScope**       | Enum {`tenant`, `mission`, `idea`, `work`} on `agents.scope` constraining where the Agent appears and what it can act on.                                     |
+| **AgentMembership**  | Row linking a tenant- or mission-scoped Agent to a specific Mission/Idea/Work it's allowed to operate on. Polymorphic ownerType + ownerId.                    |
+| **AgentRun**         | One execution of a heartbeat / task / chat reply. Reaches a terminal state (`completed` / `failed` / `cancelled`).                                            |
+| **AgentBudget**      | Per-Agent spending cap with interval (hour/day/week/month/unlimited). Re-uses the same `BudgetGuardService` cascade as `WorkBudget`.                          |
+| **AgentPermissions** | JSON object on `agents.permissions` gating tool calls (createTask, editAgentFile, commitToRepo, canCreateAgents, …).                                          |
+| **Agent files**      | The five canonical files `SOUL.md`, `AGENTS.md`, `HEARTBEAT.md`, `TOOLS.md`, `agent.yml`. Live in the scope's Git repo (or inline for Tenant DB-only mode).   |
+| **Heartbeat tick**   | A scheduled execution of an Agent driven by `agent-heartbeat-dispatcher` cron + the per-Agent `heartbeatCadence`. The Agent's "what would you do next?" loop. |
 
 ### 5.1 Sidebar i18n keys (additive)
 
@@ -336,12 +336,12 @@ Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agent
 
 ## 5.9 Cascade on delete
 
-| Event                       | Cascade                                                                                                                                                                                                                                                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Delete Agent                | `agent_runs`, `agent_run_logs`, `agent_budget`, `agent_memberships`, `skill_bindings(targetType='agent')` all CASCADE. `task_assignees(assigneeType='agent', assigneeId=<id>)` row drops. Task chat messages authored by this Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent". |
-| Delete Mission              | Mission-scoped Agents CASCADE. The Mission's `missionRepo` on GitHub is NOT touched. UI prompts the user with a "delete GitHub repo separately" notice. See [QUESTIONS N1](../../QUESTIONS-agents-skills-tasks.md#n1--cascade-on-mission-delete).                                                  |
-| Delete Work                 | Work-scoped Agents CASCADE. `dataRepo` / `websiteRepo` on GitHub untouched (same posture as Mission delete).                                                                                                                                                                                       |
-| Delete User                 | All entities CASCADE via FK chain. Agent files stored inline (tenant scope) are removed; files in Mission/Work repos remain (the user still owns the repo on GitHub).                                                                                                                              |
+| Event          | Cascade                                                                                                                                                                                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete Agent   | `agent_runs`, `agent_run_logs`, `agent_budget`, `agent_memberships`, `skill_bindings(targetType='agent')` all CASCADE. `task_assignees(assigneeType='agent', assigneeId=<id>)` row drops. Task chat messages authored by this Agent: `authorId` becomes a dangling UUID — UI renders "Deleted Agent". |
+| Delete Mission | Mission-scoped Agents CASCADE. The Mission's `missionRepo` on GitHub is NOT touched. UI prompts the user with a "delete GitHub repo separately" notice. See [QUESTIONS N1](../../QUESTIONS-agents-skills-tasks.md#n1--cascade-on-mission-delete).                                                     |
+| Delete Work    | Work-scoped Agents CASCADE. `dataRepo` / `websiteRepo` on GitHub untouched (same posture as Mission delete).                                                                                                                                                                                          |
+| Delete User    | All entities CASCADE via FK chain. Agent files stored inline (tenant scope) are removed; files in Mission/Work repos remain (the user still owns the repo on GitHub).                                                                                                                                 |
 
 ## 5.10 Dry-run mode
 
@@ -351,15 +351,16 @@ Beyond the `AGENT_*` event types in [architecture §10](../../architecture/agent
 
 Every Agent has a visual identity that appears on the Agent list cards, Task assignee chips, chat messages, dashboard, etc. Three modes — pick per Agent:
 
-| Mode             | What it renders                                                                                       | Storage                                                                  |
-| ---------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `initials`       | First 1-2 letters of the Agent's name in a circle, color hashed from the slug. **Default.**           | Nothing extra; rendered client-side.                                     |
-| `icon`           | A lucide-react icon picked from a curated set of ~30 (Bot, Briefcase, Hammer, Microscope, …). Color same hashed palette. | `agents.avatarIcon: varchar(64) nullable` — stores the lucide icon name. |
-| `image`          | Uploaded image (square, ≤ 1 MB, png / jpg / webp). Available only when tenant has file storage enabled. | `agents.avatarImageUploadId: uuid nullable` — FK to `work_knowledge_upload` (reuses existing upload pipeline). |
+| Mode       | What it renders                                                                                                          | Storage                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `initials` | First 1-2 letters of the Agent's name in a circle, color hashed from the slug. **Default.**                              | Nothing extra; rendered client-side.                                                                           |
+| `icon`     | A lucide-react icon picked from a curated set of ~30 (Bot, Briefcase, Hammer, Microscope, …). Color same hashed palette. | `agents.avatarIcon: varchar(64) nullable` — stores the lucide icon name.                                       |
+| `image`    | Uploaded image (square, ≤ 1 MB, png / jpg / webp). Available only when tenant has file storage enabled.                  | `agents.avatarImageUploadId: uuid nullable` — FK to `work_knowledge_upload` (reuses existing upload pipeline). |
 
 The Agent's settings tab exposes the three modes as a radio group. Picking `icon` opens an icon picker modal; picking `image` opens the existing KB upload modal (with "1:1 ratio recommended, ≤ 1 MB" copy). Switching modes preserves the unused-mode's data so a user can flip back without re-uploading.
 
 Schema:
+
 - `agents.avatarMode: varchar(8) NOT NULL DEFAULT 'initials'` (enum: `initials | icon | image`).
 - `agents.avatarIcon: varchar(64) NULL` — only used when mode = `icon`.
 - `agents.avatarImageUploadId: uuid NULL` — only used when mode = `image`.

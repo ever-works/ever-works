@@ -12,13 +12,13 @@
 
 Every Agent — whether shipped as a template in [`ever-works/agents`](https://github.com/ever-works/agents), authored by a user inside a Mission/Work repo, or created inline at tenant scope — has an `agent.yml` file. Locations:
 
-| Scope        | Path                                                                                                                 |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Tenant       | DB-inline column `agents.agentYml` (per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)).         |
-| Mission      | `<missionRepo>/.works/agents/<slug>/agent.yml`                                                                       |
-| Idea         | `<missionRepo>/.works/ideas/<ideaId>/agents/<slug>/agent.yml`                                                        |
-| Work         | `<workDataRepo>/.works/agents/<slug>/agent.yml`                                                                      |
-| Template     | `<ever-works/agents-repo>/<template-slug>/agent.yml`                                                                 |
+| Scope    | Path                                                                                                        |
+| -------- | ----------------------------------------------------------------------------------------------------------- |
+| Tenant   | DB-inline column `agents.agentYml` (per [ADR-008](../decisions/008-tenant-control-repo-deferred-to-v2.md)). |
+| Mission  | `<missionRepo>/.works/agents/<slug>/agent.yml`                                                              |
+| Idea     | `<missionRepo>/.works/ideas/<ideaId>/agents/<slug>/agent.yml`                                               |
+| Work     | `<workDataRepo>/.works/agents/<slug>/agent.yml`                                                             |
+| Template | `<ever-works/agents-repo>/<template-slug>/agent.yml`                                                        |
 
 The schema is identical across all scopes. A template's `agent.yml` lacks the per-instance fields (`createdAt`, `lastRunAt`, etc.) — they get populated when the template is instantiated.
 
@@ -30,97 +30,113 @@ Lives at `packages/agent/src/agents/agent-manifest.schema.ts`:
 import { z } from 'zod';
 
 const cronOrManual = z.union([
-    z.literal('manual'),
-    z.string().regex(/^[\s\S]{1,64}$/, 'cron expression too long').refine(
-        (s) => parseCron(s).isValid(),
-        { message: 'invalid cron expression' }
-    ),
+	z.literal('manual'),
+	z
+		.string()
+		.regex(/^[\s\S]{1,64}$/, 'cron expression too long')
+		.refine((s) => parseCron(s).isValid(), { message: 'invalid cron expression' })
 ]);
 
-const agentPermissionsSchema = z.object({
-    canCreateAgents: z.boolean().default(false),
-    canAssignTasks: z.boolean().default(false),
-    canEditSkills: z.boolean().default(false),
-    canEditAgentFiles: z.boolean().default(false),
-    canSpend: z.boolean().default(false),
-    canCommitToRepo: z.boolean().default(false),
-    canOpenPullRequests: z.boolean().default(false),
-    canCallExternalTools: z.boolean().default(false),
-}).strict();
+const agentPermissionsSchema = z
+	.object({
+		canCreateAgents: z.boolean().default(false),
+		canAssignTasks: z.boolean().default(false),
+		canEditSkills: z.boolean().default(false),
+		canEditAgentFiles: z.boolean().default(false),
+		canSpend: z.boolean().default(false),
+		canCommitToRepo: z.boolean().default(false),
+		canOpenPullRequests: z.boolean().default(false),
+		canCallExternalTools: z.boolean().default(false)
+	})
+	.strict();
 
-const agentBudgetSchema = z.object({
-    intervalUnit: z.enum(['month', 'unlimited']),    // v1: only month + unlimited (see QUESTIONS N6)
-    capCents: z.number().int().min(0),
-    currency: z.string().length(3).default('usd'),
-    allowOverage: z.boolean().default(false),
-}).strict();
+const agentBudgetSchema = z
+	.object({
+		intervalUnit: z.enum(['month', 'unlimited']), // v1: only month + unlimited (see QUESTIONS N6)
+		capCents: z.number().int().min(0),
+		currency: z.string().length(3).default('usd'),
+		allowOverage: z.boolean().default(false)
+	})
+	.strict();
 
 const agentAvatarSchema = z.discriminatedUnion('mode', [
-    z.object({ mode: z.literal('initials') }).strict(),
-    z.object({ mode: z.literal('icon'), icon: z.string().min(1).max(64) }).strict(),
-    z.object({ mode: z.literal('image'), uploadId: z.string().uuid() }).strict(),
+	z.object({ mode: z.literal('initials') }).strict(),
+	z.object({ mode: z.literal('icon'), icon: z.string().min(1).max(64) }).strict(),
+	z.object({ mode: z.literal('image'), uploadId: z.string().uuid() }).strict()
 ]);
 
-const agentSkillBindingSchema = z.object({
-    slug: z.string(),
-    injectIntoAgent: z.boolean().default(true),
-    priority: z.number().int().min(0).default(100),
-}).strict();
+const agentSkillBindingSchema = z
+	.object({
+		slug: z.string(),
+		injectIntoAgent: z.boolean().default(true),
+		priority: z.number().int().min(0).default(100)
+	})
+	.strict();
 
-export const agentManifestSchema = z.object({
-    // Identity
-    apiVersion: z.literal('agent/v1'),
-    slug: z.string().regex(/^[a-z][a-z0-9-]{0,79}$/, 'slug must be kebab-case'),
-    name: z.string().min(1).max(120),
-    title: z.string().max(200).optional(),
-    capabilities: z.string().max(5000).optional(),
+export const agentManifestSchema = z
+	.object({
+		// Identity
+		apiVersion: z.literal('agent/v1'),
+		slug: z.string().regex(/^[a-z][a-z0-9-]{0,79}$/, 'slug must be kebab-case'),
+		name: z.string().min(1).max(120),
+		title: z.string().max(200).optional(),
+		capabilities: z.string().max(5000).optional(),
 
-    // Visual identity (H3 — all three modes)
-    avatar: agentAvatarSchema.default({ mode: 'initials' }),
+		// Visual identity (H3 — all three modes)
+		avatar: agentAvatarSchema.default({ mode: 'initials' }),
 
-    // Scope (one of these is set; others null)
-    scope: z.enum(['tenant', 'mission', 'idea', 'work']),
-    missionId: z.string().uuid().optional().nullable(),
-    ideaId: z.string().uuid().optional().nullable(),
-    workId: z.string().uuid().optional().nullable(),
+		// Scope (one of these is set; others null)
+		scope: z.enum(['tenant', 'mission', 'idea', 'work']),
+		missionId: z.string().uuid().optional().nullable(),
+		ideaId: z.string().uuid().optional().nullable(),
+		workId: z.string().uuid().optional().nullable(),
 
-    // AI provider routing (null = use account default per ADR-006 cascade)
-    aiProviderId: z.string().max(100).nullable().default(null),
-    modelId: z.string().max(100).nullable().default(null),
-    maxSkillContextTokens: z.number().int().min(0).max(20000).default(4000),
+		// AI provider routing (null = use account default per ADR-006 cascade)
+		aiProviderId: z.string().max(100).nullable().default(null),
+		modelId: z.string().max(100).nullable().default(null),
+		maxSkillContextTokens: z.number().int().min(0).max(20000).default(4000),
 
-    // Heartbeat
-    heartbeatCadence: cronOrManual.default('manual'),
-    pauseAfterFailures: z.number().int().min(1).max(20).default(3),
-    idleBehavior: z.enum(['propose', 'noop', 'observe']).default('propose'),
+		// Heartbeat
+		heartbeatCadence: cronOrManual.default('manual'),
+		pauseAfterFailures: z.number().int().min(1).max(20).default(3),
+		idleBehavior: z.enum(['propose', 'noop', 'observe']).default('propose'),
 
-    // Permissions
-    permissions: agentPermissionsSchema.default({}),
+		// Permissions
+		permissions: agentPermissionsSchema.default({}),
 
-    // Budget
-    budget: agentBudgetSchema.optional(),
+		// Budget
+		budget: agentBudgetSchema.optional(),
 
-    // Templates can pre-declare bundled skills
-    skills: z.array(agentSkillBindingSchema).default([]),
+		// Templates can pre-declare bundled skills
+		skills: z.array(agentSkillBindingSchema).default([]),
 
-    // Tenant-scoped agents can have explicit memberships
-    targets: z.array(z.object({
-        type: z.enum(['mission', 'idea', 'work', 'wildcard']),
-        id: z.string().uuid().optional(),
-    })).optional(),
+		// Tenant-scoped agents can have explicit memberships
+		targets: z
+			.array(
+				z.object({
+					type: z.enum(['mission', 'idea', 'work', 'wildcard']),
+					id: z.string().uuid().optional()
+				})
+			)
+			.optional(),
 
-    // Metadata for templates
-    templateMeta: z.object({
-        version: z.string().regex(/^\d+\.\d+\.\d+$/).default('1.0.0'),
-        author: z.string().optional(),
-        tags: z.array(z.string()).default([]),
-        description: z.string().max(500).optional(),
-    }).optional(),
-}).strict()
-  .refine(
-      (m) => scopeAndTargetIdConsistent(m),
-      { message: 'scope must match the populated target id (missionId/ideaId/workId)' }
-  );
+		// Metadata for templates
+		templateMeta: z
+			.object({
+				version: z
+					.string()
+					.regex(/^\d+\.\d+\.\d+$/)
+					.default('1.0.0'),
+				author: z.string().optional(),
+				tags: z.array(z.string()).default([]),
+				description: z.string().max(500).optional()
+			})
+			.optional()
+	})
+	.strict()
+	.refine((m) => scopeAndTargetIdConsistent(m), {
+		message: 'scope must match the populated target id (missionId/ideaId/workId)'
+	});
 
 export type AgentManifest = z.infer<typeof agentManifestSchema>;
 ```
@@ -129,18 +145,18 @@ export type AgentManifest = z.infer<typeof agentManifestSchema>;
 
 Implemented in the `.refine()` clauses + service-layer checks:
 
-| Rule                                                                                              | Where                                       |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `scope = 'tenant'` ⇒ all of `missionId / ideaId / workId` MUST be null.                          | `scopeAndTargetIdConsistent`                |
-| `scope = 'mission'` ⇒ `missionId` MUST be set; others null.                                       | Same.                                       |
-| `scope = 'idea'` ⇒ `ideaId` MUST be set; others null.                                             | Same.                                       |
-| `scope = 'work'` ⇒ `workId` MUST be set; others null.                                             | Same.                                       |
-| `targets` only valid when `scope = 'tenant'`.                                                     | Custom refine.                               |
-| `avatar.mode = 'image'` requires tenant storage plugin enabled.                                   | Service-layer check at write time.           |
-| `avatar.mode = 'icon'` ⇒ `icon` must be in the platform's curated icon set (validated at runtime). | Service-layer check.                         |
-| `heartbeatCadence` cron string must validate via `cron-parser`.                                   | Schema-level via the `cronOrManual` union.   |
-| `permissions.canOpenPullRequests` requires `permissions.canCommitToRepo`.                          | Custom refine.                               |
-| `budget.intervalUnit` in v1 is `month | unlimited` only (per QUESTIONS N6).                       | Already in schema.                           |
+| Rule                                                                                               | Where                                      |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------ |
+| `scope = 'tenant'` ⇒ all of `missionId / ideaId / workId` MUST be null.                            | `scopeAndTargetIdConsistent`               |
+| `scope = 'mission'` ⇒ `missionId` MUST be set; others null.                                        | Same.                                      |
+| `scope = 'idea'` ⇒ `ideaId` MUST be set; others null.                                              | Same.                                      |
+| `scope = 'work'` ⇒ `workId` MUST be set; others null.                                              | Same.                                      |
+| `targets` only valid when `scope = 'tenant'`.                                                      | Custom refine.                             |
+| `avatar.mode = 'image'` requires tenant storage plugin enabled.                                    | Service-layer check at write time.         |
+| `avatar.mode = 'icon'` ⇒ `icon` must be in the platform's curated icon set (validated at runtime). | Service-layer check.                       |
+| `heartbeatCadence` cron string must validate via `cron-parser`.                                    | Schema-level via the `cronOrManual` union. |
+| `permissions.canOpenPullRequests` requires `permissions.canCommitToRepo`.                          | Custom refine.                             |
+| `budget.intervalUnit` in v1 is `month                                                              | unlimited` only (per QUESTIONS N6).        | Already in schema. |
 
 ## 4. Defaults and "use account default" semantics
 
@@ -173,7 +189,7 @@ scope: tenant
 aiProviderId: null
 modelId: null
 
-heartbeatCadence: "0 9 * * MON"
+heartbeatCadence: '0 9 * * MON'
 idleBehavior: propose
 pauseAfterFailures: 3
 
@@ -195,10 +211,10 @@ skills:
       priority: 100
 
 templateMeta:
-    version: "1.0.0"
-    author: "Ever Works"
+    version: '1.0.0'
+    author: 'Ever Works'
     tags: [executive, strategic, weekly]
-    description: "Weekly executive check-in — reviews state, delegates one task to the right Agent."
+    description: 'Weekly executive check-in — reviews state, delegates one task to the right Agent.'
 ```
 
 ## 6. Example — Mission-scoped researcher (user-authored)
@@ -224,7 +240,7 @@ aiProviderId: anthropic
 modelId: claude-sonnet-4-6
 maxSkillContextTokens: 6000
 
-heartbeatCadence: "0 6 * * *"
+heartbeatCadence: '0 6 * * *'
 idleBehavior: propose
 
 permissions:
@@ -255,12 +271,12 @@ skills:
 
 ## 8. Validation lifecycle
 
-| Event                              | Validator              | Failure mode                                                        |
-| ---------------------------------- | ---------------------- | ------------------------------------------------------------------- |
-| User saves via UI editor           | Zod schema             | Save rejected; UI highlights offending fields                       |
-| Template read at create time       | Zod schema             | Template skipped; warning surfaced in admin logs                    |
-| `gitFacade` pulls a Mission repo   | Zod schema             | Agent row marked `error`; visible in UI with "manifest invalid" banner |
-| AI tool `editAgentFile('agent.yml')` | Zod schema + secret scan | Tool returns `validation_failed` error                              |
+| Event                                | Validator                | Failure mode                                                           |
+| ------------------------------------ | ------------------------ | ---------------------------------------------------------------------- |
+| User saves via UI editor             | Zod schema               | Save rejected; UI highlights offending fields                          |
+| Template read at create time         | Zod schema               | Template skipped; warning surfaced in admin logs                       |
+| `gitFacade` pulls a Mission repo     | Zod schema               | Agent row marked `error`; visible in UI with "manifest invalid" banner |
+| AI tool `editAgentFile('agent.yml')` | Zod schema + secret scan | Tool returns `validation_failed` error                                 |
 
 ## 9. References
 

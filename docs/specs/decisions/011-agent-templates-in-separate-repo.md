@@ -45,15 +45,15 @@ The repo is **MIT-licensed** so the templates can be reused widely (including by
 
 ADR-007 keeps the Skill catalog inside the platform monorepo. ADR-011 puts Agent templates in a separate repo. They look superficially similar — why the split?
 
-| Aspect                              | Skills catalog (ADR-007)                                 | Agent templates (this ADR)                                                              |
-| ----------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Unit shape**                      | Single MD file                                            | Folder with 5 files + optional sub-tree of bundled skills                               |
-| **Expected volume at maturity**     | ~1000+ entries                                            | ~100+ entries                                                                            |
-| **Read pattern**                    | Read at every Agent run's prompt-assembly (hot path)      | Read only at template selection time (cold path; once per Agent create)                  |
-| **Versioning per entry**            | Frequent — skills evolve as platform AI capabilities do  | Infrequent — Agent personas are mostly stable                                            |
-| **Atomic deploy with platform code** | Important — Skill body format may evolve with code        | Not important — Agent template format is stable                                          |
-| **Community contribution velocity** | Lower; skills are tighter to platform semantics           | Higher; "I made an Agent for X profession" is broadly approachable                       |
-| **Fork-on-use semantics**           | No — install copies the body, but it's still bound to catalog | Yes — pick once, then user-owned forever; never re-pulled                                 |
+| Aspect                               | Skills catalog (ADR-007)                                      | Agent templates (this ADR)                                              |
+| ------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Unit shape**                       | Single MD file                                                | Folder with 5 files + optional sub-tree of bundled skills               |
+| **Expected volume at maturity**      | ~1000+ entries                                                | ~100+ entries                                                           |
+| **Read pattern**                     | Read at every Agent run's prompt-assembly (hot path)          | Read only at template selection time (cold path; once per Agent create) |
+| **Versioning per entry**             | Frequent — skills evolve as platform AI capabilities do       | Infrequent — Agent personas are mostly stable                           |
+| **Atomic deploy with platform code** | Important — Skill body format may evolve with code            | Not important — Agent template format is stable                         |
+| **Community contribution velocity**  | Lower; skills are tighter to platform semantics               | Higher; "I made an Agent for X profession" is broadly approachable      |
+| **Fork-on-use semantics**            | No — install copies the body, but it's still bound to catalog | Yes — pick once, then user-owned forever; never re-pulled               |
 
 The decisive differences: **Agent templates are cold-path** (read once per Agent create, not per AI call), and **community velocity matters more** for personas than for skills. Putting Agent templates in a separate repo gives community contributors a low-friction surface (PR to a small repo) without exposing them to the platform's build/test apparatus.
 
