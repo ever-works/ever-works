@@ -38,3 +38,9 @@ export {
     AgentMembership,
     type AgentMembershipTargetType,
 } from '../entities/agent-membership.entity';
+// FU-2 — re-export the repositories that the api-side controller
+// reaches for directly (run-history pagination, cancel, skill rollup,
+// budget rollup). Mirrors the same pattern as `AgentFileService` etc.
+export { AgentRunRepository } from '../database/repositories/agent-run.repository';
+export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
+export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';

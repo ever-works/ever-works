@@ -23,6 +23,40 @@ export class AgentRunRepository {
         });
     }
 
+    async countByAgent(agentId: string): Promise<number> {
+        return this.repository.count({ where: { agentId } });
+    }
+
+    /**
+     * FU-2 — cancel a queued / running AgentRun. The (id, userId) guard
+     * ensures cross-user runs return null (controller maps that to 404
+     * per architecture/security §9, no-existence-leak).
+     */
+    async findByIdAndUser(runId: string, userId: string): Promise<AgentRun | null> {
+        return this.repository.findOne({ where: { id: runId, userId } });
+    }
+
+    /**
+     * FU-2 — flip a queued / running run to `cancelled`. Returns the
+     * pre-update status so the controller can detect "already
+     * terminal" (no-op) vs "actually cancelled".
+     */
+    async cancel(
+        runId: string,
+        userId: string,
+    ): Promise<{ found: boolean; previousStatus?: AgentRunStatus }> {
+        const run = await this.repository.findOne({ where: { id: runId, userId } });
+        if (!run) return { found: false };
+        if (run.status !== 'queued' && run.status !== 'running') {
+            return { found: true, previousStatus: run.status };
+        }
+        await this.repository.update(runId, {
+            status: 'cancelled',
+            finishedAt: new Date(),
+        });
+        return { found: true, previousStatus: run.status };
+    }
+
     async createQueued(args: {
         agentId: string;
         userId: string;

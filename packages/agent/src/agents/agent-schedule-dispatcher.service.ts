@@ -178,6 +178,72 @@ export class AgentScheduleDispatcherService {
     }
 
     /**
+     * FU-2 — one-shot heartbeat dispatch for a single Agent. Bypasses
+     * the `nextHeartbeatAt` schedule entirely (the controller's
+     * "Run now" affordance). Still CAS-claims the Agent so two
+     * concurrent run-now calls can't double-fire.
+     *
+     * Returns either the queued AgentRun id (success) or a structured
+     * `{ skipped: true, reason }` so the controller can surface the
+     * outcome to the user instead of swallowing a 500.
+     */
+    async dispatchOne(
+        trigger: AgentHeartbeatTrigger,
+        agentId: string,
+    ): Promise<
+        | { outcome: 'dispatched'; runId: string }
+        | { outcome: 'skipped'; reason: 'already-claimed' | 'agent-missing' | 'inactive' }
+        | { outcome: 'failed'; message: string }
+    > {
+        const agent = await this.agentRepository.findById(agentId);
+        if (!agent) {
+            return { outcome: 'skipped', reason: 'agent-missing' };
+        }
+        if (agent.status !== AgentStatus.ACTIVE && agent.status !== AgentStatus.ERROR) {
+            return { outcome: 'skipped', reason: 'inactive' };
+        }
+
+        let originalNext: Date | null = null;
+        let enqueueSucceeded = false;
+        try {
+            originalNext = await this.agentRepository.tryClaimForRun(agent.id);
+            if (!originalNext) {
+                return { outcome: 'skipped', reason: 'already-claimed' };
+            }
+
+            const run = await this.agentRunRepository.createQueued({
+                agentId: agent.id,
+                userId: agent.userId,
+                triggerKind: 'manual',
+            });
+            const handle = await trigger.enqueue({
+                agentId: agent.id,
+                userId: agent.userId,
+                scheduledFor: originalNext,
+            });
+            enqueueSucceeded = true;
+            return { outcome: 'dispatched', runId: run?.id ?? handle.runId };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`run-now dispatch failed for ${agent.id}: ${message}`);
+            if (originalNext && !enqueueSucceeded) {
+                try {
+                    await this.agentRepository.releaseAfterRun(
+                        agent.id,
+                        originalNext,
+                        'dispatch-failed',
+                    );
+                } catch (releaseErr) {
+                    this.logger.warn(
+                        `Failed to release CAS claim for ${agent.id} after run-now failure: ${releaseErr}`,
+                    );
+                }
+            }
+            return { outcome: 'failed', message };
+        }
+    }
+
+    /**
      * Sweep Agents that are stuck in RUNNING past the stuck-timeout
      * window and reset them to ACTIVE with a fresh nextHeartbeatAt
      * computed from their cadence. The worker may have died mid-run;

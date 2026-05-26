@@ -271,3 +271,33 @@ export class ListAgentsQueryDto {
     @Min(0)
     offset?: number;
 }
+
+/**
+ * FU-2 — pagination DTO for `GET /api/agents/:id/runs`.
+ */
+export class ListAgentRunsQueryDto {
+    @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+
+    @ApiProperty({ required: false, minimum: 0 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    offset?: number;
+}
+
+/**
+ * FU-2 — payload for `POST /api/agents/:id/assign-task`.
+ */
+export class AssignTaskToAgentDto {
+    @ApiProperty()
+    @IsUUID()
+    taskId: string;
+}
+
