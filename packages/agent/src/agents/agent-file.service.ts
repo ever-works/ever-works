@@ -84,17 +84,15 @@ export class AgentFileService {
         this.assertValidName(name);
         const agent = await this.requireOwned(userId, agentId);
 
-        if (this.usesInlineStorage(agent)) {
-            const body = this.readInline(agent, name) ?? '';
-            return { name, body, hash: agent.contentHash ?? '', storage: 'db' };
-        }
-
-        // Git mode — stub for v1 Phase 4. Will land alongside heartbeat
-        // dispatcher in Phase 6 when scope-repo helpers are wired.
-        throw new BadRequestException(
-            `Git-mode file storage for Mission/Work-scoped Agents lands in Phase 6 — ` +
-                `use a tenant-scoped Agent for now, or edit the file directly in the scope's GitHub repo.`,
-        );
+        // FU-14 — DB-inline is now the universal fallback. Git-mode
+        // reads land when (a) the new `GitFacadeService.getRepoDir`
+        // helper resolves for the Agent's scope and (b) the operator
+        // explicitly opts the Agent into git storage. Until then, all
+        // scopes share the inline columns + ETag flow, which means
+        // Mission/Work/Idea-scoped Agents created post-FU-14 stop
+        // throwing "Git-mode lands in Phase 6" on every file read.
+        const body = this.readInline(agent, name) ?? '';
+        return { name, body, hash: agent.contentHash ?? '', storage: 'db' };
     }
 
     async write(args: {
@@ -131,11 +129,12 @@ export class AgentFileService {
             );
         }
 
-        if (!this.usesInlineStorage(agent) && agent.scope !== AgentScope.TENANT) {
-            throw new BadRequestException(
-                `Git-mode file storage for Mission/Work-scoped Agents lands in Phase 6.`,
-            );
-        }
+        // FU-14 — DB-inline is now the universal fallback for writes
+        // too. Git-mode writes will land when `GitFacadeService.getRepoDir`
+        // resolves for the Agent's scope AND the operator opts in;
+        // until then, all scopes share the same path. Eliminates the
+        // throw-by-default behaviour for non-tenant Agents.
+        void AgentScope; // ensure import stays for the typed enum reference below.
 
         // Build the new full row state (only one MD field changes).
         // Review-fix C4: pass `agent` as the base so unchanged file

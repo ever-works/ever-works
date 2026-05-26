@@ -205,11 +205,41 @@ appear in the Agent's per-run tool list (gated additionally on the
 matching `permissions.canCommitToRepo` / `canOpenPullRequests`
 flags).
 
-**Default binding**: **UNBOUND**. The token is intentionally not
-wired in v1 of `apps/api/src/agents/agents.module.ts`. Leaving it
-unbound means the descriptors are simply absent from the model's
-tool list — better than the model seeing a tool that mysteriously
-fails because the platform git provider isn't configured.
+**Default binding** (FU-13 follow-up — post-PR-1019):
+
+```typescript
+{
+    provide: AGENT_GIT_FACADE,
+    inject: [GitFacadeService, AgentRepository],
+    useFactory: (git, agents): AgentGitFacade => ({
+        async commitToRepo({ userId, agentId, workId, message, files, branch }) {
+            const agent = await agents.findById(agentId);
+            const dir = await git.getRepoDir('work', workId, { userId, workId });
+            // … writeFile per `files[]`, then commit + push …
+            const committerName = agent.committerName ?? agent.name;
+            const committerEmail = agent.committerEmail ?? `${agent.slug}@agents.ever.works`;
+            const sha = await git.commit('github', dir, message, {
+                name: committerName,
+                email: committerEmail,
+            });
+            await git.push({ dir }, { providerId: 'github', userId, workId });
+            return { sha, branch: branch ?? 'main', filesChanged: files?.length ?? 0 };
+        },
+        async openPullRequest({ … }) { … },
+    }),
+}
+```
+
+Committer identity falls back to (Agent.committerName ?? Agent.name)
+and (Agent.committerEmail ?? `<slug>@agents.ever.works`) when the
+operator hasn't set either column. The synthesized email domain is a
+deliberate non-deliverable placeholder until the [Email Providers
+surface](../specs/features/email-providers/spec.md) ships — at that
+point operators can assign a real inbox to each Agent.
+
+Auth is delegated to `GitFacadeService.resolvePluginAndToken`, which
+already handles the User's stored OAuth token + plugin-integration
+account chain.
 
 **When to override**: bind once the operator's git provider setup
 is stable. Suggested adapter shape:

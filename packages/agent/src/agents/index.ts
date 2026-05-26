@@ -41,6 +41,10 @@ export {
 // FU-2 — re-export the repositories that the api-side controller
 // reaches for directly (run-history pagination, cancel, skill rollup,
 // budget rollup). Mirrors the same pattern as `AgentFileService` etc.
+export { AgentRepository } from '../database/repositories/agent.repository';
 export { AgentRunRepository } from '../database/repositories/agent-run.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
+// FU-14 — re-export WorkRepository for the AGENT_GIT_FACADE binding
+// (it resolves the Work's git config + owner/repo before the commit).
+export { WorkRepository } from '../database/repositories/work.repository';
