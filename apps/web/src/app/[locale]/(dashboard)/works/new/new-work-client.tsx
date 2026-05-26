@@ -14,6 +14,8 @@ import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+
 interface NewWorkClientProps {
     user: AuthUser;
     providers: ProviderWithConnection[];
@@ -24,6 +26,7 @@ interface NewWorkClientProps {
     proposal?: WorkProposal | null;
     initialMode?: CreationMode | null;
     initialPrompt?: string;
+    initialKind?: InitialWorkKind | null;
 }
 
 export default function NewWorkClient({
@@ -36,6 +39,7 @@ export default function NewWorkClient({
     proposal,
     initialMode = null,
     initialPrompt,
+    initialKind = null,
 }: NewWorkClientProps) {
     const [creationMode, setCreationMode] = useState<CreationMode | null>(
         proposal ? 'ai' : initialMode,
@@ -158,6 +162,7 @@ export default function NewWorkClient({
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
                         initialPrompt={initialPrompt}
+                        initialKind={initialKind ?? undefined}
                     />
                 )}
                 {creationMode === 'manual' && (

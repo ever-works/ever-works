@@ -32,6 +32,8 @@ interface NewWorkPageProps {
 }
 
 const VALID_CREATION_MODES: CreationMode[] = ['ai', 'manual', 'import'];
+const VALID_WORK_KINDS = ['website', 'landing-page', 'blog', 'directory', 'awesome-repo'] as const;
+type InitialWorkKind = (typeof VALID_WORK_KINDS)[number];
 
 export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
     const params = await searchParams;
@@ -42,6 +44,9 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
         : initialPrompt.length > 0
           ? 'ai'
           : null;
+    const initialKind = (VALID_WORK_KINDS as readonly string[]).includes(params.kind ?? '')
+        ? (params.kind as InitialWorkKind)
+        : null;
 
     if (!proposalId && !initialMode) {
         redirect(ROUTES.DASHBOARD_NEW);
@@ -131,6 +136,7 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             proposal={proposal}
             initialMode={initialMode}
             initialPrompt={initialPrompt}
+            initialKind={initialKind}
         />
     );
 }
