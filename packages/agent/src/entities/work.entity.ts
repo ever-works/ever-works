@@ -79,8 +79,14 @@ export class Work {
      * Cached `company_website` from `.works/works.yml`. See `configCache`
      * for the full design — populated by the generator and by the lazy
      * backfill path in `WorkQueryService`.
+     *
+     * `type: 'varchar'` is required for `string | null` unions —
+     * TypeORM's reflect-metadata fallback emits `Object` for the
+     * union, which better-sqlite3 (used in CLI tests) rejects with
+     * `DataTypeNotSupportedError`. Same pattern as `committerName`
+     * / `committerEmail` above. See develop commit f1ad254e.
      */
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     companyWebsite?: string | null;
 
     @Column({ default: false })
