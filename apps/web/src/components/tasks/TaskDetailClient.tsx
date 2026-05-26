@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
 import { postTaskChatAction, transitionTaskAction } from '@/app/actions/tasks';
+import { TaskRecurringSection } from './TaskRecurringSection';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
     backlog: 'bg-surface-secondary text-text-secondary',
@@ -155,6 +156,11 @@ export function TaskDetailClient({
                     </p>
                 )}
             </section>
+
+            {/* Phase 17.8 UI — Recurring template controls. Sits
+                between transitions and conversation so it's
+                discoverable without dominating the page. */}
+            <TaskRecurringSection task={task} />
 
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">

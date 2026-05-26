@@ -53,3 +53,37 @@ export async function postTaskChatAction(taskId: string, body: string): Promise<
 export async function editTaskChatAction(messageId: string, body: string): Promise<TaskChatMessage> {
     return tasksAPI.editChat(messageId, body);
 }
+
+/**
+ * Phase 17.8 UI — promote a Task to a recurring template. The
+ * service-layer validates the RRULE and computes the first
+ * `nextOccurrenceAt`; the dispatcher (`task-recurrence-dispatcher`)
+ * spawns instances on schedule.
+ */
+export async function setTaskRecurringAction(
+    id: string,
+    input: {
+        recurrenceRule: string;
+        recurrenceTimezone?: string;
+        recurrenceEndsAt?: string;
+        recurrenceMaxOccurrences?: number;
+    },
+): Promise<Task> {
+    const task = await tasksAPI.setRecurring(id, input);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}
+
+/**
+ * Phase 17.8 UI — demote a recurring template back to a plain
+ * Task. Existing spawned instances are NOT cascaded — they keep
+ * their `parentRecurringTaskId` pointer and continue to live as
+ * independent rows.
+ */
+export async function clearTaskRecurringAction(id: string): Promise<Task> {
+    const task = await tasksAPI.clearRecurring(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}

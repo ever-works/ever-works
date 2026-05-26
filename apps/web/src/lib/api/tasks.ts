@@ -165,6 +165,44 @@ export const tasksAPI = {
             wrapInData: false,
         });
     },
+
+    /**
+     * Phase 17.8 UI — promote a Task to a recurring template.
+     *
+     * `recurrenceRule` is an RRULE string per RFC 5545 (e.g.
+     * `FREQ=WEEKLY;BYDAY=MO`). `TasksService.setRecurring`
+     * validates the rule + computes the first `nextOccurrenceAt`
+     * from now; rejects rules with no future occurrences.
+     */
+    async setRecurring(
+        id: string,
+        input: {
+            recurrenceRule: string;
+            recurrenceTimezone?: string;
+            recurrenceEndsAt?: string;
+            recurrenceMaxOccurrences?: number;
+        },
+    ) {
+        return serverMutation<Task>({
+            endpoint: `/tasks/${id}/recurring`,
+            data: input as Record<string, unknown>,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Phase 17.8 UI — demote a recurring template back to a plain
+     * Task (clears `isRecurring` + all recurrence columns).
+     */
+    async clearRecurring(id: string) {
+        return serverMutation<Task>({
+            endpoint: `/tasks/${id}/recurring`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
 
 export interface TaskChatMention {
