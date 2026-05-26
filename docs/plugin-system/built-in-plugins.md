@@ -884,3 +884,55 @@ Auto-generates SEO-optimized A vs B comparison pages between work items.
 | `extended_analysis`        | boolean | `false`    | Enable deep-dive 7-section extended analysis                 |
 
 See [Comparisons](/features/comparisons) for the full feature documentation.
+
+### Ever Works Skills
+
+First-party `skills-provider` capability plugin (ADR-012). Sources
+the curated Skills catalog from the [`ever-works/skills`](https://github.com/ever-works/skills)
+GitHub repo (per ADR-014). Ships v1 with a built-in fallback catalog
+(cron-defaults / secret-handling / commit-message-style) so the
+plugin works before the upstream repo is created — the platform
+self-recovers when it appears.
+
+| Field              | Value                            |
+| ------------------ | -------------------------------- |
+| Plugin ID          | `everworks-skills`               |
+| Package            | `@ever-works/everworks-skills-plugin` |
+| License            | MIT (ADR-014 catalog split)      |
+| Configuration Mode | `admin-only`                     |
+| Auto Enable        | Yes (default `skills-provider`)  |
+| Capabilities       | `skills-provider`                |
+
+**Settings:**
+
+| Setting             | Type   | Default              | Description                              |
+| ------------------- | ------ | -------------------- | ---------------------------------------- |
+| `catalogRepo`       | string | `ever-works/skills`  | GitHub owner/repo of the catalog source. |
+| `catalogBranch`     | string | `main`               | Branch to read from.                     |
+| `cacheTtlSeconds`   | number | `3600`               | How long to cache the cloned catalog.    |
+
+See [Skills feature](/features/skills) for the platform-side
+data model + resolver + injection pipeline.
+
+### Ever Works Task Tracker
+
+First-party `task-tracker` capability plugin (ADR-013). Thin shim
+over the platform's own DB-backed Tasks family — when this plugin
+is enabled, `TasksFacadeService` routes every Task operation
+through it. Community plugins (Linear / Jira / GitHub Issues) drop
+in by implementing the same `ITaskTrackerPlugin` contract.
+
+| Field              | Value                                  |
+| ------------------ | -------------------------------------- |
+| Plugin ID          | `everworks-task-tracker`               |
+| Package            | `@ever-works/everworks-task-tracker-plugin` |
+| License            | MIT (ADR-014 catalog split)            |
+| Configuration Mode | `admin-only`                           |
+| Auto Enable        | Yes (default `task-tracker`)           |
+| Capabilities       | `task-tracker`                         |
+
+**Settings:** none — the plugin binds to the platform's DB-backed
+service at boot via a runtime `setPlatformTaskBackend()` delegate.
+
+See [Task tracking feature](/features/task-tracking) for the full
+data model + state machine + chat thread + recurrence pipeline.
