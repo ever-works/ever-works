@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 25
-- **Last tick at**: 2026-05-26 (tick 25 — Phase 20 (docs) complete: docs/plugin-system/built-in-plugins.md extended with everworks-skills + everworks-task-tracker sections + 3 new API reference pages (docs/api/agents.md, skills.md, tasks.md) + top-level IMPLEMENTATION-SUMMARY.md as the PR description scaffold. pnpm format / lint / type-check / test + PR open intentionally left to the operator per the autonomous-loop rules.)
-- **In progress now**: 🏁 **All 20 phases shipped end-to-end.** Operator picks up from here for QA + PR.
+- **Last tick #**: 26
+- **Last tick at**: 2026-05-26 (tick 26 — Phase 9.4 follow-up: `/skills/[id]` detail page with sectioned scroll (header / body editor / bindings panel / danger zone) + 800ms autosave on the body textarea (Tiptap upgrade still deferred) + add/remove bindings (priority + targetType selector) + delete-with-confirm + Installed cards on /skills now link through to detail.)
+- **In progress now**: Working through deferred sub-items post-Phase-20. All 20 main phases done; remaining unticked items below are post-merge polish that the loop can knock out incrementally.
 
 ---
 
@@ -151,7 +151,7 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 - [x] **9.1** `POST /skills/install`, `POST /skills`, `PATCH /skills/:id`, `DELETE /skills/:id` via `SkillsService` (CRUD + install-from-catalog through `SkillsFacadeService.getEntry`). 64 KB cap + secret-scan on every body write; slug uniqueness in (ownerType, ownerId). ✓ Tick 13
 - [x] **9.2** Bindings CRUD: `GET /skills/:id/bindings`, `POST /skills/:id/bindings` (both on the main controller), `DELETE /skill-bindings/:id` on a separate `SkillBindingsController` per spec §4. ✓ Tick 13
 - [x] **9.3** `/skills` page rewritten as a real 3-section client (Installed / Available / Custom) with section toggle. Server-fetches the user's installed Skills + the catalog union in parallel; defensive `.catch()` so a flaky catalog provider still renders the page. Catalog-card Install button calls `installCatalogSkillAction` server action. ✓ Tick 13
-- [ ] **9.4** `/skills/[id]` Body + Bindings tabs — page route + server actions exist; full Tiptap-body + bindings UI deferred to a later sub-tick once the shared KbEditor toolbar is extracted.
+- [x] **9.4** `/skills/[id]` detail page shipped at `apps/web/src/app/[locale]/(dashboard)/skills/[id]/page.tsx` + `SkillDetailClient.tsx`. Sectioned scroll instead of tabs (page is short enough): header / body editor (800ms autosave textarea — Tiptap upgrade still deferred until shared KbEditor toolbar extraction) / Bindings panel (priority + targetType picker + add/remove with optimistic update) / danger zone (delete-with-confirm). Installed cards on `/skills` now link through. ✓ Tick 26
 - [x] **9.5** Service unit tests at `packages/agent/src/skills/__tests__/skills.service.spec.ts` (~13 assertions: empty-title rejection, secret rejection, 64 KB cap, slug conflict, contentHash recomputation on body change, install conflict, install activity emission, binding tenant/non-tenant target validation, cross-user 404 on binding delete). ✓ Tick 13
 
 ### Phase 10 — Skill injection into AI calls

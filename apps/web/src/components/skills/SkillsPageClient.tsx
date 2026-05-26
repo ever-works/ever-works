@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
 import { installCatalogSkillAction } from '@/app/actions/skills';
 
@@ -75,9 +77,10 @@ function InstalledList({ installed }: { installed: Skill[] }) {
     return (
         <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
             {installed.map((s) => (
-                <div
+                <Link
                     key={s.id}
-                    className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5"
+                    href={ROUTES.DASHBOARD_SKILL(s.id)}
+                    className="block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
                 >
                     <div className="flex items-start justify-between gap-2">
                         <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
@@ -95,7 +98,7 @@ function InstalledList({ installed }: { installed: Skill[] }) {
                         <span>v{s.version}</span>
                         {s.sourceCatalogSlug && <span>· from catalog</span>}
                     </div>
-                </div>
+                </Link>
             ))}
         </div>
     );
