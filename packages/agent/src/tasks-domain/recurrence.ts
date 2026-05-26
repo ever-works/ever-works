@@ -13,33 +13,35 @@ import { TaskStatus, type Task } from '../entities/task.entity';
  * RRULE strings follow RFC 5545 (e.g. `FREQ=DAILY;BYHOUR=9`).
  */
 
-export function validateRecurrenceRule(rule: string): { valid: true } | { valid: false; reason: string } {
-	if (!rule || typeof rule !== 'string') {
-		return { valid: false, reason: 'recurrenceRule is required when isRecurring=true.' };
-	}
-	if (rule.length > 200) {
-		return { valid: false, reason: 'recurrenceRule exceeds 200 characters.' };
-	}
-	try {
-		const parsed = RRule.fromString(rule);
-		if (!parsed.options.freq && parsed.options.freq !== 0) {
-			return { valid: false, reason: 'RRULE missing FREQ.' };
-		}
-		return { valid: true };
-	} catch (err) {
-		return {
-			valid: false,
-			reason: `RRULE parse error: ${err instanceof Error ? err.message : String(err)}`,
-		};
-	}
+export function validateRecurrenceRule(
+    rule: string,
+): { valid: true } | { valid: false; reason: string } {
+    if (!rule || typeof rule !== 'string') {
+        return { valid: false, reason: 'recurrenceRule is required when isRecurring=true.' };
+    }
+    if (rule.length > 200) {
+        return { valid: false, reason: 'recurrenceRule exceeds 200 characters.' };
+    }
+    try {
+        const parsed = RRule.fromString(rule);
+        if (!parsed.options.freq && parsed.options.freq !== 0) {
+            return { valid: false, reason: 'RRULE missing FREQ.' };
+        }
+        return { valid: true };
+    } catch (err) {
+        return {
+            valid: false,
+            reason: `RRULE parse error: ${err instanceof Error ? err.message : String(err)}`,
+        };
+    }
 }
 
 export interface NextOccurrenceContext {
-	rule: string;
-	from: Date;
-	recurrenceEndsAt?: Date | null;
-	recurrenceMaxOccurrences?: number | null;
-	recurrenceOccurredCount?: number;
+    rule: string;
+    from: Date;
+    recurrenceEndsAt?: Date | null;
+    recurrenceMaxOccurrences?: number | null;
+    recurrenceOccurredCount?: number;
 }
 
 /**
@@ -48,24 +50,24 @@ export interface NextOccurrenceContext {
  * null when the recurrence is exhausted (no more fires).
  */
 export function computeNextOccurrence(ctx: NextOccurrenceContext): Date | null {
-	if (
-		ctx.recurrenceMaxOccurrences != null &&
-		(ctx.recurrenceOccurredCount ?? 0) >= ctx.recurrenceMaxOccurrences
-	) {
-		return null;
-	}
-	let parsed: RRule;
-	try {
-		parsed = RRule.fromString(ctx.rule);
-	} catch {
-		return null;
-	}
-	const next = parsed.after(ctx.from, false);
-	if (!next) return null;
-	if (ctx.recurrenceEndsAt && next.getTime() > ctx.recurrenceEndsAt.getTime()) {
-		return null;
-	}
-	return next;
+    if (
+        ctx.recurrenceMaxOccurrences != null &&
+        (ctx.recurrenceOccurredCount ?? 0) >= ctx.recurrenceMaxOccurrences
+    ) {
+        return null;
+    }
+    let parsed: RRule;
+    try {
+        parsed = RRule.fromString(ctx.rule);
+    } catch {
+        return null;
+    }
+    const next = parsed.after(ctx.from, false);
+    if (!next) return null;
+    if (ctx.recurrenceEndsAt && next.getTime() > ctx.recurrenceEndsAt.getTime()) {
+        return null;
+    }
+    return next;
 }
 
 /**
@@ -84,32 +86,32 @@ export function computeNextOccurrence(ctx: NextOccurrenceContext): Date | null {
  *     callers can re-link if needed)
  */
 export function cloneRecurringTaskAsInstance(template: Task): Partial<Task> {
-	return {
-		userId: template.userId,
-		title: template.title,
-		description: template.description ?? null,
-		// Review-fix I18: drop the `as any` cast — TaskStatus.BACKLOG is in scope.
-		status: TaskStatus.BACKLOG,
-		previousStatus: null,
-		priority: template.priority,
-		labels: template.labels ?? null,
-		missionId: template.missionId ?? null,
-		ideaId: template.ideaId ?? null,
-		workId: template.workId ?? null,
-		parentTaskId: null,
-		createdByType: template.createdByType,
-		createdById: template.createdById,
-		requireAllApprovers: template.requireAllApprovers,
-		startedAt: null,
-		completedAt: null,
-		// Recurring columns — the instance is not itself a template.
-		isRecurring: false,
-		recurrenceRule: null,
-		recurrenceTimezone: null,
-		nextOccurrenceAt: null,
-		recurrenceEndsAt: null,
-		recurrenceMaxOccurrences: null,
-		recurrenceOccurredCount: 0,
-		parentRecurringTaskId: template.id,
-	};
+    return {
+        userId: template.userId,
+        title: template.title,
+        description: template.description ?? null,
+        // Review-fix I18: drop the `as any` cast — TaskStatus.BACKLOG is in scope.
+        status: TaskStatus.BACKLOG,
+        previousStatus: null,
+        priority: template.priority,
+        labels: template.labels ?? null,
+        missionId: template.missionId ?? null,
+        ideaId: template.ideaId ?? null,
+        workId: template.workId ?? null,
+        parentTaskId: null,
+        createdByType: template.createdByType,
+        createdById: template.createdById,
+        requireAllApprovers: template.requireAllApprovers,
+        startedAt: null,
+        completedAt: null,
+        // Recurring columns — the instance is not itself a template.
+        isRecurring: false,
+        recurrenceRule: null,
+        recurrenceTimezone: null,
+        nextOccurrenceAt: null,
+        recurrenceEndsAt: null,
+        recurrenceMaxOccurrences: null,
+        recurrenceOccurredCount: 0,
+        parentRecurringTaskId: template.id,
+    };
 }

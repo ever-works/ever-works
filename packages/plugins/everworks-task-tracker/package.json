@@ -42,8 +42,12 @@
 			"id": "everworks-task-tracker",
 			"name": "Ever Works Task Tracker",
 			"category": "utility",
-			"capabilities": ["task-tracker"],
-			"defaultForCapabilities": ["task-tracker"]
+			"capabilities": [
+				"task-tracker"
+			],
+			"defaultForCapabilities": [
+				"task-tracker"
+			]
 		}
 	}
 }

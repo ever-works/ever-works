@@ -40,14 +40,13 @@ export const agentHeartbeatDispatcherTask = schedules.task({
 
             const trigger: AgentHeartbeatTrigger = {
                 async enqueue(payload) {
-                    const handle = await tasks.trigger<typeof import('./agent-heartbeat.task').agentHeartbeatTask>(
-                        'agent-heartbeat',
-                        {
-                            agentId: payload.agentId,
-                            userId: payload.userId,
-                            scheduledFor: payload.scheduledFor.toISOString(),
-                        } satisfies AgentHeartbeatPayload,
-                    );
+                    const handle = await tasks.trigger<
+                        typeof import('./agent-heartbeat.task').agentHeartbeatTask
+                    >('agent-heartbeat', {
+                        agentId: payload.agentId,
+                        userId: payload.userId,
+                        scheduledFor: payload.scheduledFor.toISOString(),
+                    } satisfies AgentHeartbeatPayload);
                     return { runId: handle.id };
                 },
             };

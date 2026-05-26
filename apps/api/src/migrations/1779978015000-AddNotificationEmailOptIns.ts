@@ -9,36 +9,36 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * fire regardless. Idempotent: gates on `hasColumn`.
  */
 export class AddNotificationEmailOptIns1779978015000 implements MigrationInterface {
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		if (!(await queryRunner.hasColumn('users', 'emailAgentAlerts'))) {
-			await queryRunner.addColumn(
-				'users',
-				new TableColumn({
-					name: 'emailAgentAlerts',
-					type: 'boolean',
-					isNullable: false,
-					default: false,
-				}),
-			);
-		}
-		if (!(await queryRunner.hasColumn('users', 'emailTaskNotifications'))) {
-			await queryRunner.addColumn(
-				'users',
-				new TableColumn({
-					name: 'emailTaskNotifications',
-					type: 'boolean',
-					isNullable: false,
-					default: false,
-				}),
-			);
-		}
-	}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        if (!(await queryRunner.hasColumn('users', 'emailAgentAlerts'))) {
+            await queryRunner.addColumn(
+                'users',
+                new TableColumn({
+                    name: 'emailAgentAlerts',
+                    type: 'boolean',
+                    isNullable: false,
+                    default: false,
+                }),
+            );
+        }
+        if (!(await queryRunner.hasColumn('users', 'emailTaskNotifications'))) {
+            await queryRunner.addColumn(
+                'users',
+                new TableColumn({
+                    name: 'emailTaskNotifications',
+                    type: 'boolean',
+                    isNullable: false,
+                    default: false,
+                }),
+            );
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		for (const col of ['emailTaskNotifications', 'emailAgentAlerts']) {
-			if (await queryRunner.hasColumn('users', col)) {
-				await queryRunner.dropColumn('users', col);
-			}
-		}
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        for (const col of ['emailTaskNotifications', 'emailAgentAlerts']) {
+            if (await queryRunner.hasColumn('users', col)) {
+                await queryRunner.dropColumn('users', col);
+            }
+        }
+    }
 }

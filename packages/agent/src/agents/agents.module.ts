@@ -31,40 +31,40 @@ import { SkillsModule } from '../skills/skills.module';
  * later phases (4 / 6 / 7).
  */
 @Module({
-	imports: [
-		TypeOrmModule.forFeature([Agent, AgentRun, AgentRunLog, AgentBudget, AgentMembership]),
-		ActivityLogModule,
-		// Phase 10 — AgentRunService resolves active skills via
-		// SkillBindingRepository before assembling the prompt.
-		SkillsModule,
-	],
-	providers: [
-		AgentRepository,
-		AgentRunRepository,
-		AgentRunLogRepository,
-		AgentBudgetRepository,
-		AgentMembershipRepository,
-		AgentsService,
-		AgentFileService,
-		AgentScheduleDispatcherService,
-		AgentExportService,
-		PromptAssemblerService,
-		AgentRunService,
-		AgentToolService,
-	],
-	exports: [
-		AgentRepository,
-		AgentRunRepository,
-		AgentRunLogRepository,
-		AgentBudgetRepository,
-		AgentMembershipRepository,
-		AgentsService,
-		AgentFileService,
-		AgentScheduleDispatcherService,
-		AgentExportService,
-		PromptAssemblerService,
-		AgentRunService,
-		AgentToolService,
-	],
+    imports: [
+        TypeOrmModule.forFeature([Agent, AgentRun, AgentRunLog, AgentBudget, AgentMembership]),
+        ActivityLogModule,
+        // Phase 10 — AgentRunService resolves active skills via
+        // SkillBindingRepository before assembling the prompt.
+        SkillsModule,
+    ],
+    providers: [
+        AgentRepository,
+        AgentRunRepository,
+        AgentRunLogRepository,
+        AgentBudgetRepository,
+        AgentMembershipRepository,
+        AgentsService,
+        AgentFileService,
+        AgentScheduleDispatcherService,
+        AgentExportService,
+        PromptAssemblerService,
+        AgentRunService,
+        AgentToolService,
+    ],
+    exports: [
+        AgentRepository,
+        AgentRunRepository,
+        AgentRunLogRepository,
+        AgentBudgetRepository,
+        AgentMembershipRepository,
+        AgentsService,
+        AgentFileService,
+        AgentScheduleDispatcherService,
+        AgentExportService,
+        PromptAssemblerService,
+        AgentRunService,
+        AgentToolService,
+    ],
 })
 export class AgentsModule {}

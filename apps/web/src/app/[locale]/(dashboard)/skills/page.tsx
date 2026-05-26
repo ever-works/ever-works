@@ -47,10 +47,7 @@ export default async function SkillsPage() {
                     </p>
                 </div>
             </div>
-            <SkillsPageClient
-                installed={installed.data ?? []}
-                catalog={catalog.entries ?? []}
-            />
+            <SkillsPageClient installed={installed.data ?? []} catalog={catalog.entries ?? []} />
         </div>
     );
 }

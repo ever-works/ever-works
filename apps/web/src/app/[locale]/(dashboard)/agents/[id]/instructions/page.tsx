@@ -27,7 +27,13 @@ export default async function AgentInstructionsPage({
             agentsAPI
                 .readFile(id, name)
                 .catch(
-                    () => ({ name, body: '', hash: '', storage: 'db' as const }) satisfies AgentFileBody,
+                    () =>
+                        ({
+                            name,
+                            body: '',
+                            hash: '',
+                            storage: 'db' as const,
+                        }) satisfies AgentFileBody,
                 ),
         ),
     );

@@ -957,7 +957,14 @@ describe('GitHubSyncService', () => {
                 '/tmp/clone/skills/cron.json': { __kind: 'skill', slug: 'cron' },
                 '/tmp/clone/tasks/T-1.json': { __kind: 'task', slug: 'T-1' },
             };
-            fsMocks.existsSync.mockImplementation((p: any) => p in fileTree || p === '/tmp/clone/agents' || p === '/tmp/clone/skills' || p === '/tmp/clone/tasks' || p === '/tmp/clone/works');
+            fsMocks.existsSync.mockImplementation(
+                (p: any) =>
+                    p in fileTree ||
+                    p === '/tmp/clone/agents' ||
+                    p === '/tmp/clone/skills' ||
+                    p === '/tmp/clone/tasks' ||
+                    p === '/tmp/clone/works',
+            );
             fsMocks.readFileSync.mockImplementation((p: any) =>
                 p in fileTree ? JSON.stringify(fileTree[p]) : '',
             );
@@ -1005,7 +1012,9 @@ describe('GitHubSyncService', () => {
                 '/tmp/clone/plugins/user-plugins.json': [],
                 '/tmp/clone/agents/ceo.json': { __kind: 'agent', identity: { slug: 'ceo' } },
             };
-            fsMocks.existsSync.mockImplementation((p: any) => p in fileTree || p === '/tmp/clone/agents');
+            fsMocks.existsSync.mockImplementation(
+                (p: any) => p in fileTree || p === '/tmp/clone/agents',
+            );
             fsMocks.readFileSync.mockImplementation((p: any) =>
                 p in fileTree ? JSON.stringify(fileTree[p]) : '',
             );

@@ -137,7 +137,9 @@ export function DataManagement() {
                             </label>
                             <label
                                 className={`inline-flex items-center gap-2.5 select-none group ml-8 ${
-                                    includeTasks ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                                    includeTasks
+                                        ? 'cursor-pointer'
+                                        : 'cursor-not-allowed opacity-50'
                                 }`}
                             >
                                 <input
@@ -153,7 +155,8 @@ export function DataManagement() {
                             </label>
                             {includeTaskChat && includeTasks && (
                                 <p className="text-[11px] text-text-muted dark:text-text-muted-dark pl-8 leading-relaxed">
-                                    Chat threads bloat the payload — only enable when you actually need them.
+                                    Chat threads bloat the payload — only enable when you actually
+                                    need them.
                                 </p>
                             )}
                         </fieldset>

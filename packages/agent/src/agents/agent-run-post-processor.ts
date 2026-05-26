@@ -13,28 +13,28 @@
  */
 
 export interface AgentChatBackPostInput {
-	userId: string;
-	taskId: string;
-	/** Agent posting the reply — used as the chat-row author. */
-	agentId: string;
-	body: string;
+    userId: string;
+    taskId: string;
+    /** Agent posting the reply — used as the chat-row author. */
+    agentId: string;
+    body: string;
 }
 
 export interface AgentRunChatBackPoster {
-	postReply(input: AgentChatBackPostInput): Promise<{ messageId: string }>;
+    postReply(input: AgentChatBackPostInput): Promise<{ messageId: string }>;
 }
 
 export interface AgentTaskFinishInput {
-	userId: string;
-	taskId: string;
-	/** Target status — typically `done` on success, `blocked` on need-input. */
-	to: 'done' | 'in_review' | 'blocked' | 'cancelled';
-	/** Forces past approver gate (not blocker) — security spec §6. */
-	force?: boolean;
+    userId: string;
+    taskId: string;
+    /** Target status — typically `done` on success, `blocked` on need-input. */
+    to: 'done' | 'in_review' | 'blocked' | 'cancelled';
+    /** Forces past approver gate (not blocker) — security spec §6. */
+    force?: boolean;
 }
 
 export interface AgentRunTaskFinisher {
-	finishTask(input: AgentTaskFinishInput): Promise<{ status: string }>;
+    finishTask(input: AgentTaskFinishInput): Promise<{ status: string }>;
 }
 
 export const AGENT_RUN_CHAT_BACK_POSTER = 'AGENT_RUN_CHAT_BACK_POSTER' as const;
@@ -55,10 +55,10 @@ export const AGENT_RUN_TASK_FINISHER = 'AGENT_RUN_TASK_FINISHER' as const;
  * completed and side-effects are skipped.
  */
 export interface AgentRunOutcome {
-	summary?: string | null;
-	replyBody?: string | null;
-	taskFinishStatus?: AgentTaskFinishInput['to'] | null;
-	force?: boolean;
-	errored?: boolean;
-	errorMessage?: string;
+    summary?: string | null;
+    replyBody?: string | null;
+    taskFinishStatus?: AgentTaskFinishInput['to'] | null;
+    force?: boolean;
+    errored?: boolean;
+    errorMessage?: string;
 }

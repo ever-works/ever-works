@@ -13,7 +13,7 @@ import { SkillBindingsController } from './skill-bindings.controller';
  *   - SkillBindingsController  — /api/skill-bindings/:id (delete)
  */
 @Module({
-	imports: [AgentSkillsModule, FacadesModule],
-	controllers: [SkillsController, SkillBindingsController],
+    imports: [AgentSkillsModule, FacadesModule],
+    controllers: [SkillsController, SkillBindingsController],
 })
 export class SkillsModule {}

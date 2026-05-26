@@ -33,10 +33,7 @@ export function SkillsPageClient({
     const [section, setSection] = useState<Section>('installed');
 
     const installedSlugs = useMemo(() => new Set(installed.map((s) => s.slug)), [installed]);
-    const customSkills = useMemo(
-        () => installed.filter((s) => !s.sourceCatalogSlug),
-        [installed],
-    );
+    const customSkills = useMemo(() => installed.filter((s) => !s.sourceCatalogSlug), [installed]);
 
     return (
         <div className="space-y-4">
@@ -242,11 +239,16 @@ function CustomSection({
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    Hand-authored Skills you wrote yourself — not installed from a plugin
-                    catalog. {skills.length} {skills.length === 1 ? 'Skill' : 'Skills'}.
+                    Hand-authored Skills you wrote yourself — not installed from a plugin catalog.{' '}
+                    {skills.length} {skills.length === 1 ? 'Skill' : 'Skills'}.
                 </p>
                 {!open && (
-                    <Button size="sm" variant="primary" onClick={() => setOpen(true)} className="gap-1.5">
+                    <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => setOpen(true)}
+                        className="gap-1.5"
+                    >
                         <Plus className="w-3.5 h-3.5" />
                         New Skill
                     </Button>

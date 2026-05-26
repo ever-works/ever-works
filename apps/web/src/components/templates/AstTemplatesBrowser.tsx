@@ -48,9 +48,9 @@ export function AstTemplatesBrowser({
         return (
             <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
                 <p>
-                    No templates available for {entity}s yet. The unified Workshop Templates
-                    catalog (ADR-010) is still on a separate branch — once it merges, this page
-                    will populate automatically.
+                    No templates available for {entity}s yet. The unified Workshop Templates catalog
+                    (ADR-010) is still on a separate branch — once it merges, this page will
+                    populate automatically.
                 </p>
             </div>
         );
@@ -105,13 +105,31 @@ function TemplateCard({
     entry: AstTemplateEntry;
     entity: AstTemplateEntityType;
 }) {
-    const Icon = pickIcon(entry.iconName);
+    // Post-rebase lint fix: `react-hooks/no-component-creation-during-render`
+    // doesn't like capturing a component constructor into a local var via
+    // a switch and then rendering it as JSX. Render the icon inline via
+    // a small switch expression instead.
     const newHref = newRouteFor(entity, entry.slug);
+    const iconClass = 'w-4 h-4 text-text-secondary dark:text-text-secondary-dark';
+    const iconNode = (() => {
+        switch (entry.iconName) {
+            case 'ClipboardList':
+                return <ClipboardList className={iconClass} />;
+            case 'Code2':
+                return <Code2 className={iconClass} />;
+            case 'BookOpen':
+                return <BookOpen className={iconClass} />;
+            case 'Sparkles':
+                return <Sparkles className={iconClass} />;
+            default:
+                return <FileText className={iconClass} />;
+        }
+    })();
     return (
         <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 flex flex-col h-full">
             <div className="flex items-start gap-3">
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark border border-border/40 flex items-center justify-center">
-                    <Icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
+                    {iconNode}
                 </div>
                 <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
@@ -155,21 +173,6 @@ function TemplateCard({
             </div>
         </div>
     );
-}
-
-function pickIcon(name?: string) {
-    switch (name) {
-        case 'ClipboardList':
-            return ClipboardList;
-        case 'Code2':
-            return Code2;
-        case 'BookOpen':
-            return BookOpen;
-        case 'Sparkles':
-            return Sparkles;
-        default:
-            return FileText;
-    }
 }
 
 function newRouteFor(entity: AstTemplateEntityType, slug: string): string | null {

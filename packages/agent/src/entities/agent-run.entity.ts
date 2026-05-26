@@ -37,49 +37,49 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 @Index('idx_agent_runs_task', ['taskId'])
 @Index('idx_agent_runs_chat_message', ['chatMessageId'])
 export class AgentRun {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	agentId: string;
+    @Column('uuid')
+    agentId: string;
 
-	@Column('uuid')
-	userId: string;
+    @Column('uuid')
+    userId: string;
 
-	@Column({ length: 16 })
-	triggerKind: AgentRunTriggerKind;
+    @Column({ length: 16 })
+    triggerKind: AgentRunTriggerKind;
 
-	@Column({ length: 16 })
-	status: AgentRunStatus;
+    @Column({ length: 16 })
+    status: AgentRunStatus;
 
-	/** Trigger.dev run id; used to call `runs.cancel(...)` on user-initiated cancel. */
-	@Column({ length: 64, nullable: true })
-	triggerRunId?: string | null;
+    /** Trigger.dev run id; used to call `runs.cancel(...)` on user-initiated cancel. */
+    @Column({ length: 64, nullable: true })
+    triggerRunId?: string | null;
 
-	@Column({ type: 'timestamp', nullable: true })
-	startedAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    startedAt?: Date | null;
 
-	@Column({ type: 'timestamp', nullable: true })
-	finishedAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    finishedAt?: Date | null;
 
-	@Column({ type: 'int', nullable: true })
-	durationMs?: number | null;
+    @Column({ type: 'int', nullable: true })
+    durationMs?: number | null;
 
-	@Column({ type: 'text', nullable: true })
-	errorMessage?: string | null;
+    @Column({ type: 'text', nullable: true })
+    errorMessage?: string | null;
 
-	/** Free-text summary produced by the AI; surfaced in the dashboard. */
-	@Column({ type: 'text', nullable: true })
-	summary?: string | null;
+    /** Free-text summary produced by the AI; surfaced in the dashboard. */
+    @Column({ type: 'text', nullable: true })
+    summary?: string | null;
 
-	/** Populated only when `triggerKind = 'task'`. FK to `tasks.id` (added by Tasks migration). */
-	@Column('uuid', { nullable: true })
-	taskId?: string | null;
+    /** Populated only when `triggerKind = 'task'`. FK to `tasks.id` (added by Tasks migration). */
+    @Column('uuid', { nullable: true })
+    taskId?: string | null;
 
-	/** Populated only when `triggerKind = 'chat'`. FK to `task_chat_messages.id`. */
-	@Column('uuid', { nullable: true })
-	chatMessageId?: string | null;
+    /** Populated only when `triggerKind = 'chat'`. FK to `task_chat_messages.id`. */
+    @Column('uuid', { nullable: true })
+    chatMessageId?: string | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

@@ -10,7 +10,7 @@ import type {
 	JsonSchema,
 	PluginCategory,
 	PluginContext,
-	PluginSettings,
+	PluginSettings
 } from '@ever-works/plugin';
 
 /**
@@ -42,7 +42,7 @@ export interface PlatformTaskBackend {
 	deleteTask(id: string): Promise<void>;
 	listChat(
 		taskId: string,
-		opts: { limit?: number; cursor?: string },
+		opts: { limit?: number; cursor?: string }
 	): Promise<{ messages: ExternalChatDto[]; nextCursor?: string }>;
 	postChat(input: ExternalChatPostInput): Promise<ExternalChatDto>;
 }
@@ -70,7 +70,7 @@ export class EverWorksTaskTrackerPlugin implements IPlugin, ITaskTrackerPlugin {
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
-		properties: {},
+		properties: {}
 	};
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'admin-only';
@@ -122,7 +122,7 @@ export class EverWorksTaskTrackerPlugin implements IPlugin, ITaskTrackerPlugin {
 
 	async listChat(
 		taskId: string,
-		opts: { limit?: number; cursor?: string },
+		opts: { limit?: number; cursor?: string }
 	): Promise<{ messages: ExternalChatDto[]; nextCursor?: string }> {
 		if (!installedBackend) return NOOP_CHAT;
 		return installedBackend.listChat(taskId, opts);

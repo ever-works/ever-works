@@ -16,64 +16,64 @@
  */
 
 export interface AgentSearchWebInput {
-	userId: string;
-	agentId: string;
-	workId?: string;
-	taskId?: string;
-	query: string;
-	maxResults?: number;
-	includeDomains?: string[];
-	excludeDomains?: string[];
+    userId: string;
+    agentId: string;
+    workId?: string;
+    taskId?: string;
+    query: string;
+    maxResults?: number;
+    includeDomains?: string[];
+    excludeDomains?: string[];
 }
 
 export interface AgentSearchWebResult {
-	results: Array<{
-		title: string;
-		url: string;
-		snippet?: string | null;
-		publishedDate?: string | null;
-		score?: number;
-	}>;
+    results: Array<{
+        title: string;
+        url: string;
+        snippet?: string | null;
+        publishedDate?: string | null;
+        score?: number;
+    }>;
 }
 
 export interface AgentScreenshotInput {
-	userId: string;
-	agentId: string;
-	workId?: string;
-	taskId?: string;
-	url: string;
-	viewportWidth?: number;
-	viewportHeight?: number;
-	fullPage?: boolean;
+    userId: string;
+    agentId: string;
+    workId?: string;
+    taskId?: string;
+    url: string;
+    viewportWidth?: number;
+    viewportHeight?: number;
+    fullPage?: boolean;
 }
 
 export interface AgentScreenshotResult {
-	success: boolean;
-	imageUrl?: string | null;
-	cacheUrl?: string | null;
+    success: boolean;
+    imageUrl?: string | null;
+    cacheUrl?: string | null;
 }
 
 export interface AgentExtractContentInput {
-	userId: string;
-	agentId: string;
-	workId?: string;
-	taskId?: string;
-	url: string;
-	/** Cap on raw content length returned to the model (defaults to 50 KB). */
-	maxChars?: number;
+    userId: string;
+    agentId: string;
+    workId?: string;
+    taskId?: string;
+    url: string;
+    /** Cap on raw content length returned to the model (defaults to 50 KB). */
+    maxChars?: number;
 }
 
 export interface AgentExtractContentResult {
-	url: string;
-	content: string;
-	contentLength: number;
-	providerId?: string | null;
+    url: string;
+    content: string;
+    contentLength: number;
+    providerId?: string | null;
 }
 
 export interface AgentPluginToolsFacade {
-	searchWeb(input: AgentSearchWebInput): Promise<AgentSearchWebResult>;
-	screenshot(input: AgentScreenshotInput): Promise<AgentScreenshotResult>;
-	extractContent(input: AgentExtractContentInput): Promise<AgentExtractContentResult>;
+    searchWeb(input: AgentSearchWebInput): Promise<AgentSearchWebResult>;
+    screenshot(input: AgentScreenshotInput): Promise<AgentScreenshotResult>;
+    extractContent(input: AgentExtractContentInput): Promise<AgentExtractContentResult>;
 }
 
 export const AGENT_PLUGIN_TOOLS_FACADE = 'AGENT_PLUGIN_TOOLS_FACADE' as const;

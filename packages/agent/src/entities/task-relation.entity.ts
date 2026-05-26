@@ -1,11 +1,11 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task } from './task.entity';
 
@@ -19,22 +19,22 @@ export type TaskRelationKind = 'related' | 'duplicates' | 'follow-up';
 @Index('uq_task_relation', ['taskId', 'relatedTaskId'], { unique: true })
 @Index('idx_task_related', ['relatedTaskId'])
 export class TaskRelation {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	taskId: string;
+    @Column({ type: 'uuid' })
+    taskId: string;
 
-	@ManyToOne(() => Task, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'taskId' })
-	task?: Task;
+    @ManyToOne(() => Task, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'taskId' })
+    task?: Task;
 
-	@Column({ type: 'uuid' })
-	relatedTaskId: string;
+    @Column({ type: 'uuid' })
+    relatedTaskId: string;
 
-	@Column({ length: 16 })
-	kind: TaskRelationKind;
+    @Column({ length: 16 })
+    kind: TaskRelationKind;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

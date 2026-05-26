@@ -17,12 +17,7 @@ export type AgentStatus = 'draft' | 'active' | 'paused' | 'running' | 'error' | 
 export type AgentAvatarMode = 'initials' | 'icon' | 'image';
 export type AgentIdleBehavior = 'propose' | 'sleep' | 'self-improve';
 
-export type AgentFileName =
-    | 'SOUL.md'
-    | 'AGENTS.md'
-    | 'HEARTBEAT.md'
-    | 'TOOLS.md'
-    | 'agent.yml';
+export type AgentFileName = 'SOUL.md' | 'AGENTS.md' | 'HEARTBEAT.md' | 'TOOLS.md' | 'agent.yml';
 
 export interface AgentPermissions {
     canCreateAgents: boolean;

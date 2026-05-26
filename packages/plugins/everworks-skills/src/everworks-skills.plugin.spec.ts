@@ -7,7 +7,7 @@ describe('EverWorksSkillsPlugin (builtin fallback catalog)', () => {
 	beforeEach(async () => {
 		plugin = new EverWorksSkillsPlugin();
 		await plugin.onLoad({
-			logger: { log: () => undefined, warn: () => undefined, error: () => undefined },
+			logger: { log: () => undefined, warn: () => undefined, error: () => undefined }
 		} as any);
 	});
 
@@ -20,7 +20,7 @@ describe('EverWorksSkillsPlugin (builtin fallback catalog)', () => {
 		const result = await plugin.listEntries({ limit: 50, offset: 0 });
 		expect(result.total).toBeGreaterThanOrEqual(3);
 		expect(result.entries.map((e) => e.slug)).toEqual(
-			expect.arrayContaining(['cron-defaults', 'secret-handling', 'commit-message-style']),
+			expect.arrayContaining(['cron-defaults', 'secret-handling', 'commit-message-style'])
 		);
 	});
 
@@ -56,11 +56,9 @@ describe('EverWorksSkillsPlugin (builtin fallback catalog)', () => {
 	it('checkForUpdates flags rows whose installed version mismatches the catalog', async () => {
 		const result = await plugin.checkForUpdates({
 			'cron-defaults': '0.9.0',
-			'secret-handling': '1.0.0',
+			'secret-handling': '1.0.0'
 		});
-		expect(result.updated).toEqual([
-			{ slug: 'cron-defaults', oldVersion: '0.9.0', newVersion: '1.0.0' },
-		]);
+		expect(result.updated).toEqual([{ slug: 'cron-defaults', oldVersion: '0.9.0', newVersion: '1.0.0' }]);
 	});
 
 	it('isAvailable returns true (no required credentials)', () => {

@@ -63,9 +63,7 @@ export interface ExportToggles {
     includeTaskChat?: boolean;
 }
 
-export async function exportAccountData(
-    includeSecretsOrToggles: boolean | ExportToggles,
-) {
+export async function exportAccountData(includeSecretsOrToggles: boolean | ExportToggles) {
     await ensureAuth();
     // Back-compat — `exportAccountData(true)` keeps working for the
     // pre-Phase-19.6 caller signature; `exportAccountData({...})` is

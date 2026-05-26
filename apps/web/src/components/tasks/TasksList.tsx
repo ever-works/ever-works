@@ -153,7 +153,9 @@ function TaskTable({ tasks }: { tasks: Task[] }) {
                 <tbody className="divide-y divide-border/60 dark:divide-border-dark/60">
                     {tasks.map((t) => (
                         <tr key={t.id} className="hover:bg-surface-secondary/30">
-                            <td className="px-4 py-2 font-mono text-xs text-text-muted">{t.slug}</td>
+                            <td className="px-4 py-2 font-mono text-xs text-text-muted">
+                                {t.slug}
+                            </td>
                             <td className="px-4 py-2">
                                 <Link
                                     href={ROUTES.DASHBOARD_TASK(t.id)}

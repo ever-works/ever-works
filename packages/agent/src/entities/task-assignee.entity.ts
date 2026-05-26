@@ -1,11 +1,11 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
 
@@ -19,22 +19,22 @@ import { Task, type TaskActorType } from './task.entity';
 @Index('uq_task_assignee', ['taskId', 'assigneeType', 'assigneeId'], { unique: true })
 @Index('idx_task_assignee_actor', ['assigneeType', 'assigneeId'])
 export class TaskAssignee {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	taskId: string;
+    @Column({ type: 'uuid' })
+    taskId: string;
 
-	@ManyToOne(() => Task, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'taskId' })
-	task?: Task;
+    @ManyToOne(() => Task, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'taskId' })
+    task?: Task;
 
-	@Column({ length: 8 })
-	assigneeType: TaskActorType;
+    @Column({ length: 8 })
+    assigneeType: TaskActorType;
 
-	@Column({ type: 'uuid' })
-	assigneeId: string;
+    @Column({ type: 'uuid' })
+    assigneeId: string;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

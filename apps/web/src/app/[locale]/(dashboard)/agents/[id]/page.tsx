@@ -8,11 +8,7 @@ import { notFound } from 'next/navigation';
  * budget consumption) land in a later sub-tick once the run /
  * heartbeat dispatcher ships in Phase 6.
  */
-export default async function AgentDashboardPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function AgentDashboardPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const agent = await agentsAPI.get(id);
     if (!agent) notFound();

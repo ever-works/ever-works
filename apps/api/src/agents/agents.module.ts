@@ -1,12 +1,12 @@
 import { Global, Module } from '@nestjs/common';
 import {
-	AgentsModule as AgentAgentsModule,
-	AGENT_RUN_CHAT_BACK_POSTER,
-	AGENT_RUN_TASK_FINISHER,
-	AGENT_PLUGIN_TOOLS_FACADE,
-	type AgentRunChatBackPoster,
-	type AgentRunTaskFinisher,
-	type AgentPluginToolsFacade,
+    AgentsModule as AgentAgentsModule,
+    AGENT_RUN_CHAT_BACK_POSTER,
+    AGENT_RUN_TASK_FINISHER,
+    AGENT_PLUGIN_TOOLS_FACADE,
+    type AgentRunChatBackPoster,
+    type AgentRunTaskFinisher,
+    type AgentPluginToolsFacade,
 } from '@ever-works/agent/agents';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -18,16 +18,16 @@ import {
 // it post-merge when their git provider setup is stable. Leaving it
 // unbound keeps the model from seeing tools that would fail mysteriously.
 import {
-	TasksDomainModule,
-	TaskChatService,
-	TasksService,
-	TaskStatus,
+    TasksDomainModule,
+    TaskChatService,
+    TasksService,
+    TaskStatus,
 } from '@ever-works/agent/tasks-domain';
 import {
-	FacadesModule,
-	SearchFacadeService,
-	ScreenshotFacadeService,
-	ContentExtractorFacadeService,
+    FacadesModule,
+    SearchFacadeService,
+    ScreenshotFacadeService,
+    ContentExtractorFacadeService,
 } from '@ever-works/agent/facades';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
@@ -65,90 +65,109 @@ import { AgentsController } from './agents.controller';
 // every unit test passing.
 @Global()
 @Module({
-	imports: [AgentAgentsModule, TasksDomainModule, FacadesModule, AuthModule],
-	controllers: [AgentsController],
-	providers: [
-		{
-			provide: AGENT_RUN_CHAT_BACK_POSTER,
-			inject: [TaskChatService],
-			useFactory: (chat: TaskChatService): AgentRunChatBackPoster => ({
-				async postReply({ userId, taskId, agentId, body }) {
-					const row = await chat.post(userId, {
-						taskId,
-						authorType: 'agent',
-						authorId: agentId,
-						body,
-					});
-					return { messageId: row.id };
-				},
-			}),
-		},
-		{
-			provide: AGENT_RUN_TASK_FINISHER,
-			inject: [TasksService],
-			useFactory: (tasks: TasksService): AgentRunTaskFinisher => ({
-				async finishTask({ userId, taskId, to, force }) {
-					const row = await tasks.transition(userId, taskId, to as TaskStatus, {
-						force: force ?? false,
-					});
-					return { status: row.status };
-				},
-			}),
-		},
-		{
-			provide: AGENT_PLUGIN_TOOLS_FACADE,
-			inject: [SearchFacadeService, ScreenshotFacadeService, ContentExtractorFacadeService],
-			useFactory: (
-				search: SearchFacadeService,
-				screenshot: ScreenshotFacadeService,
-				extractor: ContentExtractorFacadeService,
-			): AgentPluginToolsFacade => ({
-				async searchWeb({ userId, workId, agentId, taskId, query, maxResults, includeDomains, excludeDomains }) {
-					const results = await search.search(
-						query,
-						{ maxResults, includeDomains, excludeDomains },
-						{ userId, workId, agentId, taskId },
-					);
-					return {
-						results: results.map((r) => ({
-							title: r.title,
-							url: r.url,
-							snippet: (r as any).snippet ?? null,
-							publishedDate: (r as any).publishedDate ?? null,
-							score: (r as any).score,
-						})),
-					};
-				},
-				async screenshot({ userId, workId, agentId, taskId, url, viewportWidth, viewportHeight, fullPage }) {
-					const result = await screenshot.capture(
-						{ url, viewportWidth, viewportHeight, fullPage } as any,
-						{ userId, workId, agentId, taskId },
-					);
-					return {
-						success: result.success,
-						imageUrl: result.imageUrl ?? null,
-						cacheUrl: result.cacheUrl ?? null,
-					};
-				},
-				async extractContent({ userId, workId, agentId, taskId, url, maxChars }) {
-					const result = await extractor.extractContent(
-						url,
-						undefined,
-						{ userId, workId, agentId, taskId },
-					);
-					const raw = result?.rawContent ?? '';
-					const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
-					const content = raw.length > cap ? raw.slice(0, cap) : raw;
-					return {
-						url,
-						content,
-						contentLength: raw.length,
-						providerId: result?.extraction?.providerId ?? null,
-					};
-				},
-			}),
-		},
-	],
-	exports: [AGENT_RUN_CHAT_BACK_POSTER, AGENT_RUN_TASK_FINISHER, AGENT_PLUGIN_TOOLS_FACADE],
+    imports: [AgentAgentsModule, TasksDomainModule, FacadesModule, AuthModule],
+    controllers: [AgentsController],
+    providers: [
+        {
+            provide: AGENT_RUN_CHAT_BACK_POSTER,
+            inject: [TaskChatService],
+            useFactory: (chat: TaskChatService): AgentRunChatBackPoster => ({
+                async postReply({ userId, taskId, agentId, body }) {
+                    const row = await chat.post(userId, {
+                        taskId,
+                        authorType: 'agent',
+                        authorId: agentId,
+                        body,
+                    });
+                    return { messageId: row.id };
+                },
+            }),
+        },
+        {
+            provide: AGENT_RUN_TASK_FINISHER,
+            inject: [TasksService],
+            useFactory: (tasks: TasksService): AgentRunTaskFinisher => ({
+                async finishTask({ userId, taskId, to, force }) {
+                    const row = await tasks.transition(userId, taskId, to as TaskStatus, {
+                        force: force ?? false,
+                    });
+                    return { status: row.status };
+                },
+            }),
+        },
+        {
+            provide: AGENT_PLUGIN_TOOLS_FACADE,
+            inject: [SearchFacadeService, ScreenshotFacadeService, ContentExtractorFacadeService],
+            useFactory: (
+                search: SearchFacadeService,
+                screenshot: ScreenshotFacadeService,
+                extractor: ContentExtractorFacadeService,
+            ): AgentPluginToolsFacade => ({
+                async searchWeb({
+                    userId,
+                    workId,
+                    agentId,
+                    taskId,
+                    query,
+                    maxResults,
+                    includeDomains,
+                    excludeDomains,
+                }) {
+                    const results = await search.search(
+                        query,
+                        { maxResults, includeDomains, excludeDomains },
+                        { userId, workId, agentId, taskId },
+                    );
+                    return {
+                        results: results.map((r) => ({
+                            title: r.title,
+                            url: r.url,
+                            snippet: (r as any).snippet ?? null,
+                            publishedDate: (r as any).publishedDate ?? null,
+                            score: (r as any).score,
+                        })),
+                    };
+                },
+                async screenshot({
+                    userId,
+                    workId,
+                    agentId,
+                    taskId,
+                    url,
+                    viewportWidth,
+                    viewportHeight,
+                    fullPage,
+                }) {
+                    const result = await screenshot.capture(
+                        { url, viewportWidth, viewportHeight, fullPage } as any,
+                        { userId, workId, agentId, taskId },
+                    );
+                    return {
+                        success: result.success,
+                        imageUrl: result.imageUrl ?? null,
+                        cacheUrl: result.cacheUrl ?? null,
+                    };
+                },
+                async extractContent({ userId, workId, agentId, taskId, url, maxChars }) {
+                    const result = await extractor.extractContent(url, undefined, {
+                        userId,
+                        workId,
+                        agentId,
+                        taskId,
+                    });
+                    const raw = result?.rawContent ?? '';
+                    const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
+                    const content = raw.length > cap ? raw.slice(0, cap) : raw;
+                    return {
+                        url,
+                        content,
+                        contentLength: raw.length,
+                        providerId: result?.extraction?.providerId ?? null,
+                    };
+                },
+            }),
+        },
+    ],
+    exports: [AGENT_RUN_CHAT_BACK_POSTER, AGENT_RUN_TASK_FINISHER, AGENT_PLUGIN_TOOLS_FACADE],
 })
 export class AgentsModule {}

@@ -87,7 +87,13 @@ export function AgentInstructionsEditor({
         }
     }
 
-    const FILE_TABS: AgentFileName[] = ['SOUL.md', 'AGENTS.md', 'HEARTBEAT.md', 'TOOLS.md', 'agent.yml'];
+    const FILE_TABS: AgentFileName[] = [
+        'SOUL.md',
+        'AGENTS.md',
+        'HEARTBEAT.md',
+        'TOOLS.md',
+        'agent.yml',
+    ];
 
     return (
         <div className="p-6 space-y-4 max-w-screen-2xl mx-auto">
@@ -121,7 +127,8 @@ export function AgentInstructionsEditor({
                     role="alert"
                     className="rounded-md border border-warning/40 bg-warning/10 text-warning text-xs px-3 py-2"
                 >
-                    Another edit happened in parallel. Refresh to load the latest version, then re-apply your change.
+                    Another edit happened in parallel. Refresh to load the latest version, then
+                    re-apply your change.
                 </div>
             )}
             {activeStatus === 'error' && (
@@ -135,9 +142,7 @@ export function AgentInstructionsEditor({
 
             <textarea
                 value={activeBody}
-                onChange={(e) =>
-                    setBuffers((b) => ({ ...b, [active]: e.target.value }))
-                }
+                onChange={(e) => setBuffers((b) => ({ ...b, [active]: e.target.value }))}
                 className="w-full min-h-[480px] rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 font-mono text-xs text-text dark:text-text-dark"
                 spellCheck={false}
                 aria-label={active}

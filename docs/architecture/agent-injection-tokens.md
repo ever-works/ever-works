@@ -39,14 +39,14 @@ Three concerns drove this layout:
 
 ## Inventory
 
-| Token | Contract | Consumer | Default binding |
-|-------|----------|----------|-----------------|
-| `AGENT_TASK_EXECUTE_DISPATCHER` | `AgentTaskExecuteDispatcher` | `TaskTransitionService` | `agentTaskExecuteTriggerAdapter` (Trigger.dev) |
-| `AGENT_CHAT_REPLY_DISPATCHER` | `AgentChatReplyDispatcher` | `TaskChatService.post` | `agentChatReplyTriggerAdapter` (Trigger.dev) |
-| `AGENT_RUN_CHAT_BACK_POSTER` | `AgentRunChatBackPoster` | `AgentRunService.finalize` | `TaskChatService.post(authorType='agent')` |
-| `AGENT_RUN_TASK_FINISHER` | `AgentRunTaskFinisher` | `AgentRunService.finalize` | `TasksService.transition` |
-| `AGENT_GIT_FACADE` | `AgentGitFacade` | `AgentToolService` | **UNBOUND** in v1 |
-| `AGENT_PLUGIN_TOOLS_FACADE` | `AgentPluginToolsFacade` | `AgentToolService` | `SearchFacadeService` + `ScreenshotFacadeService` + `ContentExtractorFacadeService` |
+| Token                           | Contract                     | Consumer                   | Default binding                                                                     |
+| ------------------------------- | ---------------------------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| `AGENT_TASK_EXECUTE_DISPATCHER` | `AgentTaskExecuteDispatcher` | `TaskTransitionService`    | `agentTaskExecuteTriggerAdapter` (Trigger.dev)                                      |
+| `AGENT_CHAT_REPLY_DISPATCHER`   | `AgentChatReplyDispatcher`   | `TaskChatService.post`     | `agentChatReplyTriggerAdapter` (Trigger.dev)                                        |
+| `AGENT_RUN_CHAT_BACK_POSTER`    | `AgentRunChatBackPoster`     | `AgentRunService.finalize` | `TaskChatService.post(authorType='agent')`                                          |
+| `AGENT_RUN_TASK_FINISHER`       | `AgentRunTaskFinisher`       | `AgentRunService.finalize` | `TasksService.transition`                                                           |
+| `AGENT_GIT_FACADE`              | `AgentGitFacade`             | `AgentToolService`         | **UNBOUND** in v1                                                                   |
+| `AGENT_PLUGIN_TOOLS_FACADE`     | `AgentPluginToolsFacade`     | `AgentToolService`         | `SearchFacadeService` + `ScreenshotFacadeService` + `ContentExtractorFacadeService` |
 
 All token strings are exported from `@ever-works/agent/agents` and
 `@ever-works/agent/tasks-domain` respectively. Contract interfaces
@@ -60,12 +60,7 @@ ship alongside.
 
 ```typescript
 interface AgentTaskExecuteDispatcher {
-    enqueue(payload: {
-        agentId: string;
-        userId: string;
-        taskId: string;
-        dedupKey: string;
-    }): Promise<{ runId: string }>;
+	enqueue(payload: { agentId: string; userId: string; taskId: string; dedupKey: string }): Promise<{ runId: string }>;
 }
 ```
 
@@ -86,13 +81,13 @@ for e2e specs); replacing Trigger.dev with another job runner.
 
 ```typescript
 interface AgentChatReplyDispatcher {
-    enqueue(payload: {
-        agentId: string;
-        userId: string;
-        taskId: string;
-        triggeringMessageId: string;
-        dedupKey: string;
-    }): Promise<{ runId: string }>;
+	enqueue(payload: {
+		agentId: string;
+		userId: string;
+		taskId: string;
+		triggeringMessageId: string;
+		dedupKey: string;
+	}): Promise<{ runId: string }>;
 }
 ```
 
@@ -112,12 +107,7 @@ than spawned.
 
 ```typescript
 interface AgentRunChatBackPoster {
-    postReply(input: {
-        userId: string;
-        taskId: string;
-        agentId: string;
-        body: string;
-    }): Promise<{ messageId: string }>;
+	postReply(input: { userId: string; taskId: string; agentId: string; body: string }): Promise<{ messageId: string }>;
 }
 ```
 
@@ -145,8 +135,9 @@ called for `chat` kind outcomes when `outcome.replyBody` is set.
 ```
 
 The wrapped `TaskChatService.post()` still runs the mention parser
-+ secret-scan + size cap, so an agent-authored reply gets the same
-treatment as a user-authored one.
+
+- secret-scan + size cap, so an agent-authored reply gets the same
+  treatment as a user-authored one.
 
 **When to override**: routing chat-back posts through an alternate
 chat surface (Slack, email digest, etc.); short-circuiting the post
@@ -158,12 +149,12 @@ to a moderation queue.
 
 ```typescript
 interface AgentRunTaskFinisher {
-    finishTask(input: {
-        userId: string;
-        taskId: string;
-        to: 'done' | 'in_review' | 'blocked' | 'cancelled';
-        force?: boolean;
-    }): Promise<{ status: string }>;
+	finishTask(input: {
+		userId: string;
+		taskId: string;
+		to: 'done' | 'in_review' | 'blocked' | 'cancelled';
+		force?: boolean;
+	}): Promise<{ status: string }>;
 }
 ```
 
@@ -186,25 +177,25 @@ in a separate event stream.
 
 ```typescript
 interface AgentGitFacade {
-    commitToRepo(input: {
-        userId: string;
-        agentId: string;
-        workId: string;
-        message: string;
-        files?: { path: string; body: string }[];
-        branch?: string;
-    }): Promise<{ sha: string | null; branch: string; filesChanged: number }>;
+	commitToRepo(input: {
+		userId: string;
+		agentId: string;
+		workId: string;
+		message: string;
+		files?: { path: string; body: string }[];
+		branch?: string;
+	}): Promise<{ sha: string | null; branch: string; filesChanged: number }>;
 
-    openPullRequest(input: {
-        userId: string;
-        agentId: string;
-        workId: string;
-        title: string;
-        body: string;
-        head: string;
-        base?: string;
-        draft?: boolean;
-    }): Promise<{ number: number; url: string; state: 'open' | 'closed' | 'merged' | 'draft' }>;
+	openPullRequest(input: {
+		userId: string;
+		agentId: string;
+		workId: string;
+		title: string;
+		body: string;
+		head: string;
+		base?: string;
+		draft?: boolean;
+	}): Promise<{ number: number; url: string; state: 'open' | 'closed' | 'merged' | 'draft' }>;
 }
 ```
 
@@ -250,9 +241,9 @@ is stable. Suggested adapter shape:
 
 ```typescript
 interface AgentPluginToolsFacade {
-    searchWeb(input: AgentSearchWebInput): Promise<AgentSearchWebResult>;
-    screenshot(input: AgentScreenshotInput): Promise<AgentScreenshotResult>;
-    extractContent(input: AgentExtractContentInput): Promise<AgentExtractContentResult>;
+	searchWeb(input: AgentSearchWebInput): Promise<AgentSearchWebResult>;
+	screenshot(input: AgentScreenshotInput): Promise<AgentScreenshotResult>;
+	extractContent(input: AgentExtractContentInput): Promise<AgentExtractContentResult>;
 }
 ```
 
@@ -301,8 +292,8 @@ load-bearing — do not remove the decorator.**
 The reason: the consumers (`TaskTransitionService`, `TaskChatService`,
 `AgentRunService`, `AgentToolService`) live in the imported
 agent-package modules (`TasksDomainModule`, agent-side `AgentsModule`).
-NestJS's module isolation rule is *providers from a parent module are
-NOT visible to services in an imported child module's DI scope*.
+NestJS's module isolation rule is _providers from a parent module are
+NOT visible to services in an imported child module's DI scope_.
 Without `@Global()` the `@Optional() @Inject(TOKEN)` calls silently
 resolve to `undefined` in production — every unit test still passes
 (each binds tokens locally in its `TestingModule`), but the entire

@@ -68,20 +68,29 @@ export interface ListResponse<T> {
 }
 
 export const skillsAPI = {
-    async listInstalled(query: { ownerType?: SkillOwnerType; search?: string; limit?: number; offset?: number } = {}) {
+    async listInstalled(
+        query: {
+            ownerType?: SkillOwnerType;
+            search?: string;
+            limit?: number;
+            offset?: number;
+        } = {},
+    ) {
         const params = new URLSearchParams();
         if (query.ownerType) params.set('ownerType', query.ownerType);
         if (query.search) params.set('search', query.search);
         if (query.limit !== undefined) params.set('limit', String(query.limit));
         if (query.offset !== undefined) params.set('offset', String(query.offset));
         const qs = params.toString();
-        return serverFetch<{ data: Skill[]; meta: { total: number; limit: number; offset: number } }>(
-            `/skills${qs ? `?${qs}` : ''}`,
-            { method: 'GET' },
-        );
+        return serverFetch<{
+            data: Skill[];
+            meta: { total: number; limit: number; offset: number };
+        }>(`/skills${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
-    async listCatalog(query: { search?: string; tags?: string[]; limit?: number; offset?: number } = {}) {
+    async listCatalog(
+        query: { search?: string; tags?: string[]; limit?: number; offset?: number } = {},
+    ) {
         const params = new URLSearchParams();
         if (query.search) params.set('search', query.search);
         if (query.tags?.length) params.set('tags', query.tags.join(','));
@@ -128,7 +137,12 @@ export const skillsAPI = {
         });
     },
 
-    async update(id: string, body: Partial<Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>>) {
+    async update(
+        id: string,
+        body: Partial<
+            Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>
+        >,
+    ) {
         return serverMutation<Skill>({
             endpoint: `/skills/${id}`,
             data: body as Record<string, unknown>,
@@ -150,7 +164,16 @@ export const skillsAPI = {
         return serverFetch<SkillBinding[]>(`/skills/${skillId}/bindings`, { method: 'GET' });
     },
 
-    async createBinding(skillId: string, body: { targetType: SkillBindingTargetType; targetId?: string | null; priority?: number; injectIntoAgent?: boolean; injectIntoGenerator?: boolean }) {
+    async createBinding(
+        skillId: string,
+        body: {
+            targetType: SkillBindingTargetType;
+            targetId?: string | null;
+            priority?: number;
+            injectIntoAgent?: boolean;
+            injectIntoGenerator?: boolean;
+        },
+    ) {
         return serverMutation<SkillBinding>({
             endpoint: `/skills/${skillId}/bindings`,
             data: body,

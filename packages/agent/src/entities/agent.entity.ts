@@ -1,12 +1,12 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
-	UpdateDateColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 
@@ -20,10 +20,10 @@ import { User } from './user.entity';
  * - `WORK`    — bound to a single Work; sees its data/website repos + items.
  */
 export enum AgentScope {
-	TENANT = 'tenant',
-	MISSION = 'mission',
-	IDEA = 'idea',
-	WORK = 'work',
+    TENANT = 'tenant',
+    MISSION = 'mission',
+    IDEA = 'idea',
+    WORK = 'work',
 }
 
 /**
@@ -39,12 +39,12 @@ export enum AgentScope {
  *   *       → archived     (soft-delete)
  */
 export enum AgentStatus {
-	DRAFT = 'draft',
-	ACTIVE = 'active',
-	RUNNING = 'running',
-	PAUSED = 'paused',
-	ERROR = 'error',
-	ARCHIVED = 'archived',
+    DRAFT = 'draft',
+    ACTIVE = 'active',
+    RUNNING = 'running',
+    PAUSED = 'paused',
+    ERROR = 'error',
+    ARCHIVED = 'archived',
 }
 
 /**
@@ -57,9 +57,9 @@ export enum AgentStatus {
  *                tenant to have a storage plugin enabled.
  */
 export enum AgentAvatarMode {
-	INITIALS = 'initials',
-	ICON = 'icon',
-	IMAGE = 'image',
+    INITIALS = 'initials',
+    ICON = 'icon',
+    IMAGE = 'image',
 }
 
 /**
@@ -73,14 +73,14 @@ export enum AgentAvatarMode {
  * enforces this in `AgentService.update`).
  */
 export interface AgentPermissions {
-	canCreateAgents: boolean;
-	canAssignTasks: boolean;
-	canEditSkills: boolean;
-	canEditAgentFiles: boolean;
-	canSpend: boolean;
-	canCommitToRepo: boolean;
-	canOpenPullRequests: boolean;
-	canCallExternalTools: boolean;
+    canCreateAgents: boolean;
+    canAssignTasks: boolean;
+    canEditSkills: boolean;
+    canEditAgentFiles: boolean;
+    canSpend: boolean;
+    canCommitToRepo: boolean;
+    canOpenPullRequests: boolean;
+    canCallExternalTools: boolean;
 }
 
 /**
@@ -89,14 +89,14 @@ export interface AgentPermissions {
  * assert against the same shape.
  */
 export const AGENT_PERMISSIONS_DEFAULT: AgentPermissions = Object.freeze({
-	canCreateAgents: false,
-	canAssignTasks: false,
-	canEditSkills: false,
-	canEditAgentFiles: false,
-	canSpend: false,
-	canCommitToRepo: false,
-	canOpenPullRequests: false,
-	canCallExternalTools: false,
+    canCreateAgents: false,
+    canAssignTasks: false,
+    canEditSkills: false,
+    canEditAgentFiles: false,
+    canSpend: false,
+    canCommitToRepo: false,
+    canOpenPullRequests: false,
+    canCallExternalTools: false,
 });
 
 /**
@@ -109,8 +109,8 @@ export const AGENT_PERMISSIONS_DEFAULT: AgentPermissions = Object.freeze({
  * can persist an explicit "all" choice.
  */
 export interface AgentTarget {
-	type: 'mission' | 'idea' | 'work' | 'wildcard';
-	id?: string;
+    type: 'mission' | 'idea' | 'work' | 'wildcard';
+    id?: string;
 }
 
 /**
@@ -121,9 +121,9 @@ export interface AgentTarget {
  * - `observe`  — read scope state + emit an activity row; no AI call.
  */
 export enum AgentIdleBehavior {
-	PROPOSE = 'propose',
-	NOOP = 'noop',
-	OBSERVE = 'observe',
+    PROPOSE = 'propose',
+    NOOP = 'noop',
+    OBSERVE = 'observe',
 }
 
 /**
@@ -146,149 +146,151 @@ export enum AgentIdleBehavior {
  * avoid forward-import cycles; FK constraints are added by the migration.
  */
 @Entity({ name: 'agents' })
-@Index('uq_agents_user_scope_slug', ['userId', 'scope', 'missionId', 'ideaId', 'workId', 'slug'], { unique: true })
+@Index('uq_agents_user_scope_slug', ['userId', 'scope', 'missionId', 'ideaId', 'workId', 'slug'], {
+    unique: true,
+})
 @Index('idx_agents_user_status', ['userId', 'status'])
 @Index('idx_agents_next_heartbeat', ['status', 'nextHeartbeatAt'])
 @Index('idx_agents_mission', ['missionId'])
 @Index('idx_agents_work', ['workId'])
 @Index('idx_agents_idea', ['ideaId'])
 export class Agent {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	userId: string;
+    @Column('uuid')
+    userId: string;
 
-	@ManyToOne(() => User, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'userId' })
-	user?: User;
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'userId' })
+    user?: User;
 
-	@Column({ type: 'varchar', length: 16 })
-	scope: AgentScope;
+    @Column({ type: 'varchar', length: 16 })
+    scope: AgentScope;
 
-	/** FK to `missions.id` when `scope = 'mission'`. */
-	@Column('uuid', { nullable: true })
-	missionId?: string | null;
+    /** FK to `missions.id` when `scope = 'mission'`. */
+    @Column('uuid', { nullable: true })
+    missionId?: string | null;
 
-	/** FK to `work_proposals.id` when `scope = 'idea'`. */
-	@Column('uuid', { nullable: true })
-	ideaId?: string | null;
+    /** FK to `work_proposals.id` when `scope = 'idea'`. */
+    @Column('uuid', { nullable: true })
+    ideaId?: string | null;
 
-	/** FK to `works.id` when `scope = 'work'`. */
-	@Column('uuid', { nullable: true })
-	workId?: string | null;
+    /** FK to `works.id` when `scope = 'work'`. */
+    @Column('uuid', { nullable: true })
+    workId?: string | null;
 
-	@Column({ length: 120 })
-	name: string;
+    @Column({ length: 120 })
+    name: string;
 
-	/** Kebab-case derived from `name`; unique per scope (see composite index). */
-	@Column({ length: 80 })
-	slug: string;
+    /** Kebab-case derived from `name`; unique per scope (see composite index). */
+    @Column({ length: 80 })
+    slug: string;
 
-	@Column({ length: 200, nullable: true })
-	title?: string | null;
+    @Column({ length: 200, nullable: true })
+    title?: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	capabilities?: string | null;
+    @Column({ type: 'text', nullable: true })
+    capabilities?: string | null;
 
-	// ── AI provider routing ──
-	// null = use account default per the existing AiFacadeService cascade.
+    // ── AI provider routing ──
+    // null = use account default per the existing AiFacadeService cascade.
 
-	@Column({ length: 100, nullable: true })
-	aiProviderId?: string | null;
+    @Column({ length: 100, nullable: true })
+    aiProviderId?: string | null;
 
-	@Column({ length: 100, nullable: true })
-	modelId?: string | null;
+    @Column({ length: 100, nullable: true })
+    modelId?: string | null;
 
-	@Column({ type: 'int', default: 4000 })
-	maxSkillContextTokens: number;
+    @Column({ type: 'int', default: 4000 })
+    maxSkillContextTokens: number;
 
-	// ── Lifecycle ──
+    // ── Lifecycle ──
 
-	@Column({ type: 'varchar', length: 16, default: AgentStatus.DRAFT })
-	status: AgentStatus;
+    @Column({ type: 'varchar', length: 16, default: AgentStatus.DRAFT })
+    status: AgentStatus;
 
-	@Column('simple-json')
-	permissions: AgentPermissions;
+    @Column('simple-json')
+    permissions: AgentPermissions;
 
-	/**
-	 * Tenant-scoped Agents may carry an explicit memberships list here.
-	 * `null` (or empty) for tenant-scope = "available to all" the user's
-	 * Missions/Ideas/Works. Concrete memberships also live in the
-	 * `agent_memberships` join table for indexed lookup; this column is the
-	 * authoritative source the UI edits.
-	 */
-	@Column('simple-json', { nullable: true })
-	targets?: AgentTarget[] | null;
+    /**
+     * Tenant-scoped Agents may carry an explicit memberships list here.
+     * `null` (or empty) for tenant-scope = "available to all" the user's
+     * Missions/Ideas/Works. Concrete memberships also live in the
+     * `agent_memberships` join table for indexed lookup; this column is the
+     * authoritative source the UI edits.
+     */
+    @Column('simple-json', { nullable: true })
+    targets?: AgentTarget[] | null;
 
-	// ── Heartbeat ──
+    // ── Heartbeat ──
 
-	/** Cron expression OR the literal string 'manual'. Null = treated as manual. */
-	@Column({ type: 'varchar', length: 64, nullable: true })
-	heartbeatCadence?: string | null;
+    /** Cron expression OR the literal string 'manual'. Null = treated as manual. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    heartbeatCadence?: string | null;
 
-	@Column({ type: 'varchar', length: 16, default: AgentIdleBehavior.PROPOSE })
-	idleBehavior: AgentIdleBehavior;
+    @Column({ type: 'varchar', length: 16, default: AgentIdleBehavior.PROPOSE })
+    idleBehavior: AgentIdleBehavior;
 
-	@Column({ type: 'timestamp', nullable: true })
-	nextHeartbeatAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    nextHeartbeatAt?: Date | null;
 
-	@Column({ type: 'timestamp', nullable: true })
-	lastRunAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    lastRunAt?: Date | null;
 
-	@Column({ length: 16, nullable: true })
-	lastRunStatus?: string | null;
+    @Column({ length: 16, nullable: true })
+    lastRunStatus?: string | null;
 
-	@Column({ type: 'int', default: 0 })
-	errorCount: number;
+    @Column({ type: 'int', default: 0 })
+    errorCount: number;
 
-	@Column({ type: 'int', default: 3 })
-	pauseAfterFailures: number;
+    @Column({ type: 'int', default: 3 })
+    pauseAfterFailures: number;
 
-	// ── Avatar (H3 — all three modes in v1) ──
+    // ── Avatar (H3 — all three modes in v1) ──
 
-	@Column({ type: 'varchar', length: 8, default: AgentAvatarMode.INITIALS })
-	avatarMode: AgentAvatarMode;
+    @Column({ type: 'varchar', length: 8, default: AgentAvatarMode.INITIALS })
+    avatarMode: AgentAvatarMode;
 
-	/** Lucide icon name; populated only when `avatarMode = 'icon'`. */
-	@Column({ length: 64, nullable: true })
-	avatarIcon?: string | null;
+    /** Lucide icon name; populated only when `avatarMode = 'icon'`. */
+    @Column({ length: 64, nullable: true })
+    avatarIcon?: string | null;
 
-	/**
-	 * FK to `work_knowledge_upload.id`. Populated only when
-	 * `avatarMode = 'image'`. Reuses the existing KB upload pipeline so we
-	 * inherit storage / quota / ACL semantics.
-	 */
-	@Column('uuid', { nullable: true })
-	avatarImageUploadId?: string | null;
+    /**
+     * FK to `work_knowledge_upload.id`. Populated only when
+     * `avatarMode = 'image'`. Reuses the existing KB upload pipeline so we
+     * inherit storage / quota / ACL semantics.
+     */
+    @Column('uuid', { nullable: true })
+    avatarImageUploadId?: string | null;
 
-	// ── DB-only file storage (ADR-008 — tenant Agents without a control repo) ──
-	// Mission/Idea/Work-scoped Agents store these in their scope's Git repo at
-	// `.works/agents/<slug>/{SOUL,AGENTS,HEARTBEAT,TOOLS}.md` + `agent.yml`;
-	// the columns below remain null for those.
+    // ── DB-only file storage (ADR-008 — tenant Agents without a control repo) ──
+    // Mission/Idea/Work-scoped Agents store these in their scope's Git repo at
+    // `.works/agents/<slug>/{SOUL,AGENTS,HEARTBEAT,TOOLS}.md` + `agent.yml`;
+    // the columns below remain null for those.
 
-	@Column({ type: 'text', nullable: true })
-	soulMd?: string | null;
+    @Column({ type: 'text', nullable: true })
+    soulMd?: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	agentsMd?: string | null;
+    @Column({ type: 'text', nullable: true })
+    agentsMd?: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	heartbeatMd?: string | null;
+    @Column({ type: 'text', nullable: true })
+    heartbeatMd?: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	toolsMd?: string | null;
+    @Column({ type: 'text', nullable: true })
+    toolsMd?: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	agentYml?: string | null;
+    @Column({ type: 'text', nullable: true })
+    agentYml?: string | null;
 
-	/** sha256 of the canonical 5-file concatenation; used for ETag / optimistic concurrency. */
-	@Column({ length: 64, nullable: true })
-	contentHash?: string | null;
+    /** sha256 of the canonical 5-file concatenation; used for ETag / optimistic concurrency. */
+    @Column({ length: 64, nullable: true })
+    contentHash?: string | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

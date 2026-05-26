@@ -25,11 +25,7 @@ export async function generateMetadata({
  * the same 800ms autosave + secret/size error banner pattern as
  * the Agent Instructions editor.
  */
-export default async function SkillDetailPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function SkillDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const [skill, bindings] = await Promise.all([
         skillsAPI.get(id),

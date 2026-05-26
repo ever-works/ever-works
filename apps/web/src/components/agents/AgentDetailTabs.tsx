@@ -18,7 +18,11 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
     const pathname = usePathname() ?? '';
 
     const tabs = [
-        { key: 'dashboard', href: ROUTES.DASHBOARD_AGENT_DASHBOARD(agentId), label: t('dashboard') },
+        {
+            key: 'dashboard',
+            href: ROUTES.DASHBOARD_AGENT_DASHBOARD(agentId),
+            label: t('dashboard'),
+        },
         { key: 'activity', href: ROUTES.DASHBOARD_AGENT_ACTIVITY(agentId), label: t('activity') },
         {
             key: 'instructions',

@@ -1,7 +1,7 @@
 import type { SkillRepository } from '../database/repositories/skill.repository';
 import type {
-	SkillBindingRepository,
-	ResolvedSkill,
+    SkillBindingRepository,
+    ResolvedSkill,
 } from '../database/repositories/skill-binding.repository';
 
 /**
@@ -24,90 +24,91 @@ import type {
  */
 
 export interface GetSkillBodyToolArgs {
-	slug: string;
+    slug: string;
 }
 
 export interface GetSkillBodyToolResult {
-	slug: string;
-	title: string;
-	body: string;
-	priority: number;
-	version: string;
+    slug: string;
+    title: string;
+    body: string;
+    priority: number;
+    version: string;
 }
 
 export interface GetSkillBodyToolDescriptor {
-	name: 'getSkillBody';
-	description: string;
-	parameters: {
-		type: 'object';
-		properties: {
-			slug: { type: 'string'; description: string };
-		};
-		required: ['slug'];
-	};
-	invoke: (args: GetSkillBodyToolArgs) => Promise<GetSkillBodyToolResult | { error: string }>;
+    name: 'getSkillBody';
+    description: string;
+    parameters: {
+        type: 'object';
+        properties: {
+            slug: { type: 'string'; description: string };
+        };
+        required: ['slug'];
+    };
+    invoke: (args: GetSkillBodyToolArgs) => Promise<GetSkillBodyToolResult | { error: string }>;
 }
 
 export interface CreateGetSkillBodyToolContext {
-	userId: string;
-	agentId: string;
-	workId?: string;
-	missionId?: string;
-	ideaId?: string;
+    userId: string;
+    agentId: string;
+    workId?: string;
+    missionId?: string;
+    ideaId?: string;
 }
 
 export function createGetSkillBodyTool(
-	skills: SkillRepository,
-	bindings: SkillBindingRepository,
-	context: CreateGetSkillBodyToolContext,
+    skills: SkillRepository,
+    bindings: SkillBindingRepository,
+    context: CreateGetSkillBodyToolContext,
 ): GetSkillBodyToolDescriptor {
-	return {
-		name: 'getSkillBody',
-		description:
-			'Fetch the full body of one bound Skill by slug. Use this when the priority-sorted Skill summary lists a slug whose details you need to act on. Returns an error if the slug is not bound to this Agent.',
-		parameters: {
-			type: 'object',
-			properties: {
-				slug: {
-					type: 'string',
-					description: 'The skill slug (lowercase-with-hyphens) as listed in ACTIVE SKILLS.',
-				},
-			},
-			required: ['slug'],
-		},
-		invoke: async (args) => {
-			if (!args?.slug || typeof args.slug !== 'string') {
-				return { error: 'slug is required' };
-			}
-			const active: ResolvedSkill[] = await bindings.resolveActive({
-				userId: context.userId,
-				agentId: context.agentId,
-				workId: context.workId,
-				missionId: context.missionId,
-				ideaId: context.ideaId,
-				forAgentRun: true,
-			});
-			const match = active.find((row) => row.skill.slug === args.slug);
-			if (!match) {
-				return {
-					error: `Skill "${args.slug}" is not bound to this Agent. Available: ${active
-						.map((r) => r.skill.slug)
-						.join(', ')}`,
-				};
-			}
-			const full = await skills.findByIdAndUser(match.skill.id, context.userId);
-			if (!full) {
-				return { error: `Skill "${args.slug}" not readable.` };
-			}
-			return {
-				slug: full.slug,
-				title: full.title,
-				body: full.instructionsMd,
-				priority: match.binding.priority,
-				version: full.version,
-			};
-		},
-	};
+    return {
+        name: 'getSkillBody',
+        description:
+            'Fetch the full body of one bound Skill by slug. Use this when the priority-sorted Skill summary lists a slug whose details you need to act on. Returns an error if the slug is not bound to this Agent.',
+        parameters: {
+            type: 'object',
+            properties: {
+                slug: {
+                    type: 'string',
+                    description:
+                        'The skill slug (lowercase-with-hyphens) as listed in ACTIVE SKILLS.',
+                },
+            },
+            required: ['slug'],
+        },
+        invoke: async (args) => {
+            if (!args?.slug || typeof args.slug !== 'string') {
+                return { error: 'slug is required' };
+            }
+            const active: ResolvedSkill[] = await bindings.resolveActive({
+                userId: context.userId,
+                agentId: context.agentId,
+                workId: context.workId,
+                missionId: context.missionId,
+                ideaId: context.ideaId,
+                forAgentRun: true,
+            });
+            const match = active.find((row) => row.skill.slug === args.slug);
+            if (!match) {
+                return {
+                    error: `Skill "${args.slug}" is not bound to this Agent. Available: ${active
+                        .map((r) => r.skill.slug)
+                        .join(', ')}`,
+                };
+            }
+            const full = await skills.findByIdAndUser(match.skill.id, context.userId);
+            if (!full) {
+                return { error: `Skill "${args.slug}" not readable.` };
+            }
+            return {
+                slug: full.slug,
+                title: full.title,
+                body: full.instructionsMd,
+                priority: match.binding.priority,
+                version: full.version,
+            };
+        },
+    };
 }
 
 /**
@@ -116,5 +117,5 @@ export function createGetSkillBodyTool(
  * bound skill is resolved.
  */
 export function shouldRegisterSkillTool(resolvedSkills: { slug: string }[]): boolean {
-	return resolvedSkills.length > 0;
+    return resolvedSkills.length > 0;
 }

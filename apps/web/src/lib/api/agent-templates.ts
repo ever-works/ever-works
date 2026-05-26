@@ -126,9 +126,7 @@ const FALLBACK: Record<AstTemplateEntityType, AstTemplateEntry[]> = {
  * `serverFetch('/api/agent-templates?entity=' + entity)` and
  * callers stay unchanged.
  */
-export async function listAstTemplates(
-    entity: AstTemplateEntityType,
-): Promise<AstTemplateEntry[]> {
+export async function listAstTemplates(entity: AstTemplateEntityType): Promise<AstTemplateEntry[]> {
     // TODO(ADR-010): replace with `serverFetch('/api/agent-templates?entity=' + entity)`.
     return FALLBACK[entity] ?? [];
 }

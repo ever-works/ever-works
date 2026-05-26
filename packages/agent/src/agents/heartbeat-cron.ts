@@ -27,30 +27,30 @@ import { matchesCron, parseCron } from '../missions/cron-matcher';
  * (the dispatcher pauses the Agent + emits an error log row).
  */
 export function computeNextHeartbeat(
-	cadence: string | null,
-	from: Date = new Date(),
-	maxLookaheadMinutes = 60 * 24 * 400,
+    cadence: string | null,
+    from: Date = new Date(),
+    maxLookaheadMinutes = 60 * 24 * 400,
 ): Date | null {
-	if (!cadence) return null;
-	if (cadence === 'manual') return null;
+    if (!cadence) return null;
+    if (cadence === 'manual') return null;
 
-	try {
-		// Parse-once to surface invalid expressions before iterating.
-		parseCron(cadence);
-	} catch {
-		return null;
-	}
+    try {
+        // Parse-once to surface invalid expressions before iterating.
+        parseCron(cadence);
+    } catch {
+        return null;
+    }
 
-	// Start at the next whole minute strictly after `from`. We never
-	// return a value at or before `from` because the dispatcher's
-	// `findDueForHeartbeat` would re-pick the row on the same tick.
-	const cursor = new Date(Math.floor(from.getTime() / 60_000) * 60_000 + 60_000);
+    // Start at the next whole minute strictly after `from`. We never
+    // return a value at or before `from` because the dispatcher's
+    // `findDueForHeartbeat` would re-pick the row on the same tick.
+    const cursor = new Date(Math.floor(from.getTime() / 60_000) * 60_000 + 60_000);
 
-	for (let i = 0; i < maxLookaheadMinutes; i++) {
-		if (matchesCron(cadence, cursor)) {
-			return cursor;
-		}
-		cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
-	}
-	return null;
+    for (let i = 0; i < maxLookaheadMinutes; i++) {
+        if (matchesCron(cadence, cursor)) {
+            return cursor;
+        }
+        cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+    }
+    return null;
 }

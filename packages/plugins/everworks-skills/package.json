@@ -43,8 +43,12 @@
 			"id": "everworks-skills",
 			"name": "Ever Works Skills",
 			"category": "utility",
-			"capabilities": ["skills-provider"],
-			"defaultForCapabilities": ["skills-provider"]
+			"capabilities": [
+				"skills-provider"
+			],
+			"defaultForCapabilities": [
+				"skills-provider"
+			]
 		}
 	}
 }

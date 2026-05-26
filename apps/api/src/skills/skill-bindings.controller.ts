@@ -1,11 +1,4 @@
-import {
-	Controller,
-	Delete,
-	HttpCode,
-	HttpStatus,
-	Param,
-	ParseUUIDPipe,
-} from '@nestjs/common';
+import { Controller, Delete, HttpCode, HttpStatus, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { SkillsService } from '@ever-works/agent/skills';
@@ -22,16 +15,16 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 @ApiTags('skills')
 @Controller('api/skill-bindings')
 export class SkillBindingsController {
-	constructor(private readonly service: SkillsService) {}
+    constructor(private readonly service: SkillsService) {}
 
-	@Delete(':id')
-	@ApiOperation({ summary: 'Remove one Skill binding by id.' })
-	@HttpCode(HttpStatus.OK)
-	@Throttle({ default: { limit: 60, ttl: 60_000 } })
-	async remove(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<{ deleted: true }> {
-		return this.service.removeBinding(auth.userId, id);
-	}
+    @Delete(':id')
+    @ApiOperation({ summary: 'Remove one Skill binding by id.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ deleted: true }> {
+        return this.service.removeBinding(auth.userId, id);
+    }
 }

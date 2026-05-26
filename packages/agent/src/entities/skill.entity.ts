@@ -1,12 +1,12 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
-	UpdateDateColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 
@@ -30,11 +30,11 @@ import { User } from './user.entity';
 export type SkillOwnerType = 'tenant' | 'mission' | 'idea' | 'work' | 'agent';
 
 export interface SkillFrontmatter {
-	name: string;
-	description: string;
-	allowedTools?: string[];
-	tags?: string[];
-	[key: string]: unknown;
+    name: string;
+    description: string;
+    allowedTools?: string[];
+    tags?: string[];
+    [key: string]: unknown;
 }
 
 @Entity({ name: 'skills' })
@@ -42,55 +42,55 @@ export interface SkillFrontmatter {
 @Index('idx_skills_owner', ['ownerType', 'ownerId'])
 @Index('idx_skills_user', ['userId'])
 export class Skill {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	userId: string;
+    @Column({ type: 'uuid' })
+    userId: string;
 
-	@ManyToOne(() => User, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'userId' })
-	user?: User;
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'userId' })
+    user?: User;
 
-	@Column({ length: 16 })
-	ownerType: SkillOwnerType;
+    @Column({ length: 16 })
+    ownerType: SkillOwnerType;
 
-	@Column('uuid')
-	ownerId: string;
+    @Column('uuid')
+    ownerId: string;
 
-	@Column({ length: 80 })
-	slug: string;
+    @Column({ length: 80 })
+    slug: string;
 
-	@Column({ length: 120 })
-	title: string;
+    @Column({ length: 120 })
+    title: string;
 
-	@Column({ type: 'text' })
-	description: string;
+    @Column({ type: 'text' })
+    description: string;
 
-	@Column({ type: 'simple-json' })
-	frontmatter: SkillFrontmatter;
+    @Column({ type: 'simple-json' })
+    frontmatter: SkillFrontmatter;
 
-	@Column({ type: 'text' })
-	instructionsMd: string;
+    @Column({ type: 'text' })
+    instructionsMd: string;
 
-	@Column({ length: 64 })
-	contentHash: string;
+    @Column({ length: 64 })
+    contentHash: string;
 
-	@Column({ type: 'varchar', length: 200, nullable: true })
-	sourcePath?: string | null;
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    sourcePath?: string | null;
 
-	@Column({ type: 'varchar', length: 80, nullable: true })
-	sourceCatalogSlug?: string | null;
+    @Column({ type: 'varchar', length: 80, nullable: true })
+    sourceCatalogSlug?: string | null;
 
-	@Column({ type: 'varchar', length: 16, nullable: true })
-	sourceCatalogVersion?: string | null;
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    sourceCatalogVersion?: string | null;
 
-	@Column({ type: 'varchar', length: 16, default: '1.0.0' })
-	version: string;
+    @Column({ type: 'varchar', length: 16, default: '1.0.0' })
+    version: string;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

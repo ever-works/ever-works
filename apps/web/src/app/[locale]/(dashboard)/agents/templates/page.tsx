@@ -36,8 +36,8 @@ export default async function AgentTemplatesPage() {
                         Agent templates
                     </h1>
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 max-w-2xl">
-                        Pre-built Agent shapes you can spin up in a click. Click "Use template" to
-                        open the New flow with the body pre-filled.
+                        Pre-built Agent shapes you can spin up in a click. Click &ldquo;Use
+                        template&rdquo; to open the New flow with the body pre-filled.
                     </p>
                 </div>
             </div>

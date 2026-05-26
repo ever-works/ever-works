@@ -15,24 +15,24 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 @Index('idx_agent_run_logs_run_created', ['runId', 'createdAt'])
 @Index('idx_agent_run_logs_run_level', ['runId', 'level'])
 export class AgentRunLog {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	runId: string;
+    @Column('uuid')
+    runId: string;
 
-	@Column({ length: 8 })
-	level: 'INFO' | 'WARN' | 'ERROR';
+    @Column({ length: 8 })
+    level: 'INFO' | 'WARN' | 'ERROR';
 
-	@Column({ length: 80 })
-	step: string;
+    @Column({ length: 80 })
+    step: string;
 
-	@Column({ type: 'text' })
-	message: string;
+    @Column({ type: 'text' })
+    message: string;
 
-	@Column('simple-json', { nullable: true })
-	metadata?: Record<string, unknown> | null;
+    @Column('simple-json', { nullable: true })
+    metadata?: Record<string, unknown> | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

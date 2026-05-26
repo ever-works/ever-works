@@ -46,9 +46,7 @@ export async function resumeAgentAction(id: string): Promise<Agent> {
     return agent;
 }
 
-export async function archiveAgentAction(
-    id: string,
-): Promise<{ archived?: true; deleted?: true }> {
+export async function archiveAgentAction(id: string): Promise<{ archived?: true; deleted?: true }> {
     const res = await agentsAPI.archive(id);
     revalidatePath('/agents');
     return res;

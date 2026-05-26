@@ -1,10 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-	FacadeOptions,
-	ISkillsProviderPlugin,
-	SkillCatalogEntry,
-	SkillCatalogListOptions,
-	SkillCatalogListResult,
+    FacadeOptions,
+    ISkillsProviderPlugin,
+    SkillCatalogEntry,
+    SkillCatalogListOptions,
+    SkillCatalogListResult,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -13,10 +13,10 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class SkillsFacadeError extends FacadeError {
-	constructor(message: string, operation: string, provider?: string, cause?: Error) {
-		super(message, operation, provider, cause);
-		this.name = 'SkillsFacadeError';
-	}
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
+        this.name = 'SkillsFacadeError';
+    }
 }
 
 /**
@@ -35,82 +35,86 @@ export class SkillsFacadeError extends FacadeError {
  */
 @Injectable()
 export class SkillsFacadeService extends BaseFacadeService {
-	protected readonly logger = new Logger(SkillsFacadeService.name);
-	protected readonly CAPABILITY = PLUGIN_CAPABILITIES.SKILLS_PROVIDER;
+    protected readonly logger = new Logger(SkillsFacadeService.name);
+    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.SKILLS_PROVIDER;
 
-	constructor(
-		registry: PluginRegistryService,
-		settingsService: PluginSettingsService,
-		@Optional() workPluginRepository?: WorkPluginRepository,
-	) {
-		super(registry, settingsService, workPluginRepository);
-	}
+    constructor(
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() workPluginRepository?: WorkPluginRepository,
+    ) {
+        super(registry, settingsService, workPluginRepository);
+    }
 
-	/**
-	 * Aggregate `listEntries` across all enabled providers. Dedupes
-	 * by slug. Caps `limit` per provider so a chatty provider can't
-	 * blow the page size.
-	 */
-	async listEntries(
-		options: SkillCatalogListOptions,
-		facadeOptions: FacadeOptions,
-	): Promise<SkillCatalogListResult> {
-		const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
-		if (plugins.length === 0) {
-			return { entries: [], total: 0 };
-		}
+    /**
+     * Aggregate `listEntries` across all enabled providers. Dedupes
+     * by slug. Caps `limit` per provider so a chatty provider can't
+     * blow the page size.
+     */
+    async listEntries(
+        options: SkillCatalogListOptions,
+        facadeOptions: FacadeOptions,
+    ): Promise<SkillCatalogListResult> {
+        const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
+        if (plugins.length === 0) {
+            return { entries: [], total: 0 };
+        }
 
-		const seenSlugs = new Set<string>();
-		const merged: SkillCatalogEntry[] = [];
-		let totalAcrossProviders = 0;
+        const seenSlugs = new Set<string>();
+        const merged: SkillCatalogEntry[] = [];
+        let totalAcrossProviders = 0;
 
-		for (const wrapped of plugins) {
-			const plugin = wrapped.plugin as ISkillsProviderPlugin;
-			try {
-				const settings = this.settingsService
-					? await this.settingsService.resolveSettings(plugin.id, facadeOptions).catch(() => undefined)
-					: undefined;
-				const result = await plugin.listEntries({
-					limit: options.limit,
-					offset: options.offset,
-					tags: options.tags,
-					search: options.search,
-					settings,
-				});
-				totalAcrossProviders += result.total;
-				for (const entry of result.entries) {
-					if (seenSlugs.has(entry.slug)) continue;
-					seenSlugs.add(entry.slug);
-					merged.push(entry);
-				}
-			} catch (err) {
-				this.logger.warn(
-					`Skills provider ${plugin.id} failed to listEntries: ${err instanceof Error ? err.message : err}`,
-				);
-			}
-		}
-		return { entries: merged, total: totalAcrossProviders };
-	}
+        for (const wrapped of plugins) {
+            const plugin = wrapped.plugin as ISkillsProviderPlugin;
+            try {
+                const settings = this.settingsService
+                    ? await this.settingsService
+                          .getResolvedSettings(plugin.id, facadeOptions)
+                          .catch(() => undefined)
+                    : undefined;
+                const result = await plugin.listEntries({
+                    limit: options.limit,
+                    offset: options.offset,
+                    tags: options.tags,
+                    search: options.search,
+                    settings,
+                });
+                totalAcrossProviders += result.total;
+                for (const entry of result.entries) {
+                    if (seenSlugs.has(entry.slug)) continue;
+                    seenSlugs.add(entry.slug);
+                    merged.push(entry);
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Skills provider ${plugin.id} failed to listEntries: ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+        return { entries: merged, total: totalAcrossProviders };
+    }
 
-	async getEntry(
-		slug: string,
-		facadeOptions: FacadeOptions,
-	): Promise<{ entry: SkillCatalogEntry; providerId: string } | null> {
-		const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
-		for (const wrapped of plugins) {
-			const plugin = wrapped.plugin as ISkillsProviderPlugin;
-			try {
-				const settings = this.settingsService
-					? await this.settingsService.resolveSettings(plugin.id, facadeOptions).catch(() => undefined)
-					: undefined;
-				const entry = await plugin.getEntry(slug, settings);
-				if (entry) return { entry, providerId: plugin.id };
-			} catch (err) {
-				this.logger.warn(
-					`Skills provider ${plugin.id} failed to getEntry(${slug}): ${err instanceof Error ? err.message : err}`,
-				);
-			}
-		}
-		return null;
-	}
+    async getEntry(
+        slug: string,
+        facadeOptions: FacadeOptions,
+    ): Promise<{ entry: SkillCatalogEntry; providerId: string } | null> {
+        const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
+        for (const wrapped of plugins) {
+            const plugin = wrapped.plugin as ISkillsProviderPlugin;
+            try {
+                const settings = this.settingsService
+                    ? await this.settingsService
+                          .getResolvedSettings(plugin.id, facadeOptions)
+                          .catch(() => undefined)
+                    : undefined;
+                const entry = await plugin.getEntry(slug, settings);
+                if (entry) return { entry, providerId: plugin.id };
+            } catch (err) {
+                this.logger.warn(
+                    `Skills provider ${plugin.id} failed to getEntry(${slug}): ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+        return null;
+    }
 }

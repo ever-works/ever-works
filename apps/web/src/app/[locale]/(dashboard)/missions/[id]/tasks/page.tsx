@@ -12,11 +12,7 @@ export const metadata: Metadata = { title: 'Tasks' };
  * (tick 38), so Overview and Tasks both inherit the navigation
  * automatically — this page only needs to render its Tasks content.
  */
-export default async function MissionTasksTabPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function MissionTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const result = await tasksAPI
         .list({ missionId: id, limit: 100 })

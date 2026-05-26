@@ -24,7 +24,15 @@ export async function createTaskAction(input: {
     return task;
 }
 
-export async function updateTaskAction(id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'labels' | 'parentTaskId' | 'requireAllApprovers'>>): Promise<Task> {
+export async function updateTaskAction(
+    id: string,
+    patch: Partial<
+        Pick<
+            Task,
+            'title' | 'description' | 'priority' | 'labels' | 'parentTaskId' | 'requireAllApprovers'
+        >
+    >,
+): Promise<Task> {
     const task = await tasksAPI.update(id, patch);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -37,7 +45,11 @@ export async function deleteTaskAction(id: string): Promise<{ deleted: true }> {
     return res;
 }
 
-export async function transitionTaskAction(id: string, to: TaskStatus, force = false): Promise<Task> {
+export async function transitionTaskAction(
+    id: string,
+    to: TaskStatus,
+    force = false,
+): Promise<Task> {
     const task = await tasksAPI.transition(id, to, force);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -50,7 +62,10 @@ export async function postTaskChatAction(taskId: string, body: string): Promise<
     return message;
 }
 
-export async function editTaskChatAction(messageId: string, body: string): Promise<TaskChatMessage> {
+export async function editTaskChatAction(
+    messageId: string,
+    body: string,
+): Promise<TaskChatMessage> {
     return tasksAPI.editChat(messageId, body);
 }
 

@@ -1,7 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { skillsAPI, type Skill, type SkillBinding, type SkillFrontmatter, type SkillOwnerType, type SkillBindingTargetType } from '@/lib/api/skills';
+import {
+    skillsAPI,
+    type Skill,
+    type SkillBinding,
+    type SkillFrontmatter,
+    type SkillOwnerType,
+    type SkillBindingTargetType,
+} from '@/lib/api/skills';
 import { getAuthFromCookie } from '@/lib/auth';
 
 /**
@@ -53,9 +60,7 @@ export async function createCustomSkillAction(input: {
     slug?: string;
 }): Promise<Skill> {
     const ownerId =
-        input.ownerType === 'tenant' && !input.ownerId
-            ? await getCurrentUserId()
-            : input.ownerId;
+        input.ownerType === 'tenant' && !input.ownerId ? await getCurrentUserId() : input.ownerId;
     const skill = await skillsAPI.create({ ...input, ownerId });
     revalidatePath('/skills');
     return skill;
@@ -63,7 +68,9 @@ export async function createCustomSkillAction(input: {
 
 export async function updateSkillAction(
     id: string,
-    body: Partial<Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>>,
+    body: Partial<
+        Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>
+    >,
 ): Promise<Skill> {
     const skill = await skillsAPI.update(id, body);
     revalidatePath('/skills');

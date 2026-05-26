@@ -195,13 +195,14 @@ This deliberately diverges from Skills (in-monorepo, [ADR-007](../decisions/007-
 ```
 
 Notes:
+
 - "Use account default" is **the first option**, always pre-selected.
 - "Run first heartbeat now after creating" is **checked by default** to deliver the wow moment.
 - The permissions list shows in plain English; defaults are conservative (all off except the most useful for the starter).
 
 ### 4.3 Microcopy decisions
 
-- "Heartbeat" → never explained except via tooltip on the field: *"How often your Agent wakes up to think about what to do next. Pick `Manual only` to control it by hand."*
+- "Heartbeat" → never explained except via tooltip on the field: _"How often your Agent wakes up to think about what to do next. Pick `Manual only` to control it by hand."_
 - "Capabilities" → never called "system prompt." That terminology bleeds into the SaaS too much.
 - "Budget cap" → never called "rate limit" or "token cap." Cost is dollars.
 
@@ -482,7 +483,7 @@ Bound to:
 Every new spending surface follows three rules:
 
 1. **Show the cap and current spend BEFORE the action.** The `Run heartbeat now` button has an inline label: `(est. $0.03)`. The Agent dashboard always shows month progress bar.
-2. **Yellow warning at 80% of cap; red at 95%; blocked at 100%.** Banner copy: *"Your CEO Agent is at 95% of its $20 budget for May. New runs may be blocked on Sat Jun 1 — adjust below or wait for reset."*
+2. **Yellow warning at 80% of cap; red at 95%; blocked at 100%.** Banner copy: _"Your CEO Agent is at 95% of its $20 budget for May. New runs may be blocked on Sat Jun 1 — adjust below or wait for reset."_
 3. **No silent failures.** A blocked run still appears in the activity feed with a clear `Budget exceeded` row + a "Top up" button (deep links to Budget tab).
 
 This addresses the #1 user fear with autonomous AI: surprise bills.
@@ -491,17 +492,17 @@ This addresses the #1 user fear with autonomous AI: surprise bills.
 
 ## 9. Error / loading / empty states matrix
 
-| Surface                       | Empty                                          | Loading                       | Error                                                    |
-| ----------------------------- | ---------------------------------------------- | ----------------------------- | -------------------------------------------------------- |
-| `/agents` list                | Card with sample + "+ New Agent" CTA            | Skeleton cards × 6            | "Couldn't load Agents. [Try again]"                       |
-| `/agents/[id]/dashboard`      | (Never empty after create)                     | Skeleton blocks               | Per-block error banners + retry                          |
-| `/agents/[id]/instructions`   | (Files always exist post-create)               | Skeleton editor               | "Your Mission repo is unreachable. We have a cached copy."|
-| `/agents/[id]/activity`       | "No runs yet. The next tick runs Mon 9am UTC." | Skeleton feed rows            | Same as activity feed today.                              |
-| `/agents/[id]/budgets`        | (Always populated)                             | Skeleton sparkline            | "Budget data unavailable. [Refresh]"                      |
-| `/agents/[id]/skills`         | "No skills attached. Browse the catalog →"     | Skeleton cards                | Standard.                                                |
-| `/tasks` list                 | "No tasks yet. Try `+ New Task`."              | Skeleton cards                | Standard.                                                |
-| `/tasks/[id]`                 | (404 if doesn't exist)                         | Skeleton split-pane           | Standard.                                                |
-| `/skills` list                | (Always shows catalog; never empty)            | Skeleton sections             | Standard.                                                |
+| Surface                     | Empty                                          | Loading             | Error                                                      |
+| --------------------------- | ---------------------------------------------- | ------------------- | ---------------------------------------------------------- |
+| `/agents` list              | Card with sample + "+ New Agent" CTA           | Skeleton cards × 6  | "Couldn't load Agents. [Try again]"                        |
+| `/agents/[id]/dashboard`    | (Never empty after create)                     | Skeleton blocks     | Per-block error banners + retry                            |
+| `/agents/[id]/instructions` | (Files always exist post-create)               | Skeleton editor     | "Your Mission repo is unreachable. We have a cached copy." |
+| `/agents/[id]/activity`     | "No runs yet. The next tick runs Mon 9am UTC." | Skeleton feed rows  | Same as activity feed today.                               |
+| `/agents/[id]/budgets`      | (Always populated)                             | Skeleton sparkline  | "Budget data unavailable. [Refresh]"                       |
+| `/agents/[id]/skills`       | "No skills attached. Browse the catalog →"     | Skeleton cards      | Standard.                                                  |
+| `/tasks` list               | "No tasks yet. Try `+ New Task`."              | Skeleton cards      | Standard.                                                  |
+| `/tasks/[id]`               | (404 if doesn't exist)                         | Skeleton split-pane | Standard.                                                  |
+| `/skills` list              | (Always shows catalog; never empty)            | Skeleton sections   | Standard.                                                  |
 
 Loading: skeleton elements, not spinners. Loading should feel like "almost there," not "still nothing."
 
@@ -519,13 +520,13 @@ Where do users see "Agent paused" / "Task assigned" notifications?
 
 Notification copy templates:
 
-| Event                                  | Title                                       | Body                                                                  |
-| -------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
-| `AGENT_PAUSED` (after threshold)       | "Your Agent paused itself"                  | *Your "CEO" Agent paused after 3 consecutive failed runs. [Review →]* |
-| `AGENT_BUDGET_EXCEEDED`                | "Agent budget exceeded"                     | *Your "CEO" Agent hit its $20 monthly cap. Budget resets Jun 1. [Adjust →]*|
-| `TASK_ASSIGNED`                        | "You were assigned to a task"               | *Maya assigned you to T-42 "Pick screenshot plugin" — p1. [Open →]*    |
-| `TASK_AGENT_REPLIED`                   | "Agent replied in T-42"                     | *VP-Engineering posted: "PR #43 opened. Will switch on merge." [Open →]*|
-| `SKILL_UPDATE_AVAILABLE`               | "Catalog skill updated"                     | *"seo-meta" has a new version (v1.1). Review changes? [Compare →]*    |
+| Event                            | Title                         | Body                                                                        |
+| -------------------------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `AGENT_PAUSED` (after threshold) | "Your Agent paused itself"    | _Your "CEO" Agent paused after 3 consecutive failed runs. [Review →]_       |
+| `AGENT_BUDGET_EXCEEDED`          | "Agent budget exceeded"       | _Your "CEO" Agent hit its $20 monthly cap. Budget resets Jun 1. [Adjust →]_ |
+| `TASK_ASSIGNED`                  | "You were assigned to a task" | _Maya assigned you to T-42 "Pick screenshot plugin" — p1. [Open →]_         |
+| `TASK_AGENT_REPLIED`             | "Agent replied in T-42"       | _VP-Engineering posted: "PR #43 opened. Will switch on merge." [Open →]_    |
+| `SKILL_UPDATE_AVAILABLE`         | "Catalog skill updated"       | _"seo-meta" has a new version (v1.1). Review changes? [Compare →]_          |
 
 ---
 
@@ -613,6 +614,7 @@ And per K3 (round 8):
 > "K3 — NO, we don't care much about existing users at this stage, as long as nothing broke we are fine etc."
 
 Discovery is entirely passive:
+
 - New sidebar items (Agents, Tasks, Skills) appear after deploy. Users see them or they don't.
 - Dashboard empty tiles ("Agents enabled — 0") for users who notice.
 - Onboarding wizard's new optional steps (§11.1 + §11.2) for any user who happens to re-run onboarding.
@@ -625,14 +627,14 @@ No backwards-compat code, no migration job, no announcement infrastructure to bu
 
 A Work / Mission can have multiple human members today (OWNER / MANAGER / EDITOR / VIEWER). Adding Agents to a shared Work raises questions:
 
-| Question                                           | Behavior in v1                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Who can create an Agent on a Work?                 | OWNER and MANAGER. EDITOR can attach existing tenant Agents.                                       |
-| Who pays for Agent runs?                            | The Agent's `userId` (creator) pays. Cost is visible to all members on the Work's Spend tab.     |
-| Who can pause/start an Agent on a shared Work?     | OWNER, MANAGER, and the Agent's creator (`userId`).                                                |
-| Who can edit Agent files?                           | OWNER, MANAGER, and the Agent's `userId`. EDITORS see read-only.                                   |
-| Who can see the Agent's runs/activity?              | All Work members.                                                                                 |
-| Can a non-creator delete/archive the Agent?         | OWNER and MANAGER only.                                                                            |
+| Question                                       | Behavior in v1                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Who can create an Agent on a Work?             | OWNER and MANAGER. EDITOR can attach existing tenant Agents.                                 |
+| Who pays for Agent runs?                       | The Agent's `userId` (creator) pays. Cost is visible to all members on the Work's Spend tab. |
+| Who can pause/start an Agent on a shared Work? | OWNER, MANAGER, and the Agent's creator (`userId`).                                          |
+| Who can edit Agent files?                      | OWNER, MANAGER, and the Agent's `userId`. EDITORS see read-only.                             |
+| Who can see the Agent's runs/activity?         | All Work members.                                                                            |
+| Can a non-creator delete/archive the Agent?    | OWNER and MANAGER only.                                                                      |
 
 This puts cost & control with the creator while letting collaborators benefit from the output. See [QUESTIONS B4](../QUESTIONS-agents-skills-tasks.md#b4--can-a-human-work-member-with-role-viewer-see-agents-on-that-work).
 
@@ -662,18 +664,18 @@ v1 mobile is "functional, not delightful." A "mobile companion" pass is post-MVP
 
 ## 15. Telemetry — what we measure post-launch
 
-| Metric                                              | Why                                                            |
-| --------------------------------------------------- | -------------------------------------------------------------- |
-| % tenants who create their first Agent within 7d    | Discoverability of the feature.                                |
-| % first-Agents using the "Try sample" path           | If high, double down on samples; if low, kill them.           |
-| Time-from-create to first-completed-heartbeat        | If > 30s, optimize the wow moment.                            |
-| Median budget cap users set                          | Tune defaults.                                                 |
-| % runs that fail with `budget_exceeded`              | Default budgets too low?                                       |
-| Most-installed catalog skill                         | Curate more like the winners.                                  |
-| % tenants using @-mentions in task chat              | Validate the Tasks-as-comms channel assumption.                |
-| % cross-scope task assignments                       | Validate the hierarchy story.                                  |
-| Agent-run failure rate, p50, p90                    | Quality of starters.                                           |
-| Median tokens per Agent run                          | Cost benchmark for default model selection.                    |
+| Metric                                           | Why                                                 |
+| ------------------------------------------------ | --------------------------------------------------- |
+| % tenants who create their first Agent within 7d | Discoverability of the feature.                     |
+| % first-Agents using the "Try sample" path       | If high, double down on samples; if low, kill them. |
+| Time-from-create to first-completed-heartbeat    | If > 30s, optimize the wow moment.                  |
+| Median budget cap users set                      | Tune defaults.                                      |
+| % runs that fail with `budget_exceeded`          | Default budgets too low?                            |
+| Most-installed catalog skill                     | Curate more like the winners.                       |
+| % tenants using @-mentions in task chat          | Validate the Tasks-as-comms channel assumption.     |
+| % cross-scope task assignments                   | Validate the hierarchy story.                       |
+| Agent-run failure rate, p50, p90                 | Quality of starters.                                |
+| Median tokens per Agent run                      | Cost benchmark for default model selection.         |
 
 PostHog events (in addition to ActivityLog already covering most): `agent_created_via_starter` (with starter slug), `agent_first_heartbeat_completed`, `task_kanban_drag`, `skill_attached_via_search`, `notification_clicked`.
 

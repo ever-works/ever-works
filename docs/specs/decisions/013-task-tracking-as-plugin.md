@@ -21,6 +21,7 @@ Crucial nuance from the operator: **the Task concept is still core; what becomes
 **Task TRACKING is a plugin capability.** The platform defines plugin category `task-tracker` with the contract `ITaskTrackerPlugin`. The first-party plugin **"Ever Works Task Tracker"** is the default `task-tracker`, storing tasks in platform DB tables (the schema designed in [`features/task-tracking/plan.md`](../features/task-tracking/plan.md)).
 
 Future community plugins can implement the same capability — e.g.:
+
 - **Linear Task Tracker** — proxies create/list/update/delete to Linear's API.
 - **JIRA Task Tracker** — same for Jira Cloud.
 - **GitHub Issues Task Tracker** — backs tasks with GitHub Issues.
@@ -48,50 +49,50 @@ A tenant has **exactly one active `task-tracker` plugin** at a time (unlike Skil
 ```typescript
 // packages/plugin/src/contracts/capabilities/task-tracker.interface.ts
 export interface TaskDto {
-    id: string;
-    slug: string;
-    title: string;
-    description?: string;
-    status: TaskStatus;
-    priority: TaskPriority;
-    labels: string[];
-    scope: { workId?: string; missionId?: string; ideaId?: string };
-    assignees: { type: 'user' | 'agent'; id: string }[];
-    // ... full Task shape
+	id: string;
+	slug: string;
+	title: string;
+	description?: string;
+	status: TaskStatus;
+	priority: TaskPriority;
+	labels: string[];
+	scope: { workId?: string; missionId?: string; ideaId?: string };
+	assignees: { type: 'user' | 'agent'; id: string }[];
+	// ... full Task shape
 }
 
 export interface ITaskTrackerPlugin extends IPlugin {
-    readonly providerName: string;
+	readonly providerName: string;
 
-    // CRUD
-    listTasks(options: ListTasksOptions): Promise<{ tasks: TaskDto[]; total: number }>;
-    getTask(id: string): Promise<TaskDto | null>;
-    createTask(input: CreateTaskInput, context: TaskContext): Promise<TaskDto>;
-    updateTask(id: string, patch: UpdateTaskInput, context: TaskContext): Promise<TaskDto>;
-    deleteTask(id: string, context: TaskContext): Promise<void>;
+	// CRUD
+	listTasks(options: ListTasksOptions): Promise<{ tasks: TaskDto[]; total: number }>;
+	getTask(id: string): Promise<TaskDto | null>;
+	createTask(input: CreateTaskInput, context: TaskContext): Promise<TaskDto>;
+	updateTask(id: string, patch: UpdateTaskInput, context: TaskContext): Promise<TaskDto>;
+	deleteTask(id: string, context: TaskContext): Promise<void>;
 
-    // State machine
-    transitionTask(id: string, to: TaskStatus, context: TaskContext): Promise<TaskDto>;
+	// State machine
+	transitionTask(id: string, to: TaskStatus, context: TaskContext): Promise<TaskDto>;
 
-    // Assignees / reviewers / approvers (mutations)
-    addAssignee(id: string, assignee: { type: 'user' | 'agent'; id: string }): Promise<void>;
-    removeAssignee(id: string, assigneeId: string): Promise<void>;
-    // ... reviewers, approvers, blockers, relations
+	// Assignees / reviewers / approvers (mutations)
+	addAssignee(id: string, assignee: { type: 'user' | 'agent'; id: string }): Promise<void>;
+	removeAssignee(id: string, assigneeId: string): Promise<void>;
+	// ... reviewers, approvers, blockers, relations
 
-    // Chat
-    listChat(taskId: string, options: { limit: number; cursor?: string }): Promise<{ messages: ChatMessageDto[] }>;
-    postChat(taskId: string, body: PostChatInput, context: TaskContext): Promise<ChatMessageDto>;
+	// Chat
+	listChat(taskId: string, options: { limit: number; cursor?: string }): Promise<{ messages: ChatMessageDto[] }>;
+	postChat(taskId: string, body: PostChatInput, context: TaskContext): Promise<ChatMessageDto>;
 
-    // Attachments
-    listAttachments(taskId: string): Promise<AttachmentDto[]>;
-    attachUpload(taskId: string, uploadId: string): Promise<void>;
+	// Attachments
+	listAttachments(taskId: string): Promise<AttachmentDto[]>;
+	attachUpload(taskId: string, uploadId: string): Promise<void>;
 
-    // Capability flags — for trackers that don't support certain features
-    readonly supportsSubTasks: boolean;
-    readonly supportsBlockers: boolean;
-    readonly supportsApprovers: boolean;
-    readonly supportsChat: boolean;
-    readonly supportsAgentAssignees: boolean;          // Linear/Jira/GH likely false
+	// Capability flags — for trackers that don't support certain features
+	readonly supportsSubTasks: boolean;
+	readonly supportsBlockers: boolean;
+	readonly supportsApprovers: boolean;
+	readonly supportsChat: boolean;
+	readonly supportsAgentAssignees: boolean; // Linear/Jira/GH likely false
 }
 ```
 
@@ -107,17 +108,20 @@ Lives at `packages/plugins/everworks-task-tracker/`. `package.json` `everworks.p
 
 ```json
 {
-    "id": "everworks-task-tracker",
-    "name": "Ever Works Task Tracker",
-    "category": "task-tracker",
-    "capabilities": ["task-tracker"],
-    "defaultForCapabilities": ["task-tracker"],
-    "visibility": "public",
-    "settingsSchema": { /* (mostly empty — uses platform DB) */ }
+	"id": "everworks-task-tracker",
+	"name": "Ever Works Task Tracker",
+	"category": "task-tracker",
+	"capabilities": ["task-tracker"],
+	"defaultForCapabilities": ["task-tracker"],
+	"visibility": "public",
+	"settingsSchema": {
+		/* (mostly empty — uses platform DB) */
+	}
 }
 ```
 
 Implementation:
+
 - All CRUD operations write to the existing `tasks` / `task_*` tables via the existing repositories (which live in `packages/agent/src/database/repositories/`).
 - All capability flags are `true` (the only tracker that supports the full feature set).
 - Bundles the Task templates loaded from [`ever-works/tasks`](https://github.com/ever-works/tasks) (per ADR-014) for the "+ New Task from template" flow.

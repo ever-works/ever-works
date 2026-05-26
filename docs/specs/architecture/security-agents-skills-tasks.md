@@ -10,20 +10,20 @@
 
 ## 1. Threats covered
 
-| Threat                                  | Impact                                                  | Where the surface is                                            | Mitigation section |
-| --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------- | ------------------ |
-| **T1**: Prompt injection from KB        | Agent obeys malicious instructions from KB document     | `getKbDocument` tool; system-message injection of KB content     | §3                 |
-| **T2**: Prompt injection from Task body | Agent obeys task description with hidden instructions   | Task body / chat input → prompt assembly                          | §4                 |
-| **T3**: Path traversal in `editAgentFile`/`commitToRepo` | Agent writes outside its scope subtree     | Tool args: `name`, `path`                                        | §5                 |
-| **T4**: Secret leakage in chat/description | API keys end up in `task_chat_messages` body          | `POST /tasks/:id/chat`, `POST /tasks`                            | §6                 |
-| **T5**: Tool ACL bypass                 | Agent invokes tool not gated by its permissions          | `AgentToolService.resolveAllowedTools` + per-tool gates           | §7                 |
-| **T6**: DDoS via chat-triggered runs    | Spam mentions trigger 100s of Trigger.dev runs           | `task_chat_messages` insert → mention parser → run dispatch       | §8                 |
-| **T7**: Cross-tenant data leak via Agent context | Tenant A's Agent reads Tenant B's data            | `getActivity`, `getMissionState`, `getKbDocument`                 | §9                 |
-| **T8**: Privilege escalation via sub-agent creation | Child Agent gets perms parent doesn't have    | `createSubAgent` tool                                            | §10                |
-| **T9**: Cost-abuse from runaway tool loop | Agent calls `searchWeb` 1000× in one run               | Tool loop, AI provider, budget                                   | §11                |
-| **T10**: Stale-state from concurrent file edits | UI save races with Agent's `editAgentFile`        | Both go through `AgentFileService`                                | §12                |
-| **T11**: Audit-log tampering            | Agent edits its own activity rows                       | Tool surface — none allowed today                                | §13                |
-| **T12**: Replay of internal RPC         | Worker → API `/internal/trigger/remote/call` replayed   | Existing `x-trigger-secret` channel                              | §14                |
+| Threat                                                   | Impact                                                | Where the surface is                                         | Mitigation section |
+| -------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------ | ------------------ |
+| **T1**: Prompt injection from KB                         | Agent obeys malicious instructions from KB document   | `getKbDocument` tool; system-message injection of KB content | §3                 |
+| **T2**: Prompt injection from Task body                  | Agent obeys task description with hidden instructions | Task body / chat input → prompt assembly                     | §4                 |
+| **T3**: Path traversal in `editAgentFile`/`commitToRepo` | Agent writes outside its scope subtree                | Tool args: `name`, `path`                                    | §5                 |
+| **T4**: Secret leakage in chat/description               | API keys end up in `task_chat_messages` body          | `POST /tasks/:id/chat`, `POST /tasks`                        | §6                 |
+| **T5**: Tool ACL bypass                                  | Agent invokes tool not gated by its permissions       | `AgentToolService.resolveAllowedTools` + per-tool gates      | §7                 |
+| **T6**: DDoS via chat-triggered runs                     | Spam mentions trigger 100s of Trigger.dev runs        | `task_chat_messages` insert → mention parser → run dispatch  | §8                 |
+| **T7**: Cross-tenant data leak via Agent context         | Tenant A's Agent reads Tenant B's data                | `getActivity`, `getMissionState`, `getKbDocument`            | §9                 |
+| **T8**: Privilege escalation via sub-agent creation      | Child Agent gets perms parent doesn't have            | `createSubAgent` tool                                        | §10                |
+| **T9**: Cost-abuse from runaway tool loop                | Agent calls `searchWeb` 1000× in one run              | Tool loop, AI provider, budget                               | §11                |
+| **T10**: Stale-state from concurrent file edits          | UI save races with Agent's `editAgentFile`            | Both go through `AgentFileService`                           | §12                |
+| **T11**: Audit-log tampering                             | Agent edits its own activity rows                     | Tool surface — none allowed today                            | §13                |
+| **T12**: Replay of internal RPC                          | Worker → API `/internal/trigger/remote/call` replayed | Existing `x-trigger-secret` channel                          | §14                |
 
 ---
 
@@ -115,6 +115,7 @@
     - **Redact** (Task descriptions, chat messages): the matched span is replaced with `[redacted secret]` before storage, with an inline warning toast to the writer.
 
     Why split: agent files / skills are deliberate authoring; tasks/chat are often in-the-moment and harder to ask the user to fix.
+
 3. **Output-side scan**. Every `task_chat_messages` and `agent_run_logs.message` ALSO scans before storage on the response side (the AI could echo a key). Same regex, same redact behavior.
 4. **Activity log never embeds plaintext secrets** — payloads are scanned + summarised.
 

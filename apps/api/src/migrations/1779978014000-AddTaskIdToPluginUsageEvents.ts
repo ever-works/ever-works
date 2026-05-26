@@ -13,48 +13,48 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * Idempotent: gates on `hasColumn` / `hasIndex`.
  */
 export class AddTaskIdToPluginUsageEvents1779978014000 implements MigrationInterface {
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		const hasColumn = await queryRunner.hasColumn('plugin_usage_events', 'taskId');
-		if (!hasColumn) {
-			await queryRunner.addColumn(
-				'plugin_usage_events',
-				new TableColumn({
-					name: 'taskId',
-					type: 'uuid',
-					isNullable: true,
-				}),
-			);
-		}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        const hasColumn = await queryRunner.hasColumn('plugin_usage_events', 'taskId');
+        if (!hasColumn) {
+            await queryRunner.addColumn(
+                'plugin_usage_events',
+                new TableColumn({
+                    name: 'taskId',
+                    type: 'uuid',
+                    isNullable: true,
+                }),
+            );
+        }
 
-		const table = await queryRunner.getTable('plugin_usage_events');
-		const indexExists = table?.indices.some(
-			(idx) => idx.name === 'idx_plugin_usage_events_task_occurred',
-		);
-		if (!indexExists) {
-			await queryRunner.createIndex(
-				'plugin_usage_events',
-				new TableIndex({
-					name: 'idx_plugin_usage_events_task_occurred',
-					columnNames: ['taskId', 'occurredAt'],
-				}),
-			);
-		}
-	}
+        const table = await queryRunner.getTable('plugin_usage_events');
+        const indexExists = table?.indices.some(
+            (idx) => idx.name === 'idx_plugin_usage_events_task_occurred',
+        );
+        if (!indexExists) {
+            await queryRunner.createIndex(
+                'plugin_usage_events',
+                new TableIndex({
+                    name: 'idx_plugin_usage_events_task_occurred',
+                    columnNames: ['taskId', 'occurredAt'],
+                }),
+            );
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		const table = await queryRunner.getTable('plugin_usage_events');
-		const indexExists = table?.indices.some(
-			(idx) => idx.name === 'idx_plugin_usage_events_task_occurred',
-		);
-		if (indexExists) {
-			await queryRunner.dropIndex(
-				'plugin_usage_events',
-				'idx_plugin_usage_events_task_occurred',
-			);
-		}
-		const hasColumn = await queryRunner.hasColumn('plugin_usage_events', 'taskId');
-		if (hasColumn) {
-			await queryRunner.dropColumn('plugin_usage_events', 'taskId');
-		}
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        const table = await queryRunner.getTable('plugin_usage_events');
+        const indexExists = table?.indices.some(
+            (idx) => idx.name === 'idx_plugin_usage_events_task_occurred',
+        );
+        if (indexExists) {
+            await queryRunner.dropIndex(
+                'plugin_usage_events',
+                'idx_plugin_usage_events_task_occurred',
+            );
+        }
+        const hasColumn = await queryRunner.hasColumn('plugin_usage_events', 'taskId');
+        if (hasColumn) {
+            await queryRunner.dropColumn('plugin_usage_events', 'taskId');
+        }
+    }
 }

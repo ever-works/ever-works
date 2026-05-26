@@ -130,9 +130,7 @@ export function TaskDetailClient({
             </header>
 
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
-                    Move to
-                </h2>
+                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">Move to</h2>
                 <div className="flex flex-wrap gap-2">
                     {(NEXT_STATUS[currentStatus] ?? []).map((next) => (
                         <Button

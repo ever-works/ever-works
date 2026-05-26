@@ -1,10 +1,7 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { config } from '@ever-works/agent/config';
-import {
-    AgentRepository,
-    AgentRunRepository,
-} from '@ever-works/agent/database';
+import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { computeNextHeartbeat } from '@ever-works/agent/agents';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';

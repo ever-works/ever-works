@@ -35,7 +35,10 @@ export function SkillDetailClient({
 }) {
     return (
         <div className="max-w-screen-2xl mx-auto p-6 space-y-6">
-            <Link href={ROUTES.DASHBOARD_SKILLS} className="text-xs text-text-muted hover:text-text">
+            <Link
+                href={ROUTES.DASHBOARD_SKILLS}
+                className="text-xs text-text-muted hover:text-text"
+            >
                 ← Skills
             </Link>
             <header className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
@@ -177,10 +180,7 @@ function BindingsPanel({
         })();
     };
 
-    const sorted = useMemo(
-        () => [...bindings].sort((a, b) => a.priority - b.priority),
-        [bindings],
-    );
+    const sorted = useMemo(() => [...bindings].sort((a, b) => a.priority - b.priority), [bindings]);
 
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
@@ -331,7 +331,12 @@ function DangerZone({ skillId }: { skillId: string }) {
                     </Button>
                 </div>
             ) : (
-                <Button size="sm" variant="ghost" onClick={() => setConfirming(true)} className="text-danger">
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirming(true)}
+                    className="text-danger"
+                >
                     Delete this Skill
                 </Button>
             )}

@@ -894,22 +894,22 @@ GitHub repo (per ADR-014). Ships v1 with a built-in fallback catalog
 plugin works before the upstream repo is created — the platform
 self-recovers when it appears.
 
-| Field              | Value                            |
-| ------------------ | -------------------------------- |
-| Plugin ID          | `everworks-skills`               |
+| Field              | Value                                 |
+| ------------------ | ------------------------------------- |
+| Plugin ID          | `everworks-skills`                    |
 | Package            | `@ever-works/everworks-skills-plugin` |
-| License            | MIT (ADR-014 catalog split)      |
-| Configuration Mode | `admin-only`                     |
-| Auto Enable        | Yes (default `skills-provider`)  |
-| Capabilities       | `skills-provider`                |
+| License            | MIT (ADR-014 catalog split)           |
+| Configuration Mode | `admin-only`                          |
+| Auto Enable        | Yes (default `skills-provider`)       |
+| Capabilities       | `skills-provider`                     |
 
 **Settings:**
 
-| Setting             | Type   | Default              | Description                              |
-| ------------------- | ------ | -------------------- | ---------------------------------------- |
-| `catalogRepo`       | string | `ever-works/skills`  | GitHub owner/repo of the catalog source. |
-| `catalogBranch`     | string | `main`               | Branch to read from.                     |
-| `cacheTtlSeconds`   | number | `3600`               | How long to cache the cloned catalog.    |
+| Setting           | Type   | Default             | Description                              |
+| ----------------- | ------ | ------------------- | ---------------------------------------- |
+| `catalogRepo`     | string | `ever-works/skills` | GitHub owner/repo of the catalog source. |
+| `catalogBranch`   | string | `main`              | Branch to read from.                     |
+| `cacheTtlSeconds` | number | `3600`              | How long to cache the cloned catalog.    |
 
 See [Skills feature](/features/skills) for the platform-side
 data model + resolver + injection pipeline.
@@ -922,14 +922,14 @@ is enabled, `TasksFacadeService` routes every Task operation
 through it. Community plugins (Linear / Jira / GitHub Issues) drop
 in by implementing the same `ITaskTrackerPlugin` contract.
 
-| Field              | Value                                  |
-| ------------------ | -------------------------------------- |
-| Plugin ID          | `everworks-task-tracker`               |
+| Field              | Value                                       |
+| ------------------ | ------------------------------------------- |
+| Plugin ID          | `everworks-task-tracker`                    |
 | Package            | `@ever-works/everworks-task-tracker-plugin` |
-| License            | MIT (ADR-014 catalog split)            |
-| Configuration Mode | `admin-only`                           |
-| Auto Enable        | Yes (default `task-tracker`)           |
-| Capabilities       | `task-tracker`                         |
+| License            | MIT (ADR-014 catalog split)                 |
+| Configuration Mode | `admin-only`                                |
+| Auto Enable        | Yes (default `task-tracker`)                |
+| Capabilities       | `task-tracker`                              |
 
 **Settings:** none — the plugin binds to the platform's DB-backed
 service at boot via a runtime `setPlatformTaskBackend()` delegate.

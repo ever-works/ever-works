@@ -19,8 +19,8 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
  * + SKILL_ATTACHED_TO_AGENT events.
  */
 @Module({
-	imports: [TypeOrmModule.forFeature([Skill, SkillBinding]), ActivityLogModule],
-	providers: [SkillRepository, SkillBindingRepository, SkillsService],
-	exports: [SkillRepository, SkillBindingRepository, SkillsService],
+    imports: [TypeOrmModule.forFeature([Skill, SkillBinding]), ActivityLogModule],
+    providers: [SkillRepository, SkillBindingRepository, SkillsService],
+    exports: [SkillRepository, SkillBindingRepository, SkillsService],
 })
 export class SkillsModule {}

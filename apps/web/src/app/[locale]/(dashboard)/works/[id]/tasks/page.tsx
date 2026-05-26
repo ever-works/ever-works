@@ -15,11 +15,7 @@ export const metadata: Metadata = { title: 'Tasks' };
  * `items` / `kb` / `generator`. No tab-array registration needed
  * — the layout reads route segments dynamically.
  */
-export default async function WorkTasksTabPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function WorkTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const result = await tasksAPI
         .list({ workId: id, limit: 100 })

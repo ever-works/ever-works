@@ -70,9 +70,19 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
-    const scopeChoices: Array<{ value: AgentScope; label: string; desc: string; disabled?: boolean }> = [
+    const scopeChoices: Array<{
+        value: AgentScope;
+        label: string;
+        desc: string;
+        disabled?: boolean;
+    }> = [
         { value: 'tenant', label: t('scopeTenantDesc'), desc: t('scopeTenantDesc') },
-        { value: 'mission', label: t('scopeMissionDesc'), desc: t('scopeMissionDesc'), disabled: true },
+        {
+            value: 'mission',
+            label: t('scopeMissionDesc'),
+            desc: t('scopeMissionDesc'),
+            disabled: true,
+        },
         { value: 'work', label: t('scopeWorkDesc'), desc: t('scopeWorkDesc'), disabled: true },
         { value: 'idea', label: t('scopeIdeaDesc'), desc: t('scopeIdeaDesc'), disabled: true },
     ];
@@ -102,7 +112,9 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
                     <Bot className="w-4 h-4 text-primary" />
                 </div>
-                <h1 className="text-xl font-semibold text-text dark:text-text-dark">{t('title')}</h1>
+                <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h1>
             </div>
 
             {step === 1 && (
@@ -186,11 +198,7 @@ export function NewAgentDialog({ createAgent }: { createAgent: CreateAgentFn }) 
                             <ChevronLeft className="w-3.5 h-3.5" />
                             {t('back')}
                         </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleSubmit}
-                            disabled={pending || !name.trim()}
-                        >
+                        <Button size="sm" onClick={handleSubmit} disabled={pending || !name.trim()}>
                             {pending ? '…' : t('create')}
                         </Button>
                     </div>

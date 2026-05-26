@@ -8,11 +8,7 @@ import { agentsAPI } from '@/lib/api/agents';
  * lands in a later sub-tick once the shared Form primitives are
  * extracted from the Mission settings surface.
  */
-export default async function AgentSettingsPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function AgentSettingsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const agent = await agentsAPI.get(id);
     if (!agent) notFound();
@@ -20,9 +16,7 @@ export default async function AgentSettingsPage({
     return (
         <div className="p-6 max-w-screen-2xl mx-auto space-y-4">
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
-                    Identity
-                </h2>
+                <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">Identity</h2>
                 <dl className="grid grid-cols-2 gap-4 text-xs">
                     <div>
                         <dt className="text-text-muted">Slug</dt>

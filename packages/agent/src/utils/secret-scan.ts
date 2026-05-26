@@ -31,22 +31,22 @@
  */
 
 export interface SecretMatch {
-	pattern: string;
-	matched: string; // truncated for safe surfacing in error messages
-	index: number;
+    pattern: string;
+    matched: string; // truncated for safe surfacing in error messages
+    index: number;
 }
 
 const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
-	{
-		name: 'generic',
-		re: /\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/g,
-	},
-	{ name: 'aws_access_key', re: /\bAKIA[A-Z0-9]{16}\b/g },
-	{ name: 'github_pat_classic', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
-	{ name: 'github_oauth', re: /\bgho_[A-Za-z0-9]{36,}\b/g },
-	{ name: 'gitlab_pat', re: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
-	{ name: 'slack_token', re: /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g },
-	{ name: 'generic_pat', re: /\bpat_[A-Za-z0-9]{30,}\b/g },
+    {
+        name: 'generic',
+        re: /\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/g,
+    },
+    { name: 'aws_access_key', re: /\bAKIA[A-Z0-9]{16}\b/g },
+    { name: 'github_pat_classic', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
+    { name: 'github_oauth', re: /\bgho_[A-Za-z0-9]{36,}\b/g },
+    { name: 'gitlab_pat', re: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
+    { name: 'slack_token', re: /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g },
+    { name: 'generic_pat', re: /\bpat_[A-Za-z0-9]{30,}\b/g },
 ];
 
 /**
@@ -54,25 +54,25 @@ const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
  * patterns; empty array means "clean".
  */
 export function scanForSecrets(body: string): SecretMatch[] {
-	if (!body) return [];
-	const out: SecretMatch[] = [];
-	for (const { name, re } of PATTERNS) {
-		const r = new RegExp(re.source, re.flags); // fresh state per call
-		let m: RegExpExecArray | null;
-		while ((m = r.exec(body)) !== null) {
-			out.push({
-				pattern: name,
-				matched: truncateForDisplay(m[0]),
-				index: m.index,
-			});
-		}
-	}
-	return out;
+    if (!body) return [];
+    const out: SecretMatch[] = [];
+    for (const { name, re } of PATTERNS) {
+        const r = new RegExp(re.source, re.flags); // fresh state per call
+        let m: RegExpExecArray | null;
+        while ((m = r.exec(body)) !== null) {
+            out.push({
+                pattern: name,
+                matched: truncateForDisplay(m[0]),
+                index: m.index,
+            });
+        }
+    }
+    return out;
 }
 
 /** True if any secret pattern matches. */
 export function containsSecret(body: string): boolean {
-	return scanForSecrets(body).length > 0;
+    return scanForSecrets(body).length > 0;
 }
 
 /**
@@ -82,13 +82,13 @@ export function containsSecret(body: string): boolean {
  * offending content without us leaking the full secret back.
  */
 export function assertNoSecrets(body: string, fieldHint = 'body'): void {
-	const hits = scanForSecrets(body);
-	if (hits.length === 0) return;
-	const first = hits[0];
-	throw new Error(
-		`Secret-like value (${first.pattern}: "${first.matched}") detected in ${fieldHint}. ` +
-			`Remove it before saving — credentials must live in plugin settings, not in Agent files or Skill bodies.`,
-	);
+    const hits = scanForSecrets(body);
+    if (hits.length === 0) return;
+    const first = hits[0];
+    throw new Error(
+        `Secret-like value (${first.pattern}: "${first.matched}") detected in ${fieldHint}. ` +
+            `Remove it before saving — credentials must live in plugin settings, not in Agent files or Skill bodies.`,
+    );
 }
 
 /**
@@ -97,20 +97,20 @@ export function assertNoSecrets(body: string, fieldHint = 'body'): void {
  * AND the count of redactions so the caller can flag a toast.
  */
 export function redactSecrets(body: string): { cleaned: string; redactions: number } {
-	if (!body) return { cleaned: body, redactions: 0 };
-	let cleaned = body;
-	let count = 0;
-	for (const { re } of PATTERNS) {
-		const r = new RegExp(re.source, re.flags);
-		cleaned = cleaned.replace(r, () => {
-			count += 1;
-			return '[redacted secret]';
-		});
-	}
-	return { cleaned, redactions: count };
+    if (!body) return { cleaned: body, redactions: 0 };
+    let cleaned = body;
+    let count = 0;
+    for (const { re } of PATTERNS) {
+        const r = new RegExp(re.source, re.flags);
+        cleaned = cleaned.replace(r, () => {
+            count += 1;
+            return '[redacted secret]';
+        });
+    }
+    return { cleaned, redactions: count };
 }
 
 function truncateForDisplay(s: string): string {
-	if (s.length <= 12) return s;
-	return `${s.slice(0, 6)}…${s.slice(-3)}`;
+    if (s.length <= 12) return s;
+    return `${s.slice(0, 6)}…${s.slice(-3)}`;
 }

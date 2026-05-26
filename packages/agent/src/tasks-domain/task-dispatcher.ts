@@ -12,26 +12,26 @@
  */
 
 export interface AgentTaskExecuteDispatchPayload {
-	agentId: string;
-	userId: string;
-	taskId: string;
-	dedupKey: string;
+    agentId: string;
+    userId: string;
+    taskId: string;
+    dedupKey: string;
 }
 
 export interface AgentChatReplyDispatchPayload {
-	agentId: string;
-	userId: string;
-	taskId: string;
-	triggeringMessageId: string;
-	dedupKey: string;
+    agentId: string;
+    userId: string;
+    taskId: string;
+    triggeringMessageId: string;
+    dedupKey: string;
 }
 
 export interface AgentTaskExecuteDispatcher {
-	enqueue(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }>;
+    enqueue(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }>;
 }
 
 export interface AgentChatReplyDispatcher {
-	enqueue(payload: AgentChatReplyDispatchPayload): Promise<{ runId: string }>;
+    enqueue(payload: AgentChatReplyDispatchPayload): Promise<{ runId: string }>;
 }
 
 export const AGENT_TASK_EXECUTE_DISPATCHER = 'AGENT_TASK_EXECUTE_DISPATCHER' as const;

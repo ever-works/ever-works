@@ -219,7 +219,9 @@ function InactivePanel({ task }: { task: Task }) {
                     </div>
                 )}
                 <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Ends (optional)</label>
+                    <label className="block text-[10px] text-text-muted mb-1">
+                        Ends (optional)
+                    </label>
                     <input
                         type="date"
                         value={endsAt}
@@ -242,7 +244,9 @@ function InactivePanel({ task }: { task: Task }) {
                     />
                 </div>
             </div>
-            <div className="text-[11px] text-text-muted font-mono">Rule preview: {ruleString || '(empty)'}</div>
+            <div className="text-[11px] text-text-muted font-mono">
+                Rule preview: {ruleString || '(empty)'}
+            </div>
             <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleSave} disabled={pending}>
                     {pending ? '…' : 'Save'}

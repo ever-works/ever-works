@@ -1,8 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import {
-	TasksDomainModule,
-	AGENT_TASK_EXECUTE_DISPATCHER,
-	AGENT_CHAT_REPLY_DISPATCHER,
+    TasksDomainModule,
+    AGENT_TASK_EXECUTE_DISPATCHER,
+    AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
 import { DatabaseModule } from '@ever-works/agent/database';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
@@ -12,8 +12,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
 // AgentRepository is not available" Nest error.
 import { AgentsModule } from '@ever-works/agent/agents';
 import {
-	agentTaskExecuteTriggerAdapter,
-	agentChatReplyTriggerAdapter,
+    agentTaskExecuteTriggerAdapter,
+    agentChatReplyTriggerAdapter,
 } from '@ever-works/trigger-tasks';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
@@ -40,12 +40,12 @@ import { TaskChatController } from './task-chat.controller';
 // breaking the entire Phase 15.3 / 15.4 dispatch fan-out.
 @Global()
 @Module({
-	imports: [TasksDomainModule, DatabaseModule, AgentsModule],
-	controllers: [TasksController, TaskChatController],
-	providers: [
-		{ provide: AGENT_TASK_EXECUTE_DISPATCHER, useValue: agentTaskExecuteTriggerAdapter },
-		{ provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
-	],
-	exports: [AGENT_TASK_EXECUTE_DISPATCHER, AGENT_CHAT_REPLY_DISPATCHER],
+    imports: [TasksDomainModule, DatabaseModule, AgentsModule],
+    controllers: [TasksController, TaskChatController],
+    providers: [
+        { provide: AGENT_TASK_EXECUTE_DISPATCHER, useValue: agentTaskExecuteTriggerAdapter },
+        { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
+    ],
+    exports: [AGENT_TASK_EXECUTE_DISPATCHER, AGENT_CHAT_REPLY_DISPATCHER],
 })
 export class TasksModule {}

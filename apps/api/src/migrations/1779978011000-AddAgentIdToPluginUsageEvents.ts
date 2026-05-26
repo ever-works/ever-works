@@ -21,54 +21,52 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * NOT cascade-delete historical usage rows (they're an audit trail).
  */
 export class AddAgentIdToPluginUsageEvents1779978011000 implements MigrationInterface {
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		const hasTable = await queryRunner.hasTable('plugin_usage_events');
-		if (!hasTable) {
-			return; // table doesn't exist yet — caller has bigger problems
-		}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        const hasTable = await queryRunner.hasTable('plugin_usage_events');
+        if (!hasTable) {
+            return; // table doesn't exist yet — caller has bigger problems
+        }
 
-		const hasCol = await queryRunner.hasColumn('plugin_usage_events', 'agentId');
-		if (!hasCol) {
-			await queryRunner.addColumn(
-				'plugin_usage_events',
-				new TableColumn({
-					name: 'agentId',
-					type: 'uuid',
-					isNullable: true,
-				}),
-			);
-		}
+        const hasCol = await queryRunner.hasColumn('plugin_usage_events', 'agentId');
+        if (!hasCol) {
+            await queryRunner.addColumn(
+                'plugin_usage_events',
+                new TableColumn({
+                    name: 'agentId',
+                    type: 'uuid',
+                    isNullable: true,
+                }),
+            );
+        }
 
-		const table = await queryRunner.getTable('plugin_usage_events');
-		const hasIdx = table?.indices.some(
-			(idx) => idx.name === 'idx_plugin_usage_events_agent_occurred',
-		);
-		if (!hasIdx) {
-			await queryRunner.createIndex(
-				'plugin_usage_events',
-				new TableIndex({
-					name: 'idx_plugin_usage_events_agent_occurred',
-					columnNames: ['agentId', 'occurredAt'],
-				}),
-			);
-		}
-	}
+        const table = await queryRunner.getTable('plugin_usage_events');
+        const hasIdx = table?.indices.some(
+            (idx) => idx.name === 'idx_plugin_usage_events_agent_occurred',
+        );
+        if (!hasIdx) {
+            await queryRunner.createIndex(
+                'plugin_usage_events',
+                new TableIndex({
+                    name: 'idx_plugin_usage_events_agent_occurred',
+                    columnNames: ['agentId', 'occurredAt'],
+                }),
+            );
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		const table = await queryRunner.getTable('plugin_usage_events');
-		if (!table) {
-			return;
-		}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        const table = await queryRunner.getTable('plugin_usage_events');
+        if (!table) {
+            return;
+        }
 
-		const idx = table.indices.find(
-			(i) => i.name === 'idx_plugin_usage_events_agent_occurred',
-		);
-		if (idx) {
-			await queryRunner.dropIndex('plugin_usage_events', idx);
-		}
+        const idx = table.indices.find((i) => i.name === 'idx_plugin_usage_events_agent_occurred');
+        if (idx) {
+            await queryRunner.dropIndex('plugin_usage_events', idx);
+        }
 
-		if (await queryRunner.hasColumn('plugin_usage_events', 'agentId')) {
-			await queryRunner.dropColumn('plugin_usage_events', 'agentId');
-		}
-	}
+        if (await queryRunner.hasColumn('plugin_usage_events', 'agentId')) {
+            await queryRunner.dropColumn('plugin_usage_events', 'agentId');
+        }
+    }
 }

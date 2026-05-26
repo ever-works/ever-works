@@ -14,11 +14,7 @@ export const metadata: Metadata = { title: 'Tasks' };
  * The drawer surface lands once the shared expansion-drawer
  * primitive is extracted from the Idea card.
  */
-export default async function IdeaTasksTabPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function IdeaTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const result = await tasksAPI
         .list({ ideaId: id, limit: 100 })

@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+} from 'typeorm';
 
 /**
  * Per-Agent spending interval (agents/spec.md §3.4, operator N6 override
@@ -28,41 +35,41 @@ export type AgentBudgetIntervalUnit = 'hour' | 'day' | 'week' | 'month' | 'unlim
 @Entity({ name: 'agent_budgets' })
 @Index('uq_agent_budgets_agentId', ['agentId'], { unique: true })
 export class AgentBudget {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	agentId: string;
+    @Column('uuid')
+    agentId: string;
 
-	@Column({ type: 'varchar', length: 16 })
-	intervalUnit: AgentBudgetIntervalUnit;
+    @Column({ type: 'varchar', length: 16 })
+    intervalUnit: AgentBudgetIntervalUnit;
 
-	/**
-	 * UTC anchor timestamp for sub-month intervals (hour/day/week). Periods
-	 * roll forward from here (e.g. created at 09:42 UTC with `intervalUnit
-	 * = 'hour'` ⇒ resets at 10:42, 11:42, …). NULL for `month` (calendar
-	 * boundary) and `unlimited`.
-	 */
-	@Column({ type: 'timestamp', nullable: true })
-	intervalAnchor?: Date | null;
+    /**
+     * UTC anchor timestamp for sub-month intervals (hour/day/week). Periods
+     * roll forward from here (e.g. created at 09:42 UTC with `intervalUnit
+     * = 'hour'` ⇒ resets at 10:42, 11:42, …). NULL for `month` (calendar
+     * boundary) and `unlimited`.
+     */
+    @Column({ type: 'timestamp', nullable: true })
+    intervalAnchor?: Date | null;
 
-	@Column({ type: 'int' })
-	capCents: number;
+    @Column({ type: 'int' })
+    capCents: number;
 
-	@Column({ length: 3, default: 'usd' })
-	currency: string;
+    @Column({ length: 3, default: 'usd' })
+    currency: string;
 
-	/**
-	 * When true, the budget guard logs a warning but does NOT short-circuit
-	 * an AI call that would cross the cap. Useful for "soft" budgets where
-	 * the user wants visibility, not blocking.
-	 */
-	@Column({ type: 'boolean', default: false })
-	allowOverage: boolean;
+    /**
+     * When true, the budget guard logs a warning but does NOT short-circuit
+     * an AI call that would cross the cap. Useful for "soft" budgets where
+     * the user wants visibility, not blocking.
+     */
+    @Column({ type: 'boolean', default: false })
+    allowOverage: boolean;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

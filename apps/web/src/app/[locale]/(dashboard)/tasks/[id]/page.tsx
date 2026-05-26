@@ -24,11 +24,7 @@ export async function generateMetadata({
  * shared editor toolbar is extracted; v1 displays description as
  * plain text with line-break preservation.
  */
-export default async function TaskDetailPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const [task, chat] = await Promise.all([
         tasksAPI.get(id),

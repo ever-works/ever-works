@@ -25,23 +25,24 @@ This doc specifies the canonical assembly order so different Agent triggers (hea
 
 The system message is a concatenation of named segments. Lower index = earlier in the message = higher priority for the model's attention.
 
-| # | Segment                       | Source                                                                                                   | Budget (tokens) | Required? |
-| - | ----------------------------- | -------------------------------------------------------------------------------------------------------- | --------------- | --------- |
-| 1 | **Identity (`SOUL.md`)**      | Agent's `SOUL.md`                                                                                        | full            | ✓         |
-| 2 | **Role (`AGENTS.md`)**        | Agent's `AGENTS.md`                                                                                      | full            | ✓         |
-| 3 | **Capabilities**              | `agents.capabilities` TEXT column                                                                        | full            | optional  |
-| 4 | **Operating loop**            | Agent's `HEARTBEAT.md` (heartbeat run only) OR a per-trigger preamble (task / chat)                       | full            | ✓         |
-| 5 | **Tools the Agent may call**  | Agent's `TOOLS.md` filtered by `permissions.canCallExternalTools` etc.                                    | up to 1500      | ✓         |
-| 6 | **Active Skills**             | Skills resolved by `SkillBindingRepository.resolveActive` ([Skills spec §3.3](../features/skills/spec.md)). Progressive disclosure. | `maxSkillContextTokens` (default 4000) | optional  |
-| 7 | **Scope WorkAdvancedPrompts** | For Work-scoped Agents, the relevant WorkAdvancedPrompts column ([`work-advanced-prompts.entity.ts`](../../packages/agent/src/entities/work-advanced-prompts.entity.ts)) | full            | optional  |
-| 8 | **Scope context**             | Mission description / Idea description / Work `initial_prompt` — depends on scope                         | up to 800       | ✓         |
-| 9 | **Memory: recent activity**   | Last N=20 `activity_log` rows for this Agent's scope (filtered to events the Agent should "know about")   | up to 1200      | optional  |
-| 10 | **Memory: last N runs**       | Compact JSON of the Agent's last 5 `agent_runs` summaries                                                | up to 800       | optional  |
-| 11 | **Output contract**           | Strict JSON-schema reminder when caller used `askJson()`; otherwise free-form                            | 150             | depends   |
+| #   | Segment                       | Source                                                                                                                                                                   | Budget (tokens)                        | Required? |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | --------- |
+| 1   | **Identity (`SOUL.md`)**      | Agent's `SOUL.md`                                                                                                                                                        | full                                   | ✓         |
+| 2   | **Role (`AGENTS.md`)**        | Agent's `AGENTS.md`                                                                                                                                                      | full                                   | ✓         |
+| 3   | **Capabilities**              | `agents.capabilities` TEXT column                                                                                                                                        | full                                   | optional  |
+| 4   | **Operating loop**            | Agent's `HEARTBEAT.md` (heartbeat run only) OR a per-trigger preamble (task / chat)                                                                                      | full                                   | ✓         |
+| 5   | **Tools the Agent may call**  | Agent's `TOOLS.md` filtered by `permissions.canCallExternalTools` etc.                                                                                                   | up to 1500                             | ✓         |
+| 6   | **Active Skills**             | Skills resolved by `SkillBindingRepository.resolveActive` ([Skills spec §3.3](../features/skills/spec.md)). Progressive disclosure.                                      | `maxSkillContextTokens` (default 4000) | optional  |
+| 7   | **Scope WorkAdvancedPrompts** | For Work-scoped Agents, the relevant WorkAdvancedPrompts column ([`work-advanced-prompts.entity.ts`](../../packages/agent/src/entities/work-advanced-prompts.entity.ts)) | full                                   | optional  |
+| 8   | **Scope context**             | Mission description / Idea description / Work `initial_prompt` — depends on scope                                                                                        | up to 800                              | ✓         |
+| 9   | **Memory: recent activity**   | Last N=20 `activity_log` rows for this Agent's scope (filtered to events the Agent should "know about")                                                                  | up to 1200                             | optional  |
+| 10  | **Memory: last N runs**       | Compact JSON of the Agent's last 5 `agent_runs` summaries                                                                                                                | up to 800                              | optional  |
+| 11  | **Output contract**           | Strict JSON-schema reminder when caller used `askJson()`; otherwise free-form                                                                                            | 150                                    | depends   |
 
 Total budget target: **≤ 12 000 input tokens** in the system message. If a segment exceeds its budget, it is **truncated tail-first** (newest preserved, oldest cut). Truncation events emit an `AgentRunLog` row at `level=WARN, step='prompt-assembly'`.
 
 Order rationale:
+
 - Identity + Role first — the model anchors on "who am I and what do I do" before "how do I do it."
 - Tools before Skills — Skills may reference tools; the tool list must be parsed first.
 - Skills before scope context — Skills should be domain-agnostic enough to apply across scopes.
@@ -75,11 +76,11 @@ Keep the reply focused on the chat question.
 
 Composed of:
 
-| # | Content                                                                                          |
-| - | ------------------------------------------------------------------------------------------------ |
-| 1 | The **immediate input** — for heartbeat, the literal string `"What's the next action you should take? Choose ONE."`; for task, the Task description; for chat, the new chat message body. |
-| 2 | The **conversation context** — for task, the most recent 20 `task_chat_messages` of that task (newest last); for chat, the same. For heartbeat, omitted. |
-| 3 | **Attachments / mentions / KB references** rendered inline as fenced blocks the model can read. KB references injected as their `instructionsMd` body. |
+| #   | Content                                                                                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | The **immediate input** — for heartbeat, the literal string `"What's the next action you should take? Choose ONE."`; for task, the Task description; for chat, the new chat message body. |
+| 2   | The **conversation context** — for task, the most recent 20 `task_chat_messages` of that task (newest last); for chat, the same. For heartbeat, omitted.                                  |
+| 3   | **Attachments / mentions / KB references** rendered inline as fenced blocks the model can read. KB references injected as their `instructionsMd` body.                                    |
 
 ## 4. Memory model
 
@@ -100,6 +101,7 @@ For passive history (last 30 days of activity), the model reads `activity_log` o
 ### 4.3 Cross-Agent memory
 
 Agents cannot read each other's MD files. Cross-Agent knowledge flows through:
+
 - **Tasks** — assigning, commenting, mentioning.
 - **Mission/Work KB** — any Agent in scope can read KB documents.
 - **Activity log** — `getActivity()` includes other Agents' run summaries (but not their prompts).

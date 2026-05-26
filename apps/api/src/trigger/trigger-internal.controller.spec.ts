@@ -107,7 +107,14 @@ describe('TriggerInternalController', () => {
             undefined, // deployReadyPoller
             workKnowledgeDocumentRepository,
             missionTickService,
-            undefined, // workProposalsApiService
+            // Agents/Skills/Tasks PR #1017 — Phase 6 + 17 added 4 new
+            // constructor args after missionTickService; tests pass
+            // undefined since they don't exercise these paths.
+            undefined, // agentScheduleDispatcherService
+            undefined, // agentRepositoryRef
+            undefined, // agentRunRepositoryRef
+            undefined, // taskRecurrenceDispatcherService
+            undefined, // workProposalsApiService (Optional trailing)
         );
         c.onModuleInit();
         return c;

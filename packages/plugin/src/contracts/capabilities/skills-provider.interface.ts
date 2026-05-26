@@ -72,7 +72,7 @@ export interface ISkillsProviderPlugin extends IPlugin {
 
 	checkForUpdates?(
 		installedVersions: Record<string, string>,
-		settings?: PluginSettings,
+		settings?: PluginSettings
 	): Promise<{ updated: SkillCatalogUpdate[] }>;
 
 	isAvailable?(settings?: PluginSettings): boolean;

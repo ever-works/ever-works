@@ -1,9 +1,9 @@
 import { tasks } from '@trigger.dev/sdk';
 import type {
-	AgentChatReplyDispatcher,
-	AgentChatReplyDispatchPayload,
-	AgentTaskExecuteDispatcher,
-	AgentTaskExecuteDispatchPayload,
+    AgentChatReplyDispatcher,
+    AgentChatReplyDispatchPayload,
+    AgentTaskExecuteDispatcher,
+    AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
 import type { AgentChatReplyPayload } from '../tasks/trigger/agent-chat-reply.task';
 import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execute.task';
@@ -19,40 +19,44 @@ import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execut
  * @ever-works/agent package's dependency graph.
  */
 export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
-	async enqueue(payload: AgentTaskExecuteDispatchPayload) {
-		// Review-fix I10: pass `idempotencyKey` to Trigger.dev so a
-		// double-fire for the same (taskId, agentId, generation) tuple
-		// is deduped at the runner. Previously `dedupKey` rode only as
-		// payload data; without `idempotencyKey` Trigger.dev would
-		// happily spawn two runs for the same logical trigger.
-		const handle = await tasks.trigger<typeof import('../tasks/trigger/agent-task-execute.task').agentTaskExecuteTask>(
-			'agent-task-execute',
-			{
-				agentId: payload.agentId,
-				userId: payload.userId,
-				taskId: payload.taskId,
-				dedupKey: payload.dedupKey,
-			} satisfies AgentTaskExecutePayload,
-			{ idempotencyKey: payload.dedupKey },
-		);
-		return { runId: handle.id };
-	},
+    async enqueue(payload: AgentTaskExecuteDispatchPayload) {
+        // Review-fix I10: pass `idempotencyKey` to Trigger.dev so a
+        // double-fire for the same (taskId, agentId, generation) tuple
+        // is deduped at the runner. Previously `dedupKey` rode only as
+        // payload data; without `idempotencyKey` Trigger.dev would
+        // happily spawn two runs for the same logical trigger.
+        const handle = await tasks.trigger<
+            typeof import('../tasks/trigger/agent-task-execute.task').agentTaskExecuteTask
+        >(
+            'agent-task-execute',
+            {
+                agentId: payload.agentId,
+                userId: payload.userId,
+                taskId: payload.taskId,
+                dedupKey: payload.dedupKey,
+            } satisfies AgentTaskExecutePayload,
+            { idempotencyKey: payload.dedupKey },
+        );
+        return { runId: handle.id };
+    },
 };
 
 export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
-	async enqueue(payload: AgentChatReplyDispatchPayload) {
-		// Review-fix I10 (mirror of agent-task-execute adapter above).
-		const handle = await tasks.trigger<typeof import('../tasks/trigger/agent-chat-reply.task').agentChatReplyTask>(
-			'agent-chat-reply',
-			{
-				agentId: payload.agentId,
-				userId: payload.userId,
-				taskId: payload.taskId,
-				triggeringMessageId: payload.triggeringMessageId,
-				dedupKey: payload.dedupKey,
-			} satisfies AgentChatReplyPayload,
-			{ idempotencyKey: payload.dedupKey },
-		);
-		return { runId: handle.id };
-	},
+    async enqueue(payload: AgentChatReplyDispatchPayload) {
+        // Review-fix I10 (mirror of agent-task-execute adapter above).
+        const handle = await tasks.trigger<
+            typeof import('../tasks/trigger/agent-chat-reply.task').agentChatReplyTask
+        >(
+            'agent-chat-reply',
+            {
+                agentId: payload.agentId,
+                userId: payload.userId,
+                taskId: payload.taskId,
+                triggeringMessageId: payload.triggeringMessageId,
+                dedupKey: payload.dedupKey,
+            } satisfies AgentChatReplyPayload,
+            { idempotencyKey: payload.dedupKey },
+        );
+        return { runId: handle.id };
+    },
 };

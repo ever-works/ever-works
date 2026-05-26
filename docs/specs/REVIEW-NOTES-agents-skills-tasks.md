@@ -4,6 +4,7 @@
 **Audience**: Operator + future me reading after sleep. Captures gaps, inconsistencies, and "wait, did we actually answer this?" findings from a critical re-read of rounds 1 & 2.
 
 Findings are graded:
+
 - **🔴 Blocker** — needs a decision before implementation can start.
 - **🟡 Tighten** — design is OK but spec wording lets a reader come away wrong.
 - **🟢 Polish** — nice-to-have for the spec; not load-bearing.
@@ -17,6 +18,7 @@ Where a finding leads to a new question, it's linked into [`QUESTIONS-agents-ski
 ### 1.1 🔴 Tools API surface is referenced everywhere but never specified
 
 The runtime invokes tools by name: `createTask`, `commentOnTask`, `transitionTask`, `editAgentFile`, `commitToRepo`, `openPullRequest`, `createSubAgent`, `getActivity`, `getMissionState`, `getKbDocument`, `getSkillBody`. None of these have a documented:
+
 - argument schema (zod or JSON schema)
 - response shape
 - error envelope
@@ -28,6 +30,7 @@ Patch: new doc [`architecture/agent-tools-catalog.md`](./architecture/agent-tool
 ### 1.2 🔴 No security threat model
 
 The agents/skills/tasks design surfaces four real attack surfaces that aren't named anywhere:
+
 1. **Prompt injection from KB** — Agent reads a KB doc into context; the doc contains "ignore previous instructions and …". Without filtering or framing, the Agent obeys.
 2. **Path traversal in `editAgentFile`** — argument `name` is supposed to be one of 5 filenames; what if the Agent passes `../../other-agent/SOUL.md`? Validation must be on the path, not just the name.
 3. **Secret echo via task chat** — a user pastes their API key into a task description; an Agent's run picks it up and the assembled prompt sends it to the AI provider. Existing secret-scan covers files; chat/description need it too.
@@ -51,6 +54,7 @@ Patch: a dedicated `§6 Cascade behavior` subsection in each feature spec (agent
 ### 1.4 🟡 Idempotency is inconsistent — and I didn't pick one
 
 The platform's existing posture: no consistent rule. Onboarding uses `Idempotency-Key` header; activity-log uses `ingestEventId` in body. For new POST endpoints:
+
 - `POST /agents` — should it accept Idempotency-Key? If a UI double-submit creates two Agents named "CEO", we get an `UNIQUE(userId, scope, slug)` 409, which is acceptable. **Probably don't need idempotency.**
 - `POST /tasks` — same; UNIQUE on slug protects. **Don't need idempotency.**
 - `POST /tasks/:id/chat` — duplicate chat posts are worse (Agent dispatches twice). **Should support an `Idempotency-Key` header.**
@@ -64,6 +68,7 @@ Patch: lock in per endpoint above.
 The existing platform uses offset-based with `{data: T[], meta: {total, limit, offset}}`. My specs say "paginated" without naming the shape. Several endpoints (`GET /agents`, `GET /tasks`, `GET /agents/:id/runs`, `GET /tasks/:id/chat`) need this nailed.
 
 Special case: **chat pagination should be reverse-chronological cursor** (newest first, scroll-up loads older) — but the platform doesn't have cursor pagination anywhere yet, so we either:
+
 - (a) Add cursor pagination as a one-off for chat (precedent-setting; should be a separate ADR).
 - (b) Use offset pagination with `order DESC` and accept the "insertion happens at limit boundary" bug (acceptable for chat where insertions are infrequent).
 
@@ -72,6 +77,7 @@ Patch: pick one in [QUESTIONS M3](./QUESTIONS-agents-skills-tasks.md#m-api-surfa
 ### 1.6 🟡 Authentication scope wasn't stated for new endpoints
 
 JWT session is the default; the platform also has API keys (an existing `api-keys` feature). For new endpoints:
+
 - All `/agents/*`, `/skills/*`, `/tasks/*` accept session auth.
 - Should they also accept API keys? Use case: a user wants to script "create a task from a CI build". Today, no MCP/automation surface exposes Task creation.
 - **Recommendation**: session-only for v1; add API-key support when MCP exposes these endpoints. Add to QUESTIONS.
@@ -81,6 +87,7 @@ JWT session is the default; the platform also has API keys (an existing `api-key
 Platform uses `@nestjs/throttler` with 3-tier global + per-route overrides. Quick-create work gets `10/min`. My specs don't say what `POST /tasks`, `POST /agents`, `POST /tasks/:id/chat`, `POST /agents/:id/run-now` should cap at.
 
 Recommended caps:
+
 - `POST /agents` — 30/min/user.
 - `POST /tasks` — 60/min/user.
 - `POST /tasks/:id/chat` — 30/min/user per task.
@@ -99,10 +106,12 @@ Patch: agents/plan.md task T29-T30 should reference `WorkScheduleDispatcherServi
 ### 1.9 🟡 Real-time chat updates: confirmed poll, but interval not specified
 
 Activity Feed polls every 5s. Task chat should be the same — **but**:
+
 - 5s is OK for a feed of 100s of events.
 - A two-person chat with one Agent typing wants smoother updates.
 
 Three options:
+
 - (a) Stick to 5s polling for v1.
 - (b) Tighten polling on the chat tab to 2s (cheap; same transport).
 - (c) Move chat to SSE (reuses the AI compat streaming infra). Bigger surface but matches user expectation.
@@ -132,6 +141,7 @@ Same intent; one wording could trip a reader into thinking Tasks goes elsewhere.
 The `BudgetGuardService` aggregates spend over the **calendar month**. My AgentBudget entity lists `intervalUnit: 'hour' | 'day' | 'week' | 'month' | 'unlimited'`. Mismatch — does the service know how to aggregate hour/day/week? **Almost certainly not without refactor.**
 
 Three responses:
+
 - (a) Drop hour/day/week from `intervalUnit` in v1; only month + unlimited.
 - (b) Spec the new aggregation method `getCurrentSpendCents(ownerType, ownerId, sinceTimestamp)` and implement for sub-month intervals.
 - (c) Keep the schema but implement only month/unlimited; emit a clear error if a user picks hour/day/week.
@@ -143,6 +153,7 @@ Patch: agents/plan.md §3 AgentBudget, agents/spec.md FR-14/§3.4. QUESTIONS upd
 ### 2.3 🟡 The "Mission tick cap-hit observability gap" was flagged but never assigned
 
 [QUESTIONS G1](./QUESTIONS-agents-skills-tasks.md#g-activity-log--observability) asks whether to persist Mission tick cap-hit events. This isn't part of the Agents/Skills/Tasks feature — it's a fix to develop's current state. Either:
+
 - (a) Land it in this PR set (small additive).
 - (b) Split into a separate PR.
 
@@ -165,6 +176,7 @@ Patch: minor edit to J5.
 The agent-prompt-assembly doc §9 says "for chat replies: streaming, debounced 250ms". But the implementation surface — how the partial message updates flow from the worker to the API to the polling client — isn't specified.
 
 Three implementations possible:
+
 - (a) Worker writes full message at end of run; client polls; no streaming UX.
 - (b) Worker streams chunks via remote-proxy `appendToChatMessage(messageId, chunkText)`; client polls 1s and sees growing text.
 - (c) SSE end-to-end (worker → API → browser).
@@ -184,6 +196,7 @@ Patch: add to agents/spec.md as FR-41+ and to tasks.md.
 ### 3.3 🟡 No "Agent export" / "Agent import"
 
 Once a user invests in tuning an Agent's MD files, they'll want to:
+
 - Export to JSON to share / version externally.
 - Import into another tenant / another platform.
 - Fork another user's Agent (if a marketplace exists).

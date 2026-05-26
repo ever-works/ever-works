@@ -1,11 +1,11 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Skill } from './skill.entity';
 import { User } from './user.entity';
@@ -34,38 +34,38 @@ export type SkillBindingTargetType = 'agent' | 'work' | 'mission' | 'idea' | 'te
 @Index('idx_skill_binding_target', ['targetType', 'targetId'])
 @Index('idx_skill_binding_user', ['userId'])
 export class SkillBinding {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	skillId: string;
+    @Column('uuid')
+    skillId: string;
 
-	@ManyToOne(() => Skill, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'skillId' })
-	skill?: Skill;
+    @ManyToOne(() => Skill, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'skillId' })
+    skill?: Skill;
 
-	@Column({ length: 16 })
-	targetType: SkillBindingTargetType;
+    @Column({ length: 16 })
+    targetType: SkillBindingTargetType;
 
-	@Column({ type: 'uuid', nullable: true })
-	targetId?: string | null;
+    @Column({ type: 'uuid', nullable: true })
+    targetId?: string | null;
 
-	@Column({ type: 'uuid' })
-	userId: string;
+    @Column({ type: 'uuid' })
+    userId: string;
 
-	@ManyToOne(() => User, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'userId' })
-	user?: User;
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'userId' })
+    user?: User;
 
-	@Column({ type: 'boolean', default: true })
-	injectIntoAgent: boolean;
+    @Column({ type: 'boolean', default: true })
+    injectIntoAgent: boolean;
 
-	@Column({ type: 'boolean', default: false })
-	injectIntoGenerator: boolean;
+    @Column({ type: 'boolean', default: false })
+    injectIntoGenerator: boolean;
 
-	@Column({ type: 'int', default: 100 })
-	priority: number;
+    @Column({ type: 'int', default: 100 })
+    priority: number;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

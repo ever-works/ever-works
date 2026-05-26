@@ -24,18 +24,18 @@ export type AgentMembershipTargetType = 'mission' | 'idea' | 'work' | 'wildcard'
 @Index('uq_agent_membership', ['agentId', 'targetType', 'targetId'], { unique: true })
 @Index('idx_agent_memberships_target', ['targetType', 'targetId'])
 export class AgentMembership {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column('uuid')
-	agentId: string;
+    @Column('uuid')
+    agentId: string;
 
-	@Column({ length: 16 })
-	targetType: AgentMembershipTargetType;
+    @Column({ length: 16 })
+    targetType: AgentMembershipTargetType;
 
-	@Column('uuid', { nullable: true })
-	targetId?: string | null;
+    @Column('uuid', { nullable: true })
+    targetId?: string | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

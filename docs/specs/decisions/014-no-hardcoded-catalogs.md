@@ -29,12 +29,12 @@ This ADR codifies the rule platform-side. The Workspace knowledge note `knowledg
 
 Concrete inventory at the time of writing:
 
-| Catalog                | Repo                                                                        | Notes                                            |
-| ---------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| Mission Templates       | one repo per template (e.g. `ever-works/p2p-marketplace-mission-template`)  | already on develop; the precedent.              |
-| Agent templates         | [`ever-works/agents`](https://github.com/ever-works/agents)                  | new; to be created during Agents v1 impl.       |
-| Skill catalog           | [`ever-works/skills`](https://github.com/ever-works/skills)                  | new; supersedes ADR-007's in-monorepo posture.  |
-| Task templates          | [`ever-works/tasks`](https://github.com/ever-works/tasks)  | new; created when Task Templates v2 ships.     |
+| Catalog           | Repo                                                                       | Notes                                          |
+| ----------------- | -------------------------------------------------------------------------- | ---------------------------------------------- |
+| Mission Templates | one repo per template (e.g. `ever-works/p2p-marketplace-mission-template`) | already on develop; the precedent.             |
+| Agent templates   | [`ever-works/agents`](https://github.com/ever-works/agents)                | new; to be created during Agents v1 impl.      |
+| Skill catalog     | [`ever-works/skills`](https://github.com/ever-works/skills)                | new; supersedes ADR-007's in-monorepo posture. |
+| Task templates    | [`ever-works/tasks`](https://github.com/ever-works/tasks)                  | new; created when Task Templates v2 ships.     |
 
 This list will grow as future catalog-shaped features land.
 
@@ -62,22 +62,22 @@ Every catalog has a paired NestJS service in the platform that wraps it:
 ```typescript
 @Injectable()
 export class XCatalogService {
-    // env vars
-    private ref = process.env.EVER_WORKS_X_REF ?? 'latest'; // ref-pinning
-    private localPath = process.env.EVER_WORKS_X_PATH;       // self-hosted / offline override
+	// env vars
+	private ref = process.env.EVER_WORKS_X_REF ?? 'latest'; // ref-pinning
+	private localPath = process.env.EVER_WORKS_X_PATH; // self-hosted / offline override
 
-    // 1-hour cache in the existing cache_entries TypeORM-backed cache
-    async listEntries(): Promise<EntryMeta[]> {
-        const cached = await this.cache.get(`x-catalog:${this.ref}`);
-        if (cached) return cached;
-        const entries = this.localPath
-            ? await this.readFromLocalClone(this.localPath)
-            : await this.cloneAndRead(this.ref);
-        await this.cache.set(`x-catalog:${this.ref}`, entries, { ttl: 3600 });
-        return entries;
-    }
+	// 1-hour cache in the existing cache_entries TypeORM-backed cache
+	async listEntries(): Promise<EntryMeta[]> {
+		const cached = await this.cache.get(`x-catalog:${this.ref}`);
+		if (cached) return cached;
+		const entries = this.localPath
+			? await this.readFromLocalClone(this.localPath)
+			: await this.cloneAndRead(this.ref);
+		await this.cache.set(`x-catalog:${this.ref}`, entries, { ttl: 3600 });
+		return entries;
+	}
 
-    // ...
+	// ...
 }
 ```
 
@@ -108,6 +108,7 @@ Every catalog repo's `LICENSE` file is **the standard MIT license** with copyrig
 ### Contributing guidance lives in each repo
 
 Per operator S3 answer (round 9):
+
 > "S3 — in separate skills repo. Same for Agents repo btw."
 
 The `CONTRIBUTING.md` for community contributions lives **inside each catalog repo**, not in the platform repo. Each catalog's `CONTRIBUTING.md` covers: schema validation, MD style guide, PR review checklist, MIT-licensing acknowledgement on contribution.

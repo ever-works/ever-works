@@ -713,11 +713,7 @@ describe('AccountExportService', () => {
      * (covered indirectly by every preceding spec).
      */
     describe('exportAccountData — v2 payload tail (Phase 19.6)', () => {
-        function makeServiceWithTail(tail: {
-            agents?: any[];
-            skills?: any[];
-            tasks?: any[];
-        }) {
+        function makeServiceWithTail(tail: { agents?: any[]; skills?: any[]; tasks?: any[] }) {
             const inner = makeService();
             const tailService = {
                 exportTail: jest.fn().mockResolvedValue(tail),

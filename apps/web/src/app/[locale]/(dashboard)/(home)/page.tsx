@@ -65,7 +65,9 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'])
             .catch(() => []),
         usageAPI.accountWide().catch(() => null),
-        agentsAPI.list({ limit: 1 }).catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
+        agentsAPI
+            .list({ limit: 1 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),
         agentsAPI
             .list({ status: 'active', limit: 1 })
             .catch(() => ({ data: [], meta: { total: 0, limit: 1, offset: 0 } })),

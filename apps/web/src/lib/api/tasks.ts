@@ -110,7 +110,20 @@ export const tasksAPI = {
         });
     },
 
-    async update(id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'labels' | 'parentTaskId' | 'requireAllApprovers'>>) {
+    async update(
+        id: string,
+        patch: Partial<
+            Pick<
+                Task,
+                | 'title'
+                | 'description'
+                | 'priority'
+                | 'labels'
+                | 'parentTaskId'
+                | 'requireAllApprovers'
+            >
+        >,
+    ) {
         return serverMutation<Task>({
             endpoint: `/tasks/${id}`,
             data: patch as Record<string, unknown>,
@@ -142,10 +155,9 @@ export const tasksAPI = {
         if (opts.limit !== undefined) params.set('limit', String(opts.limit));
         if (opts.offset !== undefined) params.set('offset', String(opts.offset));
         const qs = params.toString();
-        return serverFetch<{ data: TaskChatMessage[] }>(
-            `/tasks/${id}/chat${qs ? `?${qs}` : ''}`,
-            { method: 'GET' },
-        );
+        return serverFetch<{ data: TaskChatMessage[] }>(`/tasks/${id}/chat${qs ? `?${qs}` : ''}`, {
+            method: 'GET',
+        });
     },
 
     async postChat(id: string, body: string, attachments?: { uploadId: string }[]) {

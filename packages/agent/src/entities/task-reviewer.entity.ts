@@ -1,11 +1,11 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
 
@@ -19,28 +19,28 @@ export type TaskReviewState = 'pending' | 'requested-changes' | 'approved';
 @Index('uq_task_reviewer', ['taskId', 'reviewerType', 'reviewerId'], { unique: true })
 @Index('idx_task_reviewer_actor', ['reviewerType', 'reviewerId'])
 export class TaskReviewer {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	taskId: string;
+    @Column({ type: 'uuid' })
+    taskId: string;
 
-	@ManyToOne(() => Task, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'taskId' })
-	task?: Task;
+    @ManyToOne(() => Task, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'taskId' })
+    task?: Task;
 
-	@Column({ length: 8 })
-	reviewerType: TaskActorType;
+    @Column({ length: 8 })
+    reviewerType: TaskActorType;
 
-	@Column({ type: 'uuid' })
-	reviewerId: string;
+    @Column({ type: 'uuid' })
+    reviewerId: string;
 
-	@Column({ type: 'varchar', length: 24, default: "'pending'" })
-	reviewState: TaskReviewState;
+    @Column({ type: 'varchar', length: 24, default: "'pending'" })
+    reviewState: TaskReviewState;
 
-	@Column({ type: 'timestamp', nullable: true })
-	reviewedAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    reviewedAt?: Date | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

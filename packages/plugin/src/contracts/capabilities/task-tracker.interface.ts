@@ -18,14 +18,7 @@ import type { PluginSettings } from '../../settings/settings.types.js';
  * Capability id: `'task-tracker'`.
  */
 
-export type ExternalTaskStatus =
-	| 'backlog'
-	| 'todo'
-	| 'in_progress'
-	| 'in_review'
-	| 'blocked'
-	| 'done'
-	| 'cancelled';
+export type ExternalTaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'blocked' | 'done' | 'cancelled';
 
 export type ExternalTaskPriority = 'p0' | 'p1' | 'p2' | 'p3' | 'p4';
 
@@ -116,23 +109,22 @@ export interface ExternalChatPostInput {
 export interface ITaskTrackerPlugin extends IPlugin {
 	readonly providerName: string;
 
-	listTasks(filter: ExternalTaskListFilter, settings?: PluginSettings): Promise<{
+	listTasks(
+		filter: ExternalTaskListFilter,
+		settings?: PluginSettings
+	): Promise<{
 		tasks: ExternalTaskDto[];
 		total: number;
 	}>;
 	getTask(id: string, settings?: PluginSettings): Promise<ExternalTaskDto | null>;
 	createTask(input: ExternalTaskCreateInput, settings?: PluginSettings): Promise<ExternalTaskDto>;
-	updateTask(
-		id: string,
-		patch: ExternalTaskUpdatePatch,
-		settings?: PluginSettings,
-	): Promise<ExternalTaskDto>;
+	updateTask(id: string, patch: ExternalTaskUpdatePatch, settings?: PluginSettings): Promise<ExternalTaskDto>;
 	deleteTask(id: string, settings?: PluginSettings): Promise<void>;
 
 	listChat(
 		taskId: string,
 		opts: { limit?: number; cursor?: string },
-		settings?: PluginSettings,
+		settings?: PluginSettings
 	): Promise<{ messages: ExternalChatDto[]; nextCursor?: string }>;
 	postChat(input: ExternalChatPostInput, settings?: PluginSettings): Promise<ExternalChatDto>;
 

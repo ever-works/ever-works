@@ -1,23 +1,23 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
-	UpdateDateColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 import { Task, type TaskActorType } from './task.entity';
 
 export interface TaskChatMention {
-	type: 'user' | 'agent' | 'kb';
-	id?: string;
-	slug?: string;
+    type: 'user' | 'agent' | 'kb';
+    id?: string;
+    slug?: string;
 }
 
 export interface TaskChatAttachmentRef {
-	uploadId: string;
+    uploadId: string;
 }
 
 /**
@@ -30,37 +30,37 @@ export interface TaskChatAttachmentRef {
 @Index('idx_task_chat_task_created', ['taskId', 'createdAt'])
 @Index('idx_task_chat_author', ['authorType', 'authorId'])
 export class TaskChatMessage {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	taskId: string;
+    @Column({ type: 'uuid' })
+    taskId: string;
 
-	@ManyToOne(() => Task, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'taskId' })
-	task?: Task;
+    @ManyToOne(() => Task, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'taskId' })
+    task?: Task;
 
-	@Column({ length: 8 })
-	authorType: TaskActorType;
+    @Column({ length: 8 })
+    authorType: TaskActorType;
 
-	@Column({ type: 'uuid' })
-	authorId: string;
+    @Column({ type: 'uuid' })
+    authorId: string;
 
-	@Column({ type: 'text' })
-	body: string;
+    @Column({ type: 'text' })
+    body: string;
 
-	@Column({ type: 'simple-json', nullable: true })
-	mentions?: TaskChatMention[] | null;
+    @Column({ type: 'simple-json', nullable: true })
+    mentions?: TaskChatMention[] | null;
 
-	@Column({ type: 'simple-json', nullable: true })
-	attachments?: TaskChatAttachmentRef[] | null;
+    @Column({ type: 'simple-json', nullable: true })
+    attachments?: TaskChatAttachmentRef[] | null;
 
-	@Column({ type: 'timestamp', nullable: true })
-	editedAt?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    editedAt?: Date | null;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

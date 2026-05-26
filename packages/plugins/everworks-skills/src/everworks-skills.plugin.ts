@@ -8,7 +8,7 @@ import type {
 	SkillCatalogEntry,
 	SkillCatalogListOptions,
 	SkillCatalogListResult,
-	SkillCatalogUpdate,
+	SkillCatalogUpdate
 } from '@ever-works/plugin';
 
 import matter from 'gray-matter';
@@ -31,15 +31,16 @@ const BUILTIN_CATALOG: SkillCatalogEntry[] = [
 	{
 		slug: 'cron-defaults',
 		title: 'Cron defaults to UTC',
-		description: 'When you see a cron expression, default the timezone to UTC unless the user explicitly says otherwise.',
+		description:
+			'When you see a cron expression, default the timezone to UTC unless the user explicitly says otherwise.',
 		frontmatter: {
 			name: 'cron-defaults',
 			description: 'Cron timezone default',
-			tags: ['scheduling', 'time'],
+			tags: ['scheduling', 'time']
 		},
 		body: `When working with cron expressions:\n\n- Default to UTC unless the user explicitly says otherwise.\n- Match the platform's existing scheduling code which is UTC throughout.\n- When showing a cron expression to the user, also format the next 3 fire times in their local timezone for clarity.`,
 		version: '1.0.0',
-		tags: ['scheduling', 'time'],
+		tags: ['scheduling', 'time']
 	},
 	{
 		slug: 'secret-handling',
@@ -48,11 +49,11 @@ const BUILTIN_CATALOG: SkillCatalogEntry[] = [
 		frontmatter: {
 			name: 'secret-handling',
 			description: 'Secret handling policy',
-			tags: ['security'],
+			tags: ['security']
 		},
 		body: `Secrets MUST NEVER appear in:\n\n- Log output (file, stdout, run-log rows).\n- Chat messages.\n- Agent definition files (SOUL.md, AGENTS.md, etc.).\n- Task descriptions or comments.\n\nIf you need to reference a secret, refer to its environment variable name only (e.g. \`OPENAI_API_KEY\`). The platform secret-scanner will reject writes containing values matching common secret patterns (\`sk-\`, \`ghp_\`, \`AKIA\`, \`glpat-\`, \`xoxb-\`, \`pat_\`).`,
 		version: '1.0.0',
-		tags: ['security'],
+		tags: ['security']
 	},
 	{
 		slug: 'commit-message-style',
@@ -61,12 +62,12 @@ const BUILTIN_CATALOG: SkillCatalogEntry[] = [
 		frontmatter: {
 			name: 'commit-message-style',
 			description: 'Commit message format',
-			tags: ['git', 'style'],
+			tags: ['git', 'style']
 		},
 		body: `When creating a git commit, follow conventional-commits:\n\n- Subject line: \`<type>(<scope>): <imperative description>\`\n- \`<type>\` is one of: \`feat\`, \`fix\`, \`docs\`, \`refactor\`, \`test\`, \`chore\`.\n- \`<scope>\` is optional and names the affected package or module.\n- The body explains \`why\`, not \`what\` — the diff already shows \`what\`.\n- Wrap body lines at ~72 chars.`,
 		version: '1.0.0',
-		tags: ['git', 'style'],
-	},
+		tags: ['git', 'style']
+	}
 ];
 
 export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
@@ -85,13 +86,13 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 				title: 'Catalog GitHub repo',
 				description: 'Owner/repo of the Skills catalog source. Defaults to ever-works/skills (ADR-014).',
 				default: 'ever-works/skills',
-				'x-envVar': 'PLUGIN_EVERWORKS_SKILLS_REPO',
+				'x-envVar': 'PLUGIN_EVERWORKS_SKILLS_REPO'
 			},
 			catalogBranch: {
 				type: 'string',
 				title: 'Branch',
 				default: 'main',
-				'x-envVar': 'PLUGIN_EVERWORKS_SKILLS_BRANCH',
+				'x-envVar': 'PLUGIN_EVERWORKS_SKILLS_BRANCH'
 			},
 			cacheTtlSeconds: {
 				type: 'number',
@@ -99,9 +100,9 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 				description: 'How long to cache the cloned catalog locally.',
 				default: 3600,
 				minimum: 0,
-				maximum: 86400,
-			},
-		},
+				maximum: 86400
+			}
+		}
 	};
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'admin-only';
@@ -136,7 +137,7 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 
 	async checkForUpdates(
 		installedVersions: Record<string, string>,
-		settings?: PluginSettings,
+		settings?: PluginSettings
 	): Promise<{ updated: SkillCatalogUpdate[] }> {
 		const all = await this.loadAll(settings);
 		const updated: SkillCatalogUpdate[] = [];
@@ -167,18 +168,12 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 	}
 }
 
-function filterCatalog(
-	entries: SkillCatalogEntry[],
-	options: SkillCatalogListOptions,
-): SkillCatalogEntry[] {
+function filterCatalog(entries: SkillCatalogEntry[], options: SkillCatalogListOptions): SkillCatalogEntry[] {
 	let out = entries;
 	if (options.search) {
 		const q = options.search.toLowerCase();
 		out = out.filter(
-			(e) =>
-				e.slug.includes(q) ||
-				e.title.toLowerCase().includes(q) ||
-				e.description.toLowerCase().includes(q),
+			(e) => e.slug.includes(q) || e.title.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)
 		);
 	}
 	if (options.tags && options.tags.length > 0) {

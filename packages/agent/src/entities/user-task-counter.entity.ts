@@ -11,12 +11,12 @@ import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
  */
 @Entity({ name: 'user_task_counter' })
 export class UserTaskCounter {
-	@PrimaryColumn({ type: 'uuid' })
-	userId: string;
+    @PrimaryColumn({ type: 'uuid' })
+    userId: string;
 
-	@Column({ type: 'int', default: 0 })
-	lastSlugNumber: number;
+    @Column({ type: 'int', default: 0 })
+    lastSlugNumber: number;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

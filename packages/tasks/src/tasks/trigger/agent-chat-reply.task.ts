@@ -45,7 +45,10 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
             try {
                 const runs = appContext.get(AgentRunRepository);
                 const message = error instanceof Error ? error.message : String(error);
-                const inFlight = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+                const inFlight = await runs.findInFlightForTaskAgent(
+                    payload.taskId,
+                    payload.agentId,
+                );
                 if (inFlight) {
                     await runs.markFailed(inFlight.id, message);
                 }

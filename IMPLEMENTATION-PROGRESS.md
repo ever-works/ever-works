@@ -35,6 +35,7 @@ The autonomous review loop has been halted. The remaining post-merge follow-up i
 6. After merge the API auto-applies the 6 new migrations on next boot via `migrationsRun: true`.
 
 **Genuinely external follow-ups** (NOT loop-sized — wait for the relevant upstream work):
+
 - Phase 4 Git-mode AgentFileService writes (waits on `GitFacadeService` scope-repo helpers)
 - Phase 5.6 Tiptap upgrade for the Instructions editor (shared editor toolbar primitive)
 - Phase 6a / 13.5 upload-UI surfaces (shared FileInput primitive lift)

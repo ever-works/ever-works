@@ -1,11 +1,11 @@
 import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-	PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task } from './task.entity';
 import { User } from './user.entity';
@@ -19,23 +19,23 @@ import { User } from './user.entity';
 @Index('uq_task_watcher', ['taskId', 'userId'], { unique: true })
 @Index('idx_task_watcher_user', ['userId'])
 export class TaskWatcher {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ type: 'uuid' })
-	taskId: string;
+    @Column({ type: 'uuid' })
+    taskId: string;
 
-	@ManyToOne(() => Task, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'taskId' })
-	task?: Task;
+    @ManyToOne(() => Task, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'taskId' })
+    task?: Task;
 
-	@Column({ type: 'uuid' })
-	userId: string;
+    @Column({ type: 'uuid' })
+    userId: string;
 
-	@ManyToOne(() => User, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'userId' })
-	user?: User;
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'userId' })
+    user?: User;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 }

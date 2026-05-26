@@ -13,16 +13,16 @@ import { TaskKbMention } from '../entities/task-kb-mention.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import {
-	TaskAssigneeRepository,
-	TaskReviewerRepository,
-	TaskApproverRepository,
-	TaskBlockRepository,
-	TaskRelationRepository,
-	TaskChatMessageRepository,
-	TaskAttachmentRepository,
-	TaskWatcherRepository,
-	TaskKbMentionRepository,
-	UserTaskCounterRepository,
+    TaskAssigneeRepository,
+    TaskReviewerRepository,
+    TaskApproverRepository,
+    TaskBlockRepository,
+    TaskRelationRepository,
+    TaskChatMessageRepository,
+    TaskAttachmentRepository,
+    TaskWatcherRepository,
+    TaskKbMentionRepository,
+    UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
@@ -41,65 +41,65 @@ import { NotificationsModule } from '../notifications/notifications.module';
  * TaskChatService).
  */
 @Module({
-	imports: [
-		TypeOrmModule.forFeature([
-			Task,
-			TaskAssignee,
-			TaskReviewer,
-			TaskApprover,
-			TaskBlock,
-			TaskRelation,
-			TaskChatMessage,
-			TaskAttachment,
-			TaskWatcher,
-			TaskKbMention,
-			UserTaskCounter,
-		]),
-		ActivityLogModule,
-		// Phase 15 — TaskTransitionService + TaskChatService consume
-		// AgentRunRepository to pre-create queued AgentRun rows before
-		// fanning out the agent-task-execute / agent-chat-reply
-		// Trigger.dev runs. AgentsModule exports AgentRunRepository.
-		AgentsModule,
-		// Phase 18.4 — TaskNotificationService wraps
-		// NotificationService.create() for the new TASK category.
-		NotificationsModule,
-	],
-	providers: [
-		TaskRepository,
-		TaskAssigneeRepository,
-		TaskReviewerRepository,
-		TaskApproverRepository,
-		TaskBlockRepository,
-		TaskRelationRepository,
-		TaskChatMessageRepository,
-		TaskAttachmentRepository,
-		TaskWatcherRepository,
-		TaskKbMentionRepository,
-		UserTaskCounterRepository,
-		TaskTransitionService,
-		TasksService,
-		TaskChatService,
-		TaskRecurrenceDispatcherService,
-		TaskNotificationService,
-	],
-	exports: [
-		TaskRepository,
-		TaskAssigneeRepository,
-		TaskReviewerRepository,
-		TaskApproverRepository,
-		TaskBlockRepository,
-		TaskRelationRepository,
-		TaskChatMessageRepository,
-		TaskAttachmentRepository,
-		TaskWatcherRepository,
-		TaskKbMentionRepository,
-		UserTaskCounterRepository,
-		TaskTransitionService,
-		TasksService,
-		TaskChatService,
-		TaskRecurrenceDispatcherService,
-		TaskNotificationService,
-	],
+    imports: [
+        TypeOrmModule.forFeature([
+            Task,
+            TaskAssignee,
+            TaskReviewer,
+            TaskApprover,
+            TaskBlock,
+            TaskRelation,
+            TaskChatMessage,
+            TaskAttachment,
+            TaskWatcher,
+            TaskKbMention,
+            UserTaskCounter,
+        ]),
+        ActivityLogModule,
+        // Phase 15 — TaskTransitionService + TaskChatService consume
+        // AgentRunRepository to pre-create queued AgentRun rows before
+        // fanning out the agent-task-execute / agent-chat-reply
+        // Trigger.dev runs. AgentsModule exports AgentRunRepository.
+        AgentsModule,
+        // Phase 18.4 — TaskNotificationService wraps
+        // NotificationService.create() for the new TASK category.
+        NotificationsModule,
+    ],
+    providers: [
+        TaskRepository,
+        TaskAssigneeRepository,
+        TaskReviewerRepository,
+        TaskApproverRepository,
+        TaskBlockRepository,
+        TaskRelationRepository,
+        TaskChatMessageRepository,
+        TaskAttachmentRepository,
+        TaskWatcherRepository,
+        TaskKbMentionRepository,
+        UserTaskCounterRepository,
+        TaskTransitionService,
+        TasksService,
+        TaskChatService,
+        TaskRecurrenceDispatcherService,
+        TaskNotificationService,
+    ],
+    exports: [
+        TaskRepository,
+        TaskAssigneeRepository,
+        TaskReviewerRepository,
+        TaskApproverRepository,
+        TaskBlockRepository,
+        TaskRelationRepository,
+        TaskChatMessageRepository,
+        TaskAttachmentRepository,
+        TaskWatcherRepository,
+        TaskKbMentionRepository,
+        UserTaskCounterRepository,
+        TaskTransitionService,
+        TasksService,
+        TaskChatService,
+        TaskRecurrenceDispatcherService,
+        TaskNotificationService,
+    ],
 })
 export class TasksDomainModule {}

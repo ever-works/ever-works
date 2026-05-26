@@ -1,13 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-	ExternalChatDto,
-	ExternalChatPostInput,
-	ExternalTaskCreateInput,
-	ExternalTaskDto,
-	ExternalTaskListFilter,
-	ExternalTaskUpdatePatch,
-	FacadeOptions,
-	ITaskTrackerPlugin,
+    ExternalChatDto,
+    ExternalChatPostInput,
+    ExternalTaskCreateInput,
+    ExternalTaskDto,
+    ExternalTaskListFilter,
+    ExternalTaskUpdatePatch,
+    FacadeOptions,
+    ITaskTrackerPlugin,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -16,10 +16,10 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class TasksFacadeError extends FacadeError {
-	constructor(message: string, operation: string, provider?: string, cause?: Error) {
-		super(message, operation, provider, cause);
-		this.name = 'TasksFacadeError';
-	}
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
+        this.name = 'TasksFacadeError';
+    }
 }
 
 /**
@@ -39,93 +39,93 @@ export class TasksFacadeError extends FacadeError {
  */
 @Injectable()
 export class TasksFacadeService extends BaseFacadeService {
-	protected readonly logger = new Logger(TasksFacadeService.name);
-	protected readonly CAPABILITY = PLUGIN_CAPABILITIES.TASK_TRACKER;
+    protected readonly logger = new Logger(TasksFacadeService.name);
+    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.TASK_TRACKER;
 
-	constructor(
-		registry: PluginRegistryService,
-		settingsService: PluginSettingsService,
-		@Optional() workPluginRepository?: WorkPluginRepository,
-	) {
-		super(registry, settingsService, workPluginRepository);
-	}
+    constructor(
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() workPluginRepository?: WorkPluginRepository,
+    ) {
+        super(registry, settingsService, workPluginRepository);
+    }
 
-	private async resolveTracker(facadeOptions: FacadeOptions): Promise<ITaskTrackerPlugin> {
-		return this.resolvePlugin<ITaskTrackerPlugin>(
-			facadeOptions.providerOverride,
-			facadeOptions.userId,
-			facadeOptions.workId,
-		);
-	}
+    private async resolveTracker(facadeOptions: FacadeOptions): Promise<ITaskTrackerPlugin> {
+        return this.resolvePlugin<ITaskTrackerPlugin>(
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.workId,
+        );
+    }
 
-	async listTasks(
-		filter: ExternalTaskListFilter,
-		facadeOptions: FacadeOptions,
-	): Promise<{ tasks: ExternalTaskDto[]; total: number }> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.listTasks(filter, settings);
-	}
+    async listTasks(
+        filter: ExternalTaskListFilter,
+        facadeOptions: FacadeOptions,
+    ): Promise<{ tasks: ExternalTaskDto[]; total: number }> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.listTasks(filter, settings);
+    }
 
-	async getTask(id: string, facadeOptions: FacadeOptions): Promise<ExternalTaskDto | null> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.getTask(id, settings);
-	}
+    async getTask(id: string, facadeOptions: FacadeOptions): Promise<ExternalTaskDto | null> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.getTask(id, settings);
+    }
 
-	async createTask(
-		input: ExternalTaskCreateInput,
-		facadeOptions: FacadeOptions,
-	): Promise<ExternalTaskDto> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.createTask(input, settings);
-	}
+    async createTask(
+        input: ExternalTaskCreateInput,
+        facadeOptions: FacadeOptions,
+    ): Promise<ExternalTaskDto> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.createTask(input, settings);
+    }
 
-	async updateTask(
-		id: string,
-		patch: ExternalTaskUpdatePatch,
-		facadeOptions: FacadeOptions,
-	): Promise<ExternalTaskDto> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.updateTask(id, patch, settings);
-	}
+    async updateTask(
+        id: string,
+        patch: ExternalTaskUpdatePatch,
+        facadeOptions: FacadeOptions,
+    ): Promise<ExternalTaskDto> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.updateTask(id, patch, settings);
+    }
 
-	async deleteTask(id: string, facadeOptions: FacadeOptions): Promise<void> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.deleteTask(id, settings);
-	}
+    async deleteTask(id: string, facadeOptions: FacadeOptions): Promise<void> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.deleteTask(id, settings);
+    }
 
-	async listChat(
-		taskId: string,
-		opts: { limit?: number; cursor?: string },
-		facadeOptions: FacadeOptions,
-	): Promise<{ messages: ExternalChatDto[]; nextCursor?: string }> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.listChat(taskId, opts, settings);
-	}
+    async listChat(
+        taskId: string,
+        opts: { limit?: number; cursor?: string },
+        facadeOptions: FacadeOptions,
+    ): Promise<{ messages: ExternalChatDto[]; nextCursor?: string }> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.listChat(taskId, opts, settings);
+    }
 
-	async postChat(
-		input: ExternalChatPostInput,
-		facadeOptions: FacadeOptions,
-	): Promise<ExternalChatDto> {
-		const plugin = await this.resolveTracker(facadeOptions);
-		const settings = await this.resolveSettings(plugin.id, facadeOptions);
-		return plugin.postChat(input, settings);
-	}
+    async postChat(
+        input: ExternalChatPostInput,
+        facadeOptions: FacadeOptions,
+    ): Promise<ExternalChatDto> {
+        const plugin = await this.resolveTracker(facadeOptions);
+        const settings = await this.resolveSettings(plugin.id, facadeOptions);
+        return plugin.postChat(input, settings);
+    }
 
-	private async resolveSettings(
-		pluginId: string,
-		facadeOptions: FacadeOptions,
-	): Promise<Record<string, unknown> | undefined> {
-		if (!this.settingsService) return undefined;
-		try {
-			return await this.settingsService.resolveSettings(pluginId, facadeOptions);
-		} catch {
-			return undefined;
-		}
-	}
+    private async resolveSettings(
+        pluginId: string,
+        facadeOptions: FacadeOptions,
+    ): Promise<Record<string, unknown> | undefined> {
+        if (!this.settingsService) return undefined;
+        try {
+            return await this.settingsService.getResolvedSettings(pluginId, facadeOptions);
+        } catch {
+            return undefined;
+        }
+    }
 }

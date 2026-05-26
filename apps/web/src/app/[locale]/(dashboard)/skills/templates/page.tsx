@@ -35,8 +35,8 @@ export default async function SkillTemplatesPage() {
                         Skill templates
                     </h1>
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 max-w-2xl">
-                        Reusable Skill bodies — conventions, references, style guides — your
-                        Agents can pull in via bindings.
+                        Reusable Skill bodies — conventions, references, style guides — your Agents
+                        can pull in via bindings.
                     </p>
                 </div>
             </div>
