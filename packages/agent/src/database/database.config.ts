@@ -54,6 +54,17 @@ import {
     AgentMembership,
     Skill,
     SkillBinding,
+    Task,
+    TaskAssignee,
+    TaskReviewer,
+    TaskApprover,
+    TaskBlock,
+    TaskRelation,
+    TaskChatMessage,
+    TaskAttachment,
+    TaskWatcher,
+    TaskKbMention,
+    UserTaskCounter,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -137,6 +148,18 @@ export const ENTITIES = [
     AgentMembership,
     Skill,
     SkillBinding,
+    // Phase 11 — Tasks family
+    Task,
+    TaskAssignee,
+    TaskReviewer,
+    TaskApprover,
+    TaskBlock,
+    TaskRelation,
+    TaskChatMessage,
+    TaskAttachment,
+    TaskWatcher,
+    TaskKbMention,
+    UserTaskCounter,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,

@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 14
-- **Last tick at**: 2026-05-26 (tick 14 — Phase 10 complete: AgentRunService resolves bound skills via SkillBindingRepository + priority-sorted greedy budget-drop with WARN log + SKILL_INVOKED activity emission + getSkillBody tool helper + auto-register predicate + tests.)
-- **In progress now**: (none — next tick picks up Phase 11 Tasks family of entities + Ever Works Task Tracker plugin)
+- **Last tick #**: 15
+- **Last tick at**: 2026-05-26 (tick 15 — Phase 11.1-11.4: Task + 10 sub-entities + CreateTasksTables migration + AddTaskIdToPluginUsageEvents migration + entity barrel + database.config registration. Repositories + plugin contract + plugin + facade follow next tick.)
+- **In progress now**: Phase 11 (11.1-11.4 ticked; 11.5-11.8 remaining)
 
 ---
 
@@ -165,10 +165,10 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 11 — Tasks family of entities (as "Ever Works Task Tracker" plugin per ADR-013)
 
-- [ ] **11.1** Entity `task.entity.ts` per `features/task-tracking/plan.md §3.1` — includes recurring columns per F5 override (isRecurring, recurrenceRule, recurrenceTimezone, nextOccurrenceAt, recurrenceEndsAt, recurrenceMaxOccurrences, recurrenceOccurredCount, parentRecurringTaskId).
-- [ ] **11.2** Entities `task-assignee.entity.ts`, `task-reviewer.entity.ts`, `task-approver.entity.ts`, `task-block.entity.ts`, `task-relation.entity.ts`, `task-chat-message.entity.ts`, `task-attachment.entity.ts`, `task-watcher.entity.ts`, `task-kb-mention.entity.ts`, `user-task-counter.entity.ts`.
-- [ ] **11.3** Migration `CreateTasksTables.ts`.
-- [ ] **11.4** Migration `AddTaskIdToPluginUsageEvents.ts`.
+- [x] **11.1** Entity `task.entity.ts` per `features/task-tracking/plan.md §3.1` — TaskStatus + TaskPriority enums + scope columns (mission/idea/work nullable, mutually-exclusive at service layer) + parentTaskId + reserve `promotedToIdeaId` + all 8 recurring columns per F5 (isRecurring, recurrenceRule, recurrenceTimezone, nextOccurrenceAt, recurrenceEndsAt, recurrenceMaxOccurrences, recurrenceOccurredCount, parentRecurringTaskId). 7 indexes including the `(isRecurring, nextOccurrenceAt)` Phase-17 dispatcher hot path. ✓ Tick 15
+- [x] **11.2** All 10 sub-entities shipped: `task-assignee.entity.ts`, `task-reviewer.entity.ts` (+ reviewState/reviewedAt), `task-approver.entity.ts` (+ approvalState/approvedAt), `task-block.entity.ts`, `task-relation.entity.ts`, `task-chat-message.entity.ts` (+ mentions/attachments JSON + editedAt for the 5-min edit window), `task-attachment.entity.ts` (FK pointer to work_knowledge_upload), `task-watcher.entity.ts`, `task-kb-mention.entity.ts`, `user-task-counter.entity.ts` (per-user atomic slug sequence). ✓ Tick 15
+- [x] **11.3** Migration `apps/api/src/migrations/1779978013000-CreateTasksTables.ts` — 11 tables in FK-safe order, ~22 indexes via the `ensureIndex` helper, FK CASCADE on (taskId → tasks, userId → users). Idempotent. `tasks.parentTaskId` / `task_blocks.blockedByTaskId` / `task_relations.relatedTaskId` / `task_attachments.uploadId` deliberately NOT FK'd to avoid self-referential cycles / cross-table deletes; service-layer validates. ✓ Tick 15
+- [x] **11.4** Migration `apps/api/src/migrations/1779978014000-AddTaskIdToPluginUsageEvents.ts` — adds nullable `taskId uuid` column + `(taskId, occurredAt)` index for the spend rollup endpoint. No FK to `tasks` (audit preservation on Task delete). `PluginUsageEvent` entity gains the column + `idx_plugin_usage_events_task_occurred` index decorator. ✓ Tick 15
 - [ ] **11.5** Repositories (cycle detector, casClaimRecurrence, etc.).
 - [ ] **11.6** `ITaskTrackerPlugin` contract in `packages/plugin/src/contracts/capabilities/task-tracker.interface.ts`.
 - [ ] **11.7** **"Ever Works Task Tracker" plugin** at `packages/plugins/everworks-task-tracker/`.

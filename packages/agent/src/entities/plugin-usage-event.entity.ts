@@ -29,6 +29,11 @@ export enum PluginUsageCapability {
 // Migration `AddAgentIdToPluginUsageEvents1779978011000` adds the column +
 // index. No FK to `agents` — archiving an Agent must NOT delete audit rows.
 @Index('idx_plugin_usage_events_agent_occurred', ['agentId', 'occurredAt'])
+// Tasks feature — Phase 11.4 (`features/task-tracking/plan.md §3.2`).
+// Per-Task spend aggregator filter. Migration
+// `AddTaskIdToPluginUsageEvents1779978014000` adds the column + index.
+// No FK to `tasks` — task delete must NOT cascade-drop audit rows.
+@Index('idx_plugin_usage_events_task_occurred', ['taskId', 'occurredAt'])
 @Entity({ name: 'plugin_usage_events' })
 export class PluginUsageEvent {
     @PrimaryGeneratedColumn('uuid')
@@ -80,6 +85,15 @@ export class PluginUsageEvent {
      */
     @Column({ type: 'uuid', nullable: true })
     agentId?: string | null;
+
+    /**
+     * Per-Task attribution (Tasks Phase 11.4). Populated when a
+     * plugin usage event is recorded inside an Agent run that was
+     * triggered by a Task (`taskId` from `AgentRun.taskId`). Null
+     * for non-Task usage. No FK — task delete must preserve audit.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    taskId?: string | null;
 
     /**
      * Polymorphic-owner discriminator (Missions/Ideas/Works spec §8.2).
