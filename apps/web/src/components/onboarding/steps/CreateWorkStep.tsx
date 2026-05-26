@@ -104,7 +104,7 @@ export function CreateWorkStep({ onLeave, prompt, onQuickCreate }: CreateWorkSte
                     </>
                 ) : (
                     <Link
-                        href={ROUTES.DASHBOARD_WORKS_NEW}
+                        href={ROUTES.DASHBOARD_NEW}
                         onClick={onLeave}
                         className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
                     >

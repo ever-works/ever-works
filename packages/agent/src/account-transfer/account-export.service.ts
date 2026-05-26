@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkMemberRepository } from '../database/repositories/work-member.repository';
 import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
@@ -25,6 +25,7 @@ import type {
 } from './types';
 import { maskSecretSettings } from './types';
 import { getActiveCapabilities } from '../plugins/utils/active-capabilities.util';
+import { AgentsSkillsTasksExportService } from './agents-skills-tasks-export.service';
 
 @Injectable()
 export class AccountExportService {
@@ -40,6 +41,11 @@ export class AccountExportService {
         private readonly advancedPromptsRepository: WorkAdvancedPromptsRepository,
         private readonly scheduleRepository: WorkScheduleRepository,
         private readonly gitFacade: GitFacadeService,
+        // Phase 19.6 — v2 payload tail. Optional() so the existing
+        // single-arg constructors in tests + the AccountTransferModule's
+        // current wiring don't break; when bound, the per-feature
+        // toggles flip the tail on.
+        @Optional() private readonly agentsSkillsTasksExport?: AgentsSkillsTasksExportService,
     ) {}
 
     async exportAccountData(
@@ -74,8 +80,41 @@ export class AccountExportService {
             return exported;
         });
 
+        // Phase 19.6 — collect the v2 tail when toggles are set + the
+        // tail service is bound. Each section is opt-in; the tail is
+        // populated only when the corresponding flag is true AND the
+        // resulting array has rows, so the payload stays v1-shaped for
+        // legacy users.
+        const wantsTail =
+            (options.includeAgents || options.includeSkills || options.includeTasks) === true;
+        let tailAgents: AccountExportPayload['data']['agents'];
+        let tailSkills: AccountExportPayload['data']['skills'];
+        let tailTasks: AccountExportPayload['data']['tasks'];
+        if (wantsTail && this.agentsSkillsTasksExport) {
+            try {
+                const tail = await this.agentsSkillsTasksExport.exportTail(userId, {
+                    includeAgents: options.includeAgents,
+                    includeSkills: options.includeSkills,
+                    includeTasks: options.includeTasks,
+                    includeTaskChat: options.includeTaskChat,
+                });
+                if (tail.agents && tail.agents.length > 0) tailAgents = tail.agents;
+                if (tail.skills && tail.skills.length > 0) tailSkills = tail.skills;
+                if (tail.tasks && tail.tasks.length > 0) tailTasks = tail.tasks;
+            } catch (err) {
+                // Best-effort — a tail failure should not break the v1
+                // export. Log and continue with the v1 payload.
+                this.logger.warn(
+                    `v2 tail export failed for user ${userId}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+        const hasTailRows = !!(tailAgents || tailSkills || tailTasks);
+
         return {
-            version: 1,
+            version: hasTailRows ? 2 : 1,
             exportedAt: new Date().toISOString(),
             includesSecrets: includeSecrets,
             data: {
@@ -86,6 +125,9 @@ export class AccountExportService {
                 },
                 works: exportedWorks,
                 userPlugins: exportedUserPlugins,
+                ...(tailAgents ? { agents: tailAgents } : {}),
+                ...(tailSkills ? { skills: tailSkills } : {}),
+                ...(tailTasks ? { tasks: tailTasks } : {}),
             },
         };
     }

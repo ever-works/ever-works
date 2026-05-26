@@ -746,6 +746,74 @@ export class GitFacadeService implements IGitFacade {
         return plugin.commit(dir, message, committer);
     }
 
+    /**
+     * FU-14 — resolve the on-disk repo directory for a scope+scopeId
+     * pair so AgentFileService and the AGENT_GIT_FACADE adapter can
+     * find where to stage commits without each rolling its own path
+     * logic.
+     *
+     * Behaviour:
+     *   - `scope='work'`  → reads the Work's `gitProvider` + repo coords
+     *     via `WorkRepository.findById`, then `cloneOrPull` into a
+     *     stable per-Work directory. Returns the absolute path.
+     *   - `scope='mission'` / `scope='idea'`  → returns `null` in v1.
+     *     Missions / Ideas don't have their own git repos in the
+     *     current data model. Callers MUST fall back to DB-inline
+     *     storage (AgentFileService does this automatically).
+     *   - any failure (Work not found, provider unconfigured, clone
+     *     error) → returns `null` so the caller falls back rather
+     *     than failing the whole request. The failure is logged so
+     *     it's visible in ops telemetry.
+     *
+     * `options` carries the auth context — typically the User's id
+     * so `resolvePluginAndToken` can look up the OAuth account. When
+     * omitted, the resolver throws.
+     */
+    async getRepoDir(
+        scope: 'work' | 'mission' | 'idea',
+        scopeId: string,
+        options: GitFacadeOptions,
+    ): Promise<string | null> {
+        if (scope !== 'work') {
+            // Mission + Idea scopes don't yet have their own repos —
+            // future spec work covers whether they should (versus
+            // continuing to use DB-inline storage). See
+            // docs/specs/features/agents/spec.md §file-storage.
+            return null;
+        }
+
+        try {
+            const work = await this.workRepository.findById(scopeId);
+            if (!work) return null;
+            const source = work.sourceRepository;
+            if (!source?.owner || !source?.repo) return null;
+
+            const dir = await this.cloneOrPull(
+                {
+                    owner: source.owner,
+                    repo: source.repo,
+                    autoSwitchToMainBranch: true,
+                },
+                {
+                    ...options,
+                    providerId: options.providerId ?? work.gitProvider,
+                    workId: scopeId,
+                } as GitFacadeOptions,
+            );
+            return dir;
+        } catch (err) {
+            // Don't propagate — callers always fall back. Surface in
+            // the logger so this is visible if it happens repeatedly.
+            // eslint-disable-next-line no-console
+            console.warn(
+                `GitFacadeService.getRepoDir: clone/pull failed for ${scope} ${scopeId}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return null;
+        }
+    }
+
     async push(pushOptions: FacadePushOptions, options: GitFacadeOptions): Promise<void> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.push({ ...pushOptions, token });

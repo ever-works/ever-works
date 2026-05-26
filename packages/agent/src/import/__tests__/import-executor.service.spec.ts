@@ -86,6 +86,20 @@ describe('ImportExecutorService', () => {
         );
     });
 
+    it('skips generated markdown repo creation when an awesome README import reuses the source as main', async () => {
+        const { service, markdownGenerator, websiteGenerator } = createService();
+
+        await service.importFromAwesomeReadme({
+            work,
+            user,
+            sourceUrl: 'https://github.com/ever-works/awesome-cloud',
+            reuseSourceRepositoryAsMain: true,
+        });
+
+        expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        expect(websiteGenerator.initialize).toHaveBeenCalledWith(work, user);
+    });
+
     it('passes the resolved .works/works.yml config to data generation for config-only imports', async () => {
         const { service, dataGenerator } = createService();
         const worksConfig = {

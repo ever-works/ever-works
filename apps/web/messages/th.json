@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "ค้นหารายการ...",
                 "allCategories": "ทุกหมวดหมู่",
                 "showing": "แสดง {current} จาก {total} รายการ",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "ไม่มีรายการที่ตรงกับเกณฑ์ค้นหา",
                 "source": "แหล่งที่มา",
                 "viewOnWebsite": "ดูในเว็บไซต์",
@@ -3077,7 +3078,19 @@
                     "legalNote": "หมายเหตุ:",
                     "legalDescription": "โหมดวิจัยใช้ repository ต้นทางเป็นข้อมูลนำเข้าเท่านั้น คอลเลกชันสุดท้ายจะประกอบด้วยไอเท็มที่ค้นพบใหม่เป็นหลักพร้อมคำอธิบายที่สร้างโดย AI เดิม เนื้อหาต้นทางไม่ถูกคัดลอกแบบตรงตัว",
                     "importButton": "เริ่มนำเข้าและวิจัย",
-                    "importingButton": "กำลังเริ่ม pipeline วิจัย..."
+                    "importingButton": "กำลังเริ่ม pipeline วิจัย...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "วิเคราะห์ Repository",
                 "importButton": "นำเข้างาน",

@@ -5,6 +5,9 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
+import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -55,6 +58,36 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'MissionTickService'),
             inject: [TriggerInternalApiClient],
         },
+        // Agents/Skills/Tasks PR #1017 — Phase 6. Per-Agent heartbeat
+        // dispatcher + per-Agent repositories used by the
+        // `agent-heartbeat-dispatcher` cron task and the
+        // `agent-heartbeat` one-shot task.
+        {
+            provide: AgentScheduleDispatcherService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentScheduleDispatcherService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: AgentRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: AgentRunRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentRunRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Agents/Skills/Tasks PR #1017 — Phase 17. Recurring Task
+        // dispatcher exposed for the task-recurrence-dispatcher cron.
+        {
+            provide: TaskRecurrenceDispatcherService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskRecurrenceDispatcherService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -63,6 +96,10 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         DATA_SYNC_DISPATCHER_SERVICE,
         DeployReadyPollerService,
         MissionTickService,
+        AgentScheduleDispatcherService,
+        AgentRepository,
+        AgentRunRepository,
+        TaskRecurrenceDispatcherService,
     ],
 })
 export class TriggerInternalModule {}

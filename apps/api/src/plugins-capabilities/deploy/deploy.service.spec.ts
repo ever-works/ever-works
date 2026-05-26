@@ -307,7 +307,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 'CRON_SECRET',
                 'DATA_REPOSITORY',
                 'DEPLOY_TOKEN',
-                'K8S_TOKEN',
+                'LEGACY_TOKEN',
                 'TENANT_ID',
             ]),
         );
@@ -560,6 +560,45 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 secrets.find((s: any) => s.key === 'GITHUB_READ_PACKAGES_TOKEN'),
             ).toBeUndefined();
         });
+
+        it('uses readPackagesPatOwner as REGISTRY_USERNAME when a user classic PAT is saved', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: {
+                    readPackagesPatClassic: 'ghp_classic_user_pat',
+                    readPackagesPatOwner: 'octocat',
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.REGISTRY_PASSWORD).toBe('ghp_classic_user_pat');
+            expect(byKey.REGISTRY_USERNAME).toBe('octocat');
+        });
+
+        it('falls back to x-access-token instead of a blank platform username for user classic PATs', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                githubPluginSettings: { readPackagesPatClassic: 'ghp_classic_user_pat' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.REGISTRY_PASSWORD).toBe('ghp_classic_user_pat');
+            expect(byKey.REGISTRY_USERNAME).toBe('x-access-token');
+        });
     });
 
     it('emits DeploymentDispatchedEvent after a successful dispatch', async () => {
@@ -630,6 +669,31 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         );
 
         errorSpy.mockRestore();
+    });
+
+    describe('ever-works provider backed by k8s plugin', () => {
+        it('keeps DEPLOY_PROVIDER=ever-works but writes the kubeconfig to K8S_TOKEN', async () => {
+            const { service, githubPlugin } = buildService({
+                deployProvider: 'ever-works',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                token: 'user-kubeconfig-yaml',
+                settings: { clusterSource: 'custom-kubeconfig' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets, variables } = captureCalls(githubPlugin);
+            const bySecretKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            const byVariableKey = Object.fromEntries(variables.map((v: any) => [v.key, v.value]));
+
+            expect(byVariableKey.DEPLOY_PROVIDER).toBe('ever-works');
+            expect(bySecretKey.K8S_TOKEN).toBe('user-kubeconfig-yaml');
+            expect(bySecretKey.EVER_WORKS_TOKEN).toBeUndefined();
+        });
     });
 
     describe('EW-617 G5 — ever-works subdomain templating', () => {

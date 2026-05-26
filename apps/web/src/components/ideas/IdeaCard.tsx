@@ -1,7 +1,8 @@
 'use client';
 
 import { useTransition } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -168,30 +169,45 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 </div>
             )}
 
-            <button
-                type="button"
-                onClick={handleAccept}
-                className={cn(
-                    'mt-auto inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
-                    // Phase 5 PR P — Done state uses the success
-                    // color and a checkmark icon. Visually distinct
-                    // from the primary-blue Build CTA so a finished
-                    // Idea reads as "completed" at a glance.
-                    isDone ? 'bg-success hover:bg-success/90' : 'bg-primary hover:bg-primary-hover',
-                )}
-            >
-                {isDone ? (
-                    <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        {t('actions.viewWork')}
-                    </>
-                ) : (
-                    <>
-                        {t('actions.accept')}
-                        <ChevronRight className="w-4 h-4" />
-                    </>
-                )}
-            </button>
+            <div className="mt-auto flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={handleAccept}
+                    className={cn(
+                        'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
+                        // Phase 5 PR P — Done state uses the success
+                        // color and a checkmark icon. Visually distinct
+                        // from the primary-blue Build CTA so a finished
+                        // Idea reads as "completed" at a glance.
+                        isDone
+                            ? 'bg-success hover:bg-success/90'
+                            : 'bg-primary hover:bg-primary-hover',
+                    )}
+                >
+                    {isDone ? (
+                        <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            {t('actions.viewWork')}
+                        </>
+                    ) : (
+                        <>
+                            {t('actions.accept')}
+                            <ChevronRight className="w-4 h-4" />
+                        </>
+                    )}
+                </button>
+                {/* FU-3 — quick on-ramp to an Idea-scoped Agent. Lives
+                    next to the primary CTA so it's discoverable from
+                    every Ideas list view without the user having to
+                    drill into a separate detail page. */}
+                <Link
+                    href={`/ideas/${proposal.id}/agents/new`}
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md border border-border dark:border-border-dark px-2.5 py-2 text-xs font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                    title="Create a new Idea-scoped Agent"
+                >
+                    <Bot className="w-3.5 h-3.5" />
+                </Link>
+            </div>
         </div>
     );
 }

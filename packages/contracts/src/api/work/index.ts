@@ -18,9 +18,10 @@ export type {
 } from './generation-metrics.js';
 export { WorkHistoryActivityType } from './generation-metrics.js';
 export type { UpdateSourceValidationPayload, SourceValidationSettingsDto } from './source-validation.dto.js';
-export { IMPORT_SOURCE_TYPES } from './import-source.dto.js';
+export { IMPORT_SOURCE_TYPES, AWESOME_README_IMPORT_MODES } from './import-source.dto.js';
 export type {
 	ImportSourceType,
+	AwesomeReadmeImportMode,
 	RepositoryRole,
 	RepositoryTarget,
 	RelatedRepositories,

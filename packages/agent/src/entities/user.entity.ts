@@ -158,6 +158,19 @@ export class User {
     userResearchOptOut: boolean;
 
     /**
+     * Agents/Skills/Tasks PR #1017 — Phase 18.5. Email opt-in flags
+     * for the two new notification categories. Default OFF (in-app
+     * notifications still fire; email is opt-in to keep new users
+     * from getting flooded). UI toggle lives at /settings/profile
+     * once the wiring lands.
+     */
+    @Column({ default: false })
+    emailAgentAlerts: boolean;
+
+    @Column({ default: false })
+    emailTaskNotifications: boolean;
+
+    /**
      * EW-602 — Self-hosted platform admin flag. Grants access to the
      * cross-user admin view at /admin/usage. Default false; the
      * self-hosted operator seeds it via SEED_PLATFORM_ADMIN_EMAIL on

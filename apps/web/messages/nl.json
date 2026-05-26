@@ -1644,6 +1644,7 @@
                 "searchPlaceholder": "Zoek items…",
                 "allCategories": "Alle categorieën",
                 "showing": "Weergeven {current} van {total} items",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Geen items die overeenkomen met je zoekcriteria",
                 "source": "Bron",
                 "viewOnWebsite": "Bekijk op website",
@@ -3077,7 +3078,19 @@
                     "legalNote": "Opmerking:",
                     "legalDescription": "Onderzoeksmodus gebruikt de bronrepository alleen als inputdata. De finale collectie bestaat voornamelijk uit nieuw ontdekte items met originele, AI-gegenereerde beschrijvingen. Broncontent wordt niet verbatim gekopieerd.",
                     "importButton": "Import en onderzoek starten",
-                    "importingButton": "Onderzoeks-pipeline starten..."
+                    "importingButton": "Onderzoeks-pipeline starten...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Repository analyseren",
                 "importButton": "Werk importeren",

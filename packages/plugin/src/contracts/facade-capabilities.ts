@@ -19,7 +19,17 @@ export const PLUGIN_CAPABILITIES = {
 	STORAGE: 'storage',
 	PUT_OBJECT: 'put-object',
 	GET_OBJECT: 'get-object',
-	PRESIGNED_PUT: 'presigned-put'
+	PRESIGNED_PUT: 'presigned-put',
+	// Agents/Skills/Tasks PR #1017 — Phase 8 (ADR-012). Plugin
+	// category for Skill catalog providers. "Ever Works Skills" is
+	// the first-party default; community plugins implement the same
+	// `ISkillsProviderPlugin` contract to surface other catalogs.
+	SKILLS_PROVIDER: 'skills-provider',
+	// Agents/Skills/Tasks PR #1017 — Phase 11 (ADR-013). Plugin
+	// category for external task trackers. "Ever Works Task Tracker"
+	// is the first-party default. Community plugins (Linear / Jira /
+	// GitHub Issues) implement the same contract.
+	TASK_TRACKER: 'task-tracker'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

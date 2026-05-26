@@ -2,7 +2,26 @@ jest.mock('@ever-works/agent/database', () => ({
     WorkRepository: class WorkRepository {},
     AuthAccountRepository: class AuthAccountRepository {},
     TemplateRepository: class TemplateRepository {},
+    TemplateCustomizationRepository: class TemplateCustomizationRepository {},
     UserTemplatePreferenceRepository: class UserTemplatePreferenceRepository {},
+    UserRepository: class UserRepository {},
+    WorkKnowledgeDocumentRepository: class WorkKnowledgeDocumentRepository {},
+    AgentRepository: class AgentRepository {},
+    AgentRunRepository: class AgentRunRepository {},
+}));
+// FU-2 post-CI fix: trigger-internal.controller.ts imports the
+// AgentScheduleDispatcherService from `@ever-works/agent/agents` and
+// TaskRecurrenceDispatcherService from `@ever-works/agent/tasks-domain`
+// (added by PR #1019). Loading those barrels transitively pulls in
+// the entity classes which reference `@src/*` aliases that aren't
+// mapped under the agent package's jest scope. Stub the barrels here
+// to avoid the resolution chain.
+jest.mock('@ever-works/agent/agents', () => ({
+    AgentScheduleDispatcherService: class AgentScheduleDispatcherService {},
+    AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
+}));
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TaskRecurrenceDispatcherService: class TaskRecurrenceDispatcherService {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -107,7 +126,14 @@ describe('TriggerInternalController', () => {
             undefined, // deployReadyPoller
             workKnowledgeDocumentRepository,
             missionTickService,
-            undefined, // workProposalsApiService
+            // Agents/Skills/Tasks PR #1017 — Phase 6 + 17 added 4 new
+            // constructor args after missionTickService; tests pass
+            // undefined since they don't exercise these paths.
+            undefined, // agentScheduleDispatcherService
+            undefined, // agentRepositoryRef
+            undefined, // agentRunRepositoryRef
+            undefined, // taskRecurrenceDispatcherService
+            undefined, // workProposalsApiService (Optional trailing)
         );
         c.onModuleInit();
         return c;

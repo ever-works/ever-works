@@ -57,6 +57,10 @@ describe('AccountTransferModule + barrel re-exports', () => {
                     'AccountTransferModule',
                     'AccountExportService',
                     'AccountImportService',
+                    // PR #1019 — Agents/Skills/Tasks v2 payload tail
+                    // export+import services.
+                    'AgentsSkillsTasksExportService',
+                    'AgentsSkillsTasksImportService',
                     'GitHubSyncService',
                     'UserSyncConfig',
                     'UserSyncConfigRepository',

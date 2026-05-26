@@ -46,6 +46,9 @@ const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = [
     'custom-kubeconfig',
 ];
 
+const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
+const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
 function coerceClusterSource(value: unknown): ClusterSource {
     if (typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value)) {
         return value as ClusterSource;
@@ -178,6 +181,7 @@ export class DeployService {
         // platform-managed sources.
         const effectiveDeployToken = this.resolveDeployToken(
             work.deployProvider,
+            plugin.id,
             websiteOwner,
             settings ?? {},
             token,
@@ -200,7 +204,7 @@ export class DeployService {
         // k8s plugin's default LB hostname remains the fallback.
         const deploySettings = await this.applyEverWorksSubdomain(work, settings);
         await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
-        await this.setKubernetesGhcrPullSecret(ctx, work, userId);
+        await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
         await this.ensureWebhookSecret(ctx, work);
@@ -398,11 +402,12 @@ export class DeployService {
      */
     private resolveDeployToken(
         deployProvider: string | undefined,
+        pluginId: string | undefined,
         websiteOwner: string,
         settings: Record<string, unknown>,
         userToken: string,
     ): string {
-        if (deployProvider !== 'k8s') {
+        if (!this.isKubernetesDeploy(deployProvider, pluginId)) {
             return userToken;
         }
 
@@ -504,7 +509,8 @@ export class DeployService {
         plugin?: IDeploymentPlugin,
         settings?: Record<string, unknown>,
     ) {
-        const provider = work.deployProvider || 'ever-works';
+        const provider = work.deployProvider || EVER_WORKS_DEPLOY_PROVIDER_ID;
+        const tokenSecretProvider = plugin?.id || provider;
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
         } catch (error: any) {
@@ -517,7 +523,7 @@ export class DeployService {
             this.setSecret(ctx, 'TENANT_ID', work.id),
             this.setSecret(ctx, 'WORK_ID', work.id),
             this.setSecret(ctx, 'DATA_REPOSITORY', work.getDataRepo()),
-            this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
+            this.setSecret(ctx, this.providerTokenSecretName(tokenSecretProvider), deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
 
@@ -673,8 +679,13 @@ export class DeployService {
      * never thrown — a failed secret push degrades to "image pull may
      * 403" rather than blocking the whole deploy.
      */
-    private async setKubernetesGhcrPullSecret(ctx: RepoContext, work: Work, userId: string) {
-        if (work.deployProvider !== 'k8s') {
+    private async setKubernetesGhcrPullSecret(
+        ctx: RepoContext,
+        work: Work,
+        userId: string,
+        plugin?: IDeploymentPlugin,
+    ) {
+        if (!this.isKubernetesDeploy(work.deployProvider, plugin?.id)) {
             return;
         }
         try {
@@ -690,6 +701,10 @@ export class DeployService {
                 typeof githubSettings?.readPackagesPat === 'string'
                     ? githubSettings.readPackagesPat.trim()
                     : '';
+            const userRegistryUsername =
+                typeof githubSettings?.readPackagesPatOwner === 'string'
+                    ? githubSettings.readPackagesPatOwner.trim()
+                    : '';
 
             // Platform-side fallback by website repo owner.
             const platformDefaults = this.getPlatformGhcrCredentials(ctx.owner);
@@ -698,7 +713,7 @@ export class DeployService {
             const fineGrainedPat = userFineGrained || platformDefaults.fineGrained;
             const registryUsername =
                 userClassic || userFineGrained
-                    ? platformDefaults.username // fall back to platform login if user didn't tell us their own
+                    ? userRegistryUsername || platformDefaults.username || 'x-access-token'
                     : platformDefaults.username;
 
             const writes: Promise<unknown>[] = [];
@@ -738,6 +753,19 @@ export class DeployService {
                 }`,
             );
         }
+    }
+
+    private isKubernetesDeploy(deployProvider?: string, pluginId?: string): boolean {
+        return (
+            deployProvider === KUBERNETES_DEPLOY_PROVIDER_ID ||
+            deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID ||
+            pluginId === KUBERNETES_DEPLOY_PROVIDER_ID
+        );
+    }
+
+    private providerTokenSecretName(providerId: string): string {
+        const normalised = providerId.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+        return `${normalised}_TOKEN`;
     }
 
     /**

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Lightbulb, Plus, Settings as SettingsIcon } from 'lucide-react';
+import { Lightbulb, Send, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
@@ -275,37 +275,37 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             </div>
 
             {/* Quick add */}
-            <div className="mb-6 rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4">
+            <div className="mb-5 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/40 dark:bg-surface-dark/30 p-3">
                 <label
                     htmlFor="ideas-quick-add"
-                    className="text-xs uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
+                    className="text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
                 >
                     {t('quickAdd.label')}
                 </label>
-                <div className="mt-2 flex flex-col gap-3 @3xl/main:flex-row @3xl/main:items-start">
+                <div className="mt-2 flex flex-col gap-2 @3xl/main:flex-row @3xl/main:items-stretch">
                     <Textarea
                         id="ideas-quick-add"
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
-                        rows={3}
+                        rows={2}
                         placeholder={t('quickAdd.placeholder')}
-                        className="flex-1"
+                        className="min-h-20 flex-1 resize-none bg-card dark:bg-card-primary-dark"
                     />
                     <Button
                         type="button"
                         size="sm"
-                        className="gap-1.5 self-start @3xl/main:self-stretch @3xl/main:px-4"
+                        className="gap-1.5 self-stretch @3xl/main:px-4"
                         onClick={handleQuickAdd}
                         disabled={isCreating || draft.trim().length < 10}
                     >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Send className="w-3.5 h-3.5" />
                         {t('quickAdd.submit')}
                     </Button>
                 </div>
             </div>
 
             {/* Toggles + filter chips row */}
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 dark:border-border-dark/50 bg-card/70 dark:bg-card-primary-dark/50 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-3">
                     <label className="inline-flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer select-none">
                         <input
@@ -395,9 +395,14 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
 
             {/* Sorted list */}
             {visibleIdeas.length === 0 ? (
-                <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6">
-                    <p className="text-sm text-text dark:text-text-dark">{t('empty.title')}</p>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                <div className="rounded-lg border border-dashed border-border/70 dark:border-border-dark/70 bg-surface/40 dark:bg-surface-dark/30 p-8 text-center">
+                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-warning/20 bg-warning/10">
+                        <Lightbulb className="w-4 h-4 text-warning" />
+                    </div>
+                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                        {t('empty.title')}
+                    </p>
+                    <p className="mx-auto mt-1 max-w-xl text-xs text-text-muted dark:text-text-muted-dark">
                         {t('empty.subtitle')}
                     </p>
                 </div>

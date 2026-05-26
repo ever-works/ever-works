@@ -3077,7 +3077,19 @@
                     "legalNote": "注意：",
                     "legalDescription": "研究模式仅将源仓库用作输入数据。最终集合主要由新发现的项目组成，带有原创的 AI 生成描述。源内容不会逐字复制。",
                     "importButton": "开始导入和研究",
-                    "importingButton": "正在启动研究管道..."
+                    "importingButton": "正在启动研究管道...",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "分析仓库",
                 "importButton": "导入作品",

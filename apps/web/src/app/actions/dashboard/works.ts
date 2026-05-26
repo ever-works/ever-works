@@ -184,6 +184,17 @@ export async function createWork(data: CreateWorkDto) {
     }
 }
 
+const aiWorkKindSchema = z.enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo']);
+type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
+
+const AI_WORK_KIND_PROMPT_LABELS: Record<AIWorkKind, string> = {
+    website: 'website',
+    'landing-page': 'landing page',
+    blog: 'blog',
+    directory: 'directory',
+    'awesome-repo': 'awesome repository list',
+};
+
 interface AIWorkOptions {
     name: string;
     prompt: string;
@@ -201,6 +212,7 @@ interface AIWorkOptions {
     };
     pluginConfig?: Record<string, unknown>;
     proposalId?: string;
+    workKind?: AIWorkKind;
 }
 
 export async function createWorkWithAI(request: AIWorkOptions) {
@@ -220,6 +232,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             .pipe(z.string().max(100, t('name.maxLength'))),
         gitProvider: z.string().optional(),
         proposalId: z.string().uuid().optional(),
+        workKind: aiWorkKindSchema.optional(),
     });
 
     const createWorkSchema = await getCreateWorkSchema();
@@ -231,6 +244,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             name: request.name,
             gitProvider: request.gitProvider,
             proposalId: request.proposalId,
+            workKind: request.workKind,
         });
         if (!validation.success) {
             return {
@@ -259,6 +273,9 @@ export async function createWorkWithAI(request: AIWorkOptions) {
         }
 
         const aiProvider = request.providers?.ai;
+        const generationPrompt = validation.data.workKind
+            ? `Create a ${AI_WORK_KIND_PROMPT_LABELS[validation.data.workKind]}.\n\n${validation.data.prompt}`
+            : validation.data.prompt;
         const defaultDetails = {
             name: validation.data.name,
             slug: slugify(validation.data.name),
@@ -272,7 +289,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             workDetails = await workAPI
                 .generateDetails({
                     work_name: validation.data.name,
-                    prompt: validation.data.prompt,
+                    prompt: generationPrompt,
                     ai_provider: aiProvider,
                 })
                 .catch(() => defaultDetails);
@@ -308,7 +325,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
 
         await itemsGeneratorAPI.generate(work.id, {
             name: validation.data.name,
-            prompt: validation.data.prompt,
+            prompt: generationPrompt,
             providers: request.providers || undefined,
             pluginConfig: {
                 target_keywords: workDetails.keywords,
@@ -660,6 +677,7 @@ export async function importWork(data: ImportWorkRequest) {
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
         sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config']),
+        awesomeReadmeImportMode: z.enum(['clone', 'reuse_source']).optional(),
         name: z
             .string()
             .min(1, t('name.required'))
@@ -716,6 +734,7 @@ export async function importWork(data: ImportWorkRequest) {
         const result = await workAPI.importWork({
             sourceUrl: validation.data.sourceUrl,
             sourceType: validation.data.sourceType,
+            awesomeReadmeImportMode: validation.data.awesomeReadmeImportMode,
             name: validation.data.name,
             organization,
             owner: owner || undefined,

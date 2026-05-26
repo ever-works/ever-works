@@ -166,13 +166,29 @@ export interface ExportedUserPlugin {
 }
 
 export interface AccountExportPayload {
-    version: 1;
+    /**
+     * Payload version. v1 = profile + works + userPlugins only.
+     * v2 = same plus optional `agents`, `skills`, `tasks` tail (per
+     * Phase 19 / ADR-008 v1 requirement). Stays at 1 when the v2 tail
+     * arrays are absent or empty so v1 readers can still parse the
+     * envelope.
+     */
+    version: 1 | 2;
     exportedAt: string;
     includesSecrets: boolean;
     data: {
         profile: ExportedProfile;
         works: ExportedWork[];
         userPlugins: ExportedUserPlugin[];
+        /**
+         * Phase 19 — v2 payload tail. Populated by
+         * `AgentsSkillsTasksExportService.exportTail()` when the user
+         * opts into the corresponding sections on the
+         * `/settings/import-export` page. Empty/absent on v1 payloads.
+         */
+        agents?: import('./agents-skills-tasks-types').ExportedAgent[];
+        skills?: import('./agents-skills-tasks-types').ExportedSkill[];
+        tasks?: import('./agents-skills-tasks-types').ExportedTask[];
     };
 }
 
@@ -222,6 +238,20 @@ export interface ImportOptions {
 
 export interface ExportOptions {
     includeSecrets?: boolean;
+    /**
+     * Agents/Skills/Tasks PR #1017 — Phase 19.6. Per-feature toggles
+     * that flip on the v2 payload tail (`data.agents` / `data.skills`
+     * / `data.tasks`). All default `false` so a v1 caller gets a
+     * v1-compatible payload.
+     */
+    includeAgents?: boolean;
+    includeSkills?: boolean;
+    includeTasks?: boolean;
+    /**
+     * Per Phase-19.3, chat threads bloat the payload fast — opt in
+     * separately. Only honored when `includeTasks` is true.
+     */
+    includeTaskChat?: boolean;
 }
 
 // ─── Secret Masking ─────────────────────────────────────────────
@@ -294,4 +324,17 @@ export interface ConfigureSyncDto {
 
 export interface SyncPushOptions {
     includeSecrets?: boolean;
+    /**
+     * Review-fix C3: v2 payload-tail toggles. Without forwarding
+     * these, `GitHubSyncService.pushToGitHub` always wrote a v1
+     * payload — the `agents/`/`skills/`/`tasks/` subdir layout was
+     * dead code on the push path. Defaults to `true` for Agents +
+     * Skills so a sync repo mirrors what's typically a small
+     * complete account state; Tasks is opt-in (volume) and
+     * Task chat is double-opt-in (chat threads bloat the payload).
+     */
+    includeAgents?: boolean;
+    includeSkills?: boolean;
+    includeTasks?: boolean;
+    includeTaskChat?: boolean;
 }

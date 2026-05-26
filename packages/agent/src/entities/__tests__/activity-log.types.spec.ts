@@ -74,12 +74,14 @@ describe('activity-log.types', () => {
         });
 
         it('has the expected total number of literal values (catch silent additions)', () => {
-            // 51 documented literals — pinned so any silent addition is a
-            // deliberate change. Last bumped by EW-641 Phase 1B/b (5
-            // KB_UPLOAD_* + 3 KB_DOCUMENT_* values for the Knowledge
-            // Base ingest pipeline + document lifecycle events).
+            // 84 documented literals — pinned so any silent addition is a
+            // deliberate change. Last bumped by post-PR-1019 follow-up FU-2
+            // (added AGENT_RUN_TRIGGERED + AGENT_TASK_ASSIGNED for the new
+            // controller endpoints; PR #1019 itself had added 30 Agent /
+            // Skill / Task lifecycle values that weren't pinned here at
+            // the time).
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(51);
+            expect(literals).toHaveLength(84);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

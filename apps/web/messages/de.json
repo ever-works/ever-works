@@ -1708,6 +1708,7 @@
                 "searchPlaceholder": "Einträge suchen…",
                 "allCategories": "Alle Kategorien",
                 "showing": "Zeige {current} von {total} Einträgen",
+                "loadingFromRepo": "Please wait, we are loading your items from the data repository of this Work…",
                 "noMatch": "Keine Einträge entsprechen Ihren Suchkriterien",
                 "source": "Quelle",
                 "viewOnWebsite": "Auf Website ansehen",
@@ -3141,7 +3142,19 @@
                     "legalNote": "Hinweis:",
                     "legalDescription": "Research-Modus verwendet das Quell-Repository nur als Eingabedaten. Die finale Sammlung besteht hauptsächlich aus neu entdeckten Einträgen mit originalen, KI-generierten Beschreibungen. Quelleninhalt wird nicht wörtlich kopiert.",
                     "importButton": "Import & Research starten",
-                    "importingButton": "Research-Pipeline wird gestartet…"
+                    "importingButton": "Research-Pipeline wird gestartet…",
+                    "mainRepository": {
+                        "title": "Main repository",
+                        "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
+                        "clone": {
+                            "title": "Clone / recreate",
+                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                        },
+                        "reuse": {
+                            "title": "Reuse source README",
+                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                        }
+                    }
                 },
                 "analyzeButton": "Repository analysieren",
                 "importButton": "Werk importieren",

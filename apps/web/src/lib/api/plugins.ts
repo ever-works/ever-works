@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
+    PluginConnectionStatus,
     PluginResponse,
     UserPluginResponse,
     WorkPluginResponse,
@@ -13,6 +14,7 @@ import type {
 
 // Re-export types from @ever-works/plugin/api for consistency
 export type {
+    PluginConnectionStatus,
     PluginSettingsSchemaProperty,
     PluginSettingsSchema,
     PluginCategory,
@@ -84,6 +86,23 @@ export const pluginsAPI = {
             return await serverFetch<any[]>(`/plugins/${pluginId}/models`);
         } catch {
             return [];
+        }
+    },
+
+    /**
+     * Probe one plugin's connection status on demand. Returns the
+     * same shape the list endpoint used to embed per-plugin
+     * eagerly — call this from settings drawers or a "test
+     * connection" button so the list response itself can stay fast.
+     */
+    getConnectionStatus: async (pluginId: string): Promise<PluginConnectionStatus | null> => {
+        try {
+            const response = await serverFetch<{
+                connectionStatus: PluginConnectionStatus | null | undefined;
+            }>(`/plugins/${pluginId}/connection-status`);
+            return response.connectionStatus ?? null;
+        } catch {
+            return null;
         }
     },
 

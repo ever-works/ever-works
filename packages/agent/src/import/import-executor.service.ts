@@ -31,6 +31,7 @@ export interface ExecuteBySourceTypeOptions {
     expansionFactor?: number;
     providers?: ProvidersDto;
     worksConfig?: ResolvedWorksConfig | null;
+    reuseSourceRepositoryAsMain?: boolean;
 }
 
 export interface ImportFromDataRepoOptions {
@@ -49,6 +50,7 @@ export interface ImportFromAwesomeReadmeOptions {
     providers?: ProvidersDto;
     worksConfig?: ResolvedWorksConfig | null;
     updateWithPullRequest?: boolean;
+    reuseSourceRepositoryAsMain?: boolean;
 }
 
 export interface LinkExistingDataRepoOptions {
@@ -195,6 +197,7 @@ export class ImportExecutorService {
             providers,
             worksConfig,
             updateWithPullRequest = false,
+            reuseSourceRepositoryAsMain = false,
         } = options;
 
         try {
@@ -221,7 +224,9 @@ export class ImportExecutorService {
             });
 
             if (genResult.success !== false) {
-                await this.markdownGenerator.initialize(work, user);
+                if (!reuseSourceRepositoryAsMain) {
+                    await this.markdownGenerator.initialize(work, user);
+                }
                 await this.websiteGenerator.initialize(work, user);
             }
 
@@ -398,6 +403,7 @@ export class ImportExecutorService {
                     expansionFactor: opts.expansionFactor,
                     providers: opts.providers,
                     worksConfig: opts.worksConfig,
+                    reuseSourceRepositoryAsMain: opts.reuseSourceRepositoryAsMain,
                 });
             case 'link_existing': {
                 if (!token) {

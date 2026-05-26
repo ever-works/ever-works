@@ -11,6 +11,9 @@ export enum NotificationCategory {
     GENERATION = 'generation',
     SYSTEM = 'system',
     SECURITY = 'security',
+    // Agents/Skills/Tasks PR #1017 — Phase 18.3.
+    AGENT = 'agent',
+    TASK = 'task',
 }
 
 export interface CreateNotificationDto {

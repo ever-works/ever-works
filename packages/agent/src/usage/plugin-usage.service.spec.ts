@@ -125,4 +125,95 @@ describe('PluginUsageService.record', () => {
         expect(result).toBeNull();
         // No throw — that's the assertion.
     });
+
+    /**
+     * Agents/Skills/Tasks PR #1017 — Phase 15.6. Agent + Task
+     * attribution propagation.
+     */
+    describe('agentId / taskId attribution (Phase 15.6)', () => {
+        it('persists agentId + taskId when supplied alongside workId', async () => {
+            const { service, repository } = makeService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                agentId: 'agent-9',
+                taskId: 'task-42',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: 'work-1',
+                    userId: 'user-1',
+                    agentId: 'agent-9',
+                    taskId: 'task-42',
+                }),
+            );
+        });
+
+        it('agent-initiated call WITHOUT workId still persists when agentId is set', async () => {
+            const { service, repository } = makeService();
+            const result = await service.record({
+                workId: undefined,
+                userId: 'user-1',
+                agentId: 'agent-9',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+            });
+            expect(result).toEqual({ id: 'event-1' });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: undefined,
+                    userId: 'user-1',
+                    agentId: 'agent-9',
+                    taskId: null,
+                }),
+            );
+        });
+
+        it('task-initiated call WITHOUT workId still persists when taskId is set', async () => {
+            const { service, repository } = makeService();
+            const result = await service.record({
+                workId: undefined,
+                userId: 'user-1',
+                taskId: 'task-42',
+                pluginId: 'tavily',
+                capability: PluginUsageCapability.SEARCH,
+            });
+            expect(result).toEqual({ id: 'event-1' });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: undefined,
+                    userId: 'user-1',
+                    taskId: 'task-42',
+                    agentId: null,
+                }),
+            );
+        });
+
+        it('still skips when all of workId / agentId / taskId are absent', async () => {
+            const { service, repository } = makeService();
+            const result = await service.record({
+                workId: undefined,
+                userId: 'user-1',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+            });
+            expect(result).toBeNull();
+            expect(repository.record).not.toHaveBeenCalled();
+        });
+
+        it('defaults agentId / taskId to null when omitted but workId is present', async () => {
+            const { service, repository } = makeService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({ agentId: null, taskId: null }),
+            );
+        });
+    });
 });

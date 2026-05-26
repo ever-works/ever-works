@@ -78,6 +78,13 @@ describe('GitHubPlugin', () => {
 			expect(props.readPackagesPat['x-scope']).toBe('user');
 			expect(props.readPackagesPat['x-widget']).toBe('github-packages-oauth');
 		});
+
+		it('exposes readPackagesPatOwner as a user-scoped non-secret registry username', () => {
+			const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+			expect(props.readPackagesPatOwner).toBeDefined();
+			expect(props.readPackagesPatOwner['x-scope']).toBe('user');
+			expect(props.readPackagesPatOwner['x-secret']).toBeUndefined();
+		});
 	});
 
 	describe('IGitProviderPlugin pure helpers', () => {

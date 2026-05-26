@@ -13,6 +13,11 @@ import { AccountImportService } from './account-import.service';
 import { GitHubSyncService } from './github-sync.service';
 import { UserSyncConfig } from './entities/user-sync-config.entity';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
+import { AgentsSkillsTasksExportService } from './agents-skills-tasks-export.service';
+import { AgentsSkillsTasksImportService } from './agents-skills-tasks-import.service';
+import { AgentsModule } from '../agents/agents.module';
+import { SkillsModule } from '../skills/skills.module';
+import { TasksDomainModule } from '../tasks-domain/tasks.module';
 
 @Module({
     imports: [
@@ -24,6 +29,10 @@ import { UserSyncConfigRepository } from './repositories/user-sync-config.reposi
             UserPluginEntity,
             WorkPluginEntity,
         ]),
+        // Phase 19 — v2 account-transfer payload tail.
+        AgentsModule,
+        SkillsModule,
+        TasksDomainModule,
     ],
     providers: [
         AccountExportService,
@@ -33,12 +42,16 @@ import { UserSyncConfigRepository } from './repositories/user-sync-config.reposi
         PluginRepository,
         UserPluginRepository,
         WorkPluginRepository,
+        AgentsSkillsTasksExportService,
+        AgentsSkillsTasksImportService,
     ],
     exports: [
         AccountExportService,
         AccountImportService,
         GitHubSyncService,
         UserSyncConfigRepository,
+        AgentsSkillsTasksExportService,
+        AgentsSkillsTasksImportService,
     ],
 })
 export class AccountTransferModule {}

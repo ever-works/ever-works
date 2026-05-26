@@ -75,6 +75,20 @@ export class Work {
     @Column({ nullable: true })
     companyName: string;
 
+    /**
+     * Cached `company_website` from `.works/works.yml`. See `configCache`
+     * for the full design — populated by the generator and by the lazy
+     * backfill path in `WorkQueryService`.
+     *
+     * `type: 'varchar'` is required for `string | null` unions —
+     * TypeORM's reflect-metadata fallback emits `Object` for the
+     * union, which better-sqlite3 (used in CLI tests) rejects with
+     * `DataTypeNotSupportedError`. Same pattern as `committerName`
+     * / `committerEmail` above. See develop commit f1ad254e.
+     */
+    @Column({ type: 'varchar', nullable: true })
+    companyWebsite?: string | null;
+
     @Column({ default: false })
     organization: boolean;
 
@@ -183,6 +197,36 @@ export class Work {
 
     @Column({ nullable: true })
     itemsCount?: number;
+
+    /**
+     * Denormalised counts cached from the Work's data repo, so the
+     * Overview tab can render without `gitFacade.cloneOrPull()`.
+     * Populated by the generator on every successful run and by the
+     * lazy backfill in `WorkQueryService` on first read after the
+     * caching migration deploys. Source of truth is still the
+     * `categories.yml` / `tags.yml` / comparisons listing in the repo.
+     */
+    @Column({ nullable: true })
+    categoriesCount?: number;
+
+    @Column({ nullable: true })
+    tagsCount?: number;
+
+    @Column({ nullable: true })
+    comparisonsCount?: number;
+
+    /**
+     * Cached `.works/works.yml` payload (the full `IDataConfig`) so
+     * tabs that need config fields — Overview, Generator, Settings,
+     * Deploy — can read straight from Postgres instead of cloning the
+     * data repo. Populated alongside the count columns above and
+     * refreshed whenever the generator (or the Settings save path)
+     * writes the YAML back to the repo. Stored as `text` + parsed at
+     * read time, matching the `simple-json` convention used elsewhere
+     * on this entity (`readmeConfig`, `kbConfig`, etc.).
+     */
+    @Column('simple-json', { nullable: true, name: 'configCache' })
+    configCache?: WorksConfigCache | null;
 
     // Git committer overrides at work level (optional — fallback to user/default)
     @Column({ type: 'varchar', nullable: true })
@@ -452,6 +496,20 @@ export interface MarkdownReadmeConfig {
     footer?: string;
     overwriteDefaultFooter?: boolean;
 }
+
+/**
+ * Cached copy of the parsed `.works/works.yml` (the IDataConfig
+ * shape returned by `DataRepository.getConfig()`). Mirrored from
+ * the data repo by the generator + the lazy backfill path so that
+ * dashboard tabs can render without cloning the data repo on every
+ * request. Loose `Record`-shape because (a) we don't query any
+ * fields inside it from SQL, and (b) we don't want the entity file
+ * to import from `agent/generators` (would create a cycle).
+ *
+ * Consumers that need a strongly-typed view should cast to
+ * `IDataConfig` from `@src/generators/data-generator`.
+ */
+export type WorksConfigCache = Record<string, unknown>;
 
 export type {
     ImportSourceType,

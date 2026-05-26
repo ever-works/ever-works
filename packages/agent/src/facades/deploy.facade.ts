@@ -20,6 +20,15 @@ import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.faca
 import type { Work } from '../entities/work.entity';
 import type { User } from '../entities/user.entity';
 
+const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
+const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
+function resolvePluginProviderId(providerId: string): string {
+    return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
+        ? KUBERNETES_DEPLOY_PROVIDER_ID
+        : providerId;
+}
+
 export class DeployFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
         super(message, operation, provider, cause);
@@ -95,14 +104,15 @@ export class DeployFacadeService implements IDeployFacade {
                 return false;
             }
 
-            const registered = this.registry.get(work.deployProvider);
+            const pluginProviderId = resolvePluginProviderId(work.deployProvider);
+            const registered = this.registry.get(pluginProviderId);
             if (!registered || registered.state !== 'loaded') {
                 return false;
             }
 
             // Check if user has configured their token
             const token = await this.getTokenFromSettings(
-                work.deployProvider,
+                pluginProviderId,
                 options.userId,
                 options.workId,
             );
@@ -292,7 +302,11 @@ export class DeployFacadeService implements IDeployFacade {
             if (!work?.deployProvider) {
                 return null;
             }
-            return this.getTokenFromSettings(work.deployProvider, options.userId, options.workId);
+            return this.getTokenFromSettings(
+                resolvePluginProviderId(work.deployProvider),
+                options.userId,
+                options.workId,
+            );
         } catch {
             return null;
         }
@@ -689,7 +703,8 @@ export class DeployFacadeService implements IDeployFacade {
             throw new NoDeployProviderError();
         }
 
-        const registered = this.registry.get(providerId);
+        const pluginProviderId = resolvePluginProviderId(providerId);
+        const registered = this.registry.get(pluginProviderId);
         if (!registered || !registered.manifest.capabilities.includes(this.CAPABILITY)) {
             throw new DeployProviderNotFoundError(providerId);
         }
@@ -699,7 +714,11 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         // Get token from plugin settings (user-required mode)
-        const token = await this.getTokenFromSettings(providerId, options.userId, options.workId);
+        const token = await this.getTokenFromSettings(
+            pluginProviderId,
+            options.userId,
+            options.workId,
+        );
 
         if (!token) {
             const providerName =

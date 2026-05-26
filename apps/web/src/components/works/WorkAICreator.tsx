@@ -22,12 +22,16 @@ import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+
 interface WorkAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
     proposal?: WorkProposal;
+    initialPrompt?: string;
+    initialKind?: InitialWorkKind;
 }
 
 export function WorkAICreator({
@@ -36,8 +40,10 @@ export function WorkAICreator({
     deployProvider,
     websiteTemplates,
     proposal,
+    initialPrompt,
+    initialKind,
 }: WorkAICreatorProps) {
-    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? '');
+    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? initialPrompt ?? '');
     const [workName, setWorkName] = useState(proposal?.title ?? '');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
@@ -131,6 +137,7 @@ export function WorkAICreator({
                 pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 websiteTemplateId: websiteTemplateId || undefined,
                 proposalId: proposal?.id,
+                workKind: initialKind,
             });
 
             if (result.success) {

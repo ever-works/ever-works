@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { workAPI } from '@/lib/api';
-import type {
-    ItemData,
-    Category,
-    Collection,
-    Tag,
-    SourceValidationSettingsDto,
-} from '@/lib/api/types-only';
+import type { SourceValidationSettingsDto } from '@/lib/api/types-only';
 import { ItemsPageClient } from '@/components/works/detail/items/ItemsPageClient';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,75 +14,24 @@ type Params = { params: Promise<{ id: string }> };
 export default async function WorkItemsPage({ params }: Params) {
     const { id } = await params;
 
-    let items: ItemData[] = [];
-    let categories: Category[] = [];
-    let tags: Tag[] = [];
-    let collections: Collection[] = [];
+    // Items + taxonomy are intentionally NOT fetched on the server
+    // any more — `workAPI.getItems()` and `workAPI.getCategoriesTags()`
+    // both trigger a `cloneOrPull()` of the data repo on the API
+    // side, which can take 10–20 s on large repos and previously
+    // blocked the whole route from rendering. They now load
+    // client-side from `loadItemsForList()` inside `ItemsPageClient`,
+    // so the page shell (title, tabs, search input, sticky actions)
+    // paints immediately and the rows fill in once the clone
+    // completes.
+    //
+    // `getSourceValidationSettings` stays in SSR — it's a cheap DB
+    // read, and the Source Health tab needs it on first paint.
     let sourceValidationSettings: SourceValidationSettingsDto | null = null;
-    let error: string | null = null;
-
     try {
-        // Fetch items and taxonomy data in parallel
-        const [itemsRes, taxonomyRes, sourceValidationRes] = await Promise.all([
-            workAPI.getItems(id).catch(() => ({ items: [] })),
-            workAPI
-                .getCategoriesTags(id)
-                .catch(() => ({ categories: [], tags: [], collections: [] })),
-            workAPI.getSourceValidationSettings(id).catch(() => null),
-        ]);
-        sourceValidationSettings = sourceValidationRes;
-
-        items = itemsRes.items || [];
-
-        // Convert string arrays to Category/Tag/Collection objects if needed
-        const rawCategories = taxonomyRes.categories || [];
-        const rawTags = taxonomyRes.tags || [];
-        const rawCollections = taxonomyRes.collections || [];
-
-        // Ensure categories have proper structure
-        categories = rawCategories.map((cat: string | Category) => {
-            if (typeof cat === 'string') {
-                return { id: cat, name: cat };
-            }
-            return cat;
-        });
-
-        // Ensure tags have proper structure
-        tags = rawTags.map((tag: string | Tag) => {
-            if (typeof tag === 'string') {
-                return { id: tag, name: tag };
-            }
-            return tag;
-        });
-
-        // Ensure collections have proper structure
-        collections = rawCollections.map((col: string | Collection) => {
-            if (typeof col === 'string') {
-                return { id: col, name: col };
-            }
-            return col;
-        });
+        sourceValidationSettings = await workAPI.getSourceValidationSettings(id).catch(() => null);
     } catch (err) {
-        console.error('Failed to fetch items:', err);
-        error = 'Failed to load items';
+        console.error('Failed to fetch source validation settings:', err);
     }
 
-    if (error) {
-        return (
-            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6">
-                <p className="text-red-800 dark:text-red-200">{error}</p>
-            </div>
-        );
-    }
-
-    return (
-        <ItemsPageClient
-            items={items}
-            workId={id}
-            categories={categories}
-            tags={tags}
-            collections={collections}
-            sourceValidationSettings={sourceValidationSettings}
-        />
-    );
+    return <ItemsPageClient workId={id} sourceValidationSettings={sourceValidationSettings} />;
 }

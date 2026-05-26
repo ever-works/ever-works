@@ -6,13 +6,15 @@ import { cn } from '@/lib/utils/cn';
 import { WorkAICreator } from '@/components/works/WorkAICreator';
 import { WorkManualForm } from '@/components/works/WorkManualForm';
 import { WorkImportForm } from '@/components/works/WorkImportForm';
-import { CreationBlockTrio } from '@/components/works/CreationBlockTrio';
+import { CreationBlockTrio, type CreationMode } from '@/components/works/CreationBlockTrio';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
+
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
 
 interface NewWorkClientProps {
     user: AuthUser;
@@ -22,6 +24,9 @@ interface NewWorkClientProps {
     defaultDeployProviderId: string | null;
     websiteTemplates: WebsiteTemplateOption[];
     proposal?: WorkProposal | null;
+    initialMode?: CreationMode | null;
+    initialPrompt?: string;
+    initialKind?: InitialWorkKind | null;
 }
 
 export default function NewWorkClient({
@@ -32,9 +37,12 @@ export default function NewWorkClient({
     defaultDeployProviderId,
     websiteTemplates,
     proposal,
+    initialMode = null,
+    initialPrompt,
+    initialKind = null,
 }: NewWorkClientProps) {
-    const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(
-        proposal ? 'ai' : null,
+    const [creationMode, setCreationMode] = useState<CreationMode | null>(
+        proposal ? 'ai' : initialMode,
     );
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
         defaultProviderId || providers[0]?.provider.id || null,
@@ -153,6 +161,8 @@ export default function NewWorkClient({
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
+                        initialPrompt={initialPrompt}
+                        initialKind={initialKind ?? undefined}
                     />
                 )}
                 {creationMode === 'manual' && (
@@ -163,6 +173,7 @@ export default function NewWorkClient({
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
+                        initialDescription={initialPrompt}
                     />
                 )}
                 {creationMode === 'import' && (
