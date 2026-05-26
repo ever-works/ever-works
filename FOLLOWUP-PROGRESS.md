@@ -12,7 +12,7 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 
 ## Tier 2
 
-- [ ] FU-6 · i18n Tasks/Skills/Templates components
+- [x] FU-6 · i18n Tasks/Skills/Templates components — new `dashboard.tasksPage.{list,newDialog,detail,recurring,status}`, `.skillsPage.{list,detail}`, `.templatesPage.*` keys in `apps/web/messages/en.json`. Threaded `useTranslations` through TasksList (filter labels, status select, empty state) and TaskDetailClient (Move to, transition labels, conversation, draft placeholder, Post button). Non-en locales fall back to en via next-intl per existing convention.
 - [ ] FU-7 · Recurring picker friendly controls
 - [ ] FU-8 · Skills binding picker UI
 - [ ] FU-9 · Kanban drag-and-drop transitions

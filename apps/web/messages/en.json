@@ -615,6 +615,68 @@
             "empty": {
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "list": {
+                "newTask": "+ New Task",
+                "kanban": "Kanban",
+                "list": "List",
+                "filter": {
+                    "status": "Status",
+                    "priority": "Priority",
+                    "label": "Label",
+                    "all": "All"
+                }
+            },
+            "newDialog": {
+                "title": "Create a new Task",
+                "name": "Title",
+                "namePlaceholder": "Add a task title",
+                "description": "Description",
+                "descriptionPlaceholder": "Add context (optional)",
+                "priority": "Priority",
+                "labels": "Labels",
+                "labelsPlaceholder": "comma-separated",
+                "cancel": "Cancel",
+                "create": "Create"
+            },
+            "detail": {
+                "moveTo": "Move to",
+                "noTransitions": "No transitions available.",
+                "conversation": "Conversation",
+                "noMessages": "No messages yet.",
+                "post": "Post",
+                "draftPlaceholder": "Write a message. Use @agent-slug to ping an Agent.",
+                "attachments": "Attachments",
+                "fileCount": "{count, plural, one {1 file} other {# files}}",
+                "dropFiles": "Drag & drop a file here or",
+                "browse": "Browse",
+                "uploading": "Uploading…",
+                "detach": "Detach",
+                "labels": "Labels",
+                "edited": "edited"
+            },
+            "recurring": {
+                "section": "Recurring schedule",
+                "promoteToRecurring": "Promote to recurring",
+                "demote": "Demote to one-off",
+                "daily": "Daily",
+                "weekly": "Weekly",
+                "monthly": "Monthly",
+                "custom": "Custom RRULE",
+                "timeOfDay": "Time of day",
+                "dayOfWeek": "Day of week",
+                "dayOfMonth": "Day of month",
+                "timezone": "Timezone",
+                "save": "Save schedule"
+            },
+            "status": {
+                "backlog": "Backlog",
+                "todo": "To do",
+                "in_progress": "In progress",
+                "in_review": "In review",
+                "blocked": "Blocked",
+                "done": "Done",
+                "cancelled": "Cancelled"
             }
         },
         "skillsPage": {
@@ -623,6 +685,39 @@
             "empty": {
                 "title": "No Skills yet.",
                 "subtitle": "Skills ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "list": {
+                "newSkill": "+ New Skill",
+                "filter": {
+                    "scope": "Scope",
+                    "all": "All"
+                }
+            },
+            "detail": {
+                "instructions": "Instructions",
+                "bindings": "Bindings",
+                "bindingHelper": "Bind this Skill to an Agent, Mission, Idea, or Work. Priority 1 = highest precedence.",
+                "addBinding": "+ Add binding",
+                "removeBinding": "Remove",
+                "targetType": "Bind to",
+                "priority": "Priority",
+                "agent": "Agent",
+                "mission": "Mission",
+                "idea": "Idea",
+                "work": "Work",
+                "tenant": "Tenant"
+            }
+        },
+        "templatesPage": {
+            "title": "Templates",
+            "subtitle": "Pre-built starting points for Agents, Skills, and Tasks.",
+            "empty": "No templates available yet.",
+            "useTemplate": "Use template",
+            "browse": "Browse templates",
+            "entity": {
+                "agent": "Agent",
+                "skill": "Skill",
+                "task": "Task"
             }
         },
         "budgetSummary": {
