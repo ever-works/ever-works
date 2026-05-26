@@ -367,6 +367,14 @@ export class AgentRunService {
         let iterations = 0;
         let assistantText: string | null = null;
         let lastFinishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null = null;
+        // FU-1 review fix (greptile P2): track whether the last round
+        // emitted tool calls. Some providers (notably Anthropic's older
+        // tool-use beta + a few self-hosted gateways) leave
+        // `finishReason` as null when tool calls are present, which made
+        // the cap-hit check fall through and the orchestrator return a
+        // partial outcome. Using the toolCalls.length signal directly is
+        // provider-agnostic.
+        let lastRoundHadToolCalls = false;
 
         try {
             while (iterations < TOOL_LOOP_MAX_ITERATIONS) {
@@ -385,6 +393,7 @@ export class AgentRunService {
                 });
 
                 lastFinishReason = round.finishReason;
+                lastRoundHadToolCalls = round.toolCalls.length > 0;
                 assistantText = round.text;
 
                 await this.runLogs
@@ -445,8 +454,11 @@ export class AgentRunService {
             };
         }
 
-        if (iterations >= TOOL_LOOP_MAX_ITERATIONS && lastFinishReason === 'tool_calls') {
-            const errorMessage = `Tool loop hit cap (${TOOL_LOOP_MAX_ITERATIONS} iterations) without a stop.`;
+        if (
+            iterations >= TOOL_LOOP_MAX_ITERATIONS &&
+            (lastFinishReason === 'tool_calls' || lastRoundHadToolCalls)
+        ) {
+            const errorMessage = `Tool loop hit cap (${TOOL_LOOP_MAX_ITERATIONS} iterations) without a stop (finishReason=${lastFinishReason ?? 'null'}).`;
             await this.runLogs
                 .append({
                     runId: context.runId,

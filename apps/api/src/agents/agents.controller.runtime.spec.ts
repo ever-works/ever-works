@@ -94,6 +94,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             cancel: jest.fn(),
             createQueued: jest.fn(),
             findInFlightForTaskAgent: jest.fn().mockResolvedValue(null),
+            markFailed: jest.fn().mockResolvedValue(undefined),
         };
         skillBindings = { resolveActive: jest.fn().mockResolvedValue([]) };
         pluginUsage = { getTotalSpendCentsForOwner: jest.fn().mockResolvedValue(0) };
@@ -285,6 +286,18 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             expect(result.runId).toBe(runId);
             expect(taskExecuteDispatcher.enqueue).not.toHaveBeenCalled();
             expect(agentRuns.createQueued).not.toHaveBeenCalled();
+        });
+
+        it('rolls back the queued AgentRun when enqueue throws (codex P1 fix)', async () => {
+            agentRuns.createQueued.mockResolvedValueOnce({ id: runId });
+            taskExecuteDispatcher.enqueue.mockRejectedValueOnce(new Error('trigger.dev down'));
+            await expect(
+                controller.assignTask(auth, agentId, { taskId }),
+            ).rejects.toBeInstanceOf(InternalServerErrorException);
+            expect(agentRuns.markFailed).toHaveBeenCalledWith(
+                runId,
+                expect.stringContaining('enqueue-failed'),
+            );
         });
 
         it('throws 500 when AGENT_TASK_EXECUTE_DISPATCHER is unbound', async () => {

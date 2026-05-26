@@ -24,13 +24,17 @@ const TABS = [
         label: 'Tasks',
         route: (id: string) => `${ROUTES.DASHBOARD_MISSION(id)}/tasks`,
     },
-    // FU-3 — Agents tab routes to the scope-pinned new-agent page. A
-    // listing route (`/missions/[id]/agents`) will follow; for now the
-    // tab is a direct on-ramp to "+ New mission-scoped Agent".
+    // FU-3 review fix (greptile P2): Agents tab routes to the listing
+    // page now, matching the conventional tab metaphor. The "+ New"
+    // button on the listing page still routes to `/agents/new` so the
+    // create flow stays one click away. Previous behaviour was to
+    // route the tab directly to the wizard, which broke active-state
+    // detection for any future `/missions/[id]/agents/[id]/...` deep
+    // page.
     {
         key: 'agents' as const,
         label: 'Agents',
-        route: (id: string) => `${ROUTES.DASHBOARD_MISSION(id)}/agents/new`,
+        route: (id: string) => `${ROUTES.DASHBOARD_MISSION(id)}/agents`,
     },
 ];
 

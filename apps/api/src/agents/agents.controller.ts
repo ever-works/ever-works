@@ -576,12 +576,26 @@ export class AgentsController {
             triggerKind: 'task',
             taskId: body.taskId,
         });
-        await this.taskExecuteDispatcher.enqueue({
-            agentId: id,
-            userId: auth.userId,
-            taskId: body.taskId,
-            dedupKey: `${body.taskId}:${id}:assigned:${run.id}`,
-        });
+        try {
+            await this.taskExecuteDispatcher.enqueue({
+                agentId: id,
+                userId: auth.userId,
+                taskId: body.taskId,
+                dedupKey: `${body.taskId}:${id}:assigned:${run.id}`,
+            });
+        } catch (err) {
+            // FU-2 review fix (codex P1): without this rollback, the
+            // queued AgentRun row stays forever and
+            // `findInFlightForTaskAgent` keeps short-circuiting future
+            // assign-task calls (because the queued row passes its
+            // "in flight" filter). Mark it failed so retries can
+            // re-dispatch cleanly.
+            const message = err instanceof Error ? err.message : String(err);
+            await this.agentRuns
+                .markFailed(run.id, `enqueue-failed: ${message}`)
+                .catch(() => undefined);
+            throw new InternalServerErrorException(`assign-task enqueue failed: ${message}`);
+        }
         void this.tryLog({
             userId: auth.userId,
             agentId: id,

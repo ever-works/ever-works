@@ -203,11 +203,22 @@ export class AgentScheduleDispatcherService {
             return { outcome: 'skipped', reason: 'inactive' };
         }
 
-        let originalNext: Date | null = null;
+        // FU-2 review fix (codex P1): manual run-now must work for
+        // agents with no scheduled heartbeat (default manual-cadence)
+        // and for ERROR-status agents (operator retry path). Use the
+        // manual-variant claim that doesn't require `nextHeartbeatAt`
+        // and that preserves prior status for the release-on-failure
+        // path. Otherwise default agents would silently 200 with
+        // `outcome: skipped, reason: already-claimed` while no run
+        // was actually in flight.
+        let priorClaim: Awaited<
+            ReturnType<typeof this.agentRepository.tryClaimForManualRun>
+        > = null;
+        let createdRun: { id: string } | null = null;
         let enqueueSucceeded = false;
         try {
-            originalNext = await this.agentRepository.tryClaimForRun(agent.id);
-            if (!originalNext) {
+            priorClaim = await this.agentRepository.tryClaimForManualRun(agent.id);
+            if (!priorClaim) {
                 return { outcome: 'skipped', reason: 'already-claimed' };
             }
 
@@ -216,21 +227,38 @@ export class AgentScheduleDispatcherService {
                 userId: agent.userId,
                 triggerKind: 'manual',
             });
+            createdRun = run ?? null;
             const handle = await trigger.enqueue({
                 agentId: agent.id,
                 userId: agent.userId,
-                scheduledFor: originalNext,
+                scheduledFor: priorClaim.priorNextHeartbeatAt ?? new Date(),
             });
             enqueueSucceeded = true;
             return { outcome: 'dispatched', runId: run?.id ?? handle.runId };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             this.logger.error(`run-now dispatch failed for ${agent.id}: ${message}`);
-            if (originalNext && !enqueueSucceeded) {
+            // FU-2 review fix (greptile P1): if the AgentRun row was
+            // created but the trigger enqueue failed, the row would be
+            // stuck in `queued` forever (stuck-run sweeper only resets
+            // RUNNING). Mark it failed so re-runs aren't blocked.
+            if (createdRun && !enqueueSucceeded) {
                 try {
-                    await this.agentRepository.releaseAfterRun(
+                    await this.agentRunRepository.markFailed(
+                        createdRun.id,
+                        `dispatch-failed: ${message}`,
+                    );
+                } catch (failErr) {
+                    this.logger.warn(
+                        `Failed to mark orphan AgentRun ${createdRun.id} failed: ${failErr}`,
+                    );
+                }
+            }
+            if (priorClaim && !enqueueSucceeded) {
+                try {
+                    await this.agentRepository.releaseAfterManualRunFailure(
                         agent.id,
-                        originalNext,
+                        priorClaim,
                         'dispatch-failed',
                     );
                 } catch (releaseErr) {

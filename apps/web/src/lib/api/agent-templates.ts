@@ -161,6 +161,15 @@ function isAdr010Enabled(): boolean {
  * Lookup-by-slug helper used by the per-template detail panel (and
  * by the future `?from=<slug>` pre-fill on the New flow). Returns
  * null when the slug is unknown.
+ *
+ * FU-11 review fix (greptile P1): `listAstTemplates` already routes
+ * through the ADR-010 catalog when the env flag is on, so a derived
+ * lookup via `listAstTemplates(...).find(...)` is already
+ * flag-aware. Earlier the implementation here hard-coded `FALLBACK`,
+ * which made catalog-only slugs unreachable via `getAstTemplate`.
+ * Keeping this thin wrapper means both helpers stay consistent —
+ * if the catalog returns a row, `getAstTemplate` returns it; if the
+ * fetch falls back, this falls back too.
  */
 export async function getAstTemplate(
     entity: AstTemplateEntityType,

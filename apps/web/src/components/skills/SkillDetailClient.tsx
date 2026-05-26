@@ -311,11 +311,19 @@ function SkillBindingTargetPicker({
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [filter, setFilter] = useState('');
+    // FU-8 review fix (greptile P2): stash `onChange` in a ref so the
+    // effect doesn't re-fire (or worse, infinite-loop) when a parent
+    // passes an inline arrow function. The effect should only re-run
+    // on `targetType` changes — the callback identity is incidental.
+    const onChangeRef = useRef(onChange);
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
 
     useEffect(() => {
         if (targetType === 'tenant') {
             setOptions([]);
-            onChange('');
+            onChangeRef.current('');
             return;
         }
         let cancelled = false;
@@ -353,7 +361,8 @@ function SkillBindingTargetPicker({
         return () => {
             cancelled = true;
         };
-    }, [targetType, onChange]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetType]);
 
     if (targetType === 'tenant') {
         return (

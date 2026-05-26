@@ -189,14 +189,20 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
                             >
                                 <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    <a
-                                        href={`/api/uploads/${r.uploadId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-text dark:text-text-dark hover:text-primary truncate block"
+                                    {/* FU-5 review fix (greptile + codex P1):
+                                        the previous `<a href="/api/uploads/{uploadId}">`
+                                        404'd because the existing backend GET is
+                                        `/:userId/:filename` and there's no resolver
+                                        that turns an uploadId alone into a download.
+                                        Surface filename as plain text + a tooltip
+                                        until the resolver lands — upload + detach
+                                        still work end-to-end. */}
+                                    <span
+                                        className="text-sm text-text dark:text-text-dark truncate block"
+                                        title="Download wiring pending — see FOLLOWUP-PROGRESS"
                                     >
                                         {filename}
-                                    </a>
+                                    </span>
                                     <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                         {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
                                         {new Date(r.createdAt).toLocaleString()}
