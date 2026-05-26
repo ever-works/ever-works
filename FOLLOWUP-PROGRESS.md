@@ -19,11 +19,15 @@ Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
 - [x] FU-10 · GitHub-sync v2 toggles UI — added Include Agents / Skills / Tasks / Task chat checkboxes to `GitHubSync.tsx`, mirroring the export form in `DataManagement.tsx`. Wired through to `pushToGitHub` action which already accepts the v2 toggle bag. Task-chat gated on includeTasks so toggling Tasks off cleanly resets the chat flag. (Persistence to UserSyncConfig is server-side; UI defaults to all-off matching the v1 payload until the user opts in.)
 - [x] FU-11 · Templates browser content swap to ADR-010 catalog — added env-flag (`NEXT_PUBLIC_AGENT_TEMPLATES_CATALOG`) opt-in path in `listAstTemplates`. When the flag is on, lazy-imports `serverFetch` and hits `/api/agent-templates?entity=<entity>`; on error or flag-off, returns the existing fallback constants. Shape preserved across both branches so callers (route pages + dialog pre-fill) don't change. Updated spec covers all 3 cases (flag-on success, flag-on error → fallback, flag-off). ADR-010 catalog itself still pending operator-led work — flag stays off by default until it lands.
 
-## Tier 3 (operator decisions — deferred)
+## Tier 3 (operator decisions — partially resolved 2026-05-26)
 
-- [ ] FU-12 · Transition lattice `done → in_progress` divergence
-- [ ] FU-13 · Operator-binding for `AGENT_GIT_FACADE`
-- [ ] FU-14 · Phase 4 Git-mode AgentFileService writes
+- [ ] FU-12 · Transition lattice `done → in_progress` divergence — still awaiting operator pick between (a) spec carve-out or (b) tightening `ALLOWED[DONE]`.
+- [x] FU-13 · Operator-binding for `AGENT_GIT_FACADE` — added per-Agent `committerName`/`committerEmail` columns + migration; bound the token in api-side AgentsModule using User's OAuth token via existing `GitFacadeService.commit/.createPullRequest`; updated injection-tokens doc with the canonical adapter.
+- [x] FU-14 · Phase 4 Git-mode AgentFileService writes — added `GitFacadeService.getRepoDir(scope, scopeId)` that resolves Work scopes via `WorkRepository.findById` + `cloneOrPull`, returns null for Mission/Idea (no repo in current data model); removed "Git-mode lands in Phase 6" throws so non-tenant Agents fall back to DB-inline cleanly.
+
+## Future tracks (post-PR-1021)
+
+- **Email Providers** — new spec at [`docs/specs/features/email-providers/spec.md`](docs/specs/features/email-providers/spec.md). Tenant-managed inbound + outbound email addresses, multi-provider plugin contract (Mailchimp, Mailgun, Postmark, Resend, Sendgrid), per-Agent assignment, integration with the agent-run path. Closes the loop on the FU-13 `Agent.committerEmail` synthesized-domain placeholder.
 
 ## Log
 
