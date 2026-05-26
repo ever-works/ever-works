@@ -1,0 +1,30 @@
+# Agents/Skills/Tasks — Post-PR-1019 Follow-ups Progress
+
+Branch: `feat/agents-skills-tasks-followups` (off `origin/develop` @ `a961f0e2`)
+
+## Tier 1
+
+- [x] FU-1 · LLM dispatch in `AgentRunService.execute` — token-based facade (`AGENT_AI_DISPATCH_FACADE`), tool loop capped at 10 iterations, virtual `transitionTask` capture tool on `task` runs, INFO/WARN/ERROR run-log rows for `ai-dispatch` + `tool-invocation`, finalize() routes chat-back + task-finish
+- [ ] FU-2 · 6 missing Agents API controller routes
+- [ ] FU-3 · Mission/Work/Idea-scoped Agent creation entry points
+- [ ] FU-4 · 3 placeholder Agent-detail tabs
+- [ ] FU-5 · Attachment UI on Task detail
+
+## Tier 2
+
+- [ ] FU-6 · i18n Tasks/Skills/Templates components
+- [ ] FU-7 · Recurring picker friendly controls
+- [ ] FU-8 · Skills binding picker UI
+- [ ] FU-9 · Kanban drag-and-drop transitions
+- [ ] FU-10 · GitHub-sync v2 toggles UI
+- [ ] FU-11 · Templates browser content swap to ADR-010 catalog
+
+## Tier 3 (operator decisions — deferred)
+
+- [ ] FU-12 · Transition lattice `done → in_progress` divergence
+- [ ] FU-13 · Operator-binding for `AGENT_GIT_FACADE`
+- [ ] FU-14 · Phase 4 Git-mode AgentFileService writes
+
+## Log
+
+(timestamps in UTC)

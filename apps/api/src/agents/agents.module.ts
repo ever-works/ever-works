@@ -4,9 +4,12 @@ import {
     AGENT_RUN_CHAT_BACK_POSTER,
     AGENT_RUN_TASK_FINISHER,
     AGENT_PLUGIN_TOOLS_FACADE,
+    AGENT_AI_DISPATCH_FACADE,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
+    type AgentAiDispatchFacade,
+    type AgentAiToolCall,
 } from '@ever-works/agent/agents';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -28,6 +31,7 @@ import {
     SearchFacadeService,
     ScreenshotFacadeService,
     ContentExtractorFacadeService,
+    AiFacadeService,
 } from '@ever-works/agent/facades';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
@@ -167,7 +171,114 @@ import { AgentsController } from './agents.controller';
                 },
             }),
         },
+        // FU-1 — AI dispatch facade. Thin adapter over
+        // `AiFacadeService.createChatCompletion()` that owns the
+        // ToolDefinition mapping + tool-call parsing. The agent-side
+        // `AgentRunService.runToolLoop` keeps the actual loop +
+        // iteration cap + run-log emission, so this binding stays
+        // small (one call per round-trip).
+        {
+            provide: AGENT_AI_DISPATCH_FACADE,
+            inject: [AiFacadeService],
+            useFactory: (ai: AiFacadeService): AgentAiDispatchFacade => ({
+                async dispatch(input) {
+                    const tools = input.tools?.map((t) => ({
+                        type: 'function' as const,
+                        function: {
+                            name: t.name,
+                            description: t.description,
+                            parameters: t.parameters,
+                        },
+                    }));
+                    const messages = input.messages.map((m) => {
+                        const base: Record<string, unknown> = {
+                            role: m.role,
+                            content: m.content,
+                        };
+                        if (m.name) base.name = m.name;
+                        if (m.toolCallId) base.toolCallId = m.toolCallId;
+                        if (m.toolCalls && m.toolCalls.length > 0) {
+                            base.toolCalls = m.toolCalls.map((c) => ({
+                                id: c.id,
+                                type: 'function',
+                                function: {
+                                    name: c.name,
+                                    arguments:
+                                        typeof c.args === 'string'
+                                            ? c.args
+                                            : JSON.stringify(c.args ?? {}),
+                                },
+                            }));
+                        }
+                        return base as any;
+                    });
+                    const response = await ai.createChatCompletion(
+                        {
+                            model: input.model,
+                            messages,
+                            tools,
+                            temperature: input.temperature ?? 0.4,
+                            maxTokens: input.maxTokens,
+                        },
+                        {
+                            userId: input.facadeOptions.userId,
+                            workId: input.facadeOptions.workId,
+                            agentId: input.facadeOptions.agentId,
+                            taskId: input.facadeOptions.taskId,
+                            providerOverride: input.facadeOptions.providerOverride,
+                        },
+                    );
+                    const first = response.choices[0];
+                    const msg = first?.message;
+                    const rawToolCalls = msg?.toolCalls ?? [];
+                    const toolCalls: AgentAiToolCall[] = rawToolCalls.map((tc) => {
+                        let args: unknown = {};
+                        try {
+                            args = tc.function.arguments
+                                ? JSON.parse(tc.function.arguments)
+                                : {};
+                        } catch {
+                            args = tc.function.arguments;
+                        }
+                        return { id: tc.id, name: tc.function.name, args };
+                    });
+                    const content = msg?.content ?? '';
+                    const text =
+                        typeof content === 'string'
+                            ? content
+                            : Array.isArray(content)
+                              ? content
+                                    .map((part) =>
+                                        typeof part === 'string'
+                                            ? part
+                                            : part && typeof part === 'object' && 'text' in part
+                                              ? (part as { text: string }).text
+                                              : '',
+                                    )
+                                    .join('')
+                              : null;
+                    return {
+                        text: text && text.length > 0 ? text : null,
+                        toolCalls,
+                        finishReason: first?.finishReason ?? null,
+                        usage: response.usage
+                            ? {
+                                  promptTokens: response.usage.promptTokens,
+                                  completionTokens: response.usage.completionTokens,
+                                  totalTokens: response.usage.totalTokens,
+                              }
+                            : undefined,
+                        model: response.model,
+                    };
+                },
+            }),
+        },
     ],
-    exports: [AGENT_RUN_CHAT_BACK_POSTER, AGENT_RUN_TASK_FINISHER, AGENT_PLUGIN_TOOLS_FACADE],
+    exports: [
+        AGENT_RUN_CHAT_BACK_POSTER,
+        AGENT_RUN_TASK_FINISHER,
+        AGENT_PLUGIN_TOOLS_FACADE,
+        AGENT_AI_DISPATCH_FACADE,
+    ],
 })
 export class AgentsModule {}
