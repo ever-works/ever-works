@@ -9,6 +9,7 @@ export * from './prompt-assembler.service';
 export * from './agent-run.service';
 export * from './agent-run-post-processor';
 export * from './agent-git-facade';
+export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
 export * from './budget-period';

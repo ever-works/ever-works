@@ -12,6 +12,13 @@ import {
 	type AgentCommitToRepoResult,
 	type AgentOpenPullRequestResult,
 } from './agent-git-facade';
+import {
+	AGENT_PLUGIN_TOOLS_FACADE,
+	type AgentPluginToolsFacade,
+	type AgentSearchWebResult,
+	type AgentScreenshotResult,
+	type AgentExtractContentResult,
+} from './agent-plugin-tools-facade';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -69,6 +76,9 @@ export class AgentToolService {
 		@Optional()
 		@Inject(AGENT_GIT_FACADE)
 		private readonly git?: AgentGitFacade,
+		@Optional()
+		@Inject(AGENT_PLUGIN_TOOLS_FACADE)
+		private readonly pluginTools?: AgentPluginToolsFacade,
 	) {}
 
 	/**
@@ -137,6 +147,18 @@ export class AgentToolService {
 		// granular flag.
 		if (agent.permissions?.canOpenPullRequests && this.git) {
 			tools.push(this.buildOpenPullRequestTool(agent));
+		}
+
+		// Phase 16.10 — plugin pass-through tools (searchWeb /
+		// screenshot / extractContent). Single permission gate
+		// (canCallExternalTools) per architecture spec §6 — these
+		// share the same "outbound network call" risk class. Gated on
+		// token presence so when the platform hasn't wired the adapter
+		// the model never sees the tools.
+		if (agent.permissions?.canCallExternalTools && this.pluginTools) {
+			tools.push(this.buildSearchWebTool(agent));
+			tools.push(this.buildScreenshotTool(agent));
+			tools.push(this.buildExtractContentTool(agent));
 		}
 
 		// getActivity + getKbDocument — placeholders that document the
@@ -386,6 +408,137 @@ export class AgentToolService {
 						head: args.head,
 						base: args.base,
 						draft: args.draft,
+					});
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		};
+	}
+
+	private buildSearchWebTool(
+		agent: Agent,
+	): AgentToolDescriptor<
+		{ query: string; maxResults?: number; includeDomains?: string[]; excludeDomains?: string[] },
+		AgentSearchWebResult
+	> {
+		return {
+			name: 'searchWeb',
+			description:
+				'Web search via the active search plugin (Tavily / Brave / etc.). Returns ranked results with title, URL, and optional snippet. Requires canCallExternalTools. Use sparingly — every call hits the per-Work budget.',
+			parameters: {
+				type: 'object',
+				properties: {
+					query: { type: 'string', description: 'Search query.' },
+					maxResults: {
+						type: 'string',
+						description: 'Optional cap on result count. Defaults to the plugin\'s default.',
+					},
+					includeDomains: {
+						type: 'string',
+						description: 'Optional comma-separated list of domains to bias toward.',
+					},
+					excludeDomains: {
+						type: 'string',
+						description: 'Optional comma-separated list of domains to filter out.',
+					},
+				},
+				required: ['query'],
+			},
+			invoke: async (args) => {
+				if (!args?.query || args.query.trim().length === 0) {
+					return { error: 'query is required.' };
+				}
+				try {
+					return await this.pluginTools!.searchWeb({
+						userId: agent.userId,
+						agentId: agent.id,
+						workId: agent.workId ?? undefined,
+						query: args.query,
+						maxResults: args.maxResults,
+						includeDomains: args.includeDomains,
+						excludeDomains: args.excludeDomains,
+					});
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		};
+	}
+
+	private buildScreenshotTool(
+		agent: Agent,
+	): AgentToolDescriptor<
+		{ url: string; viewportWidth?: number; viewportHeight?: number; fullPage?: boolean },
+		AgentScreenshotResult
+	> {
+		return {
+			name: 'screenshot',
+			description:
+				'Capture a screenshot of a URL via the active screenshot plugin. Returns the imageUrl (and cacheUrl when available). Requires canCallExternalTools. Used when visual layout context matters and a text extraction would miss it.',
+			parameters: {
+				type: 'object',
+				properties: {
+					url: { type: 'string', description: 'URL to screenshot.' },
+					viewportWidth: { type: 'string', description: 'Optional viewport width in px.' },
+					viewportHeight: { type: 'string', description: 'Optional viewport height in px.' },
+					fullPage: { type: 'string', description: 'Optional full-page flag. Default false.' },
+				},
+				required: ['url'],
+			},
+			invoke: async (args) => {
+				if (!args?.url || args.url.trim().length === 0) {
+					return { error: 'url is required.' };
+				}
+				try {
+					return await this.pluginTools!.screenshot({
+						userId: agent.userId,
+						agentId: agent.id,
+						workId: agent.workId ?? undefined,
+						url: args.url,
+						viewportWidth: args.viewportWidth,
+						viewportHeight: args.viewportHeight,
+						fullPage: args.fullPage,
+					});
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		};
+	}
+
+	private buildExtractContentTool(
+		agent: Agent,
+	): AgentToolDescriptor<
+		{ url: string; maxChars?: number },
+		AgentExtractContentResult
+	> {
+		return {
+			name: 'extractContent',
+			description:
+				"Fetch and clean a URL's primary text content via the active content-extractor plugin (Firecrawl / Tavily extract / Readability fallback). Returns the cleaned body + content length. Requires canCallExternalTools. Prefer over raw fetch — the extractor strips nav/ads/footers.",
+			parameters: {
+				type: 'object',
+				properties: {
+					url: { type: 'string', description: 'URL to extract.' },
+					maxChars: {
+						type: 'string',
+						description: 'Optional cap on returned characters. Defaults to 50000 (the adapter clamps).',
+					},
+				},
+				required: ['url'],
+			},
+			invoke: async (args) => {
+				if (!args?.url || args.url.trim().length === 0) {
+					return { error: 'url is required.' };
+				}
+				try {
+					return await this.pluginTools!.extractContent({
+						userId: agent.userId,
+						agentId: agent.id,
+						workId: agent.workId ?? undefined,
+						url: args.url,
+						maxChars: args.maxChars,
 					});
 				} catch (err) {
 					return { error: err instanceof Error ? err.message : String(err) };

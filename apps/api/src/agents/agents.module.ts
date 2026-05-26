@@ -3,8 +3,10 @@ import {
 	AgentsModule as AgentAgentsModule,
 	AGENT_RUN_CHAT_BACK_POSTER,
 	AGENT_RUN_TASK_FINISHER,
+	AGENT_PLUGIN_TOOLS_FACADE,
 	type AgentRunChatBackPoster,
 	type AgentRunTaskFinisher,
+	type AgentPluginToolsFacade,
 } from '@ever-works/agent/agents';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -21,11 +23,17 @@ import {
 	TasksService,
 	TaskStatus,
 } from '@ever-works/agent/tasks-domain';
+import {
+	FacadesModule,
+	SearchFacadeService,
+	ScreenshotFacadeService,
+	ContentExtractorFacadeService,
+} from '@ever-works/agent/facades';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
 
 /**
- * Agents/Skills/Tasks PR #1017 — api-side AgentsModule (Phase 3 + 15.5).
+ * Agents/Skills/Tasks PR #1017 — api-side AgentsModule (Phase 3 + 15.5 + 16.10).
  *
  * Mounts the AgentsController; defers to the agent-side AgentsModule
  * for the service + repositories + entities.
@@ -39,9 +47,16 @@ import { AgentsController } from './agents.controller';
  * `agent-chat-reply` dispatcher tokens (Phase 15.3 / 15.4) —
  * keeps the agent package free of a hard `@ever-works/agent/tasks-domain`
  * runtime dependency at the AgentsModule layer.
+ *
+ * Phase 16.10: binds `AGENT_PLUGIN_TOOLS_FACADE` to a thin adapter
+ * that forwards `searchWeb` / `screenshot` / `extractContent` calls
+ * to `SearchFacadeService.search`, `ScreenshotFacadeService.capture`,
+ * `ContentExtractorFacadeService.extractContent`. Each forwarded call
+ * threads `agentId` + optional `taskId` onto `FacadeOptions` so the
+ * Phase 15.6 attribution lands on every resulting `PluginUsageEvent`.
  */
 @Module({
-	imports: [AgentAgentsModule, TasksDomainModule, AuthModule],
+	imports: [AgentAgentsModule, TasksDomainModule, FacadesModule, AuthModule],
 	controllers: [AgentsController],
 	providers: [
 		{
@@ -71,7 +86,60 @@ import { AgentsController } from './agents.controller';
 				},
 			}),
 		},
+		{
+			provide: AGENT_PLUGIN_TOOLS_FACADE,
+			inject: [SearchFacadeService, ScreenshotFacadeService, ContentExtractorFacadeService],
+			useFactory: (
+				search: SearchFacadeService,
+				screenshot: ScreenshotFacadeService,
+				extractor: ContentExtractorFacadeService,
+			): AgentPluginToolsFacade => ({
+				async searchWeb({ userId, workId, agentId, taskId, query, maxResults, includeDomains, excludeDomains }) {
+					const results = await search.search(
+						query,
+						{ maxResults, includeDomains, excludeDomains },
+						{ userId, workId, agentId, taskId },
+					);
+					return {
+						results: results.map((r) => ({
+							title: r.title,
+							url: r.url,
+							snippet: (r as any).snippet ?? null,
+							publishedDate: (r as any).publishedDate ?? null,
+							score: (r as any).score,
+						})),
+					};
+				},
+				async screenshot({ userId, workId, agentId, taskId, url, viewportWidth, viewportHeight, fullPage }) {
+					const result = await screenshot.capture(
+						{ url, viewportWidth, viewportHeight, fullPage } as any,
+						{ userId, workId, agentId, taskId },
+					);
+					return {
+						success: result.success,
+						imageUrl: result.imageUrl ?? null,
+						cacheUrl: result.cacheUrl ?? null,
+					};
+				},
+				async extractContent({ userId, workId, agentId, taskId, url, maxChars }) {
+					const result = await extractor.extractContent(
+						url,
+						undefined,
+						{ userId, workId, agentId, taskId },
+					);
+					const raw = result?.rawContent ?? '';
+					const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
+					const content = raw.length > cap ? raw.slice(0, cap) : raw;
+					return {
+						url,
+						content,
+						contentLength: raw.length,
+						providerId: result?.extraction?.providerId ?? null,
+					};
+				},
+			}),
+		},
 	],
-	exports: [AGENT_RUN_CHAT_BACK_POSTER, AGENT_RUN_TASK_FINISHER],
+	exports: [AGENT_RUN_CHAT_BACK_POSTER, AGENT_RUN_TASK_FINISHER, AGENT_PLUGIN_TOOLS_FACADE],
 })
 export class AgentsModule {}
