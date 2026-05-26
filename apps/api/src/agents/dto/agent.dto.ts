@@ -300,4 +300,3 @@ export class AssignTaskToAgentDto {
     @IsUUID()
     taskId: string;
 }
-

@@ -85,13 +85,11 @@ describe('AgentToolService git tools (Phase 16.6 + 16.7)', () => {
             commitToRepo: jest
                 .fn()
                 .mockResolvedValue({ sha: 'abc123', branch: 'main', filesChanged: 2 }),
-            openPullRequest: jest
-                .fn()
-                .mockResolvedValue({
-                    number: 42,
-                    url: 'https://github.com/x/y/pull/42',
-                    state: 'open',
-                }),
+            openPullRequest: jest.fn().mockResolvedValue({
+                number: 42,
+                url: 'https://github.com/x/y/pull/42',
+                state: 'open',
+            }),
         };
         svc = new AgentToolService(agentsRepo, undefined, undefined, undefined, git);
     });

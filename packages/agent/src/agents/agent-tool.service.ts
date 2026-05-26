@@ -489,9 +489,7 @@ export class AgentToolService {
         };
     }
 
-    private buildSearchWebTool(
-        agent: Agent,
-    ): AgentToolDescriptor<
+    private buildSearchWebTool(agent: Agent): AgentToolDescriptor<
         {
             query: string;
             maxResults?: number;

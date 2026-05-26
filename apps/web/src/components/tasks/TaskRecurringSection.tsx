@@ -387,9 +387,7 @@ function InactivePanel({ task }: { task: Task }) {
             </div>
             <div className="text-[11px] text-text-muted font-mono">
                 Rule preview: {ruleString || '(empty)'}
-                {!isValidRule && ruleString && (
-                    <span className="text-danger ml-2">· invalid</span>
-                )}
+                {!isValidRule && ruleString && <span className="text-danger ml-2">· invalid</span>}
             </div>
             <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleSave} disabled={pending || !isValidRule}>

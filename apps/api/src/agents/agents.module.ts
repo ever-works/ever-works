@@ -234,9 +234,7 @@ import { AgentsController } from './agents.controller';
                     const toolCalls: AgentAiToolCall[] = rawToolCalls.map((tc) => {
                         let args: unknown = {};
                         try {
-                            args = tc.function.arguments
-                                ? JSON.parse(tc.function.arguments)
-                                : {};
+                            args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
                         } catch {
                             args = tc.function.arguments;
                         }

@@ -49,8 +49,7 @@ export function AgentSkillsClient({ agentId, initial }: Props) {
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark divide-y divide-border/40 dark:divide-border-dark/40">
                 {rows.length === 0 ? (
                     <div className="p-6 text-center text-xs text-text-muted dark:text-text-muted-dark">
-                        No skills bound yet. Bind a Skill to this Agent from the Skills detail
-                        page.
+                        No skills bound yet. Bind a Skill to this Agent from the Skills detail page.
                     </div>
                 ) : (
                     rows.map((r) => (

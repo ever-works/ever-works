@@ -254,9 +254,7 @@ function BindingsPanel({
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
-                        {targetType === 'tenant'
-                            ? 'Target (auto-filled)'
-                            : `Pick a ${targetType}`}
+                        {targetType === 'tenant' ? 'Target (auto-filled)' : `Pick a ${targetType}`}
                     </label>
                     <SkillBindingTargetPicker
                         targetType={targetType}
@@ -368,9 +366,10 @@ function SkillBindingTargetPicker({
         );
     }
 
-    const filtered = filter.trim().length === 0
-        ? options
-        : options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
+    const filtered =
+        filter.trim().length === 0
+            ? options
+            : options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
 
     if (loadError || options.length === 0) {
         return (

@@ -7,15 +7,9 @@ import {
     AgentStatus,
 } from '../../entities/agent.entity';
 import type { Agent } from '../../entities/agent.entity';
-import type {
-    AgentAiDispatchFacade,
-    AgentAiDispatchResult,
-} from '../agent-ai-dispatch-facade';
+import type { AgentAiDispatchFacade, AgentAiDispatchResult } from '../agent-ai-dispatch-facade';
 import type { AgentToolService } from '../agent-tool.service';
-import type {
-    AgentRunChatBackPoster,
-    AgentRunTaskFinisher,
-} from '../agent-run-post-processor';
+import type { AgentRunChatBackPoster, AgentRunTaskFinisher } from '../agent-run-post-processor';
 
 /**
  * Agents/Skills/Tasks PR #1019 follow-up — FU-1.

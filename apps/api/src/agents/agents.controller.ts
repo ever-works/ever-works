@@ -44,7 +44,11 @@ import {
     type AgentTaskExecuteDispatcher,
     TasksService,
 } from '@ever-works/agent/tasks-domain';
-import { ActivityLogService, ActivityActionType, ActivityStatus } from '@ever-works/agent/activity-log';
+import {
+    ActivityLogService,
+    ActivityActionType,
+    ActivityStatus,
+} from '@ever-works/agent/activity-log';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -444,8 +448,7 @@ export class AgentsController {
         if (!result.found) {
             throw new NotFoundException(`AgentRun ${runId} not found.`);
         }
-        const wasOpen =
-            result.previousStatus === 'queued' || result.previousStatus === 'running';
+        const wasOpen = result.previousStatus === 'queued' || result.previousStatus === 'running';
         if (wasOpen) {
             void this.tryLog({
                 userId: auth.userId,

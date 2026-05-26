@@ -254,9 +254,9 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 heartbeatTrigger,
                 undefined,
             );
-            await expect(
-                controller.assignTask(auth, agentId, { taskId }),
-            ).rejects.toBeInstanceOf(InternalServerErrorException);
+            await expect(controller.assignTask(auth, agentId, { taskId })).rejects.toBeInstanceOf(
+                InternalServerErrorException,
+            );
         });
     });
 });

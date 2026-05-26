@@ -24,17 +24,15 @@ export default async function AgentInstructionsPage({
 
     const files: AgentFileBody[] = await Promise.all(
         FILES.map((name) =>
-            agentsAPI
-                .readFile(id, name)
-                .catch(
-                    () =>
-                        ({
-                            name,
-                            body: '',
-                            hash: '',
-                            storage: 'db' as const,
-                        }) satisfies AgentFileBody,
-                ),
+            agentsAPI.readFile(id, name).catch(
+                () =>
+                    ({
+                        name,
+                        body: '',
+                        hash: '',
+                        storage: 'db' as const,
+                    }) satisfies AgentFileBody,
+            ),
         ),
     );
 

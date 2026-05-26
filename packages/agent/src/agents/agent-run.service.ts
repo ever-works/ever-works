@@ -71,12 +71,7 @@ export interface AgentRunBudgetCheck {
 
 export interface AgentRunExecuteResult {
     runId: string;
-    status:
-        | 'assembled'
-        | 'budget-blocked'
-        | 'agent-not-found'
-        | 'dispatched'
-        | 'dispatch-failed';
+    status: 'assembled' | 'budget-blocked' | 'agent-not-found' | 'dispatched' | 'dispatch-failed';
     prompt?: AssembledPrompt;
     budgetCheck?: AgentRunBudgetCheck;
     /** Set when the LLM-dispatch path ran end-to-end. */
@@ -421,11 +416,7 @@ export class AgentRunService {
                 });
 
                 for (const call of round.toolCalls) {
-                    const result = await this.invokeTool(
-                        context.runId,
-                        descriptorByName,
-                        call,
-                    );
+                    const result = await this.invokeTool(context.runId, descriptorByName, call);
                     messages.push({
                         role: 'tool',
                         toolCallId: call.id,
@@ -492,10 +483,7 @@ export class AgentRunService {
      * task paths.
      */
     private buildTransitionTaskTool(
-        capture: (
-            status: 'done' | 'in_review' | 'blocked' | 'cancelled',
-            force: boolean,
-        ) => void,
+        capture: (status: 'done' | 'in_review' | 'blocked' | 'cancelled', force: boolean) => void,
     ): AgentToolDescriptor<
         { to: 'done' | 'in_review' | 'blocked' | 'cancelled'; force?: boolean },
         { captured: true; to: string }
@@ -553,8 +541,7 @@ export class AgentRunService {
         }
         try {
             const result = await descriptor.invoke(call.args as never);
-            const isError =
-                result && typeof result === 'object' && 'error' in (result as object);
+            const isError = result && typeof result === 'object' && 'error' in (result as object);
             await this.runLogs
                 .append({
                     runId,
@@ -606,11 +593,9 @@ export class AgentRunService {
     ): AgentRunOutcome {
         const text = (assistantText ?? '').trim();
         const firstLine =
-            text.length > 0 ? text.split('\n').find((l) => l.trim().length > 0) ?? null : null;
+            text.length > 0 ? (text.split('\n').find((l) => l.trim().length > 0) ?? null) : null;
         const summary =
-            firstLine && firstLine.length > 200
-                ? firstLine.slice(0, 200).trim() + '…'
-                : firstLine;
+            firstLine && firstLine.length > 200 ? firstLine.slice(0, 200).trim() + '…' : firstLine;
 
         if (kind === 'chat') {
             return {

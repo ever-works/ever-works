@@ -124,9 +124,7 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
             <header className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">
-                    Attachments
-                </h2>
+                <h2 className="text-sm font-medium text-text dark:text-text-dark">Attachments</h2>
                 <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
                     {rows.length} file{rows.length === 1 ? '' : 's'}
                 </p>
@@ -200,8 +198,8 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
                                         {filename}
                                     </a>
                                     <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                        {size ?? r.uploadId.slice(0, 12) + '…'}{' '}
-                                        · attached {new Date(r.createdAt).toLocaleString()}
+                                        {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
+                                        {new Date(r.createdAt).toLocaleString()}
                                     </div>
                                 </div>
                                 <Button
