@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 15
-- **Last tick at**: 2026-05-26 (tick 15 — Phase 11.1-11.4: Task + 10 sub-entities + CreateTasksTables migration + AddTaskIdToPluginUsageEvents migration + entity barrel + database.config registration. Repositories + plugin contract + plugin + facade follow next tick.)
-- **In progress now**: Phase 11 (11.1-11.4 ticked; 11.5-11.8 remaining)
+- **Last tick #**: 16
+- **Last tick at**: 2026-05-26 (tick 16 — Phase 11 complete: TaskRepository (with cycle detector + casClaimRecurrence + findDueRecurringTemplates) + 10 side repos + UserTaskCounter atomic slug sequence + ITaskTrackerPlugin contract + TASK_TRACKER capability + Ever Works Task Tracker plugin (DB-shim) + TasksFacadeService + TasksDomainModule + cycle-detector tests.)
+- **In progress now**: (none — next tick picks up Phase 12 TasksController + /tasks list page)
 
 ---
 
@@ -169,10 +169,12 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 - [x] **11.2** All 10 sub-entities shipped: `task-assignee.entity.ts`, `task-reviewer.entity.ts` (+ reviewState/reviewedAt), `task-approver.entity.ts` (+ approvalState/approvedAt), `task-block.entity.ts`, `task-relation.entity.ts`, `task-chat-message.entity.ts` (+ mentions/attachments JSON + editedAt for the 5-min edit window), `task-attachment.entity.ts` (FK pointer to work_knowledge_upload), `task-watcher.entity.ts`, `task-kb-mention.entity.ts`, `user-task-counter.entity.ts` (per-user atomic slug sequence). ✓ Tick 15
 - [x] **11.3** Migration `apps/api/src/migrations/1779978013000-CreateTasksTables.ts` — 11 tables in FK-safe order, ~22 indexes via the `ensureIndex` helper, FK CASCADE on (taskId → tasks, userId → users). Idempotent. `tasks.parentTaskId` / `task_blocks.blockedByTaskId` / `task_relations.relatedTaskId` / `task_attachments.uploadId` deliberately NOT FK'd to avoid self-referential cycles / cross-table deletes; service-layer validates. ✓ Tick 15
 - [x] **11.4** Migration `apps/api/src/migrations/1779978014000-AddTaskIdToPluginUsageEvents.ts` — adds nullable `taskId uuid` column + `(taskId, occurredAt)` index for the spend rollup endpoint. No FK to `tasks` (audit preservation on Task delete). `PluginUsageEvent` entity gains the column + `idx_plugin_usage_events_task_occurred` index decorator. ✓ Tick 15
-- [ ] **11.5** Repositories (cycle detector, casClaimRecurrence, etc.).
-- [ ] **11.6** `ITaskTrackerPlugin` contract in `packages/plugin/src/contracts/capabilities/task-tracker.interface.ts`.
-- [ ] **11.7** **"Ever Works Task Tracker" plugin** at `packages/plugins/everworks-task-tracker/`.
-- [ ] **11.8** `TasksFacadeService`.
+- [x] **11.5** `TaskRepository` (full CRUD + scope-aware filters + `wouldCreateCycle` iterative parent-walk for sub-task assignment + `findDueRecurringTemplates` + `casClaimRecurrence` mirroring `WorkScheduleRepository.tryMarkDispatched`) + 10 side repositories (assignees / reviewers / approvers / blocks / relations / chat-messages / attachments / watchers / kb-mentions / user-task-counter) in `task-side.repositories.ts`. `UserTaskCounterRepository.nextSlug()` does atomic increment with INSERT-on-missing fallback + retry on race so two parallel inserts never collide on the same slug. ✓ Tick 16
+- [x] **11.6** `ITaskTrackerPlugin` contract at `packages/plugin/src/contracts/capabilities/task-tracker.interface.ts` — `listTasks/getTask/createTask/updateTask/deleteTask/listChat/postChat` + `isAvailable?` + cursor-paginated chat + ExternalTask/ExternalChat DTOs. New `TASK_TRACKER='task-tracker'` capability constant in `facade-capabilities.ts`. ✓ Tick 16
+- [x] **11.7** **"Ever Works Task Tracker" plugin** at `packages/plugins/everworks-task-tracker/` — MIT-licensed thin shim that forwards every method to a runtime-injected `PlatformTaskBackend` delegate set via `setPlatformTaskBackend()`. The platform's TasksDomainModule binds the real DB-backed service into the delegate during plugin bootstrap. When unbound (tests / pre-boot), the plugin returns empty/no-op results so the registry can still load it. ✓ Tick 16
+- [x] **11.8** `TasksFacadeService` at `packages/agent/src/facades/tasks.facade.ts` — resolves the active `task-tracker` plugin per user/work scope and forwards every Task operation through it. Unlike SkillsFacadeService (union of all enabled providers), the Task facade picks exactly ONE provider so the UI's single source of truth stays coherent. Wired into `FacadesModule` + facades barrel. ✓ Tick 16
+- [x] **11.9** `TasksDomainModule` at `packages/agent/src/tasks-domain/` — registers all 11 entities + all 11 repositories. New subpath export `@ever-works/agent/tasks-domain` (distinct from the Trigger.dev `tasks` subpath). ✓ Tick 16
+- [x] **11.10** Tests (don't run): `__tests__/task.repository.spec.ts` (~8 assertions: self-loop / sibling-chain / 2-hop cycle / 3-hop cycle / pre-existing-cyclic-data resilience for `wouldCreateCycle`; CAS hit + CAS miss for `casClaimRecurrence`). ✓ Tick 16
 
 ### Phase 12 — TasksController + /tasks list page
 

@@ -153,6 +153,10 @@
             "types": "./dist/skills/index.d.ts",
             "default": "./dist/skills/index.js"
         },
+        "./tasks-domain": {
+            "types": "./dist/tasks-domain/index.d.ts",
+            "default": "./dist/tasks-domain/index.js"
+        },
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"

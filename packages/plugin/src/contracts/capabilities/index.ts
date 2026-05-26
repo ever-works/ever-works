@@ -14,3 +14,4 @@ export * from './prompt-provider.interface.js';
 export * from './device-auth-provider.interface.js';
 export * from './storage.interface.js';
 export * from './skills-provider.interface.js';
+export * from './task-tracker.interface.js';
