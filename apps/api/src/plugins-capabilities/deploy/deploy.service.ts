@@ -701,12 +701,10 @@ export class DeployService {
                 typeof githubSettings?.readPackagesPat === 'string'
                     ? githubSettings.readPackagesPat.trim()
                     : '';
-            const userRegistryUsername = this.firstNonBlankSetting(
-                githubSettings?.readPackagesPatOwner,
-                githubSettings?.readPackagesUsername,
-                githubSettings?.githubUsername,
-                githubSettings?.username,
-            );
+            const userRegistryUsername =
+                typeof githubSettings?.readPackagesPatOwner === 'string'
+                    ? githubSettings.readPackagesPatOwner.trim()
+                    : '';
 
             // Platform-side fallback by website repo owner.
             const platformDefaults = this.getPlatformGhcrCredentials(ctx.owner);
@@ -768,15 +766,6 @@ export class DeployService {
     private providerTokenSecretName(providerId: string): string {
         const normalised = providerId.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
         return `${normalised}_TOKEN`;
-    }
-
-    private firstNonBlankSetting(...values: unknown[]): string {
-        for (const value of values) {
-            if (typeof value !== 'string') continue;
-            const trimmed = value.trim();
-            if (trimmed) return trimmed;
-        }
-        return '';
     }
 
     /**

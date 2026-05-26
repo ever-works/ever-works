@@ -571,5 +571,24 @@ describe('OAuthService', () => {
             );
             expect(result).toEqual({ providerId: 'github', connected: true });
         });
+
+        it('still stores the read-packages token when resolving the GitHub owner fails', async () => {
+            oauthFacade.getAuthenticatedUser.mockRejectedValueOnce(new Error('rate limited'));
+
+            const result = await service.handleReadPackagesOAuthCallback(
+                'user-1',
+                'github',
+                'code-abc',
+                'state-xyz',
+            );
+
+            expect(pluginSettingsService.updateUserSettings).toHaveBeenCalledWith(
+                'github',
+                'user-1',
+                { readPackagesPat: 'packages-token' },
+                { secretKeys: ['readPackagesPat'] },
+            );
+            expect(result).toEqual({ providerId: 'github', connected: true });
+        });
     });
 });
