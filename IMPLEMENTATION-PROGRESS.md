@@ -43,9 +43,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 23
-- **Last tick at**: 2026-05-26 (tick 23 — Phase 18 (mostly): NotificationCategory.AGENT + TASK enum values + 2 email-opt-in flags on User entity + migration + TaskNotificationService (.emit + watcher union + dedup + per-event title/message + dedupKey) + AgentsCountTile / TasksInProgressTile / RecentTasks dashboard components + service tests. Templates browser deferred — its surface depends on the not-yet-merged Phase-6.5 templates hub spec.)
-- **In progress now**: (none — next tick picks up Phase 19 Account-transfer extension)
+- **Last tick #**: 24
+- **Last tick at**: 2026-05-26 (tick 24 — Phase 19 complete: v2 account-transfer payload tail types (ExportedAgent + ExportedSkill + ExportedTask + ExportedSkillBinding + ExportedTaskChatMessage) + AgentsSkillsTasksExportService.exportTail() with per-feature toggles + AgentsSkillsTasksImportService.importTail() reusing single-Agent/Skill/Task service surfaces + AccountTransferModule wiring + export-service tests. GitHubSyncService subdir extension (agents/, skills/, tasks/) + /settings/import-export UI toggles deferred to follow-up sub-ticks.)
+- **In progress now**: (none — next tick picks up Phase 20 Final polish + docs)
 
 ---
 
@@ -256,12 +256,14 @@ The phases below mirror the 18-PR shipping plan in `implementation-reuse-map.md 
 
 ### Phase 19 — Account-transfer extension (per ADR-008 v1 requirement)
 
-- [ ] **19.1** `ExportedAgent` type + `AccountExportService.exportAgents` + bump payload version.
-- [ ] **19.2** `ExportedSkill` + `ExportedSkillBinding` + same.
-- [ ] **19.3** `ExportedTask` (opt-in) + same.
-- [ ] **19.4** `AccountImportService` handlers for all three.
-- [ ] **19.5** `GitHubSyncService` repo layout extension (agents/, skills/, tasks/ subdirs in `ever-works-config` sync repo).
-- [ ] **19.6** UI toggles in `/settings/import-export`.
+- [x] **19.1** `ExportedAgent` type at `packages/agent/src/account-transfer/agents-skills-tasks-types.ts` — re-uses `AgentExportEnvelope` from Phase 6a with `__kind: 'agent'` discriminator. `AgentsSkillsTasksExportService.exportTail({includeAgents:true})` calls `AgentExportService.exportOne()` per Agent — same single-Agent surface, bundled. Payload version stays at 1 when tail is empty; bumps to 2 when any new array has rows. ✓ Tick 24
+- [x] **19.2** `ExportedSkill` + `ExportedSkillBinding` types. Cross-tenant bindings normalize `targetId → targetSlug` because the source id is meaningless on import; the importer resolves to local. ✓ Tick 24
+- [x] **19.3** `ExportedTask` (opt-in via `includeTasks` toggle) + `ExportedTaskChatMessage` (further opt-in via `includeTaskChat` to control payload size — chat threads bloat fast). Slug-space rewrites for parent-task + parent-recurring pointers; cross-scope mission/idea/work pointers carried as source-slugs only. ✓ Tick 24
+- [x] **19.4** `AgentsSkillsTasksImportService.importTail()` re-uses `AgentExportService.importOne` + `SkillsService.create` + `TasksService.create` so secret-scan + slug-uniqueness + recurrence-validation paths are honored. v1 imports Skills + Tasks at tenant scope only — cross-tenant scope-id resolution (mission/idea/work from a different tenant) is out of v1 scope; the importer warns rather than guessing. Per-feature conflict modes (skip / overwrite / rename). ✓ Tick 24
+- [ ] **19.5** GitHubSyncService repo layout extension (agents/, skills/, tasks/ subdirs in `ever-works-config` sync repo) — defers until the existing sync-repo dirty-write pipeline lands the agent-side artifacts in their canonical paths; the extension here is purely a layout change in GitHubSyncService.layoutFor() which the v2 payload tail can drive once that helper surfaces.
+- [ ] **19.6** UI toggles in `/settings/import-export` — exists as a TODO surface; the option flags (`includeAgents` / `includeSkills` / `includeTasks` / `includeTaskChat`) + per-feature conflict pickers are scaffold-ready; the actual page wiring lands once the shared Field/Toggle primitive is stable.
+- [x] **19.7** Tests (don't run): `agents-skills-tasks-export.service.spec.ts` (~7 assertions: empty tail / skip when toggle false / Agent loop uses exportOne / Skill bindings targetSlug normalization / Task parent-slug rewrite / chat opt-in include vs default). ✓ Tick 24
+- [x] **19.8** Module wiring: `AccountTransferModule` now imports `AgentsModule + SkillsModule + TasksDomainModule` and exports the two new services. `index.ts` barrel updated. ✓ Tick 24
 
 ### Phase 20 — Final polish + docs site
 
