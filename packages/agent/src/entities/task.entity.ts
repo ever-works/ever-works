@@ -129,7 +129,7 @@ export class Task {
     @Column({ type: 'varchar', length: 200, nullable: true })
     recurrenceRule?: string | null;
 
-    @Column({ type: 'varchar', length: 64, nullable: true, default: "'UTC'" })
+    @Column({ type: 'varchar', length: 64, nullable: true, default: 'UTC' })
     recurrenceTimezone?: string | null;
 
     @PortableDateColumn({ nullable: true })

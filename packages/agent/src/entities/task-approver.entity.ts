@@ -36,7 +36,7 @@ export class TaskApprover {
     @Column({ type: 'uuid' })
     approverId: string;
 
-    @Column({ type: 'varchar', length: 16, default: "'pending'" })
+    @Column({ type: 'varchar', length: 16, default: 'pending' })
     approvalState: TaskApprovalState;
 
     @PortableDateColumn({ nullable: true })

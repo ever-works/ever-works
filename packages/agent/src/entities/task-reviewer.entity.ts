@@ -36,7 +36,7 @@ export class TaskReviewer {
     @Column({ type: 'uuid' })
     reviewerId: string;
 
-    @Column({ type: 'varchar', length: 24, default: "'pending'" })
+    @Column({ type: 'varchar', length: 24, default: 'pending' })
     reviewState: TaskReviewState;
 
     @PortableDateColumn({ nullable: true })
