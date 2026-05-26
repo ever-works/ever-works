@@ -34,8 +34,13 @@ export interface ExportedSkillBinding {
 export interface ExportedSkill {
 	__kind: 'skill';
 	ownerType: 'tenant' | 'mission' | 'idea' | 'work' | 'agent';
-	/** Source-id resolution table — empty when the Skill is tenant-owned. */
-	ownerSourceSlug: string | null;
+	/**
+	 * Review-fix I9: this carries the source `ownerId` (UUID) as
+	 * written by the exporter, NOT a slug. The importer resolves this
+	 * to a local id (or drops if cross-tenant). Renamed from
+	 * `ownerSourceSlug` to `ownerSourceId` to match the actual value.
+	 */
+	ownerSourceId: string | null;
 	slug: string;
 	title: string;
 	description: string;
@@ -62,16 +67,27 @@ export interface ExportedTask {
 	status: string;
 	priority: string;
 	labels: string[] | null;
-	/** Scope identifiers carried as the source ids; importer maps to local. */
-	missionSourceSlug: string | null;
-	ideaSourceSlug: string | null;
-	workSourceSlug: string | null;
+	/**
+	 * Review-fix I9: these carry source `missionId` / `ideaId` /
+	 * `workId` (UUIDs) as written by the exporter, NOT slugs.
+	 * Renamed from `…SourceSlug` to `…SourceId` to match the actual
+	 * value. Importer resolves to local or drops cross-tenant.
+	 */
+	missionSourceId: string | null;
+	ideaSourceId: string | null;
+	workSourceId: string | null;
+	/**
+	 * Parent task slug — this IS a slug (within the same export
+	 * batch). The importer rewrites it to the local Task id after
+	 * creating the parent first.
+	 */
 	parentTaskSlug: string | null;
 	isRecurring: boolean;
 	recurrenceRule: string | null;
 	recurrenceTimezone: string | null;
 	recurrenceEndsAt: string | null;
 	recurrenceMaxOccurrences: number | null;
+	/** Parent recurring template slug — same slug-resolution semantics as parentTaskSlug. */
 	parentRecurringTaskSlug: string | null;
 	assignees: Array<{ type: 'user' | 'agent'; identifier: string }>;
 	reviewers: Array<{ type: 'user' | 'agent'; identifier: string }>;

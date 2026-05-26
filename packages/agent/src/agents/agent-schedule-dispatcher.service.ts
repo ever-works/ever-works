@@ -98,8 +98,14 @@ export class AgentScheduleDispatcherService {
 		};
 
 		for (const agent of due) {
+			// Review-fix C11: track whether the CAS-claim succeeded so a
+			// failure between claim and enqueue can release the Agent
+			// back to ACTIVE instead of leaving it stuck in RUNNING
+			// for ~30 min until the stuck-recovery sweeper picks it up.
+			let originalNext: Date | null = null;
+			let enqueueSucceeded = false;
 			try {
-				const originalNext = await this.agentRepository.tryClaimForRun(agent.id);
+				originalNext = await this.agentRepository.tryClaimForRun(agent.id);
 				if (!originalNext) {
 					this.logger.warn(
 						`Agent ${agent.id} was already claimed by another dispatcher worker — skipping`,
@@ -123,6 +129,7 @@ export class AgentScheduleDispatcherService {
 					userId: agent.userId,
 					scheduledFor: originalNext,
 				});
+				enqueueSucceeded = true;
 
 				summary.dispatched += 1;
 				summary.entries.push(
@@ -136,6 +143,19 @@ export class AgentScheduleDispatcherService {
 				this.logger.error(`Failed to dispatch Agent ${agent.id}: ${message}`, error as Error);
 				summary.failed += 1;
 				summary.entries.push(this.entry(agent, { outcome: 'failed', message }));
+				// Review-fix C11: release the CAS claim so the Agent
+				// returns to ACTIVE immediately. Without this the row
+				// stays in RUNNING with no worker until the next
+				// stuck-recovery sweep.
+				if (originalNext && !enqueueSucceeded) {
+					try {
+						await this.agentRepository.releaseAfterRun(agent.id, originalNext, 'dispatch-failed');
+					} catch (releaseErr) {
+						this.logger.warn(
+							`Failed to release CAS claim for ${agent.id} after dispatch failure: ${releaseErr}`,
+						);
+					}
+				}
 			}
 		}
 

@@ -194,11 +194,32 @@ export class TaskChatService {
 
 		this.assertBody(newBody);
 
-		// Re-parse mentions on edit — keeps the materialized references
-		// honest if the user removes a mention.
-		this.parseMentions(newBody, lookups);
+		// Review-fix I3: re-parse mentions on edit AND persist the
+		// updated `mentions` JSON column + refresh `task_kb_mentions`.
+		// The previous version called parseMentions and discarded the
+		// result, defeating the "keeps materialized references honest"
+		// intent.
+		const reparsed = this.parseMentions(newBody, lookups);
 
-		await this.messages.updateBody(messageId, newBody);
+		await this.messages.updateBodyAndMentions(
+			messageId,
+			newBody,
+			reparsed.records.length > 0 ? reparsed.records : null,
+		);
+
+		// Re-materialize KB mentions. We do NOT delete prior rows —
+		// `task_kb_mentions` is task-scoped (not message-scoped), so
+		// removing a KB link from this message doesn't necessarily
+		// orphan the Task-level link. Just additively insert anything
+		// new; unique-violation swallowed for already-linked docs.
+		for (const kbDocumentId of reparsed.kbDocIds) {
+			try {
+				await this.kbMentions.add(msg.taskId, kbDocumentId);
+			} catch {
+				// Unique violation — already linked.
+			}
+		}
+
 		const refreshed = await this.messages.findById(messageId);
 		if (!refreshed) throw new NotFoundException(`Chat message ${messageId} vanished.`);
 		return refreshed;

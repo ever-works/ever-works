@@ -76,7 +76,12 @@ export class TaskApproverRepository {
 	}
 	async allApproved(taskId: string): Promise<boolean> {
 		const rows = await this.repo.find({ where: { taskId } });
-		if (rows.length === 0) return false;
+		// Review-fix I2: spec FR-11 phrases the gate as "if any
+		// approvers are configured" — a Task with NO approvers should
+		// pass the gate (rows.length === 0 → return true). The
+		// previous behavior locked any approver-less Task out of
+		// `done` permanently unless force=true was used.
+		if (rows.length === 0) return true;
 		return rows.every((r) => r.approvalState === 'approved');
 	}
 }
@@ -90,6 +95,18 @@ export class TaskBlockRepository {
 	}
 	async findBlockingTasks(blockedByTaskId: string): Promise<TaskBlock[]> {
 		return this.repo.find({ where: { blockedByTaskId } });
+	}
+
+	/**
+	 * Review-fix I1 helper. Returns the IDs of every Task that's
+	 * blocked BY `blockerTaskId` — used by
+	 * `TaskTransitionService.autoUnblockResolvedTasks` to find
+	 * candidates whose `blocked` status should be restored when a
+	 * blocker resolves.
+	 */
+	async findTasksBlockedBy(blockerTaskId: string): Promise<string[]> {
+		const rows = await this.repo.find({ where: { blockedByTaskId: blockerTaskId } });
+		return rows.map((r) => r.taskId);
 	}
 	async add(taskId: string, blockedByTaskId: string): Promise<TaskBlock> {
 		const entity = this.repo.create({ taskId, blockedByTaskId });
@@ -143,6 +160,22 @@ export class TaskChatMessageRepository {
 	}
 	async updateBody(id: string, body: string): Promise<void> {
 		await this.repo.update(id, { body, editedAt: new Date() });
+	}
+	/**
+	 * Review-fix I3: persist re-parsed mentions on chat edit so the
+	 * materialized `mentions` JSON column stays honest when the user
+	 * removes (or changes) a mention during the 5-min edit window.
+	 */
+	async updateBodyAndMentions(
+		id: string,
+		body: string,
+		mentions: Array<{ type: 'user' | 'agent' | 'kb'; id?: string; slug?: string }> | null,
+	): Promise<void> {
+		await this.repo.update(id, {
+			body,
+			mentions: mentions && mentions.length > 0 ? mentions : null,
+			editedAt: new Date(),
+		});
 	}
 }
 
@@ -228,31 +261,39 @@ export class UserTaskCounterRepository {
 	 * concurrent one.
 	 */
 	async nextSlug(userId: string): Promise<number> {
-		const updated = await this.repo
-			.createQueryBuilder()
-			.update(UserTaskCounter)
-			.set({ lastSlugNumber: () => 'lastSlugNumber + 1', updatedAt: new Date() })
-			.where('userId = :userId', { userId })
-			.execute();
-		if ((updated.affected ?? 0) > 0) {
-			const row = await this.repo.findOne({ where: { userId } });
-			return row?.lastSlugNumber ?? 1;
+		// Review-fix C10: single-round-trip INSERT … ON CONFLICT
+		// DO UPDATE … RETURNING avoids the original two-statement
+		// race (where two concurrent callers could read the same
+		// post-increment value and produce duplicate `T-N` slugs,
+		// compounding C1's per-user uniqueness constraint).
+		//
+		// Postgres-specific syntax; for SQLite (dev/test) the
+		// equivalent ON CONFLICT DO UPDATE clause is honored
+		// identically by both drivers in TypeORM's raw query path.
+		const driverType = this.repo.manager.connection.options.type;
+		if (driverType === 'postgres' || driverType === 'cockroachdb') {
+			const rows = await this.repo.query(
+				`INSERT INTO user_task_counter ("userId", "lastSlugNumber", "createdAt", "updatedAt")
+				 VALUES ($1, 1, now(), now())
+				 ON CONFLICT ("userId") DO UPDATE
+					 SET "lastSlugNumber" = user_task_counter."lastSlugNumber" + 1,
+						 "updatedAt" = now()
+				 RETURNING "lastSlugNumber"`,
+				[userId],
+			);
+			return Number(rows[0]?.lastSlugNumber ?? 1);
 		}
-		try {
-			await this.repo.insert({ userId, lastSlugNumber: 1 });
-			return 1;
-		} catch {
-			// Another worker inserted between our UPDATE and our INSERT —
-			// re-try the increment now that the row exists.
-			await this.repo
-				.createQueryBuilder()
-				.update(UserTaskCounter)
-				.set({ lastSlugNumber: () => 'lastSlugNumber + 1', updatedAt: new Date() })
-				.where('userId = :userId', { userId })
-				.execute();
-			const row = await this.repo.findOne({ where: { userId } });
-			return row?.lastSlugNumber ?? 1;
-		}
+		// SQLite path — same shape, lowercase column names.
+		const rows = await this.repo.query(
+			`INSERT INTO user_task_counter (userId, lastSlugNumber, createdAt, updatedAt)
+			 VALUES (?, 1, datetime('now'), datetime('now'))
+			 ON CONFLICT(userId) DO UPDATE
+				 SET lastSlugNumber = user_task_counter.lastSlugNumber + 1,
+					 updatedAt = datetime('now')
+			 RETURNING lastSlugNumber`,
+			[userId],
+		);
+		return Number(rows[0]?.lastSlugNumber ?? rows[0]?.lastslugnumber ?? 1);
 	}
 
 	/** Test/debug helper — list rows older than a cutoff. */

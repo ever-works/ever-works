@@ -21,10 +21,46 @@ import { AgentBudgetRepository } from '../database/repositories/agent-budget.rep
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import { createHash } from 'crypto';
 import { slugifyText } from '../utils/text.utils';
 import { assertNoSecrets } from '../utils/secret-scan';
 import type { AgentDto } from './types';
 import { toAgentDto } from './types';
+
+/**
+ * Review-fix I7: shared canonical-hash function. Mirrors the
+ * algorithm in `AgentFileService.hashOf` so import-overwrite refresh
+ * stays bit-identical with future Instructions-editor writes. Kept
+ * inline here (and matched exactly) to avoid coupling agent-export
+ * to agent-file at the module-construction layer; the file is
+ * intentionally tiny.
+ */
+function computeContentHash(files: {
+	soulMd?: string | null;
+	agentsMd?: string | null;
+	heartbeatMd?: string | null;
+	toolsMd?: string | null;
+	agentYml?: string | null;
+}): string {
+	const merged = {
+		SOUL: files.soulMd ?? '',
+		AGENTS: files.agentsMd ?? '',
+		HEARTBEAT: files.heartbeatMd ?? '',
+		TOOLS: files.toolsMd ?? '',
+		AGENT_YML: files.agentYml ?? '',
+	};
+	const concat =
+		merged.SOUL +
+		'SOUL/AGENTS' +
+		merged.AGENTS +
+		'AGENTS/HEARTBEAT' +
+		merged.HEARTBEAT +
+		'HEARTBEAT/TOOLS' +
+		merged.TOOLS +
+		'TOOLS/AGENTYML' +
+		merged.AGENT_YML;
+	return createHash('sha256').update(concat, 'utf8').digest('hex');
+}
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 6a.
@@ -148,6 +184,26 @@ export class AgentExportService {
 		const agent = await this.agents.findByIdAndUser(agentId, userId);
 		if (!agent) {
 			throw new NotFoundException(`Agent ${agentId} not found.`);
+		}
+
+		// Review-fix I8: secret-scan every file body BEFORE serializing
+		// the envelope. The import path already runs assertNoSecrets,
+		// but a body written before the secret-scan landed (or by a
+		// pre-PR-1017 import path) could otherwise leak credentials
+		// through an export → off-platform → import round-trip. Hard
+		// reject with a clear actionable message — the user can
+		// scrub the file via the Instructions editor and re-export.
+		const fileBodies: Array<[string, string | null | undefined]> = [
+			['SOUL.md', agent.soulMd],
+			['AGENTS.md', agent.agentsMd],
+			['HEARTBEAT.md', agent.heartbeatMd],
+			['TOOLS.md', agent.toolsMd],
+			['agent.yml', agent.agentYml],
+		];
+		for (const [name, body] of fileBodies) {
+			if (typeof body === 'string' && body.length > 0) {
+				assertNoSecrets(body, `export-envelope:${agent.slug}:${name}`);
+			}
 		}
 
 		const budgetRow = await this.budgets.findByAgentId(agentId).catch(() => null);
@@ -380,6 +436,17 @@ export class AgentExportService {
 	}
 
 	private async applyEnvelopeToExisting(target: Agent, envelope: AgentExportEnvelope): Promise<void> {
+		// Review-fix I7: recompute contentHash so subsequent
+		// Instructions-editor writes (which use expectedHash for
+		// optimistic concurrency) don't fail with a stale-hash mismatch
+		// against the now-overwritten file bodies.
+		const files = {
+			soulMd: envelope.files.soulMd ?? null,
+			agentsMd: envelope.files.agentsMd ?? null,
+			heartbeatMd: envelope.files.heartbeatMd ?? null,
+			toolsMd: envelope.files.toolsMd ?? null,
+			agentYml: envelope.files.agentYml ?? null,
+		};
 		const patch: Partial<Agent> = {
 			name: envelope.identity.name,
 			title: envelope.identity.title,
@@ -392,11 +459,12 @@ export class AgentExportService {
 			heartbeatCadence: envelope.runtime.heartbeatCadence,
 			idleBehavior: envelope.runtime.idleBehavior,
 			pauseAfterFailures: envelope.runtime.pauseAfterFailures,
-			soulMd: envelope.files.soulMd ?? null,
-			agentsMd: envelope.files.agentsMd ?? null,
-			heartbeatMd: envelope.files.heartbeatMd ?? null,
-			toolsMd: envelope.files.toolsMd ?? null,
-			agentYml: envelope.files.agentYml ?? null,
+			soulMd: files.soulMd,
+			agentsMd: files.agentsMd,
+			heartbeatMd: files.heartbeatMd,
+			toolsMd: files.toolsMd,
+			agentYml: files.agentYml,
+			contentHash: computeContentHash(files),
 		};
 		await this.agents.updateById(target.id, patch);
 	}

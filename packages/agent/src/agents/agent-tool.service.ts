@@ -1,8 +1,9 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { Agent } from '../entities/agent.entity';
-import { AgentScope } from '../entities/agent.entity';
+import type { Agent, AgentPermissions } from '../entities/agent.entity';
+import { AgentScope, AgentStatus, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentFileService } from './agent-file.service';
+import { AgentsService } from './agents.service';
 import { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { createGetSkillBodyTool } from './agent-tools-skill';
@@ -26,12 +27,27 @@ import {
  * build time, so callers (the AiFacadeService tool-loop wrapper)
  * don't need to thread the user/agent/scope ids back in.
  */
+/**
+ * JSON-Schema-ish property type — extended in Review-fix C5 to
+ * carry `items` (for arrays) and a richer `type` union so LLMs
+ * generating tool calls receive the correct JSON-Schema type tag
+ * for each parameter. Previously every parameter was typed
+ * `'string'` even when the runtime expected a number / boolean /
+ * array — LLMs honor schema types when serializing, so this
+ * mismatch sent strings into number-typed adapter fields.
+ */
+export interface AgentToolParameterSchema {
+	type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object';
+	description: string;
+	items?: { type: 'string' | 'number' | 'integer' | 'boolean' | 'object' };
+}
+
 export interface AgentToolDescriptor<TArgs = unknown, TResult = unknown> {
 	name: string;
 	description: string;
 	parameters: {
 		type: 'object';
-		properties: Record<string, { type: string; description: string }>;
+		properties: Record<string, AgentToolParameterSchema>;
 		required: string[];
 	};
 	invoke: (args: TArgs) => Promise<TResult | { error: string }>;
@@ -79,6 +95,12 @@ export class AgentToolService {
 		@Optional()
 		@Inject(AGENT_PLUGIN_TOOLS_FACADE)
 		private readonly pluginTools?: AgentPluginToolsFacade,
+		// Review-fix I6: route createSubAgent through AgentsService so
+		// scope-ownership validation + slug-uniqueness + avatar-field
+		// validation + permission refinement all run, instead of the
+		// raw repository.create that bypassed everything. Optional()
+		// keeps unit tests that mock only AgentRepository working.
+		@Optional() private readonly agentsService?: AgentsService,
 	) {}
 
 	/**
@@ -244,10 +266,34 @@ export class AgentToolService {
 			invoke: async (args) => {
 				if (!args?.name) return { error: 'name is required' };
 				try {
+					// Review-fix I6: route through AgentsService.create()
+					// when available so the model gets a structured
+					// ConflictException instead of a raw DB unique-
+					// constraint violation. Falls back to repo.create
+					// only when the service isn't bound (unit-test mode).
+					if (this.agentsService) {
+						const dto = await this.agentsService.create(actor.userId, {
+							scope: actor.scope,
+							missionId: actor.scope === AgentScope.MISSION ? actor.missionId ?? undefined : null,
+							ideaId: actor.scope === AgentScope.IDEA ? actor.ideaId ?? undefined : null,
+							workId: actor.scope === AgentScope.WORK ? actor.workId ?? undefined : null,
+							name: args.name,
+							title: args.title ?? null,
+							capabilities: args.capabilities ?? null,
+							aiProviderId: actor.aiProviderId ?? null,
+							modelId: actor.modelId ?? null,
+							maxSkillContextTokens: 4000,
+							// Spec security §6 — sub-Agent always DRAFT,
+							// permissions all-false (use the shared default
+							// constant so future flag additions stay in sync).
+							permissions: { ...AGENT_PERMISSIONS_DEFAULT },
+						});
+						return { id: dto.id, slug: dto.slug };
+					}
+					// Fallback repository path (unit-test mode only).
 					// Sub-Agent inherits actor's scope verbatim — Mission-
 					// scoped Agent creates Mission-scoped sub-Agent on the
-					// same Mission. permissions stay all-false per the spec
-					// (security §6 — explicit grant required).
+					// same Mission. Permissions stay all-false per spec.
 					const created = await this.agents.create({
 						userId: actor.userId,
 						scope: actor.scope,
@@ -261,17 +307,8 @@ export class AgentToolService {
 						aiProviderId: actor.aiProviderId ?? null,
 						modelId: actor.modelId ?? null,
 						maxSkillContextTokens: 4000,
-						status: 'draft' as any,
-						permissions: {
-							canCreateAgents: false,
-							canAssignTasks: false,
-							canEditSkills: false,
-							canEditAgentFiles: false,
-							canSpend: false,
-							canCommitToRepo: false,
-							canOpenPullRequests: false,
-							canCallExternalTools: false,
-						},
+						status: AgentStatus.DRAFT as any,
+						permissions: { ...AGENT_PERMISSIONS_DEFAULT } as AgentPermissions,
 						targets: null,
 						heartbeatCadence: null,
 						idleBehavior: actor.idleBehavior,
@@ -307,9 +344,11 @@ export class AgentToolService {
 						description: 'Commit message. Should be agent-authored and reference what changed.',
 					},
 					files: {
-						type: 'string',
+						// Review-fix C5: array, not string. LLMs honor schema types.
+						type: 'array',
+						items: { type: 'object' },
 						description:
-							'Optional JSON array of {path, body} objects to stage before committing. When omitted, commits whatever the previous tool calls already staged.',
+							'Optional array of {path, body} objects to stage before committing. When omitted, commits whatever previous tool calls already staged.',
 					},
 					branch: {
 						type: 'string',
@@ -378,7 +417,8 @@ export class AgentToolService {
 						description: "Optional base branch. Defaults to the Work's default branch.",
 					},
 					draft: {
-						type: 'string',
+						// Review-fix C5: boolean, not string.
+						type: 'boolean',
 						description: 'Optional flag — open as a draft PR. Default false.',
 					},
 				},
@@ -431,16 +471,21 @@ export class AgentToolService {
 				properties: {
 					query: { type: 'string', description: 'Search query.' },
 					maxResults: {
-						type: 'string',
-						description: 'Optional cap on result count. Defaults to the plugin\'s default.',
+						// Review-fix C5: integer, not string.
+						type: 'integer',
+						description: "Optional cap on result count. Defaults to the plugin's default.",
 					},
 					includeDomains: {
-						type: 'string',
-						description: 'Optional comma-separated list of domains to bias toward.',
+						// Review-fix C5: array of strings, not a single string.
+						type: 'array',
+						items: { type: 'string' },
+						description: 'Optional list of domains to bias toward.',
 					},
 					excludeDomains: {
-						type: 'string',
-						description: 'Optional comma-separated list of domains to filter out.',
+						// Review-fix C5: array of strings, not a single string.
+						type: 'array',
+						items: { type: 'string' },
+						description: 'Optional list of domains to filter out.',
 					},
 				},
 				required: ['query'],
@@ -480,9 +525,10 @@ export class AgentToolService {
 				type: 'object',
 				properties: {
 					url: { type: 'string', description: 'URL to screenshot.' },
-					viewportWidth: { type: 'string', description: 'Optional viewport width in px.' },
-					viewportHeight: { type: 'string', description: 'Optional viewport height in px.' },
-					fullPage: { type: 'string', description: 'Optional full-page flag. Default false.' },
+					// Review-fix C5: numbers + boolean, not strings.
+					viewportWidth: { type: 'integer', description: 'Optional viewport width in px.' },
+					viewportHeight: { type: 'integer', description: 'Optional viewport height in px.' },
+					fullPage: { type: 'boolean', description: 'Optional full-page flag. Default false.' },
 				},
 				required: ['url'],
 			},
@@ -522,7 +568,8 @@ export class AgentToolService {
 				properties: {
 					url: { type: 'string', description: 'URL to extract.' },
 					maxChars: {
-						type: 'string',
+						// Review-fix C5: integer, not string.
+						type: 'integer',
 						description: 'Optional cap on returned characters. Defaults to 50000 (the adapter clamps).',
 					},
 				},
@@ -558,7 +605,8 @@ export class AgentToolService {
 				type: 'object',
 				properties: {
 					since: { type: 'string', description: 'ISO timestamp lower bound. Defaults to 24h ago.' },
-					limit: { type: 'string', description: 'Max rows. Defaults to 50, capped at 200.' },
+					// Review-fix C5: integer, not string.
+					limit: { type: 'integer', description: 'Max rows. Defaults to 50, capped at 200.' },
 				},
 				required: [],
 			},

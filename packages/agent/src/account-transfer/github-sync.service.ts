@@ -170,8 +170,16 @@ export class GitHubSyncService {
         const gitOptions = { providerId: PROVIDER_ID, userId };
 
         try {
+            // Review-fix C3: forward the v2-tail toggles so the
+            // GitHub sync push actually picks up Agents/Skills/Tasks.
+            // Defaults: Agents + Skills auto-mirror (small footprint),
+            // Tasks opt-in (volume), Task chat double-opt-in (bloat).
             const payload = await this.exportService.exportAccountData(userId, {
                 includeSecrets: options.includeSecrets || config.includeSecrets,
+                includeAgents: options.includeAgents ?? true,
+                includeSkills: options.includeSkills ?? true,
+                includeTasks: options.includeTasks ?? false,
+                includeTaskChat: options.includeTaskChat ?? false,
             });
 
             const user = await this.userRepository.findById(userId);

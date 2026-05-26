@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Link2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
 import {
@@ -285,6 +285,10 @@ function DangerZone({ skillId }: { skillId: string }) {
     const [confirming, setConfirming] = useState(false);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    // Review-fix I14: use next-intl router so the post-delete redirect
+    // preserves the user's locale prefix (`/fr/skills/abc` previously
+    // bounced to `/skills` losing locale + triggering a hard reload).
+    const router = useRouter();
 
     const handleDelete = () => {
         setError(null);
@@ -292,7 +296,7 @@ function DangerZone({ skillId }: { skillId: string }) {
             void (async () => {
                 try {
                     await deleteSkillAction(skillId);
-                    window.location.href = '/skills';
+                    router.push(ROUTES.DASHBOARD_SKILLS);
                 } catch (err) {
                     setError(err instanceof Error ? err.message : 'Delete failed');
                     setConfirming(false);

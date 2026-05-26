@@ -47,7 +47,10 @@ export enum TaskPriority {
 export type TaskActorType = 'user' | 'agent';
 
 @Entity({ name: 'tasks' })
-@Index('uq_tasks_slug', ['slug'], { unique: true })
+// Review-fix C1: slug uniqueness is per-user (UserTaskCounter
+// increments per user, so two users both produce `T-1`). Global
+// unique would deadlock the platform after the second user creates a Task.
+@Index('uq_tasks_slug', ['userId', 'slug'], { unique: true })
 @Index('idx_tasks_user_status', ['userId', 'status'])
 @Index('idx_tasks_work', ['workId', 'status'])
 @Index('idx_tasks_mission', ['missionId', 'status'])

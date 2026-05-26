@@ -109,23 +109,57 @@ Every service ships with unit tests under `__tests__/` written but **NOT run** d
 
 ---
 
-## Post-merge follow-ups
+## Post-review fixup commits (Tick 42)
 
-These items have their data layer + API path complete; the listed surface lands on a follow-up sub-tick:
+A comprehensive 4-parallel-agent review of the 226 changed files surfaced
+11 critical + 7 important issues. All were fixed in a single fixup tick
+on top of the 41 implementation ticks. Headline fixes:
+
+- **C1 + C10**: `tasks.uq_tasks_slug` changed from global to `(userId, slug)` to match the per-user `UserTaskCounter` increment; `nextSlug` rewritten as single-round-trip `INSERT … ON CONFLICT DO UPDATE … RETURNING`.
+- **C2**: `installCatalogSkillAction` now reads the real `everworks_auth_token` cookie via `getAuthFromCookie()` (the previous `user-id` cookie didn't exist).
+- **C3**: `GitHubSyncService.pushToGitHub` now forwards the v2-tail toggles — Agents/Skills auto-mirror, Tasks opt-in.
+- **C4**: `AgentFileService.write` passes `agent` as the `hashOf` base so multi-file ETag checks stop mismatching.
+- **C5**: 10 tool-descriptor parameters retyped from `'string'` to correct JSON-Schema types (`array`/`number`/`integer`/`boolean`).
+- **C6**: Blocker gate fires on `→ in_progress` AND `→ done` per spec FR-9. `force` overrides approver only, never blocker.
+- **C7**: Notification dedup key includes per-event discriminators (from→to status, blockerTaskId, occurrenceCount) so users see every event, not just the first.
+- **C8**: `TasksService.create` walks the parent chain for cycle detection on insert.
+- **C9**: `commentOnTask` validates Agent membership; `transitionTask` gated by `canAssignTasks`.
+- **C11**: Heartbeat dispatcher releases the CAS claim when enqueue fails (instead of leaving the Agent stuck in RUNNING).
+- **I1**: `TaskTransitionService.autoUnblockResolvedTasks` cascades on blocker → done/cancelled and on `removeBlocker` — FR-10.
+- **I2**: `allApproved` returns true when zero approvers configured (FR-11 phrasing).
+- **I3**: Chat edit persists re-parsed `mentions` + re-materializes KB mentions.
+- **I4**: Assignee / reviewer / approver add paths validate Agent existence belongs to the user.
+- **I5**: `postChat` populates `ownedAgentSlugs` mention-lookup → `@<slug>` mentions now resolve → agent-chat-reply dispatch fires from human comments.
+- **I6**: `createSubAgent` tool routes through `AgentsService.create()` so slug-uniqueness + scope-ownership validation + permission refinement all run.
+- **I7**: Agent import-overwrite refreshes `contentHash` so subsequent ETag-aware writes stay consistent.
+- **I8**: `AgentExportService.exportOne` runs `assertNoSecrets` on every file body BEFORE serializing the envelope.
+- **I9**: Renamed `…SourceSlug` fields to `…SourceId` (they carry UUIDs, not slugs).
+- **I10**: Trigger.dev dispatcher adapters pass `idempotencyKey` so double-fires are deduped at the runner.
+- **I11**: `PUT /agents/:id/files/:name` throttle tightened to 30/min per spec §7.1.
+- **I13**: `TaskNotificationService.emit` is now actually invoked — `task_assigned` on `addAssignee`, `task_status_changed` + `task_blocked` on transition.
+- **I14**: SkillDetailClient delete-redirect uses `useRouter().push()` so the locale prefix is preserved.
+- **I15**: AgentInstructionsEditor `dirty` flag allows saving an intentionally-cleared file body.
+- **I17**: Activating an Agent from DRAFT now computes the first heartbeat slot via `computeNextHeartbeat(cadence)` instead of firing immediately.
+- **I18**: Dropped the `as any` cast on `TaskStatus.BACKLOG` in `cloneRecurringTaskAsInstance`.
+
+The previously-listed "Phase 14.4 / 17.8 / 18.1" follow-ups are removed
+from this list — they were already in the branch but stale-noted as
+deferred.
+
+## Remaining post-merge follow-ups
+
+These items are genuinely gated on external work (not autonomous-loop-sized):
 
 - **Phase 4 Git-mode** AgentFileService writes (waits on `GitFacadeService` scope-repo helpers shared with the heartbeat dispatcher)
 - **Phase 5.6 Tiptap upgrade** for the Instructions 5-pill editor (currently plain textarea; reuses `KbEditor` once the shared editor toolbar is extracted)
 - **Phase 6a UI** export/import flow surface (server actions + envelope ready; needs the FileInput primitive lifted out of the KB upload surface)
-- **Phase 7.4/7.5 LLM dispatch** inside `AgentRunService.execute` — the orchestrator assembles the prompt, runs `finalize()`, and integrates with `AGENT_RUN_CHAT_BACK_POSTER` / `AGENT_RUN_TASK_FINISHER` / `AGENT_GIT_FACADE` / `AGENT_PLUGIN_TOOLS_FACADE` — what remains is the actual `AiFacadeService.createChatCompletion` round-trip wiring (kept out of the autonomous loop because it needs real provider keys)
+- **Phase 7.4/7.5 LLM dispatch** inside `AgentRunService.execute` — the orchestrator assembles the prompt, runs `finalize()`, and integrates with `AGENT_RUN_CHAT_BACK_POSTER` / `AGENT_RUN_TASK_FINISHER` / `AGENT_GIT_FACADE` / `AGENT_PLUGIN_TOOLS_FACADE` — what remains is the actual `AiFacadeService.createChatCompletion` round-trip wiring (needs real provider keys)
 - **Phase 13.3 chat input upgrade**: mention picker + Tiptap-lite + KB wikilink autocomplete (waits on the shared chat-input primitive)
-- **Phase 13.5 attachment UI** (the API path + 3 endpoints shipped tick 27; the shared FileInput primitive is the only remaining piece)
+- **Phase 13.5 attachment UI** (the API path + 3 endpoints shipped; the shared FileInput primitive is the only remaining piece)
 - **Phase 14.2 drag-drop** Kanban transitions (click-to-transition ships; drag-drop wraps once a dnd library is chosen)
-- **Phase 14.4 Mission layout mount** for the MissionTabs scaffold
 - **Phase 14.5 Idea per-card drawer** for Tasks
-- **Phase 16.6/16.7 operator binding**: the `AGENT_GIT_FACADE` token is wired in `AgentToolService` (tick 30); the API-side `AgentsModule` deliberately leaves it unbound until the operator confirms their git provider setup is stable, then binds a thin adapter over `GitFacadeService.commit()` / `.createPullRequest()`
-- **Phase 17.8 UI**: Recurring-task toggle + frequency picker (API path complete; waits on shared Tiptap chip primitive)
-- **Phase 18.1 grid mount**: `AgentsCountTile` + `TasksInProgressTile` are shipped; the 1-line parent pass-through to the Dashboard home grid is operator's call on placement
-- **Phase 18.6 templates content swap**: scaffold shipped (tick 34); when ADR-010 unified catalog lands, `listAstTemplates` body swaps from fallback constants to a `serverFetch('/api/agent-templates?entity=…')` call
+- **Phase 16.6/16.7 operator binding**: the `AGENT_GIT_FACADE` token is wired in `AgentToolService`; the API-side `AgentsModule` deliberately leaves it unbound until the operator confirms their git provider setup is stable, then binds a thin adapter over `GitFacadeService.commit()` / `.createPullRequest()`
+- **Phase 18.6 templates content swap**: scaffold shipped; when ADR-010 unified catalog lands, `listAstTemplates` body swaps from fallback constants to a `serverFetch('/api/agent-templates?entity=…')` call
 - **Phase 19.6 per-feature import conflict pickers** (skip / overwrite / rename per family): existing `ImportFlow`'s per-item conflict surface stays — the family-scope picker rework is post-merge UX
 
 ---

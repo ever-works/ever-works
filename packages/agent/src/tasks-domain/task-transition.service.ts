@@ -19,6 +19,7 @@ import {
 	AGENT_TASK_EXECUTE_DISPATCHER,
 	type AgentTaskExecuteDispatcher,
 } from './task-dispatcher';
+import { TaskNotificationService } from './task-notification.service';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -81,6 +82,10 @@ export class TaskTransitionService {
 		@Optional()
 		@Inject(AGENT_TASK_EXECUTE_DISPATCHER)
 		private readonly dispatcher?: AgentTaskExecuteDispatcher,
+		// Review-fix I13: in-app notification emit on every transition
+		// + blocked event. Optional so unit-test fixtures without the
+		// Notifications graph still work.
+		@Optional() private readonly notifications?: TaskNotificationService,
 	) {}
 
 	/**
@@ -94,14 +99,20 @@ export class TaskTransitionService {
 			throw new BadRequestException(`Cannot transition Task from ${from} to ${to}.`);
 		}
 
-		// → done: blocker + approver gates.
-		if (to === TaskStatus.DONE) {
+		// Blocker gate — Review-fix C6: spec FR-9 requires 409 on
+		// `→ in_progress` AND `→ done` when blockers are open. `force`
+		// is an approver-gate override only; it must NOT bypass the
+		// blocker gate (blockers are an integrity rule, not policy).
+		if (to === TaskStatus.IN_PROGRESS || to === TaskStatus.DONE) {
 			const openBlockers = await this.findOpenBlockers(task.id);
 			if (openBlockers.length > 0) {
 				throw new ConflictException(
-					`Task cannot transition to done — has ${openBlockers.length} open blocker(s).`,
+					`Task cannot transition to ${to} — has ${openBlockers.length} open blocker(s).`,
 				);
 			}
+		}
+		// → done: approver gate (separate from blocker — `force` overrides this one only).
+		if (to === TaskStatus.DONE) {
 			if (!opts.force && task.requireAllApprovers) {
 				const ok = await this.approvers.allApproved(task.id);
 				if (!ok) {
@@ -143,6 +154,44 @@ export class TaskTransitionService {
 				this.logger.warn(`Agent fan-out failed for task ${refreshed.id}: ${err}`),
 			);
 		}
+
+		// Review-fix I1: auto-unblock dependents when this Task itself
+		// transitions to a "resolved" state. Done/cancelled both
+		// count — a cancelled blocker no longer holds anything back.
+		// Best-effort: failures log WARN but don't bubble.
+		if (to === TaskStatus.DONE || to === TaskStatus.CANCELLED) {
+			void this.autoUnblockResolvedTasks(refreshed.id).catch((err) =>
+				this.logger.warn(`autoUnblock cascade failed for task ${refreshed.id}: ${err}`),
+			);
+		}
+
+		// Review-fix I13: in-app notifications. `task_status_changed`
+		// on every transition, `task_blocked` when the destination is
+		// `blocked`. Best-effort — emit failures log inside
+		// TaskNotificationService and don't bubble.
+		if (this.notifications) {
+			void this.notifications
+				.emit('task_status_changed', {
+					taskId: refreshed.id,
+					taskSlug: refreshed.slug,
+					taskTitle: refreshed.title,
+					fromStatus: from,
+					toStatus: to,
+				})
+				.catch(() => undefined);
+			if (to === TaskStatus.BLOCKED) {
+				void this.notifications
+					.emit('task_blocked', {
+						taskId: refreshed.id,
+						taskSlug: refreshed.slug,
+						taskTitle: refreshed.title,
+						fromStatus: from,
+						toStatus: to,
+					})
+					.catch(() => undefined);
+			}
+		}
+
 		return refreshed;
 	}
 
@@ -195,5 +244,42 @@ export class TaskTransitionService {
 	/** Pure helper for tests + UI affordance check — no DB I/O. */
 	canTransition(from: TaskStatus, to: TaskStatus): boolean {
 		return ALLOWED[from]?.includes(to) ?? false;
+	}
+
+	/**
+	 * Review-fix I1: auto-unblock side effect per spec FR-10.
+	 * Called from `TasksService.removeBlocker` (after each block row
+	 * deletion) and from the transition path (when a blocker Task
+	 * itself transitions to `done` / `cancelled`). For every Task
+	 * currently in `blocked` status that has no remaining open
+	 * blockers, transition it back to its `previousStatus`.
+	 *
+	 * Idempotent + best-effort: a failed sub-transition logs WARN
+	 * but never bubbles, so resolving a blocker can't be rolled back
+	 * by a transient downstream failure.
+	 */
+	async autoUnblockResolvedTasks(blockerTaskId: string): Promise<{ unblocked: string[] }> {
+		// Find every Task that was blocked BY this Task and is still in `blocked` status.
+		const blockedTaskIds = await this.blocks.findTasksBlockedBy(blockerTaskId).catch(() => []);
+		const unblocked: string[] = [];
+		for (const blockedTaskId of blockedTaskIds) {
+			const blocked = await this.tasks.findById(blockedTaskId).catch(() => null);
+			if (!blocked || blocked.status !== TaskStatus.BLOCKED) continue;
+			const openBlockers = await this.findOpenBlockers(blockedTaskId);
+			if (openBlockers.length > 0) continue;
+			const restoreTo = blocked.previousStatus ?? TaskStatus.TODO;
+			try {
+				// Re-enter transition() so blocker/approver gates + side
+				// effects (previousStatus clear, startedAt set) all fire
+				// consistently with a user-driven move.
+				await this.transition(blocked, restoreTo, { force: false });
+				unblocked.push(blockedTaskId);
+			} catch (err) {
+				this.logger.warn(
+					`autoUnblock failed for task ${blockedTaskId} (restore→${restoreTo}): ${err}`,
+				);
+			}
+		}
+		return { unblocked };
 	}
 }

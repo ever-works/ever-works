@@ -324,4 +324,17 @@ export interface ConfigureSyncDto {
 
 export interface SyncPushOptions {
     includeSecrets?: boolean;
+    /**
+     * Review-fix C3: v2 payload-tail toggles. Without forwarding
+     * these, `GitHubSyncService.pushToGitHub` always wrote a v1
+     * payload — the `agents/`/`skills/`/`tasks/` subdir layout was
+     * dead code on the push path. Defaults to `true` for Agents +
+     * Skills so a sync repo mirrors what's typically a small
+     * complete account state; Tasks is opt-in (volume) and
+     * Task chat is double-opt-in (chat threads bloat the payload).
+     */
+    includeAgents?: boolean;
+    includeSkills?: boolean;
+    includeTasks?: boolean;
+    includeTaskChat?: boolean;
 }

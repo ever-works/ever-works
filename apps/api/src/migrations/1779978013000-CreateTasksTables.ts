@@ -114,7 +114,12 @@ export class CreateTasksTables1779978013000 implements MigrationInterface {
 			);
 		}
 
-		await this.ensureIndex(queryRunner, 'tasks', 'uq_tasks_slug', ['slug'], true);
+		// Review-fix C1: slug uniqueness is per-user, not global. The
+		// UserTaskCounter increments per user (T-1, T-2, …) so two users
+		// will both produce `T-1` — a global unique constraint here
+		// would deadlock the platform after the second user creates a
+		// Task. Constraint scopes to (userId, slug).
+		await this.ensureIndex(queryRunner, 'tasks', 'uq_tasks_slug', ['userId', 'slug'], true);
 		await this.ensureIndex(queryRunner, 'tasks', 'idx_tasks_user_status', ['userId', 'status']);
 		await this.ensureIndex(queryRunner, 'tasks', 'idx_tasks_work', ['workId', 'status']);
 		await this.ensureIndex(queryRunner, 'tasks', 'idx_tasks_mission', ['missionId', 'status']);

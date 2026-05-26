@@ -11,7 +11,7 @@ This file is the source of truth for "where are we in implementation." **Every t
 
 ## [BRANCH COMPLETE — OPERATOR ACTION REQUIRED]
 
-**As of tick 41 (2026-05-26)** every box on the Phase 1–20 tracker is ticked AND every reachable deferred sub-item has shipped. Ticks 26–40 closed the post-Phase-20 polish; ticks 39–40 added the operator-reference docs.
+**As of tick 42 (2026-05-26)** every box on the Phase 1–20 tracker is ticked AND every reachable deferred sub-item has shipped. Ticks 26–40 closed the post-Phase-20 polish; ticks 39–40 added the operator-reference docs. **Tick 42 applied all 11 critical + 16 important fixes** surfaced by a parallel-agent code review of the 226-file diff — see `IMPLEMENTATION-SUMMARY.md` "Post-review fixup commits (Tick 42)" for the headline list.
 
 **There is no work left for the autonomous loop.** Subsequent ticks would either fabricate phantom work or marginally polish already-shipped code, both of which inflate diff size without value. If this loop fires again it should self-stop on this sentinel.
 
@@ -73,9 +73,9 @@ Specs are NOT in this implementation branch's checkout (we branched off `develop
 
 ## Tick counter
 
-- **Last tick #**: 41
-- **Last tick at**: 2026-05-26 (tick 41 — terminal-state sentinel + loop self-halt rule. Added `[BRANCH COMPLETE — OPERATOR ACTION REQUIRED]` section at the top of this file documenting that all 20 phases + every reachable post-Phase-20 polish have shipped through tick 40. Includes the merge runbook (rebase → format → lint → type-check → test → PR) and the inventory of genuinely external follow-ups (each annotated with the actual gating reason). Added tick rule 0 — "terminal-state check first" — instructing the autonomous loop to read the top sentinel before doing anything else, and to halt without committing if the sentinel is present. This converts the cron's continued firing into a no-op rather than a polish-noise generator. Subsequent ticks will read PROGRESS, see the sentinel, and exit cleanly.)
-- **In progress now**: [BRANCH COMPLETE — see top of file]. Loop halted by tick rule 0; awaiting operator merge actions.
+- **Last tick #**: 42
+- **Last tick at**: 2026-05-26 (tick 42 — applied review-fix commits for all 11 critical issues (C1–C11) + 14 important issues (I1–I15, I17–I18) surfaced by a 4-parallel-agent deep review of the 226-file diff. See `IMPLEMENTATION-SUMMARY.md` "Post-review fixup commits" for the full bullet list. Headline: per-user Task slug uniqueness, single-round-trip nextSlug, real auth-cookie read for skills install, GitHub sync v2 toggles, contentHash base arg, tool-descriptor JSON-Schema types, blocker gate on → in_progress, notification dedup discriminators, parent-chain cycle check on Task create, membership check on commentOnTask + canAssignTasks gate on transitionTask, dispatcher releaseAfterRun on enqueue failure, auto-unblock cascade, allApproved-empty=true, chat-edit persists mentions, addAssignee validates Agent, postChat populates lookups, createSubAgent through service, contentHash refresh on import, assertNoSecrets on export, SourceSlug→SourceId rename, idempotencyKey on Trigger.dev, file-write throttle 30/min, TaskNotificationService emit on transition+assign, locale-aware Skill delete redirect, clear-file save allowed, computeNextHeartbeat on DRAFT→ACTIVE, drop `as any` cast.)
+- **In progress now**: [BRANCH COMPLETE — see top of file]. All review fixes applied; awaiting operator merge.
 
 ---
 

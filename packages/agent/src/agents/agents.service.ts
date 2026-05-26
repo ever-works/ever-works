@@ -21,6 +21,7 @@ import { AgentMembershipRepository } from '../database/repositories/agent-member
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { slugifyText } from '../utils/text.utils';
 import { toAgentDto, type AgentDto } from './types';
+import { computeNextHeartbeat } from './heartbeat-cron';
 
 /**
  * Create-Agent input — writable subset of the entity. Validation
@@ -285,11 +286,18 @@ export class AgentsService {
 			throw new ConflictException('Agent status changed between read and write — retry.');
 		}
 		// Activating from draft schedules first heartbeat.
+		// Review-fix I17: compute the FIRST cadence slot via
+		// `computeNextHeartbeat` instead of setting it to `now`. The
+		// previous behavior fired the first heartbeat ~immediately on
+		// activation regardless of cadence (e.g. an Agent on
+		// `0 9 * * *` activated at 14:30 would fire a stray run at
+		// 14:30, then again the next morning at 09:00). Now the first
+		// scheduled fire genuinely respects the configured cadence.
+		// Fallback to `now` if the cadence is unparseable so a
+		// misconfigured Agent doesn't get stuck without scheduling.
 		if (to === AgentStatus.ACTIVE && agent.heartbeatCadence && agent.heartbeatCadence !== 'manual') {
-			// We don't compute next-fire here — dispatcher does that on the
-			// first tick. Set nextHeartbeatAt to now so the dispatcher picks
-			// it up immediately.
-			await this.agents.updateById(id, { nextHeartbeatAt: new Date() });
+			const next = computeNextHeartbeat(agent.heartbeatCadence, new Date()) ?? new Date();
+			await this.agents.updateById(id, { nextHeartbeatAt: next });
 		}
 		const refreshed = await this.agents.findById(id);
 		if (!refreshed) throw new NotFoundException('Agent vanished after transition');

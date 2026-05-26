@@ -20,6 +20,11 @@ import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execut
  */
 export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
 	async enqueue(payload: AgentTaskExecuteDispatchPayload) {
+		// Review-fix I10: pass `idempotencyKey` to Trigger.dev so a
+		// double-fire for the same (taskId, agentId, generation) tuple
+		// is deduped at the runner. Previously `dedupKey` rode only as
+		// payload data; without `idempotencyKey` Trigger.dev would
+		// happily spawn two runs for the same logical trigger.
 		const handle = await tasks.trigger<typeof import('../tasks/trigger/agent-task-execute.task').agentTaskExecuteTask>(
 			'agent-task-execute',
 			{
@@ -28,6 +33,7 @@ export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
 				taskId: payload.taskId,
 				dedupKey: payload.dedupKey,
 			} satisfies AgentTaskExecutePayload,
+			{ idempotencyKey: payload.dedupKey },
 		);
 		return { runId: handle.id };
 	},
@@ -35,6 +41,7 @@ export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
 
 export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
 	async enqueue(payload: AgentChatReplyDispatchPayload) {
+		// Review-fix I10 (mirror of agent-task-execute adapter above).
 		const handle = await tasks.trigger<typeof import('../tasks/trigger/agent-chat-reply.task').agentChatReplyTask>(
 			'agent-chat-reply',
 			{
@@ -44,6 +51,7 @@ export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
 				triggeringMessageId: payload.triggeringMessageId,
 				dedupKey: payload.dedupKey,
 			} satisfies AgentChatReplyPayload,
+			{ idempotencyKey: payload.dedupKey },
 		);
 		return { runId: handle.id };
 	},

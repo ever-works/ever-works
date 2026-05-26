@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { skillsAPI, type Skill, type SkillBinding, type SkillFrontmatter, type SkillOwnerType, type SkillBindingTargetType } from '@/lib/api/skills';
+import { getAuthFromCookie } from '@/lib/auth';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 9 server actions for the
@@ -10,22 +10,19 @@ import { skillsAPI, type Skill, type SkillBinding, type SkillFrontmatter, type S
  * re-fetches on the next render.
  *
  * `installCatalogSkillAction` defaults to tenant-scope using the
- * current userId as ownerId. The userId is read from the auth
- * cookie at server-action time (cookies()), keeping the client
- * surface minimal.
+ * current userId as ownerId. The userId is read from the encrypted
+ * auth cookie (`everworks_auth_token`) at server-action time via
+ * `getAuthFromCookie()`.
  */
 
 async function getCurrentUserId(): Promise<string> {
-    // The platform's existing auth cookie carries the userId in the JWT
-    // claim; the actual decoding lives in `lib/auth.ts`. Server actions
-    // that need user-scoped data should call through a shared helper —
-    // we keep the import shallow here to avoid pulling JWT internals
-    // into this thin wrapper. The real value is plumbed through
-    // serverFetch which already attaches the cookie automatically.
-    const cookieStore = await cookies();
-    const uid = cookieStore.get('user-id')?.value;
-    if (!uid) throw new Error('Not authenticated');
-    return uid;
+    // Review-fix C2: previously read a non-existent `user-id` cookie,
+    // which broke every "Install" click on /skills. The real auth cookie
+    // is `everworks_auth_token` (encrypted JWT) — use the shared helper
+    // that decodes it.
+    const user = await getAuthFromCookie();
+    if (!user?.id) throw new Error('Not authenticated');
+    return user.id;
 }
 
 export async function installCatalogSkillAction(input: {

@@ -11,6 +11,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TaskChatService } from '@ever-works/agent/tasks-domain';
+import { AgentRepository } from '@ever-works/agent/agents';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
@@ -24,7 +25,14 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 @ApiTags('tasks')
 @Controller('api/task-chat-messages')
 export class TaskChatController {
-	constructor(private readonly chat: TaskChatService) {}
+	constructor(
+		private readonly chat: TaskChatService,
+		// Review-fix I5: mention-lookup population on edit too — keeps
+		// the materialized `mentions` JSON column (refreshed in
+		// TaskChatService.edit per Review-fix I3) honest when the user
+		// changes which Agent they were tagging mid-edit.
+		private readonly agents: AgentRepository,
+	) {}
 
 	@Patch(':id')
 	@ApiOperation({
@@ -41,6 +49,15 @@ export class TaskChatController {
 		if (typeof body?.body !== 'string') {
 			throw new BadRequestException('body is required.');
 		}
-		return this.chat.edit(auth.userId, id, body.body, {});
+		const ownedAgentSlugs = new Map<string, string>();
+		try {
+			const { rows } = await this.agents.findByUserIdScoped(auth.userId, { limit: 500 });
+			for (const a of rows) {
+				if (a?.slug && a?.id) ownedAgentSlugs.set(a.slug, a.id);
+			}
+		} catch {
+			// Best-effort.
+		}
+		return this.chat.edit(auth.userId, id, body.body, { ownedAgentSlugs });
 	}
 }

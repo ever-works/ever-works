@@ -24,6 +24,12 @@ import {
 	type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
 import { PluginUsageRepository } from '@ever-works/agent/database';
+// Review-fix I5: populate the postChat `lookups.ownedAgentSlugs`
+// map so the mention parser can resolve `@<slug>` tokens to real
+// Agent ids; resolved agent mentions then drive the chat-dispatch
+// fan-out (TaskChatService:136-168) — without this map, human
+// comments never trigger `agent-chat-reply`.
+import { AgentRepository } from '@ever-works/agent/agents';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
@@ -55,7 +61,31 @@ export class TasksController {
 		private readonly service: TasksService,
 		private readonly chat: TaskChatService,
 		private readonly pluginUsage: PluginUsageRepository,
+		// Review-fix I5: AgentRepository for mention-lookup population.
+		private readonly agents: AgentRepository,
 	) {}
+
+	/**
+	 * Review-fix I5: build the `ownedAgentSlugs` map used by
+	 * `TaskChatService.parseMentions`. We pull a generous page of the
+	 * user's owned Agents (the platform's Agent count per user is
+	 * bounded to ~hundreds in v1; this is cheap). The map is rebuilt
+	 * per post — Agent slugs change rarely enough that caching is
+	 * unnecessary for v1.
+	 */
+	private async buildMentionLookups(userId: string) {
+		const ownedAgentSlugs = new Map<string, string>();
+		try {
+			const { rows } = await this.agents.findByUserIdScoped(userId, { limit: 500 });
+			for (const a of rows) {
+				if (a?.slug && a?.id) ownedAgentSlugs.set(a.slug, a.id);
+			}
+		} catch {
+			// Best-effort. A failure here just means @<slug> mentions
+			// are stripped (same as v1 default) — never propagated.
+		}
+		return { ownedAgentSlugs };
+	}
 
 	@Get()
 	@ApiOperation({ summary: 'List my Tasks (filter by status/priority/scope/label/search).' })
@@ -428,12 +458,13 @@ export class TasksController {
 		if (typeof body?.body !== 'string') {
 			throw new BadRequestException('body is required.');
 		}
-		// v1: empty mention-lookup maps — `parseMentions` strips all
-		// `@<slug>` / `[[kb]]` tokens. The lookup-population work
-		// (load owned Agent slugs + workspace user slugs + reachable
-		// KB docs) lands in a follow-up sub-tick once the helper
-		// surface from those domains is extracted. Hard rule today:
-		// mentions never bleed into the model.
+		// Review-fix I5: populate the mention-lookup map with the
+		// user's owned Agent slugs so @<slug> mentions resolve →
+		// chat-dispatch fan-out fires `agent-chat-reply` for each
+		// mentioned Agent. Unknown tokens are still stripped (T6
+		// posture). Known-user-slugs + known-kb-slugs maps land in
+		// a follow-up once those domains expose lookup helpers.
+		const lookups = await this.buildMentionLookups(auth.userId);
 		return this.chat.post(
 			auth.userId,
 			{
@@ -443,7 +474,7 @@ export class TasksController {
 				body: body.body,
 				attachments: body.attachments,
 			},
-			{},
+			lookups,
 		);
 	}
 }

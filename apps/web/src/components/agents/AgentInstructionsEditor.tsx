@@ -56,7 +56,12 @@ export function AgentInstructionsEditor({
 
     const activeBody = buffers[active] ?? '';
     const activeStatus = status[active] ?? 'idle';
-    const dirty = activeBody !== (initialMap[active]?.body ?? '') && activeBody !== '';
+    // Review-fix I15: drop the `activeBody !== ''` clause. Previously
+    // an intentional clear (e.g. user erasing HEARTBEAT.md to reset
+    // the heartbeat preamble) couldn't be saved because the dirty
+    // flag was false. Empty bodies are valid — the 64KB cap is an
+    // upper bound, not a lower one.
+    const dirty = activeBody !== (initialMap[active]?.body ?? '');
 
     useEffect(() => {
         if (!dirty) return;

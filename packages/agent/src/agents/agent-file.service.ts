@@ -123,9 +123,15 @@ export class AgentFileService {
 		}
 
 		// Build the new full row state (only one MD field changes).
+		// Review-fix C4: pass `agent` as the base so unchanged file
+		// columns fall through to their existing values inside hashOf.
+		// Without the base arg, hashOf treats every column except the
+		// freshly-edited one as empty, corrupting all subsequent ETag
+		// checks (any second write would throw "etag mismatch" until
+		// the user reloads).
 		const prevHash = agent.contentHash ?? null;
 		const updates = this.computeInlineUpdates(agent, name, body);
-		const newHash = this.hashOf(updates);
+		const newHash = this.hashOf(updates, agent);
 		await this.agents.updateById(agent.id, { ...updates, contentHash: newHash });
 
 		// Activity row — captured before throwing if logger unavailable, so we

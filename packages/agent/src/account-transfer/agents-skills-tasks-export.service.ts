@@ -102,7 +102,9 @@ export class AgentsSkillsTasksExportService {
 			out.push({
 				__kind: 'skill',
 				ownerType: skill.ownerType,
-				ownerSourceSlug: skill.ownerType === 'tenant' ? null : skill.ownerId,
+				// Review-fix I9: this is the source ownerId (UUID),
+				// not a slug. Field renamed to ownerSourceId.
+				ownerSourceId: skill.ownerType === 'tenant' ? null : skill.ownerId,
 				slug: skill.slug,
 				title: skill.title,
 				description: skill.description,
@@ -146,9 +148,11 @@ export class AgentsSkillsTasksExportService {
 				status: task.status,
 				priority: task.priority,
 				labels: task.labels ?? null,
-				missionSourceSlug: task.missionId ?? null,
-				ideaSourceSlug: task.ideaId ?? null,
-				workSourceSlug: task.workId ?? null,
+				// Review-fix I9: these are source UUIDs, not slugs.
+				// Field names corrected to match the actual values.
+				missionSourceId: task.missionId ?? null,
+				ideaSourceId: task.ideaId ?? null,
+				workSourceId: task.workId ?? null,
 				parentTaskSlug: task.parentTaskId ? idToSlug.get(task.parentTaskId) ?? null : null,
 				isRecurring: task.isRecurring,
 				recurrenceRule: task.recurrenceRule ?? null,

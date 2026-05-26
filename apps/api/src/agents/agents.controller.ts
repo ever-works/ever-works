@@ -218,7 +218,10 @@ export class AgentsController {
 			'Replace one Agent definition file body. Optimistic concurrency: pass `expectedHash` to guard against concurrent edits.',
 	})
 	@HttpCode(HttpStatus.OK)
-	@Throttle({ default: { limit: 60, ttl: 60_000 } })
+	// Review-fix I11: spec §7.1 calls for 30/min on write paths
+	// (file writes are heavier than typical CRUD — secret-scan +
+	// hash recompute on every call).
+	@Throttle({ default: { limit: 30, ttl: 60_000 } })
 	async writeFile(
 		@CurrentUser() auth: AuthenticatedUser,
 		@Param('id', ParseUUIDPipe) id: string,

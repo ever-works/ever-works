@@ -1,6 +1,7 @@
 import type { Agent } from '../entities/agent.entity';
 import type { TasksService } from './tasks.service';
 import type { TaskChatService } from './task-chat.service';
+import type { TaskAssigneeRepository, TaskReviewerRepository, TaskApproverRepository } from '../database/repositories/task-side.repositories';
 import type { TaskStatus } from '../entities/task.entity';
 
 /**
@@ -12,16 +13,17 @@ import type { TaskStatus } from '../entities/task.entity';
  * graph into the agents subpath — `AiFacadeService.assembleTools()`
  * concatenates the two lists at run time.
  *
- * Permission gating:
+ * Permission gating (Review-fix C9 — tightened):
  *   - createTask       → permissions.canAssignTasks
- *   - commentOnTask    → always allowed (commenting is communication,
- *                        not delegation; falls under the basic
- *                        chat-thread participation any Agent has on
- *                        Tasks it can see)
- *   - transitionTask   → always allowed when the Agent is an
- *                        assignee/reviewer/approver — the
- *                        TaskTransitionService still enforces the
- *                        state-machine + blocker/approver gates
+ *   - commentOnTask    → Agent must be a member (assignee/reviewer/
+ *                        approver) of the target Task. Spec
+ *                        agents/tasks.md:99 — "validates the agent
+ *                        is assignee/reviewer/approver". Cross-user
+ *                        404 is still enforced via TasksService.getOne
+ *                        inside TaskChatService.post.
+ *   - transitionTask   → permissions.canAssignTasks (Spec FR-15).
+ *                        State-machine + blocker/approver gates still
+ *                        apply downstream in TaskTransitionService.
  */
 
 export interface TaskToolDescriptor<TArgs = unknown, TResult = unknown> {
@@ -29,7 +31,14 @@ export interface TaskToolDescriptor<TArgs = unknown, TResult = unknown> {
 	description: string;
 	parameters: {
 		type: 'object';
-		properties: Record<string, { type: string; description: string }>;
+		properties: Record<
+			string,
+			{
+				type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object';
+				description: string;
+				items?: { type: 'string' | 'number' | 'integer' | 'boolean' | 'object' };
+			}
+		>;
 		required: string[];
 	};
 	invoke: (args: TArgs) => Promise<TResult | { error: string }>;
@@ -60,6 +69,12 @@ export function buildAgentTaskTools(args: {
 	agent: Agent;
 	tasksService: TasksService;
 	chatService: TaskChatService;
+	// Review-fix C9: membership-check helpers. Optional so unit tests
+	// that don't need the gate can omit them; production wiring in
+	// the API-side module always binds all three.
+	assignees?: TaskAssigneeRepository;
+	reviewers?: TaskReviewerRepository;
+	approvers?: TaskApproverRepository;
 }): TaskToolDescriptor[] {
 	const out: TaskToolDescriptor[] = [];
 
@@ -106,10 +121,30 @@ export function buildAgentTaskTools(args: {
 		} satisfies TaskToolDescriptor<CreateTaskArgs, { id: string; slug: string }>);
 	}
 
+	// Helper for C9: returns true iff the Agent is on the Task as
+	// assignee / reviewer / approver. When the repos aren't bound
+	// (unit-test mode), default to allowing the call — the test
+	// already chose not to enforce the gate.
+	async function agentIsOnTask(taskId: string): Promise<boolean> {
+		if (!args.assignees && !args.reviewers && !args.approvers) return true;
+		const checks = await Promise.all([
+			args.assignees?.findByTaskId(taskId).catch(() => []),
+			args.reviewers?.findByTaskId(taskId).catch(() => []),
+			args.approvers?.findByTaskId(taskId).catch(() => []),
+		]);
+		const flat = (checks.flat().filter(Boolean) as Array<{ assigneeType?: string; assigneeId?: string; reviewerType?: string; reviewerId?: string; approverType?: string; approverId?: string }>);
+		return flat.some(
+			(row) =>
+				(row.assigneeType === 'agent' && row.assigneeId === args.agent.id) ||
+				(row.reviewerType === 'agent' && row.reviewerId === args.agent.id) ||
+				(row.approverType === 'agent' && row.approverId === args.agent.id),
+		);
+	}
+
 	out.push({
 		name: 'commentOnTask',
 		description:
-			'Post a chat message on a Task. The body is secret-scanned + size-capped. Use @<slug> mentions to ping other Agents/users; [[kb-slug]] to reference KB docs. Unknown mentions are stripped server-side.',
+			'Post a chat message on a Task you are a member of (assignee/reviewer/approver). The body is secret-scanned + size-capped. Use @<slug> mentions to ping other Agents/users; [[kb-slug]] to reference KB docs. Unknown mentions are stripped server-side.',
 		parameters: {
 			type: 'object',
 			properties: {
@@ -121,6 +156,12 @@ export function buildAgentTaskTools(args: {
 		invoke: async (raw) => {
 			const a = raw as CommentOnTaskArgs;
 			if (!a?.taskId || !a?.body) return { error: 'taskId and body are required' };
+			// Review-fix C9: membership check before posting.
+			if (!(await agentIsOnTask(a.taskId))) {
+				return {
+					error: 'commentOnTask: this Agent is not a member of the Task (assignee/reviewer/approver). Add the Agent to the Task before commenting.',
+				};
+			}
 			try {
 				const message = await args.chatService.post(
 					args.agent.userId,
@@ -139,36 +180,43 @@ export function buildAgentTaskTools(args: {
 		},
 	} satisfies TaskToolDescriptor<CommentOnTaskArgs, { id: string; createdAt: string }>);
 
-	out.push({
-		name: 'transitionTask',
-		description:
-			'Move a Task to a new status. The state-machine enforces legal transitions; → done requires no open blockers AND (when requireAllApprovers=true) all approvers must have approved.',
-		parameters: {
-			type: 'object',
-			properties: {
-				taskId: { type: 'string', description: 'The Task UUID.' },
-				to: {
-					type: 'string',
-					description:
-						'Target status: backlog / todo / in_progress / in_review / blocked / done / cancelled.',
+	// Review-fix C9: transitionTask now gated by canAssignTasks per Spec FR-15.
+	if (args.agent.permissions?.canAssignTasks) {
+		out.push({
+			name: 'transitionTask',
+			description:
+				'Move a Task to a new status. Requires canAssignTasks. The state-machine enforces legal transitions; → done requires no open blockers AND (when requireAllApprovers=true) all approvers must have approved.',
+			parameters: {
+				type: 'object',
+				properties: {
+					taskId: { type: 'string', description: 'The Task UUID.' },
+					to: {
+						type: 'string',
+						description:
+							'Target status: backlog / todo / in_progress / in_review / blocked / done / cancelled.',
+					},
+					force: {
+						// Review-fix C5: boolean, not string.
+						type: 'boolean',
+						description: 'Override the approver gate (NOT the blocker gate). Default false.',
+					},
 				},
-				force: { type: 'string', description: '"true" to override the approver gate (NOT blocker gate).' },
+				required: ['taskId', 'to'],
 			},
-			required: ['taskId', 'to'],
-		},
-		invoke: async (raw) => {
-			const a = raw as TransitionTaskArgs;
-			if (!a?.taskId || !a?.to) return { error: 'taskId and to are required' };
-			try {
-				const updated = await args.tasksService.transition(args.agent.userId, a.taskId, a.to, {
-					force: a.force === true || (a.force as any) === 'true',
-				});
-				return { id: updated.id, status: updated.status };
-			} catch (err) {
-				return { error: err instanceof Error ? err.message : String(err) };
-			}
-		},
-	} satisfies TaskToolDescriptor<TransitionTaskArgs, { id: string; status: TaskStatus }>);
+			invoke: async (raw) => {
+				const a = raw as TransitionTaskArgs;
+				if (!a?.taskId || !a?.to) return { error: 'taskId and to are required' };
+				try {
+					const updated = await args.tasksService.transition(args.agent.userId, a.taskId, a.to, {
+						force: a.force === true || (a.force as any) === 'true',
+					});
+					return { id: updated.id, status: updated.status };
+				} catch (err) {
+					return { error: err instanceof Error ? err.message : String(err) };
+				}
+			},
+		} satisfies TaskToolDescriptor<TransitionTaskArgs, { id: string; status: TaskStatus }>);
+	}
 
 	return out;
 }

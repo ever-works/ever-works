@@ -27,6 +27,8 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
+import { AgentRepository } from '../database/repositories/agent.repository';
+import { TaskNotificationService } from './task-notification.service';
 
 export interface CreateTaskInput {
 	title: string;
@@ -67,7 +69,39 @@ export class TasksService {
 		private readonly transitions: TaskTransitionService,
 		@Optional() private readonly activityLog?: ActivityLogService,
 		@Optional() private readonly attachments?: TaskAttachmentRepository,
+		// Review-fix I4: validate Agent assignee existence. Optional()
+		// keeps the unit-test surface that mocks TasksService without
+		// the Agent graph working.
+		@Optional() private readonly agents?: AgentRepository,
+		// Review-fix I13: in-app notification emit on assign.
+		@Optional() private readonly notifications?: TaskNotificationService,
 	) {}
+
+	/**
+	 * Review-fix I4: shared validator for assignee / reviewer / approver
+	 * add paths. For `agent` actor type, the Agent must belong to the
+	 * acting user (cross-user is rejected with a 400). For `user` actor
+	 * type we just sanity-check the id is a non-empty string — full
+	 * user-existence validation requires a UserRepository in this graph
+	 * and is deferred to the API layer's @CurrentUser() resolution.
+	 */
+	private async assertActorIsValid(
+		userId: string,
+		actorType: TaskActorType,
+		actorId: string,
+	): Promise<void> {
+		if (!actorId || actorId.trim().length === 0) {
+			throw new BadRequestException(`${actorType} id is required.`);
+		}
+		if (actorType === 'agent' && this.agents) {
+			const agent = await this.agents.findByIdAndUser(actorId, userId).catch(() => null);
+			if (!agent) {
+				throw new BadRequestException(
+					`Agent ${actorId} is not reachable for this user — cannot assign.`,
+				);
+			}
+		}
+	}
 
 	async list(userId: string, filter: ListTasksFilter = {}): Promise<{ rows: Task[]; total: number }> {
 		return this.tasks.findByUserIdFiltered(userId, filter);
@@ -85,10 +119,31 @@ export class TasksService {
 		if (input.description) assertNoSecrets(input.description, 'task.description');
 
 		// Validate parent cycle (root task has no parent).
+		// Review-fix C8: also walk the parent chain to bound depth +
+		// detect existing-cyclic data before insertion. Self-cycle is
+		// impossible for a brand-new id, but a malformed parent chain
+		// pointing into existing-cyclic data would propagate downstream.
 		if (input.parentTaskId) {
 			const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
 			if (!parent) {
 				throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
+			}
+			// Walk parent chain to detect pre-existing cyclic data
+			// (defensive — bounded at 64 hops to avoid runaway loops).
+			let cursor: string | null = parent.parentTaskId ?? null;
+			const seen = new Set<string>([input.parentTaskId]);
+			let hops = 0;
+			while (cursor && hops < 64) {
+				if (seen.has(cursor)) {
+					throw new BadRequestException(
+						`Parent Task ${input.parentTaskId} is on an existing cycle; reparent it first.`,
+					);
+				}
+				seen.add(cursor);
+				const ancestor = await this.tasks.findByIdAndUser(cursor, userId);
+				if (!ancestor) break;
+				cursor = ancestor.parentTaskId ?? null;
+				hops += 1;
 			}
 		}
 
@@ -262,7 +317,9 @@ export class TasksService {
 		assigneeType: TaskActorType,
 		assigneeId: string,
 	) {
-		await this.getOne(userId, taskId);
+		const task = await this.getOne(userId, taskId);
+		// Review-fix I4: validate the actor exists / belongs to user.
+		await this.assertActorIsValid(userId, assigneeType, assigneeId);
 		const row = await this.assignees.add(taskId, assigneeType, assigneeId);
 		await this.logActivity({
 			userId,
@@ -270,6 +327,24 @@ export class TasksService {
 			actionType: ActivityActionType.TASK_ASSIGNEE_ADDED,
 			details: { assigneeType, assigneeId },
 		});
+		// Review-fix I13: in-app notification on assign. Best-effort —
+		// failure inside emit logs there, doesn't bubble. Only fires
+		// for user-type assignees (agent-type assignees get notified
+		// via the dispatch hook in TaskTransitionService instead).
+		if (assigneeType === 'user' && this.notifications) {
+			void this.notifications
+				.emit(
+					'task_assigned',
+					{
+						taskId,
+						taskSlug: task.slug,
+						taskTitle: task.title,
+						actorUserId: userId,
+					},
+					[assigneeId],
+				)
+				.catch(() => undefined);
+		}
 		return row;
 	}
 
@@ -292,6 +367,8 @@ export class TasksService {
 		reviewerId: string,
 	) {
 		await this.getOne(userId, taskId);
+		// Review-fix I4: validate the actor exists / belongs to user.
+		await this.assertActorIsValid(userId, reviewerType, reviewerId);
 		return this.reviewers.add(taskId, reviewerType, reviewerId);
 	}
 
@@ -302,6 +379,8 @@ export class TasksService {
 		approverId: string,
 	) {
 		await this.getOne(userId, taskId);
+		// Review-fix I4: validate the actor exists / belongs to user.
+		await this.assertActorIsValid(userId, approverType, approverId);
 		return this.approvers.add(taskId, approverType, approverId);
 	}
 
@@ -327,6 +406,13 @@ export class TasksService {
 	async removeBlocker(userId: string, taskId: string, blockId: string) {
 		await this.getOne(userId, taskId);
 		await this.blocks.remove(blockId);
+		// Review-fix I1: removing a blocker may unblock the dependent
+		// Task (FR-10). The transition service walks the chain and
+		// best-effort restores any blocked Task whose blockers are
+		// now all resolved. Fire-and-forget — keeps the explicit
+		// `removeBlocker` response shape and doesn't add latency to
+		// the explicit user action.
+		void this.transitions.autoUnblockResolvedTasks(taskId).catch(() => undefined);
 		return { deleted: true } as const;
 	}
 

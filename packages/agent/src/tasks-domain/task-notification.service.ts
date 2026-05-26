@@ -23,6 +23,10 @@ export interface TaskNotificationContext {
 	actorAgentSlug?: string;
 	fromStatus?: string;
 	toStatus?: string;
+	/** Review-fix C7 dedup discriminator for `task_blocked` events. */
+	blockerTaskId?: string;
+	/** Review-fix C7 dedup discriminator for `task_recurrence_fired` events. */
+	occurrenceCount?: number;
 	extra?: Record<string, unknown>;
 }
 
@@ -72,7 +76,32 @@ export class TaskNotificationService {
 		const message = this.formatMessage(event, context);
 		const title = this.formatTitle(event, context);
 		const type = TYPE_BY_EVENT[event];
-		const dedupKey = `task:${context.taskId}:${event}`;
+		// Review-fix C7: the dedup key must be unique per FIRING of an
+		// event, not per event-type. With the old `task:<id>:<event>`
+		// shape, NotificationService.create's existing-row dedup would
+		// silently swallow every status-change after the first, every
+		// assignment after the first, etc. We now include the most
+		// distinguishing context per event type (from→to for status,
+		// blockerTaskId for blocked, occurrenceCount for recurrence,
+		// fallback to a millisecond timestamp so each emit is unique).
+		const discriminator = (() => {
+			switch (event) {
+				case 'task_status_changed':
+					return `${context.fromStatus ?? ''}->${context.toStatus ?? ''}`;
+				case 'task_blocked':
+					return context.blockerTaskId ?? context.toStatus ?? '';
+				case 'task_recurrence_fired':
+					return String(context.occurrenceCount ?? '');
+				case 'task_assigned':
+				case 'task_mentioned':
+					return context.actorAgentSlug ?? context.actorUserId ?? '';
+				case 'task_due_soon':
+					return new Date().toISOString().slice(0, 10); // dedup per-day at most
+				default:
+					return String(Date.now());
+			}
+		})();
+		const dedupKey = `task:${context.taskId}:${event}:${discriminator}`;
 
 		let sent = 0;
 		for (const userId of uniqueRecipients) {

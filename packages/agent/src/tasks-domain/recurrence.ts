@@ -1,5 +1,5 @@
 import { RRule } from 'rrule';
-import type { Task } from '../entities/task.entity';
+import { TaskStatus, type Task } from '../entities/task.entity';
 
 /**
  * Tasks feature — Phase 17.2 / 17.3.
@@ -88,7 +88,8 @@ export function cloneRecurringTaskAsInstance(template: Task): Partial<Task> {
 		userId: template.userId,
 		title: template.title,
 		description: template.description ?? null,
-		status: 'backlog' as any,
+		// Review-fix I18: drop the `as any` cast — TaskStatus.BACKLOG is in scope.
+		status: TaskStatus.BACKLOG,
 		previousStatus: null,
 		priority: template.priority,
 		labels: template.labels ?? null,
