@@ -12,13 +12,25 @@ import { exportAccountData } from '@/app/actions/account-transfer';
 export function DataManagement() {
     const t = useTranslations('dashboard.settings.data');
     const [includeSecrets, setIncludeSecrets] = useState(false);
+    // Phase 19.6 — per-feature v2 payload tail toggles. All default
+    // off so a v1 user gets a v1-shaped payload exactly as before.
+    const [includeAgents, setIncludeAgents] = useState(false);
+    const [includeSkills, setIncludeSkills] = useState(false);
+    const [includeTasks, setIncludeTasks] = useState(false);
+    const [includeTaskChat, setIncludeTaskChat] = useState(false);
     const [isExporting, startExportTransition] = useTransition();
     const [showImport, setShowImport] = useState(false);
 
     const handleExport = () => {
         startExportTransition(async () => {
             try {
-                const result = await exportAccountData(includeSecrets);
+                const result = await exportAccountData({
+                    includeSecrets,
+                    includeAgents,
+                    includeSkills,
+                    includeTasks,
+                    includeTaskChat: includeTasks && includeTaskChat,
+                });
                 if (!result.success || !result.data) {
                     throw new Error(result.error || 'Export failed');
                 }
@@ -79,6 +91,72 @@ export function DataManagement() {
                                 <span>{t('secretsWarning')}</span>
                             </div>
                         )}
+
+                        {/* Phase 19.6 — v2 payload tail: Agents / Skills /
+                            Tasks (+ optional Task chat). All opt-in so a
+                            v1 user gets the same payload they always did. */}
+                        <fieldset className="space-y-2 pt-2 border-t border-border/40 dark:border-border-dark/40">
+                            <legend className="text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-1">
+                                Additional sections (v2 payload)
+                            </legend>
+                            <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group">
+                                <input
+                                    type="checkbox"
+                                    checked={includeAgents}
+                                    onChange={(e) => setIncludeAgents(e.target.checked)}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                                    Include Agents
+                                </span>
+                            </label>
+                            <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group ml-3">
+                                <input
+                                    type="checkbox"
+                                    checked={includeSkills}
+                                    onChange={(e) => setIncludeSkills(e.target.checked)}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                                    Include Skills (+ bindings)
+                                </span>
+                            </label>
+                            <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group ml-3">
+                                <input
+                                    type="checkbox"
+                                    checked={includeTasks}
+                                    onChange={(e) => {
+                                        setIncludeTasks(e.target.checked);
+                                        if (!e.target.checked) setIncludeTaskChat(false);
+                                    }}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                                    Include Tasks
+                                </span>
+                            </label>
+                            <label
+                                className={`inline-flex items-center gap-2.5 select-none group ml-8 ${
+                                    includeTasks ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                                }`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={includeTasks && includeTaskChat}
+                                    disabled={!includeTasks}
+                                    onChange={(e) => setIncludeTaskChat(e.target.checked)}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                                    Include Task chat threads
+                                </span>
+                            </label>
+                            {includeTaskChat && includeTasks && (
+                                <p className="text-[11px] text-text-muted dark:text-text-muted-dark pl-8 leading-relaxed">
+                                    Chat threads bloat the payload — only enable when you actually need them.
+                                </p>
+                            )}
+                        </fieldset>
 
                         <div className="pt-1">
                             <Button

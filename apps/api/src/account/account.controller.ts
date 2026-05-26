@@ -35,9 +35,20 @@ export class AccountController {
     async exportData(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('includeSecrets') includeSecrets: string,
+        // Phase 19.6 — per-feature toggles for the v2 payload tail.
+        // All default `false` so a v1 caller (no query params) gets a
+        // v1-shaped payload exactly as before.
+        @Query('includeAgents') includeAgents?: string,
+        @Query('includeSkills') includeSkills?: string,
+        @Query('includeTasks') includeTasks?: string,
+        @Query('includeTaskChat') includeTaskChat?: string,
     ) {
         return this.exportService.exportAccountData(auth.userId, {
             includeSecrets: includeSecrets === 'true',
+            includeAgents: includeAgents === 'true',
+            includeSkills: includeSkills === 'true',
+            includeTasks: includeTasks === 'true',
+            includeTaskChat: includeTaskChat === 'true',
         });
     }
 

@@ -703,4 +703,113 @@ describe('AccountExportService', () => {
             expect(result.data.works[0].siteConfig).toEqual({ siteName: 'Best', tagline: 'Tools' });
         });
     });
+
+    /**
+     * Phase 19.6 — v2 payload tail wiring. The 10th constructor arg is
+     * Optional<AgentsSkillsTasksExportService>; when bound + a toggle is
+     * set on the options, `data.agents` / `data.skills` / `data.tasks`
+     * appear on the payload and the version bumps to 2. Toggles default
+     * false, so existing v1 callers see the same payload as before
+     * (covered indirectly by every preceding spec).
+     */
+    describe('exportAccountData — v2 payload tail (Phase 19.6)', () => {
+        function makeServiceWithTail(tail: {
+            agents?: any[];
+            skills?: any[];
+            tasks?: any[];
+        }) {
+            const inner = makeService();
+            const tailService = {
+                exportTail: jest.fn().mockResolvedValue(tail),
+            };
+            inner.mocks.userRepository.findById.mockResolvedValue({
+                username: 'octocat',
+                email: 'o@e.com',
+            });
+            const service = new AccountExportService(
+                inner.mocks.workRepository as any,
+                inner.mocks.workMemberRepository as any,
+                inner.mocks.workCustomDomainRepository as any,
+                inner.mocks.userPluginRepository as any,
+                inner.mocks.workPluginRepository as any,
+                inner.mocks.userRepository as any,
+                inner.mocks.advancedPromptsRepository as any,
+                inner.mocks.scheduleRepository as any,
+                inner.mocks.gitFacade as any,
+                tailService as any,
+            );
+            return { service, tailService };
+        }
+
+        it('keeps version=1 + no tail keys when all 3 toggles are false', async () => {
+            const { service, tailService } = makeServiceWithTail({
+                agents: [{ __kind: 'agent' }],
+            });
+            const result = await service.exportAccountData('user-1');
+            expect(result.version).toBe(1);
+            expect(tailService.exportTail).not.toHaveBeenCalled();
+            expect((result.data as any).agents).toBeUndefined();
+            expect((result.data as any).skills).toBeUndefined();
+            expect((result.data as any).tasks).toBeUndefined();
+        });
+
+        it('forwards toggles to the tail service and includes returned arrays', async () => {
+            const { service, tailService } = makeServiceWithTail({
+                agents: [{ __kind: 'agent', identity: { slug: 'ceo' } }],
+                skills: [{ __kind: 'skill', slug: 'cron' }],
+                tasks: [{ __kind: 'task', slug: 'T-1' }],
+            });
+            const result = await service.exportAccountData('user-1', {
+                includeAgents: true,
+                includeSkills: true,
+                includeTasks: true,
+                includeTaskChat: true,
+            });
+            expect(tailService.exportTail).toHaveBeenCalledWith('user-1', {
+                includeAgents: true,
+                includeSkills: true,
+                includeTasks: true,
+                includeTaskChat: true,
+            });
+            expect(result.version).toBe(2);
+            expect((result.data as any).agents).toHaveLength(1);
+            expect((result.data as any).skills).toHaveLength(1);
+            expect((result.data as any).tasks).toHaveLength(1);
+        });
+
+        it('returns version=1 when toggle is set but tail comes back empty', async () => {
+            const { service } = makeServiceWithTail({
+                agents: [],
+                skills: [],
+                tasks: [],
+            });
+            const result = await service.exportAccountData('user-1', {
+                includeAgents: true,
+                includeSkills: true,
+                includeTasks: true,
+            });
+            expect(result.version).toBe(1);
+            expect((result.data as any).agents).toBeUndefined();
+            expect((result.data as any).skills).toBeUndefined();
+            expect((result.data as any).tasks).toBeUndefined();
+        });
+
+        it('best-effort: a tail failure logs warn and returns v1 payload (does not throw)', async () => {
+            const { service, tailService } = makeServiceWithTail({});
+            tailService.exportTail.mockRejectedValueOnce(new Error('tail crash'));
+            const result = await service.exportAccountData('user-1', {
+                includeAgents: true,
+            });
+            expect(result.version).toBe(1);
+            expect((result.data as any).agents).toBeUndefined();
+        });
+
+        it('does NOT call tail service when bound but no toggle is set', async () => {
+            const { service, tailService } = makeServiceWithTail({
+                agents: [{ __kind: 'agent' }],
+            });
+            await service.exportAccountData('user-1', { includeSecrets: true });
+            expect(tailService.exportTail).not.toHaveBeenCalled();
+        });
+    });
 });

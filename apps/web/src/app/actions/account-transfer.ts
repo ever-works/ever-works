@@ -51,11 +51,38 @@ function ensureAuth() {
     });
 }
 
-export async function exportAccountData(includeSecrets: boolean) {
+export interface ExportToggles {
+    includeSecrets?: boolean;
+    /**
+     * Phase 19.6 — per-feature v2 tail toggles. Default false so an
+     * absent flag yields a v1-compatible payload.
+     */
+    includeAgents?: boolean;
+    includeSkills?: boolean;
+    includeTasks?: boolean;
+    includeTaskChat?: boolean;
+}
+
+export async function exportAccountData(
+    includeSecretsOrToggles: boolean | ExportToggles,
+) {
     await ensureAuth();
+    // Back-compat — `exportAccountData(true)` keeps working for the
+    // pre-Phase-19.6 caller signature; `exportAccountData({...})` is
+    // the new shape used by /settings/import-export.
+    const opts: ExportToggles =
+        typeof includeSecretsOrToggles === 'boolean'
+            ? { includeSecrets: includeSecretsOrToggles }
+            : includeSecretsOrToggles;
+    const params = new URLSearchParams();
+    if (opts.includeSecrets) params.set('includeSecrets', 'true');
+    if (opts.includeAgents) params.set('includeAgents', 'true');
+    if (opts.includeSkills) params.set('includeSkills', 'true');
+    if (opts.includeTasks) params.set('includeTasks', 'true');
+    if (opts.includeTaskChat && opts.includeTasks) params.set('includeTaskChat', 'true');
     try {
         const data = await serverFetch<AccountExportPayload>(
-            `/account/export?includeSecrets=${includeSecrets}`,
+            `/account/export?${params.toString()}`,
         );
         return { success: true as const, data, error: null };
     } catch (error) {

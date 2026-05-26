@@ -238,6 +238,20 @@ export interface ImportOptions {
 
 export interface ExportOptions {
     includeSecrets?: boolean;
+    /**
+     * Agents/Skills/Tasks PR #1017 — Phase 19.6. Per-feature toggles
+     * that flip on the v2 payload tail (`data.agents` / `data.skills`
+     * / `data.tasks`). All default `false` so a v1 caller gets a
+     * v1-compatible payload.
+     */
+    includeAgents?: boolean;
+    includeSkills?: boolean;
+    includeTasks?: boolean;
+    /**
+     * Per Phase-19.3, chat threads bloat the payload fast — opt in
+     * separately. Only honored when `includeTasks` is true.
+     */
+    includeTaskChat?: boolean;
 }
 
 // ─── Secret Masking ─────────────────────────────────────────────
