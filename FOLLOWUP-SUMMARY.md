@@ -30,14 +30,14 @@ Lands on top of `develop` (which already contains PR #1019). Branch:
 
 Wires `agents/plan.md §4`'s runtime surface:
 
-| Endpoint | Behaviour |
-|---|---|
-| `POST /api/agents/:id/run-now` | dispatches `agent-heartbeat` immediately via new `AgentScheduleDispatcherService.dispatchOne` |
-| `GET /api/agents/:id/runs?limit=&offset=` | paginated AgentRun history + total |
-| `POST /api/agents/:id/runs/:runId/cancel` | flips queued/running → cancelled via new `AgentRunRepository.cancel` |
-| `GET /api/agents/:id/skills` | active SkillBinding rollup |
-| `GET /api/agents/:id/budget` | 30-day spend rollup via `PluginUsageRepository.getTotalSpendCentsForOwner('agent', …)` |
-| `POST /api/agents/:id/assign-task` | pre-creates AgentRun + enqueues `agent-task-execute` |
+| Endpoint                                  | Behaviour                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `POST /api/agents/:id/run-now`            | dispatches `agent-heartbeat` immediately via new `AgentScheduleDispatcherService.dispatchOne` |
+| `GET /api/agents/:id/runs?limit=&offset=` | paginated AgentRun history + total                                                            |
+| `POST /api/agents/:id/runs/:runId/cancel` | flips queued/running → cancelled via new `AgentRunRepository.cancel`                          |
+| `GET /api/agents/:id/skills`              | active SkillBinding rollup                                                                    |
+| `GET /api/agents/:id/budget`              | 30-day spend rollup via `PluginUsageRepository.getTotalSpendCentsForOwner('agent', …)`        |
+| `POST /api/agents/:id/assign-task`        | pre-creates AgentRun + enqueues `agent-task-execute`                                          |
 
 Writes are throttled 30/60s per plan §7.1, log `AGENT_RUN_TRIGGERED` /
 `AGENT_RUN_CANCELLED` / `AGENT_TASK_ASSIGNED` on success. `assign-task`
@@ -123,11 +123,11 @@ activity types from `@ever-works/agent/activity-log`.
 
 - New `SkillBindingTargetPicker` replaces the raw UUID textbox on the
   bindings panel:
-  - `tenant` → disabled input (auto-fills server-side)
-  - `agent` → loads via `agentsAPI.list({ limit: 100 })`
-  - `mission` → `missionsAPI.list()`
-  - `idea` → `workProposalsAPI.list(['pending','accepted'])`
-  - `work` → `workAPI.getAll({ limit: 100 })`
+    - `tenant` → disabled input (auto-fills server-side)
+    - `agent` → loads via `agentsAPI.list({ limit: 100 })`
+    - `mission` → `missionsAPI.list()`
+    - `idea` → `workProposalsAPI.list(['pending','accepted'])`
+    - `work` → `workAPI.getAll({ limit: 100 })`
 - Search filter above the listbox (case-insensitive substring),
   sized to min(5, options+1).
 - Falls back to a paste-uuid input when the endpoint errors or returns
@@ -194,7 +194,7 @@ Per the FU prompt's operating rules: **tests were written as files but
 NOT run.** The operator runs the suite (agent jest + web vitest +
 build) at review time. Type-checks pass for both the agent package
 (`packages/agent`) and `apps/web`; the API typecheck is clean for the
-agents/* surfaces (unrelated package-not-built errors for `@ever-works/monitoring`
+agents/\* surfaces (unrelated package-not-built errors for `@ever-works/monitoring`
 etc. are pre-existing in this worktree without a full root build).
 
 ## What didn't ship
