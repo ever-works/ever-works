@@ -545,10 +545,18 @@
         "missionsPage": {
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
+            "newMission": "New Mission",
+            "quickAdd": {
+                "label": "Start a new Mission",
+                "submitTitle": "Create Mission",
+                "minLength": "Description must be at least 10 characters.",
+                "created": "Mission created",
+                "error": "Couldn't create Mission. Please try again."
+            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "Open the unified creator"
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -829,6 +837,7 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
+                "submitTitle": "Add Idea",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -3262,8 +3271,8 @@
             }
         },
         "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "title": "Start something new",
+            "subtitle": "Tell the agent what you want to build. Pick a kind below to bias the result, or jump into the manual flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3276,11 +3285,20 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo"
             },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+            },
             "submit": "Create",
+            "submitTitle": "Create",
             "or": "or",
             "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+                "minLength": "Add a description (at least 10 characters) to start."
             },
             "toasts": {
                 "missionCreated": "Mission created",
