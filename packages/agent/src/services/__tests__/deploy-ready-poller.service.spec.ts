@@ -77,7 +77,11 @@ describe('DeployReadyPollerService.pollOnce', () => {
         const httpFetch = jest.fn().mockResolvedValue({ status: 503 }) as unknown as typeof fetch;
         const { service, workRepository, funnel } = buildService([work], httpFetch);
 
-        const summary = await service.pollOnce({ fetch: httpFetch, now: () => NOW, domain: 'ever.works' });
+        const summary = await service.pollOnce({
+            fetch: httpFetch,
+            now: () => NOW,
+            domain: 'ever.works',
+        });
 
         expect(summary).toEqual({ scanned: 1, ready: 0, stillPending: 1, failed: 0 });
         expect(workRepository.update).not.toHaveBeenCalled();
