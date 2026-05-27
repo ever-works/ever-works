@@ -43,7 +43,7 @@ These are minimal, high-signal reminders; full details are in `CLAUDE.md`.
 - Backend: **NestJS 11** (`apps/api`) with TypeORM and SWC.
 - Frontend: **Next.js 16 App Router** (`apps/web`) with React 19 and Tailwind CSS.
 - Shared logic: `packages/agent`, `packages/monitoring`, `packages/cli-shared`.
-- Use **pnpm** only (no npm/yarn). Node.js **≥20**.
+- Use **pnpm** only (no npm/yarn). Node.js **≥22**.
 - Respect **Prettier** and **TypeScript** rules described in `CLAUDE.md`.
 
 For architecture, testing patterns, deployment, and detailed conventions, **do not restate them here**—instead, **read and follow `CLAUDE.md`**.

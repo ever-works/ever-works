@@ -29,10 +29,6 @@
             "types": "./dist/entities/index.d.ts",
             "default": "./dist/entities/index.js"
         },
-        "./git": {
-            "types": "./dist/git/index.d.ts",
-            "default": "./dist/git/index.js"
-        },
         "./work-operations": {
             "types": "./dist/work-operations/index.d.ts",
             "default": "./dist/work-operations/index.js"
@@ -163,8 +159,9 @@
         }
     },
     "scripts": {
-        "dev": "concurrently \"npm:build:dev\" \"npm:build:types:dev\"",
+        "dev": "concurrently \"pnpm build:dev\" \"pnpm build:types:dev\"",
         "build": "nest build -b swc && tsc -p tsconfig.types.json",
+        "type-check": "tsc -p tsconfig.json --noEmit",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
         "build:types:dev": "tsc -p tsconfig.types.json --watch",
@@ -181,7 +178,6 @@
         "mysql2": "^3.14",
         "pg": "^8.16",
         "reflect-metadata": "^0.2",
-        "rrule": "^2.8.1",
         "rxjs": "^7.8"
     },
     "peerDependenciesMeta": {
@@ -248,6 +244,7 @@
         "p-map": "^7.0.4",
         "papaparse": "^5.5.3",
         "pdf-parse": "^1.1.1",
+        "rrule": "^2.8.1",
         "semver": "^7.7.3",
         "superjson": "^1.13.3",
         "turndown": "^7.2.2",

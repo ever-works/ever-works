@@ -12,9 +12,10 @@
     "scripts": {
         "cli": "cd dist && node dist/cli.js",
         "build": "tsc --noEmit && node build.js",
+        "type-check": "tsc --noEmit",
         "build:cli": "tsc --noEmit && node build.js",
-        "publish:cli": "npm run build:cli && cd dist && npm publish",
-        "test:cli": "cd dist && npm install && node cli.js --help",
+        "publish:cli": "pnpm build:cli && cd dist && pnpm publish",
+        "test:cli": "cd dist && pnpm install && node cli.js --help",
         "test": "vitest run",
         "test:watch": "vitest"
     },

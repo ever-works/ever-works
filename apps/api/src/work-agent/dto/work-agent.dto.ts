@@ -3,8 +3,10 @@ import { Type } from 'class-transformer';
 import {
     IsBoolean,
     IsInt,
+    IsNumber,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
@@ -84,6 +86,57 @@ export class UpdateWorkAgentPreferencesDto
     @IsOptional()
     @IsBoolean()
     dailySuggestionsEnabled?: boolean;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    autoGenerateCadence?: string | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(20)
+    autoGenerateBatchSize?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(1000)
+    autoBuildThrottlePerDay?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(-1)
+    @Max(1000)
+    missionDefaultOutstandingCap?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(5)
+    maxAutoRetries?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(10)
+    @Max(3600)
+    backoffSeconds?: number;
+
+    @IsOptional()
+    @IsNumber({ maxDecimalPlaces: 2 })
+    @Min(1)
+    @Max(4)
+    exponentialBackoffFactor?: number;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d+$/)
+    @MaxLength(32)
+    accountWideMonthlyCapCents?: string | null;
+
+    @IsOptional()
+    @IsBoolean()
+    accountWideAllowOverage?: boolean;
 }
 
 export class CreateWorkAgentGoalDto

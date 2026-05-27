@@ -21,17 +21,10 @@ import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
  * Local git operations (clone, push, commit, etc.) are the same for all providers.
  * They use isomorphic-git with provider-specific auth credentials.
  *
- * The actual isomorphic-git implementation is provided by the core platform
- * (`packages/agent/src/git/git.provider.ts`). Plugin authors have two options:
- *
- * 1. **Extend the platform's GitProvider** (recommended for internal plugins):
- *    ```typescript
- *    import { GitProvider } from '@ever-works/agent';
- *    class GitHubPlugin extends GitProvider implements IGitProviderPlugin { ... }
- *    ```
- *
- * 2. **Implement using isomorphic-git directly** (for external plugins):
- *    Copy the implementation pattern from the platform's GitProvider.
+ * `BaseGitProvider` is the shared plugin-side contract. Provider plugins can
+ * implement the local operations directly with isomorphic-git, or compose a
+ * shared helper from their own package when multiple providers need the same
+ * clone/commit/push behavior.
  *
  * ## Example
  *

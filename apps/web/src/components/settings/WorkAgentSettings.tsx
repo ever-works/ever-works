@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import {
     Bot,
     CircleStop,
@@ -54,6 +55,7 @@ interface WorkAgentSettingsProps {
 
 export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
+    const router = useRouter();
     const [isSaving, startSaving] = useTransition();
     const [isSavingAutoGen, startSavingAutoGen] = useTransition();
     const [isSavingAutoBuild, startSavingAutoBuild] = useTransition();
@@ -107,6 +109,15 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
         preferences.accountWideAllowOverage,
     );
 
+    useEffect(() => {
+        if (!activeRun) {
+            return;
+        }
+
+        const interval = window.setInterval(() => router.refresh(), 5000);
+        return () => window.clearInterval(interval);
+    }, [activeRun, router]);
+
     const updatePreference = <K extends keyof WorkAgentPreferences>(
         key: K,
         value: WorkAgentPreferences[K],
@@ -131,6 +142,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                     ...localPreferences.guardrails,
                 });
                 setLocalPreferences(saved);
+                router.refresh();
                 toast.success(t('toasts.settingsSaved'));
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : t('toasts.settingsError'));
@@ -142,10 +154,11 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
         startQueueing(async () => {
             try {
                 await createWorkAgentGoalAction({
-                    instruction,
+                    instruction: instruction.trim(),
                     dryRun,
                 });
                 setInstruction('');
+                router.refresh();
                 toast.success(t('toasts.goalQueued'));
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : t('toasts.goalError'));
@@ -171,6 +184,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                           },
                 );
                 setLocalPreferences(saved);
+                router.refresh();
                 // After reset, refresh the displayed values to the new
                 // platform-default-driven view.
                 if (resetToDefault) {
@@ -201,6 +215,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                           },
                 );
                 setLocalPreferences(saved);
+                router.refresh();
                 if (resetToDefault) {
                     setAutoBuildThrottle(
                         saved.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE,
@@ -238,6 +253,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                           },
                 );
                 setLocalPreferences(saved);
+                router.refresh();
                 if (resetToDefault) {
                     setMaxAutoRetries(saved.maxAutoRetries);
                     setBackoffSeconds(saved.backoffSeconds);
@@ -272,6 +288,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                           },
                 );
                 setLocalPreferences(saved);
+                router.refresh();
                 if (resetToDefault) {
                     setAccountCapEnabled(saved.accountWideMonthlyCapCents !== null);
                     setAccountCapCents(
@@ -291,6 +308,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
         startCanceling(async () => {
             try {
                 await cancelWorkAgentGoalAction(goalId);
+                router.refresh();
                 toast.success(t('toasts.goalCanceled'));
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : t('toasts.cancelError'));

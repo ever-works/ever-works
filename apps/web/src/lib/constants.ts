@@ -140,6 +140,7 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
+    DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile (alias of settings — `/profile` redirects to `/settings`)

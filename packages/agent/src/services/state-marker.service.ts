@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 
 /**
  * Minimal commit-a-single-file surface used by the state marker writer.
- * The concrete implementation lives in `@ever-works/agent/git` and uses the
- * `git-provider` plugin's local clone+commit+push primitives. We keep the
+ * Concrete implementations are supplied by git-provider plugins using their
+ * local clone+commit+push primitives. We keep the
  * interface narrow here so unit tests can supply trivial fakes.
  */
 export interface MarkerFileWriter {

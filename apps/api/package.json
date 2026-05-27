@@ -16,17 +16,18 @@
         "start:debug": "nest start -b swc --debug --watch",
         "start:prod": "node dist/main",
         "build": "nest build -b swc",
+        "type-check": "tsc -p tsconfig.build.json --noEmit",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
         "test": "jest --maxWorkers=2",
         "test:watch": "jest --watch",
         "test:cov": "jest --coverage",
         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
         "typeorm": "ts-node --project tsconfig.typeorm.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
-        "migration:generate": "npm run typeorm -- migration:generate -d typeorm.config.ts",
-        "migration:run": "npm run typeorm -- migration:run -d typeorm.config.ts",
-        "migration:revert": "npm run typeorm -- migration:revert -d typeorm.config.ts",
-        "migration:show": "npm run typeorm -- migration:show -d typeorm.config.ts",
-        "schema:log": "npm run typeorm -- schema:log -d typeorm.config.ts"
+        "migration:generate": "pnpm typeorm -- migration:generate -d typeorm.config.ts",
+        "migration:run": "pnpm typeorm -- migration:run -d typeorm.config.ts",
+        "migration:revert": "pnpm typeorm -- migration:revert -d typeorm.config.ts",
+        "migration:show": "pnpm typeorm -- migration:show -d typeorm.config.ts",
+        "schema:log": "pnpm typeorm -- schema:log -d typeorm.config.ts"
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",

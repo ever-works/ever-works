@@ -12,18 +12,19 @@
     "scripts": {
         "dev": "next dev --turbopack",
         "build": "next build --webpack",
+        "type-check": "tsc --noEmit",
         "start": "next start",
-        "lint": "npx eslint .",
+        "lint": "eslint .",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
         "translate:messages": "node scripts/translate-messages.mjs",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:unit": "vitest run",
         "test:cov": "vitest run --coverage",
-        "test:e2e": "npx playwright test",
-        "test:e2e:ui": "npx playwright test --ui",
-        "test:e2e:headed": "npx playwright test --headed",
-        "test:e2e:debug": "npx playwright test --debug"
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "test:e2e:headed": "playwright test --headed",
+        "test:e2e:debug": "playwright test --debug"
     },
     "dependencies": {
         "@ai-sdk/openai-compatible": "^2.0.41",

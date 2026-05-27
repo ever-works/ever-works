@@ -22,7 +22,7 @@
 		"write-heading-ids": "docusaurus write-heading-ids",
 		"type-check": "tsc",
 		"typecheck": "tsc",
-		"version": "npx docusaurus --version",
+		"version": "docusaurus --version",
 		"spellcheck": "cspell ."
 	},
 	"dependencies": {
