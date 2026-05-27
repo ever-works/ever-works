@@ -75,7 +75,13 @@ export class UsernameAllocatorService {
 		let candidate = normalized;
 		let suffix = 1;
 
-		while (await this.userRepository.findByUsernameCaseInsensitive(candidate)) {
+		// Check BOTH `users.username` (case-insensitive) AND `users.slug` for
+		// collisions — the slug column is auto-derived from username at
+		// insert time via the User entity's `@BeforeInsert` hook, so a free
+		// username with a colliding slug would still fail the INSERT. The
+		// loop has to skip past either kind of collision to guarantee the
+		// row will actually land.
+		while (await this.collides(candidate)) {
 			suffix += 1;
 			candidate = `${normalized}-${suffix}`;
 			if (suffix > 10_000) {
