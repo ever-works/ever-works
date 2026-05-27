@@ -40,14 +40,16 @@ export class OrganizationRepository {
 
     /**
      * Used by the WorkspaceSwitcher (Phase 8) to list the user's Orgs.
-     * Ordered by `createdAt` ASC to match the
-     * `idx_organizations_tenant_created` composite index — newer Orgs
-     * naturally appear at the top of the popover.
+     * Ordered by `createdAt DESC` so the **most recently created Org
+     * appears at the top** of the popover — matches the spec's intent
+     * ([spec.md §5.5](../../../../docs/specs/features/tenants-and-organizations/spec.md#popover-contents)).
+     * The composite index `idx_organizations_tenant_created` covers
+     * both directions.
      */
     async findByTenantId(tenantId: string): Promise<Organization[]> {
         return this.repository.find({
             where: { tenantId },
-            order: { createdAt: 'ASC' },
+            order: { createdAt: 'DESC' },
         });
     }
 

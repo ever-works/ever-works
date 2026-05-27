@@ -52,12 +52,15 @@ export class Tenant {
 
     /**
      * URL-safe slug. Mirrors `users.slug` for the bare-Tenant view's URL
-     * resolution. Globally unique across the `tenants` table; the
-     * cross-table collision check (vs `users.slug` and
-     * `organizations.slug`) is enforced by `UsernameAllocatorService`
-     * at write time, not at DB level.
+     * resolution. Globally unique across the `tenants` table (enforced
+     * by `idx_tenants_slug_unique` in the migration AND by `unique: true`
+     * here for synchronize-based contexts — the CLI/local SQLite path
+     * and in-memory integration tests build schemas from entity
+     * decorators, not migrations). The cross-table collision check
+     * (vs `users.slug` and `organizations.slug`) is enforced by
+     * `UsernameAllocatorService` at write time.
      */
-    @Column({ type: 'varchar', length: 64 })
+    @Column({ type: 'varchar', length: 64, unique: true })
     slug: string;
 
     /**
