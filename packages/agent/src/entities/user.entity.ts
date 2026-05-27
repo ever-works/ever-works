@@ -259,9 +259,15 @@ export class User {
      * The hook only fires on INSERT — not on UPDATE. Username renames go
      * through a service layer (out of scope here) that explicitly updates
      * both columns.
+     *
+     * Visibility: NOT `private` — a private method gets stripped from
+     * `ClassToObject<User>` (the mapped type doesn't see private members),
+     * which breaks downstream consumers that pass `ClassToObject<User>`
+     * where a `User` is expected (e.g. lazy-loaded relations). Same shape
+     * as the public `asCommitter()` method below.
      */
     @BeforeInsert()
-    private deriveSlugIfMissing(): void {
+    deriveSlugIfMissing(): void {
         if (this.slug) {
             return;
         }
