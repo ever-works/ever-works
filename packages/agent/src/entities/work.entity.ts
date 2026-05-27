@@ -92,6 +92,13 @@ export class Work {
     @Column({ default: false })
     organization: boolean;
 
+    // EW-655 (Tenants & Organizations Phase 3) — Tier A tenant scope.
+    // organizationId already exists from earlier work (below); tenantId
+    // joins it here. Both NULL until first-Org create (Phase 6).
+    // Ordered tenantId-first to match the other 17 Tier A entities.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
     /**
      * EW-641 Phase 2/e row 37c — owning organization id.
      *

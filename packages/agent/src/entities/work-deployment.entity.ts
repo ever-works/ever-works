@@ -86,6 +86,18 @@ export class WorkDeployment {
     @TimestampColumn({ nullable: true })
     completedAt?: Date;
 
+    // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
+    // Both NULL until the owning user creates their first Organization
+    // (Phase 6 lazy backfill). FK + index enforced at DB level by
+    // migration 1779991006000-AddTenantIdAndOrganizationIdToTierA.
+    // No @ManyToOne to avoid the entities import cycle that bit Phase 2 —
+    // see user.entity.ts EW-654 comment.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    organizationId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 
