@@ -16,6 +16,23 @@ import type {
     ImportRowValidation,
 } from './item-import-export.types';
 
+/**
+ * Concurrency cap for the per-row YAML write step.
+ *
+ * **Bounded for two reasons:**
+ *   1. The downstream `DataRepository` writes touch the same on-disk
+ *      git working tree — high concurrency thrashes the fs cache and
+ *      can race on intermediate index updates. 5 is empirically the
+ *      sweet spot between throughput and write-contention noise.
+ *   2. Each write may resolve images / brand logos via inline URL
+ *     validation; uncapped parallelism would fan out hundreds of
+ *     simultaneous network probes per import batch.
+ *
+ * Don't push past ~10 without re-measuring. The whole bulk-write is
+ * still bounded above by `MAX_IMPORT_ROWS_CEILING` (currently 2000)
+ * so even at low concurrency, worst-case wall-time stays in the
+ * "minutes, not hours" bucket.
+ */
 const WRITE_CONCURRENCY = 5;
 
 export interface ExecuteImportInput {

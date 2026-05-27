@@ -45,6 +45,53 @@ export interface WorkDetails {
     categories: string[];
 }
 
+/**
+ * Generates the structured description/keywords/categories triple for
+ * a new Work from a free-text name + prompt, plus a unique slug.
+ *
+ * **Behavioural notes worth flagging:**
+ *
+ *   - **AI-failure fallback is invisible to callers.** When
+ *     {@link AiFacadeService.askJson} throws, this service returns
+ *     hardcoded values (`"Work for {name}"` + `[name.toLowerCase()]`
+ *     + `[]`) under the same return shape as a successful AI run.
+ *     There is no field on `WorkDetails` that distinguishes
+ *     fallback from real output. Consumers that care about
+ *     AI-generated quality (e.g. retry decisions, telemetry on AI
+ *     failure rate) need to either add a discriminator here OR
+ *     watch the error log line `Error extracting details for
+ *     work …` to know how often the fallback fires.
+ *
+ *   - **`generateUniqueSlug` lookup-then-create is NOT atomic.**
+ *     Two concurrent creations for the same user with the same
+ *     base slug can both clear the existence check and both
+ *     proceed to write. Downstream insert must rely on a DB
+ *     UNIQUE constraint on `(userId, slug)` to catch the race;
+ *     this service won't.
+ *
+ *   - **Slug counter has no upper bound.** Unlike
+ *     `OnboardingAccountAdapter.resolveUniqueUsername` (which
+ *     caps at 50 iterations and falls through to a UUID
+ *     suffix), this loops until it finds a free slot. Per-user
+ *     slug collisions are rare in practice, but a user creating
+ *     hundreds of Works under the same generic name would walk
+ *     the counter linearly. Add a ceiling + suffix fallback if
+ *     this ever becomes hot.
+ *
+ *   - **Sanitisation is unconditional.** Both the AI path and
+ *     the fallback path run outputs through {@link sanitizeDescription}
+ *     / {@link sanitizeStringArray}. The inline comment
+ *     ("critical for GitHub API compatibility") is load-bearing —
+ *     removing sanitisation here breaks the downstream
+ *     `gh issue create` / `gh repo create` calls that take this
+ *     description verbatim.
+ *
+ *   - **`temperature: 0` + `complexity: 'simple'`** are deliberate:
+ *     deterministic output maximises cache reuse upstream, and
+ *     'simple' routes to a smaller/cheaper model. Don't bump these
+ *     for "better quality" without measuring the prompt-cache hit
+ *     rate hit.
+ */
 @Injectable()
 export class WorkDetailService {
     private readonly logger = new Logger(WorkDetailService.name);

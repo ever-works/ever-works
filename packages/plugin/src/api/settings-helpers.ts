@@ -131,8 +131,30 @@ export function validateRequiredSettings(
 }
 
 /**
- * Sanitize settings for save: undefined → null, empty string → null at work scope.
- * Strips masked placeholder values (containing '••••') so they are never sent to the API.
+ * Sanitise a settings object before it's POSTed to the save endpoint.
+ *
+ * Three independent transformations:
+ *
+ * 1. **Drop masked-secret placeholders.** Fields the UI rendered with a
+ *    `••••` mask (U+2022 BULLET) come back from a form submit as that
+ *    same mask string. Sending that to the API would replace the real
+ *    secret with `••••••••`, destroying the credential. The guard
+ *    matches `value.includes('••••')` rather than an exact mask string
+ *    so a partial mask (e.g. user typed extra chars and then hit save)
+ *    still gets dropped. **Trade-off**: any user-typed string that
+ *    contains four-in-a-row `•` bullets is silently discarded. Don't
+ *    use four-bullet sequences as legitimate values in any settings
+ *    field, and don't change the UI mask character without updating
+ *    this guard.
+ * 2. **`undefined` → `null`**, always. JSON.stringify drops `undefined`
+ *    properties; normalising to `null` keeps the field present in the
+ *    request body so the server can distinguish "explicitly cleared"
+ *    from "never sent".
+ * 3. **`''` → `null` only at work scope.** Work-scope (per-work
+ *    override) treats an empty string as "remove this override and
+ *    inherit", matching the work-settings inheritance contract. User
+ *    scope keeps empty strings as `''` so a user can intentionally
+ *    save a blank value.
  */
 export function sanitizeSettingsForSave(
 	settings: Record<string, unknown>,

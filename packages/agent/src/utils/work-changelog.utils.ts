@@ -25,6 +25,24 @@ export function buildWorkChangelog(
     };
 }
 
+/**
+ * Build a human-readable summary line like "3 items added, 1 item updated".
+ *
+ * **Two behavioural caveats worth flagging:**
+ *
+ *   - **Mixed-entity lists are mis-labeled.** The label is derived
+ *     from `entries[0].entityType` and applied to every count. A
+ *     changelog containing both items and categories will say "5
+ *     items added" even if some of the entries are categories.
+ *     If we ever batch multi-entity changelogs, switch to
+ *     per-entity grouping.
+ *
+ *   - **Plural form is naive `+ 's'`.** Works for `item` → `items`,
+ *     `tag` → `tags`, `collection` → `collections`, `comparison` →
+ *     `comparisons` — but produces `categorys` for `category`.
+ *     If this ever ships in user-visible UI, fix with a per-label
+ *     plural table (or `Intl.PluralRules` + a translation key).
+ */
 function buildDefaultSummary(
     entries: WorkHistoryChangeEntry[],
     addedCount: number,

@@ -29,3 +29,13 @@ Notes:
 | `403 Forbidden` / `Managed Agents not enabled`                       | Managed Agents is in beta and requires explicit account access plus the `managed-agents-2026-04-01` beta header | Confirm the account is enrolled in the Managed Agents beta at console.anthropic.com; the plugin sends the required beta header automatically                                  |
 | Run pauses with `requires custom tool result` or `tool confirmation` | Session is using a tool flow that needs orchestration outside this plugin                                       | Disable the offending tool in the agent profile, or switch to `claude-code` / `agent-pipeline` which support the full tool-loop                                               |
 | Pipeline cannot resume after host restart                            | Checkpoint not persisted (only the standard pipeline persists checkpoints today)                                | Cancel the stuck run and re-trigger generation; for production reliability prefer `standard-pipeline`                                                                         |
+
+## Local development
+
+This plugin ships built-in with the Ever Works platform. To work on it locally from the monorepo root:
+
+```bash
+pnpm install
+pnpm --filter @ever-works/claude-managed-agent-plugin build
+pnpm --filter @ever-works/claude-managed-agent-plugin test
+```

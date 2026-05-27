@@ -25,7 +25,7 @@ The **Ever Works Platform** is the backend infrastructure for building and manag
 
 ### Tech Stack
 
-- **Runtime:** Node.js 20+
+- **Runtime:** Node.js 22+
 - **Framework:** NestJS 11 (API), Next.js 16 (Web Dashboard)
 - **Language:** TypeScript 5.9 (strict mode)
 - **ORM:** TypeORM 0.3 (supports SQLite, PostgreSQL, MySQL)
