@@ -7,11 +7,10 @@ import type { ClaimPreview, ClaimAcceptResult } from '@/lib/api/claim';
 
 interface ClaimFormProps {
     token: string;
-    locale: string;
     preview: ClaimPreview;
 }
 
-export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
+export function ClaimForm({ token, preview }: ClaimFormProps) {
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<ClaimAcceptResult | null>(null);
@@ -49,7 +48,7 @@ export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
                 ) : (
                     <p>
                         You now have access to{' '}
-                        <a href={`/${locale}/works/${result.workId}`} className="underline">
+                        <a href={`/works/${result.workId}`} className="underline">
                             {preview.workName}
                         </a>
                         .
@@ -57,7 +56,7 @@ export function ClaimForm({ token, locale, preview }: ClaimFormProps) {
                 )}
                 {result.transferStatus !== 'pending_recipient_acceptance' && result.workId ? (
                     <a
-                        href={`/${locale}/works/${result.workId}`}
+                        href={`/works/${result.workId}`}
                         className="inline-block underline"
                     >
                         Go to {preview.workName} →

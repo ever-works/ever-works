@@ -1,9 +1,8 @@
-// EW-641 follow-up — use the locale-aware `Link` from `@/i18n/navigation`
-// so clicks on KB tree rows route through the next-intl middleware and
-// keep the active locale prefix (`/en/...`, `/fr/...`, etc.). Plain
-// `next/link` produces hrefs without the locale prefix, which makes the
-// catch-all `[...path]` route 404 in production whenever the user is on
-// a non-default locale.
+// Use the locale-aware `Link` from `@/i18n/navigation` so clicks on KB
+// tree rows route through the next-intl middleware. With
+// `localePrefix: 'never'` the URL no longer carries a locale prefix,
+// but the helper still wires through next-intl's link prefetching /
+// locale-cookie integration.
 import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
