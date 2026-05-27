@@ -115,6 +115,12 @@ export class Work {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
+    // EW-655 (Tenants & Organizations Phase 3) — Tier A tenant scope.
+    // organizationId already exists from earlier work; tenantId joins
+    // it here. Both NULL until first-Org create (Phase 6).
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
     @Column()
     description: string;
 
