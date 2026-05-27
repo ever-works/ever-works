@@ -14,6 +14,7 @@ jest.mock(
     '@ever-works/agent/entities',
     () => ({
         User: class {},
+        WorkAgentPreference: class {},
     }),
     { virtual: true },
 );
@@ -57,6 +58,13 @@ jest.mock(
 jest.mock(
     '@ever-works/agent/work-agent',
     () => ({
+        DEFAULT_AUTO_GENERATE_CADENCE_MINUTES: 60,
+        parseAutoGenerateCadenceMinutes: (cadence: string | null | undefined) => {
+            const match = /^\*\/(\d+)\s+\*\s+\*\s+\*\s+\*$/.exec(cadence?.trim() ?? '');
+            if (!match) return null;
+            const minutes = Number(match[1]);
+            return Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 ? minutes : null;
+        },
         WorkAgentService: class WorkAgentService {},
     }),
     { virtual: true },
@@ -86,6 +94,7 @@ describe('WorkProposalsApiService', () => {
             update: jest.fn().mockResolvedValue(undefined),
         };
         const userOrmRepo = { find: jest.fn().mockResolvedValue([]) };
+        const workAgentPreferences = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
         const workAgent = {
             createGoal: jest.fn().mockResolvedValue({
@@ -121,6 +130,7 @@ describe('WorkProposalsApiService', () => {
             limits as never,
             users as never,
             userOrmRepo as never,
+            workAgentPreferences as never,
             config as never,
             workAgent as never,
             taskLock as never,
@@ -132,6 +142,7 @@ describe('WorkProposalsApiService', () => {
             limits,
             users,
             userOrmRepo,
+            workAgentPreferences,
             config,
             workAgent,
             taskLock,
@@ -217,6 +228,52 @@ describe('WorkProposalsApiService', () => {
         limits.assertCanRun.mockRejectedValue(new StubRateLimitedError('maxRunsPerDay', 3, 3));
         const result = await svc.refresh('u1');
         expect(result.status).toBe('rate-limited');
+    });
+
+    it('skips scheduled users whose auto-generate cadence is not due', async () => {
+        const { svc, userOrmRepo, research } = makeDeps();
+        const researchedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        userOrmRepo.find.mockResolvedValue([
+            {
+                id: 'u1',
+                updatedAt: new Date(researchedAt),
+                inferredInterests: { researchedAt },
+            },
+        ]);
+
+        const result = await svc.runScheduledBatch();
+
+        expect(result).toMatchObject({ candidates: 1, due: 0, queued: 0, skipped: 1 });
+        expect(research.research).not.toHaveBeenCalled();
+    });
+
+    it('queues scheduled users when their auto-generate cadence has elapsed', async () => {
+        const { svc, userOrmRepo, workAgentPreferences, research } = makeDeps();
+        const researchedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        userOrmRepo.find.mockResolvedValue([
+            {
+                id: 'u1',
+                updatedAt: new Date(researchedAt),
+                inferredInterests: { researchedAt },
+            },
+        ]);
+        workAgentPreferences.find.mockResolvedValue([
+            {
+                userId: 'u1',
+                dailySuggestionsEnabled: true,
+                autoGenerateCadence: '*/15 * * * *',
+            },
+        ]);
+
+        const result = await svc.runScheduledBatch();
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(result).toMatchObject({ candidates: 1, due: 1, queued: 1, skipped: 0 });
+        expect(research.research).toHaveBeenCalledWith('u1', {
+            timeoutMs: 1_800_000,
+            maxSteps: 14,
+        });
     });
 
     it('skips proposal generation when research did not complete', async () => {

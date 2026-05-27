@@ -497,10 +497,10 @@
             },
             "actions": {
                 "accept": "Build",
+                "viewWork": "View Work",
                 "dismiss": "דחה",
                 "dismissAria": "דחה רעיון זה",
-                "refresh": "Suggest more",
-                "viewWork": "View Work"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "מכין רעיונות מהפרופיל שלך...",
@@ -525,6 +525,354 @@
                 "permanent-invalid-input": "Invalid input",
                 "permanent-unknown": "Build failed"
             }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "quickAdd": {
+                "label": "התחל משימה חדשה",
+                "submitTitle": "צור משימה",
+                "minLength": "התיאור חייב להיות לפחות 10 תווים.",
+                "created": "משימה נוצרה",
+                "error": "לא ניתן ליצור משימה. אנא נסה שוב."
+            },
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "פתח את היוצר המאוחד"
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "סוכנים",
+            "subtitle": "החברים המלאכותיים שלך. כל אחד נושא נשמה (מי הוא/היא), הוראות, ותקציב - ופועל על משימות, עבודות, או כל הדייר שלך.",
+            "newAgent": "+ סוכן חדש",
+            "empty": {
+                "title": "אין סוכנים עדיין.",
+                "subtitle": "צור את הסוכן הראשון שלך כדי להקצות עבודות חוזרות. סוכנים בהיקף הדייר פועלים על כל חשבונך; סוכנים בהיקף משימה או עבודה נשארים ממוקדים במטרה אחת."
+            },
+            "card": {
+                "scopeTenant": "דייר",
+                "scopeMission": "משימה",
+                "scopeWork": "עבודה",
+                "scopeIdea": "רעיון",
+                "statusDraft": "טיוטה",
+                "statusActive": "פעיל",
+                "statusPaused": "מושהה",
+                "statusRunning": "פועל",
+                "statusError": "שגיאה",
+                "statusArchived": "נשמר בארכיון",
+                "noTitle": "(ללא כותרת)",
+                "noCadence": "אין פעימת לב",
+                "cadencePrefix": "פעימת לב:"
+            },
+            "tabs": {
+                "dashboard": "לוח בקרה",
+                "activity": "פעילות",
+                "instructions": "הוראות",
+                "skills": "מיומנויות",
+                "budgets": "תקציבים",
+                "settings": "הגדרות"
+            },
+            "newDialog": {
+                "title": "סוכן חדש",
+                "step1Title": "בחר היקף",
+                "step2Title": "תן שם לסוכן שלך",
+                "nameLabel": "שם",
+                "namePlaceholder": "למשל: CEO, בודק, כותב תוכן",
+                "scopeTenantDesc": "פועל על כל הדייר שלך",
+                "scopeMissionDesc": "נעול למשימה אחת",
+                "scopeWorkDesc": "נעול לעבודה אחת",
+                "scopeIdeaDesc": "נעול לרעיון אחד",
+                "cancel": "בטל",
+                "back": "חזור",
+                "next": "הבא",
+                "create": "צור סוכן"
+            }
+        },
+        "tasksPage": {
+            "title": "משימות",
+            "subtitle": "פריטי עבודה ניתנים למעקש שהוקצו לאנשים או לסוכנים.",
+            "empty": {
+                "title": "אין משימות עדיין.",
+                "subtitle": "משימות ייכנסו בשלב מאוחר יותר של השקת סוכנים/מיומנויות/משימות. הדף שמור כדי שנתיב הניווט בסרגל הצדדי יוכל להתפתר."
+            },
+            "list": {
+                "newTask": "+ משימה חדשה",
+                "kanban": "קנבן",
+                "list": "רשימה",
+                "filter": {
+                    "status": "מצב",
+                    "priority": "עדיפות",
+                    "label": "תווית",
+                    "all": "הכל"
+                }
+            },
+            "newDialog": {
+                "title": "צור משימה חדשה",
+                "name": "כותרת",
+                "namePlaceholder": "הוסף כותרת למשימה",
+                "description": "תיאור",
+                "descriptionPlaceholder": "הוסף הקשר (אופציונלי)",
+                "priority": "עדיפות",
+                "labels": "תוויות",
+                "labelsPlaceholder": "מופרדות בפסיקים",
+                "cancel": "בטל",
+                "create": "צור"
+            },
+            "detail": {
+                "moveTo": "העבר אל",
+                "noTransitions": "אין מעברים זמינים.",
+                "conversation": "שיחה",
+                "noMessages": "אין מסרים עדיין.",
+                "post": "פרסם",
+                "draftPlaceholder": "כתוב מסר. השתמש ב@agent-slug כדי להזכיר סוכן.",
+                "attachments": "קבצים מצורפים",
+                "fileCount": "{count, plural, one {קובץ 1} other {# קבצים}}",
+                "dropFiles": "גרור ושחרר קובץ כאן או",
+                "browse": "עיין",
+                "uploading": "מעלה...",
+                "detach": "נתק",
+                "labels": "תוויות",
+                "edited": "נערך"
+            },
+            "recurring": {
+                "section": "תדירות חוזרת",
+                "promoteToRecurring": "שדרג לתדירות חוזרת",
+                "demote": "שדרג לחד-פעמי",
+                "daily": "יומי",
+                "weekly": "שבועי",
+                "monthly": "חודשי",
+                "custom": "RRULE מותאם אישית",
+                "timeOfDay": "שעת היום",
+                "dayOfWeek": "יום בשבוע",
+                "dayOfMonth": "יום בחודש",
+                "timezone": "אזור זמן",
+                "save": "שמור לוח זמנים"
+            },
+            "status": {
+                "backlog": "תור המתנה",
+                "todo": "משימות לביצוע",
+                "in_progress": "בתהליך",
+                "in_review": "בביקורת",
+                "blocked": "חסום",
+                "done": "הושלם",
+                "cancelled": "בוטל"
+            }
+        },
+        "skillsPage": {
+            "title": "מיומנויות",
+            "subtitle": "הוראות ניתנות לשימוש חוזר, בגרסאות, שסוכנים יכולים להפעיל בהפעלה כאשר הם רלוונטיים.",
+            "empty": {
+                "title": "אין מיומנויות עדיין.",
+                "subtitle": "מיומנויות ייכנסו בשלב מאוחר יותר של השקת סוכנים/מיומנויות/משימות. הדף שמור כדי שנתיב הניווט בסרגל הצדדי יוכל להתפתר."
+            },
+            "list": {
+                "newSkill": "+ מיומנות חדשה",
+                "filter": {
+                    "scope": "היקף",
+                    "all": "הכל"
+                }
+            },
+            "detail": {
+                "instructions": "הוראות",
+                "bindings": "קישורים",
+                "bindingHelper": "קשר מיומנות זו לסוכן, משימה, רעיון או עבודה. עדיפות 1 = עדיפות גבוהה ביותר.",
+                "addBinding": "+ הוסף קישור",
+                "removeBinding": "הסר",
+                "targetType": "קשר ל",
+                "priority": "עדיפות",
+                "agent": "סוכן",
+                "mission": "משימה",
+                "idea": "רעיון",
+                "work": "עבודה",
+                "tenant": "דייר"
+            }
+        },
+        "templatesPage": {
+            "title": "תבניות",
+            "subtitle": "נקודות התחלה מוכנות מראש עבור סוכנים, מיומנויות ומשימות.",
+            "empty": "אין תבניות זמינות עדיין.",
+            "useTemplate": "השתמש בתבנית",
+            "browse": "עיין בתבניות",
+            "entity": {
+                "agent": "סוכן",
+                "skill": "מיומנות",
+                "task": "משימה"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "submitTitle": "הוסף רעיון",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
         },
         "discover": {
             "title": "גלה",
@@ -836,11 +1184,11 @@
                 },
                 "actions": {
                     "saveSettings": "שמור הגדרות",
-                    "queueGoal": "הוסף לתור יעד",
-                    "stop": "עצור",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "preparePlan": "Prepare plan"
+                    "queueGoal": "הוסף לתור יעד",
+                    "preparePlan": "Prepare plan",
+                    "stop": "עצור"
                 },
                 "queue": {
                     "placeholder": "צור עבודה עם 50 הסטארטאפים המובילים בתחום הבריאות"
@@ -1122,8 +1470,8 @@
             "totalWorks": "סה\"ס עבודות",
             "totalItems": "סה\"ס פריטים",
             "activeWebsites": "אתרים פעילים",
-            "fromLastMonth": "מהחודש שעבר",
-            "monthSpend": "Month Spend"
+            "monthSpend": "Month Spend",
+            "fromLastMonth": "מהחודש שעבר"
         },
         "adminUsage": {
             "title": "שימוש בפלטפורמה",
@@ -2717,6 +3065,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "הודעת מסמך בירושה",
+                    "bannerTitle": "בירושה מהארגון",
+                    "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
+                    "overrideCta": "עקוף מקומית",
+                    "overrideCtaBusy": "מבצע פיצול…",
+                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
+                    "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2883,15 +3240,6 @@
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
                 },
-                "inherited": {
-                    "bannerLabel": "הודעת מסמך בירושה",
-                    "bannerTitle": "בירושה מהארגון",
-                    "bannerDescription": "מסמך זה בבעלות הארגון שלך והוא לקריאה בלבד כאן. עקוף מקומית כדי ליצור עותק ניתן לעריכה ב-Work זה.",
-                    "overrideCta": "עקוף מקומית",
-                    "overrideCtaPendingTooltip": "יהיה זמין לאחר שפעולת העקיפה תושק בשורה 38d",
-                    "overrideCtaBusy": "מבצע פיצול…",
-                    "overrideErrorFallback": "לא היה ניתן לפצל את המסמך הירוש. נסו שוב או רעננו את הדף."
-                },
                 "addDoc": {
                     "button": "+ הוסף",
                     "title": "צור מסמך חדש",
@@ -2919,6 +3267,59 @@
                     "errorFallback": "המחיקה נכשלה. נסה שוב.",
                     "errorBusy": "מוחק…",
                     "errorPartial": "נמחקו {ok}, נכשלו {failed}."
+                }
+            }
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "chipDescriptions": {
+                "mission": "מטרה רציפה שהסוכן ממשיך לעבוד עליה - מייצר רעיונות על פי לוח זמנים או פעם אחת.",
+                "idea": "ברירת מחדל חד-פעמית שהסוכן הופך לתוכנית עבודה שניתן לבנות.",
+                "website": "אתר רב-עמודים לעסק, שירות או מותג - תוכן מופק + קוד.",
+                "landing-page": "דף אחד ממוקד - רשימות המתנה, השקות מוצרים, הרשמות להרצאות, לכידת לידים.",
+                "blog": "בלוג עם קטגוריות, RSS, הדגשת קוד, ותוכן מוכן ל-SEO.",
+                "directory": "אתר קטלוג מסונן עם חיפוש, מסננים ונתונים מובנים של פריטים.",
+                "awesome-repo": "מאגר awesome-list - אינדקס markdown, קישורים מסוננים, ומטא-נתונים רעננים."
+            },
+            "submit": "Create",
+            "submitTitle": "צור",
+            "or": "or",
+            "hints": {
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
                 }
             }
         },
@@ -3386,16 +3787,20 @@
             "menu": "תפריט",
             "aiChat": "צ'אט AI",
             "newWork": "עבודה חדשה",
+            "new": "חדש",
             "activityIndicator": "מייצר עבודה",
             "navigation": {
                 "dashboard": "לוח מחוונים",
                 "activity": "פעילות",
-                "works": "עבודות",
-                "plugins": "תוספים",
-                "templates": "תבניות",
-                "settings": "הגדרות",
                 "missions": "Missions",
-                "ideas": "Ideas"
+                "ideas": "Ideas",
+                "works": "עבודות",
+                "tasks": "משימות",
+                "agents": "סוכנים",
+                "plugins": "תוספים",
+                "skills": "מיומנויות",
+                "templates": "תבניות",
+                "settings": "הגדרות"
             },
             "tooltips": {
                 "expandSidebar": "הרחב צד",
@@ -3408,8 +3813,7 @@
                 "keyboardShortcuts": "קיצורי מקלדת"
             },
             "signOut": "התנתק",
-            "signingOut": "מתנתק...",
-            "new": "חדש"
+            "signingOut": "מתנתק..."
         },
         "dangerZone": {
             "title": "אזור סכנה",
@@ -3648,6 +4052,11 @@
         "templates": {
             "title": "תבניות",
             "subtitle": "עיין בתבניות אתרים מובנות, נהל את הקטלוג המותאם שלך, וקבע איזו תבנית יתחילו ממנה עבודות חדשות.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "הוסף תבנית מותאמת",
                 "customizeTemplate": "יצירה באמצעות בינה מלאכותית",
@@ -3685,6 +4094,7 @@
                 "defaultSelected": "ברירת מחדל נבחרה",
                 "makeDefault": "הפוך לברירת מחדל",
                 "fork": "פיצול",
+                "useTemplate": "Use this Template",
                 "edit": "עריכה",
                 "archive": "ארכיון",
                 "customizeAgain": "התאמה אישית שוב",
@@ -3705,7 +4115,6 @@
                     "succeeded": "התאמה אישית הושלמה",
                     "failed": "הריצה האחרונה נכשלה"
                 },
-                "useTemplate": "Use this Template",
                 "syncBase": "Sync from base"
             },
             "dialog": {
@@ -3847,11 +4256,6 @@
                     "browsePlugins": "עיון בקטלוג תוספים",
                     "noRuns": "עדיין אין ריצות התאמה אישית עבור תבנית זו."
                 }
-            },
-            "kindSwitcher": {
-                "mission": "Mission Templates",
-                "work": "Work Templates",
-                "website": "Website Templates"
             },
             "syncDialog": {
                 "title": "Sync from base template",

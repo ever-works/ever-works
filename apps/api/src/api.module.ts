@@ -39,6 +39,8 @@ import { TasksModule } from './tasks/tasks.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
+import { ScopeOwnershipGuard } from './scope/scope-ownership.guard';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -135,11 +137,22 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // until Phase 7's slug-resolver middleware populates the
         // request scope.
         ScopeModule,
+        // EW-658 (Tenants & Organizations Phase 6) — Organization
+        // CRUD + lazy Tenant bootstrap + upgrade-from-account flow.
+        OrganizationsModule,
     ],
     providers: [
         {
             provide: APP_GUARD,
             useClass: AuthSessionGuard,
+        },
+        // EW-659 (Phase 7) — runs AFTER AuthSessionGuard (guard order
+        // matches providers-array order) so request.user is set. Rejects
+        // a scope mismatch with 403 to prevent cross-tenant access via
+        // slug.
+        {
+            provide: APP_GUARD,
+            useClass: ScopeOwnershipGuard,
         },
         {
             provide: APP_GUARD,

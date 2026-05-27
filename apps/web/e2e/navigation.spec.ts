@@ -58,15 +58,29 @@ test.describe('Public pages', () => {
 });
 
 test.describe('Locale routing', () => {
-    test('should redirect root to default locale', async ({ page }) => {
+    test('root URL stays unprefixed', async ({ page }) => {
+        // PR #1052 switched `localePrefix` from `'always'` to `'never'`.
+        // `/` no longer redirects to `/en/` — it renders the canonical
+        // unprefixed home directly. Assert that the URL does NOT contain
+        // a `/<locale>/` segment anywhere; an unprefixed URL like
+        // `http://host:port/` (or `/?<query>`) passes.
+        //
+        // Greptile P1: an earlier draft used a negative lookahead
+        // (`/\/(?!en|...)/ `) which is vacuously satisfied by the `/`
+        // inside `http://` — every URL passed. The negated `toHaveURL`
+        // shape below tests the substring directly, so it can actually
+        // fail when a locale prefix sneaks back in.
         await page.goto('/');
-
-        // Should redirect to /en/ or another locale
-        await page.waitForURL(/\/[a-z]{2}\//, { timeout: 10_000 });
+        await expect(page).not.toHaveURL(
+            /\/(?:en|fr|de|es|pt|nl|it|ja|zh|ar|he|ru|tr|sv|pl|uk|vi|id|hi|fa|bg|fi|no)(?:\/|$|\?|#)/,
+        );
     });
 
-    test('should load pages with explicit locale prefix', async ({ page }) => {
+    test('legacy /en/<path> URLs redirect to the unprefixed equivalent', async ({ page }) => {
+        // Old `/en/login` bookmarks should 307-redirect to `/login` and
+        // seed the NEXT_LOCALE cookie (proxy.ts handles this).
         await page.goto('/en/login');
-        await expect(page).toHaveURL(/\/en\/login/);
+        await expect(page).toHaveURL(/\/login/);
+        await expect(page).not.toHaveURL(/\/en\/login/);
     });
 });

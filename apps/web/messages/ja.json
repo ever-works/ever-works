@@ -490,6 +490,394 @@
                 "description": "{provider} アカウントを接続できませんでした。もう一度お試しください。"
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideas",
+                "titleWithName": "Ideas"
+            },
+            "actions": {
+                "accept": "Build",
+                "viewWork": "View Work",
+                "dismiss": "Dismiss",
+                "dismissAria": "Dismiss this idea",
+                "refresh": "Suggest more"
+            },
+            "researching": {
+                "title": "Drafting ideas from your profile…",
+                "subtitle": "This usually takes under a minute."
+            },
+            "empty": {
+                "title": "No ideas right now.",
+                "subtitle": "New suggestions will appear here when they are ready."
+            },
+            "errors": {
+                "rateLimited": "Daily limit reached. Try again tomorrow.",
+                "generic": "Couldn't refresh ideas. Please try again."
+            },
+            "plugins": {
+                "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
+            }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "quickAdd": {
+                "label": "新しいミッションを開始",
+                "submitTitle": "ミッションを作成",
+                "minLength": "説明は少なくとも10文字必要です。",
+                "created": "ミッションが作成されました",
+                "error": "ミッションを作成できませんでした。再試行してください。"
+            },
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "統合作成ツールを開く"
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "エージェント",
+            "subtitle": "あなたのAIチームメンバー。各々は魂（彼らの存在）、指示、予算を持ち、ミッション、作業、またはあなたの全テナントで行動します。",
+            "newAgent": "+ 新しいエージェント",
+            "empty": {
+                "title": "まだエージェントがありません。",
+                "subtitle": "定期的な作業を委譲するために最初のエージェントを作成してください。テナントスコープのエージェントはアカウ全体で動作し、ミッションまたは作業スコープのものは単一の対象に集中します。"
+            },
+            "card": {
+                "scopeTenant": "テナント",
+                "scopeMission": "ミッション",
+                "scopeWork": "作業",
+                "scopeIdea": "アイデア",
+                "statusDraft": "ドラフト",
+                "statusActive": "アクティブ",
+                "statusPaused": "一時停止",
+                "statusRunning": "実行中",
+                "statusError": "エラー",
+                "statusArchived": "アーカイブ済み",
+                "noTitle": "(タイトルなし)",
+                "noCadence": "ハートビートなし",
+                "cadencePrefix": "ハートビット:"
+            },
+            "tabs": {
+                "dashboard": "ダッシュボード",
+                "activity": "アクティビティ",
+                "instructions": "指示",
+                "skills": "スキル",
+                "budgets": "予算",
+                "settings": "設定"
+            },
+            "newDialog": {
+                "title": "新しいエージェント",
+                "step1Title": "スコープを選択",
+                "step2Title": "エージェントに名前を付ける",
+                "nameLabel": "名前",
+                "namePlaceholder": "例: CEO、レビューア、コンテンツドラフター",
+                "scopeTenantDesc": "あなたの全テナントで動作",
+                "scopeMissionDesc": "1つのミッションにロック",
+                "scopeWorkDesc": "1つの作業にロック",
+                "scopeIdeaDesc": "1つのアイデアにロック",
+                "cancel": "キャンセル",
+                "back": "戻る",
+                "next": "次へ",
+                "create": "エージェントを作成"
+            }
+        },
+        "tasksPage": {
+            "title": "タスク",
+            "subtitle": "人またはエージェントに割り当てられた追跡可能な作業項目。",
+            "empty": {
+                "title": "まだタスクがありません。",
+                "subtitle": "タスクはエージェント/スキル/タスクロールアウトの後のフェーズで提供されます。サイドバーのナビゲーションルートが解決されるように、ページは予約されています。"
+            },
+            "list": {
+                "newTask": "+ 新しいタスク",
+                "kanban": "カンバン",
+                "list": "リスト",
+                "filter": {
+                    "status": "ステータス",
+                    "priority": "優先度",
+                    "label": "ラベル",
+                    "all": "すべて"
+                }
+            },
+            "newDialog": {
+                "title": "新しいタスクを作成",
+                "name": "タイトル",
+                "namePlaceholder": "タスクタイトルを追加",
+                "description": "説明",
+                "descriptionPlaceholder": "コンテキストを追加（任意）",
+                "priority": "優先度",
+                "labels": "ラベル",
+                "labelsPlaceholder": "コンマ区切り",
+                "cancel": "キャンセル",
+                "create": "作成"
+            },
+            "detail": {
+                "moveTo": "移動先",
+                "noTransitions": "遷移はありません。",
+                "conversation": "会話",
+                "noMessages": "まだメッセージがありません。",
+                "post": "投稿",
+                "draftPlaceholder": "メッセージを書いてください。エージェントに通知するには@agent-slugを使用してください。",
+                "attachments": "添付ファイル",
+                "fileCount": "{count, plural, one {1ファイル} other {#ファイル}}",
+                "dropFiles": "ファイルをここにドラッグ＆ドロップするか",
+                "browse": "参照",
+                "uploading": "アップロード中…",
+                "detach": "取り外す",
+                "labels": "ラベル",
+                "edited": "編集済み"
+            },
+            "recurring": {
+                "section": "定期的なスケジュール",
+                "promoteToRecurring": "繰り返しに昇格",
+                "demote": "一度きりに降格",
+                "daily": "毎日",
+                "weekly": "毎週",
+                "monthly": "毎月",
+                "custom": "カスタムRRULE",
+                "timeOfDay": "時刻",
+                "dayOfWeek": "曜日",
+                "dayOfMonth": "日",
+                "timezone": "タイムゾーン",
+                "save": "スケジュールを保存"
+            },
+            "status": {
+                "backlog": "バックログ",
+                "todo": "未着手",
+                "in_progress": "進行中",
+                "in_review": "レビュー中",
+                "blocked": "ブロック中",
+                "done": "完了",
+                "cancelled": "キャンセル済み"
+            }
+        },
+        "skillsPage": {
+            "title": "スキル",
+            "subtitle": "エージェントが関連する場合に実行に取り込める再利用可能なバージョン管理された指示。",
+            "empty": {
+                "title": "まだスキルがありません。",
+                "subtitle": "スキルはエージェント/スキル/タスクロールアウトの後のフェーズで提供されます。サイドバーのナビゲーションルートが解決されるように、ページは予約されています。"
+            },
+            "list": {
+                "newSkill": "+ 新しいスキル",
+                "filter": {
+                    "scope": "スコープ",
+                    "all": "すべて"
+                }
+            },
+            "detail": {
+                "instructions": "指示",
+                "bindings": "バインド",
+                "bindingHelper": "このスキルをエージェント、ミッション、アイデア、または作業にバインドします。優先度1 = 最高の優先度。",
+                "addBinding": "+ バインドを追加",
+                "removeBinding": "削除",
+                "targetType": "バインド先",
+                "priority": "優先度",
+                "agent": "エージェント",
+                "mission": "ミッション",
+                "idea": "アイデア",
+                "work": "作業",
+                "tenant": "テナント"
+            }
+        },
+        "templatesPage": {
+            "title": "テンプレート",
+            "subtitle": "エージェント、スキル、タスクのための事前構築された開始点。",
+            "empty": "まだテンプレートが利用できません。",
+            "useTemplate": "テンプレートを使用",
+            "browse": "テンプレートを閲覧",
+            "entity": {
+                "agent": "エージェント",
+                "skill": "スキル",
+                "task": "タスク"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "submitTitle": "アイデアを追加",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
+        },
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
+        },
         "header": {
             "welcome": "おかえりなさい、{username}！",
             "subtitle": "AI 駆動のワークを管理し、パフォーマンスを追跡",
@@ -704,9 +1092,9 @@
                 "apiKeys": "API キー",
                 "data": "データ",
                 "githubApp": "GitHub App",
+                "workAgent": "Work Agent",
                 "gitProviders": "Git プロバイダー",
-                "dangerZone": "危険ゾーン",
-                "workAgent": "Work Agent"
+                "dangerZone": "危険ゾーン"
             },
             "githubApp": {
                 "title": "GitHub App インストール",
@@ -731,6 +1119,101 @@
                 "branchUnknown": "デフォルトブランチを取得できません",
                 "private": "プライベート",
                 "public": "公開"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
+                    },
+                    "queue": {
+                        "title": "Queue a goal",
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
+                    },
+                    "liveRun": {
+                        "title": "Live run",
+                        "description": "Current state and recent agent activity."
+                    },
+                    "recentGoals": {
+                        "title": "Recent goals",
+                        "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
+                    }
+                },
+                "fields": {
+                    "enabled": "Enable Work agent",
+                    "autoApproveLowImpact": "Auto-approve low-impact changes",
+                    "dailySuggestions": "Daily suggestions",
+                    "dryRunByDefault": "Dry run by default",
+                    "maxWorksPerRun": "Max Works per run",
+                    "maxItemsPerWork": "Max items per Work",
+                    "maxBudgetPerRun": "Max budget per run",
+                    "approvalThreshold": "Approval threshold",
+                    "confirmBeforeCreate": "Confirm before creating Works",
+                    "confirmBeforeDelete": "Confirm before deleting items",
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
+                },
+                "actions": {
+                    "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
+                    "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
+                },
+                "metrics": {
+                    "works": "Works",
+                    "items": "Items"
+                },
+                "labels": {
+                    "dryRun": "Dry run",
+                    "liveRun": "Live run"
+                },
+                "empty": {
+                    "noActiveRun": "No active Work agent run.",
+                    "noGoals": "No Work agent goals yet.",
+                    "waitingForUpdate": "Waiting for the first run update."
+                },
+                "toasts": {
+                    "settingsSaved": "Work agent settings saved",
+                    "settingsError": "Failed to save settings",
+                    "goalQueued": "Work agent plan prepared",
+                    "goalError": "Failed to queue goal",
+                    "goalCanceled": "Work agent goal canceled",
+                    "cancelError": "Failed to cancel goal"
+                }
             },
             "data": {
                 "exportTitle": "データをエクスポート",
@@ -839,6 +1322,11 @@
             "profile": {
                 "title": "プロフィール設定",
                 "subtitle": "プロフィール情報とアバターを更新",
+                "budgetAlerts": {
+                    "title": "Budget alert emails",
+                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
+                    "toggleLabel": "Email me budget alerts"
+                },
                 "fields": {
                     "name": "名前",
                     "username": "ユーザー名",
@@ -870,11 +1358,6 @@
                     "description": "git コミットで使用する名前とメールを上書きします。アカウント名 ({defaultName}) とメール ({defaultEmail}) を使用する場合は空にしてください。",
                     "nameLabel": "コミッター名",
                     "emailLabel": "コミッター メール"
-                },
-                "budgetAlerts": {
-                    "title": "Budget alert emails",
-                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
-                    "toggleLabel": "Email me budget alerts"
                 }
             },
             "security": {
@@ -979,101 +1462,6 @@
                     "revokeError": "API キーの取り消しに失敗しました",
                     "copyError": "クリップボードへのコピーに失敗しました"
                 }
-            },
-            "workAgent": {
-                "sections": {
-                    "agent": {
-                        "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
-                    },
-                    "guardrails": {
-                        "title": "Guardrails",
-                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
-                    },
-                    "queue": {
-                        "title": "Queue a goal",
-                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
-                    },
-                    "liveRun": {
-                        "title": "Live run",
-                        "description": "Current state and recent agent activity."
-                    },
-                    "recentGoals": {
-                        "title": "Recent goals",
-                        "description": "Pending, running, and completed Work agent instructions."
-                    },
-                    "autoGenerateIdeas": {
-                        "title": "Auto-generate Ideas",
-                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
-                    },
-                    "autoBuildWorks": {
-                        "title": "Auto-build Works",
-                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
-                    },
-                    "autoRetry": {
-                        "title": "Auto-retry policy",
-                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
-                    },
-                    "accountBudgets": {
-                        "title": "Account-wide budgets",
-                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
-                    }
-                },
-                "fields": {
-                    "enabled": "Enable Work agent",
-                    "autoApproveLowImpact": "Auto-approve low-impact changes",
-                    "dailySuggestions": "Daily suggestions",
-                    "dryRunByDefault": "Dry run by default",
-                    "maxWorksPerRun": "Max Works per run",
-                    "maxItemsPerWork": "Max items per Work",
-                    "maxBudgetPerRun": "Max budget per run",
-                    "approvalThreshold": "Approval threshold",
-                    "confirmBeforeCreate": "Confirm before creating Works",
-                    "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
-                    "autoGenerateCadenceMinutes": "Run every N minutes",
-                    "autoGenerateBatchSize": "Ideas per cycle",
-                    "autoBuildThrottlePerDay": "Daily auto-build cap",
-                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
-                    "maxAutoRetries": "Max retries (0–5)",
-                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
-                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
-                    "accountWideCapEnabled": "Set a monthly cap",
-                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
-                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
-                },
-                "actions": {
-                    "saveSettings": "Save settings",
-                    "saveSection": "Save",
-                    "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
-                    "preparePlan": "Prepare plan",
-                    "stop": "Stop"
-                },
-                "queue": {
-                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
-                },
-                "metrics": {
-                    "works": "Works",
-                    "items": "Items"
-                },
-                "labels": {
-                    "dryRun": "Dry run",
-                    "liveRun": "Live run"
-                },
-                "empty": {
-                    "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
-                    "waitingForUpdate": "Waiting for the first run update."
-                },
-                "toasts": {
-                    "settingsSaved": "Work agent settings saved",
-                    "settingsError": "Failed to save settings",
-                    "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
-                }
             }
         },
         "stats": {
@@ -1082,8 +1470,32 @@
             "totalWorks": "ワークの合計",
             "totalItems": "項目の合計",
             "activeWebsites": "アクティブなウェブサイト",
-            "fromLastMonth": "先月から",
-            "monthSpend": "Month Spend"
+            "monthSpend": "Month Spend",
+            "fromLastMonth": "先月から"
+        },
+        "adminUsage": {
+            "title": "Platform usage",
+            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
+            "periodLabel": "{period}",
+            "totalSpend": "Total spend: {amount}",
+            "empty": "No usage recorded this period.",
+            "columnUser": "User",
+            "columnEmail": "Email",
+            "columnWork": "Directory",
+            "columnUnits": "Units",
+            "columnCost": "Cost",
+            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
+        },
+        "budgets": {
+            "overviewTitle": "Spend in {period}",
+            "overviewProgressLabel": "{percent}% of {cap} cap",
+            "overviewOverageSuffix": " (overage allowed)",
+            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
+            "topPluginsTitle": "Top plugins by spend",
+            "topPluginsEmpty": "No usage recorded yet this period.",
+            "trendTitle": "Daily spend — {period}",
+            "trendEmpty": "No usage recorded yet this period.",
+            "trendDayLabel": "Day {day}"
         },
         "workCard": {
             "status": {
@@ -1703,6 +2115,11 @@
                     "screenshotError": "スクリーンショットのキャプチャ中にエラーが発生しました",
                     "featured": "注目項目",
                     "featuredHelp": "ワークでこの項目を注目としてマーク",
+                    "markdown": "Content (Markdown, optional)",
+                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
+                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
+                    "showPreview": "Preview",
+                    "hidePreview": "Hide preview",
                     "updateWithPR": "プルリクエストを作成",
                     "updateWithPRHelp": "直接コミットではなくプルリクエストで変更を送信",
                     "cancel": "キャンセル",
@@ -1717,15 +2134,15 @@
                         "invalidUrl": "http:// または https:// を含む有効な URL を入力してください",
                         "invalidImageUrl": "有効な画像 URL を入力してください",
                         "requiredFields": "すべての必須フィールドを入力してください"
-                    },
-                    "markdown": "Content (Markdown, optional)",
-                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
-                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
-                    "showPreview": "Preview",
-                    "hidePreview": "Hide preview"
+                    }
                 },
                 "editDisplay": "表示を編集",
                 "editDisplayDescription": "注目ステータスを切り替え、表示順序を設定。",
+                "editContent": "Edit content",
+                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
+                "editContentSuccess": "Item content updated.",
+                "editContentFailed": "Failed to update item content.",
+                "editContentError": "An error occurred while updating item content.",
                 "orderLabel": "表示順序 (オプション)",
                 "orderHelp": "小さい数字ほど注目/非注目グループ内で先に表示されます。",
                 "deleteDialogTitle": "項目を削除",
@@ -1922,12 +2339,7 @@
                     "saving": "保存中...",
                     "saveSuccess": "ソース検証設定が保存されました",
                     "saveFailed": "ソース検証設定の保存に失敗しました"
-                },
-                "editContent": "Edit content",
-                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
-                "editContentSuccess": "Item content updated.",
-                "editContentFailed": "Failed to update item content.",
-                "editContentError": "An error occurred while updating item content."
+                }
             },
             "generator": {
                 "tabs": {
@@ -2099,8 +2511,72 @@
                 "tabs": {
                     "general": "一般",
                     "members": "メンバー",
-                    "navigationLabel": "設定タブ",
-                    "budgets": "Budgets"
+                    "budgets": "Budgets",
+                    "navigationLabel": "設定タブ"
+                },
+                "budgets": {
+                    "title": "Budgets & Usage",
+                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
+                    "periodLabel": "{period} · spent {spent}",
+                    "globalCap": {
+                        "heading": "Global cap",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
+                        "createButton": "Create global cap",
+                        "saveButton": "Save",
+                        "removeButton": "Remove",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
+                        "createSuccess": "Create global budget succeeded",
+                        "createError": "Create global budget failed",
+                        "updateSuccess": "Update global budget succeeded",
+                        "updateError": "Update global budget failed",
+                        "deleteSuccess": "Delete global budget succeeded",
+                        "deleteError": "Delete global budget failed"
+                    },
+                    "pluginCaps": {
+                        "heading": "Per-plugin caps",
+                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
+                        "empty": "No per-plugin caps. Add one below.",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "addHeading": "Add plugin cap",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "e.g. openai",
+                        "pluginSelectPlaceholder": "Select a plugin…",
+                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
+                        "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage",
+                        "addButton": "Add cap",
+                        "saveButton": "Save",
+                        "deleteAria": "Delete budget",
+                        "errorPluginRequired": "Plugin id is required.",
+                        "errorPluginDuplicate": "A budget for this plugin already exists.",
+                        "errorPositive": "Enter a positive cap value.",
+                        "createSuccess": "Create plugin budget succeeded",
+                        "createError": "Create plugin budget failed",
+                        "updateSuccess": "Update plugin budget succeeded",
+                        "updateError": "Update plugin budget failed",
+                        "deleteSuccess": "Delete plugin budget succeeded",
+                        "deleteError": "Delete plugin budget failed"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Spend by plugin",
+                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
+                        "empty": "No usage recorded this period.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capability",
+                        "columnUnits": "Units",
+                        "columnCost": "Cost"
+                    },
+                    "export": {
+                        "downloadCsv": "Download CSV",
+                        "downloadingCsv": "Preparing CSV…",
+                        "csvFailed": "CSV export failed"
+                    }
                 },
                 "sourceSettings": "ソース リポジトリ",
                 "originalSource": "元のソース",
@@ -2405,73 +2881,13 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                },
-                "budgets": {
-                    "title": "Budgets & Usage",
-                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
-                    "periodLabel": "{period} · spent {spent}",
-                    "globalCap": {
-                        "heading": "Global cap",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
-                        "createButton": "Create global cap",
-                        "saveButton": "Save",
-                        "removeButton": "Remove",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
-                        "createSuccess": "Create global budget succeeded",
-                        "createError": "Create global budget failed",
-                        "updateSuccess": "Update global budget succeeded",
-                        "updateError": "Update global budget failed",
-                        "deleteSuccess": "Delete global budget succeeded",
-                        "deleteError": "Delete global budget failed"
-                    },
-                    "pluginCaps": {
-                        "heading": "Per-plugin caps",
-                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
-                        "empty": "No per-plugin caps. Add one below.",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "addHeading": "Add plugin cap",
-                        "pluginIdLabel": "Plugin",
-                        "pluginIdPlaceholder": "e.g. openai",
-                        "pluginSelectPlaceholder": "Select a plugin…",
-                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
-                        "allPluginsCapped": "All eligible plugins already have a cap.",
-                        "noMatchingPlugins": "No plugins match this search.",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage",
-                        "addButton": "Add cap",
-                        "saveButton": "Save",
-                        "deleteAria": "Delete budget",
-                        "errorPluginRequired": "Plugin id is required.",
-                        "errorPluginDuplicate": "A budget for this plugin already exists.",
-                        "errorPositive": "Enter a positive cap value.",
-                        "createSuccess": "Create plugin budget succeeded",
-                        "createError": "Create plugin budget failed",
-                        "updateSuccess": "Update plugin budget succeeded",
-                        "updateError": "Update plugin budget failed",
-                        "deleteSuccess": "Delete plugin budget succeeded",
-                        "deleteError": "Delete plugin budget failed"
-                    },
-                    "spendByPlugin": {
-                        "heading": "Spend by plugin",
-                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
-                        "empty": "No usage recorded this period.",
-                        "columnPlugin": "Plugin",
-                        "columnCapability": "Capability",
-                        "columnUnits": "Units",
-                        "columnCost": "Cost"
-                    },
-                    "export": {
-                        "downloadCsv": "Download CSV",
-                        "downloadingCsv": "Preparing CSV…",
-                        "csvFailed": "CSV export failed"
-                    }
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
+                },
                 "noProviderAlert": {
                     "title": "デプロイプロバイダーがありません",
                     "description": "ワークウェブサイトをデプロイするには、デプロイプロバイダーを選択してください。",
@@ -2613,10 +3029,6 @@
                     "dnsName": "名前：",
                     "dnsValue": "値：",
                     "copyButton": "コピー"
-                },
-                "progress": {
-                    "loadingStatus": "Loading deploy status...",
-                    "openWebsite": "Open website"
                 }
             },
             "kb": {
@@ -2652,6 +3064,15 @@
                     "research": "Research",
                     "output": "Outputs",
                     "freeform": "Freeform"
+                },
+                "inherited": {
+                    "bannerLabel": "継承ドキュメントの通知",
+                    "bannerTitle": "組織から継承",
+                    "bannerDescription": "このドキュメントは組織が所有しており、ここでは読み取り専用です。この Work に編集可能なコピーをフォークするには、ローカルでオーバーライドしてください。",
+                    "overrideCta": "ローカルでオーバーライド",
+                    "overrideCtaBusy": "フォーク中…",
+                    "overrideCtaPendingTooltip": "行 38d でオーバーライドアクションが出荷されると利用可能になります",
+                    "overrideErrorFallback": "継承ドキュメントをフォークできませんでした。再試行するかページを再読み込みしてください。"
                 },
                 "status": {
                     "draft": "Draft",
@@ -2819,15 +3240,6 @@
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
                 },
-                "inherited": {
-                    "bannerLabel": "継承ドキュメントの通知",
-                    "bannerTitle": "組織から継承",
-                    "bannerDescription": "このドキュメントは組織が所有しており、ここでは読み取り専用です。この Work に編集可能なコピーをフォークするには、ローカルでオーバーライドしてください。",
-                    "overrideCta": "ローカルでオーバーライド",
-                    "overrideCtaPendingTooltip": "行 38d でオーバーライドアクションが出荷されると利用可能になります",
-                    "overrideCtaBusy": "フォーク中…",
-                    "overrideErrorFallback": "継承ドキュメントをフォークできませんでした。再試行するかページを再読み込みしてください。"
-                },
                 "addDoc": {
                     "button": "+ 追加",
                     "title": "新しいドキュメントを作成",
@@ -2855,6 +3267,59 @@
                     "errorFallback": "削除できませんでした。再試行してください。",
                     "errorBusy": "削除中…",
                     "errorPartial": "削除 {ok} 件、失敗 {failed} 件。"
+                }
+            }
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "chipDescriptions": {
+                "mission": "エージェントが継続的に取り組む継続的な目標 — スケジュールまたはワンショットでアイデアを生成します。",
+                "idea": "エージェントがあなたが構築できる作業計画に変換するワンショットの簡潔な指示。",
+                "website": "ビジネス、サービス、またはブランドのためのマルチページサイト — 生成されたコンテンツ+コード。",
+                "landing-page": "焦点の当てられたワンページ — 等待リスト、製品ローンチ、ウェビナー登録、リード取得。",
+                "blog": "カテゴリ、RSS、コードハイライト、SEO対応コンテンツ付きブログ。",
+                "directory": "検索、フィルター、構造化された項目データ付きのキュレートされたディレクトリサイト。",
+                "awesome-repo": "すごいリストリポジトリ — マークダウンインデックス、カテゴリ分けされたリンク、更新可能なメタデータ。"
+            },
+            "submit": "Create",
+            "submitTitle": "作成",
+            "or": "or",
+            "hints": {
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
                 }
             }
         },
@@ -2955,6 +3420,10 @@
                 "configureNow": "今すぐ設定",
                 "formTitle": "手動でワークを作成",
                 "formSubtitle": "すべての設定を完全に制御してワークを設定",
+                "proposalBanner": {
+                    "title": "Pre-filled from an AI suggestion.",
+                    "subtitle": "Tweak anything before creating."
+                },
                 "basicInfo": "基本情報",
                 "nameLabel": "ワーク名 *",
                 "namePlaceholder": "例: Awesome AI Tools",
@@ -2986,10 +3455,6 @@
                 "createFailed": "ワーク作成に失敗しました",
                 "success": {
                     "created": "ワークが正常に作成されました！"
-                },
-                "proposalBanner": {
-                    "title": "Pre-filled from an AI suggestion.",
-                    "subtitle": "Tweak anything before creating."
                 }
             },
             "import": {
@@ -3322,16 +3787,20 @@
             "menu": "メニュー",
             "aiChat": "AI チャット",
             "newWork": "新規ワーク",
+            "new": "新規",
             "activityIndicator": "ワーク生成中",
             "navigation": {
                 "dashboard": "ダッシュボード",
                 "activity": "アクティビティ",
-                "works": "ワーク",
-                "plugins": "プラグイン",
-                "templates": "テンプレート",
-                "settings": "設定",
                 "missions": "Missions",
-                "ideas": "Ideas"
+                "ideas": "Ideas",
+                "works": "ワーク",
+                "tasks": "タスク",
+                "agents": "エージェント",
+                "plugins": "プラグイン",
+                "skills": "スキル",
+                "templates": "テンプレート",
+                "settings": "設定"
             },
             "tooltips": {
                 "expandSidebar": "サイドバーを展開",
@@ -3344,8 +3813,7 @@
                 "keyboardShortcuts": "キーボードショートカット"
             },
             "signOut": "サインアウト",
-            "signingOut": "サインアウト中...",
-            "new": "新規"
+            "signingOut": "サインアウト中..."
         },
         "dangerZone": {
             "title": "危険領域",
@@ -3455,6 +3923,11 @@
             "disable": "無効化",
             "settings": "設定",
             "saveSettings": "設定を保存",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "プラグイン設定",
             "settingsSaved": "設定が正常に保存されました",
             "noSettings": "このプラグインには構成可能な設定がありません",
@@ -3574,20 +4047,20 @@
                 "savedSuccess": "組織アクセスを保存しました。",
                 "saveFailed": "保存に失敗しました。",
                 "removeLabel": "{login} を削除"
-            },
-            "saveAndVerify": "Save & verify",
-            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
-            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
-            "verifySuccessHeader": "Connection verified.",
-            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh."
+            }
         },
         "templates": {
             "title": "テンプレート",
             "subtitle": "組み込みのウェブサイトテンプレートを閲覧し、カスタムカタログを管理し、新しいワークがどのテンプレートから開始されるかを制御してください。",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "カスタムテンプレートを追加",
-                "refreshTemplates": "テンプレートを更新",
-                "customizeTemplate": "Create with AI"
+                "customizeTemplate": "Create with AI",
+                "refreshTemplates": "テンプレートを更新"
             },
             "hero": {
                 "eyebrow": "テンプレートカタログ",
@@ -3621,8 +4094,11 @@
                 "defaultSelected": "デフォルトが選択されました",
                 "makeDefault": "デフォルトに設定",
                 "fork": "フォーク",
+                "useTemplate": "Use this Template",
                 "edit": "編集",
                 "archive": "アーカイブ",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
                 "catalogOnly": "カタログアイテムのみ",
                 "openRepository": "リポジトリを開く",
                 "previewAlt": "{name} プレビュー",
@@ -3631,9 +4107,6 @@
                 "syncBranches": "{count} 同期ブランチ",
                 "betaBranch": "ベータ: {branch}",
                 "noDescription": "まだ説明がありません。",
-                "useTemplate": "Use this Template",
-                "customizeAgain": "Customize again",
-                "viewStatus": "View customization status",
                 "status": {
                     "pending": "Queued",
                     "forking": "Forking",
@@ -3723,11 +4196,6 @@
                 "syncBaseSuccess": "Template synced from its base.",
                 "syncBaseUpToDate": "Template is already up to date with its base.",
                 "syncBaseFailed": "Failed to sync template from base."
-            },
-            "kindSwitcher": {
-                "mission": "Mission Templates",
-                "work": "Work Templates",
-                "website": "Website Templates"
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -4229,6 +4697,7 @@
             "dashboard": "ダッシュボード",
             "activity": "アクティビティログ",
             "works": "ワーク",
+            "discover": "Discover",
             "newWork": "新規ワーク",
             "work": "ワーク",
             "overview": "概要",
@@ -4245,8 +4714,7 @@
             "security": "セキュリティ",
             "apiKeys": "APIキー",
             "dangerZone": "危険ゾーン",
-            "pluginSettings": "プラグイン設定",
-            "discover": "Discover"
+            "pluginSettings": "プラグイン設定"
         }
     },
     "api": {

@@ -1,5 +1,5 @@
 /**
- * EW-638 — Single source of truth for the repositories DatabaseModule wires.
+ * EW-638 — Single source of truth for the legacy repositories DatabaseModule wires.
  *
  * Before this file existed, three places duplicated the repository inventory
  * and had to be updated in lock-step:
@@ -11,18 +11,20 @@
  * Forgetting any one of them broke `develop` CI on the next entity addition
  * (EW-634 webhook delivery worker hit it twice — see PR #889 and #891).
  *
- * Now there is exactly ONE list: `REPOSITORY_PROVIDERS` below.
+ * For repositories owned directly by DatabaseModule, there is exactly ONE list: `REPOSITORY_PROVIDERS` below.
  *   - `database.module.ts` spreads it into `providers` + `exports`.
  *   - `database.module.spec.ts` asserts against `REPOSITORY_PROVIDERS.length`
  *     (no magic number).
  *
- * # When adding a new repository
+ * # When adding a new DatabaseModule repository
  *
- * Update THIS file (one import + one entry in the array). The module gets the
- * new provider/export automatically, and the regression-guard spec re-counts
- * automatically. Companion drift-checker in `database.module.spec.ts` flags
- * any wired-up-but-not-listed repo (or vice versa) so the inventory can't
- * silently fall behind reality.
+ * Update THIS file (one import + one entry in the array) only when the
+ * repository is provided by `DatabaseModule` itself. Feature-owned repositories
+ * such as agents, skills, tasks, and work knowledge are wired by their feature
+ * modules and exported separately from `database/index.ts`. Companion
+ * drift-checker in `database.module.spec.ts` flags any DatabaseModule
+ * provider wired-up-but-not-listed (or vice versa) so this inventory cannot
+ * silently fall behind its actual module boundary.
  *
  * Order: alphabetical by class name. Easier diffs, easier merges.
  */

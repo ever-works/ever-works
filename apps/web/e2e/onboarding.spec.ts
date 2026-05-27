@@ -15,10 +15,13 @@ test.describe('Onboarding — dismissal persists', () => {
 
         // The "Welcome" / onboarding modal would block all clicks. Verify
         // we can still click a sidebar link.
-        const worksLink = page.locator('a[href="/en/works"]').first();
+        // PR #1052 dropped the URL-level locale prefix, so the sidebar
+        // href renders as `/works` (not `/en/works`). Accept both
+        // during the rollout.
+        const worksLink = page.locator('a[href="/works"], a[href="/en/works"]').first();
         await expect(worksLink).toBeVisible({ timeout: 10_000 });
         await worksLink.click();
-        await page.waitForURL(/\/en\/works(\?|\/|$)/, { timeout: 30_000 });
+        await page.waitForURL(/(?:\/en)?\/works(\?|\/|$)/, { timeout: 30_000 });
     });
 
     test('localStorage contains the dismissed onboarding state', async ({ page }) => {
