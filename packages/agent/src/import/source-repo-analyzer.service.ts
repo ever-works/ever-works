@@ -445,6 +445,29 @@ export class SourceRepoAnalyzerService {
         return bulletListLinks + numberedListLinks + tableLinks;
     }
 
+    /**
+     * Heuristic: does this README look like an "awesome list" (the
+     * `sindresorhus/awesome`-style curated link collection that the
+     * import-from-source-repo flow specifically targets)?
+     *
+     * Matches one of two qualifying shapes:
+     *  - **Standard awesome list**: at least 5 list-style external
+     *    links (bullet, numbered, or markdown-table cells) AND at
+     *    least one H1/H2/H3 header (a categorisation). The ≥5 floor
+     *    rules out regular READMEs that happen to include a couple
+     *    of reference links in their prose.
+     *  - **Multi-file (sub-page) awesome list**: at least 3 relative
+     *    links into sibling directories (`./foo/`, `./bar-baz/`)
+     *    AND headers. This catches the larger awesome lists that
+     *    split their categories into separate files.
+     *
+     * Best-effort — false positives (a non-awesome README with many
+     * link bullets and headers) are acceptable because the importer
+     * shows a confirmation step before acting. The thresholds were
+     * tuned against the existing `ever-works/awesome-*` corpus and
+     * a few hand-picked false-positive candidates; adjusting them
+     * downward will widen recall at the cost of precision.
+     */
     private isAwesomeListReadme(content: string): boolean {
         // Check for any markdown headers (H1, H2, or H3)
         const hasSectionHeaders = /^#{1,3}\s+.+$/m.test(content);

@@ -2,7 +2,15 @@ import { createHash } from 'crypto';
 import type { ItemData } from '@ever-works/contracts';
 import type { ComparisonPair } from './types';
 
+// Why: pair keys are used verbatim as the URL slug for the generated
+// "<a> vs <b>" comparison page (see comparison-generation.service.ts
+// ~L534, `slug: pairKey`). 120 chars keeps the path short enough for
+// reliable indexing/sharing without truncation surprises in browsers,
+// social-preview unfurlers, and the comparison entity's slug column.
 const MAX_COMPARISON_SLUG_LENGTH = 120;
+// Why: 48 + '--' + 48 + '-' + 10 (sha1 hex prefix) = 109 chars, leaving
+// headroom under the 120-char cap for any future suffix without
+// re-tuning this constant. Keep it ≤ 53 if you change MAX above.
 const TRUNCATED_SLUG_PART_LENGTH = 48;
 
 function truncateSlugPart(slug: string, maxLength: number): string {
@@ -13,6 +21,13 @@ function truncateSlugPart(slug: string, maxLength: number): string {
 /**
  * Build a canonical pair key that is order-independent.
  * "netlify--vercel" and "vercel--netlify" both produce "netlify--vercel".
+ *
+ * When the natural `${a}--${b}` form would exceed
+ * {@link MAX_COMPARISON_SLUG_LENGTH}, falls back to
+ * `${trunc(a)}--${trunc(b)}-${sha1(full)}`. The hash suffix is what
+ * preserves uniqueness across pairs that share their first 48 slug
+ * characters — without it, two distinct pairs could collide on the
+ * truncated form and overwrite each other in `comparisonExists`.
  */
 export function buildPairKey(slugA: string, slugB: string): string {
     const canonicalKey = [slugA, slugB].sort().join('--');

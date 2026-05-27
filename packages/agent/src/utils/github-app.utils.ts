@@ -10,6 +10,24 @@ export type GitHubAppInstallationAccessToken = {
     expiresAt: string | null;
 };
 
+/**
+ * Mint a GitHub App JWT for authenticating as the App itself
+ * (subsequent step exchanges it for a per-installation token).
+ *
+ * **Two "magic numbers" worth not changing without reading this:**
+ *
+ *   - **`iat: now - 60`** backdates issuance by 60 seconds. Without
+ *     this, any clock skew where THIS server is slightly ahead of
+ *     GitHub's clock causes GitHub to reject the JWT with
+ *     "iat must be in the past". 60s covers typical NTP drift.
+ *   - **`exp: now + 9 * 60`** = 9-minute expiry. GitHub's hard
+ *     ceiling is 10 minutes; 9 is the documented safety margin so
+ *     a clock-skew + network latency cocktail can't push `exp` past
+ *     the ceiling at validation time.
+ *
+ * RS256 is mandatory for GitHub Apps — don't switch algorithm.
+ * `base64url` (NOT plain base64) is also required.
+ */
 export const createGitHubAppJwt = ({ appId, privateKey }: GitHubAppCredentials): string => {
     const now = Math.floor(Date.now() / 1000);
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
@@ -82,6 +100,28 @@ export const requestGitHubAppInstallationAccessToken = async (
     return data.token;
 };
 
+/**
+ * Verify a GitHub webhook delivery's `X-Hub-Signature-256` against
+ * the shared secret using HMAC-SHA256.
+ *
+ * **Security invariants worth NOT regressing on:**
+ *
+ *   - **`sha256=` prefix required.** Returns `false` for missing
+ *     or `sha1=`-prefixed signatures (GitHub's legacy SHA-1
+ *     signature was deprecated; never accept it).
+ *   - **Length check before `timingSafeEqual`** — the Node API
+ *     throws on mismatched-length buffers, so the early return
+ *     keeps the call total. The length check itself isn't a
+ *     timing leak (length of a SHA-256 hex digest is constant).
+ *   - **`timingSafeEqual` on raw bytes** — protects against
+ *     byte-by-byte timing attacks on the signature comparison.
+ *     Don't replace with `===` even "for clarity".
+ *
+ * **`rawBody` must be the EXACT bytes** GitHub sent (no JSON
+ * re-serialisation). Express/Nest body parsers that pretty-print
+ * or normalise whitespace will break verification — capture the
+ * raw body in middleware before parsing.
+ */
 export const verifyGitHubWebhookSignature = (
     rawBody: string,
     secret: string,

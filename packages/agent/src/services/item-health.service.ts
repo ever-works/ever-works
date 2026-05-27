@@ -526,6 +526,23 @@ export class ItemHealthService {
         return validation;
     }
 
+    /**
+     * Has the item been checked within the freshness window?
+     *
+     * **Format coupling**: parses `checkedAt` as `'yyyy-MM-dd HH:mm'`
+     * (date-fns `parse`, NOT ISO 8601). This matches the format
+     * `buildItemHealth` and `buildSourceValidation` write via
+     * `format(new Date(), 'yyyy-MM-dd HH:mm')`. The string has NO
+     * timezone — both writer and reader assume the server's local
+     * time. If the platform ever runs in a multi-region or
+     * timezone-shifting fleet, this couples to "all writers and
+     * readers use the same TZ"; deploy to UTC everywhere and the
+     * coupling holds.
+     *
+     * Returns `false` (i.e. "treat as not recently checked, run a
+     * fresh check") for both an empty string and a malformed value
+     * — fail-safe; the cost is at most one redundant check.
+     */
     private wasCheckedRecently(
         checkedAt: string | undefined,
         freshnessWindowMinutes: number,
