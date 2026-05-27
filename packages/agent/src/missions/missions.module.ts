@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from '../entities/mission.entity';
+import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerModule } from '../titler/titler.module';
 import { UserResearchModule } from '../user-research/user-research.module';
 import { WorkAgentModule } from '../work-agent/work-agent.module';
@@ -31,7 +33,7 @@ import { MissionTickService } from './mission-tick.service';
         // Repository<WorkProposal> for the Idea-copy half of Full
         // Fork, so the entity is registered here as well as via
         // UserResearchModule.
-        TypeOrmModule.forFeature([Mission, WorkProposal]),
+        TypeOrmModule.forFeature([Mission, MissionAttachment, WorkProposal]),
         TitlerModule,
         UserResearchModule,
         WorkAgentModule,
@@ -41,12 +43,14 @@ import { MissionTickService } from './mission-tick.service';
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,
+        MissionAttachmentRepository,
     ],
     exports: [
         MissionsService,
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,
+        MissionAttachmentRepository,
     ],
 })
 export class MissionsModule {}

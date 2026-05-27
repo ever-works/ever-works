@@ -116,3 +116,19 @@ export async function cancelAgentRunAction(id: string, runId: string) {
     revalidatePath(`/agents/${id}/activity`);
     return res;
 }
+
+// Attachment actions — used by the PromptComposer-driven flow on
+// /new (Agent chip). Lets the caller wire uploads to an Agent once
+// we have its id.
+
+export async function attachUploadToAgentAction(agentId: string, uploadId: string) {
+    const row = await agentsAPI.addAttachment(agentId, uploadId);
+    revalidatePath(`/agents/${agentId}`);
+    return row;
+}
+
+export async function detachAgentAttachmentAction(agentId: string, attachmentId: string) {
+    const result = await agentsAPI.removeAttachment(agentId, attachmentId);
+    revalidatePath(`/agents/${agentId}`);
+    return result;
+}

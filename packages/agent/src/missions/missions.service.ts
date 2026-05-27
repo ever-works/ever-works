@@ -13,9 +13,16 @@ import {
     MissionType,
     type MissionGuardrailsOverride,
 } from '../entities/mission.entity';
+import { MissionAttachment } from '../entities/mission-attachment.entity';
+import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
+
+// Upload IDs are SHA-256 hex strings (the `id` field returned by
+// POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
+// (Codex + Greptile P1 on PR #1044).
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 
 /**
  * Input shape for `MissionsService.create`. Mirrors the writable
@@ -118,6 +125,11 @@ export class MissionsService {
         // and the @Optional() resolves to a real instance.
         @Optional()
         private readonly tickService?: MissionTickService,
+        // `@Optional()` for the same reason as `tickService` — hand-rolled
+        // tests construct MissionsService without the attachments dep.
+        // Production DI provides it via MissionsModule.
+        @Optional()
+        private readonly missionAttachments?: MissionAttachmentRepository,
     ) {}
 
     /**
@@ -346,6 +358,76 @@ export class MissionsService {
             ideasQueued: result.ideasQueued,
             message: result.message,
         };
+    }
+
+    /**
+     * List the Upload edges attached to a Mission. Validates ownership
+     * (only the Mission's `userId` can list) before returning rows.
+     * Returns an empty array when the attachments repo isn't wired
+     * (hand-rolled tests) — same defensive shape as the tick service.
+     */
+    async listAttachments(userId: string, missionId: string): Promise<MissionAttachment[]> {
+        await this.findOrThrow(userId, missionId);
+        if (!this.missionAttachments) return [];
+        return this.missionAttachments.findByMissionId(missionId);
+    }
+
+    /**
+     * Attach an uploaded file (by `uploadId` from `POST /api/uploads/file`)
+     * to a Mission. Idempotent at the DB layer — the unique
+     * (missionId, uploadId) index turns a duplicate attach into a no-op
+     * conflict that we swallow and return the existing row.
+     */
+    async addAttachment(
+        userId: string,
+        missionId: string,
+        uploadId: string,
+    ): Promise<MissionAttachment> {
+        await this.findOrThrow(userId, missionId);
+        if (!uploadId || !SHA256_RE.test(uploadId)) {
+            throw new BadRequestException(`Invalid uploadId`);
+        }
+        if (!this.missionAttachments) {
+            throw new BadRequestException(
+                `MissionAttachmentRepository is not wired — attach the MissionAttachment provider before calling addAttachment`,
+            );
+        }
+        try {
+            return await this.missionAttachments.add(missionId, uploadId);
+        } catch (err) {
+            // Duplicate (missionId, uploadId) — swallow and re-read.
+            // Mirrors the idempotency contract on Task attachments.
+            if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
+                const existing = (await this.missionAttachments.findByMissionId(missionId)).find(
+                    (a) => a.uploadId === uploadId,
+                );
+                if (existing) return existing;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Detach an Upload from a Mission. Validates ownership of the
+     * Mission AND that the attachment row's `missionId` matches before
+     * deleting, so a malicious caller can't pass a foreign
+     * `attachmentId` to clean up someone else's edge.
+     */
+    async removeAttachment(
+        userId: string,
+        missionId: string,
+        attachmentId: string,
+    ): Promise<{ deleted: true }> {
+        await this.findOrThrow(userId, missionId);
+        if (!this.missionAttachments) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        const row = await this.missionAttachments.findOne(attachmentId);
+        if (!row || row.missionId !== missionId) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        await this.missionAttachments.remove(attachmentId);
+        return { deleted: true };
     }
 
     // ─── internals ──────────────────────────────────────────────────

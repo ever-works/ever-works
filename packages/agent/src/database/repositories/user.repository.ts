@@ -45,6 +45,32 @@ export class UserRepository {
         });
     }
 
+    /**
+     * EW-652 (Tenants & Organizations Phase 0) — case-insensitive username
+     * lookup used by the username allocator and any caller that needs to
+     * match the DB-level uniqueness contract (which is case-insensitive on
+     * `lower(username)`). Prefer this over `findByUsername` for collision
+     * detection in registration paths.
+     */
+    async findByUsernameCaseInsensitive(username: string): Promise<User | null> {
+        return await this.repository
+            .createQueryBuilder('user')
+            .where('lower(user.username) = lower(:username)', { username })
+            .getOne();
+    }
+
+    /**
+     * EW-652 — slug lookup used by the slug routing middleware (EW-659
+     * Phase 7) and the username allocator's cross-table collision check.
+     * Slugs are always stored lowercase; this query is case-sensitive
+     * because callers are expected to normalize before lookup.
+     */
+    async findBySlug(slug: string): Promise<User | null> {
+        return await this.repository.findOne({
+            where: { slug },
+        });
+    }
+
     async findByEmail(email: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { email },

@@ -1,5 +1,6 @@
 import { agentsAPI } from '@/lib/api/agents';
 import { notFound } from 'next/navigation';
+import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 5. Dashboard tab is the
@@ -12,6 +13,10 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
     const { id } = await params;
     const agent = await agentsAPI.get(id);
     if (!agent) notFound();
+    // Server-fetch the attachment edges so the client panel can hydrate
+    // with the existing list. Defensive `.catch` so a missing migration
+    // on a stale env doesn't 500 the whole page.
+    const attachments = await agentsAPI.listAttachments(id).catch(() => []);
 
     return (
         <div className="p-6 space-y-4 max-w-screen-2xl mx-auto">
@@ -46,6 +51,7 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
                     {agent.capabilities ?? 'No capabilities set yet.'}
                 </p>
             </section>
+            <AgentAttachmentsPanel agentId={id} initial={attachments} />
         </div>
     );
 }

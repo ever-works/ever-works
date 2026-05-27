@@ -66,3 +66,19 @@ export async function buildIdeaAction(proposalId: string) {
     revalidateIdeaSurfaces();
     return result;
 }
+
+// Attachment actions — used by the PromptComposer-driven flow on
+// /new (Idea chip) and the standalone /ideas quick-add. Lets the
+// caller wire uploads to a freshly-created Idea once we have its id.
+
+export async function attachUploadToIdeaAction(ideaId: string, uploadId: string) {
+    const row = await workProposalsAPI.addAttachment(ideaId, uploadId);
+    revalidatePath(`/[locale]/(dashboard)/ideas/${ideaId}`, 'page');
+    return row;
+}
+
+export async function detachIdeaAttachmentAction(ideaId: string, attachmentId: string) {
+    const result = await workProposalsAPI.removeAttachment(ideaId, attachmentId);
+    revalidatePath(`/[locale]/(dashboard)/ideas/${ideaId}`, 'page');
+    return result;
+}

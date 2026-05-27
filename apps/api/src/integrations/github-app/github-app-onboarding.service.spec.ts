@@ -35,8 +35,19 @@ describe('GitHubAppOnboardingService', () => {
             findById: jest.fn(),
             findByEmail: jest.fn(),
             findByUsername: jest.fn(),
+            findByUsernameCaseInsensitive: jest.fn(),
+            findBySlug: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
+        };
+        // EW-652: minimal allocator stub — identity allocateUsername that
+        // mirrors whatever base it's called with. Normalization + collision
+        // semantics are covered by the dedicated allocator spec
+        // (username-allocator.service.spec.ts).
+        const usernameAllocator = {
+            allocateUsername: jest.fn().mockImplementation(async (base: string) => base),
+            normalize: jest.fn().mockImplementation((s: string) => s),
+            suggest: jest.fn(),
         };
 
         const service = new GitHubAppOnboardingService(
@@ -45,6 +56,7 @@ describe('GitHubAppOnboardingService', () => {
             userLinkRepository as any,
             authAccountRepository as any,
             userRepository as any,
+            usernameAllocator as any,
         );
 
         return {
@@ -54,6 +66,7 @@ describe('GitHubAppOnboardingService', () => {
             userLinkRepository,
             authAccountRepository,
             userRepository,
+            usernameAllocator,
         };
     };
 

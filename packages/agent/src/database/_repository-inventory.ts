@@ -37,11 +37,13 @@ import { GitHubAppInstallationRepository } from './repositories/github-app-insta
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
+import { OrganizationRepository } from './repositories/organization.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { TemplateRepository } from './repositories/template.repository';
+import { TenantRepository } from './repositories/tenant.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
 import { UserRepository } from './repositories/user.repository';
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
@@ -69,11 +71,13 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     GitHubAppUserLinkRepository,
     NotificationRepository,
     OnboardingRequestRepository,
+    OrganizationRepository,
     PluginUsageRepository,
     RefreshTokenRepository,
     SubscriptionPlanRepository,
     TemplateCustomizationRepository,
     TemplateRepository,
+    TenantRepository,
     UsageLedgerRepository,
     UserRepository,
     UserSubscriptionRepository,

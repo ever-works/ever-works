@@ -140,6 +140,66 @@ export class UploadsController {
     }
 
     /**
+     * Broader file-upload endpoint — accepts images PLUS PDFs, ZIP /
+     * Office Open XML, gzip, and the common text-like formats (markdown,
+     * CSV, JSON, code). Backs the PromptComposer's "Upload a file" /
+     * "Upload a folder" affordances on `/missions`, `/ideas`, `/new`,
+     * and `/works/new`.
+     *
+     * Same security model as `POST /api/uploads`: rate-limited, JWT-
+     * auth-gated, sha256-named storage keys, owner-scoped paths,
+     * magic-byte sniff for binaries / UTF-8 shape check for text. The
+     * declared MIME must be in the broader allow-list maintained inside
+     * `UploadsService.saveFile`.
+     *
+     * Larger size cap than the image endpoint (default 25 MiB vs 5 MiB
+     * for images) since PDFs / archives are typically bigger. Tunable
+     * via `UPLOADS_FILE_MAX_BYTES`.
+     */
+    @Post('file')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @UseInterceptors(
+        FileInterceptor('file', {
+            // Multer-level cap — UploadsService.saveFile re-validates with
+            // the env-tunable cap; the interceptor's limit is a higher
+            // bound that catches absurdly-large payloads before they hit
+            // the service. 50 MiB is roomy enough for any reasonable
+            // ZIP / PDF.
+            limits: { fileSize: 50 * 1024 * 1024 },
+        }),
+    )
+    @ApiOperation({
+        summary: 'Upload a file (image / PDF / archive / text)',
+        description:
+            'Multipart upload of an image, PDF, ZIP / Office document, gzip, or text-like file (markdown, CSV, JSON, code). Auth required. Returns the same { id, url, filename, size, mimeType, hash, key } shape as POST /api/uploads. The server validates magic bytes for binary formats and verifies UTF-8 shape for text-like declared MIMEs.',
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted, returns { id, url, ... }' })
+    @ApiResponse({
+        status: 400,
+        description:
+            'Validation failed (size, MIME, magic-byte mismatch, or non-UTF-8 bytes for a text declared MIME)',
+    })
+    @ApiResponse({ status: 401, description: 'Unauthenticated' })
+    @ApiResponse({ status: 413, description: 'File exceeds size cap' })
+    async uploadFile(
+        @CurrentUser() auth: AuthenticatedUser,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Query('workId') workId?: string,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        if (workId) {
+            await this.assertWorkAccess(auth.userId, workId);
+        }
+        return this.uploads.saveFile(auth.userId, file, workId ? { workId } : undefined);
+    }
+
+    /**
      * EW-644 (Codex P1) — verify the authenticated caller actually has
      * access to the Work referenced by `workId` before any storage
      * backend uses it to resolve repo coordinates / a token.
@@ -233,6 +293,81 @@ export class UploadsController {
         // once the website starts sending it. For now we acknowledge it
         // exists so the API contract is stable.
         void correlationHeader;
+
+        return {
+            uploadId: result.key ?? `${userId}/${result.filename}`,
+            id: result.id,
+            url: result.url,
+            filename: result.filename,
+            size: result.size,
+            mimeType: result.mimeType,
+            hash: result.hash,
+            expiresAt: anonymousExpiresAt ?? null,
+            ...(anonAccessToken ? { anonAccessToken } : {}),
+        };
+    }
+
+    /**
+     * Anonymous file upload — same as `/anonymous` but accepts the
+     * broader MIME allow-list from `saveFile` (PDFs, ZIP / Office
+     * Open XML, gzip, text-like formats) in addition to images.
+     *
+     * Backs the marketing site's "Upload a file" / "Upload a folder"
+     * affordances in `LandingPromptForm`. The website is being updated
+     * to call this endpoint instead of `/anonymous` for non-image
+     * picks; the existing `/anonymous` endpoint stays image-only so
+     * legacy callers don't change shape.
+     *
+     * Same anon-mint contract as `/anonymous`: when no bearer is
+     * present, an anonymous user is provisioned inline with a TTL of
+     * `ANONYMOUS_USER_TTL_DAYS` (default 3). The returned
+     * `anonAccessToken` is the bearer the visitor's later
+     * `/api/uploads/file` and prompt-submit calls reuse so the whole
+     * pre-signup session is attributed to the same anon user.
+     */
+    @Public()
+    @Post('anonymous/file')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @UseInterceptors(
+        FileInterceptor('file', {
+            // 50 MiB outer cap, same as the authenticated `/file` route;
+            // saveFile re-validates with its env-tunable inner cap.
+            limits: { fileSize: 50 * 1024 * 1024 },
+        }),
+    )
+    @ApiOperation({
+        summary: 'Upload a file (image / PDF / archive / text) from an anonymous visitor',
+        description:
+            'Multipart upload from an unauthenticated visitor. Accepts the same broader MIME set as POST /api/uploads/file (images, PDFs, ZIP / Office docs, gzip, text-like formats). Same anon-mint contract as /anonymous — returns { uploadId, id, url, filename, size, mimeType, hash, expiresAt, anonAccessToken? }.',
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted' })
+    @ApiResponse({
+        status: 400,
+        description:
+            'Validation failed (size, MIME, magic-byte mismatch, or non-UTF-8 bytes for a text declared MIME)',
+    })
+    @ApiResponse({ status: 413, description: 'File exceeds size cap' })
+    async uploadAnonymousFile(
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Req() req: AnonRequest,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+
+        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
+
+        const result = await this.uploads.saveFile(userId, file);
+
+        // The existing /anonymous endpoint takes an `x-correlation-id`
+        // header for future telemetry; we omit it here until the
+        // funnel-emit follow-up wires it in. Adding the parameter
+        // before it has a consumer was flagged as dead code (Greptile
+        // P2 on PR #1044).
 
         return {
             uploadId: result.key ?? `${userId}/${result.filename}`,

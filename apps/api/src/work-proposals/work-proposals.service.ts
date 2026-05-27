@@ -59,6 +59,21 @@ export class WorkProposalsApiService {
         return this.proposals.dismiss(userId, proposalId);
     }
 
+    /**
+     * Idea (WorkProposal) attachment surface — thin forwarders to the
+     * agent-side service. The controller maps these to
+     * `POST/GET/DELETE /api/me/work-proposals/:id/attachments[/:attachmentId]`.
+     */
+    async listAttachments(userId: string, proposalId: string) {
+        return this.proposals.listAttachments(userId, proposalId);
+    }
+    async addAttachment(userId: string, proposalId: string, uploadId: string) {
+        return this.proposals.addAttachment(userId, proposalId, uploadId);
+    }
+    async removeAttachment(userId: string, proposalId: string, attachmentId: string) {
+        return this.proposals.removeAttachment(userId, proposalId, attachmentId);
+    }
+
     async accept(userId: string, proposalId: string, workId: string): Promise<boolean> {
         // Existing user-facing accept: only valid from PENDING (today's
         // contract — preserved). The shared helper now lives on the

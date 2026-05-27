@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import {
     AGENT_PERMISSIONS_DEFAULT,
@@ -16,12 +17,19 @@ import {
     AgentStatus,
     type AgentTarget,
 } from '../entities/agent.entity';
+import { AgentAttachment } from '../entities/agent-attachment.entity';
 import { AgentRepository, type ListAgentsFilter } from '../database/repositories/agent.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
+import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { slugifyText } from '../utils/text.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
+
+// Upload IDs are SHA-256 hex strings (the `id` field returned by
+// POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
+// (Codex + Greptile P1 on PR #1044).
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 
 /**
  * Create-Agent input — writable subset of the entity. Validation
@@ -117,6 +125,11 @@ export class AgentsService {
         // budget row alongside (FK CASCADE handles it on DB but having
         // the call here keeps the service-level intent visible).
         private readonly budgets: AgentBudgetRepository,
+        // `@Optional()` because hand-rolled tests construct AgentsService
+        // without the attachments dep. Production DI provides it via
+        // AgentsModule.
+        @Optional()
+        private readonly agentAttachments?: AgentAttachmentRepository,
     ) {}
 
     async list(
@@ -374,6 +387,58 @@ export class AgentsService {
         await this.budgets.deleteByAgentId(id).catch(() => undefined); // FK CASCADE handles it; tolerate
         await this.memberships.deleteByAgentId(id).catch(() => undefined);
         await this.agents.deleteById(id);
+        return { deleted: true };
+    }
+
+    /**
+     * List the Upload edges attached to an Agent. Same shape as the
+     * Mission / Idea attachment surfaces.
+     */
+    async listAttachments(userId: string, id: string): Promise<AgentAttachment[]> {
+        await this.requireOwned(userId, id);
+        if (!this.agentAttachments) return [];
+        return this.agentAttachments.findByAgentId(id);
+    }
+
+    /** Attach an uploaded file to an Agent. Idempotent. */
+    async addAttachment(userId: string, id: string, uploadId: string): Promise<AgentAttachment> {
+        await this.requireOwned(userId, id);
+        if (!uploadId || !SHA256_RE.test(uploadId)) {
+            throw new BadRequestException(`Invalid uploadId`);
+        }
+        if (!this.agentAttachments) {
+            throw new BadRequestException(
+                `AgentAttachmentRepository is not wired — attach the AgentAttachment provider before calling addAttachment`,
+            );
+        }
+        try {
+            return await this.agentAttachments.add(id, uploadId);
+        } catch (err) {
+            if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
+                const existing = (await this.agentAttachments.findByAgentId(id)).find(
+                    (a) => a.uploadId === uploadId,
+                );
+                if (existing) return existing;
+            }
+            throw err;
+        }
+    }
+
+    /** Detach an Upload from an Agent. */
+    async removeAttachment(
+        userId: string,
+        id: string,
+        attachmentId: string,
+    ): Promise<{ deleted: true }> {
+        await this.requireOwned(userId, id);
+        if (!this.agentAttachments) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        const row = await this.agentAttachments.findOne(attachmentId);
+        if (!row || row.agentId !== id) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        await this.agentAttachments.remove(attachmentId);
         return { deleted: true };
     }
 
