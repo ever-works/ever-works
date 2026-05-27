@@ -116,11 +116,25 @@ export function PromptChipsRow<TValue extends string = string>({
                 aria-label={ariaLabel}
                 data-testid={testIdPrefix ? `${testIdPrefix}-chips` : undefined}
                 className={cn(
-                    'flex gap-2 overflow-x-auto scroll-smooth py-1',
-                    // Hide native scrollbar — the explicit buttons + edge
-                    // fades replace it as the affordance for scrolling.
-                    '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-                    overflowing ? 'justify-start px-10' : 'justify-start px-1',
+                    'flex gap-2 overflow-x-auto overscroll-x-contain scroll-smooth py-1',
+                    // Hide native scrollbar across browsers (Firefox uses
+                    // `scrollbar-width`, WebKit/Chromium uses the
+                    // `::-webkit-scrollbar` pseudo). Without both, some
+                    // users still see a horizontal scrollbar even though
+                    // the explicit ◀ / ▶ buttons are the intended
+                    // affordance.
+                    '[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
+                    // Asymmetric padding — only reserve room for an arrow
+                    // button on the side that's currently showing one.
+                    // Without this, the first chip ("Mission") looked like
+                    // it had stray left padding when the row was scrolled
+                    // to the start: the left button was hidden but the
+                    // padding was still applied.
+                    !overflowing && 'px-1',
+                    overflowing && !atStart && 'pl-10',
+                    overflowing && atStart && 'pl-1',
+                    overflowing && !atEnd && 'pr-10',
+                    overflowing && atEnd && 'pr-1',
                 )}
             >
                 {chips.map((c) => {

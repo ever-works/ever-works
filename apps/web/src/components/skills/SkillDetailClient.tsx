@@ -243,7 +243,7 @@ function BindingsPanel({
                         onChange={(e) => setTargetType(e.target.value as SkillBindingTargetType)}
                         className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
                     >
-                        <option value="tenant">tenant</option>
+                        <option value="tenant">workspace</option>
                         <option value="agent">agent</option>
                         <option value="work">work</option>
                         <option value="mission">mission</option>
@@ -252,7 +252,9 @@ function BindingsPanel({
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
-                        {targetType === 'tenant' ? 'Target (auto-filled)' : `Pick a ${targetType}`}
+                        {targetType === 'tenant'
+                            ? 'Target (auto-filled)'
+                            : `Pick a ${targetType}`}
                     </label>
                     <SkillBindingTargetPicker
                         targetType={targetType}

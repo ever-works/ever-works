@@ -9,15 +9,15 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { GET_WORK_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { FolderKanban } from 'lucide-react';
+import { FolderKanban, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 import type { Work } from '@/lib/api';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import type { Mission } from '@/lib/api/missions';
-// Phase 18.1 — Dashboard grid mount.
-import { AgentsCountTile } from '@/components/dashboard/AgentsCountTile';
-import { TasksInProgressTile } from '@/components/dashboard/TasksInProgressTile';
 import { RecentTasks } from '@/components/dashboard/RecentTasks';
+import { AgentsPreviewSection } from '@/components/dashboard/AgentsPreviewSection';
 import type { Task } from '@/lib/api/tasks';
+import type { Agent } from '@/lib/api/agents';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -43,12 +43,20 @@ interface DashboardClientProps {
      * default to 0 so the props remain backwards-compatible if a
      * page-level fetch fails — the tiles just show zeros instead of
      * disappearing.
+     *
+     * Dashboard polish (2026-05-27) — Agents + Tasks counts now feed
+     * the unified StatsOverview grid; the separate two-tile row from
+     * Phase 18.1 was removed. The counts themselves are still passed
+     * through unchanged.
      */
     agentsTotal?: number;
     agentsActive?: number;
     tasksInProgress?: number;
     tasksBlocked?: number;
     initialRecentTasks?: Task[];
+    /** Dashboard polish (2026-05-27) — recent Agents for the new
+     *  Agents preview section that sits below Tasks. */
+    initialAgents?: Agent[];
 }
 
 export default function DashboardClient({
@@ -72,6 +80,7 @@ export default function DashboardClient({
     tasksInProgress = 0,
     tasksBlocked = 0,
     initialRecentTasks = [],
+    initialAgents = [],
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -88,6 +97,10 @@ export default function DashboardClient({
                 </p>
             </div>
 
+            {/* Dashboard polish (2026-05-27) — single grid of 8 tiles.
+                Agents + Tasks-in-flight moved into StatsOverview so the
+                whole strip collapses to one row when the chat panel is
+                hidden (`@7xl/main:grid-cols-8`). */}
             <StatsOverview
                 totalMissions={totalMissions}
                 totalIdeas={totalIdeas}
@@ -96,17 +109,11 @@ export default function DashboardClient({
                 activeWebsites={activeWebsites}
                 monthSpendCents={monthSpendCents}
                 monthSpendCurrency={monthSpendCurrency}
+                agentsTotal={agentsTotal}
+                agentsActive={agentsActive}
+                tasksInProgress={tasksInProgress}
+                tasksBlocked={tasksBlocked}
             />
-
-            {/* Phase 18.1 — Agents/Skills/Tasks tiles. Sit between the
-                StatsOverview row and the Missions preview so the home
-                page reads: stats → AST tiles → Missions → Works.
-                Counts come from `meta.total` of the page-level
-                list({limit:1}) fetches (cheap). */}
-            <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-4 mt-6">
-                <AgentsCountTile total={agentsTotal} active={agentsActive} />
-                <TasksInProgressTile inProgress={tasksInProgress} blocked={tasksBlocked} />
-            </div>
 
             {/* Phase 6 PR S — Missions preview ABOVE Ideas so the home
                 page reads Missions → Ideas → Works in the same
@@ -125,7 +132,7 @@ export default function DashboardClient({
                 <div className="@3xl/main:col-span-3">
                     {hasWorks ? (
                         <>
-                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <div className="shrink-0 w-9 h-9 rounded-lg bg-accent-indigo/10 border border-accent-indigo/20 flex items-center justify-center">
                                         <FolderKanban className="w-4 h-4 text-accent-indigo" />
@@ -134,14 +141,28 @@ export default function DashboardClient({
                                         {t('works.recent')}
                                     </h2>
                                 </div>
-                                {totalWorks > 5 && (
+                                <div className="flex flex-nowrap items-center gap-2 shrink-0">
                                     <Link
-                                        href={ROUTES.DASHBOARD_WORKS}
-                                        className="text-sm text-primary hover:text-primary-hover transition-colors whitespace-nowrap"
+                                        href={ROUTES.DASHBOARD_WORKS_NEW}
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                            'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                            'text-text-secondary dark:text-text-secondary-dark',
+                                            'hover:border-primary/40 hover:text-primary',
+                                        )}
                                     >
-                                        {t('works.viewAll', { count: totalWorks })}
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add
                                     </Link>
-                                )}
+                                    {totalWorks > 5 && (
+                                        <Link
+                                            href={ROUTES.DASHBOARD_WORKS}
+                                            className="text-sm font-medium text-primary hover:underline whitespace-nowrap"
+                                        >
+                                            {t('works.viewAll', { count: totalWorks })}
+                                        </Link>
+                                    )}
+                                </div>
                             </div>
                             <WorkList initialWorks={initialWorks} showLimit={GET_WORK_LIST_LIMIT} />
                         </>
@@ -160,15 +181,18 @@ export default function DashboardClient({
                 </div>
             </div>
 
-            {/* Phase 18.2 — Recent Tasks block sits directly below
-                Recent Works per spec §18.2. Hidden when there are
-                no in-flight Tasks AND no Works (empty new-user state
-                already has its own empty CTA from EmptyState above). */}
-            {(initialRecentTasks.length > 0 || hasWorks) && (
-                <div className="mt-8">
-                    <RecentTasks tasks={initialRecentTasks} />
-                </div>
-            )}
+            {/* Phase 18.2 — Tasks block sits directly below Recent
+                Works. Dashboard polish (2026-05-27) — always render
+                so the dashboard reads Missions → Ideas → Works →
+                Tasks → Agents in a consistent strip even on a
+                brand-new account; the section's own empty state
+                handles the "no Tasks yet" copy. */}
+            <RecentTasks tasks={initialRecentTasks} total={tasksInProgress} />
+
+            {/* Dashboard polish (2026-05-27) — Agents preview below
+                Tasks. Same shape as the other sections so the user
+                sees the same icon-title-actions-grid rhythm. */}
+            <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
         </div>
     );
 }

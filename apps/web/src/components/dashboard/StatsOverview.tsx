@@ -3,15 +3,18 @@
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import {
+    Bot,
     FolderClosed,
-    ListTodo,
     Globe,
-    Target,
     Lightbulb,
+    ListChecks,
+    ListTodo,
+    Target,
     Wallet,
     type LucideIcon,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 interface StatsOverviewProps {
     totalWorks?: number;
@@ -21,12 +24,18 @@ interface StatsOverviewProps {
      * Phase 2 PR F — Missions/Ideas/Works v6 spec §5.1.
      * Dashboard tiles, rendered in this order (LEFT to RIGHT):
      *   [Missions] [Ideas] [Works] [Items] [Sites] [Month Spend]
+     *   [Agents] [Tasks in flight]
      * Each defaults to 0 so existing call sites that haven't been
      * updated still render (showing 0 instead of crashing).
      *
      * Phase 7 PR II added the 6th `Month Spend` tile, which is a
      * Link clicking through to `/settings/work-agent#account-budgets`
      * so the user can adjust the account-wide cap in one place.
+     *
+     * Dashboard polish (2026-05-27) — Agents + Tasks-in-flight folded
+     * into the same grid as the other 6 so all 8 share a single row
+     * when the chat panel is collapsed (`@7xl/main` and up). Replaces
+     * the previous Phase 18.1 standalone tile row.
      */
     totalMissions?: number;
     totalIdeas?: number;
@@ -34,6 +43,10 @@ interface StatsOverviewProps {
     monthSpendCents?: number;
     /** Phase 7 PR II — currency for monthSpendCents (default 'usd'). */
     monthSpendCurrency?: string;
+    agentsTotal?: number;
+    agentsActive?: number;
+    tasksInProgress?: number;
+    tasksBlocked?: number;
 }
 
 function formatMoney(cents: number, currency: string): string {
@@ -56,6 +69,10 @@ export function StatsOverview({
     totalIdeas = 0,
     monthSpendCents = 0,
     monthSpendCurrency = 'usd',
+    agentsTotal = 0,
+    agentsActive = 0,
+    tasksInProgress = 0,
+    tasksBlocked = 0,
 }: StatsOverviewProps) {
     const t = useTranslations('dashboard.stats');
 
@@ -67,10 +84,11 @@ export function StatsOverview({
         changeType: 'positive' | 'negative' | 'neutral';
         iconColor?: string;
         dotColor?: string;
-        /** Phase 7 PR II — when set, the tile renders as a Link. */
+        /** When set, the tile renders as a Link. */
         href?: string;
+        /** Optional secondary line under the title (e.g. "2 active"). */
+        sublabel?: string;
     }> = [
-        // Phase 2 PR F — new tiles FIRST, in spec §5.1 order.
         {
             title: t('totalMissions'),
             value: totalMissions,
@@ -79,6 +97,7 @@ export function StatsOverview({
             dotColor: 'bg-amber-500',
             change: '+0%',
             changeType: 'neutral',
+            href: ROUTES.DASHBOARD_MISSIONS,
         },
         {
             title: t('totalIdeas'),
@@ -88,6 +107,7 @@ export function StatsOverview({
             dotColor: 'bg-yellow-500',
             change: '+0%',
             changeType: 'neutral',
+            href: ROUTES.DASHBOARD_IDEAS,
         },
         {
             title: t('totalWorks'),
@@ -97,6 +117,7 @@ export function StatsOverview({
             dotColor: 'bg-blue-500',
             change: '+12%',
             changeType: 'positive',
+            href: ROUTES.DASHBOARD_WORKS,
         },
         {
             title: t('totalItems'),
@@ -116,9 +137,6 @@ export function StatsOverview({
             change: '0%',
             changeType: 'neutral',
         },
-        // Phase 7 PR II — Month Spend (6th tile). Clicks through to
-        // /settings/work-agent#account-budgets so the user can
-        // adjust the cap from the same row that shows the spend.
         {
             title: t('monthSpend'),
             value: formatMoney(monthSpendCents, monthSpendCurrency),
@@ -129,27 +147,54 @@ export function StatsOverview({
             changeType: 'neutral',
             href: '/settings/work-agent#account-budgets',
         },
+        {
+            title: t('agents'),
+            value: agentsTotal,
+            icon: Bot,
+            iconColor: 'text-primary',
+            dotColor: 'bg-primary',
+            change: '+0%',
+            changeType: 'neutral',
+            href: ROUTES.DASHBOARD_AGENTS,
+            sublabel: t('agentsActive', { count: agentsActive }),
+        },
+        {
+            title: t('tasksInFlight'),
+            value: tasksInProgress,
+            icon: ListChecks,
+            iconColor: 'text-info',
+            dotColor: 'bg-info',
+            change: '+0%',
+            changeType: 'neutral',
+            href: ROUTES.DASHBOARD_TASKS,
+            sublabel:
+                tasksBlocked > 0
+                    ? t('tasksBlocked', { count: tasksBlocked })
+                    : t('tasksNoBlockers'),
+        },
     ];
 
     return (
-        // 6 tiles, sized to collapse cleanly with the chat panel.
-        // When chat is open the main column is roughly @3xl-ish → show
-        // 4 per row (2 rows of stats). When chat is collapsed the main
-        // column opens up past @5xl → show all 6 in a single row.
-        // Smaller breakpoints wrap gracefully to 2 then 1 per row.
-        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-4 @5xl/main:grid-cols-6 gap-4">
+        // 8 tiles. Grid shapes itself to the available width:
+        //   1 col on the narrowest viewport.
+        //   2 cols starting at @lg.
+        //   4 cols starting at @3xl — typical width when the chat
+        //     panel is open (two rows of four).
+        //   8 cols starting at @7xl — the chat panel is collapsed
+        //     and the main column has room for a single row of eight.
+        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-4 @7xl/main:grid-cols-8 gap-4">
             {statCards.map((stat) => {
                 const tileBody = (
                     <div
                         className={cn(
-                            'group relative rounded-md p-1 transition-shadow duration-200 overflow-hidden',
+                            'group relative rounded-md p-1 transition-shadow duration-200 overflow-hidden h-full',
                             'border border-card-border dark:border-border-dark',
                             stat.href && 'hover:border-primary-500/50 dark:hover:border-white/20',
                         )}
                     >
                         <div
                             className={cn(
-                                'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden',
+                                'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden h-full',
                                 'bg-card dark:bg-surface-secondary-dark',
                                 'border border-card-border dark:border-border-dark',
                             )}
@@ -175,10 +220,15 @@ export function StatsOverview({
                             </div>
                             <div className="mt-1 flex items-center space-x-2">
                                 <div className={cn('w-1 h-1 rounded-full mt-0.5', stat.dotColor)} />
-                                <p className="text-xs text-gray-500 dark:text-text-muted-dark">
+                                <p className="text-xs text-gray-500 dark:text-text-muted-dark truncate">
                                     {stat.title}
                                 </p>
                             </div>
+                            {stat.sublabel ? (
+                                <p className="mt-1 ml-3 text-[11px] text-text-muted dark:text-text-muted-dark truncate">
+                                    {stat.sublabel}
+                                </p>
+                            ) : null}
                             <div className="mt-4 items-center hidden">
                                 <span
                                     className={cn(
