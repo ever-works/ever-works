@@ -37,6 +37,16 @@ import {
     AiFacadeService,
     GitFacadeService,
 } from '@ever-works/agent/facades';
+// FU-2 — `AgentsController` injects `SkillBindingRepository` (for the
+// `GET /api/agents/:id/skills` rollup) and `PluginUsageRepository` (for
+// the `GET /api/agents/:id/budget` rollup). Their providers live in
+// the agent-side `SkillsModule` / `DatabaseModule` — neither is
+// re-exported by `AgentAgentsModule`, so we must import them directly
+// here for Nest to resolve the controller's constructor args. Same
+// posture as api-side `TasksModule` importing `DatabaseModule` for
+// `PluginUsageRepository`.
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
 
@@ -73,7 +83,14 @@ import { AgentsController } from './agents.controller';
 // every unit test passing.
 @Global()
 @Module({
-    imports: [AgentAgentsModule, TasksDomainModule, FacadesModule, AuthModule],
+    imports: [
+        AgentAgentsModule,
+        AgentSkillsModule,
+        DatabaseModule,
+        TasksDomainModule,
+        FacadesModule,
+        AuthModule,
+    ],
     controllers: [AgentsController],
     providers: [
         {
