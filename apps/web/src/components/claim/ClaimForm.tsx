@@ -55,10 +55,7 @@ export function ClaimForm({ token, preview }: ClaimFormProps) {
                     </p>
                 )}
                 {result.transferStatus !== 'pending_recipient_acceptance' && result.workId ? (
-                    <a
-                        href={`/works/${result.workId}`}
-                        className="inline-block underline"
-                    >
+                    <a href={`/works/${result.workId}`} className="inline-block underline">
                         Go to {preview.workName} →
                     </a>
                 ) : null}
