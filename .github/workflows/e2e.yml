@@ -3,16 +3,20 @@ name: E2E Tests
 # Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope: only the long-lived branches develop / stage / main. Skipping PRs
-# and feature branches deliberately — Playwright on ubicloud-standard-8 is
-# expensive and the existing CI workflow already lints + builds + unit-tests
-# every push.
+# Scope: only the release branches stage / main. Skipping PRs, feature
+# branches, AND develop deliberately — Playwright on ubicloud-standard-8
+# is expensive (the full suite can take 90+ minutes), so we restrict it
+# to release gates (merges to stage and main). The existing CI workflow
+# still lints + builds + unit-tests every push to develop/stage/main and
+# on PR; only the heavy E2E pass is reserved for the release path.
+#
+# See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
 #
 # Trigger via "Run workflow" on any branch when you want a one-off run.
 
 on:
   push:
-    branches: [develop, stage, main]
+    branches: [stage, main]
   workflow_dispatch:
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.

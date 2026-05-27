@@ -4,11 +4,9 @@ import { useState, useTransition } from 'react';
 import { Target } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Link, useRouter } from '@/i18n/navigation';
-import { ROUTES } from '@/lib/constants';
 import { PromptComposer } from '@/components/common/PromptComposer';
-import { createMissionAction } from '@/app/actions/dashboard/missions';
+import { PageHeader } from '@/components/common/PageHeader';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { MissionCard } from './MissionCard';
 import type { Mission } from '@/lib/api/missions';
 
@@ -38,9 +36,9 @@ const MISSION_PLACEHOLDERS: ReadonlyArray<string> = [
 
 export function MissionsList({ missions }: { missions: Mission[] }) {
     const t = useTranslations('dashboard.missionsPage');
-    const router = useRouter();
     const [draft, setDraft] = useState('');
     const [submitting, startSubmit] = useTransition();
+    const startFromPrompt = useStartFromPrompt();
 
     const submit = () => {
         const description = draft.trim();
@@ -48,41 +46,23 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
             toast.error(t('quickAdd.minLength'));
             return;
         }
-        startSubmit(async () => {
-            try {
-                const mission = await createMissionAction({
-                    description,
-                    type: 'one-shot',
-                });
-                toast.success(t('quickAdd.created'));
-                setDraft('');
-                // Route into the new Mission's detail page — this is
-                // the same destination `/new?type=mission` lands on,
-                // so the user gets the next-step affordances (tune
-                // cadence, cap, auto-build) immediately.
-                router.push(ROUTES.DASHBOARD_MISSION(mission.id));
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('quickAdd.error'));
-            }
+        // The quick-add composer no longer creates a Mission inline.
+        // Instead it hands the prompt off to the chat AI (which can
+        // ask the user to confirm details, suggest a schedule, etc),
+        // and the existing /missions list itself is the canvas where
+        // the Mission will appear once chat confirms creation. This
+        // matches the pattern on /new — a single source of truth for
+        // "I'm trying to create something" is the chat side panel.
+        startSubmit(() => {
+            startFromPrompt(description, { intent: 'Mission' });
+            setDraft('');
         });
     };
 
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
             {/* Header */}
-            <div className="flex items-start gap-3 mb-6">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                    <Target className="w-4 h-4 text-warning" />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                        {t('subtitle')}
-                    </p>
-                </div>
-            </div>
+            <PageHeader icon={Target} title={t('title')} subtitle={t('subtitle')} tone="warning" />
 
             {/* Quick-add composer — modeled on the marketing site's
                 landing prompt. Used by both empty and populated
@@ -120,11 +100,6 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
                     <p className="mx-auto mt-1 max-w-2xl text-xs text-text-muted dark:text-text-muted-dark">
                         {t('empty.subtitle')}
                     </p>
-                    {/* Secondary path: open the unified /new flow if the
-                        user wants the chip-aware composer instead. */}
-                    <Button asChild variant="ghost" size="sm" className="mt-4">
-                        <Link href={`/new?type=mission`}>{t('empty.openNew')}</Link>
-                    </Button>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
