@@ -72,6 +72,12 @@ export class OpenApiLoaderService implements OnModuleInit {
 		try {
 			spec = await this.fetchAndDereference(url);
 		} catch (error) {
+			// Why: this runs in onModuleInit, so a transient API hiccup at boot
+			// (k8s rolling deploy, cold start) would otherwise crash the MCP
+			// server permanently. Single retry with a 3s pause is a deliberate
+			// floor — long enough for a rollout to swap the upstream pod, short
+			// enough that boot doesn't appear hung. If the retry also fails we
+			// rethrow and Nest aborts startup so the process is restarted clean.
 			this.logger.warn(`First attempt to load OpenAPI spec failed, retrying in 3s: ${String(error)}`);
 			await new Promise((resolve) => setTimeout(resolve, 3000));
 			spec = await this.fetchAndDereference(url);
@@ -82,6 +88,9 @@ export class OpenApiLoaderService implements OnModuleInit {
 	}
 
 	private async fetchAndDereference(url: string): Promise<OpenApiSpec> {
+		// Why: 15s covers a cold-started API serving a dereferenced OpenAPI
+		// doc that can be hundreds of KB; well above the typical hot-path
+		// response, but short enough to surface a hung upstream during boot.
 		const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
 		if (!response.ok) {
 			throw new Error(`Failed to fetch OpenAPI spec: HTTP ${response.status}`);

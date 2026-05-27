@@ -120,6 +120,28 @@ export class OnboardingAccountAdapter implements OnboardingAccountUpsert {
         return { accountId: user.id };
     }
 
+    /**
+     * Pick a username slot that isn't taken yet.
+     *
+     * Sanitises `base` (alnum + `_` + `-` only, max 32 chars; falls back
+     * to `'agent'` if everything was stripped), then probes the users
+     * table for `${sanitized}`, `${sanitized}-2`, `${sanitized}-3`, …
+     * up to suffix 50.
+     *
+     * If 50 sequential slots are all taken (extremely unlikely in
+     * practice — implies a popular GitHub login plus an aggressively
+     * concurrent onboarding flow), short-circuit to
+     * `${sanitized}-${randomUUID().slice(0, 8)}` instead of looping
+     * forever. The 8-hex-char suffix is enough entropy that a single
+     * fall-through call effectively always lands in an unused slot.
+     *
+     * Race window: the lookup-then-insert is NOT atomic — between
+     * `findByUsername` returning null and the eventual `users.create`,
+     * a parallel onboarding could grab the same slot. The DB UNIQUE
+     * constraint on `users.username` catches the race and the create
+     * call throws; the caller is responsible for retrying onboarding
+     * if the throw matters to them.
+     */
     private async resolveUniqueUsername(base: string): Promise<string> {
         const sanitized = (base || 'agent').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'agent';
         let candidate = sanitized;

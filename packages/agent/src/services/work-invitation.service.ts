@@ -35,6 +35,33 @@ const DEFAULT_EXPIRES_IN_DAYS = 30;
 const MAX_EXPIRES_IN_DAYS = 90;
 const TOKEN_BYTES = 32;
 
+/**
+ * Issuance and consumption of WorkInvitation tokens (member adds + the
+ * `owner-claim` flow for transferred works).
+ *
+ * Security model:
+ *  - Token is `randomBytes(32).toString('hex')` — 256 bits of entropy.
+ *  - **Token is returned to the issuer ONCE** (in `IssuedInvitation.token`)
+ *    and never persisted. Only `sha256(token)` lives in the DB. A lost
+ *    token can't be recovered — the issuer must revoke + re-issue.
+ *  - {@link verifyToken} compares hashes with `timingSafeEqual` so the
+ *    DB lookup path is constant-time. The route handler uses the same
+ *    primitive transitively through `findConsumable`.
+ *  - Expiry is bounded — `expiresInDays` is clamped to
+ *    `[1, MAX_EXPIRES_IN_DAYS=90]` so a misconfigured request can't
+ *    issue a year-long claim link by accident.
+ *
+ * Consumption order in `findConsumable`: not-found → revoked →
+ * already-accepted → expired → returns invitation. The order is the
+ * caller-facing precedence; an expired invitation surfaces as
+ * `invitation_expired` rather than the generic not-found, so the UI
+ * can show a specific "expired, ask for a new one" message.
+ *
+ * `tryAccept` is atomic at the repo layer (transitions
+ * PENDING → ACCEPTED only when current row is still PENDING), so two
+ * concurrent claims of the same token resolve with exactly one
+ * winner; the loser sees `invitation_state_changed`.
+ */
 @Injectable()
 export class WorkInvitationService {
     constructor(private readonly invitations: WorkInvitationRepository) {}

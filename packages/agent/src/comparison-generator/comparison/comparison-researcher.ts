@@ -43,8 +43,31 @@ export interface ResearchSeedResult {
 }
 
 /**
- * Research a comparison pair by searching the web and extracting content.
- * Returns aggregated research content and source URLs.
+ * Research a comparison pair by web-searching the pair, deduping
+ * across queries, extracting article content, and assembling a
+ * citation-bearing summary the writer can consume.
+ *
+ * Budget defaults (override via `options`):
+ *  - `maxQueries: 3` — only the first three of {@link buildSearchQueries}'s
+ *    four queries fire by default. The fourth ("which is better")
+ *    is reserved for callers that explicitly need it.
+ *  - `maxResultsPerQuery: 5` — search depth per query.
+ *  - `maxExtractions: 5` — total article extractions across all
+ *    deduped results. Caps end-to-end cost at 5 × (search + extract).
+ *  - Per-extraction body is trimmed to ~2000 chars to keep the
+ *    writer prompt's token cost bounded; longer pages lose the tail
+ *    with a trailing `'...'`.
+ *
+ * Failure semantics — all best-effort:
+ *  - A search-query throw is silently swallowed; the loop continues
+ *    with the next query so one flaky provider call doesn't lose the
+ *    whole research pass.
+ *  - An extraction throw falls back to the search-result snippet
+ *    (kept as the source body) rather than dropping the source.
+ *  - `seedResults` are pre-deduped and inserted FIRST, so a caller
+ *    that already has the best results from an upstream phase
+ *    guarantees they survive the dedup pass and aren't shadowed by
+ *    fresh search hits.
  */
 export async function researchPair(
     pair: ComparisonPair,

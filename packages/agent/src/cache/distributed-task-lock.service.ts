@@ -10,6 +10,44 @@ interface RunExclusiveOptions {
     onLocked?: () => void;
 }
 
+/**
+ * DB-backed distributed mutex using the `cache_entries` table.
+ *
+ * **The atomic primitive is `INSERT` on a PK-keyed row.** Two
+ * acquirers race; the loser hits a unique-violation, catches it,
+ * confirms a row exists, and returns `null` — the canonical
+ * Postgres "INSERT-as-lock" pattern. Don't switch to UPDATE-based
+ * locking without re-verifying the race semantics.
+ *
+ * **Three TTLs you can tune (all bounded by each other):**
+ *
+ *   - `DEFAULT_TTL_MS` (15 min) — single lease window. The
+ *     heartbeat refreshes BEFORE this elapses.
+ *   - `DEFAULT_MAX_LIFETIME_MS` (24 h) — hard ceiling on how long
+ *     ANY single call can hold the lock, including heartbeat
+ *     refreshes. After `hardDeadline`, the heartbeat stops
+ *     refreshing and the lock decays into stale.
+ *   - `MAX_STALE_LOCK_MS` (24 h) — a held lock older than this is
+ *     forcibly stolen by the next acquirer (see `tryAcquire`'s
+ *     `createdAt < staleBefore` clause). Prevents a process that
+ *     died without `release()` from locking the world forever.
+ *
+ * **Token-validated release.** Each acquirer mints a unique token
+ * (`pid-time-random`) stored in `value`; `release()` deletes WHERE
+ * `value = :token`. If another node already stole the lock after
+ * stale expiry, the original holder's `release()` is a no-op
+ * rather than freeing the NEW holder's lock — load-bearing safety
+ * property, don't change to unconditional DELETE.
+ *
+ * **`isLocked` is informational, NOT a synchronisation primitive.**
+ * It just answers "does a live lock row exist right now?" — there
+ * is no atomic check-then-act. Callers that need "do X iff
+ * unlocked" must use `runExclusive`.
+ *
+ * **`heartbeat.unref?.()`** allows Node to exit even with an active
+ * heartbeat — prevents the lock from pinning the process alive
+ * during shutdown.
+ */
 @Injectable()
 export class DistributedTaskLockService {
     private readonly logger = new Logger(DistributedTaskLockService.name);
