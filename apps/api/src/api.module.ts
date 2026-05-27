@@ -38,6 +38,7 @@ import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
+import { ScopeModule } from './scope/scope.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -128,6 +129,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // OnboardingModule, GitHubAppModule) and the public
         // `GET /api/users/check-username` endpoint.
         UsersModule,
+        // EW-657 (Tenants & Organizations Phase 5b) — global
+        // ScopeContextService + TypeORM subscriber that auto-stamps
+        // `tenantId` / `organizationId` on Tier A/C inserts. No-op
+        // until Phase 7's slug-resolver middleware populates the
+        // request scope.
+        ScopeModule,
     ],
     providers: [
         {
