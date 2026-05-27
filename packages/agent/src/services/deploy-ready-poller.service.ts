@@ -61,12 +61,12 @@ const PENDING_STATES: readonly string[] = ['pending', 'INITIALIZING', 'QUEUED', 
  *     analytics. Filter out elapsedMs=0 in the PostHog query, or
  *     bake a `hasElapsed` discriminator into the payload here.
  *
- *   - **Domain resolution** falls through `options.domain` →
- *     `EVER_WORKS_DOMAIN` env → hardcoded `'ever.works'`. The
- *     hardcoded fallback means a misconfigured deploy still tries
- *     to probe the production hostname pattern — which can give
- *     misleading "deployments are ready" results in staging if
- *     the staging slug happens to exist in prod.
+ *   - **Domain resolution** is `options.domain` → `EVER_WORKS_DOMAIN`
+ *     env → THROW. We deliberately do NOT fall through to a
+ *     hardcoded `'ever.works'`: a misconfigured staging would
+ *     otherwise probe the production hostname pattern and report
+ *     false-positive READY states for any slug that happens to
+ *     exist in prod. Misconfig surfaces as a startup-time error.
  */
 @Injectable()
 export class DeployReadyPollerService {
@@ -88,7 +88,17 @@ export class DeployReadyPollerService {
         const httpFetch = options.fetch ?? fetch;
         const now = options.now ?? (() => new Date());
         const timeoutMs = options.healthTimeoutMs ?? 5000;
-        const domain = options.domain ?? process.env.EVER_WORKS_DOMAIN ?? 'ever.works';
+        // Domain MUST be supplied explicitly (caller option) or via
+        // `EVER_WORKS_DOMAIN` env. No hardcoded fallback: a misconfigured
+        // staging probing the production hostname pattern would report
+        // false-positive READY states for any slug that happens to match
+        // a live production site (greptile P2 on PR #1031).
+        const domain = options.domain ?? process.env.EVER_WORKS_DOMAIN;
+        if (!domain) {
+            throw new Error(
+                'deploy-ready-poller: domain not configured — set EVER_WORKS_DOMAIN env or pass options.domain',
+            );
+        }
 
         const pendingWorks = await this.workRepository.findByDeploymentStates([...PENDING_STATES]);
         const summary: DeployReadyPollerSummary = {
