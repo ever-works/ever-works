@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import {
     AuthAccountRepository,
@@ -6,6 +5,7 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import type { OnboardingAccountUpsert } from '@ever-works/agent/onboarding';
+import { UsernameAllocatorService } from '@src/users/services/username-allocator.service';
 
 /**
  * Api-side implementation of `OnboardingAccountUpsert` (T9b).
@@ -28,6 +28,7 @@ export class OnboardingAccountAdapter implements OnboardingAccountUpsert {
         private readonly users: UserRepository,
         private readonly authAccounts: AuthAccountRepository,
         private readonly githubLinks: GitHubAppUserLinkRepository,
+        private readonly usernameAllocator: UsernameAllocatorService,
     ) {}
 
     async upsertFromGithub(input: {
@@ -142,19 +143,16 @@ export class OnboardingAccountAdapter implements OnboardingAccountUpsert {
      * call throws; the caller is responsible for retrying onboarding
      * if the throw matters to them.
      */
+    /**
+     * EW-652 (Tenants & Organizations Phase 0) — delegate to the shared
+     * `UsernameAllocatorService.allocateUsername`. The previous inline
+     * loop's behavior (sanitize + suffix on collision + random fallback)
+     * is preserved by the allocator with the same semantics and an
+     * identical 10k-attempt safety valve. Method kept as a thin wrapper
+     * so the file's public surface and existing test mocks stay stable.
+     */
     private async resolveUniqueUsername(base: string): Promise<string> {
-        const sanitized = (base || 'agent').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'agent';
-        let candidate = sanitized;
-        let suffix = 1;
-        while (await this.users.findByUsername(candidate)) {
-            suffix += 1;
-            candidate = `${sanitized}-${suffix}`;
-            if (suffix > 50) {
-                candidate = `${sanitized}-${randomUUID().slice(0, 8)}`;
-                break;
-            }
-        }
-        return candidate;
+        return this.usernameAllocator.allocateUsername(base || 'agent');
     }
 }
 

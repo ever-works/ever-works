@@ -7,6 +7,7 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    BeforeInsert,
 } from 'typeorm';
 import type { ClassToObject } from './types';
 import { TimestampColumn, PortableDateColumn } from './_types';
@@ -36,8 +37,22 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
+    // EW-652 (Tenants & Organizations Phase 0): username uniqueness is enforced
+    // by a case-insensitive expression UNIQUE index on `lower(username)` — see
+    // migration `1779991000000-AddUniqueIndexToUsername.ts`. Declared `unique`
+    // here as a hint to TypeORM / IDEs; the formal constraint lives in the
+    // migration because the column-level `unique: true` would generate a
+    // case-sensitive UNIQUE, which is not what the spec wants.
+    @Column({ unique: true })
     username: string;
+
+    // EW-652: URL-safe denormalized form of `username`, used by the slug
+    // routing layer (EW-659 Phase 7). Always lowercase, matches `[a-z0-9-]+`.
+    // Globally unique across the table; once `organizations.slug` lands in
+    // EW-653 (Phase 1) the `UsernameAllocatorService` enforces no
+    // cross-table collision at write time.
+    @Column({ unique: true })
+    slug: string;
 
     // EW-617 G2: anonymous (zero-friction) users have no email/password until
     // they claim the account via POST /api/auth/claim. Existing rows keep
@@ -218,6 +233,44 @@ export class User {
     defaultPlan?: ClassToObject<SubscriptionPlan> | null;
 
     local: boolean = false;
+
+    /**
+     * EW-652 (Tenants & Organizations Phase 0) — auto-derive `slug` from
+     * `username` at insert time if the caller didn't set it explicitly.
+     *
+     * This means every existing `userRepository.create({ username, ... })`
+     * call site continues to work without modification: the slug is
+     * derived in-memory before the row hits the DB. Callers that want
+     * an explicit slug (e.g. `UsernameAllocatorService.allocateUsername`
+     * pipelines) can still set `slug` directly and this hook is a no-op.
+     *
+     * Normalization is the same shape as `UsernameAllocatorService.normalize`
+     * — lowercase, replace any non-`[a-z0-9-]` with hyphen, collapse runs,
+     * trim leading/trailing hyphens. If the result is empty (degenerate
+     * username), we fall back to `u-anon` which is guaranteed to collide
+     * with at most one other unset row; the DB UNIQUE constraint will
+     * catch any race.
+     *
+     * The hook only fires on INSERT — not on UPDATE. Username renames go
+     * through a service layer (out of scope here) that explicitly updates
+     * both columns.
+     */
+    @BeforeInsert()
+    private deriveSlugIfMissing(): void {
+        if (this.slug) {
+            return;
+        }
+        if (!this.username) {
+            this.slug = 'u-anon';
+            return;
+        }
+        const normalized = this.username
+            .toLowerCase()
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        this.slug = normalized.length > 0 ? normalized : 'u-anon';
+    }
 
     asCommitter(): { name: string; email: string } {
         // Anonymous users have null email; only happens before claim-account.
