@@ -106,8 +106,14 @@ export function NewAgentDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
-    // Pre-fill from `?prompt=` (global `/new` page hands off the
-    // user's free-text description as the Agent's name/title).
+    // Pre-fill from `?prompt=` — supports direct deep-link navigation
+    // to `/agents/new?prompt=…` (e.g. from external integrations or
+    // callers that still want to pre-populate the form via URL). Note:
+    // the global `/new` page no longer passes `?prompt=` for the Agent
+    // chip; it sends the prompt through the chat channel instead and
+    // routes here without a query string. This effect is a no-op on
+    // that path and only fires when something explicitly puts a
+    // `prompt` param in the URL.
     useEffect(() => {
         const promptParam = searchParams?.get('prompt');
         if (!promptParam) return;

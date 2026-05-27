@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
@@ -33,6 +33,11 @@ vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
 
 vi.mock('@/lib/hooks/use-chat-panel', () => ({
     useChatPanel: () => ({ open: false, setOpen: vi.fn() }),
+}));
+
+const createMissionMock = vi.fn();
+vi.mock('@/app/actions/dashboard/missions', () => ({
+    createMissionAction: (...args: unknown[]) => createMissionMock(...args),
 }));
 
 import { NewPageClient } from './NewPageClient';
@@ -190,5 +195,60 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         );
         const textarea = getTextarea(container);
         expect(textarea.value).toBe(prefill);
+    });
+
+    describe('Mission template path (initialTemplateId set)', () => {
+        it('Submit with chip=mission + template inline-creates with missionTemplateRepo, opens chat WITHOUT a message, routes to the new Mission detail page', async () => {
+            createMissionMock.mockClear();
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
+            createMissionMock.mockResolvedValueOnce({ id: 'm-tpl-new', title: 'x' });
+            const { container } = render(
+                <NewPageClient
+                    initialType="mission"
+                    initialPrompt="Starter Business"
+                    initialTemplateId="starter-business"
+                />,
+            );
+            fireEvent.change(getTextarea(container), {
+                target: { value: 'Starter Business — long enough to enable Submit' },
+            });
+            await act(async () => {
+                fireEvent.click(getSubmit(container));
+            });
+            // The template path must persist the template id on the
+            // new Mission — Greptile P1 on PR #1038 caught the
+            // regression where this was silently dropped.
+            await waitFor(() =>
+                expect(createMissionMock).toHaveBeenCalledWith({
+                    description: 'Starter Business — long enough to enable Submit',
+                    type: 'one-shot',
+                    missionTemplateRepo: 'starter-business',
+                }),
+            );
+            // Codex P2: must NOT send the prompt into chat after the
+            // inline create — the chat AI's `createMission` tool would
+            // re-create the Mission as a second non-template row.
+            expect(startFromPromptMock).not.toHaveBeenCalled();
+            // Canvas is the new Mission's detail page.
+            await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/missions/m-tpl-new'));
+        });
+
+        it('Submit with chip=mission WITHOUT a template falls through to the chat-only path (no inline create)', () => {
+            createMissionMock.mockClear();
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
+            const { container } = render(<NewPageClient initialType="mission" />);
+            fireEvent.change(getTextarea(container), {
+                target: { value: 'No template, just a typed mission goal' },
+            });
+            fireEvent.click(getSubmit(container));
+            expect(createMissionMock).not.toHaveBeenCalled();
+            expect(startFromPromptMock).toHaveBeenCalledWith(
+                'No template, just a typed mission goal',
+                { intent: 'Mission' },
+            );
+            expect(routerPushMock).toHaveBeenCalledWith('/missions');
+        });
     });
 });

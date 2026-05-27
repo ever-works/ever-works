@@ -21,6 +21,7 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import { createMissionAction } from '@/app/actions/dashboard/missions';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -210,7 +211,40 @@ export function NewPageClient({
             toast.error(t('hints.minLength'));
             return;
         }
-        startSubmit(() => {
+        startSubmit(async () => {
+            // Special case: Mission with a template-id in scope.
+            // `/new?type=mission&template=<id>` comes from "Use this
+            // template" buttons elsewhere in the app and needs the
+            // template persisted as `missionTemplateRepo` on the new
+            // Mission. The chat AI doesn't yet have a template-aware
+            // Mission-creation tool, so dropping the id would silently
+            // lose the template link (Greptile P1 on PR #1038). Keep
+            // the legacy inline-create path here.
+            //
+            // Importantly, we DO NOT then send the same prompt into
+            // the chat AI: the chat has `createMission` registered as
+            // a tool and the system prompt instructs it to use tools
+            // for mutations (Codex P2), so re-sending "I want to
+            // create a Mission. <description>" would trigger a SECOND
+            // non-template Mission creation. Just open the panel so
+            // the user can iterate manually if they want, but don't
+            // dispatch a message.
+            if (selectedChip === 'mission' && initialTemplateId) {
+                try {
+                    const mission = await createMissionAction({
+                        description,
+                        type: 'one-shot',
+                        missionTemplateRepo: initialTemplateId,
+                    });
+                    toast.success(t('toasts.missionCreated'));
+                    setChatOpen?.(true);
+                    router.push(ROUTES.DASHBOARD_MISSION(mission.id));
+                } catch (err) {
+                    toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
+                }
+                return;
+            }
+
             // Send the prompt into the chat AI so the user can keep
             // iterating in chat — replaces the old "submit + redirect
             // with the same prompt pre-filled" pattern. The chat AI's
@@ -247,10 +281,6 @@ export function NewPageClient({
                 return;
             }
         });
-        // initialTemplateId stays informational for now — Mission
-        // template-driven creation moves into the chat flow once the
-        // chat surface understands "use template <id>" intents.
-        void initialTemplateId;
     };
 
     // Per-chip placeholder cycle. New reference on each chip flip
