@@ -72,9 +72,15 @@ export class UpgradeWorkKnowledgeDocumentOrganizationIdToFk1779991008000 impleme
         }
 
         // 1b. Null out the recoverable orphans (rows that still have
-        // workId set, so the CHECK passes after the NULL).
+        // workId set, so the CHECK passes after the NULL). We
+        // explicitly filter `workId IS NOT NULL` in both the SELECT and
+        // the UPDATE — defense in depth. After step 1a above, the
+        // `workId IS NULL` orphans have all been deleted, so this
+        // filter is technically redundant; but encoding the invariant
+        // in the queries themselves makes step 1b safe in isolation
+        // and protects against future re-ordering. (Greptile P1.)
         const orphans = (await queryRunner.query(
-            `SELECT COUNT(*) AS cnt FROM "work_knowledge_documents" WHERE "organizationId" IS NOT NULL AND "organizationId" NOT IN (SELECT "id" FROM "organizations")`,
+            `SELECT COUNT(*) AS cnt FROM "work_knowledge_documents" WHERE "workId" IS NOT NULL AND "organizationId" IS NOT NULL AND "organizationId" NOT IN (SELECT "id" FROM "organizations")`,
         )) as Array<{ cnt: number | string }>;
         const orphanCount = Number(orphans[0]?.cnt ?? 0);
         if (orphanCount > 0) {
@@ -83,7 +89,7 @@ export class UpgradeWorkKnowledgeDocumentOrganizationIdToFk1779991008000 impleme
                 `[UpgradeWorkKnowledgeDocumentOrganizationIdToFk] Nulling out ${orphanCount} orphan work_knowledge_documents.organizationId value(s) — no matching row in organizations. These were forward-looking UUIDs from before the FK existed.`,
             );
             await queryRunner.query(
-                `UPDATE "work_knowledge_documents" SET "organizationId" = NULL WHERE "organizationId" IS NOT NULL AND "organizationId" NOT IN (SELECT "id" FROM "organizations")`,
+                `UPDATE "work_knowledge_documents" SET "organizationId" = NULL WHERE "workId" IS NOT NULL AND "organizationId" IS NOT NULL AND "organizationId" NOT IN (SELECT "id" FROM "organizations")`,
             );
         }
 
