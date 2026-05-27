@@ -490,6 +490,394 @@
                 "description": "Chúng tôi không thể kết nối tài khoản {provider} của bạn. Vui lòng thử lại."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideas",
+                "titleWithName": "Ideas"
+            },
+            "actions": {
+                "accept": "Build",
+                "viewWork": "View Work",
+                "dismiss": "Dismiss",
+                "dismissAria": "Dismiss this idea",
+                "refresh": "Suggest more"
+            },
+            "researching": {
+                "title": "Drafting ideas from your profile…",
+                "subtitle": "This usually takes under a minute."
+            },
+            "empty": {
+                "title": "No ideas right now.",
+                "subtitle": "New suggestions will appear here when they are ready."
+            },
+            "errors": {
+                "rateLimited": "Daily limit reached. Try again tomorrow.",
+                "generic": "Couldn't refresh ideas. Please try again."
+            },
+            "plugins": {
+                "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
+            }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "quickAdd": {
+                "label": "Bắt đầu Nhiệm vụ mới",
+                "submitTitle": "Tạo Nhiệm vụ",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "created": "Nhiệm vụ đã được tạo",
+                "error": "Không thể tạo Nhiệm vụ. Vui lòng thử lại."
+            },
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "Mở trình tạo thống nhất"
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "Agents",
+            "subtitle": "Đội ngũ AI của bạn. Mỗi Agent mang một linh hồn (bản sắc), hướng dẫn và ngân sách - và hành động trên các Nhiệm vụ, Công việc, hoặc toàn bộ tenant của bạn.",
+            "newAgent": "+ Agent mới",
+            "empty": {
+                "title": "Chưa có Agent nào.",
+                "subtitle": "Tạo Agent đầu tiên của bạn để ủy quyền công việc lặp lại. Agent phạm vi tenant hoạt động trên toàn bộ tài khoản; Agent phạm vi Nhiệm vụ hoặc Công việc chỉ tập trung vào một mục tiêu duy nhất."
+            },
+            "card": {
+                "scopeTenant": "Tenant",
+                "scopeMission": "Nhiệm vụ",
+                "scopeWork": "Công việc",
+                "scopeIdea": "Ý tưởng",
+                "statusDraft": "Bản nháp",
+                "statusActive": "Hoạt động",
+                "statusPaused": "Tạm dừng",
+                "statusRunning": "Đang chạy",
+                "statusError": "Lỗi",
+                "statusArchived": "Lưu trữ",
+                "noTitle": "(không tiêu đề)",
+                "noCadence": "Không có nhịp đập",
+                "cadencePrefix": "Nhịp đập:"
+            },
+            "tabs": {
+                "dashboard": "Bảng điều khiển",
+                "activity": "Hoạt động",
+                "instructions": "Hướng dẫn",
+                "skills": "Kỹ năng",
+                "budgets": "Ngân sách",
+                "settings": "Cài đặt"
+            },
+            "newDialog": {
+                "title": "Agent mới",
+                "step1Title": "Chọn phạm vi",
+                "step2Title": "Đặt tên Agent",
+                "nameLabel": "Tên",
+                "namePlaceholder": "ví dụ: CEO, Người kiểm duyệt, Người soạn thảo nội dung",
+                "scopeTenantDesc": "Hành động trên toàn bộ tenant của bạn",
+                "scopeMissionDesc": "Được khóa vào một Nhiệm vụ",
+                "scopeWorkDesc": "Được khóa vào một Công việc",
+                "scopeIdeaDesc": "Được khóa vào một Ý tưởng",
+                "cancel": "Hủy",
+                "back": "Trước",
+                "next": "Tiếp",
+                "create": "Tạo Agent"
+            }
+        },
+        "tasksPage": {
+            "title": "Tasks",
+            "subtitle": "Các mục công việc có thể theo dõi được giao cho người hoặc Agent.",
+            "empty": {
+                "title": "Chưa có Task nào.",
+                "subtitle": "Tasks sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
+            },
+            "list": {
+                "newTask": "+ Task mới",
+                "kanban": "Kanban",
+                "list": "Danh sách",
+                "filter": {
+                    "status": "Trạng thái",
+                    "priority": "Ưu tiên",
+                    "label": "Nhãn",
+                    "all": "Tất cả"
+                }
+            },
+            "newDialog": {
+                "title": "Tạo Task mới",
+                "name": "Tiêu đề",
+                "namePlaceholder": "Thêm tiêu đề task",
+                "description": "Mô tả",
+                "descriptionPlaceholder": "Thêm ngữ cảnh (tùy chọn)",
+                "priority": "Ưu tiên",
+                "labels": "Nhãn",
+                "labelsPlaceholder": "phân cách bằng dấu phẩy",
+                "cancel": "Hủy",
+                "create": "Tạo"
+            },
+            "detail": {
+                "moveTo": "Di chuyển đến",
+                "noTransitions": "Không có chuyển đổi nào có sẵn.",
+                "conversation": "Cuộc trò chuyện",
+                "noMessages": "Chưa có tin nhắn nào.",
+                "post": "Đăng",
+                "draftPlaceholder": "Viết một tin nhắn. Sử dụng @agent-slug để ping một Agent.",
+                "attachments": "Đính kèm",
+                "fileCount": "{count, plural, one {1 file} other {# files}}",
+                "dropFiles": "Kéo & thả một file vào đây hoặc",
+                "browse": "Duyệt",
+                "uploading": "Đang tải lên...",
+                "detach": "Tách",
+                "labels": "Nhãn",
+                "edited": "đã chỉnh sửa"
+            },
+            "recurring": {
+                "section": "Lên lịch định kỳ",
+                "promoteToRecurring": "Nâng cấp thành định kỳ",
+                "demote": "Hạ cấp thành một lần",
+                "daily": "Hàng ngày",
+                "weekly": "Hàng tuần",
+                "monthly": "Hàng tháng",
+                "custom": "RRULE tùy chỉnh",
+                "timeOfDay": "Thời gian trong ngày",
+                "dayOfWeek": "Thứ trong tuần",
+                "dayOfMonth": "Ngày trong tháng",
+                "timezone": "Múi giờ",
+                "save": "Lưu lịch"
+            },
+            "status": {
+                "backlog": "Hàng đợi",
+                "todo": "Cần làm",
+                "in_progress": "Đang tiến hành",
+                "in_review": "Đang xem xét",
+                "blocked": "Bị chặn",
+                "done": "Hoàn thành",
+                "cancelled": "Đã hủy"
+            }
+        },
+        "skillsPage": {
+            "title": "Skills",
+            "subtitle": "Hướng dẫn có thể tái sử dụng, phiên bản hóa mà Agents có thể kéo vào một lần chạy khi liên quan.",
+            "empty": {
+                "title": "Chưa có Skill nào.",
+                "subtitle": "Skills sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
+            },
+            "list": {
+                "newSkill": "+ Skill mới",
+                "filter": {
+                    "scope": "Phạm vi",
+                    "all": "Tất cả"
+                }
+            },
+            "detail": {
+                "instructions": "Hướng dẫn",
+                "bindings": "Ràng buộc",
+                "bindingHelper": "Gắn Skill này với một Agent, Nhiệm vụ, Ý tưởng, hoặc Công việc. Ưu tiên 1 = mức độ ưu tiên cao nhất.",
+                "addBinding": "+ Thêm ràng buộc",
+                "removeBinding": "Xóa bỏ",
+                "targetType": "Gắn với",
+                "priority": "Ưu tiên",
+                "agent": "Agent",
+                "mission": "Nhiệm vụ",
+                "idea": "Ý tưởng",
+                "work": "Công việc",
+                "tenant": "Tenant"
+            }
+        },
+        "templatesPage": {
+            "title": "Templates",
+            "subtitle": "Các điểm khởi đầu được xây dựng sẵn cho Agents, Skills, và Tasks.",
+            "empty": "Chưa có mẫu nào có sẵn.",
+            "useTemplate": "Sử dụng mẫu",
+            "browse": "Duyệt mẫu",
+            "entity": {
+                "agent": "Agent",
+                "skill": "Skill",
+                "task": "Task"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "submitTitle": "Thêm Ý tưởng",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
+        },
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
+        },
         "header": {
             "welcome": "Chào mừng trở lại, {username}!",
             "subtitle": "Quản lý các công việc được hỗ trợ bởi AI của bạn và theo dõi hiệu suất của chúng",
@@ -704,9 +1092,9 @@
                 "apiKeys": "Khóa API",
                 "data": "Dữ liệu",
                 "githubApp": "Ứng dụng GitHub",
+                "workAgent": "Work Agent",
                 "gitProviders": "Nhà cung cấp Git",
-                "dangerZone": "Vùng nguy hiểm",
-                "workAgent": "Work Agent"
+                "dangerZone": "Vùng nguy hiểm"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -731,6 +1119,101 @@
                 "branchUnknown": "Nhánh mặc định không khả dụng",
                 "private": "Riêng tư",
                 "public": "Công khai"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
+                    },
+                    "queue": {
+                        "title": "Queue a goal",
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
+                    },
+                    "liveRun": {
+                        "title": "Live run",
+                        "description": "Current state and recent agent activity."
+                    },
+                    "recentGoals": {
+                        "title": "Recent goals",
+                        "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
+                    }
+                },
+                "fields": {
+                    "enabled": "Enable Work agent",
+                    "autoApproveLowImpact": "Auto-approve low-impact changes",
+                    "dailySuggestions": "Daily suggestions",
+                    "dryRunByDefault": "Dry run by default",
+                    "maxWorksPerRun": "Max Works per run",
+                    "maxItemsPerWork": "Max items per Work",
+                    "maxBudgetPerRun": "Max budget per run",
+                    "approvalThreshold": "Approval threshold",
+                    "confirmBeforeCreate": "Confirm before creating Works",
+                    "confirmBeforeDelete": "Confirm before deleting items",
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
+                },
+                "actions": {
+                    "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
+                    "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
+                },
+                "metrics": {
+                    "works": "Works",
+                    "items": "Items"
+                },
+                "labels": {
+                    "dryRun": "Dry run",
+                    "liveRun": "Live run"
+                },
+                "empty": {
+                    "noActiveRun": "No active Work agent run.",
+                    "noGoals": "No Work agent goals yet.",
+                    "waitingForUpdate": "Waiting for the first run update."
+                },
+                "toasts": {
+                    "settingsSaved": "Work agent settings saved",
+                    "settingsError": "Failed to save settings",
+                    "goalQueued": "Work agent plan prepared",
+                    "goalError": "Failed to queue goal",
+                    "goalCanceled": "Work agent goal canceled",
+                    "cancelError": "Failed to cancel goal"
+                }
             },
             "data": {
                 "exportTitle": "Xuất dữ liệu",
@@ -839,6 +1322,11 @@
             "profile": {
                 "title": "Cài đặt hồ sơ",
                 "subtitle": "Cập nhật thông tin hồ sơ và ảnh đại diện",
+                "budgetAlerts": {
+                    "title": "Budget alert emails",
+                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
+                    "toggleLabel": "Email me budget alerts"
+                },
                 "fields": {
                     "name": "Tên",
                     "username": "Tên người dùng",
@@ -870,11 +1358,6 @@
                     "description": "Ghi đè tên và email được sử dụng trong các commit git. Để trống để sử dụng tên tài khoản ({defaultName}) và email ({defaultEmail}) của bạn.",
                     "nameLabel": "Tên người thực hiện",
                     "emailLabel": "Email người thực hiện"
-                },
-                "budgetAlerts": {
-                    "title": "Budget alert emails",
-                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
-                    "toggleLabel": "Email me budget alerts"
                 }
             },
             "security": {
@@ -979,101 +1462,6 @@
                     "revokeError": "Không thể thu hồi khóa API",
                     "copyError": "Không thể sao chép vào bảng tạm"
                 }
-            },
-            "workAgent": {
-                "sections": {
-                    "agent": {
-                        "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
-                    },
-                    "guardrails": {
-                        "title": "Guardrails",
-                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
-                    },
-                    "queue": {
-                        "title": "Queue a goal",
-                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
-                    },
-                    "liveRun": {
-                        "title": "Live run",
-                        "description": "Current state and recent agent activity."
-                    },
-                    "recentGoals": {
-                        "title": "Recent goals",
-                        "description": "Pending, running, and completed Work agent instructions."
-                    },
-                    "autoGenerateIdeas": {
-                        "title": "Auto-generate Ideas",
-                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
-                    },
-                    "autoBuildWorks": {
-                        "title": "Auto-build Works",
-                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
-                    },
-                    "autoRetry": {
-                        "title": "Auto-retry policy",
-                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
-                    },
-                    "accountBudgets": {
-                        "title": "Account-wide budgets",
-                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
-                    }
-                },
-                "fields": {
-                    "enabled": "Enable Work agent",
-                    "autoApproveLowImpact": "Auto-approve low-impact changes",
-                    "dailySuggestions": "Daily suggestions",
-                    "dryRunByDefault": "Dry run by default",
-                    "maxWorksPerRun": "Max Works per run",
-                    "maxItemsPerWork": "Max items per Work",
-                    "maxBudgetPerRun": "Max budget per run",
-                    "approvalThreshold": "Approval threshold",
-                    "confirmBeforeCreate": "Confirm before creating Works",
-                    "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
-                    "autoGenerateCadenceMinutes": "Run every N minutes",
-                    "autoGenerateBatchSize": "Ideas per cycle",
-                    "autoBuildThrottlePerDay": "Daily auto-build cap",
-                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
-                    "maxAutoRetries": "Max retries (0–5)",
-                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
-                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
-                    "accountWideCapEnabled": "Set a monthly cap",
-                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
-                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
-                },
-                "actions": {
-                    "saveSettings": "Save settings",
-                    "saveSection": "Save",
-                    "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
-                    "preparePlan": "Prepare plan",
-                    "stop": "Stop"
-                },
-                "queue": {
-                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
-                },
-                "metrics": {
-                    "works": "Works",
-                    "items": "Items"
-                },
-                "labels": {
-                    "dryRun": "Dry run",
-                    "liveRun": "Live run"
-                },
-                "empty": {
-                    "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
-                    "waitingForUpdate": "Waiting for the first run update."
-                },
-                "toasts": {
-                    "settingsSaved": "Work agent settings saved",
-                    "settingsError": "Failed to save settings",
-                    "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
-                }
             }
         },
         "stats": {
@@ -1082,8 +1470,32 @@
             "totalWorks": "Tổng công việc",
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
-            "fromLastMonth": "từ tháng trước",
-            "monthSpend": "Month Spend"
+            "monthSpend": "Month Spend",
+            "fromLastMonth": "từ tháng trước"
+        },
+        "adminUsage": {
+            "title": "Platform usage",
+            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
+            "periodLabel": "{period}",
+            "totalSpend": "Total spend: {amount}",
+            "empty": "No usage recorded this period.",
+            "columnUser": "User",
+            "columnEmail": "Email",
+            "columnWork": "Directory",
+            "columnUnits": "Units",
+            "columnCost": "Cost",
+            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
+        },
+        "budgets": {
+            "overviewTitle": "Spend in {period}",
+            "overviewProgressLabel": "{percent}% of {cap} cap",
+            "overviewOverageSuffix": " (overage allowed)",
+            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
+            "topPluginsTitle": "Top plugins by spend",
+            "topPluginsEmpty": "No usage recorded yet this period.",
+            "trendTitle": "Daily spend — {period}",
+            "trendEmpty": "No usage recorded yet this period.",
+            "trendDayLabel": "Day {day}"
         },
         "workCard": {
             "status": {
@@ -1703,6 +2115,11 @@
                     "screenshotError": "Đã xảy ra lỗi khi chụp ảnh màn hình",
                     "featured": "Mục Nổi Bật",
                     "featuredHelp": "Đánh dấu mục này là nổi bật trong danh mục",
+                    "markdown": "Content (Markdown, optional)",
+                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
+                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
+                    "showPreview": "Preview",
+                    "hidePreview": "Hide preview",
                     "updateWithPR": "Tạo Pull Request",
                     "updateWithPRHelp": "Gửi thay đổi dưới dạng pull request thay vì commit trực tiếp",
                     "cancel": "Hủy",
@@ -1717,15 +2134,15 @@
                         "invalidUrl": "Vui lòng nhập URL hợp lệ bao gồm http:// hoặc https://",
                         "invalidImageUrl": "Vui lòng nhập URL hình ảnh hợp lệ",
                         "requiredFields": "Vui lòng điền đầy đủ các trường bắt buộc"
-                    },
-                    "markdown": "Content (Markdown, optional)",
-                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
-                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
-                    "showPreview": "Preview",
-                    "hidePreview": "Hide preview"
+                    }
                 },
                 "editDisplay": "Chỉnh Sửa Hiển Thị",
                 "editDisplayDescription": "Chuyển đổi trạng thái nổi bật và đặt thứ tự hiển thị.",
+                "editContent": "Edit content",
+                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
+                "editContentSuccess": "Item content updated.",
+                "editContentFailed": "Failed to update item content.",
+                "editContentError": "An error occurred while updating item content.",
                 "orderLabel": "Thứ Tự Hiển Thị (tùy chọn)",
                 "orderHelp": "Số nhỏ hơn sẽ hiển thị sớm hơn trong nhóm nổi bật/không nổi bật.",
                 "deleteDialogTitle": "Xóa mục",
@@ -1922,12 +2339,7 @@
                     "saving": "Đang lưu...",
                     "saveSuccess": "Đã lưu cài đặt kiểm tra nguồn",
                     "saveFailed": "Không thể lưu cài đặt kiểm tra nguồn"
-                },
-                "editContent": "Edit content",
-                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
-                "editContentSuccess": "Item content updated.",
-                "editContentFailed": "Failed to update item content.",
-                "editContentError": "An error occurred while updating item content."
+                }
             },
             "generator": {
                 "tabs": {
@@ -2099,8 +2511,72 @@
                 "tabs": {
                     "general": "Chung",
                     "members": "Thành viên",
-                    "navigationLabel": "Tab cài đặt",
-                    "budgets": "Budgets"
+                    "budgets": "Budgets",
+                    "navigationLabel": "Tab cài đặt"
+                },
+                "budgets": {
+                    "title": "Budgets & Usage",
+                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
+                    "periodLabel": "{period} · spent {spent}",
+                    "globalCap": {
+                        "heading": "Global cap",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
+                        "createButton": "Create global cap",
+                        "saveButton": "Save",
+                        "removeButton": "Remove",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
+                        "createSuccess": "Create global budget succeeded",
+                        "createError": "Create global budget failed",
+                        "updateSuccess": "Update global budget succeeded",
+                        "updateError": "Update global budget failed",
+                        "deleteSuccess": "Delete global budget succeeded",
+                        "deleteError": "Delete global budget failed"
+                    },
+                    "pluginCaps": {
+                        "heading": "Per-plugin caps",
+                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
+                        "empty": "No per-plugin caps. Add one below.",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "addHeading": "Add plugin cap",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "e.g. openai",
+                        "pluginSelectPlaceholder": "Select a plugin…",
+                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
+                        "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage",
+                        "addButton": "Add cap",
+                        "saveButton": "Save",
+                        "deleteAria": "Delete budget",
+                        "errorPluginRequired": "Plugin id is required.",
+                        "errorPluginDuplicate": "A budget for this plugin already exists.",
+                        "errorPositive": "Enter a positive cap value.",
+                        "createSuccess": "Create plugin budget succeeded",
+                        "createError": "Create plugin budget failed",
+                        "updateSuccess": "Update plugin budget succeeded",
+                        "updateError": "Update plugin budget failed",
+                        "deleteSuccess": "Delete plugin budget succeeded",
+                        "deleteError": "Delete plugin budget failed"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Spend by plugin",
+                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
+                        "empty": "No usage recorded this period.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capability",
+                        "columnUnits": "Units",
+                        "columnCost": "Cost"
+                    },
+                    "export": {
+                        "downloadCsv": "Download CSV",
+                        "downloadingCsv": "Preparing CSV…",
+                        "csvFailed": "CSV export failed"
+                    }
                 },
                 "sourceSettings": "Kho lưu trữ nguồn",
                 "originalSource": "Nguồn gốc",
@@ -2405,73 +2881,13 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                },
-                "budgets": {
-                    "title": "Budgets & Usage",
-                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
-                    "periodLabel": "{period} · spent {spent}",
-                    "globalCap": {
-                        "heading": "Global cap",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
-                        "createButton": "Create global cap",
-                        "saveButton": "Save",
-                        "removeButton": "Remove",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
-                        "createSuccess": "Create global budget succeeded",
-                        "createError": "Create global budget failed",
-                        "updateSuccess": "Update global budget succeeded",
-                        "updateError": "Update global budget failed",
-                        "deleteSuccess": "Delete global budget succeeded",
-                        "deleteError": "Delete global budget failed"
-                    },
-                    "pluginCaps": {
-                        "heading": "Per-plugin caps",
-                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
-                        "empty": "No per-plugin caps. Add one below.",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "addHeading": "Add plugin cap",
-                        "pluginIdLabel": "Plugin",
-                        "pluginIdPlaceholder": "e.g. openai",
-                        "pluginSelectPlaceholder": "Select a plugin…",
-                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
-                        "allPluginsCapped": "All eligible plugins already have a cap.",
-                        "noMatchingPlugins": "No plugins match this search.",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage",
-                        "addButton": "Add cap",
-                        "saveButton": "Save",
-                        "deleteAria": "Delete budget",
-                        "errorPluginRequired": "Plugin id is required.",
-                        "errorPluginDuplicate": "A budget for this plugin already exists.",
-                        "errorPositive": "Enter a positive cap value.",
-                        "createSuccess": "Create plugin budget succeeded",
-                        "createError": "Create plugin budget failed",
-                        "updateSuccess": "Update plugin budget succeeded",
-                        "updateError": "Update plugin budget failed",
-                        "deleteSuccess": "Delete plugin budget succeeded",
-                        "deleteError": "Delete plugin budget failed"
-                    },
-                    "spendByPlugin": {
-                        "heading": "Spend by plugin",
-                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
-                        "empty": "No usage recorded this period.",
-                        "columnPlugin": "Plugin",
-                        "columnCapability": "Capability",
-                        "columnUnits": "Units",
-                        "columnCost": "Cost"
-                    },
-                    "export": {
-                        "downloadCsv": "Download CSV",
-                        "downloadingCsv": "Preparing CSV…",
-                        "csvFailed": "CSV export failed"
-                    }
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
+                },
                 "noProviderAlert": {
                     "title": "Không có Nhà cung cấp Triển khai",
                     "description": "Chọn nhà cung cấp triển khai để triển khai trang web công việc của bạn.",
@@ -2613,10 +3029,6 @@
                     "dnsName": "Tên:",
                     "dnsValue": "Giá trị:",
                     "copyButton": "Sao chép"
-                },
-                "progress": {
-                    "loadingStatus": "Loading deploy status...",
-                    "openWebsite": "Open website"
                 }
             },
             "kb": {
@@ -2652,6 +3064,15 @@
                     "research": "Research",
                     "output": "Outputs",
                     "freeform": "Freeform"
+                },
+                "inherited": {
+                    "bannerLabel": "Thông báo tài liệu được kế thừa",
+                    "bannerTitle": "Kế thừa từ tổ chức",
+                    "bannerDescription": "Tài liệu này thuộc sở hữu của tổ chức của bạn và chỉ đọc tại đây. Ghi đè cục bộ để fork một bản sao có thể chỉnh sửa vào Work này.",
+                    "overrideCta": "Ghi đè cục bộ",
+                    "overrideCtaBusy": "Đang fork…",
+                    "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d",
+                    "overrideErrorFallback": "Không thể fork tài liệu được kế thừa. Thử lại hoặc tải lại trang."
                 },
                 "status": {
                     "draft": "Draft",
@@ -2819,15 +3240,6 @@
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
                 },
-                "inherited": {
-                    "bannerLabel": "Thông báo tài liệu được kế thừa",
-                    "bannerTitle": "Kế thừa từ tổ chức",
-                    "bannerDescription": "Tài liệu này thuộc sở hữu của tổ chức của bạn và chỉ đọc tại đây. Ghi đè cục bộ để fork một bản sao có thể chỉnh sửa vào Work này.",
-                    "overrideCta": "Ghi đè cục bộ",
-                    "overrideCtaPendingTooltip": "Có sẵn khi hành động ghi đè được phát hành trong dòng 38d",
-                    "overrideCtaBusy": "Đang fork…",
-                    "overrideErrorFallback": "Không thể fork tài liệu được kế thừa. Thử lại hoặc tải lại trang."
-                },
                 "addDoc": {
                     "button": "+ Thêm",
                     "title": "Tạo tài liệu mới",
@@ -2855,6 +3267,59 @@
                     "errorFallback": "Không thể xóa. Vui lòng thử lại.",
                     "errorBusy": "Đang xóa…",
                     "errorPartial": "Đã xóa {ok}, thất bại {failed}."
+                }
+            }
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "chipDescriptions": {
+                "mission": "Một Mục tiêu liên tục mà Agent tiếp tục làm việc - tạo ra các Ý tưởng theo lịch trình hoặc một lần.",
+                "idea": "Một brief một lần mà Agent biến thành kế hoạch Công việc mà bạn có thể xây dựng.",
+                "website": "Một trang web đa trang cho doanh nghiệp, dịch vụ hoặc thương hiệu - nội dung được tạo ra + mã.",
+                "landing-page": "Một trang một trang tập trung - danh sách chờ, ra mắt sản phẩm, đăng ký webinar, thu thập khách hàng tiềm năng.",
+                "blog": "Một blog với danh mục, RSS, làm nổi bật mã và nội dung sẵn sàng SEO.",
+                "directory": "Một trang web thư mục được biên tập với tìm kiếm, bộ lọc và dữ liệu cấu trúc hóa mục.",
+                "awesome-repo": "Kho awesome-list - chỉ mục markdown, liên kết được phân loại và metadata có thể làm mới."
+            },
+            "submit": "Create",
+            "submitTitle": "Tạo",
+            "or": "or",
+            "hints": {
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
                 }
             }
         },
@@ -2955,6 +3420,10 @@
                 "configureNow": "Cấu hình ngay",
                 "formTitle": "Tạo Công Việc Thủ Công",
                 "formSubtitle": "Cấu hình công việc với toàn quyền kiểm soát mọi cài đặt",
+                "proposalBanner": {
+                    "title": "Pre-filled from an AI suggestion.",
+                    "subtitle": "Tweak anything before creating."
+                },
                 "basicInfo": "Thông Tin Cơ Bản",
                 "nameLabel": "Tên Công Việc *",
                 "namePlaceholder": "ví dụ: Awesome AI Tools",
@@ -2986,10 +3455,6 @@
                 "createFailed": "Tạo công việc thất bại",
                 "success": {
                     "created": "Công việc được tạo thành công!"
-                },
-                "proposalBanner": {
-                    "title": "Pre-filled from an AI suggestion.",
-                    "subtitle": "Tweak anything before creating."
                 }
             },
             "import": {
@@ -3322,16 +3787,20 @@
             "menu": "Menu",
             "aiChat": "Trò chuyện AI",
             "newWork": "Công việc Mới",
+            "new": "Mới",
             "activityIndicator": "Đang tạo công việc",
             "navigation": {
                 "dashboard": "Bảng điều khiển",
                 "activity": "Hoạt động",
-                "works": "Công việc",
-                "plugins": "Plugin",
-                "templates": "Mẫu",
-                "settings": "Cài đặt",
                 "missions": "Missions",
-                "ideas": "Ideas"
+                "ideas": "Ideas",
+                "works": "Công việc",
+                "tasks": "Tasks",
+                "agents": "Agents",
+                "plugins": "Plugin",
+                "skills": "Skills",
+                "templates": "Mẫu",
+                "settings": "Cài đặt"
             },
             "tooltips": {
                 "expandSidebar": "Mở rộng thanh bên",
@@ -3344,8 +3813,7 @@
                 "keyboardShortcuts": "Phím tắt Bàn phím"
             },
             "signOut": "Đăng xuất",
-            "signingOut": "Đang đăng xuất...",
-            "new": "Mới"
+            "signingOut": "Đang đăng xuất..."
         },
         "dangerZone": {
             "title": "Vùng Nguy hiểm",
@@ -3455,6 +3923,11 @@
             "disable": "Tắt",
             "settings": "Cài đặt",
             "saveSettings": "Lưu cài đặt",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "Cài đặt plugin",
             "settingsSaved": "Đã lưu cài đặt thành công",
             "noSettings": "Plugin này không có cài đặt có thể cấu hình",
@@ -3574,20 +4047,20 @@
                 "savedSuccess": "Đã lưu quyền truy cập tổ chức.",
                 "saveFailed": "Lưu thất bại.",
                 "removeLabel": "Xóa {login}"
-            },
-            "saveAndVerify": "Save & verify",
-            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
-            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
-            "verifySuccessHeader": "Connection verified.",
-            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh."
+            }
         },
         "templates": {
             "title": "Mẫu",
             "subtitle": "Duyệt các mẫu website có sẵn, quản lý danh mục tùy chỉnh của bạn, và kiểm soát mẫu nào được dùng để bắt đầu công việc mới.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "Thêm mẫu tùy chỉnh",
-                "refreshTemplates": "Làm mới các mẫu",
-                "customizeTemplate": "Create with AI"
+                "customizeTemplate": "Create with AI",
+                "refreshTemplates": "Làm mới các mẫu"
             },
             "hero": {
                 "eyebrow": "Danh mục mẫu",
@@ -3621,8 +4094,11 @@
                 "defaultSelected": "Mặc định được chọn",
                 "makeDefault": "Đặt làm mặc định",
                 "fork": "Fork",
+                "useTemplate": "Use this Template",
                 "edit": "Chỉnh sửa",
                 "archive": "Lưu trữ",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
                 "catalogOnly": "Mục danh mục",
                 "openRepository": "Mở repository",
                 "previewAlt": "{name} xem trước",
@@ -3631,9 +4107,6 @@
                 "syncBranches": "{count} nhánh đồng bộ",
                 "betaBranch": "Beta: {branch}",
                 "noDescription": "Chưa có mô tả.",
-                "useTemplate": "Use this Template",
-                "customizeAgain": "Customize again",
-                "viewStatus": "View customization status",
                 "status": {
                     "pending": "Queued",
                     "forking": "Forking",
@@ -3723,11 +4196,6 @@
                 "syncBaseSuccess": "Template synced from its base.",
                 "syncBaseUpToDate": "Template is already up to date with its base.",
                 "syncBaseFailed": "Failed to sync template from base."
-            },
-            "kindSwitcher": {
-                "mission": "Mission Templates",
-                "work": "Work Templates",
-                "website": "Website Templates"
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -3870,295 +4338,6 @@
             "toggleError": "Không thể chuyển đổi plugin",
             "system": "Hệ thống",
             "goToPluginSettings": "Đi đến cài đặt plugin"
-        },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →"
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
         }
     },
     "layout": {
@@ -4229,6 +4408,7 @@
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
             "works": "Công việc",
+            "discover": "Discover",
             "newWork": "Công việc Mới",
             "work": "Công việc",
             "overview": "Tổng quan",
@@ -4245,8 +4425,7 @@
             "security": "Bảo mật",
             "apiKeys": "Khóa API",
             "dangerZone": "Vùng Nguy hiểm",
-            "pluginSettings": "Cài đặt Plugin",
-            "discover": "Discover"
+            "pluginSettings": "Cài đặt Plugin"
         }
     },
     "api": {
