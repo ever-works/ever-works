@@ -4,23 +4,30 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
     BookOpen,
     Bot,
+    Building2,
     Files,
     FolderOpen,
     Globe,
     Lightbulb,
     ListChecks,
     Star,
+    Store,
     Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
+import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { cn } from '@/lib/utils/cn';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -35,6 +42,12 @@ import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
  *                       there collect any remaining bits and persist).
  *   - website + 4 work kinds — forwarded to `/works/new` with the
  *                       prompt and the selected kind preserved.
+ *
+ * `store` and `company` are catalog entries telegraphing roadmap
+ * scope (see Workspace notes `2026-05-23-missions-ideas-works-spec.md`
+ * + AGENTS.md "stores + companies are in-scope future use cases"). They
+ * render as inert "Soon" chips and aren't selectable yet, matching how
+ * the marketing site already telegraphs them.
  *
  * The chat panel is auto-collapsed on mount so the prompt + chips
  * get the full main column on first land. Users can reopen it from
@@ -186,8 +199,13 @@ export function NewPageClient({
     const router = useRouter();
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType>(initialType ?? 'mission');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+
+    // `buildAttachmentRefs` imported from PromptComposer — turns the
+    // composer's full attachment list into chat-ready refs (filtering
+    // uploads in flight + failed uploads).
 
     // Close the layout chat panel on mount so the prompt + chips
     // take the full main column. We depend ONLY on the (stable)
@@ -210,13 +228,79 @@ export function NewPageClient({
             toast.error(t('hints.minLength'));
             return;
         }
-        startSubmit(() => {
+        startSubmit(async () => {
+            // Special case: Mission with a template-id in scope.
+            // `/new?type=mission&template=<id>` comes from "Use this
+            // template" buttons elsewhere in the app and needs the
+            // template persisted as `missionTemplateRepo` on the new
+            // Mission. The chat AI doesn't yet have a template-aware
+            // Mission-creation tool, so dropping the id would silently
+            // lose the template link (Greptile P1 on PR #1038). Keep
+            // the legacy inline-create path here.
+            //
+            // Importantly, we DO NOT then send the same prompt into
+            // the chat AI: the chat has `createMission` registered as
+            // a tool and the system prompt instructs it to use tools
+            // for mutations (Codex P2), so re-sending "I want to
+            // create a Mission. <description>" would trigger a SECOND
+            // non-template Mission creation. Just open the panel so
+            // the user can iterate manually if they want, but don't
+            // dispatch a message.
+            if (selectedChip === 'mission' && initialTemplateId) {
+                try {
+                    const mission = await createMissionAction({
+                        description,
+                        type: 'one-shot',
+                        missionTemplateRepo: initialTemplateId,
+                    });
+                    // Wire any completed PromptComposer uploads onto the
+                    // newly created Mission via the new attachments
+                    // endpoint. Failures here are non-fatal: the Mission
+                    // is created either way, so we toast a warning and
+                    // proceed rather than rolling back. github-repo
+                    // entries are skipped — they're metadata refs, not
+                    // uploaded files.
+                    // Single source of truth — `buildAttachmentRefs`
+                    // already filters in-flight + failed uploads and
+                    // carries the `uploadId` on each `upload` ref
+                    // (Greptile P2 on PR #1044: avoids re-scanning the
+                    // raw attachments with a divergent filter).
+                    const uploadIds = buildAttachmentRefs(attachments)
+                        .filter((r) => r.kind === 'upload' && r.uploadId)
+                        .map((r) => r.uploadId!);
+                    if (uploadIds.length > 0) {
+                        const failed: string[] = [];
+                        for (const uploadId of uploadIds) {
+                            try {
+                                await attachUploadToMissionAction(mission.id, uploadId);
+                            } catch {
+                                failed.push(uploadId);
+                            }
+                        }
+                        if (failed.length > 0) {
+                            toast.warning(
+                                `${failed.length} attachment(s) couldn't be linked to the Mission — they're still saved in your uploads.`,
+                            );
+                        }
+                    }
+                    toast.success(t('toasts.missionCreated'));
+                    setChatOpen?.(true);
+                    router.push(ROUTES.DASHBOARD_MISSION(mission.id));
+                } catch (err) {
+                    toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
+                }
+                return;
+            }
+
             // Send the prompt into the chat AI so the user can keep
             // iterating in chat — replaces the old "submit + redirect
             // with the same prompt pre-filled" pattern. The chat AI's
             // currentPageUrl context tells it where the user is, and
             // the intent prefix narrows it further.
-            startFromPrompt(description, { intent: CHIP_INTENT_LABEL[selectedChip] });
+            startFromPrompt(description, {
+                intent: CHIP_INTENT_LABEL[selectedChip],
+                attachments: buildAttachmentRefs(attachments),
+            });
 
             // Then navigate to the canvas for that intent. The canvas
             // page does NOT pre-fill the prompt — the user already
@@ -247,10 +331,6 @@ export function NewPageClient({
                 return;
             }
         });
-        // initialTemplateId stays informational for now — Mission
-        // template-driven creation moves into the chat flow once the
-        // chat surface understands "use template <id>" intents.
-        void initialTemplateId;
     };
 
     // Per-chip placeholder cycle. New reference on each chip flip
@@ -258,6 +338,22 @@ export function NewPageClient({
     const placeholderExamples = useMemo(
         () => PLACEHOLDERS_BY_CHIP[selectedChip] ?? PLACEHOLDERS_BY_CHIP.mission,
         [selectedChip],
+    );
+
+    // Full chip catalog. `store` + `company` are inert "Soon" chips,
+    // appended after the live chips so they sit at the end of the
+    // horizontal scroll the way the marketing site does it.
+    const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store' | 'company'>>>(
+        () => [
+            ...CHIP_ORDER.map((c) => ({
+                value: c,
+                label: t(`chips.${c}`),
+                Icon: CHIP_ICONS[c],
+            })),
+            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
+        ],
+        [t],
     );
 
     return (
@@ -269,8 +365,9 @@ export function NewPageClient({
                 </p>
             </div>
 
-            {/* Composer with chips below — sits directly on the page's
-                dark background, no nested card wrapper. */}
+            {/* Composer with chips rendered BELOW the card (matches the
+                website's landing layout — chips sit outside the input
+                container, not inside). */}
             <PromptComposer
                 inputId="new-prompt"
                 value={prompt}
@@ -282,32 +379,25 @@ export function NewPageClient({
                 ariaLabel={t('promptLabel')}
                 submitTitle={t('submitTitle')}
                 testId="new-prompt"
-                belowInput={
+                onAttachmentsChange={setAttachments}
+                chipsBelow={
                     <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                            {CHIP_ORDER.map((c) => {
-                                const Icon = CHIP_ICONS[c];
-                                const active = selectedChip === c;
-                                return (
-                                    <button
-                                        key={c}
-                                        type="button"
-                                        onClick={() => setSelectedChip(c)}
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors whitespace-nowrap',
-                                            active
-                                                ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
-                                                : 'border-border/60 dark:border-white/10 bg-transparent text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
-                                        )}
-                                        aria-pressed={active}
-                                    >
-                                        <Icon className="w-3.5 h-3.5" />
-                                        {t(`chips.${c}`)}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        <PromptChipsRow
+                            chips={allChips}
+                            value={selectedChip}
+                            onChange={(next) => {
+                                // `store` and `company` are inert, so the
+                                // chips row never emits them — narrow back
+                                // to ChipType before persisting.
+                                if (next === null || next === 'store' || next === 'company') {
+                                    return;
+                                }
+                                setSelectedChip(next);
+                            }}
+                            ariaLabel={t('chipLabel')}
+                            testIdPrefix="new-chip"
+                        />
+                        <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
                             {t(`chipDescriptions.${selectedChip}`)}
                         </p>
                     </div>

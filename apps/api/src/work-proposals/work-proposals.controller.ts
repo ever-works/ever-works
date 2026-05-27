@@ -2,6 +2,7 @@ import {
     BadRequestException,
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpException,
@@ -343,5 +344,44 @@ export class WorkProposalsController {
             throw new NotFoundException('Proposal not found or already finalized');
         }
         return { ok: true };
+    }
+
+    /**
+     * Idea (WorkProposal) attachment surface — list/add/remove
+     * `WorkProposalAttachment` edges (FK to `work_knowledge_uploads`).
+     * Backs the PromptComposer's "files attached when creating an
+     * Idea" flow. Same security model: ownership enforced inside
+     * `WorkProposalsApiService.{list,add,remove}Attachment`.
+     */
+    @Get(':id/attachments')
+    @ApiOperation({ summary: "List an Idea's attached uploads" })
+    async listAttachments(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.listAttachments(auth.userId, id);
+    }
+
+    @Post(':id/attachments')
+    @ApiOperation({ summary: 'Attach an uploaded file to an Idea' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    async addAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: { uploadId: string },
+    ) {
+        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+    }
+
+    @Delete(':id/attachments/:attachmentId')
+    @ApiOperation({ summary: 'Detach an upload from an Idea' })
+    @HttpCode(HttpStatus.OK)
+    async removeAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    ) {
+        return this.service.removeAttachment(auth.userId, id, attachmentId);
     }
 }

@@ -4,7 +4,11 @@ import { useState, useTransition } from 'react';
 import { Target } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { MissionCard } from './MissionCard';
@@ -37,6 +41,7 @@ const MISSION_PLACEHOLDERS: ReadonlyArray<string> = [
 export function MissionsList({ missions }: { missions: Mission[] }) {
     const t = useTranslations('dashboard.missionsPage');
     const [draft, setDraft] = useState('');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
 
@@ -54,7 +59,10 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
         // matches the pattern on /new — a single source of truth for
         // "I'm trying to create something" is the chat side panel.
         startSubmit(() => {
-            startFromPrompt(description, { intent: 'Mission' });
+            startFromPrompt(description, {
+                intent: 'Mission',
+                attachments: buildAttachmentRefs(attachments),
+            });
             setDraft('');
         });
     };
@@ -85,6 +93,7 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
                     ariaLabel={t('quickAdd.label')}
                     submitTitle={t('quickAdd.submitTitle')}
                     testId="missions-quick-add"
+                    onAttachmentsChange={setAttachments}
                 />
             </div>
 

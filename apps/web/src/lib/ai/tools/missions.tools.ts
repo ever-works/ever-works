@@ -3,6 +3,7 @@ import { tool } from 'ai';
 import { ROUTES } from '@/lib/constants';
 import { missionsAPI, type Mission } from '@/lib/api/missions';
 import {
+    attachUploadToMissionAction,
     cloneMissionAction,
     completeMissionAction,
     createMissionAction,
@@ -13,6 +14,7 @@ import {
     runMissionNowAction,
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
+import { attachUploadsBestEffort, extractUploadIds } from './utils';
 
 /**
  * Phase 9 PR Z1 — in-app AI Chat tools for Missions (spec §3.8).
@@ -129,6 +131,12 @@ export const createMission = tool({
             .nullable()
             .optional()
             .describe('Cap on un-built Ideas. -1 = unlimited; null = inherit user default.'),
+        attachmentIds: z
+            .array(z.string())
+            .optional()
+            .describe(
+                'Upload IDs (sha256 hex) OR full `/api/uploads/<userId>/<sha>.<ext>` URLs to attach to the new Mission. Source: the "Attached files:" block in the user message. Pass either the bare sha256 part of each URL or the URL itself — both are accepted.',
+            ),
     }),
     execute: async (input) => {
         const mission = await createMissionAction({
@@ -141,7 +149,18 @@ export const createMission = tool({
                 outstandingIdeasCap: input.outstandingIdeasCap,
             }),
         });
-        return { created: true, mission: summarizeMission(mission) };
+        const uploadIds = extractUploadIds(input.attachmentIds);
+        const attachStats =
+            uploadIds.length > 0
+                ? await attachUploadsBestEffort(uploadIds, (uploadId) =>
+                      attachUploadToMissionAction(mission.id, uploadId),
+                  )
+                : { attached: 0, failed: 0 };
+        return {
+            created: true,
+            mission: summarizeMission(mission),
+            ...(uploadIds.length > 0 && { attachments: attachStats }),
+        };
     },
 });
 

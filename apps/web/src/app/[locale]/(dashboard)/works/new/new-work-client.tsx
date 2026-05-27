@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
     BookOpen,
+    Building2,
     Files,
     FolderInput,
     FolderKanban,
@@ -18,10 +19,16 @@ import {
     Globe,
     PenLine,
     Star,
+    Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
+import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import type { ProviderWithConnection } from './page';
@@ -126,6 +133,7 @@ export default function NewWorkClient({
     // Composer state used by the entry view (creationMode === null).
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedKind, setSelectedKind] = useState<InitialWorkKind>(initialKind ?? 'website');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
 
@@ -148,6 +156,23 @@ export default function NewWorkClient({
         [selectedKind],
     );
 
+    // Full work-kind chip catalog. `store` + `company` are inert "Soon"
+    // chips (roadmap, not shipped) appended after the live kinds so they
+    // match the marketing site's chip catalog without breaking the
+    // existing /works/new kind picker behavior.
+    const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
+        () => [
+            ...WORK_KIND_ORDER.map((k) => ({
+                value: k,
+                label: t(`kinds.${k}`),
+                Icon: WORK_KIND_ICONS[k],
+            })),
+            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
+        ],
+        [t],
+    );
+
     const submitPrompt = () => {
         const description = prompt.trim();
         if (description.length < 10) {
@@ -161,7 +186,10 @@ export default function NewWorkClient({
         // chat carries it, the form starts empty so the user isn't
         // re-prompted to confirm the same text twice.
         startSubmit(() => {
-            startFromPrompt(description, { intent: WORK_KIND_INTENT_LABEL[selectedKind] });
+            startFromPrompt(description, {
+                intent: WORK_KIND_INTENT_LABEL[selectedKind],
+                attachments: buildAttachmentRefs(attachments),
+            });
             setPrompt('');
             setCreationMode('ai');
         });
@@ -190,32 +218,29 @@ export default function NewWorkClient({
                     ariaLabel={t('promptLabel')}
                     submitTitle={t('promptHints.submitTitle')}
                     testId="new-work-prompt"
-                    belowInput={
+                    onAttachmentsChange={setAttachments}
+                    // /works/new is the surface where importing an
+                    // existing GitHub repo as a Work makes sense.
+                    showImportGithubRepo
+                    chipsBelow={
                         <div className="space-y-2">
-                            <div className="flex flex-wrap gap-2">
-                                {WORK_KIND_ORDER.map((k) => {
-                                    const Icon = WORK_KIND_ICONS[k];
-                                    const active = selectedKind === k;
-                                    return (
-                                        <button
-                                            key={k}
-                                            type="button"
-                                            onClick={() => setSelectedKind(k)}
-                                            className={cn(
-                                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors whitespace-nowrap',
-                                                active
-                                                    ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
-                                                    : 'border-border/60 dark:border-white/10 bg-transparent text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
-                                            )}
-                                            aria-pressed={active}
-                                        >
-                                            <Icon className="w-3.5 h-3.5" />
-                                            {t(`kinds.${k}`)}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            <PromptChipsRow
+                                chips={workKindChips}
+                                value={selectedKind}
+                                onChange={(next) => {
+                                    // `store` and `company` are inert "Soon"
+                                    // chips and never get emitted — narrow
+                                    // back to InitialWorkKind before
+                                    // persisting.
+                                    if (next === null || next === 'store' || next === 'company') {
+                                        return;
+                                    }
+                                    setSelectedKind(next);
+                                }}
+                                ariaLabel={t('promptLabel')}
+                                testIdPrefix="new-work-kind"
+                            />
+                            <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t(`kindDescriptions.${selectedKind}`)}
                             </p>
                         </div>

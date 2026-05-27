@@ -3278,7 +3278,7 @@
         },
         "newPage": {
             "title": "Start something new",
-            "subtitle": "Tell the agent what you want to build. Pick a kind below to bias the result.",
+            "subtitle": "Tell us what you want to build. Pick a kind below to bias the result.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",

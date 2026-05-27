@@ -37,6 +37,7 @@ import { AgentsModule } from './agents/agents.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
+import { UsersModule } from './users/users.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -122,6 +123,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FunnelAnalyticsBindingModule,
         UploadsModule,
         WebhooksModule,
+        // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
+        // `UsernameAllocatorService` (consumed by AuthModule callers,
+        // OnboardingModule, GitHubAppModule) and the public
+        // `GET /api/users/check-username` endpoint.
+        UsersModule,
     ],
     providers: [
         {

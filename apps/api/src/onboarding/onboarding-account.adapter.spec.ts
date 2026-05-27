@@ -19,6 +19,15 @@ describe('OnboardingAccountAdapter', () => {
             findByGithubUserId: jest.Mock;
             upsertLink: jest.Mock;
         };
+        // EW-652: usernameAllocator replaces the previous inline
+        // sanitization+collision loop. Normalization edge cases live in
+        // the allocator's own spec; this mock just preserves the collision
+        // semantics needed by the integration-level tests below.
+        usernameAllocator: {
+            allocateUsername: jest.Mock;
+            normalize: jest.Mock;
+            suggest: jest.Mock;
+        };
     };
 
     const baseInput = {
@@ -68,11 +77,27 @@ describe('OnboardingAccountAdapter', () => {
                 findByGithubUserId: jest.fn().mockResolvedValue(overrides.link ?? null),
                 upsertLink: jest.fn().mockResolvedValue(undefined),
             },
+            usernameAllocator: {
+                // Identity by default, plus the existing-username collision
+                // semantics so the "appends -<n> when taken" test still works.
+                allocateUsername: jest.fn().mockImplementation(async (base: string) => {
+                    let candidate = base;
+                    let suffix = 1;
+                    while (usernameQueue.has(candidate)) {
+                        suffix += 1;
+                        candidate = `${base}-${suffix}`;
+                    }
+                    return candidate;
+                }),
+                normalize: jest.fn().mockImplementation((s: string) => s),
+                suggest: jest.fn(),
+            },
         };
         const adapter = new OnboardingAccountAdapter(
             mocks.users as any,
             mocks.authAccounts as any,
             mocks.githubLinks as any,
+            mocks.usernameAllocator as any,
         );
         return { adapter, mocks };
     };
@@ -175,51 +200,38 @@ describe('OnboardingAccountAdapter', () => {
         expect(created.username).toBe('agent-12345');
     });
 
-    it('sanitizes the username (strips non [a-zA-Z0-9_-])', async () => {
+    // EW-652: sanitization-specific assertions moved to
+    // `username-allocator.service.spec.ts`. The adapter itself just hands the
+    // raw `input.login` (or `agent-<gh-id>` fallback) to the allocator; the
+    // allocator owns the normalization rules. The two tests below cover the
+    // adapter↔allocator contract:
+    //   1. The adapter delegates with the right base.
+    //   2. Collision suffixing still produces the expected username in the
+    //      created user row (covered by the mock allocator's queue logic).
+
+    it('delegates the username to the allocator with the raw login as base', async () => {
         const { adapter, mocks } = create({});
 
         await adapter.upsertFromGithub({ ...baseInput, login: 'oct.o cat!' });
 
+        // Adapter passes the raw login through — normalization happens in the
+        // allocator (verified in its dedicated spec). The mock allocator here
+        // is an identity, so the raw input survives into `users.create`.
+        expect(mocks.usernameAllocator.allocateUsername).toHaveBeenCalledWith('oct.o cat!');
         const created = mocks.users.create.mock.calls[0][0];
-        expect(created.username).toBe('octocat');
+        expect(created.username).toBe('oct.o cat!');
     });
 
-    it('truncates the sanitized base to 32 chars', async () => {
-        const { adapter, mocks } = create({});
-        const longLogin = 'a'.repeat(50);
-        await adapter.upsertFromGithub({ ...baseInput, login: longLogin });
-        const created = mocks.users.create.mock.calls[0][0];
-        expect(created.username).toBe('a'.repeat(32));
-    });
-
-    it('falls back to agent when login sanitizes to an empty string', async () => {
-        const { adapter, mocks } = create({});
-        await adapter.upsertFromGithub({ ...baseInput, login: '!!!' });
-        const created = mocks.users.create.mock.calls[0][0];
-        expect(created.username).toBe('agent');
-    });
-
-    it('appends -<n> when username is taken', async () => {
+    it('appends -<n> when username is taken (via allocator)', async () => {
         const { adapter, mocks } = create({ existingUsernames: ['octocat'] });
 
         await adapter.upsertFromGithub(baseInput);
 
         const created = mocks.users.create.mock.calls[0][0];
         expect(created.username).toBe('octocat-2');
-        // Looked up base + 1 suffix only
-        expect(mocks.users.findByUsername).toHaveBeenCalledWith('octocat');
-        expect(mocks.users.findByUsername).toHaveBeenCalledWith('octocat-2');
-    });
-
-    it('falls back to a UUID-suffixed username after 50 attempts', async () => {
-        const taken: string[] = ['octocat'];
-        for (let i = 2; i <= 51; i++) taken.push(`octocat-${i}`);
-        const { adapter, mocks } = create({ existingUsernames: taken });
-
-        await adapter.upsertFromGithub(baseInput);
-
-        const created = mocks.users.create.mock.calls[0][0];
-        expect(created.username).toMatch(/^octocat-[0-9a-f]{8}$/);
+        // Allocator handles collision detection internally — the adapter no
+        // longer calls userRepository.findByUsername itself.
+        expect(mocks.usernameAllocator.allocateUsername).toHaveBeenCalledWith('octocat');
     });
 
     it('upserts the provider account row with the expected fields', async () => {

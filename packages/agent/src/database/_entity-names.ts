@@ -46,6 +46,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
+    'AgentAttachment',
     'AgentBudget',
     'AgentMembership',
     'AgentRun',
@@ -62,8 +63,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
     'Mission',
+    'MissionAttachment',
     'Notification',
     'OnboardingRequest',
+    'Organization',
     'PluginUsageEvent',
     'RefreshToken',
     // Skills family (PR #1019) ──
@@ -85,6 +88,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // ──────────────────────────
     'Template',
     'TemplateCustomization',
+    'Tenant',
     'UsageLedgerEntry',
     'User',
     'UserSubscription',
@@ -111,5 +115,6 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkKnowledgeUpload',
     'WorkMember',
     'WorkProposal',
+    'WorkProposalAttachment',
     'WorkSchedule',
 ] as const;
