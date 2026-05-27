@@ -497,10 +497,10 @@
             },
             "actions": {
                 "accept": "Build",
+                "viewWork": "View Work",
                 "dismiss": "تجاهل",
                 "dismissAria": "تجاهل هذه الفكرة",
-                "refresh": "Suggest more",
-                "viewWork": "View Work"
+                "refresh": "Suggest more"
             },
             "researching": {
                 "title": "صياغة الأفكار من ملفك الشخصي...",
@@ -525,6 +525,354 @@
                 "permanent-invalid-input": "Invalid input",
                 "permanent-unknown": "Build failed"
             }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "quickAdd": {
+                "label": "ابدأ مهمة جديدة",
+                "submitTitle": "إنشاء مهمة",
+                "minLength": "يجب أن يكون الوصف على الأقل 10 أحرف.",
+                "created": "تم إنشاء المهمة",
+                "error": "تعذر إنشاء المهمة. يرجى المحاولة مرة أخرى."
+            },
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "افتح المنشئ الموحد"
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "الوكلاء",
+            "subtitle": "زملائك الذكاء الاصطناعي. يحمل كل منهم روحًا (من هم)، تعليمات، وميزانية — ويعمل على المهام، الأعمال، أو مستأجرك بأكمله.",
+            "newAgent": "+ وكلاء جديد",
+            "empty": {
+                "title": "لا يوجد وكلاء بعد.",
+                "subtitle": "أنشئ أول وكيلك لتوكيل العمل المتكرر. يعمل الوكلاء بنطاق المستأجر عبر حسابك بأكمله؛ بينما يظل الوكلاء بنطاق المهمة أو العمل منصبًا على هدف واحد."
+            },
+            "card": {
+                "scopeTenant": "المستأجر",
+                "scopeMission": "المهمة",
+                "scopeWork": "العمل",
+                "scopeIdea": "الفكرة",
+                "statusDraft": "مسودة",
+                "statusActive": "نشط",
+                "statusPaused": "موقوف",
+                "statusRunning": "قيد التشغيل",
+                "statusError": "خطأ",
+                "statusArchived": "مؤرشف",
+                "noTitle": "(لا عنوان)",
+                "noCadence": "لا ينبض",
+                "cadencePrefix": "نبض القلب:"
+            },
+            "tabs": {
+                "dashboard": "لوحة التحكم",
+                "activity": "النشاط",
+                "instructions": "التعليمات",
+                "skills": "المهارات",
+                "budgets": "الميزانيات",
+                "settings": "الإعدادات"
+            },
+            "newDialog": {
+                "title": "وكيل جديد",
+                "step1Title": "اختر نطاقًا",
+                "step2Title": "سمِّ وكيلك",
+                "nameLabel": "الاسم",
+                "namePlaceholder": "مثلًا: الرئيس التنفيذي، مراجع، مساعد المحتوى",
+                "scopeTenantDesc": "يعمل على مستأجرك بأكمله",
+                "scopeMissionDesc": "مقفلة بمهمة واحدة",
+                "scopeWorkDesc": "مقفلة بعمل واحد",
+                "scopeIdeaDesc": "مقفلة بفكرة واحدة",
+                "cancel": "إلغاء",
+                "back": "رجوع",
+                "next": "التالي",
+                "create": "إنشاء وكيل"
+            }
+        },
+        "tasksPage": {
+            "title": "المهام",
+            "subtitle": "عناصر عمل قابلة للتتبع يتم تعيينها للأشخاص أو الوكلاء.",
+            "empty": {
+                "title": "لا توجد مهام بعد.",
+                "subtitle": "سيتم شحن المهام في مرحلة لاحقة من طرح الوكلاء/المهارات/المهام. تم حجز الصفحة بحيث يتم حل مسار التنقل في الشريط الجانبي."
+            },
+            "list": {
+                "newTask": "+ مهمة جديدة",
+                "kanban": "كانبان",
+                "list": "قائمة",
+                "filter": {
+                    "status": "الحالة",
+                    "priority": "الأولوية",
+                    "label": "العلامة",
+                    "all": "الكل"
+                }
+            },
+            "newDialog": {
+                "title": "إنشاء مهمة جديدة",
+                "name": "العنوان",
+                "namePlaceholder": "أضف عنوانًا للمهمة",
+                "description": "الوصف",
+                "descriptionPlaceholder": "أضف سياقًا (اختياري)",
+                "priority": "الأولوية",
+                "labels": "العلامات",
+                "labelsPlaceholder": "مفصولة بفواصل",
+                "cancel": "إلغاء",
+                "create": "إنشاء"
+            },
+            "detail": {
+                "moveTo": "نقل إلى",
+                "noTransitions": "لا توجد انتقالات متاحة.",
+                "conversation": "المحادثة",
+                "noMessages": "لا توجد رسائل بعد.",
+                "post": "نشر",
+                "draftPlaceholder": "اكتب رسالة. استخدم @agent-slug لإخطار وكيل.",
+                "attachments": "المرفقات",
+                "fileCount": "{count, plural, one {1 ملف} other {# ملفات}}",
+                "dropFiles": "اسحب وأفلت ملفًا هنا أو",
+                "browse": "تصفح",
+                "uploading": "جاري الرفع...",
+                "detach": "فصل",
+                "labels": "العلامات",
+                "edited": "تم التعديل"
+            },
+            "recurring": {
+                "section": "جدول متكرر",
+                "promoteToRecurring": "ترقية إلى متكرر",
+                "demote": "خفض إلى لمرة واحدة",
+                "daily": "يومي",
+                "weekly": "أسبوعي",
+                "monthly": "شهري",
+                "custom": "RRULE مخصص",
+                "timeOfDay": "وقت اليوم",
+                "dayOfWeek": "يوم الأسبوع",
+                "dayOfMonth": "يوم الشهر",
+                "timezone": "المنطقة الزمنية",
+                "save": "حفظ الجدول"
+            },
+            "status": {
+                "backlog": "قائمة الانتظار",
+                "todo": "المهام",
+                "in_progress": "قيد التنفيذ",
+                "in_review": "قيد المراجعة",
+                "blocked": "مُعطَّل",
+                "done": "مكتمل",
+                "cancelled": "ملغى"
+            }
+        },
+        "skillsPage": {
+            "title": "المهارات",
+            "subtitle": "تعليمات قابلة لإعادة الاستخدام والنسخ يمكن للوكلاء سحبها عند الحاجة.",
+            "empty": {
+                "title": "لا توجد مهارات بعد.",
+                "subtitle": "سيتم شحن المهارات في مرحلة لاحقة من طرح الوكلاء/المهارات/المهام. تم حجز الصفحة بحيث يتم حل مسار التنقل في الشريط الجانبي."
+            },
+            "list": {
+                "newSkill": "+ مهارة جديدة",
+                "filter": {
+                    "scope": "النطاق",
+                    "all": "الكل"
+                }
+            },
+            "detail": {
+                "instructions": "التعليمات",
+                "bindings": "الربطات",
+                "bindingHelper": "ربط هذه المهارة بوكيل، مهمة، فكرة، أو عمل. الأولوية 1 = الأعلى أولوية.",
+                "addBinding": "+ إضافة ربط",
+                "removeBinding": "إزالة",
+                "targetType": "الربط بـ",
+                "priority": "الأولوية",
+                "agent": "وكيل",
+                "mission": "المهمة",
+                "idea": "الفكرة",
+                "work": "العمل",
+                "tenant": "المستأجر"
+            }
+        },
+        "templatesPage": {
+            "title": "القوالب",
+            "subtitle": "نقاط بداية مبنية مسبقًا للوكلاء، المهارات، والمهام.",
+            "empty": "لا توجد قوالب متاحة بعد.",
+            "useTemplate": "استخدم القالب",
+            "browse": "تصفح القوالب",
+            "entity": {
+                "agent": "وكيل",
+                "skill": "مهارة",
+                "task": "مهمة"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "submitTitle": "إضافة فكرة",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
         },
         "discover": {
             "title": "اكتشف",
@@ -836,11 +1184,11 @@
                 },
                 "actions": {
                     "saveSettings": "حفظ الإعدادات",
-                    "queueGoal": "ضع الهدف في قائمة الانتظار",
-                    "stop": "توقف",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "preparePlan": "Prepare plan"
+                    "queueGoal": "ضع الهدف في قائمة الانتظار",
+                    "preparePlan": "Prepare plan",
+                    "stop": "توقف"
                 },
                 "queue": {
                     "placeholder": "أنشئ عملًا حول أفضل 50 شركة ناشئة للذكاء الاصطناعي في مجال الرعاية الصحية"
@@ -1122,8 +1470,8 @@
             "totalWorks": "إجمالي الأعمال",
             "totalItems": "إجمالي العناصر",
             "activeWebsites": "المواقع النشطة",
-            "fromLastMonth": "من الشهر الماضي",
-            "monthSpend": "Month Spend"
+            "monthSpend": "Month Spend",
+            "fromLastMonth": "من الشهر الماضي"
         },
         "adminUsage": {
             "title": "استخدام المنصة",
@@ -2717,6 +3065,15 @@
                     "output": "Outputs",
                     "freeform": "Freeform"
                 },
+                "inherited": {
+                    "bannerLabel": "إشعار مستند موروث",
+                    "bannerTitle": "موروث من المنظمة",
+                    "bannerDescription": "هذا المستند مملوك لمنظمتك وللقراءة فقط هنا. قم بتجاوزه محليًا لإنشاء نسخة قابلة للتحرير في هذا العمل.",
+                    "overrideCta": "تجاوز محليًا",
+                    "overrideCtaBusy": "جارٍ التفريع…",
+                    "overrideCtaPendingTooltip": "متاح بمجرد شحن إجراء التجاوز في الصف 38d",
+                    "overrideErrorFallback": "تعذّر تفريع المستند الموروث. حاول مرة أخرى أو حدّث الصفحة."
+                },
                 "status": {
                     "draft": "Draft",
                     "active": "Active",
@@ -2883,15 +3240,6 @@
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
                 },
-                "inherited": {
-                    "bannerLabel": "إشعار مستند موروث",
-                    "bannerTitle": "موروث من المنظمة",
-                    "bannerDescription": "هذا المستند مملوك لمنظمتك وللقراءة فقط هنا. قم بتجاوزه محليًا لإنشاء نسخة قابلة للتحرير في هذا العمل.",
-                    "overrideCta": "تجاوز محليًا",
-                    "overrideCtaPendingTooltip": "متاح بمجرد شحن إجراء التجاوز في الصف 38d",
-                    "overrideCtaBusy": "جارٍ التفريع…",
-                    "overrideErrorFallback": "تعذّر تفريع المستند الموروث. حاول مرة أخرى أو حدّث الصفحة."
-                },
                 "addDoc": {
                     "button": "+ إضافة",
                     "title": "إنشاء مستند جديد",
@@ -2919,6 +3267,59 @@
                     "errorFallback": "تعذّر الحذف. حاول مرة أخرى.",
                     "errorBusy": "جارٍ الحذف…",
                     "errorPartial": "تم حذف {ok}، فشل {failed}."
+                }
+            }
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "chipDescriptions": {
+                "mission": "هدف مستمر يعمل عليه الوكلاء باستمرار — ينتج أفكرة وفق جدولة أو لمرة واحدة.",
+                "idea": "ملخص لمرة واحدة يحوله الوكل إلى خطة عمل يمكنك بناءها.",
+                "website": "موقع متعدد الصفحات لأعمال أو خدمات أو علامات تجارية — محتوى + كود مُنشأ.",
+                "landing-page": "صفحة مركزة واحدة — قوائم الانتظار، إطلاق المنتجات، تسجيلات الندوات، التقاط العملاء.",
+                "blog": "مدونة مع فئات، RSS، تمييز الكود، ومحتوى جاهز لتحسين محركات البحث.",
+                "directory": "موقع دليل مختار مع بحث، عوامل تصفية، وبيانات منظمة للعناصر.",
+                "awesome-repo": "مستودع قائمة رائعة — فهرس markdown، روابط مصنفة، وبيانات قابلة للتحديث."
+            },
+            "submit": "Create",
+            "submitTitle": "إنشاء",
+            "or": "or",
+            "hints": {
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
                 }
             }
         },
@@ -3386,16 +3787,20 @@
             "menu": "القائمة",
             "aiChat": "دردشة الذكاء الاصطناعي",
             "newWork": "عمل جديد",
+            "new": "جديد",
             "activityIndicator": "جاري إنشاء العمل",
             "navigation": {
                 "dashboard": "لوحة التحكم",
                 "activity": "النشاط",
-                "works": "الأعمال",
-                "plugins": "الإضافات",
-                "templates": "القوالب",
-                "settings": "الإعدادات",
                 "missions": "Missions",
-                "ideas": "Ideas"
+                "ideas": "Ideas",
+                "works": "الأعمال",
+                "tasks": "المهام",
+                "agents": "الوكلاء",
+                "plugins": "الإضافات",
+                "skills": "المهارات",
+                "templates": "القوالب",
+                "settings": "الإعدادات"
             },
             "tooltips": {
                 "expandSidebar": "توسيع الشريط الجانبي",
@@ -3408,8 +3813,7 @@
                 "keyboardShortcuts": "اختصارات لوحة المفاتيح"
             },
             "signOut": "تسجيل الخروج",
-            "signingOut": "جاري تسجيل الخروج...",
-            "new": "جديد"
+            "signingOut": "جاري تسجيل الخروج..."
         },
         "dangerZone": {
             "title": "منطقة الخطر",
@@ -3648,6 +4052,11 @@
         "templates": {
             "title": "القوالب",
             "subtitle": "استعرض القوالب الجاهزة للموقع، gérer كتالوجك المخصص، وتحكم في أي قالب سيبدأ به الأعمال الجديدة.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "إضافة قالب مخصص",
                 "customizeTemplate": "إنشاء بالذكاء الاصطناعي",
@@ -3685,6 +4094,7 @@
                 "defaultSelected": "تم تحديد الافتراضي",
                 "makeDefault": "اجعله افتراضيًا",
                 "fork": "شُتّت",
+                "useTemplate": "Use this Template",
                 "edit": "تعديل",
                 "archive": "أرشفة",
                 "customizeAgain": "تخصيص مرة أخرى",
@@ -3705,7 +4115,6 @@
                     "succeeded": "تم التخصيص",
                     "failed": "فشل آخر تشغيل"
                 },
-                "useTemplate": "Use this Template",
                 "syncBase": "Sync from base"
             },
             "dialog": {
@@ -3847,11 +4256,6 @@
                     "browsePlugins": "استعرض فهرس الإضافات",
                     "noRuns": "لا توجد عمليات تخصيص بعد لهذا القالب."
                 }
-            },
-            "kindSwitcher": {
-                "mission": "Mission Templates",
-                "work": "Work Templates",
-                "website": "Website Templates"
             },
             "syncDialog": {
                 "title": "Sync from base template",
@@ -4158,8 +4562,7 @@
                     "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
                     "cta": "Import now"
                 }
-            }
-        }
+            }        }
     },
     "layout": {
         "auth": {

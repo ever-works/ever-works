@@ -24,6 +24,21 @@ export function NumberField({
     step?: number;
     onChange: (value: number) => void;
 }) {
+    const handleChange = (rawValue: string) => {
+        if (rawValue.trim() === '') {
+            onChange(min);
+            return;
+        }
+
+        const parsed = Number(rawValue);
+        if (!Number.isFinite(parsed)) {
+            return;
+        }
+
+        const clamped = Math.min(max, Math.max(min, parsed));
+        onChange(step === undefined ? Math.trunc(clamped) : clamped);
+    };
+
     return (
         <label className="space-y-1.5">
             <span className="text-xs text-text-muted dark:text-text-muted-dark">{label}</span>
@@ -33,7 +48,7 @@ export function NumberField({
                 min={min}
                 max={max}
                 step={step}
-                onChange={(event) => onChange(Number(event.target.value))}
+                onChange={(event) => handleChange(event.target.value)}
                 className="w-full h-9 rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark px-3 text-sm text-text dark:text-text-dark outline-none focus:ring-2 focus:ring-primary/25"
             />
         </label>

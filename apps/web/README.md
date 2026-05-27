@@ -7,7 +7,7 @@ https://app.ever.works
 First, run the development server:
 
 ```bash
-npm run dev
+pnpm dev
 # or
 yarn dev
 # or

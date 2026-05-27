@@ -31,7 +31,7 @@ packages/
 
 - See the root [CLAUDE.md](../CLAUDE.md) and [AGENTS.md](../AGENTS.md) for repository conventions.
 - Build everything: `pnpm build` (Turborepo handles dependency order).
-- Build a single package: `turbo build --filter=@ever-works/<package-name>` or `pnpm --filter <name> build`.
+- Build a single package: `turbo run build --filter=@ever-works/<package-name>` or `pnpm --filter <name> build`.
 - Run tests: `pnpm test` (root) or `pnpm --filter <name> test` per package.
 
 ## Documentation

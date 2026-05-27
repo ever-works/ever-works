@@ -490,6 +490,394 @@
                 "description": "{provider} 계정을 연결할 수 없습니다. 다시 시도하세요."
             }
         },
+        "proposals": {
+            "header": {
+                "title": "Ideas",
+                "titleWithName": "Ideas"
+            },
+            "actions": {
+                "accept": "Build",
+                "viewWork": "View Work",
+                "dismiss": "Dismiss",
+                "dismissAria": "Dismiss this idea",
+                "refresh": "Suggest more"
+            },
+            "researching": {
+                "title": "Drafting ideas from your profile…",
+                "subtitle": "This usually takes under a minute."
+            },
+            "empty": {
+                "title": "No ideas right now.",
+                "subtitle": "New suggestions will appear here when they are ready."
+            },
+            "errors": {
+                "rateLimited": "Daily limit reached. Try again tomorrow.",
+                "generic": "Couldn't refresh ideas. Please try again."
+            },
+            "plugins": {
+                "label": "Suggested plugins"
+            },
+            "failureKinds": {
+                "transient-network": "Network blip",
+                "transient-rate-limit": "Rate limited",
+                "transient-upstream-5xx": "Upstream service error",
+                "transient-plugin": "Plugin timeout",
+                "permanent-invalid-input": "Invalid input",
+                "permanent-unknown": "Build failed"
+            }
+        },
+        "missionsPreview": {
+            "title": "Missions",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+            },
+            "badges": {
+                "scheduled": "Scheduled"
+            },
+            "counters": {
+                "ideas": "Ideas",
+                "works": "Works",
+                "sites": "Sites"
+            }
+        },
+        "missionsPage": {
+            "title": "Missions",
+            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
+            "newMission": "+ New Mission",
+            "quickAdd": {
+                "label": "새 임무 시작",
+                "submitTitle": "임무 생성",
+                "minLength": "설명은 최소 10자 이상이어야 합니다.",
+                "created": "임무가 생성되었습니다",
+                "error": "임무를 생성할 수 없습니다. 다시 시도해 주세요."
+            },
+            "empty": {
+                "title": "No Missions yet.",
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "통합 창조자 열기"
+            },
+            "card": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "schedulePrefix": "Cron:",
+                "autoBuildOn": "Auto-build on",
+                "autoBuildOff": "Auto-build off",
+                "capInherit": "Inherit user default",
+                "capUnlimited": "Unlimited",
+                "capPrefix": "Outstanding cap:",
+                "clonedFromPrefix": "Cloned from another Mission"
+            }
+        },
+        "agentsPage": {
+            "title": "에이전트",
+            "subtitle": "당신의 AI 팀원들입니다. 각 에이전트는 자신의 정체성(누구인지), 지시사항, 그리고 예산을 가지며 - 임무, 작업, 또는 전체 테넌트에서 활동합니다.",
+            "newAgent": "+ 새 에이전트",
+            "empty": {
+                "title": "아직 에이전트가 없습니다.",
+                "subtitle": "반복되는 작업을 위임하기 위해 첫 번째 에이전트를 생성하세요. 테넌트 범위 에이전트는 전체 계정에서 작동하며, 임무 또는 작업 범위 에이전트는 단일 목표에 집중합니다."
+            },
+            "card": {
+                "scopeTenant": "테넌트",
+                "scopeMission": "임무",
+                "scopeWork": "작업",
+                "scopeIdea": "아이디어",
+                "statusDraft": "초안",
+                "statusActive": "활성",
+                "statusPaused": "일시중지",
+                "statusRunning": "실행 중",
+                "statusError": "오류",
+                "statusArchived": "보관됨",
+                "noTitle": "(제목 없음)",
+                "noCadence": "심박 없음",
+                "cadencePrefix": "심박:"
+            },
+            "tabs": {
+                "dashboard": "대시보드",
+                "activity": "활동",
+                "instructions": "지시사항",
+                "skills": "기술",
+                "budgets": "예산",
+                "settings": "설정"
+            },
+            "newDialog": {
+                "title": "새 에이전트",
+                "step1Title": "범위 선택",
+                "step2Title": "에이전트 이름 지정",
+                "nameLabel": "이름",
+                "namePlaceholder": "예: CEO, 리뷰어, 콘텐츠 드래프터",
+                "scopeTenantDesc": "전체 테넌트에서 작동합니다",
+                "scopeMissionDesc": "단일 임무에 잠깁니다",
+                "scopeWorkDesc": "단일 작업에 잠깁니다",
+                "scopeIdeaDesc": "단일 아이디어에 잠깁니다",
+                "cancel": "취소",
+                "back": "뒤로",
+                "next": "다음",
+                "create": "에이전트 생성"
+            }
+        },
+        "tasksPage": {
+            "title": "작업",
+            "subtitle": "사람 또는 에이전트에게 할당된 추적 가능한 작업 항목입니다.",
+            "empty": {
+                "title": "아직 작업이 없습니다.",
+                "subtitle": "작업은 에이전트/기술/작업 롤아웃의 후반 단계에서 제공됩니다. 페이지는 사이드바 네비게이션 경로가 해결되도록 예약되어 있습니다."
+            },
+            "list": {
+                "newTask": "+ 새 작업",
+                "kanban": "칸반",
+                "list": "목록",
+                "filter": {
+                    "status": "상태",
+                    "priority": "우선순위",
+                    "label": "레이블",
+                    "all": "전체"
+                }
+            },
+            "newDialog": {
+                "title": "새 작업 생성",
+                "name": "제목",
+                "namePlaceholder": "작업 제목 추가",
+                "description": "설명",
+                "descriptionPlaceholder": "맥락 추가 (선택 사항)",
+                "priority": "우선순위",
+                "labels": "레이블",
+                "labelsPlaceholder": "쉼표로 구분",
+                "cancel": "취소",
+                "create": "생성"
+            },
+            "detail": {
+                "moveTo": "이동 대상",
+                "noTransitions": "사용 가능한 전환이 없습니다.",
+                "conversation": "대화",
+                "noMessages": "메시지가 아직 없습니다.",
+                "post": "게시",
+                "draftPlaceholder": "메시지를 작성하세요. @agent-slug로 에이전트를 호출하세요.",
+                "attachments": "첨부 파일",
+                "fileCount": "{count, plural, one {1 파일} other {# 파일}}",
+                "dropFiles": "파일을 여기로 드래그 앤 드롭하거나",
+                "browse": "찾아보기",
+                "uploading": "업로드 중...",
+                "detach": "분리",
+                "labels": "레이블",
+                "edited": "편집됨"
+            },
+            "recurring": {
+                "section": "반복 일정",
+                "promoteToRecurring": "반복으로 승격",
+                "demote": "일회성으로 강등",
+                "daily": "매일",
+                "weekly": "매주",
+                "monthly": "매월",
+                "custom": "사용자 지정 RRULE",
+                "timeOfDay": "시간",
+                "dayOfWeek": "요일",
+                "dayOfMonth": "일",
+                "timezone": "시간대",
+                "save": "일정 저장"
+            },
+            "status": {
+                "backlog": "대기열",
+                "todo": "할 일",
+                "in_progress": "진행 중",
+                "in_review": "검토 중",
+                "blocked": "차단됨",
+                "done": "완료됨",
+                "cancelled": "취소됨"
+            }
+        },
+        "skillsPage": {
+            "title": "기술",
+            "subtitle": "재사용 가능하고 버전 관리된 지시사항입니다. 관련 시점에 에이전트가 실행 중에 가져올 수 있습니다.",
+            "empty": {
+                "title": "아직 기술이 없습니다.",
+                "subtitle": "기술은 에이전트/기술/작업 롤아웃의 후반 단계에서 제공됩니다. 페이지는 사이드바 네비게이션 경로가 해결되도록 예약되어 있습니다."
+            },
+            "list": {
+                "newSkill": "+ 새 기술",
+                "filter": {
+                    "scope": "범위",
+                    "all": "전체"
+                }
+            },
+            "detail": {
+                "instructions": "지시사항",
+                "bindings": "바인딩",
+                "bindingHelper": "이 기술을 에이전트, 임무, 아이디어 또는 작업에 바인딩하세요. 우선순위 1 = 가장 높은 우선순위입니다.",
+                "addBinding": "+ 바인딩 추가",
+                "removeBinding": "제거",
+                "targetType": "바인딩 대상",
+                "priority": "우선순위",
+                "agent": "에이전트",
+                "mission": "임무",
+                "idea": "아이디어",
+                "work": "작업",
+                "tenant": "테넌트"
+            }
+        },
+        "templatesPage": {
+            "title": "템플릿",
+            "subtitle": "에이전트, 기술 및 작업을 위한 미리 구축된 시작 지점입니다.",
+            "empty": "아직 템플릿이 없습니다.",
+            "useTemplate": "템플릿 사용",
+            "browse": "템플릿 찾아보기",
+            "entity": {
+                "agent": "에이전트",
+                "skill": "기술",
+                "task": "작업"
+            }
+        },
+        "budgetSummary": {
+            "period": "{period}",
+            "currentSpend": "Current spend",
+            "cap": "Monthly cap",
+            "noCap": "No cap set",
+            "percentUsed": "{percent}% used",
+            "blocked": "Over cap — blocked",
+            "overCap": "Over cap",
+            "loading": "Loading budget…",
+            "empty": "No budget data yet."
+        },
+        "missionDetail": {
+            "backToMissions": "Back to Missions",
+            "badges": {
+                "scheduled": "Scheduled",
+                "oneShot": "One-shot",
+                "cloned": "Cloned",
+                "clonedTooltip": "This Mission is a Full Fork of another"
+            },
+            "sections": {
+                "settings": "Mission settings",
+                "guardrails": "Guardrails override",
+                "liveRuns": "Live runs",
+                "ideas": "Ideas",
+                "relatedWorks": "Related Works",
+                "inheritedWorks": "Related Works (inherited)",
+                "activity": "Activity",
+                "spend": "Spend over time"
+            },
+            "fields": {
+                "schedule": "Schedule (cron, UTC)",
+                "autoBuildWorks": "Auto-build Works from spawned Ideas",
+                "capInherit": "Inherit user-level default cap",
+                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
+            },
+            "actions": {
+                "saveSettings": "Save settings",
+                "pause": "Pause",
+                "resume": "Resume",
+                "complete": "Complete",
+                "delete": "Delete",
+                "runNow": "Run now",
+                "clone": "Clone"
+            },
+            "confirm": {
+                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            },
+            "guardrails": {
+                "activeOverride": "Custom guardrail overrides are active on this Mission.",
+                "inheriting": "No overrides set — using your global Work-agent guardrails."
+            },
+            "liveRuns": {
+                "empty": "No active runs."
+            },
+            "ideas": {
+                "empty": "No Ideas spawned by this Mission yet."
+            },
+            "works": {
+                "empty": "No Works have been built from this Mission's Ideas yet."
+            },
+            "inherited": {
+                "fromSource": "Inherited from",
+                "empty": "The source Mission has no Works to inherit."
+            },
+            "activity": {
+                "empty": "Activity timeline will appear here once Mission ticks start running."
+            },
+            "spend": {
+                "empty": "Spend chart will appear here once budgets are wired."
+            },
+            "clone": {
+                "title": "Clone this Mission",
+                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
+                "titleLabel": "Title for the new Mission (optional)",
+                "cancel": "Cancel",
+                "confirm": "Clone Mission"
+            },
+            "toasts": {
+                "settingsSaved": "Mission settings saved",
+                "settingsError": "Couldn't save settings",
+                "paused": "Mission paused",
+                "pauseError": "Couldn't pause",
+                "resumed": "Mission resumed",
+                "resumeError": "Couldn't resume",
+                "completed": "Mission marked complete",
+                "completeError": "Couldn't complete",
+                "deleted": "Mission deleted",
+                "deleteError": "Couldn't delete",
+                "runNowError": "Couldn't run now",
+                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
+                "cloneError": "Couldn't clone Mission",
+                "runNow": {
+                    "noop-placeholder": "Run-now queued (placeholder)",
+                    "queued": "Tick queued",
+                    "spawned": "New Ideas spawned",
+                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
+                    "no-ideas": "Tick ran but generated no Ideas",
+                    "failed": "Run now failed",
+                    "cron-no-match": "Tick ran (cron skipped)"
+                }
+            }
+        },
+        "ideasPage": {
+            "title": "Ideas",
+            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
+            "quickAdd": {
+                "label": "Add a new Idea",
+                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
+                "submit": "Add",
+                "submitTitle": "아이디어 추가",
+                "minLength": "Description must be at least 10 characters."
+            },
+            "toggles": {
+                "showAccepted": "Show accepted",
+                "showDismissed": "Show dismissed"
+            },
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "queued": "Queued",
+                "building": "Building",
+                "failed": "Failed",
+                "accepted": "Accepted",
+                "dismissed": "Dismissed",
+                "done": "Done",
+                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+            },
+            "gears": {
+                "menuLabel": "Settings",
+                "autoGenerate": "Auto-generate Ideas…",
+                "autoBuild": "Auto-build Works…",
+                "autoRetry": "Auto-retry policy…",
+                "accountBudgets": "Account-wide budgets…"
+            },
+            "toasts": {
+                "ideaCreated": "Idea added",
+                "ideaCreateError": "Couldn't add idea. Please try again.",
+                "ideaQueued": "Build queued",
+                "ideaQueueError": "Couldn't queue build. Please try again."
+            },
+            "empty": {
+                "title": "No Ideas match these filters.",
+                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+            },
+            "viewAll": "View all ({n}) →"
+        },
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
+        },
         "header": {
             "welcome": "{username}님, 다시 오신 것을 환영합니다!",
             "subtitle": "AI 기반 워크를 관리하고 성능을 추적하세요",
@@ -704,9 +1092,9 @@
                 "apiKeys": "API 키",
                 "data": "데이터",
                 "githubApp": "GitHub 앱",
+                "workAgent": "Work Agent",
                 "gitProviders": "Git 공급자",
-                "dangerZone": "위험 영역",
-                "workAgent": "Work Agent"
+                "dangerZone": "위험 영역"
             },
             "githubApp": {
                 "title": "GitHub 앱 설치",
@@ -731,6 +1119,101 @@
                 "branchUnknown": "기본 브랜치를 사용할 수 없습니다",
                 "private": "비공개",
                 "public": "공개"
+            },
+            "workAgent": {
+                "sections": {
+                    "agent": {
+                        "title": "Work agent planning",
+                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                    },
+                    "guardrails": {
+                        "title": "Guardrails",
+                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
+                    },
+                    "queue": {
+                        "title": "Queue a goal",
+                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
+                    },
+                    "liveRun": {
+                        "title": "Live run",
+                        "description": "Current state and recent agent activity."
+                    },
+                    "recentGoals": {
+                        "title": "Recent goals",
+                        "description": "Pending, running, and completed Work agent instructions."
+                    },
+                    "autoGenerateIdeas": {
+                        "title": "Auto-generate Ideas",
+                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
+                    },
+                    "autoBuildWorks": {
+                        "title": "Auto-build Works",
+                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
+                    },
+                    "autoRetry": {
+                        "title": "Auto-retry policy",
+                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
+                    },
+                    "accountBudgets": {
+                        "title": "Account-wide budgets",
+                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
+                    }
+                },
+                "fields": {
+                    "enabled": "Enable Work agent",
+                    "autoApproveLowImpact": "Auto-approve low-impact changes",
+                    "dailySuggestions": "Daily suggestions",
+                    "dryRunByDefault": "Dry run by default",
+                    "maxWorksPerRun": "Max Works per run",
+                    "maxItemsPerWork": "Max items per Work",
+                    "maxBudgetPerRun": "Max budget per run",
+                    "approvalThreshold": "Approval threshold",
+                    "confirmBeforeCreate": "Confirm before creating Works",
+                    "confirmBeforeDelete": "Confirm before deleting items",
+                    "dryRunThisGoal": "Dry run this goal",
+                    "autoGenerateCadenceMinutes": "Run every N minutes",
+                    "autoGenerateBatchSize": "Ideas per cycle",
+                    "autoBuildThrottlePerDay": "Daily auto-build cap",
+                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
+                    "maxAutoRetries": "Max retries (0–5)",
+                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
+                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
+                    "accountWideCapEnabled": "Set a monthly cap",
+                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
+                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
+                },
+                "actions": {
+                    "saveSettings": "Save settings",
+                    "saveSection": "Save",
+                    "useDefault": "Use default",
+                    "queueGoal": "Queue goal",
+                    "preparePlan": "Prepare plan",
+                    "stop": "Stop"
+                },
+                "queue": {
+                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
+                },
+                "metrics": {
+                    "works": "Works",
+                    "items": "Items"
+                },
+                "labels": {
+                    "dryRun": "Dry run",
+                    "liveRun": "Live run"
+                },
+                "empty": {
+                    "noActiveRun": "No active Work agent run.",
+                    "noGoals": "No Work agent goals yet.",
+                    "waitingForUpdate": "Waiting for the first run update."
+                },
+                "toasts": {
+                    "settingsSaved": "Work agent settings saved",
+                    "settingsError": "Failed to save settings",
+                    "goalQueued": "Work agent plan prepared",
+                    "goalError": "Failed to queue goal",
+                    "goalCanceled": "Work agent goal canceled",
+                    "cancelError": "Failed to cancel goal"
+                }
             },
             "data": {
                 "exportTitle": "데이터 내보내기",
@@ -839,6 +1322,11 @@
             "profile": {
                 "title": "프로필 설정",
                 "subtitle": "프로필 정보 및 아바타 업데이트",
+                "budgetAlerts": {
+                    "title": "Budget alert emails",
+                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
+                    "toggleLabel": "Email me budget alerts"
+                },
                 "fields": {
                     "name": "이름",
                     "username": "사용자 이름",
@@ -870,11 +1358,6 @@
                     "description": "git 커밋에 사용되는 이름과 이메일을 재정의하세요. 계정 이름({defaultName})과 이메일({defaultEmail}) 사용을 위해 비워 두세요.",
                     "nameLabel": "커미터 이름",
                     "emailLabel": "커미터 이메일"
-                },
-                "budgetAlerts": {
-                    "title": "Budget alert emails",
-                    "description": "Receive an email when a directory's monthly spend crosses 75%, 90%, 100%, or goes into overage. The in-app notification always fires regardless of this setting.",
-                    "toggleLabel": "Email me budget alerts"
                 }
             },
             "security": {
@@ -979,101 +1462,6 @@
                     "revokeError": "API 키 취소에 실패했습니다",
                     "copyError": "클립보드에 복사하는 데 실패했습니다"
                 }
-            },
-            "workAgent": {
-                "sections": {
-                    "agent": {
-                        "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
-                    },
-                    "guardrails": {
-                        "title": "Guardrails",
-                        "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
-                    },
-                    "queue": {
-                        "title": "Queue a goal",
-                        "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
-                    },
-                    "liveRun": {
-                        "title": "Live run",
-                        "description": "Current state and recent agent activity."
-                    },
-                    "recentGoals": {
-                        "title": "Recent goals",
-                        "description": "Pending, running, and completed Work agent instructions."
-                    },
-                    "autoGenerateIdeas": {
-                        "title": "Auto-generate Ideas",
-                        "description": "How often the platform suggests new Ideas across your account, and how many it suggests per cycle. Applies to both standalone Ideas and Ideas spawned by your Missions."
-                    },
-                    "autoBuildWorks": {
-                        "title": "Auto-build Works",
-                        "description": "How aggressively the platform builds Works from your Ideas without asking. Daily throttle caps how many Works the auto-builder may create in a 24h window; the Mission cap limits how many outstanding Ideas each Mission may queue at once."
-                    },
-                    "autoRetry": {
-                        "title": "Auto-retry policy",
-                        "description": "When an Idea build fails on a transient error (network blip, rate limit, upstream 5xx), the platform will retry automatically up to the cap with exponential backoff. Permanent failures (invalid input, unknown) never retry."
-                    },
-                    "accountBudgets": {
-                        "title": "Account-wide budgets",
-                        "description": "Optional ceiling on total spend across every Work, Idea, and Mission in your account each calendar month. When enabled and reached, the platform pauses Idea generation + auto-build until the next cycle (or overage if allowed)."
-                    }
-                },
-                "fields": {
-                    "enabled": "Enable Work agent",
-                    "autoApproveLowImpact": "Auto-approve low-impact changes",
-                    "dailySuggestions": "Daily suggestions",
-                    "dryRunByDefault": "Dry run by default",
-                    "maxWorksPerRun": "Max Works per run",
-                    "maxItemsPerWork": "Max items per Work",
-                    "maxBudgetPerRun": "Max budget per run",
-                    "approvalThreshold": "Approval threshold",
-                    "confirmBeforeCreate": "Confirm before creating Works",
-                    "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
-                    "autoGenerateCadenceMinutes": "Run every N minutes",
-                    "autoGenerateBatchSize": "Ideas per cycle",
-                    "autoBuildThrottlePerDay": "Daily auto-build cap",
-                    "missionDefaultOutstandingCap": "Default outstanding-Ideas cap per Mission (-1 = unlimited)",
-                    "maxAutoRetries": "Max retries (0–5)",
-                    "backoffSeconds": "Initial backoff (seconds, 10–3600)",
-                    "exponentialBackoffFactor": "Backoff factor (1.0–4.0)",
-                    "accountWideCapEnabled": "Set a monthly cap",
-                    "accountWideMonthlyCap": "Monthly spend cap (USD)",
-                    "accountWideAllowOverage": "Allow overage past the cap (with warning)"
-                },
-                "actions": {
-                    "saveSettings": "Save settings",
-                    "saveSection": "Save",
-                    "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
-                    "preparePlan": "Prepare plan",
-                    "stop": "Stop"
-                },
-                "queue": {
-                    "placeholder": "Create a Work of the top 50 AI startups in healthcare"
-                },
-                "metrics": {
-                    "works": "Works",
-                    "items": "Items"
-                },
-                "labels": {
-                    "dryRun": "Dry run",
-                    "liveRun": "Live run"
-                },
-                "empty": {
-                    "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
-                    "waitingForUpdate": "Waiting for the first run update."
-                },
-                "toasts": {
-                    "settingsSaved": "Work agent settings saved",
-                    "settingsError": "Failed to save settings",
-                    "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
-                }
             }
         },
         "stats": {
@@ -1082,8 +1470,32 @@
             "totalWorks": "총 워크",
             "totalItems": "총 항목",
             "activeWebsites": "활성 웹사이트",
-            "fromLastMonth": "전월 대비",
-            "monthSpend": "Month Spend"
+            "monthSpend": "Month Spend",
+            "fromLastMonth": "전월 대비"
+        },
+        "adminUsage": {
+            "title": "Platform usage",
+            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
+            "periodLabel": "{period}",
+            "totalSpend": "Total spend: {amount}",
+            "empty": "No usage recorded this period.",
+            "columnUser": "User",
+            "columnEmail": "Email",
+            "columnWork": "Directory",
+            "columnUnits": "Units",
+            "columnCost": "Cost",
+            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
+        },
+        "budgets": {
+            "overviewTitle": "Spend in {period}",
+            "overviewProgressLabel": "{percent}% of {cap} cap",
+            "overviewOverageSuffix": " (overage allowed)",
+            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
+            "topPluginsTitle": "Top plugins by spend",
+            "topPluginsEmpty": "No usage recorded yet this period.",
+            "trendTitle": "Daily spend — {period}",
+            "trendEmpty": "No usage recorded yet this period.",
+            "trendDayLabel": "Day {day}"
         },
         "workCard": {
             "status": {
@@ -1703,6 +2115,11 @@
                     "screenshotError": "스크린샷 캡처 중 오류가 발생했습니다",
                     "featured": "추천 항목",
                     "featuredHelp": "워크에서 이 항목을 추천 항목으로 표시",
+                    "markdown": "Content (Markdown, optional)",
+                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
+                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
+                    "showPreview": "Preview",
+                    "hidePreview": "Hide preview",
                     "updateWithPR": "풀 리퀘스트 생성",
                     "updateWithPRHelp": "직접 커밋 대신 풀 리퀘스트로 변경 사항 제출",
                     "cancel": "취소",
@@ -1717,15 +2134,15 @@
                         "invalidUrl": "http:// 또는 https://를 포함한 유효한 URL을 입력하세요",
                         "invalidImageUrl": "유효한 이미지 URL을 입력하세요",
                         "requiredFields": "모든 필수 필드를 입력하세요"
-                    },
-                    "markdown": "Content (Markdown, optional)",
-                    "markdownPlaceholder": "# Heading\n\nLong-form description. Supports GitHub-Flavoured Markdown.",
-                    "markdownHelp": "Long-form body for the item detail page. When empty, a stub built from name + description + source URL is used. Supports GitHub-Flavoured Markdown.",
-                    "showPreview": "Preview",
-                    "hidePreview": "Hide preview"
+                    }
                 },
                 "editDisplay": "표시 편집",
                 "editDisplayDescription": "추천 상태를 토글하고 표시 순서를 설정하세요.",
+                "editContent": "Edit content",
+                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
+                "editContentSuccess": "Item content updated.",
+                "editContentFailed": "Failed to update item content.",
+                "editContentError": "An error occurred while updating item content.",
                 "orderLabel": "표시 순서 (선택)",
                 "orderHelp": "숫자가 낮을수록 추천/비추천 그룹 내에서 먼저 표시됩니다.",
                 "deleteDialogTitle": "항목 삭제",
@@ -1922,12 +2339,7 @@
                     "saving": "저장 중...",
                     "saveSuccess": "소스 검증 설정이 저장되었습니다",
                     "saveFailed": "소스 검증 설정 저장에 실패했습니다"
-                },
-                "editContent": "Edit content",
-                "editContentDescription": "Edit the long-form markdown body for this item. Written to <slug>.md in the data repository.",
-                "editContentSuccess": "Item content updated.",
-                "editContentFailed": "Failed to update item content.",
-                "editContentError": "An error occurred while updating item content."
+                }
             },
             "generator": {
                 "tabs": {
@@ -2099,8 +2511,72 @@
                 "tabs": {
                     "general": "일반",
                     "members": "멤버",
-                    "navigationLabel": "설정 탭",
-                    "budgets": "Budgets"
+                    "budgets": "Budgets",
+                    "navigationLabel": "설정 탭"
+                },
+                "budgets": {
+                    "title": "Budgets & Usage",
+                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
+                    "periodLabel": "{period} · spent {spent}",
+                    "globalCap": {
+                        "heading": "Global cap",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
+                        "createButton": "Create global cap",
+                        "saveButton": "Save",
+                        "removeButton": "Remove",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
+                        "createSuccess": "Create global budget succeeded",
+                        "createError": "Create global budget failed",
+                        "updateSuccess": "Update global budget succeeded",
+                        "updateError": "Update global budget failed",
+                        "deleteSuccess": "Delete global budget succeeded",
+                        "deleteError": "Delete global budget failed"
+                    },
+                    "pluginCaps": {
+                        "heading": "Per-plugin caps",
+                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
+                        "empty": "No per-plugin caps. Add one below.",
+                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
+                        "overageSuffix": " · overage allowed",
+                        "addHeading": "Add plugin cap",
+                        "pluginIdLabel": "Plugin",
+                        "pluginIdPlaceholder": "e.g. openai",
+                        "pluginSelectPlaceholder": "Select a plugin…",
+                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
+                        "allPluginsCapped": "All eligible plugins already have a cap.",
+                        "noMatchingPlugins": "No plugins match this search.",
+                        "capLabel": "Monthly cap ({currency})",
+                        "allowOverageLabel": "Allow overage",
+                        "addButton": "Add cap",
+                        "saveButton": "Save",
+                        "deleteAria": "Delete budget",
+                        "errorPluginRequired": "Plugin id is required.",
+                        "errorPluginDuplicate": "A budget for this plugin already exists.",
+                        "errorPositive": "Enter a positive cap value.",
+                        "createSuccess": "Create plugin budget succeeded",
+                        "createError": "Create plugin budget failed",
+                        "updateSuccess": "Update plugin budget succeeded",
+                        "updateError": "Update plugin budget failed",
+                        "deleteSuccess": "Delete plugin budget succeeded",
+                        "deleteError": "Delete plugin budget failed"
+                    },
+                    "spendByPlugin": {
+                        "heading": "Spend by plugin",
+                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
+                        "empty": "No usage recorded this period.",
+                        "columnPlugin": "Plugin",
+                        "columnCapability": "Capability",
+                        "columnUnits": "Units",
+                        "columnCost": "Cost"
+                    },
+                    "export": {
+                        "downloadCsv": "Download CSV",
+                        "downloadingCsv": "Preparing CSV…",
+                        "csvFailed": "CSV export failed"
+                    }
                 },
                 "sourceSettings": "소스 저장소",
                 "originalSource": "원본 소스",
@@ -2405,73 +2881,13 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                },
-                "budgets": {
-                    "title": "Budgets & Usage",
-                    "description": "Set monthly spend caps for this directory. Alerts fire at 75%, 90%, 100%; at 100% new plugin calls are blocked unless overage is allowed.",
-                    "periodLabel": "{period} · spent {spent}",
-                    "globalCap": {
-                        "heading": "Global cap",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage (warn but don’t block at 100%)",
-                        "createButton": "Create global cap",
-                        "saveButton": "Save",
-                        "removeButton": "Remove",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "errorPositive": "Enter a positive cap value (e.g. 50.00).",
-                        "createSuccess": "Create global budget succeeded",
-                        "createError": "Create global budget failed",
-                        "updateSuccess": "Update global budget succeeded",
-                        "updateError": "Update global budget failed",
-                        "deleteSuccess": "Delete global budget succeeded",
-                        "deleteError": "Delete global budget failed"
-                    },
-                    "pluginCaps": {
-                        "heading": "Per-plugin caps",
-                        "subheading": "Optional. Caps a single plugin alongside the global cap.",
-                        "empty": "No per-plugin caps. Add one below.",
-                        "rowSpend": "Spent {spent} of {cap} ({percent}%)",
-                        "overageSuffix": " · overage allowed",
-                        "addHeading": "Add plugin cap",
-                        "pluginIdLabel": "Plugin",
-                        "pluginIdPlaceholder": "e.g. openai",
-                        "pluginSelectPlaceholder": "Select a plugin…",
-                        "noEligiblePlugins": "Enable an AI, search, screenshot or content-extractor plugin for this directory to set a per-plugin cap.",
-                        "allPluginsCapped": "All eligible plugins already have a cap.",
-                        "noMatchingPlugins": "No plugins match this search.",
-                        "capLabel": "Monthly cap ({currency})",
-                        "allowOverageLabel": "Allow overage",
-                        "addButton": "Add cap",
-                        "saveButton": "Save",
-                        "deleteAria": "Delete budget",
-                        "errorPluginRequired": "Plugin id is required.",
-                        "errorPluginDuplicate": "A budget for this plugin already exists.",
-                        "errorPositive": "Enter a positive cap value.",
-                        "createSuccess": "Create plugin budget succeeded",
-                        "createError": "Create plugin budget failed",
-                        "updateSuccess": "Update plugin budget succeeded",
-                        "updateError": "Update plugin budget failed",
-                        "deleteSuccess": "Delete plugin budget succeeded",
-                        "deleteError": "Delete plugin budget failed"
-                    },
-                    "spendByPlugin": {
-                        "heading": "Spend by plugin",
-                        "subheading": "{period} — read-only breakdown sourced from PluginUsageEvent.",
-                        "empty": "No usage recorded this period.",
-                        "columnPlugin": "Plugin",
-                        "columnCapability": "Capability",
-                        "columnUnits": "Units",
-                        "columnCost": "Cost"
-                    },
-                    "export": {
-                        "downloadCsv": "Download CSV",
-                        "downloadingCsv": "Preparing CSV…",
-                        "csvFailed": "CSV export failed"
-                    }
                 }
             },
             "deploy": {
+                "progress": {
+                    "loadingStatus": "Loading deploy status...",
+                    "openWebsite": "Open website"
+                },
                 "noProviderAlert": {
                     "title": "배포 제공자 없음",
                     "description": "워크 웹사이트를 배포하려면 배포 제공자를 선택하세요.",
@@ -2613,10 +3029,6 @@
                     "dnsName": "이름:",
                     "dnsValue": "값:",
                     "copyButton": "복사"
-                },
-                "progress": {
-                    "loadingStatus": "Loading deploy status...",
-                    "openWebsite": "Open website"
                 }
             },
             "kb": {
@@ -2652,6 +3064,15 @@
                     "research": "Research",
                     "output": "Outputs",
                     "freeform": "Freeform"
+                },
+                "inherited": {
+                    "bannerLabel": "상속된 문서 알림",
+                    "bannerTitle": "조직에서 상속됨",
+                    "bannerDescription": "이 문서는 조직 소유이며 여기서는 읽기 전용입니다. 이 Work에 편집 가능한 복사본을 포크하려면 로컬에서 재정의하세요.",
+                    "overrideCta": "로컬에서 재정의",
+                    "overrideCtaBusy": "포크 중…",
+                    "overrideCtaPendingTooltip": "38d 행에서 재정의 작업이 출시되면 사용 가능",
+                    "overrideErrorFallback": "상속된 문서를 포크할 수 없습니다. 다시 시도하거나 페이지를 새로 고치세요."
                 },
                 "status": {
                     "draft": "Draft",
@@ -2819,15 +3240,6 @@
                     "viewHistory": "View Git history",
                     "historyComingSoon": "Git history view ships in the next KB drop."
                 },
-                "inherited": {
-                    "bannerLabel": "상속된 문서 알림",
-                    "bannerTitle": "조직에서 상속됨",
-                    "bannerDescription": "이 문서는 조직 소유이며 여기서는 읽기 전용입니다. 이 Work에 편집 가능한 복사본을 포크하려면 로컬에서 재정의하세요.",
-                    "overrideCta": "로컬에서 재정의",
-                    "overrideCtaPendingTooltip": "38d 행에서 재정의 작업이 출시되면 사용 가능",
-                    "overrideCtaBusy": "포크 중…",
-                    "overrideErrorFallback": "상속된 문서를 포크할 수 없습니다. 다시 시도하거나 페이지를 새로 고치세요."
-                },
                 "addDoc": {
                     "button": "+ 추가",
                     "title": "새 문서 만들기",
@@ -2855,6 +3267,59 @@
                     "errorFallback": "삭제할 수 없습니다. 다시 시도하세요.",
                     "errorBusy": "삭제 중…",
                     "errorPartial": "삭제 {ok}개, 실패 {failed}개."
+                }
+            }
+        },
+        "newPage": {
+            "title": "+ New",
+            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "promptLabel": "What do you want to build?",
+            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
+            "chipLabel": "Pick a kind",
+            "chips": {
+                "mission": "Mission",
+                "idea": "Idea",
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "chipDescriptions": {
+                "mission": "에이전트가 계속 작업하는 지속적인 목표입니다 - 일정 또는 일회성으로 아이디어를 생성합니다.",
+                "idea": "에이전트가 작업 계획으로 전환하는 일회성 개요입니다.",
+                "website": "비즈니스, 서비스 또는 브랜드를 위한 다중 페이지 사이트 - 생성된 콘텐츠 + 코드.",
+                "landing-page": "집중된 일페이지 - 대기자 명단, 제품 출시, 웨비나 신청, 리드 확보.",
+                "blog": "카테고리, RSS, 코드 하이라이트 및 SEO 준비된 콘텐츠를 갖춘 블로그.",
+                "directory": "검색, 필터 및 구조화된 항목 데이터를 갖춘 선별된 디렉토리 사이트.",
+                "awesome-repo": "멋진 목록 저장소 - 마크다운 인덱스, 분류된 링크 및 새로 고칠 수 있는 메타데이터."
+            },
+            "submit": "Create",
+            "submitTitle": "생성",
+            "or": "or",
+            "hints": {
+                "minLength": "Add a description (at least 10 characters) to enable Create."
+            },
+            "toasts": {
+                "missionCreated": "Mission created",
+                "ideaCreated": "Idea added",
+                "submitError": "Couldn't create. Please try again."
+            },
+            "cards": {
+                "ai": {
+                    "title": "Create Work with AI",
+                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
+                    "cta": "Get started"
+                },
+                "manual": {
+                    "title": "Create Work Manually",
+                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
+                    "cta": "Configure now"
+                },
+                "import": {
+                    "title": "Import Existing Work",
+                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
+                    "cta": "Import now"
                 }
             }
         },
@@ -2955,6 +3420,10 @@
                 "configureNow": "지금 구성",
                 "formTitle": "워크 수동 생성",
                 "formSubtitle": "모든 설정을 완전히 제어하며 워크 구성",
+                "proposalBanner": {
+                    "title": "Pre-filled from an AI suggestion.",
+                    "subtitle": "Tweak anything before creating."
+                },
                 "basicInfo": "기본 정보",
                 "nameLabel": "워크 이름 *",
                 "namePlaceholder": "e.g., Awesome AI Tools",
@@ -2986,10 +3455,6 @@
                 "createFailed": "워크 생성 실패",
                 "success": {
                     "created": "워크가 성공적으로 생성되었습니다!"
-                },
-                "proposalBanner": {
-                    "title": "Pre-filled from an AI suggestion.",
-                    "subtitle": "Tweak anything before creating."
                 }
             },
             "import": {
@@ -3322,16 +3787,20 @@
             "menu": "메뉴",
             "aiChat": "AI 채팅",
             "newWork": "새 워크",
+            "new": "새로",
             "activityIndicator": "워크 생성 중",
             "navigation": {
                 "dashboard": "대시보드",
                 "activity": "활동",
-                "works": "워크",
-                "plugins": "플러그인",
-                "templates": "템플릿",
-                "settings": "설정",
                 "missions": "Missions",
-                "ideas": "Ideas"
+                "ideas": "Ideas",
+                "works": "워크",
+                "tasks": "작업",
+                "agents": "에이전트",
+                "plugins": "플러그인",
+                "skills": "기술",
+                "templates": "템플릿",
+                "settings": "설정"
             },
             "tooltips": {
                 "expandSidebar": "사이드바 확장",
@@ -3344,8 +3813,7 @@
                 "keyboardShortcuts": "키보드 단축키"
             },
             "signOut": "로그아웃",
-            "signingOut": "로그아웃 중...",
-            "new": "새로"
+            "signingOut": "로그아웃 중..."
         },
         "dangerZone": {
             "title": "위험 영역",
@@ -3455,6 +3923,11 @@
             "disable": "비활성화",
             "settings": "설정",
             "saveSettings": "설정 저장",
+            "saveAndVerify": "Save & verify",
+            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
+            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
+            "verifySuccessHeader": "Connection verified.",
+            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh.",
             "settingsTitle": "플러그인 설정",
             "settingsSaved": "설정이 성공적으로 저장되었습니다",
             "noSettings": "이 플러그인은 구성할 수 있는 설정이 없습니다",
@@ -3574,20 +4047,20 @@
                 "savedSuccess": "조직 액세스가 저장되었습니다.",
                 "saveFailed": "저장 실패.",
                 "removeLabel": "{login} 제거"
-            },
-            "saveAndVerify": "Save & verify",
-            "verifiesOnSaveHint": "Saving this plugin tests the connection and reports back cluster/account info.",
-            "verifyClusterHeader": "Connected to cluster '{name}' ({version}).",
-            "verifySuccessHeader": "Connection verified.",
-            "verifyNoIngressClasses": "No IngressClass found on this cluster. Install ingress-nginx or Traefik, then re-save to refresh."
+            }
         },
         "templates": {
             "title": "템플릿",
             "subtitle": "내장 웹사이트 템플릿을 찾아보고, 사용자 지정 카탈로그를 관리하며, 새로운 작업이 시작될 때 어떤 템플릿을 사용할지 제어하세요.",
+            "kindSwitcher": {
+                "mission": "Mission Templates",
+                "work": "Work Templates",
+                "website": "Website Templates"
+            },
             "actions": {
                 "addTemplate": "사용자 지정 템플릿 추가",
-                "refreshTemplates": "템플릿 새로 고침",
-                "customizeTemplate": "Create with AI"
+                "customizeTemplate": "Create with AI",
+                "refreshTemplates": "템플릿 새로 고침"
             },
             "hero": {
                 "eyebrow": "템플릿 카탈로그",
@@ -3621,8 +4094,11 @@
                 "defaultSelected": "기본값 선택됨",
                 "makeDefault": "기본값으로 설정",
                 "fork": "포크",
+                "useTemplate": "Use this Template",
                 "edit": "편집",
                 "archive": "보관",
+                "customizeAgain": "Customize again",
+                "viewStatus": "View customization status",
                 "catalogOnly": "카탈로그 항목",
                 "openRepository": "저장소 열기",
                 "previewAlt": "{name} 미리보기",
@@ -3631,9 +4107,6 @@
                 "syncBranches": "{count} 동기화 브랜치",
                 "betaBranch": "베타: {branch}",
                 "noDescription": "아직 설명이 없습니다.",
-                "useTemplate": "Use this Template",
-                "customizeAgain": "Customize again",
-                "viewStatus": "View customization status",
                 "status": {
                     "pending": "Queued",
                     "forking": "Forking",
@@ -3723,11 +4196,6 @@
                 "syncBaseSuccess": "Template synced from its base.",
                 "syncBaseUpToDate": "Template is already up to date with its base.",
                 "syncBaseFailed": "Failed to sync template from base."
-            },
-            "kindSwitcher": {
-                "mission": "Mission Templates",
-                "work": "Work Templates",
-                "website": "Website Templates"
             },
             "customizeDialog": {
                 "title": "Create a custom template with AI",
@@ -4158,8 +4626,7 @@
                     "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
                     "cta": "Import now"
                 }
-            }
-        }
+            }        }
     },
     "layout": {
         "auth": {
@@ -4229,6 +4696,7 @@
             "dashboard": "대시보드",
             "activity": "활동 로그",
             "works": "워크",
+            "discover": "Discover",
             "newWork": "새 워크",
             "work": "워크",
             "overview": "개요",
@@ -4245,8 +4713,7 @@
             "security": "보안",
             "apiKeys": "API 키",
             "dangerZone": "위험 영역",
-            "pluginSettings": "플러그인 설정",
-            "discover": "Discover"
+            "pluginSettings": "플러그인 설정"
         }
     },
     "api": {
