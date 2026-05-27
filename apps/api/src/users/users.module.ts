@@ -17,9 +17,9 @@ import { UsernameAllocatorService } from './services/username-allocator.service'
  * provider declarations.
  */
 @Module({
-	imports: [DatabaseModule],
-	providers: [UserRepository, UsernameAllocatorService],
-	controllers: [UsersController],
-	exports: [UsernameAllocatorService],
+    imports: [DatabaseModule],
+    providers: [UserRepository, UsernameAllocatorService],
+    controllers: [UsersController],
+    exports: [UsernameAllocatorService],
 })
 export class UsersModule {}

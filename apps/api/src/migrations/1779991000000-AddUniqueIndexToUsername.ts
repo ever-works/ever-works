@@ -30,31 +30,33 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * diverges between dialects over time.
  */
 export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface {
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		const dupes = (await queryRunner.query(
-			`SELECT lower("username") AS lname, COUNT(*) AS cnt FROM "users" GROUP BY lower("username") HAVING COUNT(*) > 1`,
-		)) as Array<{ lname: string; cnt: number | string }>;
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        const dupes = (await queryRunner.query(
+            `SELECT lower("username") AS lname, COUNT(*) AS cnt FROM "users" GROUP BY lower("username") HAVING COUNT(*) > 1`,
+        )) as Array<{ lname: string; cnt: number | string }>;
 
-		if (dupes.length > 0) {
-			throw new Error(
-				`AddUniqueIndexToUsername aborted: found ${dupes.length} case-insensitive duplicate username(s) in users table. ` +
-					`Resolve manually before re-running this migration. Sample: ${JSON.stringify(dupes.slice(0, 5))}`,
-			);
-		}
+        if (dupes.length > 0) {
+            throw new Error(
+                `AddUniqueIndexToUsername aborted: found ${dupes.length} case-insensitive duplicate username(s) in users table. ` +
+                    `Resolve manually before re-running this migration. Sample: ${JSON.stringify(dupes.slice(0, 5))}`,
+            );
+        }
 
-		const table = await queryRunner.getTable('users');
-		const hasIndex = table?.indices.some((idx) => idx.name === 'idx_users_username_lower_unique');
-		if (!hasIndex) {
-			// Expression index. Use raw SQL because TypeORM's TableIndex does not
-			// model expression columns portably across dialects.
-			await queryRunner.query(
-				`CREATE UNIQUE INDEX "idx_users_username_lower_unique" ON "users" (lower("username"))`,
-			);
-		}
-	}
+        const table = await queryRunner.getTable('users');
+        const hasIndex = table?.indices.some(
+            (idx) => idx.name === 'idx_users_username_lower_unique',
+        );
+        if (!hasIndex) {
+            // Expression index. Use raw SQL because TypeORM's TableIndex does not
+            // model expression columns portably across dialects.
+            await queryRunner.query(
+                `CREATE UNIQUE INDEX "idx_users_username_lower_unique" ON "users" (lower("username"))`,
+            );
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		// IF EXISTS works on both Postgres and SQLite.
-		await queryRunner.query(`DROP INDEX IF EXISTS "idx_users_username_lower_unique"`);
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        // IF EXISTS works on both Postgres and SQLite.
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_users_username_lower_unique"`);
+    }
 }

@@ -30,70 +30,72 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * Forward-only, additive.
  */
 export class AddSlugToUsers1779991001000 implements MigrationInterface {
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		// 1. Add nullable column.
-		if (!(await queryRunner.hasColumn('users', 'slug'))) {
-			await queryRunner.addColumn(
-				'users',
-				new TableColumn({
-					name: 'slug',
-					type: 'varchar',
-					isNullable: true,
-				}),
-			);
-		}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        // 1. Add nullable column.
+        if (!(await queryRunner.hasColumn('users', 'slug'))) {
+            await queryRunner.addColumn(
+                'users',
+                new TableColumn({
+                    name: 'slug',
+                    type: 'varchar',
+                    isNullable: true,
+                }),
+            );
+        }
 
-		// 2. Backfill from username (lowercase). The Postgres + SQLite UPDATE
-		//    shape is identical here; no dialect branching needed.
-		await queryRunner.query(`UPDATE "users" SET "slug" = lower("username") WHERE "slug" IS NULL`);
+        // 2. Backfill from username (lowercase). The Postgres + SQLite UPDATE
+        //    shape is identical here; no dialect branching needed.
+        await queryRunner.query(
+            `UPDATE "users" SET "slug" = lower("username") WHERE "slug" IS NULL`,
+        );
 
-		// 3. Defensive duplicate check.
-		const dupes = (await queryRunner.query(
-			`SELECT "slug", COUNT(*) AS cnt FROM "users" WHERE "slug" IS NOT NULL GROUP BY "slug" HAVING COUNT(*) > 1`,
-		)) as Array<{ slug: string; cnt: number | string }>;
+        // 3. Defensive duplicate check.
+        const dupes = (await queryRunner.query(
+            `SELECT "slug", COUNT(*) AS cnt FROM "users" WHERE "slug" IS NOT NULL GROUP BY "slug" HAVING COUNT(*) > 1`,
+        )) as Array<{ slug: string; cnt: number | string }>;
 
-		if (dupes.length > 0) {
-			throw new Error(
-				`AddSlugToUsers aborted: backfill produced ${dupes.length} duplicate slug(s) — implies AddUniqueIndexToUsername was bypassed. ` +
-					`Resolve manually. Sample: ${JSON.stringify(dupes.slice(0, 5))}`,
-			);
-		}
+        if (dupes.length > 0) {
+            throw new Error(
+                `AddSlugToUsers aborted: backfill produced ${dupes.length} duplicate slug(s) — implies AddUniqueIndexToUsername was bypassed. ` +
+                    `Resolve manually. Sample: ${JSON.stringify(dupes.slice(0, 5))}`,
+            );
+        }
 
-		// 4. Unique index. TableIndex with isUnique handles both dialects.
-		const table = await queryRunner.getTable('users');
-		const hasIndex = table?.indices.some((idx) => idx.name === 'idx_users_slug_unique');
-		if (!hasIndex) {
-			await queryRunner.createIndex(
-				'users',
-				new TableIndex({
-					name: 'idx_users_slug_unique',
-					columnNames: ['slug'],
-					isUnique: true,
-				}),
-			);
-		}
+        // 4. Unique index. TableIndex with isUnique handles both dialects.
+        const table = await queryRunner.getTable('users');
+        const hasIndex = table?.indices.some((idx) => idx.name === 'idx_users_slug_unique');
+        if (!hasIndex) {
+            await queryRunner.createIndex(
+                'users',
+                new TableIndex({
+                    name: 'idx_users_slug_unique',
+                    columnNames: ['slug'],
+                    isUnique: true,
+                }),
+            );
+        }
 
-		// 5. Flip NOT NULL. queryRunner.changeColumn handles both Postgres and
-		//    SQLite (SQLite emits a recreate-table dance under the hood).
-		const slugColumn = (await queryRunner.getTable('users'))?.findColumnByName('slug');
-		if (slugColumn && slugColumn.isNullable) {
-			const updated = new TableColumn({
-				name: 'slug',
-				type: 'varchar',
-				isNullable: false,
-			});
-			await queryRunner.changeColumn('users', 'slug', updated);
-		}
-	}
+        // 5. Flip NOT NULL. queryRunner.changeColumn handles both Postgres and
+        //    SQLite (SQLite emits a recreate-table dance under the hood).
+        const slugColumn = (await queryRunner.getTable('users'))?.findColumnByName('slug');
+        if (slugColumn && slugColumn.isNullable) {
+            const updated = new TableColumn({
+                name: 'slug',
+                type: 'varchar',
+                isNullable: false,
+            });
+            await queryRunner.changeColumn('users', 'slug', updated);
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		const table = await queryRunner.getTable('users');
-		const hasIndex = table?.indices.some((idx) => idx.name === 'idx_users_slug_unique');
-		if (hasIndex) {
-			await queryRunner.dropIndex('users', 'idx_users_slug_unique');
-		}
-		if (await queryRunner.hasColumn('users', 'slug')) {
-			await queryRunner.dropColumn('users', 'slug');
-		}
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        const table = await queryRunner.getTable('users');
+        const hasIndex = table?.indices.some((idx) => idx.name === 'idx_users_slug_unique');
+        if (hasIndex) {
+            await queryRunner.dropIndex('users', 'idx_users_slug_unique');
+        }
+        if (await queryRunner.hasColumn('users', 'slug')) {
+            await queryRunner.dropColumn('users', 'slug');
+        }
+    }
 }

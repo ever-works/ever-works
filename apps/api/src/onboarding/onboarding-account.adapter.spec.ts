@@ -80,17 +80,15 @@ describe('OnboardingAccountAdapter', () => {
             usernameAllocator: {
                 // Identity by default, plus the existing-username collision
                 // semantics so the "appends -<n> when taken" test still works.
-                allocateUsername: jest
-                    .fn()
-                    .mockImplementation(async (base: string) => {
-                        let candidate = base;
-                        let suffix = 1;
-                        while (usernameQueue.has(candidate)) {
-                            suffix += 1;
-                            candidate = `${base}-${suffix}`;
-                        }
-                        return candidate;
-                    }),
+                allocateUsername: jest.fn().mockImplementation(async (base: string) => {
+                    let candidate = base;
+                    let suffix = 1;
+                    while (usernameQueue.has(candidate)) {
+                        suffix += 1;
+                        candidate = `${base}-${suffix}`;
+                    }
+                    return candidate;
+                }),
                 normalize: jest.fn().mockImplementation((s: string) => s),
                 suggest: jest.fn(),
             },

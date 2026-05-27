@@ -14,17 +14,18 @@ import { ApiProperty } from '@nestjs/swagger';
  * pre-empting the allocator's own normalization rules.
  */
 export class CheckUsernameQueryDto {
-	@ApiProperty({
-		description: 'The desired username to check availability for. Will be normalized to URL-safe form server-side.',
-		example: 'alice',
-		minLength: 1,
-		maxLength: 64,
-	})
-	@IsString()
-	@Length(1, 64)
-	@Matches(/^[\p{L}\p{N}._@'\- ]+$/u, {
-		message:
-			'value contains unsupported characters; allowed: letters, digits, dot, underscore, at-sign, apostrophe, hyphen, space',
-	})
-	value!: string;
+    @ApiProperty({
+        description:
+            'The desired username to check availability for. Will be normalized to URL-safe form server-side.',
+        example: 'alice',
+        minLength: 1,
+        maxLength: 64,
+    })
+    @IsString()
+    @Length(1, 64)
+    @Matches(/^[\p{L}\p{N}._@'\- ]+$/u, {
+        message:
+            'value contains unsupported characters; allowed: letters, digits, dot, underscore, at-sign, apostrophe, hyphen, space',
+    })
+    value!: string;
 }

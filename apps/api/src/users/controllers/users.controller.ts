@@ -18,44 +18,48 @@ import { CheckUsernameQueryDto } from '../dto/check-username.dto';
 @ApiTags('Users')
 @Controller('api/users')
 export class UsersController {
-	constructor(private readonly usernameAllocator: UsernameAllocatorService) {}
+    constructor(private readonly usernameAllocator: UsernameAllocatorService) {}
 
-	/**
-	 * Check whether a username is available, with a normalized form +
-	 * collision-free suggestion.
-	 *
-	 * Used by interactive signup / settings rename forms to show
-	 * "username taken — suggested: ever-2" hints before submit.
-	 *
-	 * Public + throttled because it's reachable pre-login.
-	 */
-	@Public()
-	@Throttle({ default: { limit: 30, ttl: 60_000 } })
-	@Get('check-username')
-	@ApiOperation({
-		summary: 'Check username availability',
-		description:
-			'Returns `{ available, normalized, suggestion? }`. The `normalized` field is what the platform would store; `suggestion` (only when not available) is the next free variant.',
-	})
-	@ApiQuery({ name: 'value', description: 'Desired username (will be normalized)', required: true })
-	@ApiResponse({
-		status: 200,
-		description: 'Availability result',
-		schema: {
-			type: 'object',
-			properties: {
-				available: { type: 'boolean' },
-				normalized: { type: 'string' },
-				suggestion: { type: 'string', nullable: true },
-			},
-			required: ['available', 'normalized'],
-		},
-	})
-	async checkUsername(@Query() query: CheckUsernameQueryDto): Promise<{
-		available: boolean;
-		normalized: string;
-		suggestion?: string;
-	}> {
-		return this.usernameAllocator.suggest(query.value);
-	}
+    /**
+     * Check whether a username is available, with a normalized form +
+     * collision-free suggestion.
+     *
+     * Used by interactive signup / settings rename forms to show
+     * "username taken — suggested: ever-2" hints before submit.
+     *
+     * Public + throttled because it's reachable pre-login.
+     */
+    @Public()
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Get('check-username')
+    @ApiOperation({
+        summary: 'Check username availability',
+        description:
+            'Returns `{ available, normalized, suggestion? }`. The `normalized` field is what the platform would store; `suggestion` (only when not available) is the next free variant.',
+    })
+    @ApiQuery({
+        name: 'value',
+        description: 'Desired username (will be normalized)',
+        required: true,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Availability result',
+        schema: {
+            type: 'object',
+            properties: {
+                available: { type: 'boolean' },
+                normalized: { type: 'string' },
+                suggestion: { type: 'string', nullable: true },
+            },
+            required: ['available', 'normalized'],
+        },
+    })
+    async checkUsername(@Query() query: CheckUsernameQueryDto): Promise<{
+        available: boolean;
+        normalized: string;
+        suggestion?: string;
+    }> {
+        return this.usernameAllocator.suggest(query.value);
+    }
 }
