@@ -7,7 +7,12 @@ declare module '@theme/Layout' {
 
 declare module '@theme/Heading' {
 	type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-	export interface Props extends import('react').ComponentProps<HeadingTag> {
+	// Hoisted to a named alias because prettier's TS parser can't
+	// handle the `interface X extends import('...').Y<Z>` form
+	// (SyntaxError: "Interface declaration can only extend an
+	// identifier/qualified name with optional type arguments").
+	type HeadingComponentProps = import('react').ComponentProps<HeadingTag>;
+	export interface Props extends HeadingComponentProps {
 		readonly as: HeadingTag;
 		readonly children?: import('react').ReactNode;
 		readonly className?: string;
