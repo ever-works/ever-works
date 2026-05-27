@@ -38,6 +38,24 @@ function isUrlLikeText(text: string): boolean {
     return /^https?:\/\//i.test(text.trim());
 }
 
+/**
+ * Pull `[title](url)` references out of an item's `markdown` field to
+ * use as comparison sources. Two filters keep the list to "editorial
+ * citations" rather than "stuff that happens to look like a markdown
+ * link":
+ *
+ * - **Skip URL-like titles** (`isUrlLikeText`) — auto-linkified URLs
+ *   render as `[https://...](https://...)`; the title carries no
+ *   editorial signal and just duplicates the URL in the rendered
+ *   source list.
+ * - **Skip asset URLs** (`isLikelyAssetUrl`) — image extensions
+ *   (png/jpe?g/gif/webp/svg/ico), profile-image and repo-image paths,
+ *   `storage.googleapis.com`, `twimg.com`. These are typically badge
+ *   / avatar / screenshot embeds, not articles to cite.
+ *
+ * Returns sources in the order they appeared in the markdown. The
+ * caller (`normalizeComparisonSources`) de-duplicates by URL.
+ */
 function extractMarkdownLinks(markdown?: string): ComparisonSource[] {
     if (!markdown) return [];
 
