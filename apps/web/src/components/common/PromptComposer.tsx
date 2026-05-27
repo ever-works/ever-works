@@ -10,6 +10,7 @@ import {
     type ReactNode,
 } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { uploadFile, UploadError } from '@/lib/api/uploads';
 
 /**
  * Shared prompt composer used by `/missions`, `/ideas`, `/new`, and
@@ -210,15 +211,34 @@ function useSpeechRecognition(onResult: (text: string) => void) {
 }
 
 // Attachment shapes — discriminated union mirrors the website's
-// LandingPromptForm. The composer keeps these in local state for now;
-// integration with the platform's upload backend can be added on top
-// later without changing the public PromptComposer API.
+// LandingPromptForm. Each `file` / `folder-file` entry tracks its own
+// upload state (progress / uploadId / url / error) so the chip strip
+// can render distinct uploading / ready / error variants.
 type ComposerAttachment =
     | {
           readonly kind: 'file' | 'folder-file';
           readonly localId: string;
           readonly file: File;
           readonly displayName: string;
+          /** 0–100 percent — XHR-driven during upload. */
+          progress: number;
+          uploading: boolean;
+          /**
+           * Server-side upload id (sha256 of bytes) once the upload
+           * completes. Callers persist this — it's the canonical
+           * reference for `POST /api/me/missions/:id/attachments` etc.
+           */
+          uploadId?: string;
+          /**
+           * API-routed serve URL (`/api/uploads/<userId>/<filename>`)
+           * once the upload completes. Forwarded into the chat prompt
+           * so the chat AI can reference the file by URL.
+           */
+          url?: string;
+          /** Server-declared MIME (echoed from backend response). */
+          mimeType?: string;
+          /** Human-readable failure message; chip flips to red. */
+          error?: string;
       }
     | {
           readonly kind: 'github-repo';
@@ -385,19 +405,77 @@ export function PromptComposer({
 
     const ingestFiles = useCallback((picked: FileList, kind: 'file' | 'folder-file') => {
         if (!picked || picked.length === 0) return;
-        const next = Array.from(picked).map((file): ComposerAttachment => {
-            const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || '';
-            const displayName = kind === 'folder-file' && relPath ? relPath : file.name;
-            return {
-                kind,
-                localId: `${file.name}-${file.size}-${file.lastModified}-${Math.random()
-                    .toString(36)
-                    .slice(2, 6)}`,
-                file,
-                displayName,
-            };
-        });
+        const next = Array.from(picked).map(
+            (file): Extract<ComposerAttachment, { kind: 'file' | 'folder-file' }> => {
+                const relPath =
+                    (file as File & { webkitRelativePath?: string }).webkitRelativePath || '';
+                const displayName = kind === 'folder-file' && relPath ? relPath : file.name;
+                return {
+                    kind,
+                    localId: `${file.name}-${file.size}-${file.lastModified}-${Math.random()
+                        .toString(36)
+                        .slice(2, 6)}`,
+                    file,
+                    displayName,
+                    progress: 0,
+                    uploading: true,
+                };
+            },
+        );
         setAttachments((cur) => [...cur, ...next]);
+
+        // Fire one XHR upload per file in parallel. Each settles
+        // independently; failures stay in `attachments` with an `error`
+        // field so the user can see + retry / dismiss. The submit flow
+        // can choose to wait for in-flight uploads or filter to
+        // completed `uploadId`s — that's the caller's call.
+        for (const attachment of next) {
+            void uploadFile(attachment.file, {
+                onProgress: (percent) => {
+                    setAttachments((cur) =>
+                        cur.map((a) =>
+                            a.localId === attachment.localId &&
+                            (a.kind === 'file' || a.kind === 'folder-file')
+                                ? { ...a, progress: percent }
+                                : a,
+                        ),
+                    );
+                },
+            })
+                .then((res) => {
+                    setAttachments((cur) =>
+                        cur.map((a) =>
+                            a.localId === attachment.localId &&
+                            (a.kind === 'file' || a.kind === 'folder-file')
+                                ? {
+                                      ...a,
+                                      uploading: false,
+                                      progress: 100,
+                                      uploadId: res.id,
+                                      url: res.url,
+                                      mimeType: res.mimeType,
+                                  }
+                                : a,
+                        ),
+                    );
+                })
+                .catch((err: unknown) => {
+                    const message =
+                        err instanceof UploadError
+                            ? err.message
+                            : err instanceof Error
+                              ? err.message
+                              : 'Upload failed';
+                    setAttachments((cur) =>
+                        cur.map((a) =>
+                            a.localId === attachment.localId &&
+                            (a.kind === 'file' || a.kind === 'folder-file')
+                                ? { ...a, uploading: false, progress: 0, error: message }
+                                : a,
+                        ),
+                    );
+                });
+        }
     }, []);
 
     function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -521,13 +599,37 @@ export function PromptComposer({
                                     </div>
                                 );
                             }
+                            // Three visual states:
+                            //   uploading: spinner + "% N"
+                            //   error: red ring + tooltip
+                            //   ready: default
+                            const variant = a.error
+                                ? 'border-red-500/40 bg-red-500/5 text-red-700 dark:text-red-300'
+                                : a.uploading
+                                  ? 'border-border/60 dark:border-white/10 bg-foreground/[0.03] opacity-80'
+                                  : 'border-border/60 dark:border-white/10 bg-foreground/[0.03]';
+                            const stateTag = a.error
+                                ? 'error'
+                                : a.uploading
+                                  ? 'uploading'
+                                  : 'ready';
                             return (
                                 <div
                                     key={a.localId}
-                                    className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs border-border/60 dark:border-white/10 bg-foreground/[0.03]"
-                                    title={a.displayName}
+                                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${variant}`}
+                                    title={a.error || a.displayName}
+                                    data-testid={
+                                        testId
+                                            ? `${testId}-attachment-${stateTag}`
+                                            : undefined
+                                    }
                                 >
-                                    {a.kind === 'folder-file' ? (
+                                    {a.uploading ? (
+                                        <Loader2
+                                            className="size-3 animate-spin opacity-70"
+                                            aria-hidden="true"
+                                        />
+                                    ) : a.kind === 'folder-file' ? (
                                         <Folder className="size-3 opacity-60" aria-hidden="true" />
                                     ) : (
                                         <FileIcon className="size-3 opacity-60" aria-hidden="true" />
@@ -535,6 +637,19 @@ export function PromptComposer({
                                     <span className="max-w-[12rem] truncate" title={a.displayName}>
                                         {a.displayName}
                                     </span>
+                                    {a.uploading ? (
+                                        <span
+                                            className="text-[10px] tabular-nums opacity-70"
+                                            aria-label={`Uploading ${a.progress} percent`}
+                                        >
+                                            {a.progress}%
+                                        </span>
+                                    ) : null}
+                                    {a.error ? (
+                                        <span className="text-[10px] uppercase tracking-wide">
+                                            failed
+                                        </span>
+                                    ) : null}
                                     <button
                                         type="button"
                                         onClick={() => removeAttachment(a.localId)}
@@ -807,3 +922,44 @@ export function PromptComposer({
 // Re-export the attachment shape so consumers wiring up
 // `onAttachmentsChange` can type their state safely.
 export type { ComposerAttachment };
+
+/**
+ * Helper for caller pages: turn the composer's full attachment list
+ * into the lighter `{ name, url, mimeType?, kind }` shape that
+ * `useStartFromPrompt` accepts. Uploads still in flight, uploads that
+ * failed, and entries that don't yet have a server-side URL are
+ * filtered out — only references the chat AI can actually act on are
+ * forwarded.
+ *
+ * Returned tuple matches `StartFromPromptAttachmentRef` from
+ * `use-start-from-prompt.tsx`; we don't import the type here to keep
+ * this module free of upstream-hook dependencies, but consumers can
+ * pass the return value straight into `startFromPrompt({ attachments })`.
+ */
+export interface ComposerAttachmentRef {
+    readonly name: string;
+    readonly url: string;
+    readonly mimeType?: string;
+    readonly kind: 'upload' | 'github-repo';
+}
+
+export function buildAttachmentRefs(
+    attachments: ReadonlyArray<ComposerAttachment>,
+): ReadonlyArray<ComposerAttachmentRef> {
+    const refs: ComposerAttachmentRef[] = [];
+    for (const a of attachments) {
+        if (a.kind === 'github-repo') {
+            refs.push({ name: a.displayName, url: a.url, kind: 'github-repo' });
+            continue;
+        }
+        if (a.url && !a.uploading && !a.error) {
+            refs.push({
+                name: a.displayName,
+                url: a.url,
+                mimeType: a.mimeType,
+                kind: 'upload',
+            });
+        }
+    }
+    return refs;
+}

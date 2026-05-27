@@ -23,7 +23,11 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
 import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
@@ -129,6 +133,7 @@ export default function NewWorkClient({
     // Composer state used by the entry view (creationMode === null).
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedKind, setSelectedKind] = useState<InitialWorkKind>(initialKind ?? 'website');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
 
@@ -183,7 +188,10 @@ export default function NewWorkClient({
         // chat carries it, the form starts empty so the user isn't
         // re-prompted to confirm the same text twice.
         startSubmit(() => {
-            startFromPrompt(description, { intent: WORK_KIND_INTENT_LABEL[selectedKind] });
+            startFromPrompt(description, {
+                intent: WORK_KIND_INTENT_LABEL[selectedKind],
+                attachments: buildAttachmentRefs(attachments),
+            });
             setPrompt('');
             setCreationMode('ai');
         });
@@ -212,6 +220,7 @@ export default function NewWorkClient({
                     ariaLabel={t('promptLabel')}
                     submitTitle={t('promptHints.submitTitle')}
                     testId="new-work-prompt"
+                    onAttachmentsChange={setAttachments}
                     // /works/new is the surface where importing an
                     // existing GitHub repo as a Work makes sense.
                     showImportGithubRepo

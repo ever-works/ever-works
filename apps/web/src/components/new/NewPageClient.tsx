@@ -17,7 +17,11 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
 import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -195,8 +199,13 @@ export function NewPageClient({
     const router = useRouter();
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType>(initialType ?? 'mission');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+
+    // `buildAttachmentRefs` imported from PromptComposer — turns the
+    // composer's full attachment list into chat-ready refs (filtering
+    // uploads in flight + failed uploads).
 
     // Close the layout chat panel on mount so the prompt + chips
     // take the full main column. We depend ONLY on the (stable)
@@ -258,7 +267,10 @@ export function NewPageClient({
             // with the same prompt pre-filled" pattern. The chat AI's
             // currentPageUrl context tells it where the user is, and
             // the intent prefix narrows it further.
-            startFromPrompt(description, { intent: CHIP_INTENT_LABEL[selectedChip] });
+            startFromPrompt(description, {
+                intent: CHIP_INTENT_LABEL[selectedChip],
+                attachments: buildAttachmentRefs(attachments),
+            });
 
             // Then navigate to the canvas for that intent. The canvas
             // page does NOT pre-fill the prompt — the user already
@@ -337,6 +349,7 @@ export function NewPageClient({
                 ariaLabel={t('promptLabel')}
                 submitTitle={t('submitTitle')}
                 testId="new-prompt"
+                onAttachmentsChange={setAttachments}
                 chipsBelow={
                     <div className="space-y-2">
                         <PromptChipsRow

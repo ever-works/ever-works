@@ -69,20 +69,133 @@ const MAGIC_BYTES: ReadonlyArray<{
         bytes: [0x57, 0x45, 0x42, 0x50],
         offset: 8,
     },
+    // PDF: "%PDF-"
+    { mime: 'application/pdf', ext: 'pdf', bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] },
+    // ZIP family (covers .zip + Office Open XML .docx/.xlsx/.pptx — all are
+    // ZIP archives under the hood). We store as plain `.zip` because the
+    // outer container is a ZIP; the original filename / original MIME are
+    // still echoed back to the caller so the UI knows what to show.
+    { mime: 'application/zip', ext: 'zip', bytes: [0x50, 0x4b, 0x03, 0x04] },
+    // GZIP: 1F 8B
+    { mime: 'application/gzip', ext: 'gz', bytes: [0x1f, 0x8b] },
 ];
 
 /**
- * Allow-list of accepted MIME families. Anything outside this list is
- * rejected unconditionally. SVG is INTENTIONALLY excluded — it can
- * carry inline `<script>` payloads that would execute if a downstream
- * tier ever serves it inline with `Content-Type: image/svg+xml` to a
- * browser. If you need SVG support, route through a sanitizer (DOMPurify
- * with `USE_PROFILES: { svg: true }`) and add a `image/svg+xml`
- * `sanitized` variant — do NOT just add it here.
+ * Allow-list of accepted IMAGE MIME families. Anything outside this list is
+ * rejected by `saveImage`. SVG is INTENTIONALLY excluded — it can carry
+ * inline `<script>` payloads that would execute if a downstream tier ever
+ * serves it inline with `Content-Type: image/svg+xml` to a browser. If
+ * you need SVG support, route through a sanitizer (DOMPurify with
+ * `USE_PROFILES: { svg: true }`) and add an `image/svg+xml` `sanitized`
+ * variant — do NOT just add it here.
  */
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
-const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MiB
+/**
+ * Allow-list for the broader `saveFile` path — images PLUS documents,
+ * archives, and text-like formats. PromptComposer's "Upload a file" /
+ * "Upload a folder" affordances route here. Anything not in this set OR
+ * not in `TEXT_LIKE_MIMES` below is rejected.
+ *
+ * Binary types here MUST have a matching magic-byte signature in
+ * `MAGIC_BYTES`; the sniff still runs and the declared MIME must match
+ * the bytes. Text-like types live in their own set (below) because they
+ * have no canonical magic bytes and are validated via a content shape
+ * heuristic instead.
+ */
+const ALLOWED_FILE_BINARY_MIME = new Set([
+    ...ALLOWED_MIME, // images
+    'application/pdf',
+    'application/zip',
+    'application/gzip',
+    // Office Open XML — the bytes are ZIP, but browsers may declare these
+    // canonical MIMEs. We accept the declaration AND require the magic
+    // bytes to be ZIP. Stored as `.zip` (the container format).
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+/**
+ * Declared MIMEs that have no reliable magic byte signature — these are
+ * text-like formats (plain text, markdown, CSV, JSON, code). The bytes
+ * are validated via `looksLikeUtf8Text` (no NUL bytes in the first 8KiB,
+ * mostly printable ASCII / valid UTF-8) rather than magic-byte sniffing.
+ * The map value is the canonical extension we write to disk.
+ */
+const TEXT_LIKE_MIMES: ReadonlyMap<string, string> = new Map([
+    ['text/plain', 'txt'],
+    ['text/markdown', 'md'],
+    ['text/x-markdown', 'md'],
+    ['text/csv', 'csv'],
+    ['text/tab-separated-values', 'tsv'],
+    ['text/html', 'html'],
+    ['text/css', 'css'],
+    ['text/javascript', 'js'],
+    ['application/javascript', 'js'],
+    ['application/json', 'json'],
+    ['application/xml', 'xml'],
+    ['text/xml', 'xml'],
+    ['application/x-yaml', 'yaml'],
+    ['text/yaml', 'yaml'],
+    ['text/x-yaml', 'yaml'],
+]);
+
+/**
+ * Union of all extensions writable by saveImage + saveFile. Used by
+ * `assertValidFilename` to validate filenames on the serve path.
+ */
+const ALL_VALID_EXTS = [
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'pdf',
+    'zip',
+    'gz',
+    'txt',
+    'md',
+    'csv',
+    'tsv',
+    'html',
+    'css',
+    'js',
+    'json',
+    'xml',
+    'yaml',
+];
+
+const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MiB images
+const DEFAULT_MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MiB non-image files
+
+/**
+ * Heuristic "is this UTF-8 text?" check for text-like uploads. Scans the
+ * first 8KiB and rejects when:
+ *   - any NUL byte (0x00) is present (binaries almost always have NULs;
+ *     UTF-8 text never does)
+ *   - the buffer is not a valid UTF-8 sequence
+ *
+ * This is intentionally simple — text files are bounded enough by the
+ * declared MIME + no-NUL rule that we don't need a full encoding
+ * detector. A malicious caller can still upload arbitrary "text" bytes,
+ * but the storage backend serves them with the declared text MIME so
+ * the only impact is the user re-downloading their own file.
+ */
+function looksLikeUtf8Text(buf: Buffer): boolean {
+    const head = buf.length > 8192 ? buf.subarray(0, 8192) : buf;
+    if (head.length === 0) return false;
+    for (let i = 0; i < head.length; i++) {
+        if (head[i] === 0) return false;
+    }
+    try {
+        // Strict UTF-8 decode — throws on invalid sequences.
+        new TextDecoder('utf-8', { fatal: true }).decode(head);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * EW-637 — UploadsService is now the validation + dispatch layer in front
@@ -266,6 +379,161 @@ export class UploadsService {
     }
 
     /**
+     * Validate + persist an uploaded file of broader-than-image type.
+     * Same security model as `saveImage` (magic-byte sniff for binaries,
+     * UTF-8 shape check for text-like declared MIMEs, SHA-256 storage
+     * naming, owner-scoped key, no part of the originalname reaches
+     * storage) but the allow-list covers PDFs, ZIP / Office Open XML,
+     * gzip, and the common text formats listed in `TEXT_LIKE_MIMES`.
+     *
+     * Used by `POST /api/uploads/file` (auth) and the PromptComposer's
+     * "Upload a file" / "Upload a folder" affordances. Images can also
+     * be uploaded here; they take the same magic-byte path saveImage
+     * uses and end up at the same kind of storage key (just routed
+     * through the broader allowlist).
+     *
+     * Returns the same `UploadResult` shape as `saveImage` so callers
+     * can treat both endpoints uniformly. The `mimeType` field reflects
+     * the **declared** MIME (since text formats can't be sniffed); the
+     * `key` field is the backend-opaque storage key.
+     */
+    async saveFile(
+        userId: string,
+        file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,
+        opts?: { workId?: string },
+    ): Promise<UploadResult> {
+        this.assertValidUserId(userId);
+
+        if (!file || !file.buffer || file.buffer.length === 0) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'EmptyFile',
+                message: 'No file content received',
+            });
+        }
+
+        const maxFileSize =
+            Number(process.env.UPLOADS_FILE_MAX_BYTES) || DEFAULT_MAX_FILE_SIZE;
+        if (file.size > maxFileSize) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'FileTooLarge',
+                message: `File exceeds ${maxFileSize} byte cap`,
+            });
+        }
+
+        const declared = (file.mimetype || '').toLowerCase();
+
+        // Branch 1: binary type with a known magic-byte signature.
+        // Includes images (delegated to the same path as saveImage for
+        // uniformity) plus PDF / ZIP / gzip / Office Open XML.
+        if (ALLOWED_FILE_BINARY_MIME.has(declared)) {
+            const sniffed = this.sniffMagicBytes(file.buffer);
+            if (!sniffed) {
+                throw new BadRequestException({
+                    status: 'error',
+                    code: 'MimeMismatch',
+                    message: `File has no recognized magic-byte signature`,
+                });
+            }
+            // For Office Open XML, the underlying bytes are ZIP, so the
+            // sniffed MIME is `application/zip` but the declared MIME is
+            // the canonical Office MIME. Treat that as a match.
+            const sniffedFamily = sniffed.mime;
+            const declaredFamily = declared.startsWith(
+                'application/vnd.openxmlformats-officedocument',
+            )
+                ? 'application/zip'
+                : declared;
+            if (sniffedFamily !== declaredFamily) {
+                throw new BadRequestException({
+                    status: 'error',
+                    code: 'MimeMismatch',
+                    message: `Declared Content-Type ${JSON.stringify(
+                        declared,
+                    )} does not match the file's magic bytes`,
+                });
+            }
+            const hash = createHash('sha256').update(file.buffer).digest('hex');
+            const filename = `${hash}.${sniffed.ext}`;
+            const backend = await this.getBackend();
+            const workId = opts?.workId;
+            if (workId !== undefined) this.assertValidWorkId(workId);
+            // For Office files the storage type is the ZIP (under-the-hood
+            // format); the response echoes the declared MIME so the UI can
+            // still show "Word document", not "ZIP archive".
+            const { key } = await backend.putObject({
+                buffer: file.buffer,
+                filename,
+                mimeType: sniffed.mime,
+                size: file.size,
+                ownerId: userId,
+                ...(workId ? { workId } : {}),
+            });
+            const url = workId
+                ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
+                : `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
+            return {
+                id: hash,
+                url,
+                filename,
+                size: file.size,
+                mimeType: declared, // echo declared MIME so Office docs read as such
+                hash,
+                key,
+            };
+        }
+
+        // Branch 2: text-like declared MIME (no magic bytes to sniff).
+        // Validate UTF-8 shape + absence of NUL bytes as a cheap "this
+        // really is text" guard, then store under the canonical extension
+        // mapped from the declared MIME.
+        const textExt = TEXT_LIKE_MIMES.get(declared);
+        if (textExt) {
+            if (!looksLikeUtf8Text(file.buffer)) {
+                throw new BadRequestException({
+                    status: 'error',
+                    code: 'NotTextContent',
+                    message: `Declared Content-Type ${JSON.stringify(
+                        declared,
+                    )} but the buffer is not valid UTF-8 text (NUL bytes or invalid encoding)`,
+                });
+            }
+            const hash = createHash('sha256').update(file.buffer).digest('hex');
+            const filename = `${hash}.${textExt}`;
+            const backend = await this.getBackend();
+            const workId = opts?.workId;
+            if (workId !== undefined) this.assertValidWorkId(workId);
+            const { key } = await backend.putObject({
+                buffer: file.buffer,
+                filename,
+                mimeType: declared,
+                size: file.size,
+                ownerId: userId,
+                ...(workId ? { workId } : {}),
+            });
+            const url = workId
+                ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
+                : `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
+            return {
+                id: hash,
+                url,
+                filename,
+                size: file.size,
+                mimeType: declared,
+                hash,
+                key,
+            };
+        }
+
+        throw new BadRequestException({
+            status: 'error',
+            code: 'MimeNotAllowed',
+            message: `Content-Type ${JSON.stringify(declared)} is not accepted for file uploads`,
+        });
+    }
+
+    /**
      * Read a stored file's bytes + metadata for the file-serve route.
      * Refuses to serve outside the configured storage root even if the
      * caller hands us a path-traversal `..` segment.
@@ -367,9 +635,14 @@ export class UploadsService {
     }
 
     private assertValidFilename(filename: string): void {
-        // Only allow `<hex64>.<ext>` shapes — same format saveImage
-        // writes. Anything else is invalid by construction.
-        if (!filename || !/^[a-f0-9]{64}\.(png|jpg|jpeg|gif|webp)$/.test(filename)) {
+        // Only allow `<hex64>.<ext>` shapes — same format saveImage /
+        // saveFile write. Anything else is invalid by construction. The
+        // extension list is the union of image extensions (saveImage)
+        // and file extensions (saveFile) since this method gates the
+        // serve route for both.
+        const extPattern = ALL_VALID_EXTS.join('|');
+        const filenameRe = new RegExp(`^[a-f0-9]{64}\\.(${extPattern})$`);
+        if (!filename || !filenameRe.test(filename)) {
             throw new BadRequestException({
                 status: 'error',
                 code: 'InvalidFilename',
@@ -378,11 +651,10 @@ export class UploadsService {
         }
         // Defensive: although the regex above already restricts to
         // canonical hash-named files, extract the extension here as a
-        // belt-and-suspenders check — the spec uses both alphanumeric and
-        // dot characters and a malicious key would have to slip past the
-        // regex to reach this point. Throw on anything unexpected.
+        // belt-and-suspenders check — a malicious key would have to slip
+        // past the regex to reach this point. Throw on anything unexpected.
         const ext = extname(filename).toLowerCase();
-        if (!['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+        if (!ALL_VALID_EXTS.map((e) => `.${e}`).includes(ext)) {
             throw new BadRequestException({
                 status: 'error',
                 code: 'InvalidFilename',

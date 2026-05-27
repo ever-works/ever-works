@@ -140,6 +140,66 @@ export class UploadsController {
     }
 
     /**
+     * Broader file-upload endpoint — accepts images PLUS PDFs, ZIP /
+     * Office Open XML, gzip, and the common text-like formats (markdown,
+     * CSV, JSON, code). Backs the PromptComposer's "Upload a file" /
+     * "Upload a folder" affordances on `/missions`, `/ideas`, `/new`,
+     * and `/works/new`.
+     *
+     * Same security model as `POST /api/uploads`: rate-limited, JWT-
+     * auth-gated, sha256-named storage keys, owner-scoped paths,
+     * magic-byte sniff for binaries / UTF-8 shape check for text. The
+     * declared MIME must be in the broader allow-list maintained inside
+     * `UploadsService.saveFile`.
+     *
+     * Larger size cap than the image endpoint (default 25 MiB vs 5 MiB
+     * for images) since PDFs / archives are typically bigger. Tunable
+     * via `UPLOADS_FILE_MAX_BYTES`.
+     */
+    @Post('file')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @UseInterceptors(
+        FileInterceptor('file', {
+            // Multer-level cap — UploadsService.saveFile re-validates with
+            // the env-tunable cap; the interceptor's limit is a higher
+            // bound that catches absurdly-large payloads before they hit
+            // the service. 50 MiB is roomy enough for any reasonable
+            // ZIP / PDF.
+            limits: { fileSize: 50 * 1024 * 1024 },
+        }),
+    )
+    @ApiOperation({
+        summary: 'Upload a file (image / PDF / archive / text)',
+        description:
+            'Multipart upload of an image, PDF, ZIP / Office document, gzip, or text-like file (markdown, CSV, JSON, code). Auth required. Returns the same { id, url, filename, size, mimeType, hash, key } shape as POST /api/uploads. The server validates magic bytes for binary formats and verifies UTF-8 shape for text-like declared MIMEs.',
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted, returns { id, url, ... }' })
+    @ApiResponse({
+        status: 400,
+        description:
+            'Validation failed (size, MIME, magic-byte mismatch, or non-UTF-8 bytes for a text declared MIME)',
+    })
+    @ApiResponse({ status: 401, description: 'Unauthenticated' })
+    @ApiResponse({ status: 413, description: 'File exceeds size cap' })
+    async uploadFile(
+        @CurrentUser() auth: AuthenticatedUser,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Query('workId') workId?: string,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+        if (workId) {
+            await this.assertWorkAccess(auth.userId, workId);
+        }
+        return this.uploads.saveFile(auth.userId, file, workId ? { workId } : undefined);
+    }
+
+    /**
      * EW-644 (Codex P1) — verify the authenticated caller actually has
      * access to the Work referenced by `workId` before any storage
      * backend uses it to resolve repo coordinates / a token.

@@ -8,7 +8,11 @@ import { cn } from '@/lib/utils/cn';
 import { buildIdeaAction, dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
-import { PromptComposer } from '@/components/common/PromptComposer';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import {
@@ -74,6 +78,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     const router = useRouter();
     const [ideas, setIdeas] = useState(initialIdeas);
     const [draft, setDraft] = useState('');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [toggles, setToggles] = useState<Toggles>({
         showAccepted: false,
         showDismissed: false,
@@ -108,6 +113,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     }, [ideas]);
 
     const startFromPrompt = useStartFromPrompt();
+
     const handleQuickAdd = () => {
         const description = draft.trim();
         if (description.length < 10) {
@@ -121,7 +127,10 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         // once chat confirms creation. Single source of truth for
         // "create from a prompt" lives in the chat side panel.
         startCreating(() => {
-            startFromPrompt(description, { intent: 'Idea' });
+            startFromPrompt(description, {
+                intent: 'Idea',
+                attachments: buildAttachmentRefs(attachments),
+            });
             setDraft('');
         });
     };
@@ -253,6 +262,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                     ariaLabel={t('quickAdd.label')}
                     submitTitle={t('quickAdd.submitTitle')}
                     testId="ideas-quick-add"
+                    onAttachmentsChange={setAttachments}
                 />
             </div>
 
