@@ -33,10 +33,15 @@ import {
     runMissionNowAction,
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
-import type { Mission, OwnerBudgetSummary } from '@/lib/api/missions';
+import type { Mission, MissionAttachmentRow, OwnerBudgetSummary } from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { BudgetSummaryCard } from '@/components/budgets';
+import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
+import {
+    attachUploadToMissionAction,
+    detachMissionAttachmentAction,
+} from '@/app/actions/dashboard/missions';
 import {
     Dialog,
     DialogContent,
@@ -97,6 +102,12 @@ export interface MissionDetailClientProps {
      * gracefully falls back to its empty surface).
      */
     budget?: OwnerBudgetSummary | null;
+    /**
+     * Server-rendered initial attachment rows. The attachments
+     * section is purely additive (see follow-up FU1) and slots in
+     * below the existing detail-page sections.
+     */
+    attachments?: ReadonlyArray<MissionAttachmentRow>;
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -110,6 +121,7 @@ export function MissionDetailClient({
     sourceMission = null,
     inheritedIdeas = [],
     budget = null,
+    attachments = [],
 }: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
@@ -606,6 +618,19 @@ export function MissionDetailClient({
                     )}
                 </section>
             )}
+
+            {/* Attachments section — uploads attached to this Mission
+                via the PromptComposer or future detail-page actions.
+                Drag-and-drop + browse uploads via /api/uploads/file and
+                wires the new edges via attachUploadToMissionAction. */}
+            <EntityAttachmentsSection
+                initial={attachments}
+                onAttach={(uploadId) => attachUploadToMissionAction(mission.id, uploadId)}
+                onDetach={(attachmentId) =>
+                    detachMissionAttachmentAction(mission.id, attachmentId)
+                }
+                testId="mission-attachments"
+            />
 
             {/* Phase 6 PR GG — Clone confirmation modal. Opens from
                 the toolbar Clone button. Optional title override; on

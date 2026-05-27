@@ -50,22 +50,26 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // the Spend section can render real data instead of the PR GG
     // placeholder. Defensive catch — a flaky budget endpoint
     // surfaces the empty state, never 500s the detail page.
-    const [ideas, sourceMission, sourceAcceptedIdeas, budget] = await Promise.all([
-        workProposalsAPI
-            .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
-                missionId: id,
-            })
-            .catch(() => []),
-        mission.sourceMissionId
-            ? missionsAPI.get(mission.sourceMissionId).catch(() => null)
-            : Promise.resolve(null),
-        mission.sourceMissionId
-            ? workProposalsAPI
-                  .list(['accepted'], { missionId: mission.sourceMissionId })
-                  .catch(() => [])
-            : Promise.resolve([]),
-        missionsAPI.getBudget(id).catch(() => null),
-    ]);
+    const [ideas, sourceMission, sourceAcceptedIdeas, budget, attachments] =
+        await Promise.all([
+            workProposalsAPI
+                .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
+                    missionId: id,
+                })
+                .catch(() => []),
+            mission.sourceMissionId
+                ? missionsAPI.get(mission.sourceMissionId).catch(() => null)
+                : Promise.resolve(null),
+            mission.sourceMissionId
+                ? workProposalsAPI
+                      .list(['accepted'], { missionId: mission.sourceMissionId })
+                      .catch(() => [])
+                : Promise.resolve([]),
+            missionsAPI.getBudget(id).catch(() => null),
+            // Attachments — defensive .catch so a missing migration on
+            // a stale environment doesn't 500 the page.
+            missionsAPI.listAttachments(id).catch(() => []),
+        ]);
 
     return (
         <MissionDetailClient
@@ -74,6 +78,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             sourceMission={sourceMission}
             inheritedIdeas={sourceAcceptedIdeas}
             budget={budget}
+            attachments={attachments}
         />
     );
 }

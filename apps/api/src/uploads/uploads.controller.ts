@@ -308,6 +308,78 @@ export class UploadsController {
     }
 
     /**
+     * Anonymous file upload — same as `/anonymous` but accepts the
+     * broader MIME allow-list from `saveFile` (PDFs, ZIP / Office
+     * Open XML, gzip, text-like formats) in addition to images.
+     *
+     * Backs the marketing site's "Upload a file" / "Upload a folder"
+     * affordances in `LandingPromptForm`. The website is being updated
+     * to call this endpoint instead of `/anonymous` for non-image
+     * picks; the existing `/anonymous` endpoint stays image-only so
+     * legacy callers don't change shape.
+     *
+     * Same anon-mint contract as `/anonymous`: when no bearer is
+     * present, an anonymous user is provisioned inline with a TTL of
+     * `ANONYMOUS_USER_TTL_DAYS` (default 3). The returned
+     * `anonAccessToken` is the bearer the visitor's later
+     * `/api/uploads/file` and prompt-submit calls reuse so the whole
+     * pre-signup session is attributed to the same anon user.
+     */
+    @Public()
+    @Post('anonymous/file')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @UseInterceptors(
+        FileInterceptor('file', {
+            // 50 MiB outer cap, same as the authenticated `/file` route;
+            // saveFile re-validates with its env-tunable inner cap.
+            limits: { fileSize: 50 * 1024 * 1024 },
+        }),
+    )
+    @ApiOperation({
+        summary: 'Upload a file (image / PDF / archive / text) from an anonymous visitor',
+        description:
+            'Multipart upload from an unauthenticated visitor. Accepts the same broader MIME set as POST /api/uploads/file (images, PDFs, ZIP / Office docs, gzip, text-like formats). Same anon-mint contract as /anonymous — returns { uploadId, id, url, filename, size, mimeType, hash, expiresAt, anonAccessToken? }.',
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted' })
+    @ApiResponse({
+        status: 400,
+        description:
+            'Validation failed (size, MIME, magic-byte mismatch, or non-UTF-8 bytes for a text declared MIME)',
+    })
+    @ApiResponse({ status: 413, description: 'File exceeds size cap' })
+    async uploadAnonymousFile(
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Req() req: AnonRequest,
+        @Headers('x-correlation-id') correlationHeader: string | undefined,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+
+        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
+
+        const result = await this.uploads.saveFile(userId, file);
+
+        void correlationHeader;
+
+        return {
+            uploadId: result.key ?? `${userId}/${result.filename}`,
+            id: result.id,
+            url: result.url,
+            filename: result.filename,
+            size: result.size,
+            mimeType: result.mimeType,
+            hash: result.hash,
+            expiresAt: anonymousExpiresAt ?? null,
+            ...(anonAccessToken ? { anonAccessToken } : {}),
+        };
+    }
+
+    /**
      * EW-637 — mint a presigned upload URL when the active storage backend
      * supports direct-to-cloud uploads (S3 / MinIO). Local-fs and
      * github-storage don't, in which case we return HTTP 501 with a hint

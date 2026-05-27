@@ -36,6 +36,8 @@ const { missionsAPIGetMock, missionsAPIGetBudgetMock } = vi.hoisted(() => ({
     missionsAPIGetBudgetMock: vi.fn(),
 }));
 
+const { attachUploadMock } = vi.hoisted(() => ({ attachUploadMock: vi.fn() }));
+
 vi.mock('@/app/actions/dashboard/missions', () => ({
     listMissionsAction: listMissionsMock,
     createMissionAction: createMissionMock,
@@ -46,6 +48,7 @@ vi.mock('@/app/actions/dashboard/missions', () => ({
     completeMissionAction: completeMissionMock,
     runMissionNowAction: runNowMock,
     cloneMissionAction: cloneMissionMock,
+    attachUploadToMissionAction: attachUploadMock,
 }));
 
 vi.mock('@/lib/api/missions', () => ({
@@ -301,5 +304,71 @@ describe('missions chat tools — Lifecycle', () => {
         });
         await run(cloneMission, { missionId: 'm-1' });
         expect(cloneMissionMock).toHaveBeenCalledWith('m-1', undefined);
+    });
+});
+
+describe('createMission — attachmentIds wiring', () => {
+    beforeEach(() => {
+        attachUploadMock.mockReset();
+        createMissionMock.mockReset();
+    });
+
+    const sha = 'a'.repeat(64);
+    const sha2 = 'b'.repeat(64);
+
+    it('extracts uploadIds from full /api/uploads URLs and attaches them', async () => {
+        createMissionMock.mockResolvedValueOnce({ ...sampleMission, id: 'm-new' });
+        attachUploadMock.mockResolvedValue({ id: 'att', uploadId: sha });
+        const result = await run<{
+            created: boolean;
+            mission: { id: string };
+            attachments?: { attached: number; failed: number };
+        }>(createMission, {
+            description: 'A new mission with attached files',
+            attachmentIds: [
+                `/api/uploads/user-1/${sha}.pdf`,
+                `/api/uploads/user-1/${sha2}.png`,
+            ],
+        });
+        expect(attachUploadMock).toHaveBeenCalledTimes(2);
+        expect(attachUploadMock).toHaveBeenNthCalledWith(1, 'm-new', sha);
+        expect(attachUploadMock).toHaveBeenNthCalledWith(2, 'm-new', sha2);
+        expect(result.attachments).toEqual({ attached: 2, failed: 0 });
+    });
+
+    it('accepts bare sha256 uploadIds without URL wrapping', async () => {
+        createMissionMock.mockResolvedValueOnce({ ...sampleMission, id: 'm-new' });
+        attachUploadMock.mockResolvedValue({ id: 'att', uploadId: sha });
+        await run(createMission, {
+            description: 'A new mission with bare ids',
+            attachmentIds: [sha],
+        });
+        expect(attachUploadMock).toHaveBeenCalledWith('m-new', sha);
+    });
+
+    it('does not call attach when attachmentIds is absent', async () => {
+        createMissionMock.mockResolvedValueOnce({ ...sampleMission, id: 'm-new' });
+        const result = await run<{
+            created: boolean;
+            attachments?: { attached: number; failed: number };
+        }>(createMission, { description: 'A new mission without files' });
+        expect(attachUploadMock).not.toHaveBeenCalled();
+        expect(result.attachments).toBeUndefined();
+    });
+
+    it('counts per-id attach failures and still returns created:true', async () => {
+        createMissionMock.mockResolvedValueOnce({ ...sampleMission, id: 'm-new' });
+        attachUploadMock
+            .mockRejectedValueOnce(new Error('404'))
+            .mockResolvedValueOnce({ id: 'att', uploadId: sha2 });
+        const result = await run<{
+            created: boolean;
+            attachments?: { attached: number; failed: number };
+        }>(createMission, {
+            description: 'Two files, one will fail',
+            attachmentIds: [sha, sha2],
+        });
+        expect(result.created).toBe(true);
+        expect(result.attachments).toEqual({ attached: 1, failed: 1 });
     });
 });
