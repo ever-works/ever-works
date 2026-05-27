@@ -42,6 +42,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         tasksInProgress,
         tasksBlocked,
         recentTasks,
+        recentAgents,
     ] = await Promise.all([
         searchParams,
         getAuthFromCookie(),
@@ -80,6 +81,13 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         tasksAPI
             .list({ status: ['todo', 'in_progress', 'in_review', 'blocked'] as any, limit: 5 })
             .catch(() => ({ data: [], meta: { total: 0, limit: 5, offset: 0 } })),
+        // Dashboard polish (2026-05-27) — recent Agents for the new
+        // preview section below Tasks. Same shape as `missions`:
+        // server-fetched up-front so the section can render without
+        // a client-side round-trip.
+        agentsAPI
+            .list({ limit: 3 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 3, offset: 0 } })),
     ]);
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
@@ -107,6 +115,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             tasksInProgress={tasksInProgress.meta.total}
             tasksBlocked={tasksBlocked.meta.total}
             initialRecentTasks={recentTasks.data ?? []}
+            initialAgents={recentAgents.data ?? []}
         />
     );
 }

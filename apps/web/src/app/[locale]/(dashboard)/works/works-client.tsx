@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import { Work } from '@/lib/api/work';
 import { WorkList } from '@/components/works/WorkList';
 import { WorksKanbanView } from '@/components/works/WorksKanbanView';
+import { WorksCreateComposer } from '@/components/works/WorksCreateComposer';
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
-import { Link, useRouter } from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { getWorks } from '@/app/actions/dashboard/works';
 import { getWorkStats } from '@/app/actions/dashboard/works';
 import { cn } from '@/lib/utils/cn';
@@ -264,58 +265,47 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 }
             />
 
-            {/* Search and Actions Bar */}
-            <div className="flex flex-col @sm/main:flex-row gap-4 mb-8">
-                <div className="flex-1">
-                    <div className="relative">
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            placeholder={t('search')}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className={cn(
-                                'w-full px-4 py-2 pl-10 rounded-lg',
-                                'bg-surface dark:bg-surface-dark',
-                                'border border-border dark:border-border-dark',
-                                'text-text dark:text-text-dark',
-                                'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
-                                'focus:outline-none focus:ring-2 focus:ring-primary',
-                            )}
-                        />
-                        <svg
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-text-muted-dark"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                        </svg>
-                    </div>
-                </div>
+            {/* Dashboard polish (2026-05-27) — top-of-page composer
+                with Work chips + Manual/Import buttons. Replaces the
+                old "+ New Work" button next to the search input: the
+                composer is the entry point and the two buttons cover
+                the manual/import flows that previously lived behind
+                that single CTA. Same shape as `/missions` and
+                `/ideas`. */}
+            <WorksCreateComposer />
 
-                <Link
-                    href={ROUTES.DASHBOARD_NEW}
-                    className={cn(
-                        'px-6 py-2 rounded-lg font-medium transition-colors inline-flex items-center gap-2',
-                        'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
-                    )}
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Search bar */}
+            <div className="mb-8">
+                <div className="relative">
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder={t('search')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className={cn(
+                            'w-full px-4 py-2 pl-10 rounded-lg',
+                            'bg-surface dark:bg-surface-dark',
+                            'border border-border dark:border-border-dark',
+                            'text-text dark:text-text-dark',
+                            'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                            'focus:outline-none focus:ring-2 focus:ring-primary',
+                        )}
+                    />
+                    <svg
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-text-muted-dark"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
                         <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M12 4v16m8-8H4"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                         />
                     </svg>
-                    {t('create')}
-                </Link>
+                </div>
             </div>
 
             {/* Work Count + View Mode Switch */}
