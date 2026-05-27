@@ -14,87 +14,56 @@ import { UsernameAllocatorService } from '../users/services/username-allocator.s
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 
 /**
- * Tables with both a direct `userId` column AND a `tenantId` column —
+ * Tables with both a direct user-FK column AND a `tenantId` column —
  * the universe `createOrganization`'s unconditional backfill walks to
  * stamp `tenantId` on the user's existing rows after lazy-creating
- * the Tenant. (Phase 2 added the Tier B columns; Phase 3 added the
- * Tier A columns. The Tier B entities — auth_session, refresh_tokens,
- * etc. — also have `userId`.)
+ * the Tenant.
  *
- * Tier C tables are intentionally NOT included here: they don't have
- * a direct `userId` (they reference their Tier A parent), and the
- * "join through parent" backfill SQL is hairy enough that the spec
- * defers it to a Phase 6 follow-up. New Tier C inserts after Phase 7
- * lands will be correctly scoped via the
+ * Per-table user-column name because the codebase didn't use a single
+ * convention before Phase 6: most tables use `userId`, but `templates`
+ * uses `ownerUserId`. Tables that have no direct user FK at all
+ * (`work_deployments`, `onboarding_requests`, `webhook_subscriptions`,
+ * `github_app_installations`, `work_knowledge_documents`,
+ * `verification`) are intentionally absent — those rows are owned
+ * transitively through a parent and will be backfilled via a join in
+ * the Phase 6b follow-up. (Codex P1 on PR #1058 caught the bug where
+ * `templates` was included with `userId` despite its column being
+ * `ownerUserId`.)
+ *
+ * Tier C tables are NOT included here either: they reference their
+ * Tier A parent via FK and the "join through parent" SQL is hairy
+ * enough to defer to Phase 6b. New Tier C inserts after Phase 7
+ * lands get the right scope via
  * [ScopeStampingSubscriber](../scope/scope-stamping.subscriber.ts).
  */
-const TENANT_BACKFILL_TABLES = [
-    // Tier A
-    'missions',
-    'work_proposals',
-    'tasks',
-    'agents',
-    'skills',
-    'conversations',
-    'notifications',
-    'api_keys',
-    'templates',
-    'template_customizations',
-    'user_subscriptions',
-    'work_schedules',
-    'work_deployments',
-    'onboarding_requests',
-    'webhook_subscriptions',
-    'github_app_installations',
-    'github_app_user_links',
-    'works',
-    'work_knowledge_documents',
-    // Tier B
-    'account',
-    'session',
-    'verification',
-    'refresh_tokens',
-    'user_template_preferences',
-    'user_task_counter',
+interface UserOwnedTable {
+    table: string;
+    userColumn: string;
+}
+
+const TIER_A_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
+    { table: 'missions', userColumn: 'userId' },
+    { table: 'work_proposals', userColumn: 'userId' },
+    { table: 'tasks', userColumn: 'userId' },
+    { table: 'agents', userColumn: 'userId' },
+    { table: 'skills', userColumn: 'userId' },
+    { table: 'conversations', userColumn: 'userId' },
+    { table: 'notifications', userColumn: 'userId' },
+    { table: 'api_keys', userColumn: 'userId' },
+    { table: 'templates', userColumn: 'ownerUserId' },
+    { table: 'template_customizations', userColumn: 'userId' },
+    { table: 'user_subscriptions', userColumn: 'userId' },
+    { table: 'work_schedules', userColumn: 'userId' },
+    { table: 'github_app_user_links', userColumn: 'userId' },
+    { table: 'works', userColumn: 'userId' },
 ] as const;
 
-/**
- * Tier A tables that have `organizationId` — the universe
- * `upgradeFromAccount` walks to also stamp `organizationId` (in
- * addition to `tenantId`). These are the same as Tier A in
- * `TENANT_BACKFILL_TABLES` (Phase 3 added `organizationId` to all 19
- * Tier A tables; Phase 4 upgraded the pre-existing `works.organizationId`
- * and `work_knowledge_documents.organizationId` to real FKs).
- */
-const ORG_BACKFILL_TABLES_TIER_A = [
-    'missions',
-    'work_proposals',
-    'tasks',
-    'agents',
-    'skills',
-    'conversations',
-    'notifications',
-    'api_keys',
-    'templates',
-    'template_customizations',
-    'user_subscriptions',
-    'work_schedules',
-    'work_deployments',
-    'onboarding_requests',
-    'webhook_subscriptions',
-    'github_app_installations',
-    'github_app_user_links',
-    'works',
-    'work_knowledge_documents',
-] as const;
-
-const ORG_BACKFILL_TABLES_TIER_B = [
-    'account',
-    'session',
-    'verification',
-    'refresh_tokens',
-    'user_template_preferences',
-    'user_task_counter',
+const TIER_B_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
+    { table: 'account', userColumn: 'userId' },
+    { table: 'session', userColumn: 'userId' },
+    { table: 'refresh_tokens', userColumn: 'userId' },
+    { table: 'user_template_preferences', userColumn: 'userId' },
+    { table: 'user_task_counter', userColumn: 'userId' },
 ] as const;
 
 /**
@@ -209,15 +178,16 @@ export class OrganizationService {
             // user-owned table and stamps `tenantId = tenant.id` on
             // rows where it's still NULL. Idempotent — re-running this
             // is a no-op once all rows have tenantId set.
-            for (const table of TENANT_BACKFILL_TABLES) {
+            const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
+            for (const { table, userColumn } of allTables) {
                 await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "userId" = $2 AND "tenantId" IS NULL`,
+                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
                     [tenant.id, userId],
                 );
             }
 
             this.logger.log(
-                `Created Organization ${saved.id} (slug=${saved.slug}) for user ${userId}; tenantId backfilled across ${TENANT_BACKFILL_TABLES.length} tables`,
+                `Created Organization ${saved.id} (slug=${saved.slug}) for user ${userId}; tenantId backfilled across ${allTables.length} tables`,
             );
 
             return saved;
@@ -305,19 +275,35 @@ export class OrganizationService {
                 // Non-Postgres adapter — ignore.
             }
 
+            // Tier A: stamp BOTH tenantId AND organizationId on rows
+            // owned by this user that haven't been pulled into an Org
+            // yet. The WHERE filter is `organizationId IS NULL` (NOT
+            // `tenantId IS NULL`) because by the time the user hits
+            // upgrade-from-account, `createOrganization` has already
+            // backfilled tenantId on every row — so a `tenantId IS NULL`
+            // filter would find nothing. We still SET `tenantId` as a
+            // belt-and-suspenders write: if a caller drove this endpoint
+            // without going through createOrganization first (e.g.
+            // direct DB tool), the Tenant FK is still enforced.
+            // (Codex P1 on PR #1058 caught this.)
             let tierARowsUpdated = 0;
-            for (const table of ORG_BACKFILL_TABLES_TIER_A) {
+            for (const { table, userColumn } of TIER_A_BACKFILL_TABLES) {
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "userId" = $3 AND "tenantId" IS NULL`,
+                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierARowsUpdated += this.extractAffectedRowCount(result);
             }
 
+            // Tier B: no `organizationId` column. The only thing left
+            // to stamp is `tenantId`, which `createOrganization` has
+            // already done — so this loop is purely defensive. Same
+            // `tenantId IS NULL` filter as before because Tier B has
+            // no other way to express "not-yet-stamped".
             let tierBRowsUpdated = 0;
-            for (const table of ORG_BACKFILL_TABLES_TIER_B) {
+            for (const { table, userColumn } of TIER_B_BACKFILL_TABLES) {
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "userId" = $2 AND "tenantId" IS NULL`,
+                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
                     [tenantId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierBRowsUpdated += this.extractAffectedRowCount(result);

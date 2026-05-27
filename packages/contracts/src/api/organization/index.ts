@@ -13,8 +13,6 @@ export interface CreateOrganizationRequest {
 	name: string;
 	/** Optional slug override. If omitted, allocated from `name`. */
 	slug?: string;
-	/** Optional human-readable description. Up to 1000 chars. */
-	displayName?: string;
 }
 
 export interface UpdateOrganizationRequest {

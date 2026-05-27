@@ -135,14 +135,24 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(usernameAllocator.allocateUsername).toHaveBeenCalledWith('Acme Inc.');
             expect(org.id).toBe('o-new');
             expect(org.slug).toBe('Acme Inc.');
-            // Backfill should walk every TENANT_BACKFILL_TABLES entry.
+            // Backfill should walk every user-owned table — 14 Tier A
+            // (those with a direct user FK) + 5 Tier B = 19. Tables
+            // without a direct user FK (templates uses ownerUserId,
+            // work_deployments/onboarding_requests/etc. have no user
+            // FK at all) are excluded; `templates` uses `ownerUserId`.
             const updateQueries = queryLog.filter((q) => q.sql.startsWith('UPDATE'));
-            expect(updateQueries.length).toBeGreaterThanOrEqual(25); // 19 Tier A + 6 Tier B = 25
+            expect(updateQueries.length).toBe(19);
             for (const q of updateQueries) {
                 expect(q.params).toEqual(['t-1', 'u-1']);
                 expect(q.sql).toContain('SET "tenantId" = $1');
-                expect(q.sql).toContain('WHERE "userId" = $2 AND "tenantId" IS NULL');
+                // Most tables use "userId"; templates uses "ownerUserId".
+                expect(q.sql).toMatch(/WHERE "(userId|ownerUserId)" = \$2 AND "tenantId" IS NULL/);
             }
+            // Exactly one query targets the `templates` table with `ownerUserId`.
+            expect(updateQueries.filter((q) => q.sql.includes('"templates"')).length).toBe(1);
+            expect(updateQueries.find((q) => q.sql.includes('"templates"'))?.sql).toContain(
+                '"ownerUserId"',
+            );
         });
 
         it('prefers explicit slug over name-derived', async () => {
@@ -225,7 +235,7 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             );
         });
 
-        it('moves Tier A rows and stamps Tier B tenantId on the happy path', async () => {
+        it('moves Tier A rows (organizationId IS NULL) and stamps Tier B tenantId on the happy path', async () => {
             const { service, queryLog } = makeService({
                 user: { id: 'u-1', tenantId: 't-1' },
                 organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
@@ -236,21 +246,25 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
 
             expect(result.organizationId).toBe('o-1');
             expect(result.tenantId).toBe('t-1');
-            // 19 Tier A tables, each affected = 1 in our mock.
-            expect(result.tierARowsUpdated).toBe(19);
-            // 6 Tier B tables.
-            expect(result.tierBRowsUpdated).toBe(6);
+            // 14 Tier A tables with direct user FK; each affected = 1 in our mock.
+            expect(result.tierARowsUpdated).toBe(14);
+            // 5 Tier B tables with direct user FK.
+            expect(result.tierBRowsUpdated).toBe(5);
 
             const tierAUpdates = queryLog.filter((q) => q.sql.includes('"organizationId" = $2'));
-            expect(tierAUpdates.length).toBe(19);
+            expect(tierAUpdates.length).toBe(14);
             for (const q of tierAUpdates) {
                 expect(q.params).toEqual(['t-1', 'o-1', 'u-1']);
+                // Codex P1 fix: WHERE filter is `organizationId IS NULL`,
+                // not `tenantId IS NULL` — by the time upgrade runs,
+                // createOrganization has already stamped tenantId.
+                expect(q.sql).toContain('"organizationId" IS NULL');
             }
 
             const tierBUpdates = queryLog.filter(
                 (q) => q.sql.includes('SET "tenantId" = $1') && !q.sql.includes('organizationId'),
             );
-            expect(tierBUpdates.length).toBe(6);
+            expect(tierBUpdates.length).toBe(5);
             for (const q of tierBUpdates) {
                 expect(q.params).toEqual(['t-1', 'u-1']);
             }
