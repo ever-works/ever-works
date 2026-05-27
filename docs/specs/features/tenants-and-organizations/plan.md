@@ -194,10 +194,11 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
         2. Allocate slug via `UsernameAllocatorService.allocateSlug(name, 'organizations')`.
         3. Insert Organization row.
         4. If `users.lastScopeOrganizationId IS NULL` and this is the user's first Org, store the new Org id on `users.lastScopeOrganizationId` so the next login lands there.
+        5. **Unconditional `tenantId` backfill** (runs regardless of which branch — Upgrade or Empty — the user picks later): for every Tier A/B/C row owned by this user where `tenantId IS NULL`, UPDATE to set `tenantId = newTenant.id`. Same transactional shape as `upgradeFromAccount`'s table walk, but writes only `tenantId`. This makes the "Empty" branch ([spec.md §5.2 3b](spec.md#52-user-creates-their-first-organization)) coherent even though it never calls `upgrade-from-account`.
     - `upgradeFromAccount(userId, organizationId)`:
         1. Verify ownership (user owns Tenant; Org belongs to that Tenant).
         2. Verify Org's tenantId matches user's tenantId.
-        3. **First-Org guard:** count Organizations under this Tenant; if `count > 1` OR `:organizationId` is not the only / earliest one, throw `409 Conflict`. This prevents retroactively pulling items into a non-first Org.
+        3. **First-Org guard:** the endpoint is only callable while the user has **exactly one** Organization under their Tenant AND `:organizationId` is that one Org. Concretely: `SELECT COUNT(*) FROM organizations WHERE tenantId = :userTenantId` must equal 1, and the single row's `id` must equal `:organizationId`. Either condition failing → throw `409 Conflict` with error code `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS`. This prevents retroactively pulling items into a non-first Org.
         4. **Tier A/C rows** (entities that have `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`. Rows already migrated to a Tenant are left as-is (idempotency).
         5. **Tier B rows** (entities without `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set `tenantId = newTenant.id` ONLY. Do NOT attempt to write `organizationId` — the column does not exist on these tables and the UPDATE would fail.
         6. This is a transaction; the table list is enumerated in code (one UPDATE per table, all under one DB transaction). On Postgres, set `SET LOCAL statement_timeout = '30s'` for safety.
@@ -231,7 +232,7 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
 
 - E2E: `/{username}/missions` renders the same data as the legacy `/missions` for a user with no Org.
 - E2E: `/{orgSlug}/missions` renders only that Org's data; switching the slug in the URL switches the data.
-- 404 path: `/notarealsulug/missions` returns 404, not 403, not 500.
+- 404 path: `/notarealslug/missions` returns 404, not 403, not 500.
 
 ---
 

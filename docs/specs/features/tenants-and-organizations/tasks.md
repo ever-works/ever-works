@@ -223,11 +223,13 @@ Tests:
 
 - [ ] `apps/web/src/components/organizations/CreateOrganizationModal.tsx` — single-name form, live slug preview, submit.
 - [ ] `apps/web/src/components/organizations/UpgradeOrCreateDialog.tsx` — first-Org-only, defaults to Upgrade.
+- [ ] **Settings → Account "Create your first Organization" banner** — gate on `organizations.length === 0`; opens the same `CreateOrganizationModal`. Required because the empty-state switcher is intentionally silent ([spec.md §5.5](spec.md#empty-state-zero-organizations)) so there must be an alternative discoverable entry point. Lives on the existing `/{slug}/settings/account` page (or equivalent), banner auto-hides once the user has at least one Org.
 
 ### Wiring
 
 - [ ] Switcher's "+ Create Organization" item opens the modal.
 - [ ] On modal submit (server returns the new Org), if it's the user's first Org → open the dialog; else → just navigate.
+- [ ] Settings-page banner → same modal handler.
 
 ### i18n
 

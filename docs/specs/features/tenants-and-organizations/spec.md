@@ -288,6 +288,8 @@ This is the inflection point. User clicks "**+ Create Organization**" (the only 
 
 > **Crucial detail:** in both branches we backfill `tenantId` on existing rows at this moment. Before this moment, those rows had `tenantId = NULL`. After this moment, the user has a real Tenant and every one of their rows knows about it. The `organizationId` column is only touched on Tier A + Tier C, and only in branch 3a.
 
+> **Where the `tenantId` backfill actually runs** — it does NOT live inside the `upgrade-from-account` endpoint (that endpoint only fires in branch 3a and only sets `organizationId`). The `tenantId` backfill is unconditional and lives inside `OrganizationService.createOrganization` itself, after the lazy `ensureTenant(userId)` call: every Tier A/B/C row owned by this user that has `tenantId IS NULL` gets its `tenantId` set to the new Tenant's id. This way branch 3b ("Create with empty data") also gets `tenantId` on existing rows even though it never calls `upgrade-from-account`. See [plan.md Phase 6](plan.md#phase-6--lazy-upgrade-flow--organization-create-api) for the service-method split.
+
 > **First-Org guard:** the backfill is gated by a server-side check — `upgradeFromAccount` only runs when the user has exactly one Organization (the one just created). Calling it again after the user has created additional Organizations returns **409 Conflict** to prevent retroactively pulling items into a non-first Org.
 
 ### 5.3 User creates a SECOND (or third, …) Organization

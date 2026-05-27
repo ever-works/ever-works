@@ -54,11 +54,11 @@ This file describes the **observable behavior** required for each phase to be co
 
 ### AC-2.1 — Columns present
 
-- `users.tenantId`, `auth_accounts.tenantId`, etc. all exist as nullable UUID columns.
+- `users.tenantId`, `users.lastScopeOrganizationId`, `auth_accounts.tenantId`, and every other Tier B `tenantId` column all exist as nullable UUID columns.
 
 ### AC-2.2 — No backfill
 
-- All existing rows have `tenantId IS NULL`.
+- All existing rows have `tenantId IS NULL` (across `users` and every Tier B table) AND `users.lastScopeOrganizationId IS NULL` — the migration is purely additive and touches no row data.
 
 ### AC-2.3 — No write-path change
 
