@@ -63,16 +63,13 @@ describe('MissionsList (Phase 6 PR Q + quick-add)', () => {
         expect(label).not.toBeNull();
     });
 
-    it('renders the empty-state surface when no Missions exist with a /new?type=mission escape hatch', () => {
-        const { container } = render(<MissionsList missions={[]} />);
+    it('renders the empty-state surface when no Missions exist', () => {
+        render(<MissionsList missions={[]} />);
         expect(screen.getByText('empty.title')).toBeTruthy();
         expect(screen.getByText('empty.subtitle')).toBeTruthy();
-        // The empty state still keeps a secondary link to /new for the
-        // chip-aware flow (sidebar's "+ New" target).
-        const openNewLinks = Array.from(container.querySelectorAll('a[href]')).filter(
-            (a) => (a as HTMLAnchorElement).getAttribute('href') === '/new?type=mission',
-        );
-        expect(openNewLinks.length).toBeGreaterThan(0);
+        // The empty state no longer carries a secondary "open the
+        // unified creator" button — the inline composer above is the
+        // single entry point.
     });
 
     it('renders one MissionCard per Mission and no empty-state when missions present', () => {

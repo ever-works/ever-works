@@ -70,11 +70,13 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
     return (
         <section className="mt-8" aria-labelledby="missions-preview-heading">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-warning" />
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
+                        <Target className="w-4 h-4 text-warning" />
+                    </div>
                     <h2
                         id="missions-preview-heading"
-                        className="text-xl font-semibold text-text dark:text-text-dark"
+                        className="text-xl font-semibold text-text dark:text-text-dark truncate"
                     >
                         {t('title')}
                     </h2>
@@ -82,7 +84,7 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
                 {totalMissions > 0 && (
                     <Link
                         href={ROUTES.DASHBOARD_MISSIONS}
-                        className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+                        className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
                     >
                         {t('viewAll', { n: totalMissions })}
                     </Link>

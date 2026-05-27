@@ -12,6 +12,7 @@ import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
+import { ChatPanelProvider } from '@/lib/hooks/use-chat-panel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
@@ -489,7 +490,9 @@ export function DashboardLayoutClient({
                             id="main-content"
                         >
                             <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
-                                {children}
+                                <ChatPanelProvider open={chatOpen} setOpen={setChatOpen}>
+                                    {children}
+                                </ChatPanelProvider>
                             </div>
 
                             <Footer />

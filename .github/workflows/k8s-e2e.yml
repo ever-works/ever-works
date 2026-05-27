@@ -9,17 +9,15 @@ name: K8s Plugin E2E
 #   - actual IngressClass schema across cluster versions
 #   - rollout-status mapping against a real Deployment
 #
-# Triggered only when files that could affect the runtime path change,
-# so we don't pay 5 minutes of cluster provisioning on docs-only PRs.
+# Scope: only the release branches stage / main, and only when files
+# that could affect the runtime path change. PR and develop triggers
+# were removed in 2026-05-27 (see
+# Workspace/knowledge/runbooks/CI_RELEASE_GATES.md) — kind-cluster
+# provisioning is expensive, so we restrict to release gates.
 
 on:
   push:
-    branches: [main, develop, stage]
-    paths:
-      - 'packages/plugins/k8s/**'
-      - '.github/workflows/k8s-e2e.yml'
-  pull_request:
-    branches: [main, develop, stage]
+    branches: [stage, main]
     paths:
       - 'packages/plugins/k8s/**'
       - '.github/workflows/k8s-e2e.yml'
@@ -30,15 +28,13 @@ permissions:
   contents: read
 
 concurrency:
-  # Only cancel-in-progress on PR pushes (where rapid iteration is the
-  # whole point). On main/stage/develop, the workflow can take 5+ minutes
-  # to spin up the kind cluster — if a second push lands while the first
-  # is still in setup, cancelling it shows "FAILURE" after 2-3 seconds in
-  # the PR check rollup, which is indistinguishable from a real test
-  # failure unless you click into the logs. Let branch-push runs finish
-  # so their result is a real signal.
+  # On stage/main the workflow can take 5+ minutes to spin up the kind
+  # cluster — if a second push lands while the first is still in setup,
+  # cancelling it shows "FAILURE" after 2-3 seconds, indistinguishable
+  # from a real test failure unless you click into the logs. Let
+  # branch-push runs finish so their result is a real signal.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   e2e:

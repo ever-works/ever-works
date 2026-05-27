@@ -4,6 +4,20 @@ import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { createWorkWithAI } from '@/app/actions/dashboard';
+
+/**
+ * Browser-side slug helper. Mirrors `slugify` from `@ever-works/plugin`
+ * but lives here so this client component doesn't pull in the
+ * server-only plugin package. Lowercase letters + digits, hyphen-
+ * joined, leading/trailing hyphens stripped.
+ */
+function slugifyForWork(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
@@ -45,6 +59,15 @@ export function WorkAICreator({
 }: WorkAICreatorProps) {
     const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? initialPrompt ?? '');
     const [workName, setWorkName] = useState(proposal?.title ?? '');
+    // Slug is auto-generated from the name (mirrors WorkManualForm's
+    // generateSlug) but stays user-editable so the combined Create
+    // form lets users override the repo / URL identifier without
+    // having to re-name the Work. We track whether the slug has been
+    // manually edited so name changes don't overwrite a custom slug.
+    const [slug, setSlug] = useState(
+        proposal?.slugSuggestion ?? slugifyForWork(proposal?.title ?? ''),
+    );
+    const [slugDirty, setSlugDirty] = useState(Boolean(proposal?.slugSuggestion));
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
     const [websiteTemplateId, setWebsiteTemplateId] = useState('');
@@ -128,6 +151,7 @@ export function WorkAICreator({
         startTransition(async () => {
             const result = await createWorkWithAI({
                 name: workName,
+                slug: slug.trim() || undefined,
                 prompt,
                 organization,
                 owner: organization ? owner : undefined,
@@ -184,8 +208,36 @@ export function WorkAICreator({
                         label={`${t('workNameLabel')} *`}
                         type="text"
                         value={workName}
-                        onChange={(e) => setWorkName(e.target.value)}
+                        onChange={(e) => {
+                            const nextName = e.target.value;
+                            setWorkName(nextName);
+                            // Sync slug to the new name only when the user
+                            // hasn't manually edited it — mirrors the
+                            // legacy WorkManualForm behaviour so a quick
+                            // rename keeps the slug aligned for free.
+                            if (!slugDirty) {
+                                setSlug(slugifyForWork(nextName));
+                            }
+                        }}
                         placeholder={t('workNamePlaceholder')}
+                        variant="form"
+                    />
+
+                    {/* Slug — auto-generated from name, user-editable.
+                        Carried over from the legacy WorkManualForm so the
+                        combined Create form covers everything the manual
+                        form did. */}
+                    <Input
+                        label={t('slugLabel')}
+                        type="text"
+                        value={slug}
+                        onChange={(e) => {
+                            setSlug(e.target.value);
+                            setSlugDirty(true);
+                        }}
+                        placeholder={t('slugPlaceholder')}
+                        pattern="[a-z0-9-]+"
+                        helperText={t('slugHelp')}
                         variant="form"
                     />
 

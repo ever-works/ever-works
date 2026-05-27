@@ -25,6 +25,11 @@ vi.mock('sonner', () => ({
     toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const startFromPromptMock = vi.fn();
+vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
+    useStartFromPrompt: () => startFromPromptMock,
+}));
+
 const createIdeaMock = vi.fn();
 const buildIdeaMock = vi.fn();
 const dismissProposalMock = vi.fn();
@@ -160,10 +165,9 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         expect(addBtn.disabled).toBe(false);
     });
 
-    it('quick-add calls createIdeaAction + prepends the new Idea on success', async () => {
+    it('quick-add hands the prompt to the chat AI (no inline create)', () => {
+        startFromPromptMock.mockClear();
         createIdeaMock.mockClear();
-        const newIdea = mkIdea({ id: 'new-1', status: 'pending' });
-        createIdeaMock.mockResolvedValueOnce(newIdea);
         const { container } = render(
             <IdeasPageClient initialIdeas={[mkIdea({ id: 'old', status: 'pending' })]} />,
         );
@@ -177,12 +181,16 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             'button[data-testid="ideas-quick-add-submit"]',
         ) as HTMLButtonElement;
         fireEvent.click(addBtn);
-        expect(createIdeaMock).toHaveBeenCalledWith({
-            description: 'My freshly typed Idea, longer than ten chars',
-        });
-        // useTransition schedules the setState async; findByText auto-
-        // waits for the next render that contains the new card.
-        expect(await screen.findByText('Idea new-1')).toBeTruthy();
+        // Prompt is forwarded to the shared chat-start helper instead
+        // of creating an Idea row directly — the chat AI now drives
+        // the create-from-prompt flow.
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'My freshly typed Idea, longer than ten chars',
+            { intent: 'Idea' },
+        );
+        expect(createIdeaMock).not.toHaveBeenCalled();
+        // The existing rows are still rendered (canvas) — the new
+        // Idea will appear once chat confirms creation.
         expect(screen.getByText('Idea old')).toBeTruthy();
     });
 

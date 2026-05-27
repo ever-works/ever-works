@@ -132,10 +132,12 @@ export function StatsOverview({
     ];
 
     return (
-        // Phase 7 PR II — grid now sized for 6 tiles. The @5xl breakpoint
-        // shows all 6 in a row on wide screens; smaller breakpoints
-        // wrap gracefully (3 then 2 then 1 per row).
-        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 @5xl/main:grid-cols-6 gap-6">
+        // 6 tiles, sized to collapse cleanly with the chat panel.
+        // When chat is open the main column is roughly @3xl-ish → show
+        // 4 per row (2 rows of stats). When chat is collapsed the main
+        // column opens up past @5xl → show all 6 in a single row.
+        // Smaller breakpoints wrap gracefully to 2 then 1 per row.
+        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-4 @5xl/main:grid-cols-6 gap-4">
             {statCards.map((stat) => {
                 const tileBody = (
                     <div
