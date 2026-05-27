@@ -54,11 +54,11 @@ This file describes the **observable behavior** required for each phase to be co
 
 ### AC-2.1 — Columns present
 
-- `users.tenantId`, `auth_accounts.tenantId`, etc. all exist as nullable UUID columns.
+- `users.tenantId`, `users.lastScopeOrganizationId`, `auth_accounts.tenantId`, and every other Tier B `tenantId` column all exist as nullable UUID columns.
 
 ### AC-2.2 — No backfill
 
-- All existing rows have `tenantId IS NULL`.
+- All existing rows have `tenantId IS NULL` (across `users` and every Tier B table) AND `users.lastScopeOrganizationId IS NULL` — the migration is purely additive and touches no row data.
 
 ### AC-2.3 — No write-path change
 
@@ -124,11 +124,20 @@ This file describes the **observable behavior** required for each phase to be co
 
 - Alice creates `Globex LLC` via the same endpoint. After the call: exactly one Tenant row for Alice, two Organization rows, both with the same `tenantId`.
 
-### AC-6.3 — Upgrade-from-account moves rows
+### AC-6.3 — Upgrade-from-account moves rows (per-tier)
 
-- Alice has 5 Missions, 3 Works, 12 Tasks all with `organizationId IS NULL` (currently in her Tenant root).
-- `POST /api/organizations/:id/upgrade-from-account` moves all 20 rows: their `organizationId` is now the upgraded Org's id.
-- Re-running the same endpoint a second time is a no-op (idempotent).
+- Alice has 5 Missions, 3 Works, 12 Tasks (Tier A) all with `organizationId IS NULL`, plus session/auth rows (Tier B) and KB chunks (Tier C).
+- `POST /api/organizations/:id/upgrade-from-account` succeeds and:
+    - **Tier A + Tier C rows** owned by Alice now have BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`.
+    - **Tier B rows** owned by Alice now have `tenantId = newTenant.id` ONLY — `organizationId` is not touched (Tier B has no such column; the migration would fail if attempted).
+    - `users.lastScopeOrganizationId = newOrg.id` is set so the next login lands in the new Org scope.
+- Re-running the same endpoint a second time on the same first Org is a no-op (idempotent).
+
+### AC-6.3a — Upgrade-from-account first-Org guard
+
+- After Alice creates a second Organization, calling `POST /api/organizations/:firstOrgId/upgrade-from-account` returns **409 Conflict** with an error code like `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS`.
+- Calling it with any subsequent Org's id (other than the first) also returns 409.
+- The upgrade pathway is open only while Alice has exactly one Organization and only for that one Org.
 
 ### AC-6.4 — Slug uniqueness across tables
 
@@ -147,7 +156,7 @@ This file describes the **observable behavior** required for each phase to be co
 
 - `GET /api/missions` on Alice's session with `X-Scope-Slug: alice` returns Alice's bare-Tenant Missions.
 - `GET /api/missions` with `X-Scope-Slug: acme-inc` returns only Acme Inc's Missions.
-- `GET /api/missions` with `X-Scope-Slug: notarealsulug` returns 404.
+- `GET /api/missions` with `X-Scope-Slug: notarealslug` returns 404.
 
 ### AC-7.2 — Org takes precedence on collision (defensive)
 
@@ -189,9 +198,11 @@ This file describes the **observable behavior** required for each phase to be co
 
 - When the user creates their FIRST Organization, the upgrade-vs-new dialog appears with "Upgrade current account" pre-selected and focused.
 
-### AC-9.2 — Upgrade choice moves all existing items
+### AC-9.2 — Upgrade choice moves all existing items (per-tier)
 
-- After confirming "Upgrade", every Tier A/B/C row owned by the user gets its `organizationId` set to the new Org. The new Org scope now shows the user's pre-existing items.
+- After confirming "Upgrade", every Tier A and Tier C row owned by the user gets BOTH `tenantId` and `organizationId` set to the new Org's values.
+- Every Tier B row gets `tenantId` only — Tier B has no `organizationId` column ([spec.md §2.3](spec.md#23-three-tiers-of-entities-which-columns-each-tier-gets)).
+- The new Org scope now shows the user's pre-existing Tier A items (Missions, Works, Tasks, Ideas, …).
 
 ### AC-9.3 — Empty choice leaves bare Tenant intact
 

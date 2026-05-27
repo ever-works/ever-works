@@ -65,12 +65,12 @@ This file is the granular checklist agents and reviewers tick off as work lands.
 
 ### Database
 
-- [ ] Migration `AddTenantIdToUsers` — nullable, FK + index, **no backfill**.
+- [ ] Migration `AddTenantIdToUsers` — nullable `tenantId uuid` FK + index, **no backfill**. ALSO adds the nullable `users.lastScopeOrganizationId uuid` FK column (→ `organizations(id)` ON DELETE SET NULL) in the same migration — see [spec.md §5.6](spec.md#56-default-organization-on-next-login). NULL means "default to bare Tenant on next login."
 - [ ] Migration `AddTenantIdToTierB` — same shape, applied to: `auth_accounts`, `auth_sessions`, `auth_verifications`, `refresh_tokens`, `user_template_preferences`, `user_task_counters`.
 
 ### Entities
 
-- [ ] `user.entity.ts` — add `@ManyToOne(() => Tenant, { nullable: true })`.
+- [ ] `user.entity.ts` — add `@ManyToOne(() => Tenant, { nullable: true })` AND `@ManyToOne(() => Organization, { nullable: true })` for `lastScopeOrganization`.
 - [ ] Six Tier B entities — same.
 
 ---
@@ -223,11 +223,13 @@ Tests:
 
 - [ ] `apps/web/src/components/organizations/CreateOrganizationModal.tsx` — single-name form, live slug preview, submit.
 - [ ] `apps/web/src/components/organizations/UpgradeOrCreateDialog.tsx` — first-Org-only, defaults to Upgrade.
+- [ ] **Settings → Account "Create your first Organization" banner** — gate on `organizations.length === 0`; opens the same `CreateOrganizationModal`. Required because the empty-state switcher is intentionally silent ([spec.md §5.5](spec.md#empty-state-zero-organizations)) so there must be an alternative discoverable entry point. Lives on the existing `/{slug}/settings/account` page (or equivalent), banner auto-hides once the user has at least one Org.
 
 ### Wiring
 
 - [ ] Switcher's "+ Create Organization" item opens the modal.
 - [ ] On modal submit (server returns the new Org), if it's the user's first Org → open the dialog; else → just navigate.
+- [ ] Settings-page banner → same modal handler.
 
 ### i18n
 
