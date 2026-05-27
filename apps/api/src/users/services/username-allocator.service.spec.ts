@@ -3,9 +3,14 @@ jest.mock('@ever-works/agent/database', () => ({}));
 import { UsernameAllocatorService } from './username-allocator.service';
 
 describe('UsernameAllocatorService', () => {
-    const create = (existingUsernames: string[] = [], existingSlugs: string[] = []) => {
+    const create = (
+        existingUsernames: string[] = [],
+        existingSlugs: string[] = [],
+        existingOrgSlugs: string[] = [],
+    ) => {
         const usernameSet = new Set(existingUsernames.map((u) => u.toLowerCase()));
         const slugSet = new Set(existingSlugs);
+        const orgSlugSet = new Set(existingOrgSlugs);
 
         const userRepository = {
             findByUsername: jest.fn(),
@@ -21,8 +26,22 @@ describe('UsernameAllocatorService', () => {
                 ),
         };
 
-        const service = new UsernameAllocatorService(userRepository as any);
-        return { service, userRepository };
+        // EW-658 (Phase 6) — allocator now also consults
+        // OrganizationRepository to enforce the cross-table slug
+        // collision rule.
+        const organizationRepository = {
+            findBySlug: jest
+                .fn()
+                .mockImplementation(async (slug: string) =>
+                    orgSlugSet.has(slug) ? { id: 'taken', slug } : null,
+                ),
+        };
+
+        const service = new UsernameAllocatorService(
+            userRepository as any,
+            organizationRepository as any,
+        );
+        return { service, userRepository, organizationRepository };
     };
 
     describe('normalize', () => {
@@ -86,6 +105,14 @@ describe('UsernameAllocatorService', () => {
             await expect(service.allocateUsername('ALICE')).resolves.toBe('alice-2');
         });
 
+        it('suffixes when colliding with an existing Organization slug (EW-658 cross-table)', async () => {
+            // No User has this slug, but an Org does — the allocator
+            // must still bump to -2 because user + Org slugs share a
+            // global namespace.
+            const { service } = create([], [], ['acme']);
+            await expect(service.allocateUsername('acme')).resolves.toBe('acme-2');
+        });
+
         it('finds the next free slot beyond -2', async () => {
             const { service } = create(['alice', 'alice-2', 'alice-3']);
             await expect(service.allocateUsername('alice')).resolves.toBe('alice-4');
@@ -111,7 +138,13 @@ describe('UsernameAllocatorService', () => {
                     }),
                 findBySlug: jest.fn().mockResolvedValue(null),
             };
-            const service = new UsernameAllocatorService(userRepository as any);
+            const organizationRepository = {
+                findBySlug: jest.fn().mockResolvedValue(null),
+            };
+            const service = new UsernameAllocatorService(
+                userRepository as any,
+                organizationRepository as any,
+            );
             const result = await service.allocateUsername('bob');
             // After 10k attempts the safety valve kicks in and produces a
             // random 6-hex suffix.
