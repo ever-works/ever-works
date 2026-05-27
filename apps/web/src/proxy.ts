@@ -101,19 +101,28 @@ function detectLegacyLocalePrefix(pathname: string): { locale: string; rest: str
 export default async function proxy(req: NextRequest) {
     const pathname = req.nextUrl.pathname;
 
-    // 1) Legacy `/en/works` → `/works` (308 — preserves method + body, and
-    //    is cacheable). Set NEXT_LOCALE so the user keeps the same
-    //    language without an extra round-trip.
+    // 1) Legacy `/en/works` → `/works` redirect for old bookmarks.
+    //    - `307` (not the cache-eligible `308`): the redirect's correctness
+    //      depends on the `Set-Cookie` side-effect firing on the next visit
+    //      too, so we must not let browsers / CDNs short-circuit it.
+    //    - `Cache-Control: no-store` belt-and-braces against any
+    //      intermediary that would still treat the response as cacheable.
+    //    - Only seed `NEXT_LOCALE` when the user has NO existing
+    //      preference: clicking a shared `/en/...` link should NOT
+    //      silently flip an existing French user back to English.
     const legacy = detectLegacyLocalePrefix(pathname);
     if (legacy) {
         const target = new URL(req.url);
         target.pathname = legacy.rest;
-        const response = NextResponse.redirect(target, 308);
-        response.cookies.set(NEXT_LOCALE_COOKIE, legacy.locale, {
-            path: '/',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 365,
-        });
+        const response = NextResponse.redirect(target, 307);
+        response.headers.set('Cache-Control', 'no-store');
+        if (!req.cookies.has(NEXT_LOCALE_COOKIE)) {
+            response.cookies.set(NEXT_LOCALE_COOKIE, legacy.locale, {
+                path: '/',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 * 365,
+            });
+        }
         return applySecurityHeaders(response);
     }
 
