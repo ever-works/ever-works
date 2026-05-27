@@ -4626,7 +4626,8 @@
                     "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
                     "cta": "Import now"
                 }
-            }        }
+            }
+        }
     },
     "layout": {
         "auth": {
