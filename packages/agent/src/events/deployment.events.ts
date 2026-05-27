@@ -2,6 +2,33 @@ import { Work } from '@src/entities';
 import { BaseEvent } from './base';
 
 /**
+ * Deployment lifecycle event family.
+ *
+ * **Three events form the contract:**
+ *
+ *   1. `DeploymentDispatchedEvent` — `'deployment.dispatched'`,
+ *      fires immediately after `DeployService` enqueues the
+ *      workflow. Deployment is in flight; no terminal outcome yet.
+ *   2. `DeploymentCompletedEvent` — `'deployment.completed'`,
+ *      fires when `DeploymentVerifierService` polls a `READY`
+ *      state. Carries the optional public `url`.
+ *   3. `DeploymentFailedEvent` — `'deployment.failed'`, fires on
+ *      `ERROR | TIMEOUT | CANCELED | UNKNOWN`. The
+ *      `terminalState` discriminator drives different activity-log
+ *      copy.
+ *
+ * **Always exactly one terminal event per dispatch.** Listeners
+ * counting dispatched-vs-resolved can subtract `dispatched - (
+ * completed + failed)` to find in-flight deployments; the
+ * verifier guarantees one and only one terminal event per
+ * dispatch even on poll failure (it falls through to `UNKNOWN`).
+ *
+ * **`EVENT_NAME` is the wire key** for the event-emitter subscription
+ * (`@OnEvent(DeploymentDispatchedEvent.EVENT_NAME)`). Don't rename
+ * without updating every listener.
+ */
+
+/**
  * Common payload shape carried by every deployment lifecycle event.
  * Activity-log listeners use this directly; new fields can be added
  * without breaking existing subscribers.

@@ -25,7 +25,7 @@ Each repository has its own issue tracker. File issues in the repository most re
 
 Before you begin, make sure you have the following installed:
 
-- **Node.js** >= 20.19.0 (LTS recommended)
+- **Node.js** >= 22 (LTS recommended; matches the `node:22-alpine` Docker base image and the root `package.json` engines field)
 - **pnpm** >= 10.x (strictly enforced; do not use npm or yarn)
 - **Git** >= 2.30
 - **Docker** (optional, for running the Platform locally with containers)

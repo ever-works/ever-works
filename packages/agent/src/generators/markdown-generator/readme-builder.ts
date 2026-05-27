@@ -1,8 +1,6 @@
 import GithubSlugger from 'github-slugger';
 import type { ItemData } from '@ever-works/plugin';
 
-const slugger = new GithubSlugger();
-
 export class ReadmeBuilder {
     private content: string = '';
     private isTocEnabled: boolean = false;
@@ -43,6 +41,15 @@ export class ReadmeBuilder {
         let toc = '';
 
         if (this.isTocEnabled) {
+            // Fresh slugger per ToC build. `GithubSlugger` is stateful —
+            // it tracks every slug it has ever produced to enforce
+            // intra-document uniqueness. A module-scoped or per-instance
+            // slugger reused across multiple READMEs would gradually
+            // suffix headers (`tools`, `tools-1`, `tools-2`, ...) while
+            // GitHub Markdown re-renders each `## Tools` header back to
+            // anchor `#tools` — every TOC link past the first would
+            // become a dead anchor.
+            const slugger = new GithubSlugger();
             toc += '## 📑 Table of Contents\n\n';
             this.toc.forEach(({ header, count }) => {
                 const slug = slugger.slug(header);

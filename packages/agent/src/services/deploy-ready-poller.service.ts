@@ -15,6 +15,13 @@ const READY_STATE = 'READY';
 /**
  * Pending-style states the poller probes for readiness. Mirrors the
  * states the DeploymentVerifierService transitions through.
+ *
+ * **Mixed case is intentional.** `'pending'` is the legacy internal
+ * state value; `'INITIALIZING' | 'QUEUED' | 'BUILDING'` are Vercel's
+ * own deployment state names stored verbatim. Postgres string
+ * matching is case-sensitive, so each row appears exactly once in
+ * one canonical case. Normalising would require a one-shot
+ * migration of historical rows — leave as-is until that's planned.
  */
 const PENDING_STATES: readonly string[] = ['pending', 'INITIALIZING', 'QUEUED', 'BUILDING'];
 
@@ -30,6 +37,36 @@ const PENDING_STATES: readonly string[] = ['pending', 'INITIALIZING', 'QUEUED', 
  *    correlate with).
  *  - health-check failures (network errors, non-200 responses) leave the
  *    row in its current state for the next poll tick.
+ *
+ * **Implementation notes worth flagging:**
+ *
+ *   - **Probes are sequential**, not parallel. With a default
+ *     `healthTimeoutMs` of 5s, N pending works can take up to N×5s
+ *     per tick in the worst case. Trigger.dev's schedule is every
+ *     2 minutes, so this is fine up to ~20 pending works; past
+ *     that, ticks start backing up. If pending volumes grow,
+ *     parallelise with `Promise.allSettled` (bound concurrency to
+ *     avoid hammering DNS).
+ *
+ *   - **`probeUrl` collapses every failure mode** (DNS error,
+ *     network timeout, non-200, abort) into a single `false`.
+ *     The summary counts these as `stillPending`, NOT `failed`.
+ *     `summary.failed` only counts thrown errors AROUND the
+ *     probe — DB update failures, funnel emit errors, etc. Keep
+ *     this in mind when alerting on the summary.
+ *
+ *   - **`elapsedMs` defaults to `0`** when `deploymentStartedAt` is
+ *     missing — funnel events for legacy works (pre-timestamp)
+ *     will show elapsed=0, which skews any "time to ready"
+ *     analytics. Filter out elapsedMs=0 in the PostHog query, or
+ *     bake a `hasElapsed` discriminator into the payload here.
+ *
+ *   - **Domain resolution** is `options.domain` → `EVER_WORKS_DOMAIN`
+ *     env → THROW. We deliberately do NOT fall through to a
+ *     hardcoded `'ever.works'`: a misconfigured staging would
+ *     otherwise probe the production hostname pattern and report
+ *     false-positive READY states for any slug that happens to
+ *     exist in prod. Misconfig surfaces as a startup-time error.
  */
 @Injectable()
 export class DeployReadyPollerService {
@@ -51,7 +88,17 @@ export class DeployReadyPollerService {
         const httpFetch = options.fetch ?? fetch;
         const now = options.now ?? (() => new Date());
         const timeoutMs = options.healthTimeoutMs ?? 5000;
-        const domain = options.domain ?? process.env.EVER_WORKS_DOMAIN ?? 'ever.works';
+        // Domain MUST be supplied explicitly (caller option) or via
+        // `EVER_WORKS_DOMAIN` env. No hardcoded fallback: a misconfigured
+        // staging probing the production hostname pattern would report
+        // false-positive READY states for any slug that happens to match
+        // a live production site (greptile P2 on PR #1031).
+        const domain = options.domain ?? process.env.EVER_WORKS_DOMAIN;
+        if (!domain) {
+            throw new Error(
+                'deploy-ready-poller: domain not configured — set EVER_WORKS_DOMAIN env or pass options.domain',
+            );
+        }
 
         const pendingWorks = await this.workRepository.findByDeploymentStates([...PENDING_STATES]);
         const summary: DeployReadyPollerSummary = {

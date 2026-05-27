@@ -1,6 +1,6 @@
 # Feature Specification: Kubernetes Cluster-Source Matrix (EW-616)
 
-> Behaviour-first spec per [Constitution Principle IX](../../../specs/memory/constitution.md#ix-specs-are-behaviour-first).
+> Behaviour-first spec per [Constitution Principle IX](../../../../.specify/memory/constitution.md#ix-specs-are-behaviour-first).
 > Describe **what** the system does, not how it's structured. Implementation lives in [`./plan.md`](./plan.md).
 
 **Feature ID**: `k8s-cluster-source-matrix`

@@ -1,8 +1,28 @@
 import { DatabaseModule } from './database.module';
 
 /**
- * Helper to create DatabaseModule with specific environment variables
- * This is the recommended way to configure the database for different environments
+ * Side-effecting helper: writes every entry of `envVars` into
+ * `process.env` and returns the standard {@link DatabaseModule}.
+ *
+ * **Side-effect warning.** The returned module is the same singleton
+ * regardless of input — the meaningful work happens in the env-var
+ * mutation. Consequences a future caller needs to know:
+ *
+ * - **Order of calls matters.** Calling `cli()` then `apiProduction()`
+ *   leaves you with apiProduction's env vars; the second call
+ *   overwrites whatever the first set.
+ * - **Process-wide pollution.** Anything in the process (including
+ *   unrelated services and other plugins) that reads `process.env`
+ *   after this call sees the last-applied values.
+ * - **Not reversible.** There is no reset; env vars stay for the
+ *   process lifetime. Test suites that mix configurations across
+ *   tests must restore `process.env` themselves.
+ * - **`DatabaseConfigurations.cli()` activates the destructive path
+ *   in {@link DatabaseInitService}** by setting `APP_TYPE=cli`.
+ *   That env var is the only gate on `dataSource.synchronize()`,
+ *   which drops columns not present in entities. NEVER call `cli()`
+ *   in a process that touches a production database (see the DANGER
+ *   block on `DatabaseInitService` and NN #16 in CLAUDE.md).
  */
 export function createDatabaseModuleWithEnv(envVars: Record<string, string>) {
     // Set environment variables
@@ -15,8 +35,10 @@ export function createDatabaseModuleWithEnv(envVars: Record<string, string>) {
 }
 
 /**
- * Predefined database module configurations for common use cases
- * These all use the same DatabaseModule with different environment variables
+ * Predefined env-var profiles for {@link createDatabaseModuleWithEnv}.
+ * Despite the name, these are NOT in-memory configuration objects —
+ * each call mutates `process.env`. See the side-effect warning on
+ * `createDatabaseModuleWithEnv` before mixing profiles in one process.
  */
 export const DatabaseConfigurations = {
     /**

@@ -15,6 +15,33 @@ export type ItemSourceValidationSchedulerResult = {
     errors: { workId: string; message: string }[];
 };
 
+/**
+ * Drives the recurring "is this work's items still reachable?" health
+ * check. Picks up to `LIMIT` due works per tick, runs each through
+ * {@link ItemHealthService.runScheduledCheck}, and reschedules.
+ *
+ * Behaviours worth surfacing:
+ *
+ * - **Batch size cap `LIMIT = 50`.** With more than 50 due works,
+ *   the leftover ones wait until the next tick. Sized to fit comfortably
+ *   inside the scheduler's per-invocation budget; bump it only after
+ *   profiling `runScheduledCheck` for the average work.
+ *
+ * - **Failures retry on the next tick.** When `runScheduledCheck`
+ *   throws, the error is logged but `sourceValidationNextRunAt` is
+ *   NOT advanced — the row stays "due" and the scheduler will try it
+ *   again next tick. This is correct for transient failures
+ *   (network blip, upstream 500) but creates a **starvation hazard**:
+ *   if more than `LIMIT` works persistently error, the same first 50
+ *   monopolise every tick and the rest never run. If this happens,
+ *   either fix the underlying error or add a "bumped on error" path
+ *   that pushes the run forward by the cadence on failure too.
+ *
+ * - **Silent skip for missing prerequisites.** A due work without a
+ *   loaded `user` relation or without `sourceValidationCadence` set
+ *   is counted as `skipped`, not an error — the row simply waits
+ *   until the missing field is filled in. No notification or log.
+ */
 @Injectable()
 export class ItemSourceValidationSchedulerService {
     private readonly logger = new Logger(ItemSourceValidationSchedulerService.name);
