@@ -197,6 +197,13 @@ const AI_WORK_KIND_PROMPT_LABELS: Record<AIWorkKind, string> = {
 
 interface AIWorkOptions {
     name: string;
+    /**
+     * Optional user-provided slug. When present we honor it (after
+     * sanitisation by the schema) instead of falling back to
+     * `slugify(name)`. The combined Create form lets users override
+     * the auto-generated slug, so we need a way to plumb it through.
+     */
+    slug?: string;
     prompt: string;
     organization?: boolean;
     owner?: string;
@@ -218,7 +225,11 @@ interface AIWorkOptions {
 export async function createWorkWithAI(request: AIWorkOptions) {
     const t = await getTranslations('actions.works');
 
-    // AI prompt validation schema
+    // AI prompt validation schema. `slug` is optional — when the
+    // user typed an override in the form we run it through the same
+    // shape check `getCreateWorkSchema()` uses (lowercase letters,
+    // digits, hyphens); when missing we fall back to slugify(name)
+    // below.
     const aiPromptSchema = z.object({
         prompt: z
             .string()
@@ -230,6 +241,16 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             .min(1, t('name.required'))
             .transform((val) => sanitizeName(val, 100))
             .pipe(z.string().max(100, t('name.maxLength'))),
+        slug: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim().toLowerCase())
+            .pipe(
+                z
+                    .string()
+                    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format'))
+                    .optional(),
+            ),
         gitProvider: z.string().optional(),
         proposalId: z.string().uuid().optional(),
         workKind: aiWorkKindSchema.optional(),
@@ -242,6 +263,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
         const validation = aiPromptSchema.safeParse({
             prompt: request.prompt,
             name: request.name,
+            slug: request.slug,
             gitProvider: request.gitProvider,
             proposalId: request.proposalId,
             workKind: request.workKind,
@@ -293,6 +315,14 @@ export async function createWorkWithAI(request: AIWorkOptions) {
                     ai_provider: aiProvider,
                 })
                 .catch(() => defaultDetails);
+        }
+
+        // User-provided slug overrides whatever the AI generator
+        // returned (or the slugify fallback). Lets the user keep a
+        // specific repo name even when the AI proposes something
+        // different.
+        if (validation.data.slug) {
+            workDetails = { ...workDetails, slug: validation.data.slug };
         }
 
         // Determine organization settings

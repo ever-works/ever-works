@@ -63,6 +63,30 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
+    // Pre-fill from `?prompt=` so the global `/new` page can hand off
+    // the user's free-text description into the Task form's title /
+    // description fields. The first line becomes the title and the
+    // remainder seeds the description, so a single-line prompt still
+    // lands cleanly without an empty description block.
+    useEffect(() => {
+        const promptParam = searchParams?.get('prompt');
+        if (!promptParam) return;
+        const trimmed = promptParam.trim();
+        if (!trimmed) return;
+        const firstBreak = trimmed.indexOf('\n');
+        const candidateTitle =
+            firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 120).trim();
+        const candidateDescription =
+            firstBreak > 0
+                ? trimmed.slice(firstBreak + 1).trim()
+                : trimmed.length > 120
+                  ? trimmed
+                  : '';
+        if (!title && candidateTitle) setTitle(candidateTitle);
+        if (!description && candidateDescription) setDescription(candidateDescription);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) return;

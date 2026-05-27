@@ -1,45 +1,50 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
     BookOpen,
+    Bot,
     Files,
-    FolderInput,
+    FolderOpen,
     Globe,
     Lightbulb,
-    PenLine,
+    ListChecks,
     Star,
     Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { PromptComposer } from '@/components/common/PromptComposer';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import { createMissionAction } from '@/app/actions/dashboard/missions';
-import { createIdeaAction } from '@/app/actions/dashboard/work-proposals';
+import { useChatPanel } from '@/lib/hooks/use-chat-panel';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 
 /**
- * Phase 6.5 PR CC2 + UI polish — unified `/new` page.
+ * Unified `/new` page — single prompt input + chips for every
+ * creatable kind. No "Create Work Manually" / "Import Existing"
+ * affordances here: those live on `/works/new` so this page stays
+ * focused on the conversational entry point.
  *
- * Single creation entry point per spec §8b. Composer matches the
- * marketing site's landing prompt — a rounded card on the page's
- * dark background with chips below the input and an arrow submit
- * inside the composer. The previous "Create" button + chip hint
- * are gone: a chip is always preselected (Mission for new users,
- * Idea for users with existing Missions), so the "Pick a chip to
- * enable Create" hint never served a purpose.
+ * Chip → submit routing:
+ *   - mission / idea  — created inline via server actions.
+ *   - agent / task    — route to their respective `/new` pages with
+ *                       the prompt prefilled (one-pager creators
+ *                       there collect any remaining bits and persist).
+ *   - website + 4 work kinds — forwarded to `/works/new` with the
+ *                       prompt and the selected kind preserved.
  *
- * Selecting a chip swaps the typewriter placeholder list AND
- * surfaces a one-line description of what that kind is, so the
- * user gets the same affordance the marketing site shows.
+ * The chat panel is auto-collapsed on mount so the prompt + chips
+ * get the full main column on first land. Users can reopen it from
+ * the layout's chat handle if they want it back.
  */
 export type ChipType =
     | 'mission'
     | 'idea'
+    | 'agent'
+    | 'task'
     | 'website'
     | 'landing-page'
     | 'blog'
@@ -49,6 +54,8 @@ export type ChipType =
 const CHIP_ORDER: ChipType[] = [
     'mission',
     'idea',
+    'agent',
+    'task',
     'website',
     'landing-page',
     'blog',
@@ -59,10 +66,14 @@ const CHIP_ORDER: ChipType[] = [
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,
     idea: Lightbulb,
+    agent: Bot,
+    task: ListChecks,
     website: Globe,
     'landing-page': Files,
     blog: BookOpen,
-    directory: Files,
+    // Distinct icon from `landing-page` — Greptile P2: shared `Files`
+    // makes the two chips visually indistinguishable in the chip row.
+    directory: FolderOpen,
     'awesome-repo': Star,
 };
 
@@ -80,6 +91,18 @@ const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
         'e.g. "Directory of MCP servers — capabilities, language, install command, source repo"',
         'e.g. "Knowledge base for our open-source SDK with search and versioning"',
         'e.g. "Blog about indie game development with categories for postmortems and tooling"',
+    ],
+    agent: [
+        'e.g. "Research assistant that fetches AI safety papers and summarizes them weekly"',
+        'e.g. "Content editor that rewrites our directory descriptions in a consistent voice"',
+        'e.g. "Release-notes drafter that watches a repo and proposes draft notes"',
+        'e.g. "PR triage agent that labels new community PRs and suggests reviewers"',
+    ],
+    task: [
+        'e.g. "Audit the Mission backlog and tag stale items for review"',
+        'e.g. "Run the weekly data refresh for the AI tools directory"',
+        'e.g. "Draft the launch checklist for the new website template"',
+        'e.g. "Sync website copy with the latest pricing changes"',
     ],
     website: [
         'e.g. "Modern website for a boutique design studio with case studies and a contact form"',
@@ -124,6 +147,36 @@ export interface NewPageClientProps {
     initialTemplateId?: string;
 }
 
+const CHIP_INTENT_LABEL: Record<ChipType, string> = {
+    mission: 'Mission',
+    idea: 'Idea',
+    agent: 'Agent',
+    task: 'Task',
+    website: 'website',
+    'landing-page': 'landing page',
+    blog: 'blog',
+    directory: 'directory',
+    'awesome-repo': 'awesome list repo',
+};
+
+const CHIP_TO_CANVAS_ROUTE: Partial<Record<ChipType, string>> = {
+    agent: ROUTES.DASHBOARD_AGENT_NEW,
+    task: ROUTES.DASHBOARD_TASK_NEW,
+    website: ROUTES.DASHBOARD_WORKS_NEW,
+    'landing-page': ROUTES.DASHBOARD_WORKS_NEW,
+    blog: ROUTES.DASHBOARD_WORKS_NEW,
+    directory: ROUTES.DASHBOARD_WORKS_NEW,
+    'awesome-repo': ROUTES.DASHBOARD_WORKS_NEW,
+};
+
+const CHIP_TO_WORK_KIND: Partial<Record<ChipType, string>> = {
+    website: 'website',
+    'landing-page': 'landing-page',
+    blog: 'blog',
+    directory: 'directory',
+    'awesome-repo': 'awesome-repo',
+};
+
 export function NewPageClient({
     initialType = 'mission',
     initialPrompt,
@@ -134,6 +187,22 @@ export function NewPageClient({
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType>(initialType ?? 'mission');
     const [submitting, startSubmit] = useTransition();
+    const startFromPrompt = useStartFromPrompt();
+
+    // Close the layout chat panel on mount so the prompt + chips
+    // take the full main column. We depend ONLY on the (stable)
+    // setter — not the whole context object — because the context
+    // value is recreated on every `open` flip, so depending on
+    // `chat` would re-fire `setOpen(false)` the moment the user
+    // re-opens the panel and lock them out. The setter itself is
+    // memoised by the provider so this effectively runs once on
+    // mount. Hook is null-safe when rendered outside the dashboard
+    // layout (e.g. previews/tests).
+    const chat = useChatPanel();
+    const setChatOpen = chat?.setOpen;
+    useEffect(() => {
+        setChatOpen?.(false);
+    }, [setChatOpen]);
 
     const submit = () => {
         const description = prompt.trim();
@@ -141,36 +210,47 @@ export function NewPageClient({
             toast.error(t('hints.minLength'));
             return;
         }
-        startSubmit(async () => {
-            try {
-                if (selectedChip === 'mission') {
-                    const mission = await createMissionAction({
-                        description,
-                        type: 'one-shot',
-                        ...(initialTemplateId ? { missionTemplateRepo: initialTemplateId } : {}),
-                    });
-                    toast.success(t('toasts.missionCreated'));
-                    router.push(ROUTES.DASHBOARD_MISSION(mission.id));
-                    return;
-                }
-                if (selectedChip === 'idea') {
-                    await createIdeaAction({ description });
-                    toast.success(t('toasts.ideaCreated'));
-                    router.push(ROUTES.DASHBOARD_IDEAS);
-                    return;
-                }
-                // The remaining 5 chip types route into the existing
-                // /works/new flow.
-                const params = new URLSearchParams({
-                    mode: 'ai',
-                    kind: selectedChip,
-                    prompt: description.slice(0, 4000),
-                });
-                router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
+        startSubmit(() => {
+            // Send the prompt into the chat AI so the user can keep
+            // iterating in chat — replaces the old "submit + redirect
+            // with the same prompt pre-filled" pattern. The chat AI's
+            // currentPageUrl context tells it where the user is, and
+            // the intent prefix narrows it further.
+            startFromPrompt(description, { intent: CHIP_INTENT_LABEL[selectedChip] });
+
+            // Then navigate to the canvas for that intent. The canvas
+            // page does NOT pre-fill the prompt — the user already
+            // sent it, chat is the live channel from here on. The
+            // canvas is for optional manual editing of the entity.
+            if (selectedChip === 'mission') {
+                router.push(ROUTES.DASHBOARD_MISSIONS);
+                return;
+            }
+            if (selectedChip === 'idea') {
+                router.push(ROUTES.DASHBOARD_IDEAS);
+                return;
+            }
+            const canvasRoute = CHIP_TO_CANVAS_ROUTE[selectedChip];
+            const workKind = CHIP_TO_WORK_KIND[selectedChip];
+            if (canvasRoute && workKind) {
+                // Work canvases need `mode=ai` so /works/new skips its
+                // own composer entry view and renders the form. They
+                // also need `kind` so the AI generator hints at the
+                // right Work shape. Critically, no `prompt=` — the
+                // chat already carries it.
+                const params = new URLSearchParams({ mode: 'ai', kind: workKind });
+                router.push(`${canvasRoute}?${params.toString()}`);
+                return;
+            }
+            if (canvasRoute) {
+                router.push(canvasRoute);
+                return;
             }
         });
+        // initialTemplateId stays informational for now — Mission
+        // template-driven creation moves into the chat flow once the
+        // chat surface understands "use template <id>" intents.
+        void initialTemplateId;
     };
 
     // Per-chip placeholder cycle. New reference on each chip flip
@@ -214,7 +294,7 @@ export function NewPageClient({
                                         type="button"
                                         onClick={() => setSelectedChip(c)}
                                         className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors',
+                                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors whitespace-nowrap',
                                             active
                                                 ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
                                                 : 'border-border/60 dark:border-white/10 bg-transparent text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
@@ -233,43 +313,6 @@ export function NewPageClient({
                     </div>
                 }
             />
-
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('or')}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => {
-                            const params = new URLSearchParams({ mode: 'manual' });
-                            if (prompt.trim().length > 0) {
-                                params.set('prompt', prompt.trim().slice(0, 4000));
-                            }
-                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
-                        }}
-                    >
-                        <PenLine className="w-3.5 h-3.5" />
-                        {t('cards.manual.title')}
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => {
-                            const params = new URLSearchParams({ mode: 'import' });
-                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
-                        }}
-                    >
-                        <FolderInput className="w-3.5 h-3.5" />
-                        {t('cards.import.title')}
-                    </Button>
-                </div>
-            </div>
         </div>
     );
 }
