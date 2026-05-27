@@ -2,12 +2,9 @@ import {
     Column,
     CreateDateColumn,
     Entity,
-    JoinColumn,
-    OneToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 
 /**
  * EW-653 (Tenants & Organizations Phase 1) — internal-only scope
@@ -38,17 +35,21 @@ export class Tenant {
     id: string;
 
     /**
-     * FK back to the User that owns this Tenant. 1:1 for v1 — multi-
-     * tenant per user is a v1.1 consideration (would require dropping
-     * the UNIQUE constraint on this column). The reverse relation lives
-     * on the User entity as `tenantId` (added in Phase 2 / EW-654).
+     * FK to `users.id`. 1:1 for v1 — multi-tenant per user is a v1.1
+     * consideration (would require dropping the UNIQUE constraint on
+     * this column). The cascade ON DELETE is enforced at the DB level
+     * by the migration's `fk_tenants_owner_user` FK constraint.
+     *
+     * We intentionally do NOT declare a `@OneToOne(() => User)`
+     * relation here because importing `User` into this file creates
+     * an import cycle (User entity also imports Tenant for its
+     * `@ManyToOne(() => Tenant)` relation), which ESM / vitest crash
+     * on with "Cannot access 'User' before initialization" TDZ
+     * errors. Phase 6 services that need the owner User do an
+     * explicit `userRepository.findById(tenant.ownerUserId)` lookup.
      */
     @Column('uuid', { unique: true })
     ownerUserId: string;
-
-    @OneToOne(() => User, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'ownerUserId' })
-    ownerUser?: User;
 
     /**
      * URL-safe slug. Mirrors `users.slug` for the bare-Tenant view's URL

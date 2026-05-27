@@ -17,8 +17,15 @@ import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkMember } from './work-member.entity';
-import { Tenant } from './tenant.entity';
-import { Organization } from './organization.entity';
+// EW-654 (Tenants & Organizations Phase 2) — use `import type` for the
+// Tenant + Organization classes and STRING entity references in the
+// `@ManyToOne(...)` decorators below. This breaks the import cycle
+// (User → Tenant + Organization → ... → User) that ESM / vitest crash
+// on with "Cannot access 'User' before initialization" TDZ errors.
+// TypeORM accepts either `() => ClassRef` or `'ClassName'` as the
+// target type for `@ManyToOne` — strings carry no runtime import.
+import type { Tenant } from './tenant.entity';
+import type { Organization } from './organization.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 export interface InferredUserProfile {
@@ -252,7 +259,7 @@ export class User {
     @Column({ type: 'uuid', nullable: true })
     tenantId?: string | null;
 
-    @ManyToOne(() => Tenant, { nullable: true, onDelete: 'SET NULL' })
+    @ManyToOne('Tenant', { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'tenantId' })
     tenant?: ClassToObject<Tenant> | null;
 
@@ -266,7 +273,7 @@ export class User {
     @Column({ type: 'uuid', nullable: true })
     lastScopeOrganizationId?: string | null;
 
-    @ManyToOne(() => Organization, { nullable: true, onDelete: 'SET NULL' })
+    @ManyToOne('Organization', { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'lastScopeOrganizationId' })
     lastScopeOrganization?: ClassToObject<Organization> | null;
 

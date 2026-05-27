@@ -16,6 +16,13 @@ import { WorkSchedule } from '../../entities/work-schedule.entity';
 import { UserSubscription } from '../../entities/user-subscription.entity';
 import { SubscriptionPlan } from '../../entities/subscription-plan.entity';
 import { UsageLedgerEntry } from '../../entities/usage-ledger-entry.entity';
+// EW-654 (Tenants & Organizations Phase 2) — User now has
+// `@ManyToOne(() => Tenant)` and `@ManyToOne(() => Organization)`
+// relations, so the synchronize-based test DataSource needs both
+// referenced entities in its `entities` array or TypeORM throws
+// "Entity metadata for User#tenant was not found".
+import { Tenant } from '../../entities/tenant.entity';
+import { Organization } from '../../entities/organization.entity';
 
 describe('WorkProposal entity', () => {
     let dataSource: DataSource;
@@ -38,6 +45,9 @@ describe('WorkProposal entity', () => {
                 UserSubscription,
                 SubscriptionPlan,
                 UsageLedgerEntry,
+                // EW-654 — User references both via @ManyToOne.
+                Tenant,
+                Organization,
             ],
             synchronize: true,
         });
