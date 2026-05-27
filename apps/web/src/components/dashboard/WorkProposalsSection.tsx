@@ -6,11 +6,11 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import {
-    createIdeaAction,
     getProposalsStatusAction,
     listProposalsAction,
     refreshProposalsAction,
 } from '@/app/actions/dashboard/work-proposals';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -187,22 +187,20 @@ export function WorkProposalsSection({
         );
     };
 
+    const startFromPrompt = useStartFromPrompt();
     const handleQuickAdd = () => {
         const description = draft.trim();
         if (description.length < 10) {
             toast.error(tPage('quickAdd.minLength'));
             return;
         }
-        startCreating(async () => {
-            try {
-                const created = await createIdeaAction({ description });
-                setProposals((prev) => [created, ...prev]);
-                setDraft('');
-                setQuickAddOpen(false);
-                toast.success(tPage('toasts.ideaCreated'));
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : tPage('toasts.ideaCreateError'));
-            }
+        // Same handoff as /ideas and /missions quick-add — the prompt
+        // goes to the chat AI rather than directly creating an Idea
+        // row. The Ideas preview list below acts as the canvas.
+        startCreating(() => {
+            startFromPrompt(description, { intent: 'Idea' });
+            setDraft('');
+            setQuickAddOpen(false);
         });
     };
 

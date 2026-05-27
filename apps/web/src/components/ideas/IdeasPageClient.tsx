@@ -7,13 +7,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import {
     buildIdeaAction,
-    createIdeaAction,
     dismissProposalAction,
 } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
 import { PromptComposer } from '@/components/common/PromptComposer';
 import { PageHeader } from '@/components/common/PageHeader';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -110,21 +110,22 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         return map;
     }, [ideas]);
 
+    const startFromPrompt = useStartFromPrompt();
     const handleQuickAdd = () => {
         const description = draft.trim();
         if (description.length < 10) {
             toast.error(t('quickAdd.minLength'));
             return;
         }
-        startCreating(async () => {
-            try {
-                const created = await createIdeaAction({ description });
-                setIdeas((prev) => [created, ...prev]);
-                setDraft('');
-                toast.success(t('toasts.ideaCreated'));
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.ideaCreateError'));
-            }
+        // The quick-add composer no longer creates an Idea inline.
+        // Instead the prompt is handed off to the chat AI (which can
+        // refine the brief, suggest categories, etc); the existing
+        // Ideas list IS the canvas where the new Idea will appear
+        // once chat confirms creation. Single source of truth for
+        // "create from a prompt" lives in the chat side panel.
+        startCreating(() => {
+            startFromPrompt(description, { intent: 'Idea' });
+            setDraft('');
         });
     };
 

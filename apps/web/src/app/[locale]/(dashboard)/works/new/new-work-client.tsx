@@ -22,6 +22,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PromptComposer } from '@/components/common/PromptComposer';
 import { PageHeader } from '@/components/common/PageHeader';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -123,6 +124,15 @@ export default function NewWorkClient({
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedKind, setSelectedKind] = useState<InitialWorkKind>(initialKind ?? 'website');
     const [, startSubmit] = useTransition();
+    const startFromPrompt = useStartFromPrompt();
+
+    const WORK_KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
+        website: 'website',
+        'landing-page': 'landing page',
+        blog: 'blog',
+        directory: 'directory',
+        'awesome-repo': 'awesome list repo',
+    };
 
     const gitConnected = useMemo(() => {
         if (!selectedProviderId) return false;
@@ -141,10 +151,15 @@ export default function NewWorkClient({
             toast.error(t('promptHints.minLength'));
             return;
         }
-        // Forward both the prompt and the selected kind into the AI
-        // creator. We don't navigate to a new URL — the existing AI
-        // flow lives inside this same client component.
+        // Send the prompt into the chat AI — the chat now drives the
+        // conversation while the canvas below (the WorkAICreator form)
+        // is where the user optionally edits manually. Note we DO NOT
+        // pass `initialPrompt={prompt}` to WorkAICreator anymore: the
+        // chat carries it, the form starts empty so the user isn't
+        // re-prompted to confirm the same text twice.
         startSubmit(() => {
+            startFromPrompt(description, { intent: WORK_KIND_INTENT_LABEL[selectedKind] });
+            setPrompt('');
             setCreationMode('ai');
         });
     };
@@ -306,24 +321,25 @@ export default function NewWorkClient({
                 </div>
 
                 {(creationMode === 'ai' || creationMode === 'manual') && (
-                    /* Phase X — the previously separate "Create with AI"
-                       and "Create Manually" flows have been merged. The
-                       AI creator carries the richer surface (name +
-                       prompt + advanced AI/provider settings + example
-                       prompts + advanced overrides), which is everything
-                       the manual form covered plus the AI affordances.
-                       The user-facing distinction is just whether they
-                       arrived here by typing a prompt (ai) or by
-                       clicking "Create Work Manually" (manual). The
-                       legacy WorkManualForm path stays available as a
-                       fallback for any callers still pointing at it. */
+                    /* The previously separate "Create with AI" and
+                       "Create Manually" flows are merged here. The AI
+                       creator carries the richer surface (name + slug
+                       + prompt + advanced AI/provider settings +
+                       example prompts), which is everything the
+                       manual form covered plus the AI affordances. The
+                       user-facing distinction is just how they arrived
+                       — typing a prompt (ai) vs. clicking "Create Work
+                       Manually" (manual). When the user arrived via a
+                       prompt, the chat AI now carries the prompt text
+                       and the form starts empty so we don't re-prompt
+                       them inside the canvas. */
                     <WorkAICreator
                         gitProvider={selectedProviderId || undefined}
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
-                        initialPrompt={prompt || initialPrompt}
+                        initialPrompt={initialPrompt}
                         initialKind={selectedKind || initialKind || undefined}
                     />
                 )}

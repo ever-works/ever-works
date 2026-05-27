@@ -19,8 +19,7 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
-import { createMissionAction } from '@/app/actions/dashboard/missions';
-import { createIdeaAction } from '@/app/actions/dashboard/work-proposals';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -145,6 +144,36 @@ export interface NewPageClientProps {
     initialTemplateId?: string;
 }
 
+const CHIP_INTENT_LABEL: Record<ChipType, string> = {
+    mission: 'Mission',
+    idea: 'Idea',
+    agent: 'Agent',
+    task: 'Task',
+    website: 'website',
+    'landing-page': 'landing page',
+    blog: 'blog',
+    directory: 'directory',
+    'awesome-repo': 'awesome list repo',
+};
+
+const CHIP_TO_CANVAS_ROUTE: Partial<Record<ChipType, string>> = {
+    agent: ROUTES.DASHBOARD_AGENT_NEW,
+    task: ROUTES.DASHBOARD_TASK_NEW,
+    website: ROUTES.DASHBOARD_WORKS_NEW,
+    'landing-page': ROUTES.DASHBOARD_WORKS_NEW,
+    blog: ROUTES.DASHBOARD_WORKS_NEW,
+    directory: ROUTES.DASHBOARD_WORKS_NEW,
+    'awesome-repo': ROUTES.DASHBOARD_WORKS_NEW,
+};
+
+const CHIP_TO_WORK_KIND: Partial<Record<ChipType, string>> = {
+    website: 'website',
+    'landing-page': 'landing-page',
+    blog: 'blog',
+    directory: 'directory',
+    'awesome-repo': 'awesome-repo',
+};
+
 export function NewPageClient({
     initialType = 'mission',
     initialPrompt,
@@ -155,6 +184,7 @@ export function NewPageClient({
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedChip, setSelectedChip] = useState<ChipType>(initialType ?? 'mission');
     const [submitting, startSubmit] = useTransition();
+    const startFromPrompt = useStartFromPrompt();
 
     // Close the layout chat panel on mount so the prompt + chips
     // take the full main column. The user can reopen it from the
@@ -164,7 +194,10 @@ export function NewPageClient({
     const chat = useChatPanel();
     useEffect(() => {
         chat?.setOpen?.(false);
-    }, [chat]);
+        // We intentionally only close on mount — re-running on chat
+        // ref changes would fight the user reopening the panel.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const submit = () => {
         const description = prompt.trim();
@@ -172,52 +205,47 @@ export function NewPageClient({
             toast.error(t('hints.minLength'));
             return;
         }
-        startSubmit(async () => {
-            try {
-                if (selectedChip === 'mission') {
-                    const mission = await createMissionAction({
-                        description,
-                        type: 'one-shot',
-                        ...(initialTemplateId ? { missionTemplateRepo: initialTemplateId } : {}),
-                    });
-                    toast.success(t('toasts.missionCreated'));
-                    router.push(ROUTES.DASHBOARD_MISSION(mission.id));
-                    return;
-                }
-                if (selectedChip === 'idea') {
-                    await createIdeaAction({ description });
-                    toast.success(t('toasts.ideaCreated'));
-                    router.push(ROUTES.DASHBOARD_IDEAS);
-                    return;
-                }
-                if (selectedChip === 'agent') {
-                    // The Agent creator dialog reads `?prompt=` so the
-                    // user lands in step 2 with their description
-                    // already in the title/instructions fields.
-                    const params = new URLSearchParams({ prompt: description.slice(0, 4000) });
-                    toast.success(t('toasts.agentDraft'));
-                    router.push(`${ROUTES.DASHBOARD_AGENT_NEW}?${params.toString()}`);
-                    return;
-                }
-                if (selectedChip === 'task') {
-                    const params = new URLSearchParams({ prompt: description.slice(0, 4000) });
-                    toast.success(t('toasts.taskDraft'));
-                    router.push(`${ROUTES.DASHBOARD_TASK_NEW}?${params.toString()}`);
-                    return;
-                }
-                // The remaining 5 chip types route into the /works/new
-                // flow, which has its own kind chips + manual/import
-                // affordances.
-                const params = new URLSearchParams({
-                    mode: 'ai',
-                    kind: selectedChip,
-                    prompt: description.slice(0, 4000),
-                });
-                router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
+        startSubmit(() => {
+            // Send the prompt into the chat AI so the user can keep
+            // iterating in chat — replaces the old "submit + redirect
+            // with the same prompt pre-filled" pattern. The chat AI's
+            // currentPageUrl context tells it where the user is, and
+            // the intent prefix narrows it further.
+            startFromPrompt(description, { intent: CHIP_INTENT_LABEL[selectedChip] });
+
+            // Then navigate to the canvas for that intent. The canvas
+            // page does NOT pre-fill the prompt — the user already
+            // sent it, chat is the live channel from here on. The
+            // canvas is for optional manual editing of the entity.
+            if (selectedChip === 'mission') {
+                router.push(ROUTES.DASHBOARD_MISSIONS);
+                return;
+            }
+            if (selectedChip === 'idea') {
+                router.push(ROUTES.DASHBOARD_IDEAS);
+                return;
+            }
+            const canvasRoute = CHIP_TO_CANVAS_ROUTE[selectedChip];
+            const workKind = CHIP_TO_WORK_KIND[selectedChip];
+            if (canvasRoute && workKind) {
+                // Work canvases need `mode=ai` so /works/new skips its
+                // own composer entry view and renders the form. They
+                // also need `kind` so the AI generator hints at the
+                // right Work shape. Critically, no `prompt=` — the
+                // chat already carries it.
+                const params = new URLSearchParams({ mode: 'ai', kind: workKind });
+                router.push(`${canvasRoute}?${params.toString()}`);
+                return;
+            }
+            if (canvasRoute) {
+                router.push(canvasRoute);
+                return;
             }
         });
+        // initialTemplateId stays informational for now — Mission
+        // template-driven creation moves into the chat flow once the
+        // chat surface understands "use template <id>" intents.
+        void initialTemplateId;
     };
 
     // Per-chip placeholder cycle. New reference on each chip flip

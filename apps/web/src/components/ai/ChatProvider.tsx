@@ -300,3 +300,15 @@ export function useChatContext(): ChatContextValue {
     if (!context) throw new Error('useChatContext must be used within a ChatProvider');
     return context;
 }
+
+/**
+ * Non-throwing variant. Returns `null` outside a ChatProvider so the
+ * caller can short-circuit (e.g. previews / unit tests rendering a
+ * dashboard component without the full layout wrapper). Use this in
+ * pages that want to *optionally* drive the chat panel — anything
+ * required to function (the ChatPanel itself, the input, the
+ * history list) should keep using `useChatContext`.
+ */
+export function useChatContextOptional(): ChatContextValue | null {
+    return useContext(ChatContext);
+}
