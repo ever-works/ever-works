@@ -4644,5 +4644,13 @@
             "private": "Private",
             "public": "Public"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        }
     }
 }

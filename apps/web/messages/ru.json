@@ -4889,5 +4889,13 @@
             "private": "Приватный",
             "public": "Публичный"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        }
     }
 }

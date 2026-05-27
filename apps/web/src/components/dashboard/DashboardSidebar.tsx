@@ -39,7 +39,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { LogoEverWork, FaviconEverWork } from '../logos';
+import { FaviconEverWork } from '../logos';
+import { WorkspaceSwitcher } from '../layout/WorkspaceSwitcher';
 import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
@@ -151,12 +152,24 @@ export function DashboardSidebar({
                     )}
                 >
                     <div className="w-full relative">
+                        {/*
+                            EW-660 (Tenants & Organizations Phase 8) —
+                            the expanded sidebar swaps `<LogoEverWork>`
+                            for `<WorkspaceSwitcher>`, which itself
+                            renders the unmodified logo when the user
+                            has zero Organizations (NN #20 — extension,
+                            not replacement). The collapsed sidebar
+                            keeps the bare favicon: there's no room for
+                            a chip+chevron at 16px column width, and
+                            users in that mode already expand the
+                            sidebar before reaching for the switcher.
+                        */}
                         <div className={cn('flex items-center -ml-2')}>
-                            <FaviconEverWork
-                                config={config}
-                                className={cn(isCollapsed ? 'w-11 ml-[5px]' : 'w-12')}
-                            />
-                            <LogoEverWork config={config} className={cn(isCollapsed && 'hidden')} />
+                            {isCollapsed ? (
+                                <FaviconEverWork config={config} className={cn('w-11 ml-[5px]')} />
+                            ) : (
+                                <WorkspaceSwitcher config={config} logoClassName="" />
+                            )}
                         </div>
                         <div
                             className={cn(
