@@ -124,12 +124,16 @@ async function dropOrganizationIdColumn(
     queryRunner: QueryRunner,
     tableName: string,
 ): Promise<void> {
-    const table = await queryRunner.getTable(tableName);
+    // Re-read the table between each step — dropping an index in step 1
+    // invalidates the indices array on the snapshot, and the FK lookup
+    // in step 2 would otherwise be reading a stale view.
     const idxName = `idx_${tableName}_organization_id`;
+    let table = await queryRunner.getTable(tableName);
     if (table?.indices.some((i) => i.name === idxName)) {
         await queryRunner.dropIndex(tableName, idxName);
     }
     const fkName = `fk_${tableName}_organization`;
+    table = await queryRunner.getTable(tableName);
     const fk = table?.foreignKeys.find((f) => f.name === fkName);
     if (fk) {
         await queryRunner.dropForeignKey(tableName, fk);
@@ -140,12 +144,13 @@ async function dropOrganizationIdColumn(
 }
 
 async function dropTenantIdColumn(queryRunner: QueryRunner, tableName: string): Promise<void> {
-    const table = await queryRunner.getTable(tableName);
     const idxName = `idx_${tableName}_tenant_id`;
+    let table = await queryRunner.getTable(tableName);
     if (table?.indices.some((i) => i.name === idxName)) {
         await queryRunner.dropIndex(tableName, idxName);
     }
     const fkName = `fk_${tableName}_tenant`;
+    table = await queryRunner.getTable(tableName);
     const fk = table?.foreignKeys.find((f) => f.name === fkName);
     if (fk) {
         await queryRunner.dropForeignKey(tableName, fk);
@@ -158,10 +163,21 @@ async function dropTenantIdColumn(queryRunner: QueryRunner, tableName: string): 
 export class AddTenantIdAndOrganizationIdToTierA1779991006000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         for (const tableName of TIER_A_BOTH) {
+            // Skip silently if the table doesn't exist in this environment.
+            // Migration-only contexts (CLI / test fixtures that load a
+            // subset of the schema) may not have every Tier A table yet,
+            // and we want the migration to be a no-op in that case rather
+            // than throw mid-iteration.
+            if (!(await queryRunner.hasTable(tableName))) {
+                continue;
+            }
             await addTenantIdColumn(queryRunner, tableName);
             await addOrganizationIdColumn(queryRunner, tableName);
         }
         for (const tableName of TIER_A_TENANT_ONLY) {
+            if (!(await queryRunner.hasTable(tableName))) {
+                continue;
+            }
             await addTenantIdColumn(queryRunner, tableName);
         }
     }
@@ -169,9 +185,15 @@ export class AddTenantIdAndOrganizationIdToTierA1779991006000 implements Migrati
     public async down(queryRunner: QueryRunner): Promise<void> {
         // Reverse order so the inverse of up() is exact.
         for (const tableName of [...TIER_A_TENANT_ONLY].reverse()) {
+            if (!(await queryRunner.hasTable(tableName))) {
+                continue;
+            }
             await dropTenantIdColumn(queryRunner, tableName);
         }
         for (const tableName of [...TIER_A_BOTH].reverse()) {
+            if (!(await queryRunner.hasTable(tableName))) {
+                continue;
+            }
             await dropOrganizationIdColumn(queryRunner, tableName);
             await dropTenantIdColumn(queryRunner, tableName);
         }

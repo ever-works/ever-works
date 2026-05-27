@@ -58,6 +58,13 @@ export class WorkKnowledgeDocument {
     @JoinColumn({ name: 'workId' })
     work?: ClassToObject<Work> | null;
 
+    // EW-655 (Tenants & Organizations Phase 3) — Tier A tenant scope.
+    // organizationId already exists from earlier work (below); tenantId
+    // joins it here. Both NULL until first-Org create (Phase 6).
+    // Ordered tenantId-first to match the other 17 Tier A entities.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
     /**
      * Organization-level scope. Restricted at the service layer to
      * `kbDocumentClass IN ('legal', 'style', 'seo')` in v1 — see
@@ -65,12 +72,6 @@ export class WorkKnowledgeDocument {
      */
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
-
-    // EW-655 (Tenants & Organizations Phase 3) — Tier A tenant scope.
-    // organizationId already exists from earlier work; tenantId joins
-    // it here. Both NULL until first-Org create (Phase 6).
-    @Column({ type: 'uuid', nullable: true })
-    tenantId?: string | null;
 
     /** Forward-slash separated, relative to `.content/kb/`. e.g. `brand/voice.md`. */
     @Column({ type: 'varchar', length: 512 })
