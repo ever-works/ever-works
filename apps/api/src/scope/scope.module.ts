@@ -1,8 +1,9 @@
 import { Global, MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
-import { DatabaseModule, OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { ScopeContextService } from './scope-context.service';
 import { ScopeStampingSubscriber } from './scope-stamping.subscriber';
 import { ScopeResolverMiddleware } from './scope-resolver.middleware';
+import { ScopeOwnershipGuard } from './scope-ownership.guard';
 
 /**
  * EW-657 (Tenants & Organizations Phase 5b) — exposes
@@ -31,15 +32,19 @@ import { ScopeResolverMiddleware } from './scope-resolver.middleware';
  */
 @Global()
 @Module({
+    // DatabaseModule already provides + exports `UserRepository` and
+    // `OrganizationRepository` (via REPOSITORY_PROVIDERS), so importing
+    // it here is enough — declaring those repos in our own providers
+    // array would shadow the singleton with a fresh per-module instance.
+    // (Greptile P2 on PR #1059.)
     imports: [DatabaseModule],
     providers: [
         ScopeContextService,
         ScopeStampingSubscriber,
-        UserRepository,
-        OrganizationRepository,
         ScopeResolverMiddleware,
+        ScopeOwnershipGuard,
     ],
-    exports: [ScopeContextService],
+    exports: [ScopeContextService, ScopeOwnershipGuard],
 })
 export class ScopeModule implements NestModule {
     /**

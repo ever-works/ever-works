@@ -110,6 +110,25 @@ describe('ScopeResolverMiddleware (EW-659 Phase 7)', () => {
             expect(scope).toEqual({ tenantId: 't-2', organizationId: 'o-2' });
         });
 
+        it('handles array-valued X-Scope-Slug from upstream proxies (Greptile P2)', async () => {
+            organizationRepository.findBySlug.mockResolvedValueOnce({
+                id: 'o-3',
+                tenantId: 't-3',
+                slug: 'acme',
+            });
+
+            const { scope } = await runWithCapture({
+                params: {},
+                headers: { 'x-scope-slug': ['acme', 'evilcorp'] },
+            });
+
+            // First non-empty entry wins; silently dropping the
+            // array would let an attacker bypass scope resolution by
+            // sending two values.
+            expect(organizationRepository.findBySlug).toHaveBeenCalledWith('acme');
+            expect(scope).toEqual({ tenantId: 't-3', organizationId: 'o-3' });
+        });
+
         it('URL :slug param takes precedence over X-Scope-Slug header', async () => {
             organizationRepository.findBySlug.mockResolvedValueOnce({
                 id: 'o-from-param',

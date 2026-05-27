@@ -88,15 +88,24 @@ export class ScopeResolverMiddleware implements NestMiddleware {
      * Pulls the slug from the URL `:slug` route param first, then
      * from the `X-Scope-Slug` header. Normalizes whitespace + empty
      * strings to `null`.
+     *
+     * Handles array-valued headers (HTTP proxies + load balancers
+     * sometimes merge duplicate `X-Scope-Slug` values into a `string[]`
+     * — Express surfaces them as-is). Take the first non-empty entry;
+     * silently dropping the header would let an attacker bypass scope
+     * resolution by sending two values. (Greptile P2 on PR #1059.)
      */
     private extractSlug(req: MiddlewareRequest): string | null {
         const fromParam = req.params.slug;
         if (typeof fromParam === 'string' && fromParam.trim().length > 0) {
             return fromParam.trim();
         }
-        const fromHeader = req.headers['x-scope-slug'];
-        if (typeof fromHeader === 'string' && fromHeader.trim().length > 0) {
-            return fromHeader.trim();
+        const headerValue = req.headers['x-scope-slug'];
+        const headerStr = Array.isArray(headerValue)
+            ? headerValue.find((v) => typeof v === 'string' && v.trim().length > 0)
+            : headerValue;
+        if (typeof headerStr === 'string' && headerStr.trim().length > 0) {
+            return headerStr.trim();
         }
         return null;
     }
