@@ -51,16 +51,18 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
 }
 
 describe('NewPageClient (Phase 6.5 PR CC2 + UI polish)', () => {
-    it('renders all 7 chips in the spec order: Mission, Idea, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
+    it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
             container.querySelectorAll('button[aria-pressed]'),
         ) as HTMLButtonElement[];
-        expect(chipButtons).toHaveLength(7);
+        expect(chipButtons).toHaveLength(9);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
             'dashboard.newPage.chips.mission',
             'dashboard.newPage.chips.idea',
+            'dashboard.newPage.chips.agent',
+            'dashboard.newPage.chips.task',
             'dashboard.newPage.chips.website',
             'dashboard.newPage.chips.landing-page',
             'dashboard.newPage.chips.blog',

@@ -17,18 +17,18 @@ import { listAstTemplates } from '@/lib/api/agent-templates';
 
 type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
 
+export interface ScopeParentOption {
+    id: string;
+    label: string;
+}
+
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 5. 2-step create form per
- * UX-DESIGN §10. Step 1 picks a scope, step 2 collects a name +
- * optional title. Defaults the rest from CreateAgentDto so the
- * server can fill in the safe permissions baseline.
- *
- * For Mission/Work/Idea scopes the form leaves the parent ID
- * picker as a TODO — v1 only ships tenant-scope from the +New
- * page; scope-bound Agents are typically created from inside the
- * parent's detail screen (Mission tab strip, etc.) in later
- * phases. Picking a non-tenant scope here surfaces a "coming
- * soon" hint so the user knows where to find it.
+ * UX-DESIGN §10. Step 1 picks a scope (now including
+ * Mission/Work/Idea — when the page passes the corresponding
+ * catalog lists), step 2 collects a name + optional title.
+ * Defaults the rest from CreateAgentDto so the server can fill in
+ * the safe permissions baseline.
  */
 export interface NewAgentDialogPinnedScope {
     scope: Exclude<AgentScope, 'tenant'>;
@@ -39,10 +39,7 @@ export interface NewAgentDialogPinnedScope {
     parentLabel?: string;
 }
 
-export function NewAgentDialog({
-    createAgent,
-    pinned,
-}: {
+export interface NewAgentDialogProps {
     createAgent: CreateAgentFn;
     /**
      * FU-3 — when set, the scope picker (step 1) is skipped and the
@@ -52,12 +49,29 @@ export function NewAgentDialog({
      * step 2 with the parent already chosen.
      */
     pinned?: NewAgentDialogPinnedScope;
-}) {
+    /** Catalogs surfaced for the scope-parent picker on step 1.
+     *  Empty lists collapse the corresponding scope to a "no
+     *  candidates yet" hint without breaking the flow. */
+    missions?: ScopeParentOption[];
+    works?: ScopeParentOption[];
+    ideas?: ScopeParentOption[];
+}
+
+export function NewAgentDialog({
+    createAgent,
+    pinned,
+    missions = [],
+    works = [],
+    ideas = [],
+}: NewAgentDialogProps) {
     const t = useTranslations('dashboard.agentsPage.newDialog');
     const router = useRouter();
     const searchParams = useSearchParams();
     const [step, setStep] = useState<1 | 2>(pinned ? 2 : 1);
     const [scope, setScope] = useState<AgentScope>(pinned?.scope ?? 'tenant');
+    const [parentId, setParentId] = useState<string>(
+        pinned?.missionId ?? pinned?.workId ?? pinned?.ideaId ?? '',
+    );
     const [name, setName] = useState('');
     const [title, setTitle] = useState('');
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
@@ -92,30 +106,70 @@ export function NewAgentDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
-    // FU-3 — non-tenant scopes are now reachable from the parent
-    // detail screens (Mission tab strip, Work layout, Idea detail).
-    // Each of those routes mounts the dialog with `pinned` set, which
-    // skips Step 1 entirely. The tenant-only `/agents/new` page still
-    // exposes only the tenant option here.
+    // Pre-fill from `?prompt=` (global `/new` page hands off the
+    // user's free-text description as the Agent's name/title).
+    useEffect(() => {
+        const promptParam = searchParams?.get('prompt');
+        if (!promptParam) return;
+        const trimmed = promptParam.trim();
+        if (!trimmed) return;
+        const firstBreak = trimmed.indexOf('\n');
+        const candidateName =
+            firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 80).trim();
+        const candidateTitle =
+            firstBreak > 0
+                ? trimmed.slice(firstBreak + 1).trim().slice(0, 120)
+                : trimmed.length > 80
+                  ? trimmed.slice(0, 120)
+                  : '';
+        if (!name && candidateName) setName(candidateName);
+        if (!title && candidateTitle) setTitle(candidateTitle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
     const scopeChoices: Array<{
         value: AgentScope;
         label: string;
         desc: string;
         disabled?: boolean;
+        emptyHint?: string;
     }> = [
         { value: 'tenant', label: t('scopeTenantDesc'), desc: t('scopeTenantDesc') },
         {
             value: 'mission',
             label: t('scopeMissionDesc'),
             desc: t('scopeMissionDesc'),
-            disabled: true,
+            disabled: false,
+            emptyHint: missions.length === 0 ? t('noMissions') : undefined,
         },
-        { value: 'work', label: t('scopeWorkDesc'), desc: t('scopeWorkDesc'), disabled: true },
-        { value: 'idea', label: t('scopeIdeaDesc'), desc: t('scopeIdeaDesc'), disabled: true },
+        {
+            value: 'work',
+            label: t('scopeWorkDesc'),
+            desc: t('scopeWorkDesc'),
+            disabled: false,
+            emptyHint: works.length === 0 ? t('noWorks') : undefined,
+        },
+        {
+            value: 'idea',
+            label: t('scopeIdeaDesc'),
+            desc: t('scopeIdeaDesc'),
+            disabled: false,
+            emptyHint: ideas.length === 0 ? t('noIdeas') : undefined,
+        },
     ];
+
+    const parentOptions =
+        scope === 'mission' ? missions : scope === 'work' ? works : scope === 'idea' ? ideas : [];
+
+    const canAdvance =
+        scope === 'tenant' || (!!parentId && parentOptions.some((o) => o.id === parentId));
 
     const handleSubmit = () => {
         if (!name.trim()) return;
+        if (scope !== 'tenant' && !parentId) {
+            setError(t('parentRequired'));
+            return;
+        }
         setError(null);
         startTransition(() => {
             void (async () => {
@@ -126,9 +180,10 @@ export function NewAgentDialog({
                         title: title.trim() || null,
                         // FU-3 — when the dialog is pinned to a parent
                         // entity, forward the matching id to the API.
-                        missionId: pinned?.missionId,
-                        workId: pinned?.workId,
-                        ideaId: pinned?.ideaId,
+                        missionId:
+                            pinned?.missionId ?? (scope === 'mission' ? parentId : undefined),
+                        workId: pinned?.workId ?? (scope === 'work' ? parentId : undefined),
+                        ideaId: pinned?.ideaId ?? (scope === 'idea' ? parentId : undefined),
                     });
                     router.push(ROUTES.DASHBOARD_AGENT(created.id));
                 } catch (err) {
@@ -159,7 +214,11 @@ export function NewAgentDialog({
                             <li key={c.value}>
                                 <button
                                     type="button"
-                                    onClick={() => !c.disabled && setScope(c.value)}
+                                    onClick={() => {
+                                        if (c.disabled) return;
+                                        setScope(c.value);
+                                        if (c.value === 'tenant') setParentId('');
+                                    }}
                                     disabled={c.disabled}
                                     className={`w-full text-left rounded-lg border p-3 transition-colors ${
                                         scope === c.value
@@ -174,15 +233,50 @@ export function NewAgentDialog({
                                         {c.desc}
                                         {c.disabled ? ' — coming soon' : ''}
                                     </div>
+                                    {c.emptyHint && scope === c.value && (
+                                        <div className="mt-1 text-xs text-warning">
+                                            {c.emptyHint}
+                                        </div>
+                                    )}
                                 </button>
                             </li>
                         ))}
                     </ul>
+
+                    {scope !== 'tenant' && parentOptions.length > 0 && (
+                        <div className="mt-4">
+                            <label
+                                htmlFor="agent-scope-parent"
+                                className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1"
+                            >
+                                {t('parentLabel', { scope })}
+                            </label>
+                            <select
+                                id="agent-scope-parent"
+                                value={parentId}
+                                onChange={(e) => setParentId(e.target.value)}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            >
+                                <option value="">{t('parentPlaceholder')}</option>
+                                {parentOptions.map((opt) => (
+                                    <option key={opt.id} value={opt.id}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-end gap-2 mt-6">
                         <Button variant="ghost" size="sm" onClick={() => router.back()}>
                             {t('cancel')}
                         </Button>
-                        <Button size="sm" onClick={() => setStep(2)} className="gap-1.5">
+                        <Button
+                            size="sm"
+                            onClick={() => setStep(2)}
+                            disabled={!canAdvance}
+                            className="gap-1.5"
+                        >
                             {t('next')}
                             <ChevronRight className="w-3.5 h-3.5" />
                         </Button>
@@ -206,6 +300,17 @@ export function NewAgentDialog({
                                     </span>
                                 </>
                             ) : null}
+                        </div>
+                    )}
+                    {!pinned && scope !== 'tenant' && parentId && (
+                        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            <span className="font-medium text-text dark:text-text-dark capitalize">
+                                {scope}
+                            </span>{' '}
+                            scope —{' '}
+                            <span className="font-medium text-text dark:text-text-dark">
+                                {parentOptions.find((o) => o.id === parentId)?.label}
+                            </span>
                         </div>
                     )}
                     <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">

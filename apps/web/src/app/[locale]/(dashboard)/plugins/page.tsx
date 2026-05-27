@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Puzzle } from 'lucide-react';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { PluginsList } from '@/components/plugins/PluginsList';
+import { PageHeader } from '@/components/common/PageHeader';
 import { getTranslations } from 'next-intl/server';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,10 +20,12 @@ export default async function PluginsPage() {
 
     return (
         <div className="w-full overflow-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
-                <p className="text-text-muted dark:text-text-muted-dark mt-2">{t('subtitle')}</p>
-            </div>
+            <PageHeader
+                icon={Puzzle}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="info"
+            />
 
             <PluginsList
                 plugins={pluginsData.plugins}

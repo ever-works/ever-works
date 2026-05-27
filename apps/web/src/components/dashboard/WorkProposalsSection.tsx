@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { Loader2, Plus, RefreshCw, Settings as SettingsIcon, Sparkles } from 'lucide-react';
+import { Lightbulb, Loader2, Plus, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
@@ -226,11 +226,13 @@ export function WorkProposalsSection({
     return (
         <section className="mt-8" aria-labelledby="work-proposals-heading">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
+                        <Lightbulb className="w-4 h-4 text-warning" />
+                    </div>
                     <h2
                         id="work-proposals-heading"
-                        className="text-xl font-semibold text-text dark:text-text-dark"
+                        className="text-xl font-semibold text-text dark:text-text-dark truncate"
                     >
                         {username ? t('header.titleWithName', { username }) : t('header.title')}
                     </h2>
@@ -322,7 +324,7 @@ export function WorkProposalsSection({
                             type="button"
                             onClick={handleRefresh}
                             disabled={pendingRefresh || researching}
-                            className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
                             {pendingRefresh || researching ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -331,6 +333,21 @@ export function WorkProposalsSection({
                             )}
                             {t('actions.refresh')}
                         </button>
+                    )}
+
+                    {/* View all (n) — moved into the header row so the
+                        section reads icon → title → actions → counts on
+                        one line, matching the Works section below. */}
+                    {totalVisible > 0 && (
+                        <Link
+                            href={ROUTES.DASHBOARD_IDEAS}
+                            className={cn(
+                                'text-sm font-medium text-primary hover:underline whitespace-nowrap',
+                                'inline-flex items-center gap-1',
+                            )}
+                        >
+                            {tPage('viewAll', { n: totalVisible })}
+                        </Link>
                     )}
                 </div>
             </div>
@@ -435,23 +452,6 @@ export function WorkProposalsSection({
                 </div>
             )}
 
-            {/* Phase 5 PR O — "View all (N)" link. Always rendered
-                when there's ≥1 Idea; the count reflects whatever's
-                currently visible after toggles. Wires to the
-                full /ideas catalog (PR N). */}
-            {totalVisible > 0 && (
-                <div className="mt-4 flex justify-end">
-                    <Link
-                        href={ROUTES.DASHBOARD_IDEAS}
-                        className={cn(
-                            'text-sm font-medium text-primary hover:underline',
-                            'inline-flex items-center gap-1',
-                        )}
-                    >
-                        {tPage('viewAll', { n: totalVisible })}
-                    </Link>
-                </div>
-            )}
         </section>
     );
 }

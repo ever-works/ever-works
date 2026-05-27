@@ -63,7 +63,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref,
     ) => {
         const classes = cn(
-            'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition-colors',
+            'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-colors',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             buttonVariants[variant],
             buttonSizes[size],

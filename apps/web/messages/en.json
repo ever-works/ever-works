@@ -573,7 +573,7 @@
         "agentsPage": {
             "title": "Agents",
             "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole tenant.",
-            "newAgent": "+ New Agent",
+            "newAgent": "New Agent",
             "empty": {
                 "title": "No Agents yet.",
                 "subtitle": "Create your first Agent to delegate recurring work. Tenant-scope Agents act across your whole account; Mission- or Work-scoped ones stay focused on a single target."
@@ -611,6 +611,12 @@
                 "scopeMissionDesc": "Locked to one Mission",
                 "scopeWorkDesc": "Locked to one Work",
                 "scopeIdeaDesc": "Locked to one Idea",
+                "parentLabel": "Pick a {scope}",
+                "parentPlaceholder": "Select…",
+                "parentRequired": "Pick a parent to continue.",
+                "noMissions": "You don't have any Missions yet — create one to scope an Agent here.",
+                "noWorks": "You don't have any Works yet — create one to scope an Agent here.",
+                "noIdeas": "You don't have any Ideas yet — add one to scope an Agent here.",
                 "cancel": "Cancel",
                 "back": "Back",
                 "next": "Next",
@@ -625,7 +631,7 @@
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
             },
             "list": {
-                "newTask": "+ New Task",
+                "newTask": "New Task",
                 "kanban": "Kanban",
                 "list": "List",
                 "filter": {
@@ -3272,13 +3278,15 @@
         },
         "newPage": {
             "title": "Start something new",
-            "subtitle": "Tell the agent what you want to build. Pick a kind below to bias the result, or jump into the manual flow.",
+            "subtitle": "Tell the agent what you want to build. Pick a kind below to bias the result.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
             "chips": {
                 "mission": "Mission",
                 "idea": "Idea",
+                "agent": "Agent",
+                "task": "Task",
                 "website": "Website",
                 "landing-page": "Landing Page",
                 "blog": "Blog",
@@ -3288,6 +3296,8 @@
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
                 "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole tenant.",
+                "task": "A trackable item assigned to a person or an Agent.",
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
@@ -3303,6 +3313,8 @@
             "toasts": {
                 "missionCreated": "Mission created",
                 "ideaCreated": "Idea added",
+                "agentDraft": "Opening Agent setup — finish to create.",
+                "taskDraft": "Opening Task setup — finish to create.",
                 "submitError": "Couldn't create. Please try again."
             },
             "cards": {
@@ -3325,8 +3337,32 @@
         },
         "workCreation": {
             "title": "New Work",
-            "subtitle": "Choose how you'd like to start your Work",
+            "subtitle": "Describe what you want to build, or jump into manual setup or import an existing repo.",
             "backToOptions": "Back to options",
+            "promptLabel": "What kind of Work do you want to build?",
+            "or": "or",
+            "kinds": {
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "kindDescriptions": {
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+            },
+            "promptHints": {
+                "minLength": "Add a description (at least 10 characters) to start.",
+                "submitTitle": "Create with AI"
+            },
+            "buttons": {
+                "manual": "Create Work Manually",
+                "import": "Import Existing Work"
+            },
             "sidebar": {
                 "selectedProvider": "Git Provider",
                 "selectedDeployProvider": "Deploy Provider"

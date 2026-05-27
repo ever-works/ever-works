@@ -11,7 +11,8 @@ import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState
 import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { toast } from 'sonner';
-import { Download, Loader2 } from 'lucide-react';
+import { Activity as ActivityIcon, Download, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
@@ -330,31 +331,29 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-text-muted dark:text-text-muted-dark mt-1">
-                        {t('subtitle')}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <ViewModeSwitch
-                        mode={viewMode}
-                        onChange={handleViewModeChange}
-                        cardLabel={t('viewMode.table')}
-                        kanbanLabel={t('viewMode.board')}
-                    />
-                    <button
-                        onClick={handleExport}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                        {t('actions.export')}
-                    </button>
-                </div>
-            </div>
+            <PageHeader
+                icon={ActivityIcon}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="primary"
+                actions={
+                    <>
+                        <ViewModeSwitch
+                            mode={viewMode}
+                            onChange={handleViewModeChange}
+                            cardLabel={t('viewMode.table')}
+                            kanbanLabel={t('viewMode.board')}
+                        />
+                        <button
+                            onClick={handleExport}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            {t('actions.export')}
+                        </button>
+                    </>
+                }
+            />
 
             <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
                 {summaryCards.map((card) => {

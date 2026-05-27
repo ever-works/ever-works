@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react';
 import { skillsAPI } from '@/lib/api/skills';
 import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
 import { SkillsPageClient } from '@/components/skills/SkillsPageClient';
+import { PageHeader } from '@/components/common/PageHeader';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.skillsPage');
@@ -34,19 +35,12 @@ export default async function SkillsPage() {
 
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
-            <div className="flex items-start gap-3 mb-6">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-success" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 max-w-2xl">
-                        {t('subtitle')}
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                icon={Sparkles}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="success"
+            />
             <SkillsPageClient installed={installed.data ?? []} catalog={catalog.entries ?? []} />
         </div>
     );

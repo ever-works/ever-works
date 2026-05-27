@@ -13,6 +13,7 @@ import {
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
 import { PromptComposer } from '@/components/common/PromptComposer';
+import { PageHeader } from '@/components/common/PageHeader';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -164,80 +165,77 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             {/* Header — title + subtitle take the full row width and
                 the gears menu floats to the far right so the subtitle
                 isn't truncated next to it. */}
-            <div className="flex items-start gap-3 mb-6">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                    <Lightbulb className="w-4 h-4 text-warning" />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                        {t('subtitle')}
-                    </p>
-                </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="ml-auto shrink-0 gap-1.5"
-                            aria-label={t('gears.menuLabel')}
-                        >
-                            <SettingsIcon className="w-4 h-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuLabel>{t('gears.menuLabel')}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            onClick={() => router.push('/settings/work-agent#auto-generate-ideas')}
-                        >
-                            <a
-                                href="/settings/work-agent#auto-generate-ideas"
-                                className="w-full text-left"
-                                onClick={(e) => e.preventDefault()}
+            <PageHeader
+                icon={Lightbulb}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="warning"
+                actions={
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="shrink-0 gap-1.5"
+                                aria-label={t('gears.menuLabel')}
                             >
-                                {t('gears.autoGenerate')}
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => router.push('/settings/work-agent#auto-build-works')}
-                        >
-                            <a
-                                href="/settings/work-agent#auto-build-works"
-                                className="w-full text-left"
-                                onClick={(e) => e.preventDefault()}
+                                <SettingsIcon className="w-4 h-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                            <DropdownMenuLabel>{t('gears.menuLabel')}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    router.push('/settings/work-agent#auto-generate-ideas')
+                                }
                             >
-                                {t('gears.autoBuild')}
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => router.push('/settings/work-agent#auto-retry')}
-                        >
-                            <a
-                                href="/settings/work-agent#auto-retry"
-                                className="w-full text-left"
-                                onClick={(e) => e.preventDefault()}
+                                <a
+                                    href="/settings/work-agent#auto-generate-ideas"
+                                    className="w-full text-left"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    {t('gears.autoGenerate')}
+                                </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => router.push('/settings/work-agent#auto-build-works')}
                             >
-                                {t('gears.autoRetry')}
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => router.push('/settings/work-agent#account-budgets')}
-                        >
-                            <a
-                                href="/settings/work-agent#account-budgets"
-                                className="w-full text-left"
-                                onClick={(e) => e.preventDefault()}
+                                <a
+                                    href="/settings/work-agent#auto-build-works"
+                                    className="w-full text-left"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    {t('gears.autoBuild')}
+                                </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => router.push('/settings/work-agent#auto-retry')}
                             >
-                                {t('gears.accountBudgets')}
-                            </a>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+                                <a
+                                    href="/settings/work-agent#auto-retry"
+                                    className="w-full text-left"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    {t('gears.autoRetry')}
+                                </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => router.push('/settings/work-agent#account-budgets')}
+                            >
+                                <a
+                                    href="/settings/work-agent#account-budgets"
+                                    className="w-full text-left"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    {t('gears.accountBudgets')}
+                                </a>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                }
+            />
 
             {/* Quick add — shared composer matches the marketing site. */}
             <div className="mb-6">

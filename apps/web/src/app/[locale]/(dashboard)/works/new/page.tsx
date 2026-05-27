@@ -10,12 +10,11 @@ import {
     type WebsiteTemplateOption,
 } from '@/lib/api';
 import { redirect } from 'next/navigation';
-import NewWorkClient from './new-work-client';
+import NewWorkClient, { type CreationMode } from './new-work-client';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { ROUTES } from '@/lib/constants';
-import type { CreationMode } from '@/components/works/CreationBlockTrio';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');

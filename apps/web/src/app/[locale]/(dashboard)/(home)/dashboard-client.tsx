@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { GET_WORK_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { FolderKanban } from 'lucide-react';
 import type { Work } from '@/lib/api';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import type { Mission } from '@/lib/api/missions';
@@ -124,14 +125,19 @@ export default function DashboardClient({
                 <div className="@3xl/main:col-span-3">
                     {hasWorks ? (
                         <>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {t('works.recent')}
-                                </h2>
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="shrink-0 w-9 h-9 rounded-lg bg-accent-indigo/10 border border-accent-indigo/20 flex items-center justify-center">
+                                        <FolderKanban className="w-4 h-4 text-accent-indigo" />
+                                    </div>
+                                    <h2 className="text-xl font-semibold text-text dark:text-text-dark truncate">
+                                        {t('works.recent')}
+                                    </h2>
+                                </div>
                                 {totalWorks > 5 && (
                                     <Link
                                         href={ROUTES.DASHBOARD_WORKS}
-                                        className="text-sm text-primary hover:text-primary-hover transition-colors"
+                                        className="text-sm text-primary hover:text-primary-hover transition-colors whitespace-nowrap"
                                     >
                                         {t('works.viewAll', { count: totalWorks })}
                                     </Link>

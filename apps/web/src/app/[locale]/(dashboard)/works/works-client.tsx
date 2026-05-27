@@ -14,6 +14,8 @@ import { getWorkStats } from '@/app/actions/dashboard/works';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { FolderKanban } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 300;
@@ -227,43 +229,40 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
 
     return (
         <div className="w-full">
-            <div className="mb-8 flex flex-col gap-4 @lg/main:flex-row @lg/main:items-start @lg/main:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                        {t('subtitle')}
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    {summaryCards.map((card) => (
-                        <div
-                            key={card.label}
-                            className={cn(
-                                'rounded-lg border px-3 py-2 bg-card dark:bg-card-primary-dark text-left min-w-[120px]',
-                                'border-border dark:border-border-dark transition-colors',
-                                card.active &&
-                                    'border-primary/40 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]',
-                            )}
-                        >
-                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                {card.label}
-                            </p>
-                            <p
+            <PageHeader
+                icon={FolderKanban}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="accent"
+                actions={
+                    <div className="flex flex-wrap gap-2">
+                        {summaryCards.map((card) => (
+                            <div
+                                key={card.label}
                                 className={cn(
-                                    'mt-1 text-lg font-semibold',
-                                    card.accent,
-                                    card.active && 'animate-pulse',
+                                    'rounded-lg border px-3 py-2 bg-card dark:bg-card-primary-dark text-left min-w-[120px]',
+                                    'border-border dark:border-border-dark transition-colors',
+                                    card.active &&
+                                        'border-primary/40 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]',
                                 )}
                             >
-                                {card.value.toLocaleString()}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                                <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                    {card.label}
+                                </p>
+                                <p
+                                    className={cn(
+                                        'mt-1 text-lg font-semibold',
+                                        card.accent,
+                                        card.active && 'animate-pulse',
+                                    )}
+                                >
+                                    {card.value.toLocaleString()}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                }
+            />
 
             {/* Search and Actions Bar */}
             <div className="flex flex-col @sm/main:flex-row gap-4 mb-8">
