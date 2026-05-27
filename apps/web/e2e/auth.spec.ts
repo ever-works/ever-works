@@ -43,10 +43,15 @@ test.describe('Registration', () => {
         // Submit
         await page.locator('button[type="submit"]').click();
 
-        // Should redirect to dashboard (any /en path that isn't an auth page)
-        await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-            timeout: 120_000,
-        });
+        // Should redirect to dashboard. Accept both legacy `/en/<path>`
+        // and the canonical unprefixed `/<path>` introduced by PR #1052
+        // (`localePrefix: 'never'`). Anchored at the protocol+host
+        // boundary so the auth-page exclusion lookahead fires against
+        // the actual pathname.
+        await page.waitForURL(
+            /^https?:\/\/[^/]+(?:\/en)?(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+            { timeout: 120_000 },
+        );
         await expect(page).not.toHaveURL(/\/register/);
     });
 

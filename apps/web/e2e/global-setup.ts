@@ -44,12 +44,18 @@ setup('authenticate', async ({ page, baseURL }) => {
     await page.locator('input[name="password"]').fill(TEST_USER.password);
     await page.locator('button[type="submit"]').click();
 
-    // Wait for successful redirect to dashboard. The regex matches `/en`, `/en/`,
-    // `/en?...`, or `/en/<dashboard-path>` — but NOT `/en/login` or other auth pages
-    // (so we don't accidentally consider the still-on-login state as success).
-    await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-        timeout: 120_000,
-    });
+    // Wait for successful redirect to dashboard. After PR #1052 dropped
+    // the URL-level locale prefix (`localePrefix: 'never'`), the legacy
+    // `/en/...` paths still 307-redirect to the unprefixed equivalents,
+    // so this regex accepts BOTH shapes — `/en/<path>` for any test that
+    // happens to land mid-redirect, and the canonical unprefixed
+    // `/<path>` for everything else. We anchor at the protocol+host
+    // boundary so the path-specific lookahead actually fires against
+    // the URL pathname, not a stray substring.
+    await page.waitForURL(
+        /^https?:\/\/[^/]+(?:\/en)?(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+        { timeout: 120_000 },
+    );
 
     // Verify we're authenticated
     await expect(page).not.toHaveURL(/\/login/);
