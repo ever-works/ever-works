@@ -4,7 +4,7 @@ import { ClaimForm } from '@/components/claim/ClaimForm';
 
 export const metadata: Metadata = { title: 'Claim invitation' };
 
-type Params = { params: Promise<{ token: string; locale: string }> };
+type Params = { params: Promise<{ token: string }> };
 
 type LoadOutcome = { ok: true; preview: ClaimPreview } | { ok: false; error: string };
 
@@ -19,7 +19,7 @@ async function loadPreview(token: string): Promise<LoadOutcome> {
 }
 
 export default async function ClaimPage({ params }: Params) {
-    const { token, locale } = await params;
+    const { token } = await params;
     const outcome = await loadPreview(token);
 
     if (!outcome.ok) {
@@ -71,7 +71,7 @@ export default async function ClaimPage({ params }: Params) {
                     ) : null}
                 </div>
 
-                <ClaimForm token={token} locale={locale} preview={outcome.preview} />
+                <ClaimForm token={token} preview={outcome.preview} />
 
                 <p className="text-xs text-text-secondary text-center">
                     Expires {new Date(outcome.preview.expiresAt).toLocaleString()}

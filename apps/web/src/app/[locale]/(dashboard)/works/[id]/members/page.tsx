@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 
-type Params = { params: Promise<{ id: string; locale: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 export default async function LegacyMembersRedirect({ params }: Params) {
-    const { id, locale } = await params;
-    redirect(`/${locale}/works/${id}/settings/members`);
+    const { id } = await params;
+    redirect(`/works/${id}/settings/members`);
 }
