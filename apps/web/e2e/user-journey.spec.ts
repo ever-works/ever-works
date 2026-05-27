@@ -34,10 +34,12 @@ test.describe('Complete user journey', () => {
         await page.locator('#terms').check();
         await page.locator('button[type="submit"]').click();
 
-        // Should arrive at dashboard (any /en path that isn't an auth page)
-        await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-            timeout: 60_000,
-        });
+        // Should arrive at dashboard. Match both legacy `/en/<path>`
+        // and the canonical unprefixed `/<path>` shape (PR #1052).
+        await page.waitForURL(
+            /^https?:\/\/[^/]+(?:\/en)?(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+            { timeout: 60_000 },
+        );
 
         // ---- Step 2: Navigate to create work ----
         // Pre-dismiss the onboarding wizard so the modal doesn't intercept clicks.

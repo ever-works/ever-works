@@ -54,20 +54,23 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         });
     }
 
-    test('sidebar shows "Works" nav item with /en/works href', async ({ page }) => {
+    test('sidebar shows "Works" nav item with /works href', async ({ page }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const worksLink = page.locator('a[href="/en/works"]').first();
-        await expect(worksLink, 'sidebar /en/works link present').toBeVisible({ timeout: 10_000 });
+        // PR #1052 dropped the URL-level locale prefix — match both the
+        // canonical `/works` and the legacy `/en/works` so this stays
+        // green across the cutover.
+        const worksLink = page.locator('a[href="/works"], a[href="/en/works"]').first();
+        await expect(worksLink, 'sidebar Works link present').toBeVisible({ timeout: 10_000 });
     });
 
     test('sidebar "New Work" CTA is present', async ({ page }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const newWorkLink = page.locator('a[href="/en/works/new"]').first();
-        await expect(newWorkLink, 'sidebar /en/works/new CTA present').toBeVisible({
+        const newWorkLink = page.locator('a[href="/works/new"], a[href="/en/works/new"]').first();
+        await expect(newWorkLink, 'sidebar New Work CTA present').toBeVisible({
             timeout: 10_000,
         });
     });
@@ -137,21 +140,24 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
-        const worksLink = page.locator('a[href="/en/works"]').first();
+        // PR #1052 dropped the URL-level locale prefix, so sidebar
+        // links render as `/works` (not `/en/works`). Match both shapes
+        // so this spec stays green across the cutover.
+        const worksLink = page.locator('a[href="/works"], a[href="/en/works"]').first();
         await expect(worksLink).toBeVisible({ timeout: 10_000 });
         await worksLink.click();
-        await page.waitForURL(/\/en\/works(\?|$|\/)/, { timeout: 30_000 });
-        expect(page.url()).toMatch(/\/en\/works/);
+        await page.waitForURL(/(?:\/en)?\/works(\?|$|\/)/, { timeout: 30_000 });
+        expect(page.url()).toMatch(/(?:\/en)?\/works/);
     });
 
-    test('clicking sidebar "New Work" link navigates to /en/works/new', async ({ page }) => {
+    test('clicking sidebar "New Work" link navigates to /works/new', async ({ page }) => {
         test.setTimeout(60_000);
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
-        const newWorkLink = page.locator('a[href="/en/works/new"]').first();
+        const newWorkLink = page.locator('a[href="/works/new"], a[href="/en/works/new"]').first();
         await expect(newWorkLink).toBeVisible({ timeout: 10_000 });
         await newWorkLink.click();
-        await page.waitForURL(/\/en\/works\/new/, { timeout: 30_000 });
+        await page.waitForURL(/(?:\/en)?\/works\/new/, { timeout: 30_000 });
     });
 });
