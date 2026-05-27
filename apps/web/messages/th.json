@@ -4889,5 +4889,13 @@
             "private": "ส่วนตัว",
             "public": "สาธารณะ"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        }
     }
 }

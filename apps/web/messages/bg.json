@@ -4825,5 +4825,13 @@
             "private": "Частен",
             "public": "Публичен"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        }
     }
 }

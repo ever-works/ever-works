@@ -4889,5 +4889,13 @@
             "private": "Privato",
             "public": "Pubblico"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        }
     }
 }
