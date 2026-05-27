@@ -164,9 +164,7 @@ export function WorksCreateComposer() {
                         variant="secondary"
                         size="sm"
                         className="gap-1.5"
-                        onClick={() =>
-                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?mode=manual`)
-                        }
+                        onClick={() => router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?mode=manual`)}
                     >
                         <PenLine className="w-3.5 h-3.5" />
                         {t('buttons.manual')}
@@ -176,9 +174,7 @@ export function WorksCreateComposer() {
                         variant="secondary"
                         size="sm"
                         className="gap-1.5"
-                        onClick={() =>
-                            router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?mode=import`)
-                        }
+                        onClick={() => router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?mode=import`)}
                     >
                         <FolderInput className="w-3.5 h-3.5" />
                         {t('buttons.import')}

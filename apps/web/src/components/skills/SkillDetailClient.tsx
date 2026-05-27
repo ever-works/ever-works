@@ -252,9 +252,7 @@ function BindingsPanel({
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
-                        {targetType === 'tenant'
-                            ? 'Target (auto-filled)'
-                            : `Pick a ${targetType}`}
+                        {targetType === 'tenant' ? 'Target (auto-filled)' : `Pick a ${targetType}`}
                     </label>
                     <SkillBindingTargetPicker
                         targetType={targetType}
