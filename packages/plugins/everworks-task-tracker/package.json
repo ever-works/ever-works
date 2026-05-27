@@ -42,6 +42,7 @@
 			"id": "everworks-task-tracker",
 			"name": "Ever Works Task Tracker",
 			"category": "utility",
+			"description": "Ever Works Task Tracker — first-party task-tracker plugin backing the platform's own DB-stored Tasks family.",
 			"capabilities": [
 				"task-tracker"
 			],

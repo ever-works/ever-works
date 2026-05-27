@@ -1,18 +1,24 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
-import { DEFAULT_LOCALE, PUBLIC_ROUTES, REDIRECT_SEARCH_PARAM, ROUTES } from './lib/constants';
+import { LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
 import { getAuthFromCookie } from './lib/auth';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
+// next-intl persists the active locale in this cookie when `localePrefix:
+// 'never'` is set. We read/write it directly when redirecting legacy
+// `/<locale>/...` URLs so the user keeps the language they were using.
+const NEXT_LOCALE_COOKIE = 'NEXT_LOCALE';
+const LOCALE_SET = new Set<string>(LOCALES);
+
 // Baseline security headers, duplicated from `next.config.ts headers()`
 // so they're applied unconditionally — every response the proxy returns
 // flows through `applySecurityHeaders` before leaving the function. The
 // config-headers path skips some dev-server code paths (the csp-strict
-// e2e contract was seeing the CSP header missing on /en/login), this
+// e2e contract was seeing the CSP header missing on /login), this
 // proxy-level write is the belt-and-braces guarantee.
 const STATIC_SECURITY_HEADERS: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
@@ -67,38 +73,79 @@ function isPublicRoute(pathname: string): boolean {
     });
 }
 
-function redirect(locale: string, to: string, req: NextRequest) {
-    const url = locale ? `/${locale}${to}` : to;
+/**
+ * Strip a legacy `/<locale>/...` prefix from a pathname.
+ *
+ * Until 2026-05 the app served every route under `/<locale>/...` (default
+ * `localePrefix: 'always'`). The platform is a SaaS app behind auth, so
+ * those URLs leaked the user's UI language into every shareable link.
+ * We switched to `localePrefix: 'never'` and the locale now lives in the
+ * `NEXT_LOCALE` cookie — but existing bookmarks (`/en/works`,
+ * `/fr/dashboard`, …) still hit the app. Redirect them to the
+ * unprefixed equivalent and seed the cookie so the user keeps the
+ * language they had.
+ *
+ * Returns `null` when the path has no locale segment.
+ */
+function detectLegacyLocalePrefix(pathname: string): { locale: string; rest: string } | null {
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return null;
 
-    return NextResponse.redirect(new URL(url, req.url));
+    const first = segments[0];
+    if (!LOCALE_SET.has(first)) return null;
+
+    const rest = '/' + segments.slice(1).join('/');
+    return { locale: first, rest: rest === '/' ? '/' : rest };
 }
 
 export default async function proxy(req: NextRequest) {
-    const originalPathname = req.nextUrl.pathname;
+    const pathname = req.nextUrl.pathname;
 
+    // 1) Legacy `/en/works` → `/works` redirect for old bookmarks.
+    //    - `307` (not the cache-eligible `308`): the redirect's correctness
+    //      depends on the `Set-Cookie` side-effect firing on the next visit
+    //      too, so we must not let browsers / CDNs short-circuit it.
+    //    - `Cache-Control: no-store` belt-and-braces against any
+    //      intermediary that would still treat the response as cacheable.
+    //    - Only seed `NEXT_LOCALE` when the user has NO existing
+    //      preference: clicking a shared `/en/...` link should NOT
+    //      silently flip an existing French user back to English.
+    const legacy = detectLegacyLocalePrefix(pathname);
+    if (legacy) {
+        const target = new URL(req.url);
+        target.pathname = legacy.rest;
+        const response = NextResponse.redirect(target, 307);
+        response.headers.set('Cache-Control', 'no-store');
+        if (!req.cookies.has(NEXT_LOCALE_COOKIE)) {
+            response.cookies.set(NEXT_LOCALE_COOKIE, legacy.locale, {
+                path: '/',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 * 365,
+            });
+        }
+        return applySecurityHeaders(response);
+    }
+
+    // 2) Let next-intl resolve the locale from the cookie / Accept-Language.
+    //    In `localePrefix: 'never'` mode this rewrites the request
+    //    internally (the visible URL stays unprefixed).
     const intlResponse = await nextIntlMiddleware(req);
 
-    const segments = originalPathname.split('/').filter(Boolean);
-    let maybeLocale = segments[0];
-    const hasLocale = routing.locales.includes(maybeLocale as any);
-
-    maybeLocale = hasLocale ? maybeLocale : DEFAULT_LOCALE;
-    const pathname = hasLocale ? `/${segments.slice(1).join('/')}` : originalPathname;
-
-    // Allow public routes
+    // 3) Public routes need no auth check.
     if (isPublicRoute(pathname)) {
         return applySecurityHeaders(intlResponse);
     }
 
-    // Static assets and API routes should pass through
+    // 4) Static assets and API routes pass through.
     if (pathname.startsWith('/_next') || pathname.startsWith('/api/') || pathname.includes('.')) {
         return applySecurityHeaders(intlResponse);
     }
 
-    // Check authentication
+    // 5) Auth gate — unauthenticated users go to /login (no locale prefix).
     const auth = await getAuthFromCookie().catch(() => null);
     if (!auth) {
-        const response = redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
+        const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
+        const response = NextResponse.redirect(loginUrl);
 
         if (req.cookies.has(AUTH_COOKIE_NAME)) {
             response.cookies.delete(AUTH_COOKIE_NAME);

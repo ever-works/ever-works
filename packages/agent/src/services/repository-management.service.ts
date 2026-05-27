@@ -14,6 +14,31 @@ export interface RepositoryStatus {
     exists: boolean;
 }
 
+/**
+ * Read/update visibility status for the three repos a Work owns on its
+ * git provider — the data repo (`.content` source), the main work repo
+ * (`.works` config), and the website repo (deployed site).
+ *
+ * Two contracts worth knowing:
+ *
+ * - **Status is best-effort with default-safe fallback.**
+ *   `getRepositoriesStatus` fans out across the three repos in parallel
+ *   and on *any* error from the provider (404, 500, network, auth)
+ *   treats the repo as `{ exists: false, isPrivate: true }`. The
+ *   `isPrivate: true` default is deliberate — `false` would leak a
+ *   "looks public" status if the provider call merely failed, which
+ *   could mislead operators into not noticing a real visibility
+ *   misconfiguration. The inline `// Ignore 404, treat as not exists`
+ *   comment understates the catch's actual scope: anything that throws
+ *   is silently swallowed.
+ *
+ * - **Visibility cache is opportunistically refreshed.** The result is
+ *   compared against the work's stored `repoVisibility` and the DB row
+ *   is only written when one of the three flags changed. This is a
+ *   read path that occasionally writes; callers in tight loops should
+ *   prefer `Work.repoVisibility` directly rather than re-issuing
+ *   `getRepositoriesStatus()` per render.
+ */
 @Injectable()
 export class RepositoryManagementService {
     private readonly logger = new Logger(RepositoryManagementService.name);
@@ -49,7 +74,9 @@ export class RepositoryManagementService {
                         };
                     }
                 } catch (error) {
-                    // Ignore 404, treat as not exists
+                    // Swallows ANY error (not just 404) — see class JSDoc.
+                    // Default-safe fallback (isPrivate: true) below ensures
+                    // we never report a transient failure as "public".
                 }
                 return {
                     type: repo.type,

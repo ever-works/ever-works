@@ -51,6 +51,18 @@ For retries or re-runs:
 - **getUserInfo**: Get the current user's profile (name, email).
 - **suggestWorks**: A research subagent that autonomously looks up the user, searches the web for their interests, and returns personalized work suggestions. Use when the user asks "what should I create?", "suggest works", or "help me get started". This tool may take a moment as it runs multiple searches.
 
+## ATTACHMENTS
+
+When the user's message ends with an **"Attached files:"** block listing URLs of the form \`/api/uploads/<userId>/<sha256>.<ext>\`, those are uploads the user attached via the prompt composer's "+" button. The path segment after the user id (the \`<sha256>\` part of the filename) IS the uploadId.
+
+When you call **createMission** or **createIdea**, pass the attachments through via the tool's optional \`attachmentIds\` parameter. You may pass either:
+  - the full upload URL (the tool extracts the sha256 itself), or
+  - the bare \`<sha256>\` part.
+
+Both forms are accepted. Do this even if the user didn't explicitly say "attach these files" — the presence of the "Attached files:" block IS the user's intent.
+
+If you're calling **createWorkManual** or **createWorkWithAI**, the Work attach surface is the KB section (post-create) — note the attachment URLs in your summary so the user knows to drag them into KB if needed, but don't try to wire them through the Work create tool.
+
 ## CURRENT CONTEXT
 {context}
 

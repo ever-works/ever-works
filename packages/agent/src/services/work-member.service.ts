@@ -42,6 +42,48 @@ export interface InviteMemberResult {
     work: Work;
 }
 
+/**
+ * Membership operations for a Work (invite, role change, remove, leave).
+ *
+ * **Behavioural notes worth flagging for reviewers:**
+ *
+ *   - **`inviteMember` is a soft user-enumeration vector.** A
+ *     missing email throws 404 "User with email 'X' not found",
+ *     which lets any user with `canManageMembers` rights on any
+ *     Work probe whether arbitrary emails are registered. That's
+ *     a manager-only attack surface (small blast radius), but if
+ *     this endpoint ever becomes accessible to a wider tier OR
+ *     the rate limit is loosened, fold both the "user not found"
+ *     and "user not invitable" paths into a single generic
+ *     response (e.g. always return `202 Accepted` and email the
+ *     invitee if they exist; quietly drop otherwise — the
+ *     classic "we sent an email IF the address was valid"
+ *     pattern). Same class of concern as the template's
+ *     credentials path.
+ *
+ *   - **`getMember` / `listMembers` expose every member's email
+ *     to anyone with view rights.** Currently view rights include
+ *     `viewer` role, so a low-trust collaborator can harvest the
+ *     full member roster. If `viewer` ever becomes a public-link
+ *     surface, gate the email column behind a stronger role.
+ *
+ *   - **`ASSIGNABLE_MEMBER_ROLES` excludes `creator`.** The
+ *     creator role cannot be set via this service — ownership
+ *     transfer must go through a dedicated flow (audited,
+ *     two-party). Don't extend `assignMember` to accept
+ *     `creator` without also doing that ceremony.
+ *
+ *   - **`leaveWork` refuses for the creator.** Creator must
+ *     either transfer ownership or delete the work; they can't
+ *     orphan themselves out of it.
+ *
+ *   - **`toDto` falls back to `'Unknown'` / `''`** if the user
+ *     relation is missing (e.g. user soft-deleted but member row
+ *     intact). Surfaces will silently render "Unknown" rather
+ *     than 404 — visually mild but obscures dangling-FK data
+ *     integrity issues. Worth a periodic cleanup job rather
+ *     than relying on the fallback as the long-term answer.
+ */
 @Injectable()
 export class WorkMemberService {
     constructor(

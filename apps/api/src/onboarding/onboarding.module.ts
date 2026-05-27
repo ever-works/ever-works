@@ -26,9 +26,10 @@ import { OnboardingCatalogService } from './onboarding-catalog.service';
 import { OnboardingTelemetryController } from './onboarding-telemetry.controller';
 import { ClaimController } from './claim.controller';
 import { AuthModule } from '../auth';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-    imports: [FacadesModule, DatabaseModule, WorkModule, AuthModule],
+    imports: [FacadesModule, DatabaseModule, WorkModule, AuthModule, UsersModule],
     controllers: [
         OnboardingController,
         WellKnownController,

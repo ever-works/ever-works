@@ -7,6 +7,7 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    BeforeInsert,
 } from 'typeorm';
 import type { ClassToObject } from './types';
 import { TimestampColumn, PortableDateColumn } from './_types';
@@ -16,6 +17,15 @@ import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkMember } from './work-member.entity';
+// EW-654 (Tenants & Organizations Phase 2) — use `import type` for the
+// Tenant + Organization classes and STRING entity references in the
+// `@ManyToOne(...)` decorators below. This breaks the import cycle
+// (User → Tenant + Organization → ... → User) that ESM / vitest crash
+// on with "Cannot access 'User' before initialization" TDZ errors.
+// TypeORM accepts either `() => ClassRef` or `'ClassName'` as the
+// target type for `@ManyToOne` — strings carry no runtime import.
+import type { Tenant } from './tenant.entity';
+import type { Organization } from './organization.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 export interface InferredUserProfile {
@@ -36,8 +46,27 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    // EW-652 (Tenants & Organizations Phase 0): username uniqueness is enforced
+    // ONLY by the case-insensitive expression UNIQUE index on `lower(username)`
+    // in migration `1779991000000-AddUniqueIndexToUsername.ts`. Do NOT add
+    // `unique: true` here — the column-level UNIQUE would generate a
+    // case-sensitive constraint that conflicts with the expression index
+    // (two different UNIQUE indexes covering the same column) and can confuse
+    // schema-sync tooling.
     @Column()
     username: string;
+
+    // EW-652: URL-safe denormalized form of `username`, used by the slug
+    // routing layer (EW-659 Phase 7). Always lowercase, matches `[a-z0-9-]+`.
+    // Uniqueness is enforced by `idx_users_slug_unique` in migration
+    // `1779991001000-AddSlugToUsers.ts`. Same rationale as `username` above —
+    // we keep the column declaration plain and let the migration own the
+    // UNIQUE constraint. Future rename flows (out of scope for v1 — spec
+    // says no slug_redirects table) are responsible for explicitly updating
+    // BOTH `username` AND `slug` when a user renames; the `@BeforeInsert`
+    // hook below only fires on INSERT.
+    @Column()
+    slug: string;
 
     // EW-617 G2: anonymous (zero-friction) users have no email/password until
     // they claim the account via POST /api/auth/claim. Existing rows keep
@@ -217,7 +246,82 @@ export class User {
     @JoinColumn({ name: 'defaultPlanId' })
     defaultPlan?: ClassToObject<SubscriptionPlan> | null;
 
+    /**
+     * EW-654 (Tenants & Organizations Phase 2) — FK to the user's
+     * Tenant. NULL until the user creates their first Organization
+     * (Phase 6 lazy-create fills this in). Set on every row going
+     * forward; row-level scoping for new inserts lands in Phase 5.
+     *
+     * `onDelete: 'SET NULL'` matches the migration's FK behaviour —
+     * deleting a Tenant un-scopes the User row rather than cascading
+     * the User itself.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @ManyToOne('Tenant', { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'tenantId' })
+    tenant?: ClassToObject<Tenant> | null;
+
+    /**
+     * EW-654 — pointer to the user's currently-active Organization
+     * (NULL means "default to bare-Tenant view on next login"). The
+     * WorkspaceSwitcher (Phase 8) persists this on every scope
+     * switch; the Phase 6 first-Org "Upgrade" branch sets it to the
+     * new Org's id so the next login lands in the Org's scope.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    lastScopeOrganizationId?: string | null;
+
+    @ManyToOne('Organization', { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'lastScopeOrganizationId' })
+    lastScopeOrganization?: ClassToObject<Organization> | null;
+
     local: boolean = false;
+
+    /**
+     * EW-652 (Tenants & Organizations Phase 0) — auto-derive `slug` from
+     * `username` at insert time if the caller didn't set it explicitly.
+     *
+     * This means every existing `userRepository.create({ username, ... })`
+     * call site continues to work without modification: the slug is
+     * derived in-memory before the row hits the DB. Callers that want
+     * an explicit slug (e.g. `UsernameAllocatorService.allocateUsername`
+     * pipelines) can still set `slug` directly and this hook is a no-op.
+     *
+     * Normalization is the same shape as `UsernameAllocatorService.normalize`
+     * — lowercase, replace any non-`[a-z0-9-]` with hyphen, collapse runs,
+     * trim leading/trailing hyphens. If the result is empty (degenerate
+     * username), we fall back to `u-anon` which is guaranteed to collide
+     * with at most one other unset row; the DB UNIQUE constraint will
+     * catch any race.
+     *
+     * The hook only fires on INSERT — not on UPDATE. Username renames go
+     * through a service layer (out of scope here) that explicitly updates
+     * both columns.
+     *
+     * Visibility: NOT `private` — a private method gets stripped from
+     * `ClassToObject<User>` (the mapped type doesn't see private members),
+     * which breaks downstream consumers that pass `ClassToObject<User>`
+     * where a `User` is expected (e.g. lazy-loaded relations). Same shape
+     * as the public `asCommitter()` method below.
+     */
+    @BeforeInsert()
+    deriveSlugIfMissing(): void {
+        if (this.slug) {
+            return;
+        }
+        if (!this.username) {
+            this.slug = 'u-anon';
+            return;
+        }
+        const normalized = this.username
+            .toLowerCase()
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        this.slug = normalized.length > 0 ? normalized : 'u-anon';
+    }
 
     asCommitter(): { name: string; email: string } {
         // Anonymous users have null email; only happens before claim-account.

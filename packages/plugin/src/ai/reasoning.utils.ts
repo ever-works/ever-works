@@ -67,8 +67,19 @@ function findReasoningConfig(model?: string): ReasoningConfig | undefined {
 }
 
 /**
- * Get reasoning model kwargs for a given provider type and model.
- * Returns undefined if no reasoning config is needed.
+ * Resolve provider-specific reasoning kwargs for a given model.
+ *
+ * Matches the model name against the `REASONING_MODELS` registry and, on a hit,
+ * returns the slice of config that belongs to `providerType`. Any provider not
+ * known to the registry returns `undefined` — callers should treat that as
+ * "no reasoning features for this model on this provider" and fall back to the
+ * provider's default request shape.
+ *
+ * @param providerType - Provider name. Recognised values: `openai`, `openrouter`, `google`, `groq`.
+ * @param model - Model identifier. May be bare (`gpt-5`) or namespaced (`openai/gpt-5`); the
+ *   namespace prefix is stripped before lookup.
+ * @returns Provider-specific reasoning kwargs, or `undefined` if the model is not in the
+ *   reasoning registry or the provider is unknown.
  */
 export function getReasoningConfig(providerType: string, model?: string): Record<string, unknown> | undefined {
 	const config = findReasoningConfig(model);
@@ -89,7 +100,13 @@ export function getReasoningConfig(providerType: string, model?: string): Record
 }
 
 /**
- * Provider-specific reasoning config getters (for backward compatibility)
+ * Provider-specific reasoning-config getters (for backward compatibility).
+ *
+ * Each helper is a thin wrapper that resolves the model against the reasoning
+ * registry and returns just that provider's slice of config — convenient when
+ * the caller is already locked to one provider and does not need the
+ * dispatcher in `getReasoningConfig`. All return `undefined` when the model is
+ * not a reasoning model on that provider.
  */
 export function getOpenAIReasoningConfig(
 	model?: string

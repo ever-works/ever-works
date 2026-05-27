@@ -36,6 +36,9 @@ export * from './webhook-subscription.entity';
 export * from './webhook-delivery.entity';
 export * from './work-proposal.entity';
 export * from './mission.entity';
+// Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653.
+export * from './tenant.entity';
+export * from './organization.entity';
 export * from './work-agent-preference.entity';
 export * from './work-agent-goal.entity';
 export * from './work-agent-run.entity';
@@ -66,3 +69,6 @@ export * from './task-attachment.entity';
 export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
 export * from './user-task-counter.entity';
+export * from './mission-attachment.entity';
+export * from './work-proposal-attachment.entity';
+export * from './agent-attachment.entity';

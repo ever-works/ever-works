@@ -22,6 +22,27 @@ export function deduplicateByField<T extends { [K in F]?: string | null | undefi
 	return Array.from(map.values());
 }
 
+/**
+ * Reduce a URL to a canonical form for duplicate detection (NOT for
+ * navigation — the output drops scheme and `www.` so it isn't a real URL).
+ *
+ * Transformations, in order:
+ * 1. lowercase + trim
+ * 2. strip `http://` / `https://`
+ * 3. strip leading `www.`
+ * 4. strip trailing slash(es)
+ * 5. **strip GitHub branch paths** — `/tree/<branch>/...` and
+ *    `/blob/<branch>/...` are removed so `github.com/foo/bar`,
+ *    `github.com/foo/bar/tree/main`, and
+ *    `github.com/foo/bar/blob/main/README.md` all collapse to the
+ *    same canonical `github.com/foo/bar`. This is intentional —
+ *    consumers should treat any deep link into a repo as a duplicate
+ *    of the repo itself when ingesting items.
+ * 6. strip fragments (`#...`)
+ * 7. strip `/index.html|htm|php|asp|aspx` filenames
+ *
+ * Returns `''` for empty / falsy input.
+ */
 export function normalizeUrl(url: string): string {
 	if (!url) return '';
 
@@ -36,6 +57,30 @@ export function normalizeUrl(url: string): string {
 		.replace(/\/index\.(html?|php|aspx?)$/, '');
 }
 
+/**
+ * Reduce an item name to a canonical form for duplicate detection.
+ *
+ * **Aggressive** — designed to catch near-duplicates with cosmetic
+ * differences ("React.js v18.2", "React Framework", "react"), not to
+ * produce a human-readable label. Transformations, in order:
+ * 1. lowercase
+ * 2. **strip trailing version tags** — ` v1`, ` 1.0`, ` 2.0.3`, etc.
+ *    are removed so the same item across releases collapses to one
+ *    name.
+ * 3. replace non-word non-space chars with space (drops punctuation)
+ * 4. collapse runs of whitespace
+ * 5. **strip noise-token suffixes** — the words `js`, `javascript`,
+ *    `library`, `framework`, `tool`, `app`, `application` are
+ *    removed wherever they appear. So "React.js Framework" and
+ *    "React" collapse to "react". DO NOT add the project's own
+ *    item-type vocabulary to this list without checking — it'd
+ *    erase legitimately distinct items.
+ * 6. trim
+ *
+ * Returns `''` for empty / falsy input. The output is never shown
+ * to users — it lives only as a Map key in
+ * {@link createItemLookupIndex} / {@link isItemDuplicate}.
+ */
 export function normalizeItemName(name: string): string {
 	if (!name) return '';
 

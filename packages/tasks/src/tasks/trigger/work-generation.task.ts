@@ -6,6 +6,29 @@ import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrator
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { createTaskContext } from '../../trigger/worker/utils/task-context.utils';
 
+/**
+ * Trigger.dev background task that drives the long-running work-generation
+ * pipeline.
+ *
+ * Runs for up to 5 hours (`maxDuration: 18000s`) and is invoked from both
+ * ad-hoc user actions and scheduled syncs (`payload.triggerSource`).
+ * Delegates the actual pipeline to {@link TriggerGenerationOrchestrator} via
+ * `withWorkerContext` / `createTaskContext` so each task instance gets its own
+ * Nest application context.
+ *
+ * Callback semantics:
+ * - `run`: executes the pipeline; on `triggerSource === 'schedule'` updates
+ *   the schedule run via `WorkScheduleService.markRunCompleted` (or
+ *   `markRunFailed('cancelled')` if the orchestrator returned CANCELLED).
+ * - `onFailure`: routes the error through `normalizeGeneratorError`, calls
+ *   `orchestrator.handleFailure`, and marks the schedule run failed.
+ * - `onCancel`: calls `orchestrator.handleCancellation` and marks the
+ *   schedule run failed with reason `'cancelled'`.
+ *
+ * Both callbacks are best-effort — if booting the app context throws, we
+ * swallow and move on (already-logged elsewhere) rather than crashing the
+ * Trigger.dev worker.
+ */
 export const workGenerationTask = task<'work-generation', WorkGenerationPayload>({
     id: 'work-generation',
     maxDuration: 3600 * 5, // 5 hours

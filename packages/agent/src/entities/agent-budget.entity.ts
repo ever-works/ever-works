@@ -68,6 +68,14 @@ export class AgentBudget {
     @Column({ type: 'boolean', default: false })
     allowOverage: boolean;
 
+    // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
+    // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    organizationId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

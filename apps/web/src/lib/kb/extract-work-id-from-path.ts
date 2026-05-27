@@ -14,14 +14,14 @@
  * for the agent's KB grounding — so reading it here is symmetric
  * and avoids invasive plumbing.
  *
- * Path shape: `/<locale>/works/<id>/...` (the dashboard route
- * group `(dashboard)/works/[id]/...` mounts under the locale
- * segment). The locale segment isn't validated here — any
- * single-segment prefix is allowed so the helper survives locale
- * changes / future route shuffles.
+ * Path shape (current): `/works/<id>/...` — the platform serves the
+ * dashboard without a locale prefix (`localePrefix: 'never'`).
+ * Path shape (legacy, still accepted): `/<locale>/works/<id>/...` —
+ * any older bookmark / cached path that still carries the prefix
+ * resolves the same way, so the helper survives the migration.
  *
  * Returns `null` for:
- *  - any path NOT matching `/<seg>/works/<id>/...`,
+ *  - any path NOT matching one of the two shapes above,
  *  - the `/works` index without an id,
  *  - non-string input,
  *  - paths where the captured id is empty / whitespace-only.
@@ -31,11 +31,12 @@
  */
 
 /**
- * Match `/<locale>/works/<id>` optionally followed by `/...` or end.
- * The id capture excludes `/` so nested KB paths (`/kb/brand/voice`)
- * don't accidentally claim a multi-segment id.
+ * Match either `/works/<id>` (current, unprefixed) or
+ * `/<locale>/works/<id>` (legacy, locale-prefixed) optionally followed
+ * by `/...` or end. The id capture excludes `/` so nested KB paths
+ * (`/kb/brand/voice`) don't accidentally claim a multi-segment id.
  */
-const WORK_PATH_RE = /^\/[^/]+\/works\/([^/?#]+)(?:[/?#]|$)/;
+const WORK_PATH_RE = /^(?:\/[^/]+)?\/works\/([^/?#]+)(?:[/?#]|$)/;
 
 export function extractWorkIdFromPath(pathname: string | null | undefined): string | null {
     if (typeof pathname !== 'string') return null;

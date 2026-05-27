@@ -10,6 +10,29 @@ type CacheOptions = {
     isGlobal?: boolean;
 };
 
+/**
+ * Wire either an in-process or a DB-backed cache into a Nest module.
+ *
+ * **Pick the right variant for the consistency you need:**
+ *
+ *   - **`InMemory()`** — default cache-manager LRU, per-process. Cheap
+ *     and synchronous. In a multi-pod deployment each pod has its
+ *     OWN cache; writes from one pod don't reach the others, and
+ *     invalidations only invalidate locally. Same horizontal-scaling
+ *     gotcha as the template's `session-cache` and `category-file`.
+ *     Use only for caches that tolerate per-pod drift (e.g. memoised
+ *     expensive computations where staleness is harmless).
+ *
+ *   - **`TypeORM({...})`** — backed by the `cache_entries` table via
+ *     {@link TypeORMKeyvAdapter}. Survives restart, shared across
+ *     pods. Pays one Postgres round-trip per get/set. Use when
+ *     cross-pod consistency or restart-durability matters (the
+ *     distributed-task-lock service sits on this same table).
+ *
+ *   - **`isGlobal: true`** registers the cache module globally so
+ *     child modules don't need to re-import it. Convenience flag,
+ *     no security implications.
+ */
 export const CacheFactory = {
     InMemory() {
         return CacheModule.register();

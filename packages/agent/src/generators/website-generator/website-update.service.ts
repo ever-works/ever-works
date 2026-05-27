@@ -100,8 +100,15 @@ export class WebsiteUpdateService {
 
         let updateResult: { method: string; message: string; commitSha?: string };
 
+        // Update cascade: try the duplicate method first (clone original,
+        // replace remote — fastest and preserves git history); on failure
+        // fall back to the template method (clone both, copy files —
+        // slower but works when the upstream has diverged in ways
+        // duplicate can't reconcile). `updateFork` (defined below) is
+        // intentionally NOT in this cascade — fork creation is handled
+        // at create time by the website-generator, and re-forking an
+        // already-customised work would clobber the user's changes.
         try {
-            // If fork fails, try duplicate method (clone original, replace remote)
             await this.updateDuplicate(work, user, branch);
             updateResult = {
                 method: 'duplicate',
@@ -112,7 +119,6 @@ export class WebsiteUpdateService {
             this.logger.warn(`Duplicate update failed: ${error.message}`);
 
             try {
-                // If duplicate fails, try template method (clone both, replace files)
                 await this.updateTemplate(work, user, branch);
                 updateResult = {
                     method: 'create-using-template',

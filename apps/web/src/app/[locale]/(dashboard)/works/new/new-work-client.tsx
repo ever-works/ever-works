@@ -1,20 +1,94 @@
-﻿'use client';
+'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { WorkAICreator } from '@/components/works/WorkAICreator';
-import { WorkManualForm } from '@/components/works/WorkManualForm';
 import { WorkImportForm } from '@/components/works/WorkImportForm';
-import { CreationBlockTrio, type CreationMode } from '@/components/works/CreationBlockTrio';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import {
+    BookOpen,
+    Building2,
+    Files,
+    FolderInput,
+    FolderKanban,
+    FolderOpen,
+    Globe,
+    PenLine,
+    Star,
+    Store,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+    PromptComposer,
+    buildAttachmentRefs,
+    type ComposerAttachment,
+} from '@/components/common/PromptComposer';
+import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
+import { PageHeader } from '@/components/common/PageHeader';
+import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
+export type CreationMode = 'ai' | 'manual' | 'import';
+
 type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+
+const WORK_KIND_ORDER: InitialWorkKind[] = [
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+];
+
+const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
+    website: Globe,
+    'landing-page': Files,
+    blog: BookOpen,
+    // Distinct icon from `landing-page` — Greptile P2: shared `Files`
+    // makes the two chips visually indistinguishable in the chip row.
+    directory: FolderOpen,
+    'awesome-repo': Star,
+};
+
+const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
+    website: [
+        'e.g. "Modern website for a boutique design studio with case studies and a contact form"',
+        'e.g. "Marketing site for a B2B SaaS with pricing, integrations, and a documentation hub"',
+        'e.g. "Portfolio for a freelance photographer with galleries by genre and testimonials"',
+        'e.g. "Five-page site for my dentist practice with services, team, and online booking"',
+    ],
+    'landing-page': [
+        'e.g. "Waitlist landing page for an AI customer-support copilot with a hero demo and FAQ"',
+        'e.g. "Product launch page for noise-cancelling earbuds with specs, video, and pre-order CTA"',
+        'e.g. "Lead-magnet landing page for a free SaaS pricing benchmark report"',
+        'e.g. "Webinar registration page with speaker bios, agenda, and a countdown timer"',
+    ],
+    blog: [
+        'e.g. "Personal blog about indie game development with postmortems and tooling tags"',
+        'e.g. "Engineering blog with RSS, code-highlighting, author pages, and OG previews"',
+        'e.g. "AI research summaries blog — daily 200-word paper rundowns with citations"',
+        'e.g. "Founder journal — weekly progress logs tagged for revenue, hiring, product"',
+    ],
+    directory: [
+        'e.g. "Directory of AI coding assistants with reviews, pricing tiers, and editor compatibility"',
+        'e.g. "Directory of agent skills for Claude Code — categories, install instructions, demos"',
+        'e.g. "Directory of remote-first companies with timezone overlap, perks, and stack tags"',
+        'e.g. "Directory of climate-tech startups by sub-sector with funding stage and team size"',
+    ],
+    'awesome-repo': [
+        'e.g. "Awesome list of React state-management libraries with benchmarks and trade-offs"',
+        'e.g. "Awesome list of TypeScript ESLint rules with examples and when-to-disable guidance"',
+        'e.g. "Awesome list of self-hostable open-source SaaS alternatives — categorized + docker-ready"',
+        'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
+    ],
+};
 
 interface NewWorkClientProps {
     user: AuthUser;
@@ -56,30 +130,150 @@ export default function NewWorkClient({
     );
     const t = useTranslations('dashboard.workCreation');
 
+    // Composer state used by the entry view (creationMode === null).
+    const [prompt, setPrompt] = useState(initialPrompt ?? '');
+    const [selectedKind, setSelectedKind] = useState<InitialWorkKind>(initialKind ?? 'website');
+    const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
+    const [, startSubmit] = useTransition();
+    const startFromPrompt = useStartFromPrompt();
+
+    const WORK_KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
+        website: 'website',
+        'landing-page': 'landing page',
+        blog: 'blog',
+        directory: 'directory',
+        'awesome-repo': 'awesome list repo',
+    };
+
     const gitConnected = useMemo(() => {
         if (!selectedProviderId) return false;
         const selected = providers.find((p) => p.provider.id === selectedProviderId);
         return selected?.connectionInfo?.connected ?? false;
     }, [selectedProviderId, providers]);
 
-    if (creationMode === null) {
-        return (
-            <div className="w-full">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-text-secondary dark:text-text-secondary-dark mt-2">
-                        {t('subtitle')}
-                    </p>
-                </div>
+    const placeholderExamples = useMemo(
+        () => PLACEHOLDERS_BY_KIND[selectedKind] ?? PLACEHOLDERS_BY_KIND.website,
+        [selectedKind],
+    );
 
-                {/* Phase 6.5 PR CC1 — extracted to a shared component
-                    so Phase 6.5 PR CC2's unified `/new` page can
-                    render the same trio with the alternate label set.
-                    Byte-identical render to the inline implementation
-                    per Decision A11. */}
-                <CreationBlockTrio onSelect={setCreationMode} />
+    // Full work-kind chip catalog. `store` + `company` are inert "Soon"
+    // chips (roadmap, not shipped) appended after the live kinds so they
+    // match the marketing site's chip catalog without breaking the
+    // existing /works/new kind picker behavior.
+    const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
+        () => [
+            ...WORK_KIND_ORDER.map((k) => ({
+                value: k,
+                label: t(`kinds.${k}`),
+                Icon: WORK_KIND_ICONS[k],
+            })),
+            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
+        ],
+        [t],
+    );
+
+    const submitPrompt = () => {
+        const description = prompt.trim();
+        if (description.length < 10) {
+            toast.error(t('promptHints.minLength'));
+            return;
+        }
+        // Send the prompt into the chat AI — the chat now drives the
+        // conversation while the canvas below (the WorkAICreator form)
+        // is where the user optionally edits manually. Note we DO NOT
+        // pass `initialPrompt={prompt}` to WorkAICreator anymore: the
+        // chat carries it, the form starts empty so the user isn't
+        // re-prompted to confirm the same text twice.
+        startSubmit(() => {
+            startFromPrompt(description, {
+                intent: WORK_KIND_INTENT_LABEL[selectedKind],
+                attachments: buildAttachmentRefs(attachments),
+            });
+            setPrompt('');
+            setCreationMode('ai');
+        });
+    };
+
+    if (creationMode === null) {
+        // Entry view — prompt + kind chips + manual/import affordances.
+        // Mirrors the global `/new` page but with Work-only chips
+        // (no Mission/Idea) so the user can stay focused on a Work.
+        return (
+            <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-6">
+                <PageHeader
+                    icon={FolderKanban}
+                    title={t('title')}
+                    subtitle={t('subtitle')}
+                    tone="accent"
+                />
+
+                <PromptComposer
+                    inputId="new-work-prompt"
+                    value={prompt}
+                    onChange={setPrompt}
+                    onSubmit={submitPrompt}
+                    placeholderExamples={placeholderExamples}
+                    rows={5}
+                    ariaLabel={t('promptLabel')}
+                    submitTitle={t('promptHints.submitTitle')}
+                    testId="new-work-prompt"
+                    onAttachmentsChange={setAttachments}
+                    // /works/new is the surface where importing an
+                    // existing GitHub repo as a Work makes sense.
+                    showImportGithubRepo
+                    chipsBelow={
+                        <div className="space-y-2">
+                            <PromptChipsRow
+                                chips={workKindChips}
+                                value={selectedKind}
+                                onChange={(next) => {
+                                    // `store` and `company` are inert "Soon"
+                                    // chips and never get emitted — narrow
+                                    // back to InitialWorkKind before
+                                    // persisting.
+                                    if (next === null || next === 'store' || next === 'company') {
+                                        return;
+                                    }
+                                    setSelectedKind(next);
+                                }}
+                                ariaLabel={t('promptLabel')}
+                                testIdPrefix="new-work-kind"
+                            />
+                            <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t(`kindDescriptions.${selectedKind}`)}
+                            </p>
+                        </div>
+                    }
+                />
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('or')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setCreationMode('manual')}
+                        >
+                            <PenLine className="w-3.5 h-3.5" />
+                            {t('buttons.manual')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setCreationMode('import')}
+                        >
+                            <FolderInput className="w-3.5 h-3.5" />
+                            {t('buttons.import')}
+                        </Button>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -154,7 +348,19 @@ export default function NewWorkClient({
                     </button>
                 </div>
 
-                {creationMode === 'ai' && (
+                {(creationMode === 'ai' || creationMode === 'manual') && (
+                    /* The previously separate "Create with AI" and
+                       "Create Manually" flows are merged here. The AI
+                       creator carries the richer surface (name + slug
+                       + prompt + advanced AI/provider settings +
+                       example prompts), which is everything the
+                       manual form covered plus the AI affordances. The
+                       user-facing distinction is just how they arrived
+                       — typing a prompt (ai) vs. clicking "Create Work
+                       Manually" (manual). When the user arrived via a
+                       prompt, the chat AI now carries the prompt text
+                       and the form starts empty so we don't re-prompt
+                       them inside the canvas. */
                     <WorkAICreator
                         gitProvider={selectedProviderId || undefined}
                         gitConnected={gitConnected}
@@ -162,18 +368,7 @@ export default function NewWorkClient({
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
                         initialPrompt={initialPrompt}
-                        initialKind={initialKind ?? undefined}
-                    />
-                )}
-                {creationMode === 'manual' && (
-                    <WorkManualForm
-                        user={user}
-                        gitProvider={selectedProviderId || undefined}
-                        gitConnected={gitConnected}
-                        deployProvider={selectedDeployProviderId || undefined}
-                        websiteTemplates={websiteTemplates}
-                        proposal={proposal ?? undefined}
-                        initialDescription={initialPrompt}
+                        initialKind={selectedKind || initialKind || undefined}
                     />
                 )}
                 {creationMode === 'import' && (

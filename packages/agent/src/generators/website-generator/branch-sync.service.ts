@@ -22,6 +22,27 @@ export interface BranchSyncSummary {
     results: BranchSyncResult[];
 }
 
+/**
+ * Pulls upstream template branches into each Work's own website repo so
+ * the operator's customisations stay rebased against the latest template
+ * code (and any beta branch overrides, when `Work.websiteTemplateUseBeta`
+ * is set).
+ *
+ * **Single-flight on purpose — do not parallelise.** The shared
+ * `gitFacade.cloneOrPull` uses a deterministic working directory keyed on
+ * owner+repo (not on branch), so two concurrent calls into the same
+ * work's repo would race against the same `.git` checkout and corrupt
+ * each other (mid-pull index, half-written packfiles, branch HEAD
+ * pointing into the wrong tree). `MAX_CONCURRENT_SYNCS = 1` enforces a
+ * sequential pipeline at the service level. Callers that fan out across
+ * MANY works are responsible for serialising per-work; this class only
+ * serialises within a single `syncFromTemplate()` invocation.
+ *
+ * Return shape: `BranchSyncSummary` (or `null` when there's no template
+ * resolved for the work). Each branch's outcome is one of `synced` /
+ * `skipped` / `error`; the summary's `errors` count drives the calling
+ * service's "did the deploy refresh succeed" gate.
+ */
 @Injectable()
 export class BranchSyncService {
     private readonly logger = new Logger(BranchSyncService.name);

@@ -10,6 +10,7 @@ import { config } from '@src/config/constants';
 import * as bcrypt from 'bcrypt';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { GitHubAppService } from './github-app.service';
+import { UsernameAllocatorService } from '@src/users/services/username-allocator.service';
 
 type SetupStatePayload = {
     installationId: string;
@@ -26,6 +27,7 @@ export class GitHubAppOnboardingService {
         private readonly gitHubAppUserLinkRepository: GitHubAppUserLinkRepository,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly userRepository: UserRepository,
+        private readonly usernameAllocator: UsernameAllocatorService,
     ) {}
 
     async beginSetup(input: { installationId: string; redirectTo?: string; setupAction?: string }) {
@@ -218,17 +220,16 @@ export class GitHubAppOnboardingService {
         return user;
     }
 
+    /**
+     * EW-652 (Tenants & Organizations Phase 0) — moved to the shared
+     * `UsernameAllocatorService.allocateUsername` so both this path and
+     * the interactive UI flow (`/api/users/check-username`) go through
+     * the same normalization + collision-suffix logic. Kept here as a
+     * thin delegation so existing tests that stub this method continue
+     * to work, and to preserve the public interface for future callers.
+     */
     private async resolveUniqueUsername(baseUsername: string): Promise<string> {
-        const sanitizedBase = (baseUsername || 'github-user').trim() || 'github-user';
-        let candidate = sanitizedBase;
-        let suffix = 1;
-
-        while (await this.userRepository.findByUsername(candidate)) {
-            suffix += 1;
-            candidate = `${sanitizedBase}-${suffix}`;
-        }
-
-        return candidate;
+        return this.usernameAllocator.allocateUsername(baseUsername || 'github-user');
     }
 
     private signState(payload: SetupStatePayload): string {

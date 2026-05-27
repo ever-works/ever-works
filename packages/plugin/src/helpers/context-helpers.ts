@@ -108,7 +108,28 @@ export function createScopedLogger(logger: PluginLogger | undefined, prefix: str
 }
 
 /**
- * Create a scoped cache with key prefix
+ * Wrap a {@link PluginCache} so every key is automatically prefixed
+ * with `${prefix}:` — lets multiple plugins share a single backing
+ * cache without colliding on key names.
+ *
+ * Pass-through behaviour:
+ * - When `cache` is undefined, every method resolves to the "absent"
+ *   answer (`undefined` for `get`, `false` for `delete`/`has`) without
+ *   throwing. Callers don't need to null-check the underlying cache.
+ * - `set` returns whatever the underlying cache returns (typed as
+ *   `void`/`Promise<void>` in `PluginCache`).
+ *
+ * **`clear()` is intentionally a no-op.** The naive
+ * `cache.clear()` would wipe ALL keys (including other plugins' and
+ * the platform's own), which is never what a scoped consumer wants —
+ * but {@link PluginCache} has no "delete by prefix" method, so this
+ * wrapper has no way to scope the clear. Callers that need
+ * prefix-scoped invalidation must track the keys themselves and
+ * `delete()` them individually, or live with per-key TTLs. Despite
+ * the no-op, the method is kept on the returned object so the shape
+ * satisfies the `PluginCache` interface and consumer code typechecks.
+ * Future maintainers: do NOT "fix" this by calling
+ * `cache?.clear()` — that would silently nuke unrelated entries.
  */
 export function createScopedCache(cache: PluginCache | undefined, prefix: string): PluginCache {
 	const prefixKey = (key: string) => `${prefix}:${key}`;
@@ -119,9 +140,8 @@ export function createScopedCache(cache: PluginCache | undefined, prefix: string
 		delete: async (key: string) => cache?.delete(prefixKey(key)) ?? false,
 		has: async (key: string) => cache?.has(prefixKey(key)) ?? false,
 		clear: async () => {
-			// Note: This only clears what we can access - may not clear all prefixed keys
-			// depending on implementation
-			// A full implementation would need to track keys
+			// Intentional no-op — see the function JSDoc. Calling the
+			// underlying cache.clear() would wipe other plugins' keys too.
 		}
 	};
 }

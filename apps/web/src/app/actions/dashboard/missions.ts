@@ -70,3 +70,19 @@ export async function cloneMissionAction(id: string, title?: string) {
     revalidateMissionSurfaces();
     return result;
 }
+
+// Attachment actions — used by the PromptComposer-driven create flow
+// on /new (Mission template inline-create path) to wire uploads into
+// the newly created Mission, and by future Mission detail pages.
+
+export async function attachUploadToMissionAction(missionId: string, uploadId: string) {
+    const row = await missionsAPI.addAttachment(missionId, uploadId);
+    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
+    return row;
+}
+
+export async function detachMissionAttachmentAction(missionId: string, attachmentId: string) {
+    const result = await missionsAPI.removeAttachment(missionId, attachmentId);
+    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
+    return result;
+}

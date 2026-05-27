@@ -50,7 +50,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // the Spend section can render real data instead of the PR GG
     // placeholder. Defensive catch — a flaky budget endpoint
     // surfaces the empty state, never 500s the detail page.
-    const [ideas, sourceMission, sourceAcceptedIdeas, budget] = await Promise.all([
+    const [ideas, sourceMission, sourceAcceptedIdeas, budget, attachments] = await Promise.all([
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
                 missionId: id,
@@ -65,6 +65,9 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
                   .catch(() => [])
             : Promise.resolve([]),
         missionsAPI.getBudget(id).catch(() => null),
+        // Attachments — defensive .catch so a missing migration on
+        // a stale environment doesn't 500 the page.
+        missionsAPI.listAttachments(id).catch(() => []),
     ]);
 
     return (
@@ -74,6 +77,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             sourceMission={sourceMission}
             inheritedIdeas={sourceAcceptedIdeas}
             budget={budget}
+            attachments={attachments}
         />
     );
 }

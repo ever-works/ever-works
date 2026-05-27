@@ -45,6 +45,43 @@ export interface StateMarkerPayload {
 
 const DEFAULT_MARKER_PATH = '.works/state.json';
 
+/**
+ * Persists the current dispatch state of a Work back into its own
+ * repository as a small JSON file under `.works/state.json`. Other
+ * subsystems (CI, the deploy probe, the customer-facing site) read
+ * this file to discover the latest known state without hitting the
+ * platform API — it's the source-of-truth-on-disk for FR-26a.
+ *
+ * **Contract details worth knowing for callers:**
+ *
+ *   - **Path must live under `.works/`.** Enforced here with a hard
+ *     throw rather than a silent rewrite — a wrong `markerPath`
+ *     elsewhere is a programmer bug, not a recoverable runtime case.
+ *
+ *   - **Trailing newline is intentional.** The JSON body is suffixed
+ *     with `\n` so the file matches POSIX expectations AND so the
+ *     writer's idempotency check (no-op when bytes are identical)
+ *     compares apples-to-apples across editors that always append
+ *     a newline on save.
+ *
+ *   - **Writer MUST be idempotent.** {@link MarkerFileWriter.writeFile}
+ *     is contracted to skip the commit when the file already has
+ *     the exact same bytes. Without that, every status refresh
+ *     would create a new commit → trigger CI → trigger another
+ *     status refresh, looping. Test fakes that ignore this
+ *     contract will look fine in unit tests but blow up in
+ *     integration.
+ *
+ *   - **Log line redacts the repo URL** (drops user-info / creds
+ *     that might be embedded in `repoUrl`). The `token` field is
+ *     NEVER logged — it's only forwarded to the writer. Keep it
+ *     out of logs in any future logging changes here.
+ *
+ *   - **Failure semantics.** On writer error we log a warning AND
+ *     re-throw — the caller (typically the dispatcher) is expected
+ *     to translate the throw into the appropriate delivery-failure
+ *     bookkeeping. Don't swallow here.
+ */
 @Injectable()
 export class StateMarkerService {
     private readonly logger = new Logger(StateMarkerService.name);

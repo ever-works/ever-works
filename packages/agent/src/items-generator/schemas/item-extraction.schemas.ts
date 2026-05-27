@@ -1,3 +1,32 @@
+/**
+ * Zod schemas for the LLM item-extraction pipeline.
+ *
+ * **The `.describe()` calls are load-bearing**, not human-only docs:
+ * LangChain's `withStructuredOutput` passes them through to the model
+ * as the field-by-field instructions for what to extract. Edits to a
+ * description change the model's behaviour — treat them like prompts.
+ *
+ * Schema hierarchy (extension chain):
+ *  - `baseSchema` — `name` + `description`. The minimal shape every
+ *    extracted item must have.
+ *  - `itemDataSchema` extends base with `source_url`, `featured`,
+ *    `brand`, `brand_logo_url`, `images`. The shape the extraction
+ *    step emits before classification.
+ *  - `itemDataWithCategoriesAndTagsSchema` extends `itemDataSchema`
+ *    with `slug`, `category`, `tags`. The shape after the
+ *    categorisation step has assigned taxonomy.
+ *  - `itemDataWithBadgesSchema` extends `baseSchema` (NOT
+ *    `itemDataSchema`) and adds badges. Used by the badge-enrichment
+ *    step; intentionally narrower than the full pipeline shape.
+ *
+ * Wrapper shapes:
+ *  - `extractedItemsSchema` / `extractedItemsSchemaWithTags` —
+ *    `{ items: [...] }` envelopes used as the structured-output
+ *    targets for the bulk extract / classify calls.
+ *  - `promptUnderstandingAssessmentSchema` — separate gate schema
+ *    used BEFORE extraction; asks the model whether the user prompt
+ *    is concrete enough to proceed at all.
+ */
 import { z } from 'zod';
 
 const baseSchema = z.object({

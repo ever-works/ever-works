@@ -32,8 +32,12 @@ const refreshProposalsMock = vi.fn();
 const getProposalsStatusMock = vi.fn();
 const dismissProposalMock = vi.fn();
 
+const startFromPromptMock = vi.fn();
+vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
+    useStartFromPrompt: () => startFromPromptMock,
+}));
+
 vi.mock('@/app/actions/dashboard/work-proposals', () => ({
-    createIdeaAction: (...args: unknown[]) => createIdeaMock(...args),
     listProposalsAction: (...args: unknown[]) => listProposalsMock(...args),
     refreshProposalsAction: (...args: unknown[]) => refreshProposalsMock(...args),
     getProposalsStatusAction: (...args: unknown[]) => getProposalsStatusMock(...args),
@@ -189,10 +193,9 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         expect(inFormBtn.disabled).toBe(false);
     });
 
-    it('quick-add success calls createIdeaAction and prepends the new card', async () => {
+    it('quick-add hands the prompt to the chat AI helper (no inline create)', () => {
+        startFromPromptMock.mockClear();
         createIdeaMock.mockClear();
-        const newIdea = mkIdea('new-1');
-        createIdeaMock.mockResolvedValueOnce(newIdea);
         render(
             <WorkProposalsSection
                 initialProposals={[mkIdea('old-1')]}
@@ -206,10 +209,13 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         });
         const allAddBtns = screen.getAllByText('quickAdd.submit');
         fireEvent.click(allAddBtns[allAddBtns.length - 1]);
-        expect(createIdeaMock).toHaveBeenCalledWith({
-            description: 'A typed-in Idea longer than ten chars',
+        // The dashboard quick-add now forwards the prompt to the
+        // shared chat-start helper rather than calling createIdeaAction
+        // directly — the chat AI drives the create-from-prompt flow.
+        expect(startFromPromptMock).toHaveBeenCalledWith('A typed-in Idea longer than ten chars', {
+            intent: 'Idea',
         });
-        expect(await screen.findByText('Idea new-1')).toBeTruthy();
+        expect(createIdeaMock).not.toHaveBeenCalled();
     });
 
     it('dismissing an Idea (via the card X) keeps it locally as DISMISSED, hidden by default', () => {

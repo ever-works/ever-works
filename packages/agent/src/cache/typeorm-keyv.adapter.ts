@@ -8,6 +8,31 @@ export interface TypeORMKeyvOptions {
     namespace?: string;
 }
 
+/**
+ * Keyv-shaped adapter that persists cache entries to the platform's TypeORM
+ * `cache` table (see {@link CacheEntry}). Lets the same cache façade work in
+ * dev (in-memory keyv) and prod (Postgres-backed) without code changes.
+ *
+ * Behaviour worth knowing:
+ * - **Namespaced by default.** Every key is stored under `${namespace}:${key}`
+ *   so multiple cache consumers can share the same `cache` table without
+ *   colliding. `namespace` defaults to `'app-cache'`. `get`, `set`, `delete`,
+ *   `has`, `clear`, and `deleteMany` all respect the namespace prefix.
+ * - **Lazy expiration on read.** `get()` checks `expiresAt` and deletes the
+ *   row inline if it's expired, returning `undefined`. No background sweeper
+ *   is required — call {@link TypeORMKeyvAdapter.cleanExpired} from a cron
+ *   if you also want proactive cleanup.
+ * - **`deleteUnscopedEntriesLike` is a footgun.** It runs a LIKE query
+ *   against the raw `key` column with no namespace prefix, so it can match
+ *   entries belonging to other consumers. Reserved for tenant-wide
+ *   invalidation. Pass a sufficiently distinctive `likeTerm` (typically a
+ *   tenant or work id, not a short common substring).
+ * - **Errors are swallowed and emitted.** Every method catches its DB error,
+ *   emits `'error'` on the EventEmitter, and returns the "absent" answer
+ *   (`undefined` / `false` / `0`). The caller never sees a thrown error.
+ * - `opts.ttl` is typed `any` because the Keyv interface expects an open
+ *   bag here; the constructor only reads `options.ttl`.
+ */
 export class TypeORMKeyvAdapter extends EventEmitter {
     private repository: Repository<CacheEntry>;
     public _namespace: string;

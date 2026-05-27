@@ -26,6 +26,37 @@ export interface WorkScheduleDispatchSummary {
     entries: WorkScheduleDispatchEntry[];
 }
 
+/**
+ * Per-tick dispatcher for scheduled work-generation runs.
+ *
+ * Lifecycle of a single `dispatchDue()` call:
+ * 1. **Feature gate.** When
+ *    {@link config.subscriptions.scheduledUpdatesEnabled} is `false`,
+ *    return an empty summary immediately. No error — the caller (a
+ *    cron job) can keep ticking harmlessly.
+ * 2. **Zombie cleanup.** {@link WorkScheduleService.recoverStuckSchedules}
+ *    repairs schedules that a previous worker marked "dispatched"
+ *    but never finalised (process crash mid-run). Runs BEFORE the
+ *    main loop so an unrecoverable crash from the previous tick
+ *    doesn't permanently block the row.
+ * 3. **Distributed claim.** For each due schedule,
+ *    `markRunDispatched(id)` is the **atomic lock** — it returns
+ *    `null` when another worker has already claimed the row, in
+ *    which case we count `skipped` and move on. Multiple dispatchers
+ *    running concurrently is safe; the race resolves at the DB.
+ * 4. **Delegate.** {@link WorkGenerationService.runScheduledUpdate}
+ *    actually runs the generation. The dispatcher only counts
+ *    outcomes; it does NOT call `markRunFailed` itself because the
+ *    inner finalisation paths (`finalizeGeneration`,
+ *    `handleSyncFailure`, `updateItemsGenerator` early-exit) own
+ *    that already. Catching here would double-count.
+ *
+ * Default batch size comes from
+ * `config.subscriptions.getMaxBatch()` — sized to fit the longest
+ * runtime budget of a single tick. The caller can override but
+ * raising it without re-budgeting risks the tick exceeding its
+ * worker timeout.
+ */
 @Injectable()
 export class WorkScheduleDispatcherService {
     private readonly logger = new Logger(WorkScheduleDispatcherService.name);

@@ -392,4 +392,40 @@ export const agentsAPI = {
             wrapInData: false,
         });
     },
+
+    // Agent attachment surface — list/add/remove `AgentAttachment` rows.
+    // Mirrors `missionsAPI.{list,add,remove}Attachment` and
+    // `workProposalsAPI.{list,add,remove}Attachment` so the
+    // PromptComposer-driven creates can attach uniformly.
+    async listAttachments(id: string): Promise<AgentAttachmentRow[]> {
+        return serverFetch<AgentAttachmentRow[]>(`/agents/${id}/attachments`, {
+            method: 'GET',
+        });
+    },
+
+    async addAttachment(id: string, uploadId: string): Promise<AgentAttachmentRow> {
+        return serverMutation<AgentAttachmentRow>({
+            endpoint: `/agents/${id}/attachments`,
+            data: { uploadId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async removeAttachment(id: string, attachmentId: string): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/agents/${id}/attachments/${attachmentId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
+
+/** Row shape returned by `/agents/:id/attachments`. */
+export interface AgentAttachmentRow {
+    readonly id: string;
+    readonly agentId: string;
+    readonly uploadId: string;
+    readonly createdAt: string;
+}

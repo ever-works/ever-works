@@ -16,6 +16,30 @@ type GenerationLogCollectorOptions = {
     onRecentLogsUpdated?: RecentLogsUpdatedFn;
 };
 
+/**
+ * Pipeline log buffer with two parallel lifecycles:
+ *
+ * - `buffer` is the **write-behind queue** — entries accumulate here and
+ *   are flushed to `flushFn` every {@link AUTO_FLUSH_INTERVAL_MS} ms (1s)
+ *   or on demand via `flush()`/`dispose()`. After flushing, `buffer` is
+ *   emptied; the entries live on in the DB.
+ * - `recentRing` is the **live-UI tail** — the most recent
+ *   {@link MAX_RECENT_ENTRIES} (100) entries, never cleared by flush, so
+ *   `getRecentLogs()` returns a stable view even right after a flush
+ *   reset the write-behind queue. `onRecentLogsUpdated` is invoked every
+ *   flush with the current ring snapshot.
+ *
+ * **Side-effect on construction**: starts the auto-flush
+ * `setInterval`. The handle is `.unref()`'d so it won't keep a Node
+ * process alive on its own, but **`dispose()` must still be called**
+ * during teardown — otherwise the interval continues firing and any
+ * residual `buffer` entries from the final write are flushed only when
+ * Node next decides to run the timer.
+ *
+ * `flush()` failures inside the auto-flush tick are swallowed
+ * (`.catch(() => {})`) so a transient DB blip doesn't crash the
+ * timer; the next tick retries.
+ */
 export class GenerationLogCollector {
     /** Pending entries waiting to be flushed to DB */
     private buffer: GenerationStepLog[] = [];

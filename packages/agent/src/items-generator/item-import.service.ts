@@ -387,6 +387,27 @@ function isValidHttpUrl(value: string): boolean {
     }
 }
 
+/**
+ * Reduce an `ExcelJS.CellValue` to a primitive the validator can consume.
+ *
+ * ExcelJS reports cell values in one of several shapes depending on what
+ * the workbook author put there — primitives are bare, but anything
+ * fancier (formula, hyperlink, rich text, date) comes back as an object.
+ * The validator only needs the user-visible string/number/boolean/null,
+ * so we unwrap each shape down to that:
+ *
+ *  - `null` / `undefined`: pass through (validator treats as missing).
+ *  - `Date`: ISO 8601 string (downstream date parsing is text-based).
+ *  - Non-object primitive: pass through.
+ *  - `{ text: string }`: **hyperlink or note** — surface the visible
+ *    label, drop the URL/note tooltip.
+ *  - `{ result: ... }`: **formula** — return the computed result, not
+ *    the formula source. (ExcelJS evaluates formulas at load time.)
+ *  - `{ richText: [...] }`: **multi-style run** — concatenate the
+ *    visible text fragments, drop formatting.
+ *  - Unknown object shape: return as-is so the validator can decide
+ *    (likely flagging it as invalid).
+ */
 function unwrapExcelCell(value: ExcelJS.CellValue): unknown {
     if (value === null || value === undefined) {
         return value;

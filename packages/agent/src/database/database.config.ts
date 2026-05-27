@@ -46,6 +46,9 @@ import {
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     Mission,
+    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
+    Tenant,
+    Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
     AgentRun,
@@ -65,6 +68,9 @@ import {
     TaskWatcher,
     TaskKbMention,
     UserTaskCounter,
+    MissionAttachment,
+    WorkProposalAttachment,
+    AgentAttachment,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -140,12 +146,16 @@ export const ENTITIES = [
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
+    Tenant,
+    Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
+    AgentAttachment,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family
@@ -160,6 +170,9 @@ export const ENTITIES = [
     TaskWatcher,
     TaskKbMention,
     UserTaskCounter,
+    // PR #1044 — Mission/Idea attachment edge tables
+    MissionAttachment,
+    WorkProposalAttachment,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,

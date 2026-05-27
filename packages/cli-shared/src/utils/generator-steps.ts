@@ -15,6 +15,16 @@ export enum ItemsGeneratorStep {
 	MARKDOWN_GENERATION = 'markdown-generation'
 }
 
+/**
+ * Look up the user-facing label for a known {@link ItemsGeneratorStep}.
+ * Returns the literal string `'Processing'` when `step` is not a member of
+ * the enum — and {@link getDynamicStepText} relies on that exact sentinel
+ * value to detect "no mapping found" and fall back to the raw step string.
+ * Do not change the fallback without updating the caller.
+ *
+ * @param step - One of the standard-pipeline {@link ItemsGeneratorStep} values.
+ * @returns Human-readable status text, or `'Processing'` for unknown steps.
+ */
 export function getStepText(step: ItemsGeneratorStep): string {
 	const steps: Record<ItemsGeneratorStep, string> = {
 		[ItemsGeneratorStep.PROMPT_COMPARISON]: 'Comparing prompts',
@@ -36,6 +46,19 @@ export function getStepText(step: ItemsGeneratorStep): string {
 	return steps[step] || 'Processing';
 }
 
+/**
+ * Compute a 0–100 progress percentage from an {@link ItemsGeneratorStep}.
+ *
+ * Position is derived from the enum's declaration order via
+ * `Object.values(ItemsGeneratorStep)` — adding a step in the middle of the
+ * enum will shift every subsequent step's reported progress. The percentage
+ * is 1-indexed (the first step reports `Math.round(1/N * 100)`, the last
+ * reports `100`), so it never reads as `0` for a valid step. Returns `0`
+ * when `step` is not a known enum value.
+ *
+ * @param step - One of the standard-pipeline {@link ItemsGeneratorStep} values.
+ * @returns Integer 0–100 percentage.
+ */
 export function getStepProgress(step: ItemsGeneratorStep): number {
 	const steps = Object.values(ItemsGeneratorStep);
 	const currentIndex = steps.indexOf(step);

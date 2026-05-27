@@ -1,6 +1,6 @@
 # Feature Specification: Onboarding Wizard v2
 
-> Behaviour-first spec per [Constitution Principle IX](../../memory/constitution.md#ix-specs-are-behaviour-first).
+> Behaviour-first spec per [Constitution Principle IX](../../../../.specify/memory/constitution.md#ix-specs-are-behaviour-first).
 > Describe **what** the system does, not how it's structured. Save implementation
 > details for `plan.md`. Mark any unresolved questions with `[NEEDS CLARIFICATION: …]`.
 

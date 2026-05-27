@@ -6,11 +6,43 @@ import {
 } from '@src/items-generator/dto';
 import type { Work } from '@src/entities/work.entity';
 
+/**
+ * Defaults to `'agent-pipeline'` (Vercel-AI-SDK), NOT the standard
+ * 15-step pipeline. The agent pipeline is tool-driven and lets the
+ * LLM orchestrate `processUrls` / `search` / `modifyItems` calls
+ * directly — which matches the step-by-step prompt below. Switching
+ * to `standard-pipeline` would require rewriting the prompt.
+ */
 const DEFAULT_PIPELINE_ID = 'agent-pipeline';
+
+/**
+ * Multiplier from "items in the source list" to "items in the final
+ * Work". 2.5 → source content is at most ~40% of the final
+ * collection (the rest is discovered by `search`). Raising this
+ * pushes the generator to do MORE discovery work — slower runs,
+ * higher AI cost, but smaller source-dependence.
+ *
+ * The `maxSourcePct` value computed below is interpolated into the
+ * LLM prompt verbatim — the model self-polices source ratio based
+ * on the percentage, so tuning this number directly shapes
+ * generation behaviour.
+ */
 const DEFAULT_EXPANSION_FACTOR = 2.5;
+
+/**
+ * Hard ceiling on per-import page processing. DoS bound: a malicious
+ * or pathological source could otherwise drive the pipeline through
+ * infinite link-chasing. Pipeline aborts when it hits this number
+ * even if more content is reachable.
+ */
 const MAX_PIPELINE_PAGES = 1000;
-// Generous fixed target — we don't know source size ahead of time.
-// The pipeline stops when content is exhausted, not when it hits this number.
+
+/**
+ * Generous fixed target — we don't know source size ahead of time.
+ * The pipeline stops when content is exhausted, not when it hits
+ * this number. Acts as a "ambition hint" to the LLM rather than
+ * a cap; the real cap is {@link MAX_PIPELINE_PAGES}.
+ */
 const DEFAULT_TARGET_ITEMS = 500;
 
 /**
@@ -20,6 +52,18 @@ const DEFAULT_TARGET_ITEMS = 500;
  * independently describe — never as content to copy verbatim.
  * The pipeline discovers significantly more items beyond the source so that
  * the source represents at most 30-40% of the final work.
+ *
+ * **The "do NOT copy descriptions" prompt line is load-bearing.**
+ * Awesome lists are typically licensed (CC-BY-SA, MIT, etc.) but
+ * description text is the most exposed copy-paste risk — verbatim
+ * inclusion creates downstream licensing headaches for the generated
+ * Work. Don't soften that instruction during prompt-tuning.
+ *
+ * **`sourceUrl` is interpolated into the prompt without escaping.**
+ * Editor-trusted (work owners set it via authenticated form), so
+ * not a prompt-injection vector in normal use — but if this is ever
+ * called from a less-trusted surface (public submission form,
+ * admin-impersonation), the URL should be quoted / sanitised first.
  */
 export function buildImportGenerationDto(options: {
     work: Work;

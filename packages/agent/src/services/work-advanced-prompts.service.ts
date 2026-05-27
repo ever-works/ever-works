@@ -10,6 +10,41 @@ import { WorkAdvancedPrompts } from '@src/entities/work-advanced-prompts.entity'
 /**
  * Service for managing per-work advanced prompts.
  * These prompts are appended to the standard hardcoded prompts during work generation.
+ *
+ * **Security & semantics worth flagging for reviewers:**
+ *
+ *   - **`getPromptsForGeneration` SKIPS access checks** — by
+ *     design (the generation pipeline already has an authenticated
+ *     work context). Do NOT wire this method to an HTTP route or
+ *     any caller that takes user input; it will leak prompts
+ *     across works. The comment marks it internal-use; the method
+ *     visibility doesn't enforce it.
+ *
+ *   - **Prompt-injection surface.** Editors can write arbitrary
+ *     text into these fields, and the generator concatenates them
+ *     verbatim with the system prompt at generation time. An
+ *     editor-role user can therefore steer / override AI behaviour
+ *     for that Work (the blast radius is one Work, not the
+ *     platform). Surfaces that consume this service should treat
+ *     the prompt strings as untrusted: log them at generation
+ *     time, rate-limit edits, and consider a moderation pass for
+ *     public-facing Works.
+ *
+ *   - **`updateAdvancedPrompts` is a FULL overwrite, not a patch.**
+ *     Every field in the DTO is forwarded to `createOrUpdate`;
+ *     missing fields land as `undefined` and clear the stored
+ *     value. Callers MUST send the entire prompt set on every
+ *     edit, even fields the user didn't touch. Add a merge layer
+ *     here if you ever wire a "save one field" UI.
+ *
+ *   - **Auth tiers**: `getAdvancedPrompts` requires viewer access,
+ *     mutating operations require editor. Promotion from viewer
+ *     to editor lives in {@link WorkOwnershipService}.
+ *
+ *   - **`deleteAdvancedPrompts` returns a boolean** — `false` does
+ *     NOT mean "you don't have permission" (that path throws),
+ *     only "no row to delete". Callers shouldn't treat `false`
+ *     as an error.
  */
 @Injectable()
 export class WorkAdvancedPromptsService {

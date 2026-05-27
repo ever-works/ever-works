@@ -2,6 +2,32 @@
  * Utility functions for sanitizing user input before processing.
  * Used to clean up fields before sending to external APIs (GitHub, etc.)
  * and to prevent injection attacks.
+ *
+ * **Pick-the-right-function cheat sheet:**
+ *
+ *   - {@link sanitizeText} — generic; default is aggressive (strips
+ *     newlines, collapses whitespace). Use for short freeform text.
+ *   - {@link sanitizeDescription} — short single-line strings bound
+ *     for external APIs (GitHub repo description, commit titles).
+ *     500 char cap.
+ *   - {@link sanitizeName} — same as description but for short
+ *     identifying labels. 100 char cap.
+ *   - {@link sanitizePrompt} — **preserves** newlines and whitespace.
+ *     LLM prompts depend on formatting; the aggressive defaults
+ *     would mangle them. 5000 char cap.
+ *   - {@link sanitizeStringArray} — trims + drops empty entries.
+ *
+ * **What's NOT removed:** the control-char regex covers `\x00-\x1F`
+ * + `\x7F` (DEL) but NOT the C1 control range (`\x80-\x9F`) where
+ * Windows-1252 hides smart quotes and other "printable" extended
+ * chars. Those survive intentionally so user-typed curly quotes etc.
+ * pass through.
+ *
+ * **`sanitizeStringTransform` lies about types** — for non-string
+ * inputs it returns the input unchanged but casts to `string`. If
+ * the caller passes a number, the return is typed `string` but is
+ * actually a number at runtime. Only safe in class-transformer
+ * contexts where the field is typed string upstream.
  */
 
 /**

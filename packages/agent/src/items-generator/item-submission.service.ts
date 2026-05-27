@@ -25,6 +25,26 @@ export class ItemSubmissionService {
         private readonly screenshotFacade: ScreenshotFacadeService,
     ) {}
 
+    /**
+     * Submit a single item to a work's data repo.
+     *
+     * Credential / attribution split: the **work owner's** git
+     * credentials clone+push (because the owner is the one who set up
+     * the repo's auth and is guaranteed to be authorised), but the
+     * **current user** is recorded as the git committer for attribution
+     * (`work.resolveCommitter(user)`). This is what lets a public
+     * submission from a non-owner end up in the data repo's history
+     * with the submitter's name on it.
+     *
+     * Direct-commit vs PR mode:
+     * - `submitItemDto.create_pull_request === true` always wins —
+     *   forces a PR even if autoapproval or pay-to-publish would have
+     *   allowed a direct commit.
+     * - Otherwise, direct-commit fires when either
+     *   `submitItemDto.pay_and_publish_now` is true OR the repo's
+     *   `.works/works.yml` has `autoapproval: true`.
+     * - In all other cases the change goes to a PR.
+     */
     async submitItem(
         work: Work,
         user: User,

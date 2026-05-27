@@ -191,4 +191,40 @@ export const missionsAPI = {
             method: 'GET',
         });
     },
+
+    // Attachment surface — list/add/remove `MissionAttachment` rows.
+    // Used by the PromptComposer-driven create flow on /new (Mission
+    // template inline-create path) and by future Mission detail
+    // attachment sections.
+    async listAttachments(id: string): Promise<MissionAttachmentRow[]> {
+        return serverFetch<MissionAttachmentRow[]>(`/me/missions/${id}/attachments`, {
+            method: 'GET',
+        });
+    },
+
+    async addAttachment(id: string, uploadId: string): Promise<MissionAttachmentRow> {
+        return serverMutation<MissionAttachmentRow>({
+            endpoint: `/me/missions/${id}/attachments`,
+            data: { uploadId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async removeAttachment(id: string, attachmentId: string): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/me/missions/${id}/attachments/${attachmentId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
+
+/** Row shape returned by `/me/missions/:id/attachments`. */
+export interface MissionAttachmentRow {
+    readonly id: string;
+    readonly missionId: string;
+    readonly uploadId: string;
+    readonly createdAt: string;
+}

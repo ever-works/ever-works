@@ -16,7 +16,23 @@ export class NotificationService {
 
     /**
      * Create a new notification for a user.
-     * Supports deduplication to prevent duplicate notifications.
+     *
+     * Deduplication contract (when `dto.deduplicationKey` is set):
+     * - Looks up an existing notification by `(userId, deduplicationKey)`.
+     *   If one exists AND is **not dismissed**, returns it untouched —
+     *   the new dto is silently discarded. (So "dismiss" deliberately
+     *   re-arms the dedup slot: a user who dismissed an alert can see a
+     *   fresh one for the same condition.)
+     * - Race-condition guard: if two requests slip past the lookup at
+     *   the same time, the second `INSERT` hits a UNIQUE constraint on
+     *   `(userId, deduplicationKey)` and we re-fetch + return the
+     *   first writer's row. Detected per-engine via
+     *   {@link isUniqueConstraintError} (PG `23505`, MySQL
+     *   `ER_DUP_ENTRY`, SQLite `SQLITE_CONSTRAINT`). **This contract
+     *   relies on the DB constraint existing** — if a migration ever
+     *   drops it, concurrent creates will silently duplicate.
+     *
+     * Without a `deduplicationKey`, every call writes a new row.
      */
     async create(dto: CreateNotificationDto): Promise<Notification> {
         // Check deduplication - if a notification with this key already exists and isn't dismissed, return it

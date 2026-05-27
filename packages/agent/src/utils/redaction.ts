@@ -47,6 +47,21 @@ export function redactHeaders(
     return out;
 }
 
+/**
+ * Recursively walk a JSON-like value and redact any property whose key
+ * matches {@link REDACTED_BODY_FIELDS} (case-insensitive).
+ *
+ * **Key-name match only** — no path patterns. If a nested field
+ * carries a secret but its key isn't in `REDACTED_BODY_FIELDS`,
+ * it's NOT redacted just because it's under a sensitive-looking
+ * parent (`{config: {webhookSecret: '…'}}` requires
+ * `'webhookSecret'` in the list, not just `'config'`). Extend
+ * `REDACTED_BODY_FIELDS` whenever a new sensitive field name
+ * appears anywhere in the payload schema.
+ *
+ * Pass-through for non-objects (primitives, `null`, `undefined`)
+ * and arrays (descended into).
+ */
 export function redactBody(body: unknown): unknown {
     if (body === null || body === undefined) return body;
     if (typeof body !== 'object') return body;
@@ -66,6 +81,30 @@ export function redactBody(body: unknown): unknown {
     return out;
 }
 
+/**
+ * Replace each occurrence of a known-secret string with `[REDACTED]`.
+ *
+ * **Behaviours worth knowing:**
+ *
+ *   - **Case-sensitive substring match** via `split().join()`. The
+ *     secret `'ghp_abc'` will redact `'ghp_abc'` but NOT `'GHP_ABC'`
+ *     or `'Ghp_Abc'`. Most production secrets are case-stable so
+ *     this is usually fine; widen to a case-insensitive match if
+ *     you're scrubbing user-typed values.
+ *
+ *   - **Secrets shorter than 4 chars are SKIPPED** to avoid mass
+ *     false-positives (`'k'` would redact every `k` in the string).
+ *     If you need to redact a 3-char value, the caller has to do
+ *     it themselves.
+ *
+ *   - **No regex escaping needed** — `split(secret)` treats the
+ *     argument as a literal string, so a secret containing `.`,
+ *     `*`, etc. matches verbatim.
+ *
+ *   - **Order matters** when secrets overlap. Earlier entries in
+ *     the array are redacted first, so a long secret that contains
+ *     a shorter one should appear before the short one.
+ */
 export function redactString(value: string, secrets: ReadonlyArray<string>): string {
     let out = value;
     for (const secret of secrets) {

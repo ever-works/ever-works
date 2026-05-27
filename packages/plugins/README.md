@@ -120,7 +120,7 @@ End-to-end work generation engines. One pipeline plugin is active per work.
 
 ### Prompt providers (`prompt-provider`)
 
-Externalise prompt templates so they can be edited and versioned outside the codebase.
+Externalize prompt templates so they can be edited and versioned outside the codebase.
 
 | Plugin                         | Description                                                           |
 | ------------------------------ | --------------------------------------------------------------------- |

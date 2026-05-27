@@ -56,7 +56,7 @@ Welcome to the Ever Works support center. We're here to help you get the most ou
 
 #### Installation Problems
 
-- **Node.js Version**: Ensure you're using Node.js 20+
+- **Node.js Version**: Ensure you're using Node.js 22+ (matches the platform's `package.json` engines requirement)
 - **Dependencies**: Run `pnpm install` in the project root
 - **Port Conflicts**: Use `--port` flag to specify a different port
 

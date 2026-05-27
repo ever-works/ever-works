@@ -49,6 +49,26 @@ export class WorkTaxonomyService {
      *   - `''`         → caller explicitly cleared the icon.
      *   - `'<svg…/>'`  → sanitized SVG safe for inline injection.
      */
+    /**
+     * Three-state sanitiser for the `icon_svg` field on taxonomy
+     * create/update DTOs. The output is what the downstream YAML
+     * writer compares against — and it relies on the three distinct
+     * sentinel values:
+     *
+     *  - `undefined` ← caller did not provide the field; writer
+     *    preserves whatever was already on disk (no-op).
+     *  - `''` (empty string) ← caller explicitly asked to clear the
+     *    icon; writer removes the YAML key.
+     *  - sanitised SVG string ← caller provided a new icon; writer
+     *    overwrites the YAML key with this value.
+     *
+     * On a sanitiser failure other than "empty" (script tag, bad
+     * URL scheme, etc.) throws a 400 — this is the right boundary
+     * for the API contract since the operator should see a clear
+     * "your SVG was rejected" error instead of silently saving an
+     * unsafe icon. The trim + empty-trim path is what maps both
+     * `'   '` and `''` to the explicit-clear sentinel.
+     */
     private sanitizeIconSvgInput(input: string | undefined): string | undefined {
         if (input === undefined) return undefined;
         const trimmed = input.trim();

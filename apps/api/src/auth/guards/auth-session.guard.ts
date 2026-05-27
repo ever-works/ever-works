@@ -10,6 +10,50 @@ import { toHeaders } from '../providers/request-headers';
 
 const API_KEY_PREFIX = 'ew_live_';
 
+/**
+ * Per-request auth guard for the API. Wires two independent credential
+ * paths to a single `request.user` and stays decoupled from the auth
+ * library via {@link AuthProvider}.
+ *
+ * Precedence (important — order matters and is intentional):
+ *   1. `@Public()` short-circuits to allow.
+ *   2. **API key** (`x-api-key: ew_live_…` OR `Authorization: Bearer
+ *      ew_live_…`) — if a value with the `ew_live_` prefix is present
+ *      in either slot, this guard treats the request as an API-key
+ *      request and **never falls through** to the provider path, even
+ *      if the key is rejected. A bad API key returns 401 with
+ *      "Invalid or expired API key" instead of trying cookies. This
+ *      is deliberate: a client sending an API key is asking for the
+ *      machine-credential code path and should get a deterministic
+ *      error, not silent fallback to a different identity.
+ *   3. **Provider session** — delegated to
+ *      {@link AuthProvider.authenticate}. The provider returns `null`
+ *      (NOT a throw) when no/invalid session is found so the guard
+ *      reaches the final 401 rather than masking a misconfiguration.
+ *
+ * **Synthesised JWT-shaped claims for API keys.** API-key auth has no
+ * real JWT, so this guard fabricates an `AuthenticatedUser` with
+ * `iat = now()`, `iss = 'ever-works'`, `aud = 'ever-works'` so
+ * downstream code (logging, observability, anything that reads
+ * `request.user`) sees a consistent shape regardless of which path
+ * authenticated. Treat `iat` on an API-key request as "guard
+ * activation time", NOT as "user signed in at" — it advances on
+ * every request.
+ *
+ * **Lazy DI of `ApiKeyService` + `UserRepository`** via `moduleRef`.
+ * Both are resolved on the first API-key request rather than via
+ * constructor injection. This avoids a circular-import bind at
+ * module init (the auth module imports services that themselves
+ * pull guards transitively). Switching to constructor injection
+ * here is likely to reintroduce a circular dep — confirm with
+ * `nest start` before changing.
+ *
+ * **API-key prefix is the discriminator.** Only `ew_live_…` is
+ * treated as an API key; any other `Bearer …` token falls through
+ * to the provider (most providers will then parse it as a JWT
+ * session). New key formats MUST keep the prefix or extend the
+ * matcher in {@link extractApiKey}.
+ */
 @Injectable()
 export class AuthSessionGuard {
     private apiKeyService: ApiKeyService;

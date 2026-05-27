@@ -147,6 +147,13 @@ export class WorkOperationsService {
         await this.generationHistoryRepository.updateEntry(historyId, updates);
     }
 
+    /**
+     * Dedupe the `warnings` array in-place. The same warning string can be
+     * emitted multiple times across pipeline steps (e.g. once per failing
+     * item in a batch); collapsing duplicates keeps the user-visible
+     * status payload bounded and stops `recentLogs`/JSON storage from
+     * growing without limit.
+     */
     private normalizeGenerateStatus(status: Work['generateStatus']): Work['generateStatus'] {
         if (!status?.warnings?.length) {
             return status;
@@ -158,6 +165,28 @@ export class WorkOperationsService {
         };
     }
 
+    /**
+     * Per-work serial queue for generateStatus updates.
+     *
+     * Why this exists: `updateGenerateStatus` and `updateGenerateRecentLogs`
+     * both write `Work.generateStatus`, which is a JSONB column read-modify-
+     * written rather than incrementally patched. Concurrent calls from the
+     * pipeline (one step finishing while another emits log batches) would
+     * otherwise read the same JSONB blob, mutate two different copies, and
+     * the later writer would clobber the earlier writer's fields. The Map
+     * serialises updates **per work id** so different works don't block each
+     * other.
+     *
+     * Implementation notes worth preserving:
+     * - `previous.catch(() => undefined)` swallows any prior failure so one
+     *   failed update doesn't poison the chain for the same id.
+     * - The cleanup guard (`get(id) === queued`) only deletes when our
+     *   `queued` is still the tail of the chain; without it, a later
+     *   queued update would have its key deleted out from under it.
+     * - DO NOT "simplify" this into a single in-flight Promise per service
+     *   instance — that would serialise updates across unrelated works,
+     *   gating any one slow update behind every other work's queue.
+     */
     private async runGenerateStatusUpdate(
         id: string,
         operation: () => Promise<void>,

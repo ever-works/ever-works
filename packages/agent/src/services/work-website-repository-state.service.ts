@@ -9,6 +9,30 @@ export class WorkWebsiteRepositoryStateService {
 
     constructor(private readonly gitFacade: GitFacadeService) {}
 
+    /**
+     * Has this work's website repository been initialised?
+     *
+     * Two-stage check:
+     *  1. **Fast DB-only path.** If any of five denormalised work columns
+     *     is non-empty (`website`, `deployProjectId`,
+     *     `websiteTemplateLastCommit`, `websiteTemplateLastUpdatedAt`,
+     *     `websiteTemplateLastCheckedAt`), return `true` immediately. We
+     *     only ever set these after a successful repo bootstrap, so a
+     *     truthy value is a reliable positive signal.
+     *  2. **Live repo probe.** If the DB says "not initialised", fall
+     *     back to a `gitFacade.repositoryExists` call. Tries the caller's
+     *     `user.id` AND the original `work.userId` (deduped) because the
+     *     repo might have been created by either party — the current
+     *     viewer may not have valid credentials but the work owner
+     *     usually does, and vice versa. First credential set that
+     *     reports the repo exists wins.
+     *
+     * Failure modes are all fail-safe: missing credentials → skip that
+     * user, provider errors → log + continue, no successful check →
+     * return `false`. The cost of a false negative is one redundant
+     * bootstrap attempt; a false positive would skip a needed bootstrap
+     * — much worse — so we err toward "not initialised" on uncertainty.
+     */
     async isInitialized(work: Work, user: User): Promise<boolean> {
         if (
             work.website ||

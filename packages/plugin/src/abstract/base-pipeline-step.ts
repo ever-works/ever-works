@@ -11,7 +11,36 @@ import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 
 /**
  * Abstract base class for pipeline modifier plugins.
- * TContext defaults to IPipelineContext; subclasses can narrow it.
+ *
+ * Subclasses describe their position in the standard generation pipeline
+ * (`stepId`, `stepName`, `stepPosition`, `targetPipelines`) and implement
+ * `execute()`. The plugin registry picks them up automatically based on
+ * the inherited `category: 'pipeline'` + `capabilities: ['pipeline-modifier']`
+ * — these are intentionally `readonly` here so subclasses can't accidentally
+ * register under a different category.
+ *
+ * `TContext` defaults to {@link IPipelineContext}; subclasses can narrow
+ * it (e.g. `class MyStep extends BasePipelineStep<MyContext>`) to get
+ * typed access to data their `requires` list pulls from earlier steps.
+ *
+ * Defaults worth knowing — override in subclasses when they don't fit:
+ * - `canSkip()` returns `this.optional` — `optional: true` steps are
+ *   skipped silently when `validate()` would fail; the default
+ *   non-optional step is always run.
+ * - `validate()` checks that every key in `this.requires` is present on
+ *   the context. Override to add stronger preconditions.
+ * - `rollback()` is a no-op — override when your step makes side-effect
+ *   writes that the pipeline runner needs to be able to undo on failure.
+ * - `createProgress()` clamps `percent` into `[0, 100]` silently. Callers
+ *   can pass over- or under-shoots without producing invalid progress
+ *   reports.
+ * - `shouldAbort()` watches BOTH `context.shouldStop` AND
+ *   `options.signal.aborted`, so user-cancel and global-abort signals
+ *   both stop the step at the next checkpoint.
+ *
+ * The static helpers (`after` / `before` / `replace` / `first` / `last`)
+ * form a small DSL for declaring `stepPosition` — prefer them over
+ * hand-building `StepPosition` objects in subclasses.
  */
 export abstract class BasePipelineStep<TContext extends IPipelineContext = IPipelineContext>
 	extends BasePlugin

@@ -12,6 +12,8 @@ export async function generateMetadata(): Promise<Metadata> {
 const VALID_CHIP_TYPES: ChipType[] = [
     'mission',
     'idea',
+    'agent',
+    'task',
     'website',
     'landing-page',
     'blog',

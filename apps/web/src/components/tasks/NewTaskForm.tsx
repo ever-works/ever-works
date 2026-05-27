@@ -63,6 +63,35 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
+    // Pre-fill from `?prompt=` — supports direct deep-link navigation
+    // to `/tasks/new?prompt=…` (e.g. from external integrations or
+    // callers that still want to pre-populate the form via URL). Note:
+    // the global `/new` page no longer passes `?prompt=` for the Task
+    // chip; it sends the prompt through the chat channel instead and
+    // routes here without a query string. This effect is a no-op on
+    // that path and only fires when something explicitly puts a
+    // `prompt` param in the URL. The first line becomes the title and
+    // the remainder seeds the description, so a single-line prompt
+    // still lands cleanly without an empty description block.
+    useEffect(() => {
+        const promptParam = searchParams?.get('prompt');
+        if (!promptParam) return;
+        const trimmed = promptParam.trim();
+        if (!trimmed) return;
+        const firstBreak = trimmed.indexOf('\n');
+        const candidateTitle =
+            firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 120).trim();
+        const candidateDescription =
+            firstBreak > 0
+                ? trimmed.slice(firstBreak + 1).trim()
+                : trimmed.length > 120
+                  ? trimmed
+                  : '';
+        if (!title && candidateTitle) setTitle(candidateTitle);
+        if (!description && candidateDescription) setDescription(candidateDescription);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) return;

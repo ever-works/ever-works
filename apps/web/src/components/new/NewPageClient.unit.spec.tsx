@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
@@ -26,14 +26,18 @@ vi.mock('sonner', () => ({
     toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const startFromPromptMock = vi.fn();
+vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
+    useStartFromPrompt: () => startFromPromptMock,
+}));
+
+vi.mock('@/lib/hooks/use-chat-panel', () => ({
+    useChatPanel: () => ({ open: false, setOpen: vi.fn() }),
+}));
+
 const createMissionMock = vi.fn();
 vi.mock('@/app/actions/dashboard/missions', () => ({
     createMissionAction: (...args: unknown[]) => createMissionMock(...args),
-}));
-
-const createIdeaMock = vi.fn();
-vi.mock('@/app/actions/dashboard/work-proposals', () => ({
-    createIdeaAction: (...args: unknown[]) => createIdeaMock(...args),
 }));
 
 import { NewPageClient } from './NewPageClient';
@@ -50,17 +54,19 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
     return el as HTMLButtonElement;
 }
 
-describe('NewPageClient (Phase 6.5 PR CC2 + UI polish)', () => {
-    it('renders all 7 chips in the spec order: Mission, Idea, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
+describe('NewPageClient (chat-open + canvas-route on submit)', () => {
+    it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
-            container.querySelectorAll('button[aria-pressed]'),
+            container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
-        expect(chipButtons).toHaveLength(7);
+        expect(chipButtons).toHaveLength(9);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
             'dashboard.newPage.chips.mission',
             'dashboard.newPage.chips.idea',
+            'dashboard.newPage.chips.agent',
+            'dashboard.newPage.chips.task',
             'dashboard.newPage.chips.website',
             'dashboard.newPage.chips.landing-page',
             'dashboard.newPage.chips.blog',
@@ -71,18 +77,18 @@ describe('NewPageClient (Phase 6.5 PR CC2 + UI polish)', () => {
 
     it('pre-selects the chip from initialType prop', () => {
         const { container } = render(<NewPageClient initialType="mission" />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('defaults to Mission when no initialType is supplied', () => {
         const { container } = render(<NewPageClient />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('Submit (arrow) is disabled until the prompt is >= 10 chars', () => {
@@ -103,69 +109,103 @@ describe('NewPageClient (Phase 6.5 PR CC2 + UI polish)', () => {
         expect(screen.getByText('dashboard.newPage.chipDescriptions.mission')).toBeTruthy();
     });
 
-    it('Submit with chip=mission calls createMissionAction and routes to the new Mission detail page', async () => {
-        createMissionMock.mockClear();
+    it('Submit with chip=mission opens chat with intent and routes to /missions', () => {
+        startFromPromptMock.mockClear();
         routerPushMock.mockClear();
-        createMissionMock.mockResolvedValueOnce({ id: 'm-new', title: 'x' });
         const { container } = render(<NewPageClient initialType="mission" />);
         fireEvent.change(getTextarea(container), {
             target: { value: 'Build the best cat business' },
         });
         fireEvent.click(getSubmit(container));
-        await Promise.resolve();
-        await Promise.resolve();
-        expect(createMissionMock).toHaveBeenCalledWith({
-            description: 'Build the best cat business',
-            type: 'one-shot',
-        });
-        expect(routerPushMock).toHaveBeenCalledWith('/missions/m-new');
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Build the best cat business',
+            expect.objectContaining({ intent: 'Mission' }),
+        );
+        expect(routerPushMock).toHaveBeenCalledWith('/missions');
     });
 
-    it('Submit with chip=idea calls createIdeaAction and routes to /ideas', async () => {
-        createIdeaMock.mockClear();
+    it('Submit with chip=idea opens chat with intent and routes to /ideas', () => {
+        startFromPromptMock.mockClear();
         routerPushMock.mockClear();
-        createIdeaMock.mockResolvedValueOnce({ id: 'i-new' });
         const { container } = render(<NewPageClient initialType="idea" />);
         fireEvent.change(getTextarea(container), {
             target: { value: 'A curated list of AI coding agents' },
         });
         fireEvent.click(getSubmit(container));
-        await Promise.resolve();
-        await Promise.resolve();
-        expect(createIdeaMock).toHaveBeenCalledWith({
-            description: 'A curated list of AI coding agents',
-        });
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'A curated list of AI coding agents',
+            expect.objectContaining({ intent: 'Idea' }),
+        );
         expect(routerPushMock).toHaveBeenCalledWith('/ideas');
     });
 
-    it('Submit with chip=website routes to the Work wizard with mode + kind + prompt query params', () => {
+    it('Submit with chip=agent opens chat with intent and routes to /agents/new (no prompt prefill)', () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<NewPageClient initialType="agent" />);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'Research assistant for AI safety papers' },
+        });
+        fireEvent.click(getSubmit(container));
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Research assistant for AI safety papers',
+            expect.objectContaining({ intent: 'Agent' }),
+        );
+        // Canvas route — chat carries the prompt, no `?prompt=` here.
+        expect(routerPushMock).toHaveBeenCalledWith('/agents/new');
+    });
+
+    it('Submit with chip=task opens chat with intent and routes to /tasks/new (no prompt prefill)', () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<NewPageClient initialType="task" />);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'Audit the Mission backlog for stale items' },
+        });
+        fireEvent.click(getSubmit(container));
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Audit the Mission backlog for stale items',
+            expect.objectContaining({ intent: 'Task' }),
+        );
+        expect(routerPushMock).toHaveBeenCalledWith('/tasks/new');
+    });
+
+    it('Submit with chip=website routes to /works/new with mode+kind (no prompt prefill)', () => {
+        startFromPromptMock.mockClear();
         routerPushMock.mockClear();
         const { container } = render(<NewPageClient initialType="website" />);
         fireEvent.change(getTextarea(container), {
             target: { value: 'Landing page for my SaaS launch' },
         });
         fireEvent.click(getSubmit(container));
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Landing page for my SaaS launch',
+            expect.objectContaining({ intent: 'website' }),
+        );
         expect(routerPushMock).toHaveBeenCalledTimes(1);
         const href = routerPushMock.mock.calls[0][0] as string;
         expect(href.startsWith('/works/new?')).toBe(true);
         expect(href).toContain('mode=ai');
         expect(href).toContain('kind=website');
-        expect(href).toContain('prompt=Landing+page+for+my+SaaS+launch');
+        // Critically, the prompt is NOT in the URL — the chat carries it.
+        expect(href).not.toContain('prompt=');
     });
 
-    describe('Phase 8 PR Y — template prefill', () => {
-        it('renders initialPrompt verbatim in the prompt textarea', () => {
-            const prefill = `Starter Business\n\nA blank-slate Mission for cats.`;
-            const { container } = render(
-                <NewPageClient initialType="mission" initialPrompt={prefill} />,
-            );
-            const textarea = getTextarea(container);
-            expect(textarea.value).toBe(prefill);
-        });
+    it('renders initialPrompt verbatim in the prompt textarea', () => {
+        const prefill = `Starter Business\n\nA blank-slate Mission for cats.`;
+        const { container } = render(
+            <NewPageClient initialType="mission" initialPrompt={prefill} />,
+        );
+        const textarea = getTextarea(container);
+        expect(textarea.value).toBe(prefill);
+    });
 
-        it('Submit forwards initialTemplateId as missionTemplateRepo for mission chip', async () => {
+    describe('Mission template path (initialTemplateId set)', () => {
+        it('Submit with chip=mission + template inline-creates with missionTemplateRepo, opens chat WITHOUT a message, routes to the new Mission detail page', async () => {
             createMissionMock.mockClear();
-            createMissionMock.mockResolvedValueOnce({ id: 'm-new', title: 'x' });
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
+            createMissionMock.mockResolvedValueOnce({ id: 'm-tpl-new', title: 'x' });
             const { container } = render(
                 <NewPageClient
                     initialType="mission"
@@ -173,41 +213,45 @@ describe('NewPageClient (Phase 6.5 PR CC2 + UI polish)', () => {
                     initialTemplateId="starter-business"
                 />,
             );
-            const textarea = getTextarea(container);
-            fireEvent.change(textarea, {
+            fireEvent.change(getTextarea(container), {
                 target: { value: 'Starter Business — long enough to enable Submit' },
             });
-            fireEvent.click(getSubmit(container));
-            await Promise.resolve();
-            await Promise.resolve();
-            expect(createMissionMock).toHaveBeenCalledWith(
-                expect.objectContaining({
+            await act(async () => {
+                fireEvent.click(getSubmit(container));
+            });
+            // The template path must persist the template id on the
+            // new Mission — Greptile P1 on PR #1038 caught the
+            // regression where this was silently dropped.
+            await waitFor(() =>
+                expect(createMissionMock).toHaveBeenCalledWith({
                     description: 'Starter Business — long enough to enable Submit',
                     type: 'one-shot',
                     missionTemplateRepo: 'starter-business',
                 }),
             );
+            // Codex P2: must NOT send the prompt into chat after the
+            // inline create — the chat AI's `createMission` tool would
+            // re-create the Mission as a second non-template row.
+            expect(startFromPromptMock).not.toHaveBeenCalled();
+            // Canvas is the new Mission's detail page.
+            await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/missions/m-tpl-new'));
         });
 
-        it('Submit does NOT include missionTemplateRepo when no initialTemplateId', async () => {
+        it('Submit with chip=mission WITHOUT a template falls through to the chat-only path (no inline create)', () => {
             createMissionMock.mockClear();
-            createMissionMock.mockResolvedValueOnce({ id: 'm-direct', title: 'x' });
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
             const { container } = render(<NewPageClient initialType="mission" />);
             fireEvent.change(getTextarea(container), {
                 target: { value: 'No template, just a typed mission goal' },
             });
             fireEvent.click(getSubmit(container));
-            await Promise.resolve();
-            await Promise.resolve();
-            const call = createMissionMock.mock.calls[0][0];
-            expect(call.missionTemplateRepo).toBeUndefined();
+            expect(createMissionMock).not.toHaveBeenCalled();
+            expect(startFromPromptMock).toHaveBeenCalledWith(
+                'No template, just a typed mission goal',
+                expect.objectContaining({ intent: 'Mission' }),
+            );
+            expect(routerPushMock).toHaveBeenCalledWith('/missions');
         });
-    });
-
-    it('renders compact manual/import shortcuts instead of a second Work card chooser', () => {
-        render(<NewPageClient />);
-        expect(screen.queryByText('dashboard.newPage.cards.ai.title')).toBeNull();
-        expect(screen.getByText('dashboard.newPage.cards.manual.title')).toBeTruthy();
-        expect(screen.getByText('dashboard.newPage.cards.import.title')).toBeTruthy();
     });
 });

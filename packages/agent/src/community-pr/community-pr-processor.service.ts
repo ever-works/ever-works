@@ -153,6 +153,26 @@ export class CommunityPrProcessorService {
         return `community-pr:${workId}`;
     }
 
+    /**
+     * Has this PR (at its current `updatedAt`) already been processed?
+     *
+     * Reads from TWO state shapes that coexist on the work row:
+     *  - `state.processedPrs` (the modern shape, since EW-... migration):
+     *    array of `{ number, updatedAt, outcome }`. Lets us detect that
+     *    a previously-processed PR has been edited since (different
+     *    `updatedAt`) and SHOULD be re-processed.
+     *  - `state.processedPrNumbers` (legacy shape, kept in sync by
+     *    `markPrHandled` for rows that pre-date the migration): array
+     *    of bare PR numbers. No `updatedAt`, so a match here is treated
+     *    as "handled forever — don't re-process even if edited".
+     *
+     * The modern record wins when both exist: if a `processedPrs` entry
+     * is present, the legacy `processedPrNumbers` membership is
+     * ignored. Drop the legacy fallback once the migration has been
+     * verified to have backfilled every active work — until then,
+     * removing it would silently re-process every old PR on those
+     * works.
+     */
     private isPrHandled(state: CommunityPrState, pr: GitPullRequest): boolean {
         const processedRecords = state.processedPrs ?? [];
         const record = processedRecords.find((entry) => entry.number === pr.number);
