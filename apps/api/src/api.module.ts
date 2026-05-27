@@ -39,6 +39,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -135,6 +136,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // until Phase 7's slug-resolver middleware populates the
         // request scope.
         ScopeModule,
+        // EW-658 (Tenants & Organizations Phase 6) — Organization
+        // CRUD + lazy Tenant bootstrap + upgrade-from-account flow.
+        OrganizationsModule,
     ],
     providers: [
         {
