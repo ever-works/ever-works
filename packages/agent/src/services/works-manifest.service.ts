@@ -126,6 +126,42 @@ export type ManifestParseResult =
 export const PRINTABLE_ASCII_PATTERN = PRINTABLE_ASCII_RE;
 export const SUBDOMAIN_PATTERN = SUBDOMAIN_RE;
 
+/**
+ * Parses + validates the `.works/works.yml` manifest that every Work
+ * keeps in its repo (the source-of-truth for what the generator builds).
+ *
+ * **Three-stage validation pipeline** — each stage produces a distinct
+ * `code` for callers to surface the right error class:
+ *
+ *   1. **Size cap (64 KiB).** Rejects oversized inputs before YAML
+ *      parse to bound the cost of a malicious / accidentally
+ *      enormous manifest (yaml bombs, alias loops). Subcode
+ *      `manifest.size_limit`.
+ *   2. **YAML parse.** Produces `code: 'manifest_invalid_yaml'` with
+ *      the underlying parser's message — passed through verbatim so
+ *      operators can copy-paste it to their editor's lint.
+ *   3. **Zod schema.** Produces `code: 'manifest_invalid'` with a
+ *      list of structured `{ path, message, subcode }` errors.
+ *      Multiple errors are returned in a single response so the
+ *      author can fix everything in one round-trip.
+ *
+ * **`deriveSubcode` is part of the public API contract.** The
+ * `subcode` strings (e.g. `manifest.metadata.slug_format`) are
+ * documented values that API clients pattern-match on. Changing the
+ * path-to-subcode mapping is a breaking change — bump the
+ * `apiVersion` discriminator if you do it.
+ *
+ * **`PRINTABLE_ASCII_PATTERN` is exported but not consumed inside
+ * this file.** It exists for sibling services (manifest-rewriter,
+ * spec-kit tooling) that want the same character-class definition
+ * without re-deriving it. Don't delete it as "dead code" without
+ * grepping the wider monorepo first.
+ *
+ * **Hard caps embedded in the schema** (1000 inline items, 500
+ * web-search results, 10× expansion factor, etc.) are DoS bounds.
+ * Raising them is fine but only after benchmarking the downstream
+ * generator pipeline against the new ceiling.
+ */
 @Injectable()
 export class WorksManifestService {
     parseAndValidate(rawYaml: string): ManifestParseResult {
