@@ -20,12 +20,7 @@ export default async function PluginsPage() {
 
     return (
         <div className="w-full overflow-auto">
-            <PageHeader
-                icon={Puzzle}
-                title={t('title')}
-                subtitle={t('subtitle')}
-                tone="info"
-            />
+            <PageHeader icon={Puzzle} title={t('title')} subtitle={t('subtitle')} tone="info" />
 
             <PluginsList
                 plugins={pluginsData.plugins}

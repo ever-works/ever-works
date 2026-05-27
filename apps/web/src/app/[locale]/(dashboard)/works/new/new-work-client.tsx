@@ -14,6 +14,7 @@ import {
     Files,
     FolderInput,
     FolderKanban,
+    FolderOpen,
     Globe,
     PenLine,
     Star,
@@ -43,7 +44,9 @@ const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     website: Globe,
     'landing-page': Files,
     blog: BookOpen,
-    directory: Files,
+    // Distinct icon from `landing-page` — Greptile P2: shared `Files`
+    // makes the two chips visually indistinguishable in the chip row.
+    directory: FolderOpen,
     'awesome-repo': Star,
 };
 

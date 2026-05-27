@@ -62,12 +62,7 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
             {/* Header */}
-            <PageHeader
-                icon={Target}
-                title={t('title')}
-                subtitle={t('subtitle')}
-                tone="warning"
-            />
+            <PageHeader icon={Target} title={t('title')} subtitle={t('subtitle')} tone="warning" />
 
             {/* Quick-add composer — modeled on the marketing site's
                 landing prompt. Used by both empty and populated

@@ -449,7 +449,6 @@ export function WorkProposalsSection({
                     ))}
                 </div>
             )}
-
         </section>
     );
 }

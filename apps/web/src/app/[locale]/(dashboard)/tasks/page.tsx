@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { ListChecks, Plus } from 'lucide-react';
-import { Link } from '@/i18n/navigation';
-import { cn } from '@/lib/utils/cn';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { tasksAPI, type Task } from '@/lib/api/tasks';
 import { TasksList } from '@/components/tasks/TasksList';
@@ -32,16 +31,10 @@ export default async function TasksPage() {
                 subtitle={t('subtitle')}
                 tone="info"
                 actions={
-                    <Link
-                        href={ROUTES.DASHBOARD_TASK_NEW}
-                        className={cn(
-                            'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 px-3 py-2 text-sm',
-                            'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-button-primary-foreground dark:text-button-primary-foreground-dark rounded-sm',
-                        )}
-                    >
+                    <Button href={ROUTES.DASHBOARD_TASK_NEW} size="sm" className="gap-1.5 shrink-0">
                         <Plus className="w-3.5 h-3.5" />
                         {t('list.newTask')}
-                    </Link>
+                    </Button>
                 }
             />
             <TasksList tasks={result.data} />

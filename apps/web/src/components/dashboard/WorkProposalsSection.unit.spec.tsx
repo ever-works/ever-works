@@ -212,10 +212,9 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         // The dashboard quick-add now forwards the prompt to the
         // shared chat-start helper rather than calling createIdeaAction
         // directly — the chat AI drives the create-from-prompt flow.
-        expect(startFromPromptMock).toHaveBeenCalledWith(
-            'A typed-in Idea longer than ten chars',
-            { intent: 'Idea' },
-        );
+        expect(startFromPromptMock).toHaveBeenCalledWith('A typed-in Idea longer than ten chars', {
+            intent: 'Idea',
+        });
         expect(createIdeaMock).not.toHaveBeenCalled();
     });
 

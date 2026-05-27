@@ -5,10 +5,7 @@ import { Lightbulb, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
-import {
-    buildIdeaAction,
-    dismissProposalAction,
-} from '@/app/actions/dashboard/work-proposals';
+import { buildIdeaAction, dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
 import { PromptComposer } from '@/components/common/PromptComposer';

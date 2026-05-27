@@ -5,6 +5,7 @@ import {
     BookOpen,
     Bot,
     Files,
+    FolderOpen,
     Globe,
     Lightbulb,
     ListChecks,
@@ -70,7 +71,9 @@ const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     website: Globe,
     'landing-page': Files,
     blog: BookOpen,
-    directory: Files,
+    // Distinct icon from `landing-page` — Greptile P2: shared `Files`
+    // makes the two chips visually indistinguishable in the chip row.
+    directory: FolderOpen,
     'awesome-repo': Star,
 };
 
@@ -187,17 +190,19 @@ export function NewPageClient({
     const startFromPrompt = useStartFromPrompt();
 
     // Close the layout chat panel on mount so the prompt + chips
-    // take the full main column. The user can reopen it from the
-    // layout's chat handle if they want it back. Hook is null-safe
-    // when the page is somehow rendered outside the dashboard
+    // take the full main column. We depend ONLY on the (stable)
+    // setter — not the whole context object — because the context
+    // value is recreated on every `open` flip, so depending on
+    // `chat` would re-fire `setOpen(false)` the moment the user
+    // re-opens the panel and lock them out. The setter itself is
+    // memoised by the provider so this effectively runs once on
+    // mount. Hook is null-safe when rendered outside the dashboard
     // layout (e.g. previews/tests).
     const chat = useChatPanel();
+    const setChatOpen = chat?.setOpen;
     useEffect(() => {
-        chat?.setOpen?.(false);
-        // We intentionally only close on mount — re-running on chat
-        // ref changes would fight the user reopening the panel.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        setChatOpen?.(false);
+    }, [setChatOpen]);
 
     const submit = () => {
         const description = prompt.trim();

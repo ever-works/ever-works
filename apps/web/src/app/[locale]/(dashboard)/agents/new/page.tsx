@@ -25,15 +25,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function NewAgentPage() {
     const [missions, worksResp, ideas] = await Promise.all([
         missionsAPI.list().catch(() => [] as Mission[]),
-        workAPI
-            .getAll({ limit: 100 })
-            .catch(
-                () =>
-                    ({ works: [] as Work[], total: 0 }) as {
-                        works: Work[];
-                        total: number;
-                    },
-            ),
+        workAPI.getAll({ limit: 100 }).catch(
+            () =>
+                ({ works: [] as Work[], total: 0 }) as {
+                    works: Work[];
+                    total: number;
+                },
+        ),
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted'])
             .catch(() => [] as WorkProposal[]),

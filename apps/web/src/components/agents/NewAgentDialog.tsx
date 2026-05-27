@@ -118,7 +118,10 @@ export function NewAgentDialog({
             firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 80).trim();
         const candidateTitle =
             firstBreak > 0
-                ? trimmed.slice(firstBreak + 1).trim().slice(0, 120)
+                ? trimmed
+                      .slice(firstBreak + 1)
+                      .trim()
+                      .slice(0, 120)
                 : trimmed.length > 80
                   ? trimmed.slice(0, 120)
                   : '';

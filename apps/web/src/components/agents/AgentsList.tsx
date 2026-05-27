@@ -2,8 +2,7 @@
 
 import { Bot, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
-import { cn } from '@/lib/utils/cn';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { AgentCard } from './AgentCard';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -28,16 +27,14 @@ export function AgentsList({ agents }: { agents: Agent[] }) {
                 subtitle={t('subtitle')}
                 tone="primary"
                 actions={
-                    <Link
+                    <Button
                         href={ROUTES.DASHBOARD_AGENT_NEW}
-                        className={cn(
-                            'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 px-3 py-2 text-sm',
-                            'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-button-primary-foreground dark:text-button-primary-foreground-dark rounded-sm',
-                        )}
+                        size="sm"
+                        className="gap-1.5 shrink-0"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         {t('newAgent')}
-                    </Link>
+                    </Button>
                 }
             />
 

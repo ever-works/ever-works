@@ -12,13 +12,7 @@ import { cn } from '@/lib/utils/cn';
  * right side of the header row (e.g. "+ New X" CTA) and stays
  * pinned right when the title block shrinks.
  */
-export type PageHeaderTone =
-    | 'primary'
-    | 'success'
-    | 'info'
-    | 'warning'
-    | 'danger'
-    | 'accent';
+export type PageHeaderTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'accent';
 
 interface PageHeaderProps {
     icon: LucideIcon;
