@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { UserRepository } from '@ever-works/agent/database';
 
@@ -132,10 +133,6 @@ export class UsernameAllocatorService {
 
     private randomHex(length: number): string {
         const bytes = Math.ceil(length / 2);
-        // crypto is Node's built-in; not imported at top to keep this file
-        // portable to environments that polyfill it differently.
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { randomBytes } = require('node:crypto');
         return randomBytes(bytes).toString('hex').slice(0, length);
     }
 }

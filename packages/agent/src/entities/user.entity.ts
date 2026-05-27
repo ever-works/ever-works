@@ -38,20 +38,25 @@ export class User {
     id: string;
 
     // EW-652 (Tenants & Organizations Phase 0): username uniqueness is enforced
-    // by a case-insensitive expression UNIQUE index on `lower(username)` — see
-    // migration `1779991000000-AddUniqueIndexToUsername.ts`. Declared `unique`
-    // here as a hint to TypeORM / IDEs; the formal constraint lives in the
-    // migration because the column-level `unique: true` would generate a
-    // case-sensitive UNIQUE, which is not what the spec wants.
-    @Column({ unique: true })
+    // ONLY by the case-insensitive expression UNIQUE index on `lower(username)`
+    // in migration `1779991000000-AddUniqueIndexToUsername.ts`. Do NOT add
+    // `unique: true` here — the column-level UNIQUE would generate a
+    // case-sensitive constraint that conflicts with the expression index
+    // (two different UNIQUE indexes covering the same column) and can confuse
+    // schema-sync tooling.
+    @Column()
     username: string;
 
     // EW-652: URL-safe denormalized form of `username`, used by the slug
     // routing layer (EW-659 Phase 7). Always lowercase, matches `[a-z0-9-]+`.
-    // Globally unique across the table; once `organizations.slug` lands in
-    // EW-653 (Phase 1) the `UsernameAllocatorService` enforces no
-    // cross-table collision at write time.
-    @Column({ unique: true })
+    // Uniqueness is enforced by `idx_users_slug_unique` in migration
+    // `1779991001000-AddSlugToUsers.ts`. Same rationale as `username` above —
+    // we keep the column declaration plain and let the migration own the
+    // UNIQUE constraint. Future rename flows (out of scope for v1 — spec
+    // says no slug_redirects table) are responsible for explicitly updating
+    // BOTH `username` AND `slug` when a user renames; the `@BeforeInsert`
+    // hook below only fires on INSERT.
+    @Column()
     slug: string;
 
     // EW-617 G2: anonymous (zero-friction) users have no email/password until
