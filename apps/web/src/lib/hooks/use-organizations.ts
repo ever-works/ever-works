@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
 /**
@@ -38,7 +38,11 @@ let store: OrganizationsStore = {
     isLoading: true,
     error: null,
 };
-const listeners = new Set<Listener>();
+// `let` rather than `const` because the underlying Set is mutated via
+// add/delete/clear throughout the module. Team convention (Greptile P2,
+// ref: ever-co/ever-gauzy#8961) prefers `let` for conceptually-mutable
+// container vars even when the binding itself isn't reassigned.
+let listeners = new Set<Listener>();
 let inFlight: Promise<void> | null = null;
 let hasFetchedAtLeastOnce = false;
 
