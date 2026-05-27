@@ -247,19 +247,19 @@ Tests:
 
 ## JIRA linkage
 
-JIRA Epic and per-phase Stories are created alongside this spec. Once created, update this section with the keys:
+JIRA Epic and per-phase Stories live in the `EW` project at <https://evertech.atlassian.net>:
 
-- **Epic:** `EW-???` — Tenants & Organizations
-  - Phase 0: `EW-???`
-  - Phase 1: `EW-???`
-  - Phase 2: `EW-???`
-  - Phase 3: `EW-???`
-  - Phase 4: `EW-???`
-  - Phase 5: `EW-???`
-  - Phase 6: `EW-???`
-  - Phase 7: `EW-???`
-  - Phase 8: `EW-???`
-  - Phase 9: `EW-???`
-  - Phase 10: `EW-???`
+- **Epic:** [EW-651](https://evertech.atlassian.net/browse/EW-651) — Tenants & Organizations
+  - Phase 0 — Username uniqueness contract: [EW-652](https://evertech.atlassian.net/browse/EW-652)
+  - Phase 1 — Create tenants + organizations tables: [EW-653](https://evertech.atlassian.net/browse/EW-653)
+  - Phase 2 — `tenantId` on users + Tier B: [EW-654](https://evertech.atlassian.net/browse/EW-654)
+  - Phase 3 — `tenantId` + `organizationId` on Tier A: [EW-655](https://evertech.atlassian.net/browse/EW-655)
+  - Phase 4 — Upgrade free-form `organizationId` to FK: [EW-656](https://evertech.atlassian.net/browse/EW-656)
+  - Phase 5 — Tier C denormalization: [EW-657](https://evertech.atlassian.net/browse/EW-657)
+  - Phase 6 — Lazy upgrade flow + Org-create API: [EW-658](https://evertech.atlassian.net/browse/EW-658)
+  - Phase 7 — Slug routing middleware: [EW-659](https://evertech.atlassian.net/browse/EW-659)
+  - Phase 8 — WorkspaceSwitcher UI: [EW-660](https://evertech.atlassian.net/browse/EW-660)
+  - Phase 9 — CreateOrganizationModal + upgrade-vs-new dialog: [EW-661](https://evertech.atlassian.net/browse/EW-661)
+  - Phase 10 — Company chip + Work→Org wire-up: [EW-662](https://evertech.atlassian.net/browse/EW-662)
 
 (See [JIRA_ATLASSIAN_MCP.md](../../../../../../Workspace/knowledge/runbooks/JIRA_ATLASSIAN_MCP.md) for ticket-management commands.)
