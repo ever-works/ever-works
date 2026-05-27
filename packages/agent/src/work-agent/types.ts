@@ -62,13 +62,9 @@ export interface WorkAgentPreferencesDto {
     /**
      * Phase 1 PR D — promoted-constant overrides (Phase 0 PR 0.4).
      * `null` means "inherit platform-hardcoded default" — the
-     * consumer reads `value ?? <hardcoded>`. Wired consumer in PR D:
-     * `autoGenerateBatchSize` flows into the proposal generator's
-     * target Idea count. The other 3 are surfaced through the API
-     * so settings UI can read/write them; their cron-side consumers
-     * land in later phases:
-     *   - autoGenerateCadence    → scheduled-rerun dispatcher filter
-     *                              (deferred; cron stays daily for now)
+     * consumer reads `value ?? <hardcoded>`. Wired consumers:
+     *   - autoGenerateCadence    → scheduled-rerun dispatcher due filter.
+     *   - autoGenerateBatchSize  → proposal generator target Idea count.
      *   - autoBuildThrottlePerDay → Phase 1 PR FF goal-completion
      *                              throttle on auto-built Works.
      *   - missionDefaultOutstandingCap → Phase 3 PR J Mission tick

@@ -17,8 +17,8 @@ export class ScheduledReRunService {
         private readonly taskLockService: DistributedTaskLockService,
     ) {}
 
-    @Cron(CronExpression.EVERY_DAY_AT_3AM)
-    async runDaily(): Promise<void> {
+    @Cron(CronExpression.EVERY_MINUTE)
+    async runEveryMinute(): Promise<void> {
         if (!this.shouldUseNestScheduler()) {
             return;
         }
@@ -27,7 +27,7 @@ export class ScheduledReRunService {
             SCHEDULE_LOCK_KEY,
             async () => this.proposals.runScheduledBatch(),
             {
-                ttlMs: 60 * 60 * 1000,
+                ttlMs: 55 * 1000,
                 onLocked: () =>
                     this.logger.debug(
                         'Skipping scheduled rerun because another instance holds the task lock',

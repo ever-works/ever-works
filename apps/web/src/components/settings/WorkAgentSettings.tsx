@@ -110,11 +110,28 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     );
 
     useEffect(() => {
-        if (!activeRun) {
-            return;
-        }
+        setLocalPreferences(preferences);
+        setDryRun(preferences.guardrails.dryRunByDefault);
+        setCadenceMinutes(
+            parseCadenceMinutes(preferences.autoGenerateCadence) ?? DEFAULT_CADENCE_MINUTES,
+        );
+        setBatchSize(preferences.autoGenerateBatchSize ?? DEFAULT_BATCH_SIZE);
+        setAutoBuildThrottle(preferences.autoBuildThrottlePerDay ?? DEFAULT_AUTOBUILD_THROTTLE);
+        setMissionCap(preferences.missionDefaultOutstandingCap ?? DEFAULT_MISSION_OUTSTANDING_CAP);
+        setMaxAutoRetries(preferences.maxAutoRetries);
+        setBackoffSeconds(preferences.backoffSeconds);
+        setExponentialBackoffFactor(preferences.exponentialBackoffFactor);
+        setAccountCapEnabled(preferences.accountWideMonthlyCapCents !== null);
+        setAccountCapCents(
+            parseCapCents(preferences.accountWideMonthlyCapCents) ??
+                DEFAULT_ACCOUNT_MONTHLY_CAP_CENTS,
+        );
+        setAccountAllowOverage(preferences.accountWideAllowOverage);
+    }, [preferences]);
 
-        const interval = window.setInterval(() => router.refresh(), 5000);
+    useEffect(() => {
+        const intervalMs = activeRun ? 5_000 : 15_000;
+        const interval = window.setInterval(() => router.refresh(), intervalMs);
         return () => window.clearInterval(interval);
     }, [activeRun, router]);
 

@@ -27,6 +27,7 @@ import {
     WorkAgentGoalStatus,
     WorkAgentRunLogLevel,
     WorkAgentRunStatus,
+    SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN,
 } from '@ever-works/agent/work-agent';
 
 export class WorkAgentGuardrailsDto implements Partial<WorkAgentGuardrails> {
@@ -89,6 +90,10 @@ export class UpdateWorkAgentPreferencesDto
 
     @IsOptional()
     @IsString()
+    @Matches(SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN, {
+        message:
+            'autoGenerateCadence must use the supported */N * * * * format with N between 1 and 1440',
+    })
     @MaxLength(64)
     autoGenerateCadence?: string | null;
 

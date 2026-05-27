@@ -6,6 +6,7 @@ jest.mock('@ever-works/agent/cache', () => ({
 }));
 jest.mock('@ever-works/agent/entities', () => ({
     User: class User {},
+    WorkAgentPreference: class WorkAgentPreference {},
 }));
 jest.mock('@ever-works/agent/user-research', () => ({
     UserResearchModule: class UserResearchModule {},
@@ -33,6 +34,8 @@ jest.mock('@ever-works/agent/user-research', () => ({
 // from @ever-works/agent/work-agent; matching the other deep-import
 // stubs in this file.
 jest.mock('@ever-works/agent/work-agent', () => ({
+    DEFAULT_AUTO_GENERATE_CADENCE_MINUTES: 60,
+    parseAutoGenerateCadenceMinutes: jest.fn(() => null),
     WorkAgentService: class WorkAgentService {},
     WorkAgentModule: class WorkAgentModule {},
 }));

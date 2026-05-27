@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Repository } from 'typeorm';
-import { User, type WorkProposal } from '@ever-works/agent/entities';
+import { In, Repository } from 'typeorm';
+import { User, WorkAgentPreference, type WorkProposal } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
 import {
@@ -14,20 +14,26 @@ import {
     WorkProposalSource,
     WorkProposalStatus,
 } from '@ever-works/agent/user-research';
-import { WorkAgentService } from '@ever-works/agent/work-agent';
+import {
+    DEFAULT_AUTO_GENERATE_CADENCE_MINUTES,
+    parseAutoGenerateCadenceMinutes,
+    WorkAgentService,
+} from '@ever-works/agent/work-agent';
 import type { WorkAgentGoalDto } from '@ever-works/agent/work-agent';
 
 export interface ScheduledBatchSummary {
     candidates: number;
+    due: number;
     queued: number;
     skipped: number;
     failed: number;
     batchSize: number;
-    staleDays: number;
+    scanLimit: number;
+    defaultCadenceMinutes: number;
 }
 
 const SCHEDULED_RERUN_BATCH_SIZE = 20;
-const SCHEDULED_RERUN_STALE_DAYS = 30;
+const SCHEDULED_RERUN_SCAN_LIMIT = 200;
 const PIPELINE_LOCK_TTL_MS = 2 * 60 * 60 * 1000;
 const PIPELINE_LOCK_KEY_PREFIX = 'work-proposals:pipeline';
 
@@ -42,6 +48,8 @@ export class WorkProposalsApiService {
         private readonly limits: UserResearchLimitsService,
         private readonly users: UserRepository,
         @InjectRepository(User) private readonly userOrmRepo: Repository<User>,
+        @InjectRepository(WorkAgentPreference)
+        private readonly workAgentPreferences: Repository<WorkAgentPreference>,
         private readonly config: ConfigService,
         private readonly workAgent: WorkAgentService,
         private readonly taskLockService?: DistributedTaskLockService,
@@ -277,34 +285,51 @@ export class WorkProposalsApiService {
         return { status: 'queued' };
     }
 
-    /** Pick stale candidate users and queue a refresh for each. */
+    /** Pick users whose configured auto-generate cadence is due and queue a refresh. */
     async runScheduledBatch(): Promise<ScheduledBatchSummary> {
         const batchSize = SCHEDULED_RERUN_BATCH_SIZE;
-        const staleDays = SCHEDULED_RERUN_STALE_DAYS;
-        const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
+        const scanLimit = SCHEDULED_RERUN_SCAN_LIMIT;
+        const now = new Date();
 
         const candidates = await this.userOrmRepo.find({
-            where: [
-                { isActive: true, userResearchOptOut: false, inferredInterests: IsNull() },
-                { isActive: true, userResearchOptOut: false, updatedAt: LessThan(cutoff) },
-            ],
-            take: batchSize,
+            where: { isActive: true, userResearchOptOut: false },
+            take: scanLimit,
             order: { updatedAt: 'ASC' },
         });
 
+        const preferenceRows = candidates.length
+            ? await this.workAgentPreferences.find({
+                  where: { userId: In(candidates.map((user) => user.id)) },
+              })
+            : [];
+        const preferencesByUserId = new Map(preferenceRows.map((prefs) => [prefs.userId, prefs]));
+
+        let due = 0;
         let queued = 0;
         let skipped = 0;
         let failed = 0;
 
         for (const user of candidates) {
-            const researchedAt = user.inferredInterests?.researchedAt
-                ? new Date(user.inferredInterests.researchedAt)
-                : null;
-            if (researchedAt && researchedAt > cutoff) {
-                skipped++;
-                continue;
-            }
             try {
+                const prefs = preferencesByUserId.get(user.id);
+                const cadenceMinutes =
+                    parseAutoGenerateCadenceMinutes(prefs?.autoGenerateCadence) ??
+                    DEFAULT_AUTO_GENERATE_CADENCE_MINUTES;
+
+                if (
+                    prefs?.dailySuggestionsEnabled === false ||
+                    !this.isScheduledRefreshDue(user, cadenceMinutes, now)
+                ) {
+                    skipped++;
+                    continue;
+                }
+
+                due++;
+                if (due > batchSize) {
+                    skipped++;
+                    continue;
+                }
+
                 const result = await this.refresh(user.id, WorkProposalSource.SCHEDULED);
                 if (result.status === 'queued') queued++;
                 else skipped++;
@@ -318,18 +343,31 @@ export class WorkProposalsApiService {
 
         const summary: ScheduledBatchSummary = {
             candidates: candidates.length,
+            due,
             queued,
             skipped,
             failed,
             batchSize,
-            staleDays,
+            scanLimit,
+            defaultCadenceMinutes: DEFAULT_AUTO_GENERATE_CADENCE_MINUTES,
         };
         if (candidates.length > 0 || failed > 0) {
             this.logger.log(
-                `Scheduled rerun batch: ${queued} queued, ${skipped} skipped, ${failed} failed (${candidates.length}/${batchSize} candidates, staleDays=${staleDays})`,
+                `Scheduled rerun batch: ${queued} queued, ${skipped} skipped, ${failed} failed (${due}/${candidates.length} due, batchSize=${batchSize}, scanLimit=${scanLimit})`,
             );
         }
         return summary;
+    }
+
+    private isScheduledRefreshDue(user: User, cadenceMinutes: number, now: Date): boolean {
+        const researchedAtRaw = user.inferredInterests?.researchedAt;
+        if (!researchedAtRaw) return true;
+
+        const researchedAt = new Date(researchedAtRaw);
+        if (!Number.isFinite(researchedAt.getTime())) return true;
+
+        const cadenceMs = cadenceMinutes * 60 * 1000;
+        return now.getTime() - researchedAt.getTime() >= cadenceMs;
     }
 
     private getPipelineLockKey(userId: string): string {

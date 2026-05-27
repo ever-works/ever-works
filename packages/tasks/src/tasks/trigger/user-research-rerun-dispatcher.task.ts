@@ -7,7 +7,7 @@ import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 export const userResearchRerunDispatcherTask = schedules.task({
     id: 'user-research-rerun-dispatcher',
-    cron: '0 3 * * *',
+    cron: '* * * * *',
     run: async () => {
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('UserResearchRerunDispatcher'));
