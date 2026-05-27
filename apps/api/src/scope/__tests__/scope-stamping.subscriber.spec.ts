@@ -128,4 +128,50 @@ describe('ScopeStampingSubscriber (EW-657 Phase 5b)', () => {
             }).not.toThrow();
         });
     });
+
+    describe('lifecycle (HMR safety)', () => {
+        it('onModuleInit registers exactly once even when called multiple times', () => {
+            const dataSource = { subscribers: [] as unknown[] } as unknown as DataSource;
+            const sub = new ScopeStampingSubscriber(dataSource, scopeContext);
+
+            sub.onModuleInit();
+            sub.onModuleInit();
+            sub.onModuleInit();
+
+            expect(dataSource.subscribers).toHaveLength(1);
+            expect(dataSource.subscribers[0]).toBe(sub);
+        });
+
+        it('onModuleDestroy removes this instance from the DataSource', () => {
+            const dataSource = { subscribers: [] as unknown[] } as unknown as DataSource;
+            const sub = new ScopeStampingSubscriber(dataSource, scopeContext);
+
+            sub.onModuleInit();
+            expect(dataSource.subscribers).toContain(sub);
+
+            sub.onModuleDestroy();
+            expect(dataSource.subscribers).not.toContain(sub);
+        });
+
+        it('onModuleDestroy is a no-op when this instance is not registered', () => {
+            const dataSource = { subscribers: [] as unknown[] } as unknown as DataSource;
+            const sub = new ScopeStampingSubscriber(dataSource, scopeContext);
+
+            expect(() => sub.onModuleDestroy()).not.toThrow();
+            expect(dataSource.subscribers).toHaveLength(0);
+        });
+
+        it('onModuleDestroy preserves other subscribers on the DataSource', () => {
+            const otherSubscriber = { name: 'other' };
+            const dataSource = {
+                subscribers: [otherSubscriber] as unknown[],
+            } as unknown as DataSource;
+            const sub = new ScopeStampingSubscriber(dataSource, scopeContext);
+
+            sub.onModuleInit();
+            sub.onModuleDestroy();
+
+            expect(dataSource.subscribers).toEqual([otherSubscriber]);
+        });
+    });
 });

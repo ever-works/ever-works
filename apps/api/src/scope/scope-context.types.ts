@@ -23,7 +23,12 @@ export interface ScopeContext {
     readonly organizationId: string | null;
 }
 
-export const EMPTY_SCOPE: ScopeContext = {
+// `Object.freeze` for runtime immutability — the TypeScript `readonly`
+// modifier on `ScopeContext` is compile-time only, and a consumer that
+// casts (e.g. `getScope() as { tenantId: string }`) or spreads could
+// otherwise silently mutate the shared singleton and corrupt every
+// future out-of-`runWith` reader. (Greptile P2 on PR #1055.)
+export const EMPTY_SCOPE: ScopeContext = Object.freeze({
     tenantId: null,
     organizationId: null,
-};
+});

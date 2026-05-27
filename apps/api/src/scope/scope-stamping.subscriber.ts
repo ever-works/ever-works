@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntitySubscriberInterface, InsertEvent } from 'typeorm';
 import { ScopeContextService } from './scope-context.service';
@@ -54,7 +54,9 @@ import { ScopeContextService } from './scope-context.service';
  * a no-op (column default is null).
  */
 @Injectable()
-export class ScopeStampingSubscriber implements EntitySubscriberInterface, OnModuleInit {
+export class ScopeStampingSubscriber
+    implements EntitySubscriberInterface, OnModuleInit, OnModuleDestroy
+{
     private readonly logger = new Logger(ScopeStampingSubscriber.name);
 
     constructor(
@@ -69,8 +71,25 @@ export class ScopeStampingSubscriber implements EntitySubscriberInterface, OnMod
         // latter so this subscriber lives in apps/api/ (where the
         // ScopeContextService also lives) instead of bleeding into the
         // shared agent package's database.config.ts.
-        this.dataSource.subscribers.push(this);
-        this.logger.debug('ScopeStampingSubscriber registered on DataSource');
+        //
+        // Guard against duplicate registration (e.g. HMR-driven module
+        // re-init in dev) — pushing twice would have the new + stale
+        // instances both fire on every insert. (Greptile P2 on PR #1055.)
+        if (!this.dataSource.subscribers.includes(this)) {
+            this.dataSource.subscribers.push(this);
+            this.logger.debug('ScopeStampingSubscriber registered on DataSource');
+        }
+    }
+
+    onModuleDestroy(): void {
+        // Symmetric removal so HMR / `app.close()` doesn't leave a
+        // defunct instance pinned in `dataSource.subscribers` (it'd
+        // hold a live reference to the old ScopeContextService and
+        // leak memory across reloads). (Greptile P2 on PR #1055.)
+        const idx = this.dataSource.subscribers.indexOf(this);
+        if (idx !== -1) {
+            this.dataSource.subscribers.splice(idx, 1);
+        }
     }
 
     beforeInsert(event: InsertEvent<unknown>): void {
