@@ -436,17 +436,11 @@ describe('UploadsService', () => {
     });
 
     describe('saveFile — broader-than-image accept list', () => {
-        const fakeFileWith = (
-            buffer: Buffer,
-            mimetype: string,
-            originalname = 'probe.bin',
-        ) => fakeFile({ buffer, mimetype, size: buffer.length, originalname });
+        const fakeFileWith = (buffer: Buffer, mimetype: string, originalname = 'probe.bin') =>
+            fakeFile({ buffer, mimetype, size: buffer.length, originalname });
 
         it('accepts PDF via magic-byte sniff', async () => {
-            const pdf = Buffer.concat([
-                Buffer.from('%PDF-1.4\n', 'ascii'),
-                Buffer.alloc(64, 0x20),
-            ]);
+            const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n', 'ascii'), Buffer.alloc(64, 0x20)]);
             const r = await service.saveFile(
                 userId,
                 fakeFileWith(pdf, 'application/pdf', 'doc.pdf'),
@@ -493,10 +487,7 @@ describe('UploadsService', () => {
 
         it('accepts a plain-text file with no NUL bytes', async () => {
             const text = Buffer.from('hello, world\nline two\n', 'utf-8');
-            const r = await service.saveFile(
-                userId,
-                fakeFileWith(text, 'text/plain', 'notes.txt'),
-            );
+            const r = await service.saveFile(userId, fakeFileWith(text, 'text/plain', 'notes.txt'));
             expect(r.filename.endsWith('.txt')).toBe(true);
             expect(r.mimeType).toBe('text/plain');
         });
@@ -533,10 +524,7 @@ describe('UploadsService', () => {
         it('rejects a file whose bytes do not match the declared MIME', async () => {
             // Declared PDF but bytes are PNG.
             await expect(
-                service.saveFile(
-                    userId,
-                    fakeFileWith(TINY_PNG, 'application/pdf', 'fake.pdf'),
-                ),
+                service.saveFile(userId, fakeFileWith(TINY_PNG, 'application/pdf', 'fake.pdf')),
             ).rejects.toThrow(BadRequestException);
         });
     });

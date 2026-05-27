@@ -160,9 +160,7 @@ export default function NewWorkClient({
     // chips (roadmap, not shipped) appended after the live kinds so they
     // match the marketing site's chip catalog without breaking the
     // existing /works/new kind picker behavior.
-    const workKindChips = useMemo<
-        ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>
-    >(
+    const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
         () => [
             ...WORK_KIND_ORDER.map((k) => ({
                 value: k,
@@ -234,11 +232,7 @@ export default function NewWorkClient({
                                     // chips and never get emitted — narrow
                                     // back to InitialWorkKind before
                                     // persisting.
-                                    if (
-                                        next === null ||
-                                        next === 'store' ||
-                                        next === 'company'
-                                    ) {
+                                    if (next === null || next === 'store' || next === 'company') {
                                         return;
                                     }
                                     setSelectedKind(next);

@@ -77,17 +77,17 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
 
     it('pre-selects the chip from initialType prop', () => {
         const { container } = render(<NewPageClient initialType="mission" />);
-        const mission = Array.from(container.querySelectorAll('button[role="option"][aria-selected]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
         expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('defaults to Mission when no initialType is supplied', () => {
         const { container } = render(<NewPageClient />);
-        const mission = Array.from(container.querySelectorAll('button[role="option"][aria-selected]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
         expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 

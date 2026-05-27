@@ -19,7 +19,10 @@ import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Upload IDs are SHA-256 hex strings (the `id` field returned by
+// POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
+// (Codex + Greptile P1 on PR #1044).
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 
 /**
  * Input shape for `MissionsService.create`. Mirrors the writable
@@ -381,7 +384,7 @@ export class MissionsService {
         uploadId: string,
     ): Promise<MissionAttachment> {
         await this.findOrThrow(userId, missionId);
-        if (!uploadId || !UUID_RE.test(uploadId)) {
+        if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
         if (!this.missionAttachments) {
@@ -394,10 +397,7 @@ export class MissionsService {
         } catch (err) {
             // Duplicate (missionId, uploadId) — swallow and re-read.
             // Mirrors the idempotency contract on Task attachments.
-            if (
-                err instanceof Error &&
-                /duplicate key|unique constraint/i.test(err.message)
-            ) {
+            if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (await this.missionAttachments.findByMissionId(missionId)).find(
                     (a) => a.uploadId === uploadId,
                 );

@@ -25,9 +25,11 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { NumberField, StatusPill, ToggleRow } from '@/components/work-agent';
 import {
+    attachUploadToMissionAction,
     cloneMissionAction,
     completeMissionAction,
     deleteMissionAction,
+    detachMissionAttachmentAction,
     pauseMissionAction,
     resumeMissionAction,
     runMissionNowAction,
@@ -38,10 +40,6 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
-import {
-    attachUploadToMissionAction,
-    detachMissionAttachmentAction,
-} from '@/app/actions/dashboard/missions';
 import {
     Dialog,
     DialogContent,
@@ -626,9 +624,7 @@ export function MissionDetailClient({
             <EntityAttachmentsSection
                 initial={attachments}
                 onAttach={(uploadId) => attachUploadToMissionAction(mission.id, uploadId)}
-                onDetach={(attachmentId) =>
-                    detachMissionAttachmentAction(mission.id, attachmentId)
-                }
+                onDetach={(attachmentId) => detachMissionAttachmentAction(mission.id, attachmentId)}
                 testId="mission-attachments"
             />
 

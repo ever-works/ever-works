@@ -26,7 +26,10 @@ import { slugifyText } from '../utils/text.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Upload IDs are SHA-256 hex strings (the `id` field returned by
+// POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
+// (Codex + Greptile P1 on PR #1044).
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 
 /**
  * Create-Agent input — writable subset of the entity. Validation
@@ -398,13 +401,9 @@ export class AgentsService {
     }
 
     /** Attach an uploaded file to an Agent. Idempotent. */
-    async addAttachment(
-        userId: string,
-        id: string,
-        uploadId: string,
-    ): Promise<AgentAttachment> {
+    async addAttachment(userId: string, id: string, uploadId: string): Promise<AgentAttachment> {
         await this.requireOwned(userId, id);
-        if (!uploadId || !UUID_RE.test(uploadId)) {
+        if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
         if (!this.agentAttachments) {
@@ -415,10 +414,7 @@ export class AgentsService {
         try {
             return await this.agentAttachments.add(id, uploadId);
         } catch (err) {
-            if (
-                err instanceof Error &&
-                /duplicate key|unique constraint/i.test(err.message)
-            ) {
+            if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (await this.agentAttachments.findByAgentId(id)).find(
                     (a) => a.uploadId === uploadId,
                 );

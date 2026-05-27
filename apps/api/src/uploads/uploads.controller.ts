@@ -351,7 +351,6 @@ export class UploadsController {
     async uploadAnonymousFile(
         @UploadedFile() file: Express.Multer.File | undefined,
         @Req() req: AnonRequest,
-        @Headers('x-correlation-id') correlationHeader: string | undefined,
     ) {
         if (!file) {
             throw new BadRequestException({
@@ -364,7 +363,11 @@ export class UploadsController {
 
         const result = await this.uploads.saveFile(userId, file);
 
-        void correlationHeader;
+        // The existing /anonymous endpoint takes an `x-correlation-id`
+        // header for future telemetry; we omit it here until the
+        // funnel-emit follow-up wires it in. Adding the parameter
+        // before it has a consumer was flagged as dead code (Greptile
+        // P2 on PR #1044).
 
         return {
             uploadId: result.key ?? `${userId}/${result.filename}`,

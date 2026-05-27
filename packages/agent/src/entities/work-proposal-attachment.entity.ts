@@ -33,7 +33,9 @@ export class WorkProposalAttachment {
     @JoinColumn({ name: 'workProposalId' })
     workProposal?: WorkProposal;
 
-    @Column({ type: 'uuid' })
+    // SHA-256 content hash (64 lowercase hex) — see MissionAttachment
+    // for the rationale + Codex/Greptile P1 reference.
+    @Column({ type: 'varchar', length: 64 })
     uploadId: string;
 
     @CreateDateColumn()

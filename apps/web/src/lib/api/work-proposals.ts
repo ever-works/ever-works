@@ -201,16 +201,12 @@ export const workProposalsAPI = {
     // PromptComposer-driven flows can attach files uniformly across
     // Mission / Idea creates.
     async listAttachments(id: string): Promise<WorkProposalAttachmentRow[]> {
-        return serverFetch<WorkProposalAttachmentRow[]>(
-            `/me/work-proposals/${id}/attachments`,
-            { method: 'GET' },
-        );
+        return serverFetch<WorkProposalAttachmentRow[]>(`/me/work-proposals/${id}/attachments`, {
+            method: 'GET',
+        });
     },
 
-    async addAttachment(
-        id: string,
-        uploadId: string,
-    ): Promise<WorkProposalAttachmentRow> {
+    async addAttachment(id: string, uploadId: string): Promise<WorkProposalAttachmentRow> {
         return serverMutation<WorkProposalAttachmentRow>({
             endpoint: `/me/work-proposals/${id}/attachments`,
             data: { uploadId },
@@ -219,10 +215,7 @@ export const workProposalsAPI = {
         });
     },
 
-    async removeAttachment(
-        id: string,
-        attachmentId: string,
-    ): Promise<{ deleted: true }> {
+    async removeAttachment(id: string, attachmentId: string): Promise<{ deleted: true }> {
         return serverMutation<{ deleted: true }>({
             endpoint: `/me/work-proposals/${id}/attachments/${attachmentId}`,
             data: {},

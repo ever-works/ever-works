@@ -1,10 +1,7 @@
 'use client';
 
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
-import {
-    attachUploadToAgentAction,
-    detachAgentAttachmentAction,
-} from '@/app/actions/agents';
+import { attachUploadToAgentAction, detachAgentAttachmentAction } from '@/app/actions/agents';
 import type { AgentAttachmentRow } from '@/lib/api/agents';
 
 /**

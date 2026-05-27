@@ -103,9 +103,7 @@ export function PromptChipsRow<TValue extends string = string>({
                         onClick={() => scrollBy(-220)}
                         aria-label="Scroll chips left"
                         className="absolute left-0 top-1/2 z-20 grid -translate-y-1/2 place-items-center rounded-full border border-border/60 dark:border-white/10 bg-background/90 dark:bg-black/80 size-8 shadow-md hover:bg-foreground/5"
-                        data-testid={
-                            testIdPrefix ? `${testIdPrefix}-scroll-left` : undefined
-                        }
+                        data-testid={testIdPrefix ? `${testIdPrefix}-scroll-left` : undefined}
                     >
                         <ChevronLeft className="size-4" aria-hidden="true" />
                     </button>
@@ -163,9 +161,7 @@ export function PromptChipsRow<TValue extends string = string>({
                             // is the right toggle state inside a listbox; tests
                             // querying by `[aria-selected]` get the live chips.
                             onClick={() => onChange(selected ? null : c.value)}
-                            data-testid={
-                                testIdPrefix ? `${testIdPrefix}-${c.value}` : undefined
-                            }
+                            data-testid={testIdPrefix ? `${testIdPrefix}-${c.value}` : undefined}
                             className={cn(
                                 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors',
                                 selected
@@ -191,9 +187,7 @@ export function PromptChipsRow<TValue extends string = string>({
                         onClick={() => scrollBy(220)}
                         aria-label="Scroll chips right"
                         className="absolute right-0 top-1/2 z-20 grid -translate-y-1/2 place-items-center rounded-full border border-border/60 dark:border-white/10 bg-background/90 dark:bg-black/80 size-8 shadow-md hover:bg-foreground/5"
-                        data-testid={
-                            testIdPrefix ? `${testIdPrefix}-scroll-right` : undefined
-                        }
+                        data-testid={testIdPrefix ? `${testIdPrefix}-scroll-right` : undefined}
                     >
                         <ChevronRight className="size-4" aria-hidden="true" />
                     </button>

@@ -16,12 +16,15 @@ import { Mission } from './mission.entity';
  * sections under `apps/web/src/components/missions/` etc. all consume
  * an identical row shape).
  *
- * `uploadId` is an opaque FK to a row in `work_knowledge_uploads` —
- * the same upload pipeline backing Task attachments and the broader
- * `POST /api/uploads/file` endpoint. No DB-level FK constraint on
- * `uploadId` so an upload can be GC'd or rolled over without forcing
- * a cascade through every attachment table; service-layer code
- * validates the upload row exists before insert.
+ * `uploadId` stores the SHA-256 content hash returned as `id` by
+ * `POST /api/uploads/file` (and `POST /api/uploads`). Stored as
+ * `varchar(64)` because sha256 in hex form is 64 lowercase hex
+ * characters — not a UUID, so a `uuid` column would reject every
+ * insert (Codex + Greptile P1 on PR #1044). No DB-level FK constraint
+ * either: the upload pipeline may GC the storage object independently
+ * (anonymous TTL, manual delete) and we don't want the attachment row
+ * dropped underneath us; service-layer code validates the hash shape
+ * before insert.
  */
 @Entity({ name: 'mission_attachments' })
 @Index('uq_mission_attachment', ['missionId', 'uploadId'], { unique: true })
@@ -37,7 +40,7 @@ export class MissionAttachment {
     @JoinColumn({ name: 'missionId' })
     mission?: Mission;
 
-    @Column({ type: 'uuid' })
+    @Column({ type: 'varchar', length: 64 })
     uploadId: string;
 
     @CreateDateColumn()

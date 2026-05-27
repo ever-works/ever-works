@@ -1,10 +1,4 @@
-import {
-    MigrationInterface,
-    QueryRunner,
-    Table,
-    TableForeignKey,
-    TableIndex,
-} from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
 
 /**
  * Adds three Mission/Idea/Agent → Upload edge tables. Mirrors the
@@ -16,8 +10,12 @@ import {
  *   - `<parent>Id` uuid NOT NULL, FK to the parent table with
  *     ON DELETE CASCADE so cleaning up the Mission / Idea / Agent
  *     also clears its attachment edges
- *   - `uploadId` uuid NOT NULL (no DB-level FK — service validates;
- *     mirrors `task_attachments`)
+ *   - `uploadId` varchar(64) NOT NULL — SHA-256 content hash returned
+ *     as `id` by POST /api/uploads/file. Stored as varchar(64) rather
+ *     than uuid because sha256 isn't UUID-shaped (Codex + Greptile P1
+ *     on PR #1044). No DB-level FK — the upload pipeline can GC the
+ *     storage object independently; service-layer validates the hash
+ *     shape on insert.
  *   - `createdAt` timestamp NOT NULL default now()
  *   - unique index on (`<parent>Id`, `uploadId`) — same Upload can
  *     only be attached to the same parent once
@@ -27,9 +25,7 @@ import {
  * Idempotent: each `CREATE TABLE` is guarded by `hasTable`, each index
  * by name lookup. Re-runs are no-ops.
  */
-export class CreateMissionIdeaAgentAttachmentTables1779991000000
-    implements MigrationInterface
-{
+export class CreateMissionIdeaAgentAttachmentTables1779991000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         await this.createAttachmentTable(queryRunner, {
             tableName: 'mission_attachments',
@@ -94,7 +90,9 @@ export class CreateMissionIdeaAgentAttachmentTables1779991000000
                             default: 'uuid_generate_v4()',
                         },
                         { name: parentColumn, type: 'uuid', isNullable: false },
-                        { name: 'uploadId', type: 'uuid', isNullable: false },
+                        // SHA-256 content hash — varchar(64) not uuid.
+                        // See header comment for the Codex/Greptile P1.
+                        { name: 'uploadId', type: 'varchar', length: '64', isNullable: false },
                         {
                             name: 'createdAt',
                             type: 'timestamp',

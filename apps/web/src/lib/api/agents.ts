@@ -412,10 +412,7 @@ export const agentsAPI = {
         });
     },
 
-    async removeAttachment(
-        id: string,
-        attachmentId: string,
-    ): Promise<{ deleted: true }> {
+    async removeAttachment(id: string, attachmentId: string): Promise<{ deleted: true }> {
         return serverMutation<{ deleted: true }>({
             endpoint: `/agents/${id}/attachments/${attachmentId}`,
             data: {},

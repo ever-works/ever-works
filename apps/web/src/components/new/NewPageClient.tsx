@@ -27,10 +27,7 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
-import {
-    attachUploadToMissionAction,
-    createMissionAction,
-} from '@/app/actions/dashboard/missions';
+import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -263,15 +260,15 @@ export function NewPageClient({
                     // proceed rather than rolling back. github-repo
                     // entries are skipped — they're metadata refs, not
                     // uploaded files.
-                    const refsToAttach = buildAttachmentRefs(attachments).filter(
-                        (r) => r.kind === 'upload',
-                    );
-                    if (refsToAttach.length > 0) {
-                        const uploadIds = attachments.flatMap((a) =>
-                            a.kind !== 'github-repo' && a.uploadId && !a.error
-                                ? [a.uploadId]
-                                : [],
-                        );
+                    // Single source of truth — `buildAttachmentRefs`
+                    // already filters in-flight + failed uploads and
+                    // carries the `uploadId` on each `upload` ref
+                    // (Greptile P2 on PR #1044: avoids re-scanning the
+                    // raw attachments with a divergent filter).
+                    const uploadIds = buildAttachmentRefs(attachments)
+                        .filter((r) => r.kind === 'upload' && r.uploadId)
+                        .map((r) => r.uploadId!);
+                    if (uploadIds.length > 0) {
                         const failed: string[] = [];
                         for (const uploadId of uploadIds) {
                             try {
@@ -392,11 +389,7 @@ export function NewPageClient({
                                 // `store` and `company` are inert, so the
                                 // chips row never emits them — narrow back
                                 // to ChipType before persisting.
-                                if (
-                                    next === null ||
-                                    next === 'store' ||
-                                    next === 'company'
-                                ) {
+                                if (next === null || next === 'store' || next === 'company') {
                                     return;
                                 }
                                 setSelectedChip(next);

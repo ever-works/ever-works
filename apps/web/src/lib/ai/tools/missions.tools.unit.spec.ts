@@ -325,10 +325,7 @@ describe('createMission — attachmentIds wiring', () => {
             attachments?: { attached: number; failed: number };
         }>(createMission, {
             description: 'A new mission with attached files',
-            attachmentIds: [
-                `/api/uploads/user-1/${sha}.pdf`,
-                `/api/uploads/user-1/${sha2}.png`,
-            ],
+            attachmentIds: [`/api/uploads/user-1/${sha}.pdf`, `/api/uploads/user-1/${sha2}.png`],
         });
         expect(attachUploadMock).toHaveBeenCalledTimes(2);
         expect(attachUploadMock).toHaveBeenNthCalledWith(1, 'm-new', sha);

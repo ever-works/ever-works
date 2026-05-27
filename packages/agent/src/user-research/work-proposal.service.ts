@@ -13,7 +13,10 @@ import { WorkProposalRepository } from './work-proposal.repository';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Upload IDs are SHA-256 hex strings (the `id` field returned by
+// POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
+// (Codex + Greptile P1 on PR #1044).
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 import { permissiveWorkProposalsBatchSchema, type WorkProposalDraft } from './schemas';
 import { coerceWorkProposal } from './proposal-coercion';
 import {
@@ -168,10 +171,7 @@ export class WorkProposalService {
      * List the Upload edges attached to an Idea. Validates ownership
      * before reading.
      */
-    async listAttachments(
-        userId: string,
-        proposalId: string,
-    ): Promise<WorkProposalAttachment[]> {
+    async listAttachments(userId: string, proposalId: string): Promise<WorkProposalAttachment[]> {
         const proposal = await this.repo.findByIdForUser(proposalId, userId);
         if (!proposal) {
             throw new NotFoundException(`Idea not found`);
@@ -193,7 +193,7 @@ export class WorkProposalService {
         if (!proposal) {
             throw new NotFoundException(`Idea not found`);
         }
-        if (!uploadId || !UUID_RE.test(uploadId)) {
+        if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
         if (!this.proposalAttachments) {
@@ -204,10 +204,7 @@ export class WorkProposalService {
         try {
             return await this.proposalAttachments.add(proposalId, uploadId);
         } catch (err) {
-            if (
-                err instanceof Error &&
-                /duplicate key|unique constraint/i.test(err.message)
-            ) {
+            if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (
                     await this.proposalAttachments.findByWorkProposalId(proposalId)
                 ).find((a) => a.uploadId === uploadId);

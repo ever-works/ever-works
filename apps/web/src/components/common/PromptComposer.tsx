@@ -40,7 +40,8 @@ const HOLD_ERASED_MS = 350;
 // `https://github.com/<owner>/<repo>` shape (optionally trailing slash,
 // `.git`, or extra path segments). The chat / canvas flows do deeper
 // validation; this is just to keep obvious garbage out of the picker.
-const GITHUB_REPO_RE = /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+?)(?:\.git)?\/?(?:[/?#].*)?$/i;
+const GITHUB_REPO_RE =
+    /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+?)(?:\.git)?\/?(?:[/?#].*)?$/i;
 
 function useTypewriterPlaceholder(
     focused: boolean,
@@ -619,9 +620,7 @@ export function PromptComposer({
                                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${variant}`}
                                     title={a.error || a.displayName}
                                     data-testid={
-                                        testId
-                                            ? `${testId}-attachment-${stateTag}`
-                                            : undefined
+                                        testId ? `${testId}-attachment-${stateTag}` : undefined
                                     }
                                 >
                                     {a.uploading ? (
@@ -632,7 +631,10 @@ export function PromptComposer({
                                     ) : a.kind === 'folder-file' ? (
                                         <Folder className="size-3 opacity-60" aria-hidden="true" />
                                     ) : (
-                                        <FileIcon className="size-3 opacity-60" aria-hidden="true" />
+                                        <FileIcon
+                                            className="size-3 opacity-60"
+                                            aria-hidden="true"
+                                        />
                                     )}
                                     <span className="max-w-[12rem] truncate" title={a.displayName}>
                                         {a.displayName}
@@ -686,7 +688,10 @@ export function PromptComposer({
                                 // and surface every file in it. React 19 types
                                 // accept it as a string attribute; cast for older
                                 // types.
-                                {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+                                {...({ webkitdirectory: '', directory: '' } as Record<
+                                    string,
+                                    string
+                                >)}
                             />
 
                             <div className="relative">
@@ -941,6 +946,13 @@ export interface ComposerAttachmentRef {
     readonly url: string;
     readonly mimeType?: string;
     readonly kind: 'upload' | 'github-repo';
+    /**
+     * SHA-256 upload id — present only for `kind: 'upload'` refs that
+     * have completed. Callers that wire the upload to a freshly-
+     * created entity (Mission/Idea/Agent) pass this to
+     * `addAttachment`. The chat-forwarder ignores this field.
+     */
+    readonly uploadId?: string;
 }
 
 export function buildAttachmentRefs(
@@ -952,12 +964,13 @@ export function buildAttachmentRefs(
             refs.push({ name: a.displayName, url: a.url, kind: 'github-repo' });
             continue;
         }
-        if (a.url && !a.uploading && !a.error) {
+        if (a.url && a.uploadId && !a.uploading && !a.error) {
             refs.push({
                 name: a.displayName,
                 url: a.url,
                 mimeType: a.mimeType,
                 kind: 'upload',
+                uploadId: a.uploadId,
             });
         }
     }

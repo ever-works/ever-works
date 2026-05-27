@@ -412,8 +412,7 @@ export class UploadsService {
             });
         }
 
-        const maxFileSize =
-            Number(process.env.UPLOADS_FILE_MAX_BYTES) || DEFAULT_MAX_FILE_SIZE;
+        const maxFileSize = Number(process.env.UPLOADS_FILE_MAX_BYTES) || DEFAULT_MAX_FILE_SIZE;
         if (file.size > maxFileSize) {
             throw new BadRequestException({
                 status: 'error',
