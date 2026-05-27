@@ -4,21 +4,23 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
     BookOpen,
     Bot,
+    Building2,
     Files,
     FolderOpen,
     Globe,
     Lightbulb,
     ListChecks,
     Star,
+    Store,
     Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { PromptComposer } from '@/components/common/PromptComposer';
+import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { cn } from '@/lib/utils/cn';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { createMissionAction } from '@/app/actions/dashboard/missions';
@@ -36,6 +38,12 @@ import { createMissionAction } from '@/app/actions/dashboard/missions';
  *                       there collect any remaining bits and persist).
  *   - website + 4 work kinds — forwarded to `/works/new` with the
  *                       prompt and the selected kind preserved.
+ *
+ * `store` and `company` are catalog entries telegraphing roadmap
+ * scope (see Workspace notes `2026-05-23-missions-ideas-works-spec.md`
+ * + AGENTS.md "stores + companies are in-scope future use cases"). They
+ * render as inert "Soon" chips and aren't selectable yet, matching how
+ * the marketing site already telegraphs them.
  *
  * The chat panel is auto-collapsed on mount so the prompt + chips
  * get the full main column on first land. Users can reopen it from
@@ -290,6 +298,22 @@ export function NewPageClient({
         [selectedChip],
     );
 
+    // Full chip catalog. `store` + `company` are inert "Soon" chips,
+    // appended after the live chips so they sit at the end of the
+    // horizontal scroll the way the marketing site does it.
+    const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store' | 'company'>>>(
+        () => [
+            ...CHIP_ORDER.map((c) => ({
+                value: c,
+                label: t(`chips.${c}`),
+                Icon: CHIP_ICONS[c],
+            })),
+            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
+        ],
+        [t],
+    );
+
     return (
         <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-6">
             <div>
@@ -299,8 +323,9 @@ export function NewPageClient({
                 </p>
             </div>
 
-            {/* Composer with chips below — sits directly on the page's
-                dark background, no nested card wrapper. */}
+            {/* Composer with chips rendered BELOW the card (matches the
+                website's landing layout — chips sit outside the input
+                container, not inside). */}
             <PromptComposer
                 inputId="new-prompt"
                 value={prompt}
@@ -312,32 +337,28 @@ export function NewPageClient({
                 ariaLabel={t('promptLabel')}
                 submitTitle={t('submitTitle')}
                 testId="new-prompt"
-                belowInput={
+                chipsBelow={
                     <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                            {CHIP_ORDER.map((c) => {
-                                const Icon = CHIP_ICONS[c];
-                                const active = selectedChip === c;
-                                return (
-                                    <button
-                                        key={c}
-                                        type="button"
-                                        onClick={() => setSelectedChip(c)}
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors whitespace-nowrap',
-                                            active
-                                                ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
-                                                : 'border-border/60 dark:border-white/10 bg-transparent text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
-                                        )}
-                                        aria-pressed={active}
-                                    >
-                                        <Icon className="w-3.5 h-3.5" />
-                                        {t(`chips.${c}`)}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        <PromptChipsRow
+                            chips={allChips}
+                            value={selectedChip}
+                            onChange={(next) => {
+                                // `store` and `company` are inert, so the
+                                // chips row never emits them — narrow back
+                                // to ChipType before persisting.
+                                if (
+                                    next === null ||
+                                    next === 'store' ||
+                                    next === 'company'
+                                ) {
+                                    return;
+                                }
+                                setSelectedChip(next);
+                            }}
+                            ariaLabel={t('chipLabel')}
+                            testIdPrefix="new-chip"
+                        />
+                        <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
                             {t(`chipDescriptions.${selectedChip}`)}
                         </p>
                     </div>

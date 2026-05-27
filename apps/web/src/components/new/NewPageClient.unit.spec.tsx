@@ -58,7 +58,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
     it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
-            container.querySelectorAll('button[aria-pressed]'),
+            container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
         expect(chipButtons).toHaveLength(9);
         const labels = chipButtons.map((b) => b.textContent?.trim());
@@ -77,18 +77,18 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
 
     it('pre-selects the chip from initialType prop', () => {
         const { container } = render(<NewPageClient initialType="mission" />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
+        const mission = Array.from(container.querySelectorAll('button[role="option"][aria-selected]')).find((b) =>
             b.textContent?.includes('mission'),
         ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('defaults to Mission when no initialType is supplied', () => {
         const { container } = render(<NewPageClient />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
+        const mission = Array.from(container.querySelectorAll('button[role="option"][aria-selected]')).find((b) =>
             b.textContent?.includes('mission'),
         ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('Submit (arrow) is disabled until the prompt is >= 10 chars', () => {
