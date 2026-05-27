@@ -27,7 +27,10 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
-import { createMissionAction } from '@/app/actions/dashboard/missions';
+import {
+    attachUploadToMissionAction,
+    createMissionAction,
+} from '@/app/actions/dashboard/missions';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -253,6 +256,36 @@ export function NewPageClient({
                         type: 'one-shot',
                         missionTemplateRepo: initialTemplateId,
                     });
+                    // Wire any completed PromptComposer uploads onto the
+                    // newly created Mission via the new attachments
+                    // endpoint. Failures here are non-fatal: the Mission
+                    // is created either way, so we toast a warning and
+                    // proceed rather than rolling back. github-repo
+                    // entries are skipped — they're metadata refs, not
+                    // uploaded files.
+                    const refsToAttach = buildAttachmentRefs(attachments).filter(
+                        (r) => r.kind === 'upload',
+                    );
+                    if (refsToAttach.length > 0) {
+                        const uploadIds = attachments.flatMap((a) =>
+                            a.kind !== 'github-repo' && a.uploadId && !a.error
+                                ? [a.uploadId]
+                                : [],
+                        );
+                        const failed: string[] = [];
+                        for (const uploadId of uploadIds) {
+                            try {
+                                await attachUploadToMissionAction(mission.id, uploadId);
+                            } catch {
+                                failed.push(uploadId);
+                            }
+                        }
+                        if (failed.length > 0) {
+                            toast.warning(
+                                `${failed.length} attachment(s) couldn't be linked to the Mission — they're still saved in your uploads.`,
+                            );
+                        }
+                    }
                     toast.success(t('toasts.missionCreated'));
                     setChatOpen?.(true);
                     router.push(ROUTES.DASHBOARD_MISSION(mission.id));

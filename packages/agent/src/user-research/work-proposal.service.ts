@@ -1,9 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { AiFacadeService } from '../facades/ai.facade';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { WorkProposalRepository } from './work-proposal.repository';
+import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
+import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { permissiveWorkProposalsBatchSchema, type WorkProposalDraft } from './schemas';
 import { coerceWorkProposal } from './proposal-coercion';
 import {
@@ -147,7 +157,89 @@ export class WorkProposalService {
         // service that future PRs can swap to an AI-backed impl
         // without touching this call site.
         private readonly titler: TitlerService,
+        // Idea (WorkProposal) attachments — `@Optional()` because
+        // hand-rolled tests construct WorkProposalService without it.
+        // Production DI provides it via UserResearchModule.
+        @Optional()
+        private readonly proposalAttachments?: WorkProposalAttachmentRepository,
     ) {}
+
+    /**
+     * List the Upload edges attached to an Idea. Validates ownership
+     * before reading.
+     */
+    async listAttachments(
+        userId: string,
+        proposalId: string,
+    ): Promise<WorkProposalAttachment[]> {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) {
+            throw new NotFoundException(`Idea not found`);
+        }
+        if (!this.proposalAttachments) return [];
+        return this.proposalAttachments.findByWorkProposalId(proposalId);
+    }
+
+    /**
+     * Attach an uploaded file to an Idea. Idempotent on the unique
+     * (workProposalId, uploadId) index — see `MissionsService.addAttachment`.
+     */
+    async addAttachment(
+        userId: string,
+        proposalId: string,
+        uploadId: string,
+    ): Promise<WorkProposalAttachment> {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) {
+            throw new NotFoundException(`Idea not found`);
+        }
+        if (!uploadId || !UUID_RE.test(uploadId)) {
+            throw new BadRequestException(`Invalid uploadId`);
+        }
+        if (!this.proposalAttachments) {
+            throw new BadRequestException(
+                `WorkProposalAttachmentRepository is not wired — attach the WorkProposalAttachment provider before calling addAttachment`,
+            );
+        }
+        try {
+            return await this.proposalAttachments.add(proposalId, uploadId);
+        } catch (err) {
+            if (
+                err instanceof Error &&
+                /duplicate key|unique constraint/i.test(err.message)
+            ) {
+                const existing = (
+                    await this.proposalAttachments.findByWorkProposalId(proposalId)
+                ).find((a) => a.uploadId === uploadId);
+                if (existing) return existing;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Detach an Upload from an Idea. Validates ownership of both the
+     * Idea AND that the attachment row's `workProposalId` matches.
+     */
+    async removeAttachment(
+        userId: string,
+        proposalId: string,
+        attachmentId: string,
+    ): Promise<{ deleted: true }> {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) {
+            throw new NotFoundException(`Idea not found`);
+        }
+        if (!this.proposalAttachments) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        const row = await this.proposalAttachments.findOne(attachmentId);
+        if (!row || row.workProposalId !== proposalId) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        await this.proposalAttachments.remove(attachmentId);
+        return { deleted: true };
+    }
 
     async generate(
         userId: string,

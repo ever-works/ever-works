@@ -633,4 +633,42 @@ export class AgentsController {
             // best-effort — log failure should never break the request.
         }
     }
+
+    /**
+     * Agent attachment surface — list/add/remove `AgentAttachment`
+     * edges (FK to `work_knowledge_uploads`). Same shape as the
+     * Mission / Idea endpoints; reference files / specs attached to
+     * an Agent profile (separate from the Agent's `avatarImageUploadId`).
+     */
+    @Get(':id/attachments')
+    @ApiOperation({ summary: "List an Agent's attached uploads" })
+    async listAttachments(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.listAttachments(auth.userId, id);
+    }
+
+    @Post(':id/attachments')
+    @ApiOperation({ summary: 'Attach an uploaded file to an Agent' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    async addAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: { uploadId: string },
+    ) {
+        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+    }
+
+    @Delete(':id/attachments/:attachmentId')
+    @ApiOperation({ summary: 'Detach an upload from an Agent' })
+    @HttpCode(HttpStatus.OK)
+    async removeAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    ) {
+        return this.service.removeAttachment(auth.userId, id, attachmentId);
+    }
 }

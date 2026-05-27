@@ -195,7 +195,50 @@ export const workProposalsAPI = {
             method: 'GET',
         });
     },
+
+    // Idea attachment surface — list/add/remove `WorkProposalAttachment`
+    // edges. Mirrors `missionsAPI.{list,add,remove}Attachment` so the
+    // PromptComposer-driven flows can attach files uniformly across
+    // Mission / Idea creates.
+    async listAttachments(id: string): Promise<WorkProposalAttachmentRow[]> {
+        return serverFetch<WorkProposalAttachmentRow[]>(
+            `/me/work-proposals/${id}/attachments`,
+            { method: 'GET' },
+        );
+    },
+
+    async addAttachment(
+        id: string,
+        uploadId: string,
+    ): Promise<WorkProposalAttachmentRow> {
+        return serverMutation<WorkProposalAttachmentRow>({
+            endpoint: `/me/work-proposals/${id}/attachments`,
+            data: { uploadId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async removeAttachment(
+        id: string,
+        attachmentId: string,
+    ): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/me/work-proposals/${id}/attachments/${attachmentId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
+
+/** Row shape returned by `/me/work-proposals/:id/attachments`. */
+export interface WorkProposalAttachmentRow {
+    readonly id: string;
+    readonly workProposalId: string;
+    readonly uploadId: string;
+    readonly createdAt: string;
+}
 
 // Phase 7 PR U — single-source the OwnerBudgetSummary type. Defined
 // alongside the missions client (the first consumer) and re-exported

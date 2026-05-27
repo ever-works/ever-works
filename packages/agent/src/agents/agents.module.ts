@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from '../entities/agent.entity';
+import { AgentAttachment } from '../entities/agent-attachment.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
@@ -10,6 +11,7 @@ import { AgentRunRepository } from '../database/repositories/agent-run.repositor
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
+import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
@@ -32,7 +34,14 @@ import { SkillsModule } from '../skills/skills.module';
  */
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Agent, AgentRun, AgentRunLog, AgentBudget, AgentMembership]),
+        TypeOrmModule.forFeature([
+            Agent,
+            AgentAttachment,
+            AgentRun,
+            AgentRunLog,
+            AgentBudget,
+            AgentMembership,
+        ]),
         ActivityLogModule,
         // Phase 10 — AgentRunService resolves active skills via
         // SkillBindingRepository before assembling the prompt.
@@ -44,6 +53,7 @@ import { SkillsModule } from '../skills/skills.module';
         AgentRunLogRepository,
         AgentBudgetRepository,
         AgentMembershipRepository,
+        AgentAttachmentRepository,
         AgentsService,
         AgentFileService,
         AgentScheduleDispatcherService,
@@ -58,6 +68,7 @@ import { SkillsModule } from '../skills/skills.module';
         AgentRunLogRepository,
         AgentBudgetRepository,
         AgentMembershipRepository,
+        AgentAttachmentRepository,
         AgentsService,
         AgentFileService,
         AgentScheduleDispatcherService,
