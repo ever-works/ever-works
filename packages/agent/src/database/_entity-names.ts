@@ -64,6 +64,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'Mission',
     'Notification',
     'OnboardingRequest',
+    'Organization',
     'PluginUsageEvent',
     'RefreshToken',
     // Skills family (PR #1019) ──
@@ -85,6 +86,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // ──────────────────────────
     'Template',
     'TemplateCustomization',
+    'Tenant',
     'UsageLedgerEntry',
     'User',
     'UserSubscription',

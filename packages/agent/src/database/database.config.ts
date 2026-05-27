@@ -46,6 +46,9 @@ import {
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     Mission,
+    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
+    Tenant,
+    Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
     AgentRun,
@@ -140,6 +143,9 @@ export const ENTITIES = [
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
+    Tenant,
+    Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
     AgentRun,
