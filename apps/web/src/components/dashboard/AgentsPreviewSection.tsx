@@ -1,5 +1,3 @@
-'use client';
-
 import { Bot, Plus } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
