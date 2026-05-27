@@ -61,10 +61,18 @@ test.describe('Locale routing', () => {
     test('root URL stays unprefixed', async ({ page }) => {
         // PR #1052 switched `localePrefix` from `'always'` to `'never'`.
         // `/` no longer redirects to `/en/` — it renders the canonical
-        // unprefixed home directly.
+        // unprefixed home directly. Assert that the URL does NOT contain
+        // a `/<locale>/` segment anywhere; an unprefixed URL like
+        // `http://host:port/` (or `/?<query>`) passes.
+        //
+        // Greptile P1: an earlier draft used a negative lookahead
+        // (`/\/(?!en|...)/ `) which is vacuously satisfied by the `/`
+        // inside `http://` — every URL passed. The negated `toHaveURL`
+        // shape below tests the substring directly, so it can actually
+        // fail when a locale prefix sneaks back in.
         await page.goto('/');
-        await expect(page).toHaveURL(
-            /\/(?!en|fr|de|es|pt|nl|it|ja|zh|ar|he|ru|tr|sv|pl|uk|vi|id|hi|fa|bg|fi|no)/,
+        await expect(page).not.toHaveURL(
+            /\/(?:en|fr|de|es|pt|nl|it|ja|zh|ar|he|ru|tr|sv|pl|uk|vi|id|hi|fa|bg|fi|no)(?:\/|$|\?|#)/,
         );
     });
 
