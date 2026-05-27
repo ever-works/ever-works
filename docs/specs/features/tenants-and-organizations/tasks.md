@@ -55,11 +55,11 @@ This file is the granular checklist agents and reviewers tick off as work lands.
 ## Phase 2 — `tenantId` on `users` and Tier B entities
 
 ### Database
-- [ ] Migration `AddTenantIdToUsers` — nullable, FK + index, **no backfill**.
+- [ ] Migration `AddTenantIdToUsers` — nullable `tenantId uuid` FK + index, **no backfill**. ALSO adds the nullable `users.lastScopeOrganizationId uuid` FK column (→ `organizations(id)` ON DELETE SET NULL) in the same migration — see [spec.md §5.6](spec.md#56-default-organization-on-next-login). NULL means "default to bare Tenant on next login."
 - [ ] Migration `AddTenantIdToTierB` — same shape, applied to: `auth_accounts`, `auth_sessions`, `auth_verifications`, `refresh_tokens`, `user_template_preferences`, `user_task_counters`.
 
 ### Entities
-- [ ] `user.entity.ts` — add `@ManyToOne(() => Tenant, { nullable: true })`.
+- [ ] `user.entity.ts` — add `@ManyToOne(() => Tenant, { nullable: true })` AND `@ManyToOne(() => Organization, { nullable: true })` for `lastScopeOrganization`.
 - [ ] Six Tier B entities — same.
 
 ---

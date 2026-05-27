@@ -103,10 +103,18 @@ This file describes the **observable behavior** required for each phase to be co
 ### AC-6.2 — Second Organization reuses the Tenant
 - Alice creates `Globex LLC` via the same endpoint. After the call: exactly one Tenant row for Alice, two Organization rows, both with the same `tenantId`.
 
-### AC-6.3 — Upgrade-from-account moves rows
-- Alice has 5 Missions, 3 Works, 12 Tasks all with `organizationId IS NULL` (currently in her Tenant root).
-- `POST /api/organizations/:id/upgrade-from-account` moves all 20 rows: their `organizationId` is now the upgraded Org's id.
-- Re-running the same endpoint a second time is a no-op (idempotent).
+### AC-6.3 — Upgrade-from-account moves rows (per-tier)
+- Alice has 5 Missions, 3 Works, 12 Tasks (Tier A) all with `organizationId IS NULL`, plus session/auth rows (Tier B) and KB chunks (Tier C).
+- `POST /api/organizations/:id/upgrade-from-account` succeeds and:
+  - **Tier A + Tier C rows** owned by Alice now have BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`.
+  - **Tier B rows** owned by Alice now have `tenantId = newTenant.id` ONLY — `organizationId` is not touched (Tier B has no such column; the migration would fail if attempted).
+  - `users.lastScopeOrganizationId = newOrg.id` is set so the next login lands in the new Org scope.
+- Re-running the same endpoint a second time on the same first Org is a no-op (idempotent).
+
+### AC-6.3a — Upgrade-from-account first-Org guard
+- After Alice creates a second Organization, calling `POST /api/organizations/:firstOrgId/upgrade-from-account` returns **409 Conflict** with an error code like `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS`.
+- Calling it with any subsequent Org's id (other than the first) also returns 409.
+- The upgrade pathway is open only while Alice has exactly one Organization and only for that one Org.
 
 ### AC-6.4 — Slug uniqueness across tables
 - `GET /api/organizations/check-slug?value=alice` returns `{ available: false }` if Alice's `users.slug` is `alice`.
@@ -122,7 +130,7 @@ This file describes the **observable behavior** required for each phase to be co
 ### AC-7.1 — Slug routes resolve
 - `GET /api/missions` on Alice's session with `X-Scope-Slug: alice` returns Alice's bare-Tenant Missions.
 - `GET /api/missions` with `X-Scope-Slug: acme-inc` returns only Acme Inc's Missions.
-- `GET /api/missions` with `X-Scope-Slug: notarealsulug` returns 404.
+- `GET /api/missions` with `X-Scope-Slug: notarealslug` returns 404.
 
 ### AC-7.2 — Org takes precedence on collision (defensive)
 - A degenerate test setup with `users.slug = 'acme'` and `organizations.slug = 'acme'` (which shouldn't be possible thanks to the allocator) resolves to the Organization. *(This is a defensive check; the allocator prevents this case at write time.)*
@@ -157,8 +165,10 @@ This file describes the **observable behavior** required for each phase to be co
 ### AC-9.1 — First-Org dialog defaults to Upgrade
 - When the user creates their FIRST Organization, the upgrade-vs-new dialog appears with "Upgrade current account" pre-selected and focused.
 
-### AC-9.2 — Upgrade choice moves all existing items
-- After confirming "Upgrade", every Tier A/B/C row owned by the user gets its `organizationId` set to the new Org. The new Org scope now shows the user's pre-existing items.
+### AC-9.2 — Upgrade choice moves all existing items (per-tier)
+- After confirming "Upgrade", every Tier A and Tier C row owned by the user gets BOTH `tenantId` and `organizationId` set to the new Org's values.
+- Every Tier B row gets `tenantId` only — Tier B has no `organizationId` column ([spec.md §2.3](spec.md#23-three-tiers-of-entities-which-columns-each-tier-gets)).
+- The new Org scope now shows the user's pre-existing Tier A items (Missions, Works, Tasks, Ideas, …).
 
 ### AC-9.3 — Empty choice leaves bare Tenant intact
 - After confirming "Create with empty data", the new Org scope is empty; the bare-Tenant scope still shows the user's pre-existing items.

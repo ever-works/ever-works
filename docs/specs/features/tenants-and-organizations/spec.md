@@ -199,7 +199,7 @@ The slug only changes when the username changes (and the slug recomputation goes
 /{slug}/settings/...
 ```
 
-Always a slug at the front. No "implicit" personal URLs without a slug.
+Always a slug at the front **on new surfaces**. Existing un-prefixed routes (`/missions/...`, `/works/...`) continue to resolve via session-scoped lookup for the lifetime of v1 — see §4.4 for the additive coexistence rule.
 
 ### 4.2 Slug resolution
 
@@ -260,17 +260,21 @@ This is the inflection point. User clicks "**+ Create Organization**" (the only 
 1. Server creates the Tenant row for this user (lazy creation): `INSERT INTO tenants(ownerUserId, slug, displayName) VALUES (user.id, user.slug, user.username)`.
 2. Sets `users.tenantId = newTenant.id`.
 3. Sets `organizations.tenantId = newTenant.id`.
-4. **Lazy backfill:** for every Tier A, B, C entity owned by this user, UPDATE rows to set `tenantId = newTenant.id` AND `organizationId = newOrg.id` (i.e. move all existing items into the new Org).
+4. **Lazy backfill (per-tier — Tier B has no `organizationId` column):**
+   - **Tier A + Tier C** rows owned by this user: UPDATE to set BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id` (move existing items into the new Org).
+   - **Tier B** rows owned by this user: UPDATE to set `tenantId = newTenant.id` ONLY. Tier B entities (`AuthAccount`, `AuthSession`, `AuthVerification`, `RefreshToken`, `UserTemplatePreference`, `UserTaskCounter`) are user-identity records and **do not have an `organizationId` column** ([§2.3](#23-three-tiers-of-entities-which-columns-each-tier-gets)) — setting `organizationId` on them would fail the migration.
 5. Switcher in UI updates to show the Org chip; URL slug changes from `user.slug` to `org.slug`; client navigates to the Org's dashboard.
 
 **Step 3b — "Create with empty data" branch:**
 1. Server creates the Tenant row (lazy, same as 3a step 1).
 2. Sets `users.tenantId = newTenant.id`.
 3. Sets `organizations.tenantId = newTenant.id`.
-4. **Backfills the user's existing rows with `tenantId` only** (not `organizationId`). They stay at the Tenant root.
+4. **Backfills the user's existing rows with `tenantId` only** across all three tiers (Tier A, B, C) — `organizationId` is NOT touched on any row, so existing items stay at the Tenant root rather than entering the new Org.
 5. The Org is created empty. Switching to it shows zero items. The bare-Tenant view (clicking the user-named entry in the switcher) still shows the user's existing items.
 
-> **Crucial detail:** in both branches we backfill `tenantId` on existing rows at this moment. Before this moment, those rows had `tenantId = NULL`. After this moment, the user has a real Tenant and every one of their rows knows about it.
+> **Crucial detail:** in both branches we backfill `tenantId` on existing rows at this moment. Before this moment, those rows had `tenantId = NULL`. After this moment, the user has a real Tenant and every one of their rows knows about it. The `organizationId` column is only touched on Tier A + Tier C, and only in branch 3a.
+
+> **First-Org guard:** the backfill is gated by a server-side check — `upgradeFromAccount` only runs when the user has exactly one Organization (the one just created). Calling it again after the user has created additional Organizations returns **409 Conflict** to prevent retroactively pulling items into a non-first Org.
 
 ### 5.3 User creates a SECOND (or third, …) Organization
 
@@ -302,6 +306,13 @@ The switcher icon lives at the top-left of the sidebar — the slot where the Ev
 
 - The slot continues to show the **Ever Works logo** exactly as today.
 - **No chevron**, no popover trigger. The user sees no UI hint that switching is possible — because it isn't, yet.
+
+> **Where the first-Org create flow is reachable from (the switcher is intentionally silent — so we need explicit entry points elsewhere):**
+> 1. **`+ New` page → "Company" chip** (§6.3) — the primary discoverable path. Picking the Company chip submits into the Register-Company sub-flow (§5.4), which spawns the first Organization once registration succeeds.
+> 2. **Settings → Account → "Create your first Organization"** — a small banner / CTA on the existing account-settings page. Always present until the user has at least one Org; quietly disappears after.
+> 3. **AI Chat verb** — *"create an organization called Acme Inc"* maps to the same `POST /api/organizations` endpoint via the MCP tool surface.
+>
+> Without one of these entry points, the empty-state UI would be a dead end. Implementation lands in [Phase 10](plan.md#phase-10--company-chip-on--new-page--work-of-type-company--org-wire-up) (chip) and [Phase 8/9](plan.md#phase-8--workspaceswitcher-ui-sidebar-07-reskin) (settings banner).
 
 #### Active state (1+ Organizations)
 
@@ -340,7 +351,9 @@ Two design options to surface bare Tenant in the popover:
 
 ### 5.6 Default Organization on next login
 
-The most recently active scope is persisted on the User row (e.g. `users.lastScopeOrganizationId: uuid | null`, where `null` means bare Tenant). On the next login, the user lands in that scope.
+The most recently active scope is persisted on the User row as `users.lastScopeOrganizationId: uuid | null` — `null` means bare Tenant. On the next login, the user lands in that scope.
+
+> **Migration:** the `users.lastScopeOrganizationId` column lands as part of [Phase 2](plan.md#phase-2--add-tenantid-to-users-add-tenantid-to-tier-b-entities) alongside `users.tenantId` — same migration file, same nullable+FK pattern, no backfill (NULL means "default to bare Tenant"). The lazy-upgrade flow in Phase 6 sets it to the new Org's id when the user picks the "Upgrade current account" branch.
 
 ---
 

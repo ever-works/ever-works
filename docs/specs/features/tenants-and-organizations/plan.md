@@ -82,7 +82,8 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
    - Add nullable `tenantId uuid` column to `users`.
    - Add FK to `tenants(id)` ON DELETE SET NULL.
    - Add index.
-   - **No backfill.** Existing users stay `tenantId = NULL`.
+   - **Also adds `users.lastScopeOrganizationId uuid` (nullable, FK to `organizations(id)` ON DELETE SET NULL).** This is the "remember the user's currently-active scope" column referenced by [spec.md §5.6](spec.md#56-default-organization-on-next-login) — NULL means bare Tenant. Added in the same migration to keep all User-scoped FKs in one place.
+   - **No backfill.** Existing users stay `tenantId = NULL` and `lastScopeOrganizationId = NULL`.
 2. New TypeORM migration: `AddTenantIdToTierBEntities`.
    - Adds nullable `tenantId uuid` column + FK + index to each of:
      - `auth_accounts`
@@ -179,7 +180,7 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
 
 1. New API endpoints:
    - `POST /api/organizations` — body `{ name, slug? }`. Creates Organization. If user has no Tenant, creates Tenant lazily. Returns the Organization row + scope info.
-   - `POST /api/organizations/:id/upgrade-from-account` — moves the user's existing Tier A/B/C rows from Tenant-root into this Organization. Idempotent (only runnable once per user, and only on their first Org).
+   - `POST /api/organizations/:id/upgrade-from-account` — moves the user's existing Tier A/C rows from Tenant-root into this Organization (sets `organizationId`), and writes `tenantId` on all Tier A/B/C rows that don't yet have one. **Gated**: only runs if this is the user's first Organization (i.e. `organizations.count(tenantId = user.tenantId) === 1` AND `organizations.id === :id`). Returns **409 Conflict** if called after the user has created additional Orgs. Idempotent on the same first Org.
    - `GET /api/organizations` — list all Orgs for the current user's Tenant.
    - `GET /api/organizations/:slug` — fetch one by slug (used by the slug resolver middleware).
    - `PATCH /api/organizations/:id` — update displayName, legalName, etc.
@@ -193,8 +194,10 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
    - `upgradeFromAccount(userId, organizationId)`:
      1. Verify ownership (user owns Tenant; Org belongs to that Tenant).
      2. Verify Org's tenantId matches user's tenantId.
-     3. UPDATE every Tier A/B/C row where `userId = X AND tenantId = (user's tenant) AND organizationId IS NULL` → set `organizationId = X`.
-     4. This is a transaction; the table list is enumerated in code (one UPDATE per table, all under one DB transaction). On Postgres, set `SET LOCAL statement_timeout = '30s'` for safety.
+     3. **First-Org guard:** count Organizations under this Tenant; if `count > 1` OR `:organizationId` is not the only / earliest one, throw `409 Conflict`. This prevents retroactively pulling items into a non-first Org.
+     4. **Tier A/C rows** (entities that have `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`. Rows already migrated to a Tenant are left as-is (idempotency).
+     5. **Tier B rows** (entities without `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set `tenantId = newTenant.id` ONLY. Do NOT attempt to write `organizationId` — the column does not exist on these tables and the UPDATE would fail.
+     6. This is a transaction; the table list is enumerated in code (one UPDATE per table, all under one DB transaction). On Postgres, set `SET LOCAL statement_timeout = '30s'` for safety.
 3. New service: `apps/api/src/scope/scope-context.service.ts` — the request-scoped provider from Phase 5.
 4. New service: `apps/api/src/scope/tenant-bootstrap.service.ts` — `ensureTenant(userId): Promise<Tenant>`. Lazy creation logic in one place.
 
