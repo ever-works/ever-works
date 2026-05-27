@@ -35,6 +35,11 @@ vi.mock('@/lib/hooks/use-chat-panel', () => ({
     useChatPanel: () => ({ open: false, setOpen: vi.fn() }),
 }));
 
+const createMissionMock = vi.fn();
+vi.mock('@/app/actions/dashboard/missions', () => ({
+    createMissionAction: (...args: unknown[]) => createMissionMock(...args),
+}));
+
 import { NewPageClient } from './NewPageClient';
 
 function getTextarea(container: HTMLElement): HTMLTextAreaElement {
@@ -190,5 +195,60 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         );
         const textarea = getTextarea(container);
         expect(textarea.value).toBe(prefill);
+    });
+
+    describe('Mission template path (initialTemplateId set)', () => {
+        it('Submit with chip=mission + template inline-creates with missionTemplateRepo, opens chat, routes to the new Mission detail page', async () => {
+            createMissionMock.mockClear();
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
+            createMissionMock.mockResolvedValueOnce({ id: 'm-tpl-new', title: 'x' });
+            const { container } = render(
+                <NewPageClient
+                    initialType="mission"
+                    initialPrompt="Starter Business"
+                    initialTemplateId="starter-business"
+                />,
+            );
+            fireEvent.change(getTextarea(container), {
+                target: { value: 'Starter Business — long enough to enable Submit' },
+            });
+            fireEvent.click(getSubmit(container));
+            // Resolve the in-flight startSubmit → createMissionAction promise.
+            await Promise.resolve();
+            await Promise.resolve();
+            // The template path must persist the template id on the
+            // new Mission — Greptile P1 on PR #1038 caught the
+            // regression where this was silently dropped.
+            expect(createMissionMock).toHaveBeenCalledWith({
+                description: 'Starter Business — long enough to enable Submit',
+                type: 'one-shot',
+                missionTemplateRepo: 'starter-business',
+            });
+            // Chat still gets the prompt so the user can keep iterating.
+            expect(startFromPromptMock).toHaveBeenCalledWith(
+                'Starter Business — long enough to enable Submit',
+                { intent: 'Mission' },
+            );
+            // Canvas is the new Mission's detail page.
+            expect(routerPushMock).toHaveBeenCalledWith('/missions/m-tpl-new');
+        });
+
+        it('Submit with chip=mission WITHOUT a template falls through to the chat-only path (no inline create)', () => {
+            createMissionMock.mockClear();
+            startFromPromptMock.mockClear();
+            routerPushMock.mockClear();
+            const { container } = render(<NewPageClient initialType="mission" />);
+            fireEvent.change(getTextarea(container), {
+                target: { value: 'No template, just a typed mission goal' },
+            });
+            fireEvent.click(getSubmit(container));
+            expect(createMissionMock).not.toHaveBeenCalled();
+            expect(startFromPromptMock).toHaveBeenCalledWith(
+                'No template, just a typed mission goal',
+                { intent: 'Mission' },
+            );
+            expect(routerPushMock).toHaveBeenCalledWith('/missions');
+        });
     });
 });
