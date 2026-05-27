@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
@@ -198,7 +198,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
     });
 
     describe('Mission template path (initialTemplateId set)', () => {
-        it('Submit with chip=mission + template inline-creates with missionTemplateRepo, opens chat, routes to the new Mission detail page', async () => {
+        it('Submit with chip=mission + template inline-creates with missionTemplateRepo, opens chat WITHOUT a message, routes to the new Mission detail page', async () => {
             createMissionMock.mockClear();
             startFromPromptMock.mockClear();
             routerPushMock.mockClear();
@@ -213,25 +213,25 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             fireEvent.change(getTextarea(container), {
                 target: { value: 'Starter Business — long enough to enable Submit' },
             });
-            fireEvent.click(getSubmit(container));
-            // Resolve the in-flight startSubmit → createMissionAction promise.
-            await Promise.resolve();
-            await Promise.resolve();
+            await act(async () => {
+                fireEvent.click(getSubmit(container));
+            });
             // The template path must persist the template id on the
             // new Mission — Greptile P1 on PR #1038 caught the
             // regression where this was silently dropped.
-            expect(createMissionMock).toHaveBeenCalledWith({
-                description: 'Starter Business — long enough to enable Submit',
-                type: 'one-shot',
-                missionTemplateRepo: 'starter-business',
-            });
-            // Chat still gets the prompt so the user can keep iterating.
-            expect(startFromPromptMock).toHaveBeenCalledWith(
-                'Starter Business — long enough to enable Submit',
-                { intent: 'Mission' },
+            await waitFor(() =>
+                expect(createMissionMock).toHaveBeenCalledWith({
+                    description: 'Starter Business — long enough to enable Submit',
+                    type: 'one-shot',
+                    missionTemplateRepo: 'starter-business',
+                }),
             );
+            // Codex P2: must NOT send the prompt into chat after the
+            // inline create — the chat AI's `createMission` tool would
+            // re-create the Mission as a second non-template row.
+            expect(startFromPromptMock).not.toHaveBeenCalled();
             // Canvas is the new Mission's detail page.
-            expect(routerPushMock).toHaveBeenCalledWith('/missions/m-tpl-new');
+            await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/missions/m-tpl-new'));
         });
 
         it('Submit with chip=mission WITHOUT a template falls through to the chat-only path (no inline create)', () => {

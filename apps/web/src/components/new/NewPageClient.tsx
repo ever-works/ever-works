@@ -219,9 +219,16 @@ export function NewPageClient({
             // Mission. The chat AI doesn't yet have a template-aware
             // Mission-creation tool, so dropping the id would silently
             // lose the template link (Greptile P1 on PR #1038). Keep
-            // the legacy inline-create path here, then still open
-            // chat afterward so the user can keep iterating in
-            // conversation about the Mission we just created.
+            // the legacy inline-create path here.
+            //
+            // Importantly, we DO NOT then send the same prompt into
+            // the chat AI: the chat has `createMission` registered as
+            // a tool and the system prompt instructs it to use tools
+            // for mutations (Codex P2), so re-sending "I want to
+            // create a Mission. <description>" would trigger a SECOND
+            // non-template Mission creation. Just open the panel so
+            // the user can iterate manually if they want, but don't
+            // dispatch a message.
             if (selectedChip === 'mission' && initialTemplateId) {
                 try {
                     const mission = await createMissionAction({
@@ -230,7 +237,7 @@ export function NewPageClient({
                         missionTemplateRepo: initialTemplateId,
                     });
                     toast.success(t('toasts.missionCreated'));
-                    startFromPrompt(description, { intent: CHIP_INTENT_LABEL.mission });
+                    setChatOpen?.(true);
                     router.push(ROUTES.DASHBOARD_MISSION(mission.id));
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
