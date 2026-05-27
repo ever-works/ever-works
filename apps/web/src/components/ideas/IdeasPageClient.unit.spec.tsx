@@ -186,7 +186,7 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         // the create-from-prompt flow.
         expect(startFromPromptMock).toHaveBeenCalledWith(
             'My freshly typed Idea, longer than ten chars',
-            { intent: 'Idea' },
+            expect.objectContaining({ intent: 'Idea' }),
         );
         expect(createIdeaMock).not.toHaveBeenCalled();
         // The existing rows are still rendered (canvas) — the new

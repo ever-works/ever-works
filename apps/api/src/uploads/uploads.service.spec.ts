@@ -434,4 +434,98 @@ describe('UploadsService', () => {
             expect(lastSeenKey).toEqual([`${userId}/${r.filename}`]);
         });
     });
+
+    describe('saveFile — broader-than-image accept list', () => {
+        const fakeFileWith = (buffer: Buffer, mimetype: string, originalname = 'probe.bin') =>
+            fakeFile({ buffer, mimetype, size: buffer.length, originalname });
+
+        it('accepts PDF via magic-byte sniff', async () => {
+            const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n', 'ascii'), Buffer.alloc(64, 0x20)]);
+            const r = await service.saveFile(
+                userId,
+                fakeFileWith(pdf, 'application/pdf', 'doc.pdf'),
+            );
+            expect(r.filename.endsWith('.pdf')).toBe(true);
+            expect(r.mimeType).toBe('application/pdf');
+            expect(r.size).toBe(pdf.length);
+            // Persisted at the same owner-scoped path shape saveImage uses.
+            expect(r.url).toContain(`/api/uploads/${userId}/`);
+        });
+
+        it('accepts a ZIP archive', async () => {
+            const zip = Buffer.concat([
+                Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+                Buffer.alloc(32, 0x00),
+            ]);
+            const r = await service.saveFile(
+                userId,
+                fakeFileWith(zip, 'application/zip', 'archive.zip'),
+            );
+            expect(r.filename.endsWith('.zip')).toBe(true);
+            expect(r.mimeType).toBe('application/zip');
+        });
+
+        it('accepts Office Open XML (.docx) as ZIP under the hood, echoes declared MIME', async () => {
+            const docx = Buffer.concat([
+                Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+                Buffer.alloc(64, 0x00),
+            ]);
+            const r = await service.saveFile(
+                userId,
+                fakeFileWith(
+                    docx,
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'report.docx',
+                ),
+            );
+            // Stored as ZIP, response carries the declared Office MIME.
+            expect(r.filename.endsWith('.zip')).toBe(true);
+            expect(r.mimeType).toBe(
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            );
+        });
+
+        it('accepts a plain-text file with no NUL bytes', async () => {
+            const text = Buffer.from('hello, world\nline two\n', 'utf-8');
+            const r = await service.saveFile(userId, fakeFileWith(text, 'text/plain', 'notes.txt'));
+            expect(r.filename.endsWith('.txt')).toBe(true);
+            expect(r.mimeType).toBe('text/plain');
+        });
+
+        it('accepts JSON declared as application/json', async () => {
+            const json = Buffer.from('{"hello":"world"}', 'utf-8');
+            const r = await service.saveFile(
+                userId,
+                fakeFileWith(json, 'application/json', 'config.json'),
+            );
+            expect(r.filename.endsWith('.json')).toBe(true);
+        });
+
+        it('rejects a binary uploaded with text/plain (NUL bytes)', async () => {
+            // Buffer with a NUL byte in the middle — looksLikeUtf8Text
+            // rejects when it sees 0x00 anywhere in the first 8KiB.
+            const bin = Buffer.concat([
+                Buffer.from('hello', 'utf-8'),
+                Buffer.from([0x00]),
+                Buffer.from('world', 'utf-8'),
+            ]);
+            await expect(
+                service.saveFile(userId, fakeFileWith(bin, 'text/plain', 'sneaky.txt')),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('rejects an unknown MIME type', async () => {
+            const buf = Buffer.alloc(8, 0xff);
+            await expect(
+                service.saveFile(userId, fakeFileWith(buf, 'video/mp4', 'movie.mp4')),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('rejects a file whose bytes do not match the declared MIME', async () => {
+            // Declared PDF but bytes are PNG.
+            await expect(
+                service.saveFile(userId, fakeFileWith(TINY_PNG, 'application/pdf', 'fake.pdf')),
+            ).rejects.toThrow(BadRequestException);
+        });
+    });
 });

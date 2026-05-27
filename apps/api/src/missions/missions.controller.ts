@@ -234,4 +234,46 @@ export class MissionsController {
     }> {
         return this.service.runNow(auth.userId, id);
     }
+
+    /**
+     * Mission attachment surface — list/add/remove `MissionAttachment`
+     * edges (FK to `work_knowledge_uploads`). Backs the
+     * PromptComposer's "files attached when creating a Mission" flow:
+     * the composer uploads via `POST /api/uploads/file` and then the
+     * caller hits `POST /api/me/missions/:id/attachments` to associate.
+     *
+     * Same security model as the rest of this controller — ownership
+     * is enforced inside `MissionsService.{list,add,remove}Attachment`.
+     */
+    @Get(':id/attachments')
+    @ApiOperation({ summary: "List a Mission's attached uploads" })
+    async listAttachments(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.listAttachments(auth.userId, id);
+    }
+
+    @Post(':id/attachments')
+    @ApiOperation({ summary: 'Attach an uploaded file to a Mission' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    async addAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: { uploadId: string },
+    ) {
+        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+    }
+
+    @Delete(':id/attachments/:attachmentId')
+    @ApiOperation({ summary: 'Detach an upload from a Mission' })
+    @HttpCode(HttpStatus.OK)
+    async removeAttachment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    ) {
+        return this.service.removeAttachment(auth.userId, id, attachmentId);
+    }
 }

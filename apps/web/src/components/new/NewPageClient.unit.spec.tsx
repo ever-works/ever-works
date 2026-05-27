@@ -58,7 +58,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
     it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
-            container.querySelectorAll('button[aria-pressed]'),
+            container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
         expect(chipButtons).toHaveLength(9);
         const labels = chipButtons.map((b) => b.textContent?.trim());
@@ -77,18 +77,18 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
 
     it('pre-selects the chip from initialType prop', () => {
         const { container } = render(<NewPageClient initialType="mission" />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('defaults to Mission when no initialType is supplied', () => {
         const { container } = render(<NewPageClient />);
-        const mission = Array.from(container.querySelectorAll('button[aria-pressed]')).find((b) =>
-            b.textContent?.includes('mission'),
-        ) as HTMLButtonElement;
-        expect(mission.getAttribute('aria-pressed')).toBe('true');
+        const mission = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('mission')) as HTMLButtonElement;
+        expect(mission.getAttribute('aria-selected')).toBe('true');
     });
 
     it('Submit (arrow) is disabled until the prompt is >= 10 chars', () => {
@@ -117,9 +117,10 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             target: { value: 'Build the best cat business' },
         });
         fireEvent.click(getSubmit(container));
-        expect(startFromPromptMock).toHaveBeenCalledWith('Build the best cat business', {
-            intent: 'Mission',
-        });
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Build the best cat business',
+            expect.objectContaining({ intent: 'Mission' }),
+        );
         expect(routerPushMock).toHaveBeenCalledWith('/missions');
     });
 
@@ -131,9 +132,10 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             target: { value: 'A curated list of AI coding agents' },
         });
         fireEvent.click(getSubmit(container));
-        expect(startFromPromptMock).toHaveBeenCalledWith('A curated list of AI coding agents', {
-            intent: 'Idea',
-        });
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'A curated list of AI coding agents',
+            expect.objectContaining({ intent: 'Idea' }),
+        );
         expect(routerPushMock).toHaveBeenCalledWith('/ideas');
     });
 
@@ -147,7 +149,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         fireEvent.click(getSubmit(container));
         expect(startFromPromptMock).toHaveBeenCalledWith(
             'Research assistant for AI safety papers',
-            { intent: 'Agent' },
+            expect.objectContaining({ intent: 'Agent' }),
         );
         // Canvas route — chat carries the prompt, no `?prompt=` here.
         expect(routerPushMock).toHaveBeenCalledWith('/agents/new');
@@ -163,7 +165,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         fireEvent.click(getSubmit(container));
         expect(startFromPromptMock).toHaveBeenCalledWith(
             'Audit the Mission backlog for stale items',
-            { intent: 'Task' },
+            expect.objectContaining({ intent: 'Task' }),
         );
         expect(routerPushMock).toHaveBeenCalledWith('/tasks/new');
     });
@@ -176,9 +178,10 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             target: { value: 'Landing page for my SaaS launch' },
         });
         fireEvent.click(getSubmit(container));
-        expect(startFromPromptMock).toHaveBeenCalledWith('Landing page for my SaaS launch', {
-            intent: 'website',
-        });
+        expect(startFromPromptMock).toHaveBeenCalledWith(
+            'Landing page for my SaaS launch',
+            expect.objectContaining({ intent: 'website' }),
+        );
         expect(routerPushMock).toHaveBeenCalledTimes(1);
         const href = routerPushMock.mock.calls[0][0] as string;
         expect(href.startsWith('/works/new?')).toBe(true);
@@ -246,7 +249,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             expect(createMissionMock).not.toHaveBeenCalled();
             expect(startFromPromptMock).toHaveBeenCalledWith(
                 'No template, just a typed mission goal',
-                { intent: 'Mission' },
+                expect.objectContaining({ intent: 'Mission' }),
             );
             expect(routerPushMock).toHaveBeenCalledWith('/missions');
         });

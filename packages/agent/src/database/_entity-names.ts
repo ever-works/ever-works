@@ -46,6 +46,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
+    'AgentAttachment',
     'AgentBudget',
     'AgentMembership',
     'AgentRun',
@@ -62,6 +63,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
     'Mission',
+    'MissionAttachment',
     'Notification',
     'OnboardingRequest',
     'Organization',
@@ -113,5 +115,6 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkKnowledgeUpload',
     'WorkMember',
     'WorkProposal',
+    'WorkProposalAttachment',
     'WorkSchedule',
 ] as const;

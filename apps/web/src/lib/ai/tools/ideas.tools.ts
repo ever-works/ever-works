@@ -4,6 +4,7 @@ import { ROUTES } from '@/lib/constants';
 import { workProposalsAPI, type WorkProposal } from '@/lib/api/work-proposals';
 import {
     acceptProposalAction,
+    attachUploadToIdeaAction,
     buildIdeaAction,
     createIdeaAction,
     dismissProposalAction,
@@ -11,6 +12,7 @@ import {
     listProposalsAction,
     refreshProposalsAction,
 } from '@/app/actions/dashboard/work-proposals';
+import { attachUploadsBestEffort, extractUploadIds } from './utils';
 
 /**
  * Phase 9 PR Z1 — in-app AI Chat tools for Ideas (spec §4.5).
@@ -128,13 +130,30 @@ export const createIdea = tool({
     inputSchema: z.object({
         description: z.string().min(10).describe('What the Idea is — used to seed the AI Goal.'),
         title: z.string().optional().describe('Optional display title.'),
+        attachmentIds: z
+            .array(z.string())
+            .optional()
+            .describe(
+                'Upload IDs (sha256 hex) OR full `/api/uploads/<userId>/<sha>.<ext>` URLs to attach to the new Idea. Source: the "Attached files:" block in the user message.',
+            ),
     }),
-    execute: async ({ description, title }) => {
+    execute: async ({ description, title, attachmentIds }) => {
         const idea = await createIdeaAction({
             description,
             ...(title !== undefined && { title }),
         });
-        return { created: true, idea: summarizeIdea(idea) };
+        const uploadIds = extractUploadIds(attachmentIds);
+        const attachStats =
+            uploadIds.length > 0
+                ? await attachUploadsBestEffort(uploadIds, (uploadId) =>
+                      attachUploadToIdeaAction(idea.id, uploadId),
+                  )
+                : { attached: 0, failed: 0 };
+        return {
+            created: true,
+            idea: summarizeIdea(idea),
+            ...(uploadIds.length > 0 && { attachments: attachStats }),
+        };
     },
 });
 
