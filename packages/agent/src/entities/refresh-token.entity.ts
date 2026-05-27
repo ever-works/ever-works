@@ -46,6 +46,11 @@ export class RefreshToken {
     @Column({ nullable: true })
     ipAddress: string;
 
+    // EW-654 (Tenants & Organizations Phase 2) — Tier B scope. NULL
+    // until the owning user creates their first Organization.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

@@ -17,6 +17,8 @@ import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { WorkSchedule } from './work-schedule.entity';
 import { WorkMember } from './work-member.entity';
+import { Tenant } from './tenant.entity';
+import { Organization } from './organization.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 
 export interface InferredUserProfile {
@@ -236,6 +238,37 @@ export class User {
     @ManyToOne(() => SubscriptionPlan, { nullable: true, eager: true })
     @JoinColumn({ name: 'defaultPlanId' })
     defaultPlan?: ClassToObject<SubscriptionPlan> | null;
+
+    /**
+     * EW-654 (Tenants & Organizations Phase 2) — FK to the user's
+     * Tenant. NULL until the user creates their first Organization
+     * (Phase 6 lazy-create fills this in). Set on every row going
+     * forward; row-level scoping for new inserts lands in Phase 5.
+     *
+     * `onDelete: 'SET NULL'` matches the migration's FK behaviour —
+     * deleting a Tenant un-scopes the User row rather than cascading
+     * the User itself.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @ManyToOne(() => Tenant, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'tenantId' })
+    tenant?: ClassToObject<Tenant> | null;
+
+    /**
+     * EW-654 — pointer to the user's currently-active Organization
+     * (NULL means "default to bare-Tenant view on next login"). The
+     * WorkspaceSwitcher (Phase 8) persists this on every scope
+     * switch; the Phase 6 first-Org "Upgrade" branch sets it to the
+     * new Org's id so the next login lands in the Org's scope.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    lastScopeOrganizationId?: string | null;
+
+    @ManyToOne(() => Organization, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'lastScopeOrganizationId' })
+    lastScopeOrganization?: ClassToObject<Organization> | null;
 
     local: boolean = false;
 
