@@ -1,19 +1,6 @@
 import GithubSlugger from 'github-slugger';
 import type { ItemData } from '@ever-works/plugin';
 
-// Module-scoped slugger — shared by ALL ReadmeBuilder instances in this
-// process. `GithubSlugger` is stateful: repeated `slug('Tools')` calls
-// return `tools`, `tools-1`, `tools-2`, ... so the same header label
-// in two different builders ends up with mismatched anchors (the
-// markdown header stays `## Tools`, but the TOC link points at
-// `#tools-1`).
-//
-// If you start generating multiple READMEs per process, instantiate
-// the slugger inside `build()` (or per-instance in the constructor),
-// and bump test coverage to lock that in — moving it here is a
-// behaviour change to anchor IDs across runs.
-const slugger = new GithubSlugger();
-
 export class ReadmeBuilder {
     private content: string = '';
     private isTocEnabled: boolean = false;
@@ -54,6 +41,15 @@ export class ReadmeBuilder {
         let toc = '';
 
         if (this.isTocEnabled) {
+            // Fresh slugger per ToC build. `GithubSlugger` is stateful —
+            // it tracks every slug it has ever produced to enforce
+            // intra-document uniqueness. A module-scoped or per-instance
+            // slugger reused across multiple READMEs would gradually
+            // suffix headers (`tools`, `tools-1`, `tools-2`, ...) while
+            // GitHub Markdown re-renders each `## Tools` header back to
+            // anchor `#tools` — every TOC link past the first would
+            // become a dead anchor.
+            const slugger = new GithubSlugger();
             toc += '## 📑 Table of Contents\n\n';
             this.toc.forEach(({ header, count }) => {
                 const slug = slugger.slug(header);
