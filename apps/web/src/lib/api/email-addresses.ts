@@ -101,4 +101,22 @@ export const emailAddressesAPI = {
         });
         return data.message;
     },
+    sendMessage: async (input: {
+        agentId: string;
+        to: string[];
+        subject: string;
+        bodyText: string;
+        cc?: string[];
+        bodyHtml?: string;
+        fromAddressId?: string;
+    }) => {
+        const data = await serverMutation<{
+            result: { providerMessageId: string; accepted: string[]; rejected: unknown[] };
+        }>({
+            method: 'POST',
+            path: '/api/email/messages',
+            body: input,
+        });
+        return data.result;
+    },
 };

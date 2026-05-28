@@ -26,7 +26,12 @@ import {
 import type { EmailAddressDirection } from '@ever-works/agent/entities';
 import { CurrentUser, AuthSessionGuard, Public } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import { EmailService, CreateEmailAddressInput, UpdateEmailAddressInput } from './email.service';
+import {
+    EmailService,
+    CreateEmailAddressInput,
+    UpdateEmailAddressInput,
+    SendMessageInput,
+} from './email.service';
 
 /**
  * EW-650 / EW-669 — Email surface REST API.
@@ -131,6 +136,16 @@ export class EmailController {
     async getMessage(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const message = await this.emailService.getMessage(auth.userId, id);
         return { message };
+    }
+
+    @UseGuards(AuthSessionGuard)
+    @ApiBearerAuth('JWT-auth')
+    @Post('messages')
+    @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({ summary: 'Compose + send an email from an agent outbound address' })
+    async sendMessage(@CurrentUser() auth: AuthenticatedUser, @Body() body: SendMessageInput) {
+        const result = await this.emailService.sendMessage(auth.userId, body);
+        return { result };
     }
 
     // -------------------------------------------------------------

@@ -22,6 +22,17 @@ export interface UpdateEmailAddressInput {
     readonly disabled?: boolean;
 }
 
+export interface SendMessageInput {
+    readonly agentId: string;
+    readonly to: string[];
+    readonly subject: string;
+    readonly bodyText: string;
+    readonly cc?: string[];
+    readonly bodyHtml?: string;
+    /** Specific tenant address to send from; defaults to the agent's primary outbound. */
+    readonly fromAddressId?: string;
+}
+
 /**
  * EW-650 / EW-669 — Tenant email address CRUD + verification flow.
  * Per-user scoping enforced on every read/write.
@@ -101,6 +112,45 @@ export class EmailService {
             limit: Math.min(limit, 100),
             offset,
         });
+    }
+
+    /**
+     * EW-680 / T32 — send an outbound message from one of the agent's
+     * outbound addresses. Resolves the from-address (explicit
+     * fromAddressId or the agent's primary outbound assignment), then
+     * routes through EmailFacadeService.send (which persists the
+     * email_messages row + records usage). Generates the idempotency
+     * messageRef.
+     */
+    async sendMessage(userId: string, input: SendMessageInput) {
+        let address: TenantEmailAddress | null = null;
+        if (input.fromAddressId) {
+            address = await this.addresses.findByIdForUser(input.fromAddressId, userId);
+            if (!address) throw new NotFoundException('From address not found');
+        } else {
+            const assignment = await this.assignments.findPrimaryOutboundForAgent(input.agentId);
+            if (assignment) {
+                address = await this.addresses.findById(assignment.emailAddressId);
+            }
+        }
+        if (!address) {
+            throw new NotFoundException('Agent has no outbound email address assigned');
+        }
+
+        const messageRef = `compose-${input.agentId}-${Date.now()}`;
+        const result = await this.emailFacade.send(
+            {
+                from: address.address,
+                to: input.to,
+                cc: input.cc,
+                subject: input.subject,
+                bodyText: input.bodyText,
+                bodyHtml: input.bodyHtml,
+                messageRef,
+            },
+            { userId, agentId: input.agentId, addressId: address.id },
+        );
+        return { messageRef, ...result };
     }
 
     /**
