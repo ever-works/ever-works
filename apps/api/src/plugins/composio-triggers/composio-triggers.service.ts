@@ -1,10 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import {
-    Injectable,
-    Logger,
-    NotFoundException,
-    UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ComposioTriggerSubscription } from '@ever-works/agent/entities';
@@ -101,7 +96,10 @@ export class ComposioTriggersService {
             .update(rawBody)
             .digest('hex');
 
-        const provided = signature.trim().toLowerCase().replace(/^sha256=/, '');
+        const provided = signature
+            .trim()
+            .toLowerCase()
+            .replace(/^sha256=/, '');
         if (provided.length !== computed.length) {
             throw new UnauthorizedException('Invalid Composio webhook signature');
         }
@@ -117,10 +115,7 @@ export class ComposioTriggersService {
         }
     }
 
-    async recordDelivery(
-        subscriptionId: string,
-        outcome: 'accepted' | 'rejected',
-    ): Promise<void> {
+    async recordDelivery(subscriptionId: string, outcome: 'accepted' | 'rejected'): Promise<void> {
         const column = outcome === 'accepted' ? 'deliveriesReceived' : 'deliveriesRejected';
         const updates: Partial<ComposioTriggerSubscription> = {};
         if (outcome === 'accepted') updates.lastFiredAt = new Date();

@@ -78,21 +78,13 @@ describe('ComposioTriggersService', () => {
 
         it('accepts a valid signature with the `sha256=` prefix', () => {
             expect(() =>
-                service.verifyDelivery(
-                    { webhookSecret: secret },
-                    rawBody,
-                    `sha256=${validSig}`,
-                ),
+                service.verifyDelivery({ webhookSecret: secret }, rawBody, `sha256=${validSig}`),
             ).not.toThrow();
         });
 
         it('rejects a tampered body', () => {
             expect(() =>
-                service.verifyDelivery(
-                    { webhookSecret: secret },
-                    rawBody + 'tampered',
-                    validSig,
-                ),
+                service.verifyDelivery({ webhookSecret: secret }, rawBody + 'tampered', validSig),
             ).toThrow(UnauthorizedException);
         });
 
@@ -112,11 +104,7 @@ describe('ComposioTriggersService', () => {
     describe('recordDelivery', () => {
         it('increments deliveriesReceived and sets lastFiredAt on accepted', async () => {
             await service.recordDelivery('sub-1', 'accepted');
-            expect(repo.increment).toHaveBeenCalledWith(
-                { id: 'sub-1' },
-                'deliveriesReceived',
-                1,
-            );
+            expect(repo.increment).toHaveBeenCalledWith({ id: 'sub-1' }, 'deliveriesReceived', 1);
             expect(repo.update).toHaveBeenCalled();
             const updateArgs = repo.update.mock.calls[0][1];
             expect(updateArgs.lastFiredAt).toBeInstanceOf(Date);
@@ -124,11 +112,7 @@ describe('ComposioTriggersService', () => {
 
         it('increments deliveriesRejected (and does not touch lastFiredAt) on rejected', async () => {
             await service.recordDelivery('sub-1', 'rejected');
-            expect(repo.increment).toHaveBeenCalledWith(
-                { id: 'sub-1' },
-                'deliveriesRejected',
-                1,
-            );
+            expect(repo.increment).toHaveBeenCalledWith({ id: 'sub-1' }, 'deliveriesRejected', 1);
             expect(repo.update).not.toHaveBeenCalled();
         });
     });

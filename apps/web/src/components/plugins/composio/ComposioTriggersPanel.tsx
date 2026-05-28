@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Trash2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-    deleteComposioTrigger,
-    listComposioTriggers,
-} from '@/app/actions/plugins';
+import { deleteComposioTrigger, listComposioTriggers } from '@/app/actions/plugins';
 import type { ComposioTrigger } from '@/lib/api/plugins-capabilities/composio-triggers';
 
 /**
@@ -38,22 +35,19 @@ export function ComposioTriggersPanel() {
         void refresh();
     }, [refresh]);
 
-    const handleDelete = useCallback(
-        async (id: string) => {
-            setDeletingId(id);
-            try {
-                const result = await deleteComposioTrigger(id);
-                if (!result.success) {
-                    setError(result.error ?? 'Failed to delete trigger');
-                    return;
-                }
-                setItems((prev) => prev.filter((t) => t.id !== id));
-            } finally {
-                setDeletingId(null);
+    const handleDelete = useCallback(async (id: string) => {
+        setDeletingId(id);
+        try {
+            const result = await deleteComposioTrigger(id);
+            if (!result.success) {
+                setError(result.error ?? 'Failed to delete trigger');
+                return;
             }
-        },
-        [],
-    );
+            setItems((prev) => prev.filter((t) => t.id !== id));
+        } finally {
+            setDeletingId(null);
+        }
+    }, []);
 
     if (loading) {
         return (
