@@ -55,15 +55,21 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
 }
 
 describe('NewPageClient (chat-open + canvas-route on submit)', () => {
-    it('renders all 10 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Company', () => {
-        const { container } = render(<NewPageClient />);
+    it('renders all 10 live chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Company (with `works-store` disabled so the catalog matches its production state)', () => {
+        // `store` is now flag-controlled via `works-store` like every
+        // other kind. We pass `disabledKinds={['store']}` here to mirror
+        // its current PostHog state (`active: false`), which keeps `store`
+        // as the inert "Soon" span — i.e. the same 10 live chips this
+        // test has always asserted. With every other flag fail-open, the
+        // resulting button-option list is exactly the live chip order.
+        const { container } = render(<NewPageClient disabledKinds={['store']} />);
         const chipButtons = Array.from(
             container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
         // EW-662 Phase 10 — `company` joined the live chip set so the
-        // total is now 10. `store` stays as an inert "Soon" chip
-        // (a `button[role="option"]` without `aria-selected` — filtered
-        // out by the selector above).
+        // total is now 10. `store` renders as an inert "Soon" chip
+        // (a `span[aria-disabled="true"]` — filtered out by the selector
+        // above).
         expect(chipButtons).toHaveLength(10);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
@@ -114,6 +120,40 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         // And it's NOT rendered as the inert coming-soon span.
         const blogSpan = container.querySelector('span[data-testid="new-chip-blog"]');
         expect(blogSpan).toBeNull();
+    });
+
+    describe('store chip is flag-controlled like every other kind', () => {
+        // store graduated from a hardcoded `comingSoon: true` baseline to
+        // being driven by the `works-store` PostHog flag like every other
+        // kind. With the flag resolving to `false` (its current PostHog
+        // state) it renders as the inert "Soon" span — same as before, so
+        // no user-facing change today. With the flag resolving to `true`
+        // (hypothetical — the flag does not currently activate it) it
+        // would render as a clickable button.
+        it('renders store as the inert "Soon" span when `works-store` is disabled (current PostHog state)', () => {
+            const { container } = render(<NewPageClient disabledKinds={['store']} />);
+            const storeSpan = container.querySelector('span[data-testid="new-chip-store"]');
+            expect(storeSpan).not.toBeNull();
+            expect(storeSpan?.getAttribute('aria-disabled')).toBe('true');
+            // And it's NOT a clickable button-option.
+            const storeButton = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected]'),
+            ).find((b) => b.textContent?.includes('Store'));
+            expect(storeButton).toBeUndefined();
+        });
+
+        it('renders store as a clickable button when `works-store` is enabled (flag flipped on)', () => {
+            // disabledKinds=[] mirrors every flag resolving to true (or
+            // missing — fail-open). For store specifically this means the
+            // hypothetical post-flip state where the flag is `active: true`.
+            const { container } = render(<NewPageClient disabledKinds={[]} />);
+            const storeSpan = container.querySelector('span[data-testid="new-chip-store"]');
+            expect(storeSpan).toBeNull();
+            const storeButton = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected]'),
+            ).find((b) => b.textContent?.includes('Store'));
+            expect(storeButton).toBeTruthy();
+        });
     });
 
     it('pre-selects the chip from initialType prop', () => {
