@@ -9,6 +9,7 @@ import {
     Max,
     MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -56,7 +57,11 @@ export class SaveMemoryDto extends WorkScopedDto {
     })
     @IsOptional()
     @IsArray()
+    // Per-element MaxLength cap so a caller can't smuggle a multi-MB
+    // string into a single tag (greptile P2 on PR #1086). The array
+    // length cap is implicit at the storage layer.
     @IsString({ each: true })
+    @MaxLength(128, { each: true })
     tags?: string[];
 
     @ApiPropertyOptional({
@@ -92,6 +97,7 @@ export class SearchMemoryDto extends WorkScopedDto {
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    @MaxLength(128, { each: true })
     tags?: string[];
 
     @ApiPropertyOptional({ description: 'Restrict search to this session.' })
@@ -143,6 +149,11 @@ export class OpenSessionDto extends WorkScopedDto {
 export class ListSessionsQueryDto extends WorkScopedDto {
     @ApiPropertyOptional({ description: 'Max sessions to return.', minimum: 1, maximum: 100 })
     @IsOptional()
+    // Query params arrive as strings — the global ValidationPipe in
+    // apps/api/src/main.ts uses `transform: true` without implicit
+    // conversion, so without `@Type(() => Number)` the @IsNumber()
+    // check fails for `?limit=5` (Codex + greptile P1 on PR #1086).
+    @Type(() => Number)
     @IsNumber()
     @Min(1)
     @Max(100)

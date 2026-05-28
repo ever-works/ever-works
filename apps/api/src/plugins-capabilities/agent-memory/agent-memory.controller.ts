@@ -81,9 +81,15 @@ export class AgentMemoryController {
     @ApiResponse({ status: 201, description: 'Opened session' })
     async openSession(@CurrentUser() auth: AuthenticatedUser, @Body() dto: OpenSessionDto) {
         await this.assertWorkAccess(auth, dto.workId);
+        // Codex P2 on PR #1086 — the facade's openSession takes
+        // `metadata` but the plugin reads `projectId` separately. Fold
+        // a caller-supplied projectId into metadata so the session
+        // actually scopes to the requested namespace.
+        const metadata: Record<string, unknown> = { ...(dto.metadata ?? {}) };
+        if (dto.projectId) metadata.projectId = dto.projectId;
         try {
             const session = await this.agentMemory.openSession(
-                dto.metadata,
+                metadata,
                 this.facadeOptions(auth, dto.workId),
             );
             return { status: 'success', session };
