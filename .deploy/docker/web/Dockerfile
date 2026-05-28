@@ -29,6 +29,15 @@ ENV NODE_ENV=build
 ENV NEXT_BUILD_OUTPUT=standalone
 ENV CI=true
 
+# NEXT_PUBLIC_* must be present BEFORE `next build` runs because Next.js
+# inlines them into the client bundle at build time. The docker-build
+# workflows pass them via `--build-arg`; unset values resolve to empty
+# strings and the PostHog browser SDK degrades to a no-op gracefully.
+ARG NEXT_PUBLIC_POSTHOG_KEY=
+ARG NEXT_PUBLIC_POSTHOG_HOST=
+ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
+
 # Install python3
 RUN apk add --no-cache python3 pkgconfig build-base
 RUN apk add --no-cache pixman-dev cairo-dev pango-dev jpeg-dev giflib-dev
