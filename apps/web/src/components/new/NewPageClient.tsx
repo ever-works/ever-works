@@ -46,8 +46,11 @@ import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompan
  *
  * `store` is a catalog entry telegraphing roadmap scope (see Workspace
  * notes `2026-05-23-missions-ideas-works-spec.md` + AGENTS.md "stores
- * + companies are in-scope future use cases"). It renders as an inert
- * "Soon" chip, matching how the marketing site telegraphs it.
+ * + companies are in-scope future use cases"). It's flag-controlled via
+ * the `works-store` PostHog flag like every other kind; today the flag
+ * resolves to `false`, so the chip still renders as an inert "Soon"
+ * chip matching how the marketing site telegraphs it — but it can be
+ * flipped from PostHog without a code change.
  *
  * EW-662 (Phase 10) — `company` graduated from inert to live: picking
  * the Company chip opens the Register-Company dialog (spec §5.4), which
@@ -436,18 +439,21 @@ export function NewPageClient({
         [effectiveChip],
     );
 
-    // Full chip catalog. `store` stays as an inert "Soon" chip,
-    // appended after the live chips so it sits at the end of the
-    // horizontal scroll the way the marketing site does it.
+    // Full chip catalog. `store` is appended after the live `CHIP_ORDER`
+    // chips so it sits at the end of the horizontal scroll the way the
+    // marketing site does it. Its `comingSoon` is now driven by the
+    // `works-store` PostHog flag like every other kind (the flag currently
+    // resolves to `false`, so the chip still renders as inert "Soon" with
+    // no user-facing change — but it's now controllable from PostHog).
     //
     // EW-662 Phase 10 — `company` graduated from "Soon" to live; it
     // sits at the end of the live `CHIP_ORDER` list so we render it
     // automatically from the loop below. Picking it opens the
     // Register-Company dialog on submit (see `submit()` above).
     //
-    // `comingSoon` per live chip is the union of its hardcoded baseline
-    // and any chip whose `works-<value>` PostHog flag resolved to an
-    // explicit `false` server-side. Missing/undefined flags stay enabled.
+    // `comingSoon` per chip is `disabledSet.has(value)` — i.e. driven
+    // entirely by `works-<value>` PostHog flags resolved server-side.
+    // Missing/undefined flags stay enabled (fail-open).
     const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store'>>>(
         () => [
             ...CHIP_ORDER.map((c) => ({
@@ -456,10 +462,16 @@ export function NewPageClient({
                 Icon: CHIP_ICONS[c],
                 comingSoon: disabledSet.has(c),
             })),
-            // `store` is the only hardcoded coming-soon baseline now
-            // (`company` graduated to a live chip in EW-662 Phase 10).
-            // Its `comingSoon` is pinned `true` regardless of any flag.
-            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            // store is flag-controlled via works-store like every other kind.
+            // The `works-store` PostHog flag exists as `active: false`, so
+            // the chip continues to render as the inert "Soon" baseline
+            // until the flag is flipped — no code change required to enable.
+            {
+                value: 'store' as const,
+                label: 'Store',
+                Icon: Store,
+                comingSoon: disabledSet.has('store'),
+            },
         ],
         [t, disabledSet],
     );
