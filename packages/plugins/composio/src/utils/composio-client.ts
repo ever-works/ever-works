@@ -1,10 +1,12 @@
+import { Composio } from '@composio/core';
 import type { ComposioToolRef, ComposioConnectedAccount, ComposioToolkitEntry } from '../types.js';
 
 export interface ComposioExecutionResult {
 	/**
-	 * Raw data returned by the Composio tool. Composio v3 wraps every
-	 * response in `{ successful, data, error }`; we surface `data` here
-	 * and translate `successful=false` into a thrown error in {@link ComposioClient.executeTool}.
+	 * Raw data returned by the Composio tool. The official `@composio/core`
+	 * SDK already unwraps the v3 response envelope (`{ successful, data, error,
+	 * log_id }`) — successful executions resolve to the tool's `data` payload,
+	 * failures throw. We surface that `data` here verbatim.
 	 */
 	data: unknown;
 	composioDuration: number;
@@ -14,8 +16,13 @@ interface ComposioClientOptions {
 	apiKey: string;
 	baseUrl?: string;
 	logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
-	/** Test seam — injected by unit tests. Defaults to global `fetch`. */
-	fetchImpl?: typeof fetch;
+	/**
+	 * Test seam — pass a stub `Composio`-shaped object to bypass SDK
+	 * construction. Unit tests inject their mocked SDK here instead of
+	 * `vi.mock`-ing the whole `@composio/core` module, which would also
+	 * trip the version-validation modifier the SDK installs at import time.
+	 */
+	sdkOverride?: ComposioSdkLike;
 }
 
 interface ExecuteToolOptions {
@@ -24,45 +31,79 @@ interface ExecuteToolOptions {
 }
 
 /**
- * Subset of the v3 envelope returned by `POST /tools/execute/{slug}`.
- *
- * Composio always wraps tool responses; even successful calls flag failures
- * via `successful: false` rather than HTTP status codes, so the client must
- * inspect the envelope, not just `response.ok`.
+ * Subset of the official `@composio/core` SDK surface we actually use.
+ * Pinned here so a stray major-version bump doesn't silently re-route us
+ * onto methods we haven't audited. Keep this in sync with the SDK reference
+ * at https://docs.composio.dev/sdk-reference/type-script/core-classes/composio.
  */
-interface ComposioExecuteEnvelope {
-	successful?: boolean;
-	data?: unknown;
-	error?: string;
-	log_id?: string;
+export interface ComposioSdkLike {
+	toolkits: {
+		get(query?: { limit?: number }): Promise<{ items: ComposioToolkitEntry[] }>;
+	};
+	connectedAccounts: {
+		list(query?: {
+			userIds?: string[];
+			toolkitSlugs?: string[];
+			limit?: number;
+		}): Promise<{ items: ComposioConnectedAccount[] }>;
+	};
+	tools: {
+		execute(
+			slug: string,
+			body: { userId: string; arguments?: Record<string, unknown> }
+		): Promise<{ successful?: boolean; data?: unknown; error?: string; logId?: string }>;
+	};
 }
 
 /**
- * Thin wrapper around the Composio v3 REST API.
+ * Thin wrapper around the official `@composio/core` SDK.
  *
- * Avoids the @composio/core SDK to keep dependency footprint small (matches
- * the activepieces / make pattern). Adds abort-signal support and translates
- * Composio's wrapped error envelope into Error instances.
+ * Per Workspace AGENTS.md NN #22 ("Always use the official SDK for
+ * third-party APIs — never hand-roll a REST client"), this replaces the
+ * v1 handwritten REST client that shipped in PR #1079. The SDK gets
+ * pagination, retries, response-envelope unwrapping, query-param list
+ * serialization (e.g. `user_ids` as repeated params), version validation,
+ * and breaking-change handling right — all of which we'd otherwise own.
+ *
+ * What's preserved from v1:
+ *  - The public surface (`validateConnection`, `listToolkits`,
+ *    `listConnectedAccounts`, `executeTool`) so `composio.plugin.ts`
+ *    doesn't change.
+ *  - Abort-signal support layered on top of the SDK via `Promise.race`.
+ *    Note: the SDK call itself can't be cancelled mid-flight; what we
+ *    cancel is our *await* on it. The HTTP request may still complete on
+ *    the wire — that's fine for the plugin's pipeline-timeout use case.
+ *  - Friendly error messages around 401/403, missing connections, etc.
  */
 export class ComposioClient {
-	private readonly apiKey: string;
-	private readonly baseUrl: string;
+	private readonly sdk: ComposioSdkLike;
 	private readonly logger: ComposioClientOptions['logger'];
-	private readonly fetchImpl: typeof fetch;
 
 	constructor(options: ComposioClientOptions) {
 		if (!options.apiKey || options.apiKey.trim() === '') {
 			throw new Error('Composio API key is required.');
 		}
-		this.apiKey = options.apiKey.trim();
-		this.baseUrl = (options.baseUrl ?? 'https://backend.composio.dev/api/v3').replace(/\/+$/, '');
 		this.logger = options.logger;
-		this.fetchImpl = options.fetchImpl ?? fetch;
+		this.sdk = options.sdkOverride ?? this.buildSdk(options.apiKey.trim(), options.baseUrl);
+	}
+
+	private buildSdk(apiKey: string, baseUrl: string | undefined): ComposioSdkLike {
+		const sdkConfig: { apiKey: string; baseURL?: string } = { apiKey };
+		if (baseUrl) {
+			// Composio's SDK config uses `baseURL` (capital L) — the underlying
+			// `@composio/client` follows axios-style naming. Strip trailing
+			// slashes so concatenation in the SDK works the same regardless
+			// of how the user typed it in settings.
+			sdkConfig.baseURL = baseUrl.replace(/\/+$/, '');
+		}
+		// The SDK constructor returns a richer instance than ComposioSdkLike
+		// declares; the structural cast pins us to the subset we actually use.
+		return new Composio(sdkConfig) as unknown as ComposioSdkLike;
 	}
 
 	/**
 	 * Validates that:
-	 *  1. The API key is accepted (200 from `/toolkits`).
+	 *  1. The API key is accepted (the SDK throws on 401/403).
 	 *  2. The toolkit exists.
 	 *  3. The user has at least one ACTIVE connected account for the toolkit.
 	 *
@@ -82,11 +123,12 @@ export class ComposioClient {
 
 	/** Lists toolkits the API key has access to. Used by `isAvailable` and the settings UI. */
 	async listToolkits(limit = 50): Promise<ComposioToolkitEntry[]> {
-		const url = new URL(`${this.baseUrl}/toolkits`);
-		url.searchParams.set('limit', String(Math.max(1, Math.min(limit, 200))));
-		const response = await this.request(url.toString(), { method: 'GET' });
-		const body = (await response.json()) as unknown;
-		return extractList<ComposioToolkitEntry>(body);
+		try {
+			const response = await this.sdk.toolkits.get({ limit: Math.max(1, Math.min(limit, 200)) });
+			return response.items ?? [];
+		} catch (error) {
+			throw this.wrapError(error, 'list toolkits');
+		}
 	}
 
 	/**
@@ -95,26 +137,26 @@ export class ComposioClient {
 	 * if the user has not connected any account yet.
 	 */
 	async listConnectedAccounts(userId: string, toolkit?: string): Promise<ComposioConnectedAccount[]> {
-		const url = new URL(`${this.baseUrl}/connected_accounts`);
-		// Composio v3 connected_accounts filters are list parameters — encode them
-		// as repeated query params (`?user_ids=a&user_ids=b`) which is the format
-		// the Composio Python SDK serializes. `.set()` would replace prior values
-		// AND, on Composio side, can be interpreted as a single value rather than
-		// a one-element list, which has been seen to filter strictly differently.
-		url.searchParams.append('user_ids', userId);
-		if (toolkit) url.searchParams.append('toolkit_slugs', toolkit.toUpperCase());
-		const response = await this.request(url.toString(), { method: 'GET' });
-		const body = (await response.json()) as unknown;
-		return extractList<ComposioConnectedAccount>(body);
+		try {
+			const query: { userIds: string[]; toolkitSlugs?: string[] } = { userIds: [userId] };
+			if (toolkit) query.toolkitSlugs = [toolkit.toUpperCase()];
+			const response = await this.sdk.connectedAccounts.list(query);
+			return response.items ?? [];
+		} catch (error) {
+			throw this.wrapError(error, 'list connected accounts');
+		}
 	}
 
 	/**
-	 * Executes a tool against the resolved user. Composio v3's response
-	 * envelope is always `{ successful, data, error, log_id }` — we extract
-	 * `data` on success and throw on failure with the upstream error text.
+	 * Executes a tool against the resolved user. The SDK unwraps the v3
+	 * envelope (`{ successful, data, error }`) — on success we return its
+	 * `data`; on failure (`successful === false`) we throw with the upstream
+	 * error text including the log id when present.
 	 *
-	 * Races against the abort signal so cancellation during long-running
-	 * tools still resolves cleanly.
+	 * Cancellation: the SDK does not accept an AbortSignal, so we race our
+	 * await against the signal. When the signal fires, this method rejects
+	 * with "Pipeline execution was cancelled"; the SDK's HTTP request may
+	 * still complete on the wire but its result is discarded.
 	 */
 	async executeTool(
 		ref: ComposioToolRef,
@@ -127,27 +169,21 @@ export class ComposioClient {
 		const startTime = Date.now();
 		this.logger.log(`Running Composio tool "${ref.toolSlug}" for user "${ref.userId}"`);
 
-		const url = `${this.baseUrl}/tools/execute/${encodeURIComponent(ref.toolSlug)}`;
-		const body: Record<string, unknown> = {
-			user_id: ref.userId,
-			arguments: args
-		};
-		if (options?.timeoutMs) body.timeout = Math.ceil(options.timeoutMs / 1000);
+		const execPromise = this.sdk.tools
+			.execute(ref.toolSlug, {
+				userId: ref.userId,
+				arguments: args
+			})
+			.catch((error: unknown) => {
+				throw this.wrapError(error, `execute tool ${ref.toolSlug}`);
+			});
 
-		const runPromise = this.request(url, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(body),
-			signal
-		});
-
-		const response = await runPromise;
-		const envelope = (await response.json()) as ComposioExecuteEnvelope;
+		const envelope = signal ? await raceWithAbort(execPromise, signal) : await execPromise;
 
 		if (envelope.successful === false) {
 			throw new Error(
 				`Composio tool "${ref.toolSlug}" execution failed: ${envelope.error ?? 'unknown error'}` +
-					(envelope.log_id ? ` (log_id=${envelope.log_id})` : '')
+					(envelope.logId ? ` (log_id=${envelope.logId})` : '')
 			);
 		}
 
@@ -157,99 +193,71 @@ export class ComposioClient {
 		};
 	}
 
-	private async request(url: string, init: RequestInit & { signal?: AbortSignal }): Promise<Response> {
-		const headers = new Headers(init.headers);
-		headers.set('x-api-key', this.apiKey);
-		headers.set('accept', 'application/json');
-
-		let response: Response;
-		try {
-			response = await this.fetchImpl(url, { ...init, headers });
-		} catch (error) {
-			if (init.signal?.aborted) throw new Error('Pipeline execution was cancelled');
-			throw this.wrapNetworkError(error, url);
-		}
-
-		if (!response.ok) {
-			throw await this.wrapHttpError(response, url);
-		}
-		return response;
-	}
-
-	private wrapNetworkError(error: unknown, url: string): Error {
+	private wrapError(error: unknown, context: string): Error {
 		if (error instanceof Error) {
-			return new Error(`Composio request to ${redactUrl(url)} failed: ${error.message}`);
-		}
-		return new Error(`Composio request to ${redactUrl(url)} failed: ${String(error)}`);
-	}
+			const message = error.message || String(error);
+			const status = readNumberProp(error, 'status') ?? readNumberProp(error, 'statusCode');
 
-	private async wrapHttpError(response: Response, url: string): Promise<Error> {
-		let body = '';
-		try {
-			body = await response.text();
-		} catch {
-			// ignore — best-effort read
+			if (status === 401 || status === 403) {
+				return new Error(
+					`Composio rejected the API key (HTTP ${status}) during ${context}. Verify COMPOSIO_API_KEY in plugin settings.`
+				);
+			}
+			if (status === 404) {
+				return new Error(
+					`Composio returned 404 during ${context}. Likely causes: the tool slug or toolkit does not exist, ` +
+						`or the user has no connected account.`
+				);
+			}
+			if (status === 408 || status === 504) {
+				return new Error(`Composio request timed out during ${context} (HTTP ${status}).`);
+			}
+			if (status === 429) {
+				return new Error('Composio rate limit exceeded (HTTP 429). Wait and retry.');
+			}
+			if (status !== undefined && status >= 500) {
+				return new Error(
+					`Composio is returning HTTP ${status} during ${context}. Check https://status.composio.dev. ` +
+						`(${message})`
+				);
+			}
+			// SDK error subclass we don't have a custom-rewording rule for — keep the original message.
+			return new Error(`Composio error during ${context}: ${message}`);
 		}
-		const preview = body.length > 500 ? `${body.slice(0, 500)}…` : body;
-		const redacted = redactUrl(url);
-
-		if (response.status === 401 || response.status === 403) {
-			return new Error(
-				`Composio rejected the API key (HTTP ${response.status}) when calling ${redacted}. ` +
-					`Verify COMPOSIO_API_KEY in plugin settings.${preview ? ` Response: ${preview}` : ''}`
-			);
-		}
-		if (response.status === 404) {
-			return new Error(
-				`Composio returned 404 for ${redacted}. ` +
-					`Likely causes: the tool slug or toolkit does not exist, or the user has no connected account.` +
-					(preview ? ` Response: ${preview}` : '')
-			);
-		}
-		if (response.status === 408 || response.status === 504) {
-			return new Error(`Composio request to ${redacted} timed out (HTTP ${response.status}).`);
-		}
-		if (response.status === 429) {
-			return new Error('Composio rate limit exceeded (HTTP 429). Wait and retry.');
-		}
-		if (response.status >= 500) {
-			return new Error(
-				`Composio is returning HTTP ${response.status} for ${redacted}. ` +
-					`Check https://status.composio.dev.${preview ? ` Response: ${preview}` : ''}`
-			);
-		}
-		return new Error(
-			`Composio request to ${redacted} failed: HTTP ${response.status}${preview ? ` — ${preview}` : ''}`
-		);
+		return new Error(`Unexpected error during ${context}: ${String(error)}`);
 	}
 }
 
-/**
- * Composio v3 list endpoints wrap results in `{ items: [...] }`. Older
- * preview endpoints sometimes returned `{ data: [...] }` or a bare array,
- * so handle all three.
- */
-function extractList<T>(body: unknown): T[] {
-	if (Array.isArray(body)) return body as T[];
-	if (body && typeof body === 'object') {
-		const record = body as Record<string, unknown>;
-		for (const key of ['items', 'data', 'results', 'records']) {
-			const value = record[key];
-			if (Array.isArray(value)) return value as T[];
-		}
-	}
-	return [];
-}
-
-function normalizeStatus(status: string): string {
+function normalizeStatus(status: string | undefined): string {
 	return (status || '').trim().toUpperCase();
 }
 
+function readNumberProp(target: object, prop: string): number | undefined {
+	const value = (target as Record<string, unknown>)[prop];
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 /**
- * Strips query strings from a URL before logging — Composio never embeds
- * secrets in query strings today, but `user_id` is PII so we redact it.
+ * Races a promise against an `AbortSignal`. When the signal fires we reject
+ * with the cancellation marker; when the promise settles first we forward
+ * its outcome and unhook the abort listener so we don't leak references.
  */
-function redactUrl(url: string): string {
-	const idx = url.indexOf('?');
-	return idx === -1 ? url : url.slice(0, idx);
+function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const onAbort = (): void => {
+			signal.removeEventListener('abort', onAbort);
+			reject(new Error('Pipeline execution was cancelled'));
+		};
+		signal.addEventListener('abort', onAbort, { once: true });
+		promise.then(
+			(value) => {
+				signal.removeEventListener('abort', onAbort);
+				resolve(value);
+			},
+			(error: unknown) => {
+				signal.removeEventListener('abort', onAbort);
+				reject(error as Error);
+			}
+		);
+	});
 }
