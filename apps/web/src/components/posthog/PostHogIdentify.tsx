@@ -14,8 +14,7 @@ interface PostHogIdentifyProps {
 }
 
 /**
- * Calls `posthog.identify(userId, ...)` when a known user mounts and
- * `posthog.reset()` when the user goes away (logout / unmount).
+ * Calls `posthog.identify(userId, ...)` when a known user mounts.
  *
  * Place this INSIDE <PostHogProvider> so posthog-js is already
  * initialized by the time the identify effect runs.
@@ -24,6 +23,15 @@ interface PostHogIdentifyProps {
  * about the current user (the dashboard layout passes `AuthUser` as a
  * prop from its server component — there's no client-side `useUser()`
  * hook in this repo today).
+ *
+ * UNMOUNT RESET — the real logout path on this platform redirects the
+ * whole dashboard layout to the login page, which unmounts this
+ * component without `userId` ever transitioning to falsy on a still-
+ * mounted instance. Relying purely on the prop-change branch below
+ * would leave PostHog's distinct_id pinned to the departing user for
+ * the rest of the tab's lifetime. To avoid that, a second effect runs
+ * `posthog.reset()` in its UNMOUNT cleanup so logout / route-tear-down
+ * always drops the prior identity.
  */
 export function PostHogIdentify({ userId, email, name }: PostHogIdentifyProps) {
     useEffect(() => {
@@ -40,6 +48,17 @@ export function PostHogIdentify({ userId, email, name }: PostHogIdentifyProps) {
             posthog.reset();
         }
     }, [userId, email, name]);
+
+    useEffect(() => {
+        if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
+        return () => {
+            // Logout typically unmounts the dashboard layout entirely
+            // rather than flipping `userId` to null on a mounted
+            // instance, so the identify effect above never sees the
+            // transition. Reset here so the next mount starts clean.
+            posthog.reset();
+        };
+    }, []);
 
     return null;
 }
