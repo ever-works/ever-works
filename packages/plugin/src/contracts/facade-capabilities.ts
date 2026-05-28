@@ -30,6 +30,21 @@ export const PLUGIN_CAPABILITIES = {
 	// is the first-party default. Community plugins (Linear / Jira /
 	// GitHub Issues) implement the same contract.
 	TASK_TRACKER: 'task-tracker',
+	// Notifications v2 (EW-650) — Email Providers. Plugins MAY declare
+	// `EMAIL_OUTBOUND`, `EMAIL_INBOUND`, or both. See
+	// `capabilities/email-provider.interface.ts` for the contract.
+	EMAIL_OUTBOUND: 'email-outbound',
+	EMAIL_INBOUND: 'email-inbound',
+	// Notifications v2 (sibling of EW-650) — Notification Channels.
+	// Plugins declare `NOTIFICATION_CHANNEL` (umbrella) plus the
+	// channel-specific constant for plugin discovery + UI grouping.
+	// See `capabilities/notification-channel.interface.ts`.
+	NOTIFICATION_CHANNEL: 'notification-channel',
+	NOTIFICATION_CHANNEL_DISCORD: 'notification-channel-discord',
+	NOTIFICATION_CHANNEL_SLACK: 'notification-channel-slack',
+	NOTIFICATION_CHANNEL_TELEGRAM: 'notification-channel-telegram',
+	NOTIFICATION_CHANNEL_WHATSAPP: 'notification-channel-whatsapp',
+	NOTIFICATION_CHANNEL_NOVU: 'notification-channel-novu',
 	// Pluggable persistent memory for AI coding / generation agents.
 	// First-party implementation: `@ever-works/agentmemory-plugin`
 	// (talks to the `agentmemory` standalone Node server on :3111 —

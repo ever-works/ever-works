@@ -9,6 +9,8 @@ import { WorksModule } from './works/works.module';
 import { KbStorageModule } from './uploads/kb-storage.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
+import { EmailModule } from './email/email.module';
+import { NotificationChannelsModule } from './notification-channels/notification-channels.module';
 import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 import { APIController } from './api.controller';
@@ -86,6 +88,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         KbStorageModule,
         WorksModule,
         MailModule,
+        // Notifications v2 (EW-650 + EW-663) — additive surfaces. v1
+        // MailModule + NotificationsModule above keep working unchanged.
+        EmailModule,
+        NotificationChannelsModule,
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,

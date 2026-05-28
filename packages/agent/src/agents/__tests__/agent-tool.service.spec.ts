@@ -198,4 +198,220 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect('error' in out).toBe(true);
         });
     });
+
+    describe('sendEmail tool (EW-670 / T23)', () => {
+        const makeEmailFacade = () => ({ sendEmail: jest.fn() });
+
+        it('is NOT exposed when emailFacade token is unbound', () => {
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).not.toContain('sendEmail');
+        });
+
+        it('is NOT exposed without canCallExternalTools even when facade is wired', () => {
+            const facade = makeEmailFacade();
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(makeAgent());
+            expect(tools.map((t) => t.name)).not.toContain('sendEmail');
+        });
+
+        it('is exposed when canCallExternalTools + facade are both present', () => {
+            const facade = makeEmailFacade();
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('sendEmail');
+        });
+
+        it('invoke rejects empty recipient list + forwards valid sends to the facade', async () => {
+            const facade = makeEmailFacade();
+            facade.sendEmail.mockResolvedValue({
+                providerMessageId: 'pm-1',
+                accepted: ['b@x.com'],
+                rejected: [],
+            });
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'sendEmail')!;
+
+            const bad = (await tool.invoke({
+                to: [],
+                subject: 's',
+                bodyText: 'b',
+            } as any)) as Record<string, unknown>;
+            expect('error' in bad).toBe(true);
+            expect(facade.sendEmail).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({
+                to: ['b@x.com'],
+                subject: 'hello',
+                bodyText: 'world',
+            } as any);
+            expect(facade.sendEmail).toHaveBeenCalledTimes(1);
+            expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-1');
+        });
+    });
+
+    describe('messageAgent tool (EW-670 / T24)', () => {
+        const makeFullFacade = () => ({ sendEmail: jest.fn(), messageAgent: jest.fn() });
+        const wire = (facade: unknown) =>
+            new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+
+        it('is NOT exposed when the facade only implements sendEmail', () => {
+            const svcSendOnly = wire({ sendEmail: jest.fn() });
+            const tools = svcSendOnly.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('sendEmail');
+            expect(tools.map((t) => t.name)).not.toContain('messageAgent');
+        });
+
+        it('is exposed when the facade implements messageAgent + permission present', () => {
+            const tools = wire(makeFullFacade()).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('messageAgent');
+        });
+
+        it('invoke rejects self-message + forwards a valid peer message', async () => {
+            const facade = makeFullFacade();
+            facade.messageAgent.mockResolvedValue({
+                providerMessageId: 'pm-9',
+                targetAddress: 'peer@inbound.acme.com',
+            });
+            const tools = wire(facade).resolveAllowedTools(
+                makeAgent({
+                    id: 'agent-self',
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'messageAgent')!;
+
+            const selfMsg = (await tool.invoke({
+                targetAgentId: 'agent-self',
+                subject: 's',
+                body: 'b',
+            } as any)) as Record<string, unknown>;
+            expect('error' in selfMsg).toBe(true);
+            expect(facade.messageAgent).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({
+                targetAgentId: 'agent-peer',
+                subject: 'sync up',
+                body: 'please review',
+            } as any);
+            expect(facade.messageAgent).toHaveBeenCalledTimes(1);
+            expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-9');
+        });
+    });
+
+    describe('notifyChannel tool (EW-673 / T26)', () => {
+        const wire = (facade: unknown) =>
+            new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                undefined,
+                facade as any,
+            );
+
+        it('is NOT exposed without the facade token', () => {
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).not.toContain('notifyChannel');
+        });
+
+        it('is NOT exposed without canCallExternalTools', () => {
+            const tools = wire({ notifyChannel: jest.fn() }).resolveAllowedTools(makeAgent());
+            expect(tools.map((t) => t.name)).not.toContain('notifyChannel');
+        });
+
+        it('is exposed when permission + facade are present', () => {
+            const tools = wire({ notifyChannel: jest.fn() }).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('notifyChannel');
+        });
+
+        it('invoke validates input + forwards a valid call', async () => {
+            const facade = {
+                notifyChannel: jest
+                    .fn()
+                    .mockResolvedValue({ status: 'delivered', providerMessageId: 'm-1' }),
+            };
+            const tools = wire(facade).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'notifyChannel')!;
+
+            const bad = (await tool.invoke({ channelId: '', text: 'x' } as any)) as Record<
+                string,
+                unknown
+            >;
+            expect('error' in bad).toBe(true);
+            expect(facade.notifyChannel).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({ channelId: 'ch-1', text: 'deploy finished' } as any);
+            expect(facade.notifyChannel).toHaveBeenCalledWith(
+                expect.objectContaining({ channelId: 'ch-1', text: 'deploy finished' }),
+            );
+            expect((ok as { status: string }).status).toBe('delivered');
+        });
+    });
 });

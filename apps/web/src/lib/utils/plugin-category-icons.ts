@@ -13,6 +13,8 @@ import {
     Wrench,
     Palette,
     HardDrive,
+    Mail,
+    Bell,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -36,6 +38,9 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     theme: Palette,
     // EW-637 — object storage backends (local-fs, S3, MinIO, GitHub blob)
     storage: HardDrive,
+    // EW-650 / EW-663 — Notifications v2 surfaces
+    'email-provider': Mail,
+    'notification-channel': Bell,
 };
 
 /**
@@ -56,6 +61,8 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     utility: 'Utilities',
     theme: 'Themes',
     storage: 'Storage',
+    'email-provider': 'Email Providers',
+    'notification-channel': 'Notification Channels',
 };
 
 // Type-safe assertion that all categories are covered
@@ -146,6 +153,8 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'deployment',
     'data-source',
     'storage',
+    'email-provider',
+    'notification-channel',
     'form',
     'integration',
     'utility',
