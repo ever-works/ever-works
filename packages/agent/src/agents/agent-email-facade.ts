@@ -18,6 +18,17 @@
  * resolves the actual from-address + provider from the Agent's
  * `agent_email_assignments` (lowest-priority outbound = default).
  */
+/**
+ * Handle for a registered React-Email template. When provided, the
+ * adapter renders it server-side (via `@ever-works/email-templates`)
+ * into the HTML + text bodies — the Agent supplies structured `props`
+ * instead of raw HTML.
+ */
+export interface AgentEmailTemplateRef {
+    slug: string;
+    props: Record<string, unknown>;
+}
+
 export interface AgentSendEmailInput {
     userId: string;
     agentId: string;
@@ -26,8 +37,11 @@ export interface AgentSendEmailInput {
     to: string[];
     cc?: string[];
     subject: string;
-    bodyText: string;
+    /** Plain-text body. Optional when `template` is supplied (rendered then). */
+    bodyText?: string;
     bodyHtml?: string;
+    /** Render a registered React-Email template instead of raw bodies. */
+    template?: AgentEmailTemplateRef;
     /** Optional explicit from-address id (tenant_email_addresses.id). */
     fromAddressId?: string;
 }

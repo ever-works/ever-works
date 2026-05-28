@@ -112,7 +112,7 @@ A new facade in `packages/agent/src/facades/notification-channel.facade.ts` (par
 
 - **`send(userId, eventType, payload)`** — resolves the user's enabled channels for the event (via [`event-subscriptions`](../event-subscriptions/spec.md)), and fans out to each in parallel.
 - **`sendDirect(channelId, payload)`** — bypass the subscription resolver; send to one specific channel (used for "Test" button, direct ad-hoc notifications).
-- **Failover**: per-channel attempt with exponential-backoff retry (3 attempts, 1s/4s/15s); on terminal failure, enqueue a BullMQ `notification-channel-retry` job (24h dead-letter).
+- **Failover**: per-channel delivery runs through a Trigger.dev `notification-channel-delivery` task whose `retry` policy gives exponential backoff (mirrors the existing `webhook-delivery` task). On terminal failure the run exhausts its attempts and the delivery-log row is marked `failed` (that row is the dead-letter). When Trigger.dev is disabled (dev / no token), the facade falls back to a synchronous in-process attempt. No BullMQ/Redis — Trigger.dev is the house job system.
 - **Attribution**: emits a `PluginUsageEvent` per send with `capability='notification-channel'` and `channelId` in metadata.
 
 ### 3.4 In-app channel (special-cased)
@@ -156,7 +156,7 @@ notification_channel_delivery_log
 ### 4.2 Reuses
 
 - `PluginUsageEvent` — adds rows with `capability='notification-channel'`.
-- BullMQ — adds `notification-channel-retry` queue (3 attempts, exponential backoff).
+- Trigger.dev — adds a `notification-channel-delivery` task (exponential-backoff `retry` policy; quiet-hours deferral via the run `delay` option).
 
 ---
 
@@ -214,7 +214,7 @@ The in-app channel is built-in (no plugin package).
 - [x] **I** Plugin-first — each channel ships as its own package under `packages/plugins/`.
 - [x] **II** Capability-driven — selection via `PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_*`.
 - [x] **III** Database — new tables go through TypeORM migrations per repo rules.
-- [x] **IV** Trigger.dev / BullMQ — retry queue uses BullMQ (already in use).
+- [x] **IV** Trigger.dev — delivery + retry + quiet-hours deferral use a Trigger.dev task (`delay` for deferral); no BullMQ.
 - [x] **V** Forward-only migrations — additive tables only.
 - [x] **VI** Tests — Vitest unit tests per plugin + Jest integration tests for the facade.
 - [x] **VII** Secret hygiene — bot tokens / API keys marked `x-secret` in the plugin manifest.

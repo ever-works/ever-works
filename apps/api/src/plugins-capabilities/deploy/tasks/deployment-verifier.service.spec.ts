@@ -419,6 +419,29 @@ describe('DeploymentVerifierService', () => {
             expect((completedEvent as any).payload.providerName).toBe('Vercel');
         });
 
+        it('resolves ever-works through the k8s plugin for terminal event metadata', async () => {
+            deployFacade.lookupExistingDeployment.mockResolvedValueOnce({
+                found: true,
+                deploymentState: 'READY',
+            });
+            pluginRegistry.get.mockReturnValueOnce({
+                plugin: { providerName: 'Kubernetes', name: 'Kubernetes' },
+            } as any);
+
+            await service.startVerification(
+                buildWork({ deployProvider: 'ever-works' }) as any,
+                'user-1',
+            );
+            await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+            expect(pluginRegistry.get).toHaveBeenCalledWith('k8s');
+            const completedEvent = eventEmitter.emit.mock.calls.find(
+                (c) => c[0] === DeploymentCompletedEvent.EVENT_NAME,
+            )![1];
+            expect((completedEvent as any).payload.providerId).toBe('ever-works');
+            expect((completedEvent as any).payload.providerName).toBe('Kubernetes');
+        });
+
         it('falls back to plugin.name when providerName is missing', async () => {
             deployFacade.lookupExistingDeployment.mockResolvedValueOnce({
                 found: true,

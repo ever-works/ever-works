@@ -284,6 +284,51 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect(facade.sendEmail).toHaveBeenCalledTimes(1);
             expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-1');
         });
+
+        it('accepts a template instead of bodyText and forwards it to the facade', async () => {
+            const facade = makeEmailFacade();
+            facade.sendEmail.mockResolvedValue({
+                providerMessageId: 'pm-2',
+                accepted: ['b@x.com'],
+                rejected: [],
+            });
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'sendEmail')!;
+
+            // Neither body nor template → error.
+            const bad = (await tool.invoke({ to: ['b@x.com'], subject: 's' } as any)) as Record<
+                string,
+                unknown
+            >;
+            expect('error' in bad).toBe(true);
+            expect(facade.sendEmail).not.toHaveBeenCalled();
+
+            // Template only → forwarded through to the facade.
+            const ok = await tool.invoke({
+                to: ['b@x.com'],
+                subject: 'Digest',
+                template: { slug: 'agent-summary', props: { agentName: 'Atlas' } },
+            } as any);
+            expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-2');
+            expect(facade.sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    template: { slug: 'agent-summary', props: { agentName: 'Atlas' } },
+                }),
+            );
+        });
     });
 
     describe('messageAgent tool (EW-670 / T24)', () => {

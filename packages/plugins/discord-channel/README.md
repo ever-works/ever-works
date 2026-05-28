@@ -4,8 +4,10 @@ Discord notification channel for the Ever Works platform.
 
 - **Capabilities**: `notification-channel`, `notification-channel-discord`
 - **Shape**: `broadcast` (Discord channels = broadcast surfaces)
-- **Transport**: incoming webhook URL (v1)
+- **Transport**: incoming webhook URL (v1) — a plain HTTPS POST via `fetch`
 - **Bot-token mode**: planned for a future iteration
+
+> **SDK note:** intentionally uses `fetch`, not a vendor SDK. Discord incoming webhooks are a bare URL POST with no official SDK; `discord.js` is a full gateway/bot client (WebSocket connection, intents, caches) — far too heavy for a one-shot notification POST. The SDK rule applies where a _sensible_ vendor SDK exists (cf. slack-channel → `@slack/webhook`, telegram-channel → `grammy`).
 
 ## Settings (channel-level `targetConfig`)
 

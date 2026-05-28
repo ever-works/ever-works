@@ -30,6 +30,7 @@
         "schema:log": "pnpm typeorm -- schema:log -d typeorm.config.ts"
     },
     "dependencies": {
+        "@composio/core": "^0.10.0",
         "@ever-works/agent": "workspace:*",
         "@ever-works/aws-s3-plugin": "workspace:*",
         "@ever-works/contracts": "workspace:*",

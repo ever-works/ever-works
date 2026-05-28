@@ -8,6 +8,7 @@ import './globals.css';
 import { themeInitScript } from '@/lib/theme-init';
 import { TopLoader } from '@/components/ui/top-loader';
 import { APP_NAME } from '@/lib/constants';
+import { PostHogProvider } from '@/components/posthog/PostHogProvider';
 
 export const metadata: Metadata = {
     title: {
@@ -41,20 +42,22 @@ export default async function RootLayout({
             <body className="antialiased" suppressHydrationWarning>
                 <TopLoader />
                 <NextIntlClientProvider>
-                    {children}
-                    <Toaster
-                        position="top-right"
-                        theme="system"
-                        toastOptions={{
-                            className:
-                                'sonner-toast !bg-surface dark:!bg-surface-dark !text-text dark:!text-text-dark !border !border-border dark:!border-border-dark',
-                            style: {
-                                background: undefined,
-                                color: undefined,
-                                border: undefined,
-                            },
-                        }}
-                    />
+                    <PostHogProvider>
+                        {children}
+                        <Toaster
+                            position="top-right"
+                            theme="system"
+                            toastOptions={{
+                                className:
+                                    'sonner-toast !bg-surface dark:!bg-surface-dark !text-text dark:!text-text-dark !border !border-border dark:!border-border-dark',
+                                style: {
+                                    background: undefined,
+                                    color: undefined,
+                                    border: undefined,
+                                },
+                            }}
+                        />
+                    </PostHogProvider>
                 </NextIntlClientProvider>
             </body>
         </html>
