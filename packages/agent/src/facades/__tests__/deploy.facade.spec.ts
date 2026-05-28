@@ -88,6 +88,32 @@ describe('DeployFacadeService', () => {
         ]);
     });
 
+    it('checks configured state for the ever-works alias against k8s settings', async () => {
+        const { service, registry, settingsService } = createService({
+            deployProvider: 'ever-works',
+            pluginId: 'k8s',
+            settings: { clusterSource: { value: 'k8s-works' } },
+        });
+
+        await expect(service.isProviderConfigured('ever-works', 'user-1', 'work-1')).resolves.toBe(
+            true,
+        );
+
+        expect(registry.get).toHaveBeenCalledWith('k8s');
+        expect(settingsService.getResolvedSettings).toHaveBeenCalledWith('k8s', {
+            userId: 'user-1',
+            workId: 'work-1',
+            includeSecrets: true,
+        });
+    });
+
+    it('uses the resolved plugin display name for the ever-works alias', () => {
+        const { service } = createService({ deployProvider: 'ever-works', pluginId: 'k8s' });
+
+        expect(service.resolveProviderId('ever-works')).toBe('k8s');
+        expect(service.getProviderName('ever-works')).toBe('Kubernetes');
+    });
+
     it('does not report an unconfigured loaded provider as configured', async () => {
         const { service } = createService({
             deployProvider: 'k8s',
@@ -100,6 +126,34 @@ describe('DeployFacadeService', () => {
             id: 'k8s',
             enabled: true,
             configured: false,
+        });
+    });
+
+    describe('auto-assigned deployment domains', () => {
+        const originalDomain = process.env.EVER_WORKS_DOMAIN;
+
+        afterEach(() => {
+            if (originalDomain === undefined) {
+                delete process.env.EVER_WORKS_DOMAIN;
+            } else {
+                process.env.EVER_WORKS_DOMAIN = originalDomain;
+            }
+        });
+
+        it('treats Ever Works subdomains as auto-assigned', () => {
+            const { service } = createService({ deployProvider: 'k8s' });
+
+            expect((service as any).isAutoAssignedDomain('my-site.ever.works')).toBe(true);
+            expect((service as any).isAutoAssignedDomain('my-site.vercel.app')).toBe(true);
+            expect((service as any).isAutoAssignedDomain('www.customer.com')).toBe(false);
+        });
+
+        it('respects EVER_WORKS_DOMAIN overrides for auto-assigned domains', () => {
+            process.env.EVER_WORKS_DOMAIN = 'preview.ever.works';
+            const { service } = createService({ deployProvider: 'k8s' });
+
+            expect((service as any).isAutoAssignedDomain('my-site.preview.ever.works')).toBe(true);
+            expect((service as any).isAutoAssignedDomain('my-site.ever.works')).toBe(false);
         });
     });
 

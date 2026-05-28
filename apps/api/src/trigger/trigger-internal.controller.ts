@@ -44,7 +44,7 @@ import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain'
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
-import { GitFacadeService } from '@ever-works/agent/facades';
+import { GitFacadeService, NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { RemoteCallDto } from './dto/remote-call.dto';
 import {
     PluginRepository,
@@ -164,6 +164,10 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly agentRunRepositoryRef: AgentRunRepository,
         // Phase 17 — recurring Task dispatcher.
         private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
+        // Notifications v2 (EW-663) — exposed for the
+        // notification-channel-delivery Trigger task to run a single
+        // channel attempt (plugins are loaded here, not in the worker).
+        private readonly notificationChannelFacade: NotificationChannelFacadeService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -200,6 +204,9 @@ export class TriggerInternalController implements OnModuleInit {
             AgentRunRepository: this.agentRunRepositoryRef,
             // Phase 17 — recurring Task dispatcher.
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
+            // Notifications v2 (EW-663) — notification-channel-delivery task
+            // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
+            NotificationChannelFacadeService: this.notificationChannelFacade,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

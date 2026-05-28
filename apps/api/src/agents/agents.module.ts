@@ -26,6 +26,10 @@ import {
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EmailModule } from '../email/email.module';
 import { EmailService } from '../email/email.service';
+import {
+    INBOUND_EMAIL_TASK_SPAWNER,
+    type InboundEmailTaskSpawner,
+} from '@ever-works/agent/notifications';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
 // The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
@@ -132,6 +136,35 @@ import { AgentsController } from './agents.controller';
                         force: force ?? false,
                     });
                     return { status: row.status };
+                },
+            }),
+        },
+        // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
+        // The inbound-email dispatcher's `task-spawn` mode delegates here:
+        // create a Task from the inbound email (scoped to the address
+        // owner, created-by the receiving agent) and assign that agent so
+        // the task-tracking flow dispatches `agent-task-execute`. When this
+        // token is unbound the dispatcher persists the message but spawns
+        // no Task (graceful no-op).
+        {
+            provide: INBOUND_EMAIL_TASK_SPAWNER,
+            inject: [TasksService],
+            useFactory: (tasks: TasksService): InboundEmailTaskSpawner => ({
+                async spawnTaskForInboundEmail({ agentId, userId, subject, bodyText, from }) {
+                    const title = subject?.trim()
+                        ? subject.trim().slice(0, 200)
+                        : `Inbound email from ${from}`;
+                    const task = await tasks.create(userId, {
+                        title,
+                        description: bodyText?.trim() ? bodyText.trim().slice(0, 8000) : null,
+                        labels: ['inbound-email'],
+                        createdByType: 'agent',
+                        createdById: agentId,
+                    });
+                    // Assign the receiving agent so the task-tracking flow
+                    // fans out agent-task-execute for it.
+                    await tasks.addAssignee(userId, task.id, 'agent', agentId);
+                    return { taskId: task.id };
                 },
             }),
         },
@@ -419,6 +452,7 @@ import { AgentsController } from './agents.controller';
                     subject,
                     bodyText,
                     bodyHtml,
+                    template,
                     fromAddressId,
                 }) {
                     const result = await email.sendMessage(userId, {
@@ -428,6 +462,7 @@ import { AgentsController } from './agents.controller';
                         subject,
                         bodyText,
                         bodyHtml,
+                        template,
                         fromAddressId,
                     });
                     return {
@@ -478,8 +513,11 @@ import { AgentsController } from './agents.controller';
                         { text, messageRef: `agent-${agentId}-${Date.now()}` },
                         { userId, agentId },
                     );
+                    // sendDirect is the synchronous inline path (no Trigger
+                    // dispatch), so it only ever resolves delivered/failed —
+                    // narrow the facade's wider union for the agent tool.
                     return {
-                        status: result.status,
+                        status: result.status === 'failed' ? 'failed' : 'delivered',
                         providerMessageId: result.providerMessageId,
                         error: result.error,
                     };
@@ -499,6 +537,7 @@ import { AgentsController } from './agents.controller';
         AGENT_GIT_FACADE,
         AGENT_EMAIL_FACADE,
         AGENT_NOTIFY_CHANNEL_FACADE,
+        INBOUND_EMAIL_TASK_SPAWNER,
     ],
 })
 export class AgentsModule {}

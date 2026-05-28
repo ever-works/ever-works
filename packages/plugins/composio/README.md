@@ -18,7 +18,7 @@ Composio Integrations Pipeline Plugin - Executes Composio tools across 500+ thir
 
 This plugin lets Ever Works call any of [Composio](https://composio.dev)'s 500+ third-party integrations (Gmail, Slack, GitHub, Notion, Linear, Salesforce, HubSpot, Stripe, Shopify, Airtable, …) during work generation. Composio brokers OAuth on your behalf — each user connects an app once through Composio's hosted flow, and the platform reuses that connection to execute tools.
 
-Instead of writing a per-app connector for every service your users want to integrate, you ship one plugin (this one) and your users get the entire Composio catalog. The plugin invokes tools via the Composio v3 REST API (`POST /api/v3/tools/execute/{tool_slug}`) and returns the result as pipeline outputs in one of three shapes: structured `{ items: [...] }`, native records with a field mapping, or side-effect only (fire-and-forget).
+Instead of writing a per-app connector for every service your users want to integrate, you ship one plugin (this one) and your users get the entire Composio catalog. The plugin invokes tools through the official [`@composio/core`](https://www.npmjs.com/package/@composio/core) SDK (per Workspace AGENTS.md NN #22 — always use the official vendor SDK) and returns the result as pipeline outputs in one of three shapes: structured `{ items: [...] }`, native records with a field mapping, or side-effect only (fire-and-forget).
 
 ## Why use it?
 
@@ -30,11 +30,11 @@ Instead of writing a per-app connector for every service your users want to inte
 
 ## How it works in Ever Works
 
-When this plugin is selected as the active pipeline, the platform calls the Composio v3 REST API. The 6 sequential steps:
+When this plugin is selected as the active pipeline, the platform drives a `Composio` client from `@composio/core` through 6 sequential steps:
 
-1. **Validate Composio Connection** — verifies the API key is accepted and the user has an ACTIVE connected account for the requested toolkit.
+1. **Validate Composio Connection** — `composio.toolkits.get(...)` confirms the API key is accepted, then `composio.connectedAccounts.list({ userIds, toolkitSlugs })` confirms the user has an ACTIVE connected account for the requested toolkit.
 2. **Prepare Tool Payload** — builds the `arguments` object with work metadata, an optional existing-items summary, an optional GitHub data repository, and any user-supplied tool params.
-3. **Execute Composio Tool** — `POST /tools/execute/{tool_slug}` with `{ user_id, arguments }`.
+3. **Execute Composio Tool** — `composio.tools.execute(toolSlug, { userId, arguments })`. The SDK unwraps the v3 response envelope (`{ successful, data, error, log_id }`) for us.
 4. **Collect & Validate Results** — parses the response, projects records onto work items if needed, deduplicates against existing items.
 5. **Capture Screenshots** (optional) — uses the configured screenshot plugin to fetch images for items without them.
 6. **Cleanup** — releases resources.
@@ -50,7 +50,7 @@ The plugin treats the **tool slug** as the unique identifier of an action (`GMAI
 
 ## Settings
 
-- `apiKey` (**secret**, required) — Composio API key, sent as `x-api-key` on every Composio v3 call.
+- `apiKey` (**secret**, required) — Composio API key, passed to the `@composio/core` SDK at construction time.
 - `baseUrl` — Override the Composio API base URL (leave empty for the default `https://backend.composio.dev/api/v3`).
 - `defaultUserId` — Composio `user_id` to run tools against. Defaults to your Ever Works user id.
 - `defaultToolkit` — Default toolkit slug (e.g. `GMAIL`).

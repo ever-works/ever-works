@@ -4,7 +4,9 @@ WhatsApp notification channel for the Ever Works platform.
 
 - **Capabilities**: `notification-channel`, `notification-channel-whatsapp`
 - **Shape**: `direct` (one recipient per channel)
-- **Transport**: WhatsApp Business Cloud API (`/{phoneNumberId}/messages`)
+- **Transport**: WhatsApp Business Cloud API (`/{phoneNumberId}/messages`) via `fetch`
+
+> **SDK note:** intentionally uses `fetch`, not a vendor SDK. Meta ships no official Node SDK for the WhatsApp Business Cloud API; the community packages are thin/unmaintained Graph-API wrappers that add no real value over a typed `fetch` call. The SDK rule applies where a _sensible_ vendor SDK exists (cf. slack-channel → `@slack/webhook`, telegram-channel → `grammy`).
 
 ## Settings (channel-level `targetConfig`)
 

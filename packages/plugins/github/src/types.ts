@@ -46,5 +46,6 @@ export interface GitHubActionSecret {
 export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment', 'Production deployment'] as const;
 export const ACTIVE_WORKFLOW_FILES = [
 	'.github/workflows/deploy_vercel.yaml',
-	'.github/workflows/deploy_prod.yaml'
+	'.github/workflows/deploy_prod.yaml',
+	'.github/workflows/deploy_k8s.yaml'
 ] as const;

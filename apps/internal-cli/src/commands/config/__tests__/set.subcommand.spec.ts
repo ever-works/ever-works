@@ -75,6 +75,8 @@ describe('SetSubCommand.run (validation paths)', () => {
             'anthropic',
             'openrouter',
             'ollama',
+            'lm-studio',
+            'vllm',
             'groq',
             'custom',
         ]) {

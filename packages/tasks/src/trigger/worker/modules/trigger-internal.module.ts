@@ -8,6 +8,7 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -88,6 +89,15 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskRecurrenceDispatcherService'),
             inject: [TriggerInternalApiClient],
         },
+        // Notifications v2 (EW-663) — the notification-channel-delivery
+        // task calls `deliverToChannelOrThrow` on this proxy, which RPCs
+        // to the live API where the channel plugins are loaded.
+        {
+            provide: NotificationChannelFacadeService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'NotificationChannelFacadeService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -100,6 +110,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentRepository,
         AgentRunRepository,
         TaskRecurrenceDispatcherService,
+        NotificationChannelFacadeService,
     ],
 })
 export class TriggerInternalModule {}
