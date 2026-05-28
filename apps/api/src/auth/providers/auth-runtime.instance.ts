@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
@@ -45,6 +45,36 @@ function getInitializedDatabaseClient(dataSource: DataSource): any {
     throw new Error(
         `Unable to resolve Better Auth database client from initialized TypeORM driver "${dataSource.options.type}".`,
     );
+}
+
+/**
+ * EW-652 Phase 0 — mirrors `UsernameAllocatorService.normalize()` in
+ * `apps/api/src/users/services/username-allocator.service.ts`, which is
+ * the slug shape the `/api/users/check-username` preflight reports as
+ * available. Keeping these in lockstep is load-bearing: a divergence
+ * lets the preflight return `available: true` for a normalized name
+ * whose actual Better Auth INSERT would then collide on the UNIQUE
+ * `users.slug` constraint.
+ *
+ * The User entity's `@BeforeInsert deriveSlugIfMissing()` hook falls
+ * back to the fixed string `u-anon`, but only one row in the entire
+ * table can have that slug (UNIQUE). Subsequent degenerate-username
+ * signups would collide there. Codex P2 on PR #1064: use a random
+ * suffix here so degenerate names like `!!!` or `---` each get a
+ * unique slug instead of all racing for the same `u-anon` row.
+ */
+function deriveSlugFromName(name: string | undefined | null): string {
+    const fallback = (): string => `u-${randomBytes(4).toString('hex')}`;
+
+    if (!name) {
+        return fallback();
+    }
+    const normalized = name
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return normalized.length > 0 ? normalized : fallback();
 }
 
 function getTrustedOrigins() {
@@ -143,6 +173,23 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                     input: false,
                     required: false,
                 },
+                // EW-652 (Tenants & Organizations Phase 0) — `users.slug` is
+                // a NOT NULL UNIQUE column added by
+                // `1779991001000-AddSlugToUsers.ts`. Better Auth writes through
+                // its own DB adapter (raw SQL via the Postgres pool extracted
+                // from TypeORM), which bypasses the User entity's
+                // `@BeforeInsert deriveSlugIfMissing()` hook — so without an
+                // explicit `slug` value the INSERT fails with
+                // `null value in column "slug" violates not-null constraint`
+                // and Better Auth wraps it as `FAILED_TO_CREATE_USER` (HTTP
+                // 422 "Failed to create user"). Declaring it here as an
+                // additional field with `input: false` lets the `before`
+                // hook below populate it before the INSERT runs.
+                slug: {
+                    type: 'string',
+                    input: false,
+                    required: false,
+                },
             },
         },
         account: {
@@ -198,6 +245,27 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                                 password: await bcrypt.hash(randomUUID(), getBcryptCost()),
                                 registrationProvider: RegistrationProvider.LOCAL,
                                 isActive: true,
+                                // EW-652 Phase 0 — derive the URL-safe `slug`
+                                // from the username. Mirrors the User
+                                // entity's `@BeforeInsert deriveSlugIfMissing()`,
+                                // which is bypassed because Better Auth
+                                // INSERTs through its own DB adapter rather
+                                // than the TypeORM repository. The DB UNIQUE
+                                // constraint on `slug` is the final
+                                // authority — racing duplicates will surface
+                                // as 422 to the caller, same as a duplicate
+                                // username. Better Auth applies its
+                                // `user.fields.name → username` mapping
+                                // before invoking this hook, so the column
+                                // name is available either as `username`
+                                // (post-mapping) or as the original `name`
+                                // (depending on adapter internals); we read
+                                // both for robustness across Better Auth
+                                // versions.
+                                slug: deriveSlugFromName(
+                                    (user as { username?: string }).username ??
+                                        (user as { name?: string }).name,
+                                ),
                             },
                         };
                     },

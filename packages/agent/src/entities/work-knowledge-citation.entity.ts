@@ -71,6 +71,14 @@ export class WorkKnowledgeCitation {
     @Column({ type: 'float', nullable: true, name: 'relevance_score' })
     relevanceScore?: number | null;
 
+    // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
+    // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    organizationId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

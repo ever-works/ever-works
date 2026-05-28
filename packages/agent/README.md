@@ -26,7 +26,6 @@ The package exposes 25+ sub-paths so consumers only import what they need. Each 
 | `@ever-works/agent/database`             | TypeORM data source, migrations, and repository helpers                   |
 | `@ever-works/agent/entities`             | TypeORM entities (Work, Item, Category, Tag, User, etc.)                  |
 | `@ever-works/agent/dto`                  | Shared DTOs used between the API and the agent                            |
-| `@ever-works/agent/git`                  | `isomorphic-git` wrappers shared by all git provider plugins              |
 | `@ever-works/agent/work-operations`      | Work lifecycle: create, generate, regenerate, cancel, delete              |
 | `@ever-works/agent/import`               | Importers for existing data sources (CSV, Notion, etc.)                   |
 | `@ever-works/agent/subscriptions`        | Plan limits, billing-aware feature gating                                 |
@@ -112,4 +111,4 @@ pnpm --filter @ever-works/agent test:cov
 
 ## License
 
-UNLICENSED — internal package, not for external distribution.
+AGPL-3.0. See the repository root license for details.

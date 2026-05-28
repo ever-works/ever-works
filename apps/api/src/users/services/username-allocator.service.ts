@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { UserRepository } from '@ever-works/agent/database';
+import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 
 /**
  * EW-652 (Tenants & Organizations Phase 0) — shared allocator for
@@ -25,13 +25,18 @@ import { UserRepository } from '@ever-works/agent/database';
  *   4. Strip leading/trailing `-`.
  *   5. Fallback to `u-` + 8 hex chars if empty after normalization.
  *
- * Once `organizations.slug` lands in EW-653 (Phase 1), this service will
- * also check cross-table collisions via a new `OrganizationRepository`
- * dependency; for now it only checks `users.username` / `users.slug`.
+ * **EW-658 (Phase 6)**: cross-table slug collision is now checked
+ * against both `users.slug` (case-insensitive on `lower(username)` +
+ * the dedicated `slug` column) AND `organizations.slug`. Once Phase 6
+ * landed, a Tenant's bare user-slug and any Organization slug under
+ * any Tenant share the same global namespace.
  */
 @Injectable()
 export class UsernameAllocatorService {
-    constructor(private readonly userRepository: UserRepository) {}
+    constructor(
+        private readonly userRepository: UserRepository,
+        private readonly organizationRepository: OrganizationRepository,
+    ) {}
 
     /**
      * Normalize an arbitrary string into a URL-safe form (lowercase ASCII +
@@ -128,7 +133,17 @@ export class UsernameAllocatorService {
             return true;
         }
         const bySlug = await this.userRepository.findBySlug(candidate);
-        return bySlug !== null;
+        if (bySlug !== null) {
+            return true;
+        }
+        // EW-658 (Phase 6): also check `organizations.slug` so user
+        // slugs and Org slugs share a single global namespace. Phase 7's
+        // slug-resolver middleware reads `:slug` once and routes to
+        // either a User scope or an Org scope based on which table the
+        // hit lives in; allowing the two namespaces to collide would
+        // make that lookup ambiguous.
+        const byOrgSlug = await this.organizationRepository.findBySlug(candidate);
+        return byOrgSlug !== null;
     }
 
     private randomHex(length: number): string {

@@ -17,3 +17,7 @@ export * from './onboarding/index.js';
 // EW-628 data-repo instant-sync — activity-row wire payload shared by
 // API (emitter) and web (renderer).
 export * from './data-sync/index.js';
+
+// EW-658 Tenants & Organizations Phase 6 — Org-create / list / update /
+// upgrade-from-account API wire-types.
+export * from './organization/index.js';

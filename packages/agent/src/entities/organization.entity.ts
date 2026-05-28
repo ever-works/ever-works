@@ -3,12 +3,9 @@ import {
     CreateDateColumn,
     Entity,
     Index,
-    JoinColumn,
-    ManyToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { Tenant } from './tenant.entity';
 
 /**
  * Provenance for the `Organization` row — how it came to exist.
@@ -74,12 +71,20 @@ export class Organization {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    /**
+     * FK to `tenants.id`. Cascade ON DELETE is enforced by the
+     * migration's `fk_organizations_tenant` FK constraint.
+     *
+     * As with `Tenant.ownerUserId`, we intentionally do NOT declare
+     * a `@ManyToOne(() => Tenant)` relation here — importing `Tenant`
+     * would extend the user/tenant/organization import cycle
+     * (User → Organization → Tenant → User) and crash ESM / vitest
+     * with TDZ errors. Phase 6 services do explicit
+     * `tenantRepository.findById(org.tenantId)` lookups when they
+     * need the parent Tenant.
+     */
     @Column('uuid')
     tenantId: string;
-
-    @ManyToOne(() => Tenant, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'tenantId' })
-    tenant?: Tenant;
 
     /**
      * URL-safe slug. Globally unique across the `organizations` table.

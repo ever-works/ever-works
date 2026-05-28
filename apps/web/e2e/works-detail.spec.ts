@@ -79,7 +79,7 @@ test.describe('Works list page — interactive surface', () => {
         const newWorkLink = page.locator('a[href$="/works/new"], a[href*="/works/new?"]').first();
         await expect(newWorkLink).toBeVisible({ timeout: 10_000 });
         await newWorkLink.click();
-        await page.waitForURL(/\/en\/works\/new/, { timeout: 30_000 });
+        await page.waitForURL(/(?:\/en)?\/works\/new/, { timeout: 30_000 });
     });
 });
 

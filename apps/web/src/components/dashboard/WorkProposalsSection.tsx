@@ -223,7 +223,7 @@ export function WorkProposalsSection({
 
     return (
         <section className="mt-8" aria-labelledby="work-proposals-heading">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
                         <Lightbulb className="w-4 h-4 text-warning" />
@@ -235,9 +235,17 @@ export function WorkProposalsSection({
                         {username ? t('header.titleWithName', { username }) : t('header.title')}
                     </h2>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Dashboard polish (2026-05-27) — actions stay on a
+                    single row (`flex-nowrap`) instead of stacking
+                    vertically when the chat panel narrows the column.
+                    `shrink-0` keeps each control measured so the title
+                    truncates first. */}
+                <div className="flex flex-nowrap items-center gap-2 shrink-0">
                     {/* Phase 5 PR O — quick-add trigger. Hidden while the form is open
-                        so the header and form don't show duplicate Add controls. */}
+                        so the header and form don't show duplicate Add controls.
+                        Dashboard polish (2026-05-27) — label collapses to icon-
+                        only below `@xl/main` so the action row fits one line
+                        when the chat panel is open. */}
                     {!quickAddOpen && (
                         <Button
                             type="button"
@@ -246,9 +254,13 @@ export function WorkProposalsSection({
                             className="gap-1.5"
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}
+                            aria-label={tPage('quickAdd.submit')}
+                            title={tPage('quickAdd.submit')}
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            {tPage('quickAdd.submit')}
+                            <span className="hidden @xl/main:inline">
+                                {tPage('quickAdd.submit')}
+                            </span>
                         </Button>
                     )}
 
@@ -316,12 +328,19 @@ export function WorkProposalsSection({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Existing Suggest more button (keeps prior PR-E label). */}
+                    {/* Existing Suggest more button (keeps prior PR-E label).
+                        Dashboard polish (2026-05-27) — label is hidden
+                        below `@xl/main` so the row stays one line when
+                        the chat panel is open. The icon alone still
+                        conveys "refresh" and the title attribute carries
+                        the accessible label. */}
                     {showRefreshButton && (
                         <button
                             type="button"
                             onClick={handleRefresh}
                             disabled={pendingRefresh || researching}
+                            title={t('actions.refresh')}
+                            aria-label={t('actions.refresh')}
                             className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
                             {pendingRefresh || researching ? (
@@ -329,7 +348,7 @@ export function WorkProposalsSection({
                             ) : (
                                 <RefreshCw className="w-4 h-4" />
                             )}
-                            {t('actions.refresh')}
+                            <span className="hidden @xl/main:inline">{t('actions.refresh')}</span>
                         </button>
                     )}
 

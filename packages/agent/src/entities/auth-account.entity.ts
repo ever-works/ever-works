@@ -50,6 +50,13 @@ export class AuthAccount {
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, any> | null;
 
+    // EW-654 (Tenants & Organizations Phase 2) — Tier B scope. NULL
+    // until the owning user creates their first Organization (Phase 6).
+    // Tier B has no organizationId; auth records are user-identity,
+    // not Org-scoped. See spec.md §2.3.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

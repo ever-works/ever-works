@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CalendarClock, Target } from 'lucide-react';
+import { CalendarClock, Plus, Target } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -69,7 +69,7 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
 
     return (
         <section className="mt-8" aria-labelledby="missions-preview-heading">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
                         <Target className="w-4 h-4 text-warning" />
@@ -81,14 +81,32 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
                         {t('title')}
                     </h2>
                 </div>
-                {totalMissions > 0 && (
+                {/* Dashboard polish (2026-05-27) — `+ Add` button on
+                    every dashboard section so the UI is symmetrical
+                    (Missions / Ideas / Works / Tasks / Agents all
+                    surface their own create entry point). */}
+                <div className="flex flex-nowrap items-center gap-2 shrink-0">
                     <Link
-                        href={ROUTES.DASHBOARD_MISSIONS}
-                        className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
+                        href="/new?type=mission"
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                            'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                            'text-text-secondary dark:text-text-secondary-dark',
+                            'hover:border-primary/40 hover:text-primary',
+                        )}
                     >
-                        {t('viewAll', { n: totalMissions })}
+                        <Plus className="w-3.5 h-3.5" />
+                        Add
                     </Link>
-                )}
+                    {totalMissions > 0 && (
+                        <Link
+                            href={ROUTES.DASHBOARD_MISSIONS}
+                            className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
+                        >
+                            {t('viewAll', { n: totalMissions })}
+                        </Link>
+                    )}
+                </div>
             </div>
 
             {previewMissions.length === 0 ? (

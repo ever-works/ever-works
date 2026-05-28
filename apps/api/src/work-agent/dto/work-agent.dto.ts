@@ -3,8 +3,10 @@ import { Type } from 'class-transformer';
 import {
     IsBoolean,
     IsInt,
+    IsNumber,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
@@ -25,6 +27,7 @@ import {
     WorkAgentGoalStatus,
     WorkAgentRunLogLevel,
     WorkAgentRunStatus,
+    SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN,
 } from '@ever-works/agent/work-agent';
 
 export class WorkAgentGuardrailsDto implements Partial<WorkAgentGuardrails> {
@@ -84,6 +87,61 @@ export class UpdateWorkAgentPreferencesDto
     @IsOptional()
     @IsBoolean()
     dailySuggestionsEnabled?: boolean;
+
+    @IsOptional()
+    @IsString()
+    @Matches(SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN, {
+        message:
+            'autoGenerateCadence must use the supported */N * * * * format with N between 1 and 1440',
+    })
+    @MaxLength(64)
+    autoGenerateCadence?: string | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(20)
+    autoGenerateBatchSize?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(1000)
+    autoBuildThrottlePerDay?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(-1)
+    @Max(1000)
+    missionDefaultOutstandingCap?: number | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(5)
+    maxAutoRetries?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(10)
+    @Max(3600)
+    backoffSeconds?: number;
+
+    @IsOptional()
+    @IsNumber({ maxDecimalPlaces: 2 })
+    @Min(1)
+    @Max(4)
+    exponentialBackoffFactor?: number;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d+$/)
+    @MaxLength(32)
+    accountWideMonthlyCapCents?: string | null;
+
+    @IsOptional()
+    @IsBoolean()
+    accountWideAllowOverage?: boolean;
 }
 
 export class CreateWorkAgentGoalDto

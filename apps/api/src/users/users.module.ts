@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule, UserRepository } from '@ever-works/agent/database';
+import { DatabaseModule, OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import { UsersController } from './controllers/users.controller';
 import { UsernameAllocatorService } from './services/username-allocator.service';
 
@@ -18,7 +18,7 @@ import { UsernameAllocatorService } from './services/username-allocator.service'
  */
 @Module({
     imports: [DatabaseModule],
-    providers: [UserRepository, UsernameAllocatorService],
+    providers: [UserRepository, OrganizationRepository, UsernameAllocatorService],
     controllers: [UsersController],
     exports: [UsernameAllocatorService],
 })

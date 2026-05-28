@@ -16,12 +16,13 @@
     "types": "dist/index.d.ts",
     "scripts": {
         "build": "tsc -p tsconfig.json",
+        "type-check": "tsc -p tsconfig.json --noEmit",
         "dev": "tsc -p tsconfig.json --watch",
         "build:plugins": "pnpm --filter './packages/plugins/*' build",
         "prepare:plugins": "node scripts/prepare-plugins.js",
-        "dev:trigger": "npx --yes trigger.dev@4.4.6 dev",
+        "dev:trigger": "pnpm dlx trigger.dev@4.4.6 dev",
         "predeploy:trigger": "pnpm prepare:plugins",
-        "deploy:trigger": "npx trigger.dev@4.4.6 deploy",
+        "deploy:trigger": "pnpm dlx trigger.dev@4.4.6 deploy",
         "test": "vitest run --passWithNoTests",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage"

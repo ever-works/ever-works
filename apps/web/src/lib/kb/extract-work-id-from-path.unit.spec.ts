@@ -13,46 +13,57 @@ describe('extractWorkIdFromPath (row 35e)', () => {
     });
 
     it('returns null for paths that do not match the Work shape', () => {
+        expect(extractWorkIdFromPath('/')).toBeNull();
+        expect(extractWorkIdFromPath('/dashboard')).toBeNull();
+        expect(extractWorkIdFromPath('/works')).toBeNull();
+        expect(extractWorkIdFromPath('/items/123')).toBeNull();
+        // Legacy locale-prefixed shape (still tolerated, must reject these)
         expect(extractWorkIdFromPath('/en')).toBeNull();
         expect(extractWorkIdFromPath('/en/dashboard')).toBeNull();
         expect(extractWorkIdFromPath('/en/works')).toBeNull();
         expect(extractWorkIdFromPath('/en/items/123')).toBeNull();
     });
 
-    it('extracts the Work id from a bare /works/:id', () => {
-        expect(extractWorkIdFromPath('/en/works/work-abc')).toBe('work-abc');
+    it('extracts the Work id from a bare /works/:id (current, unprefixed)', () => {
+        expect(extractWorkIdFromPath('/works/work-abc')).toBe('work-abc');
     });
 
-    it('extracts the Work id from a nested /works/:id/... path', () => {
+    it('extracts the Work id from a nested /works/:id/... path (unprefixed)', () => {
+        expect(extractWorkIdFromPath('/works/work-abc/items')).toBe('work-abc');
+        expect(extractWorkIdFromPath('/works/work-abc/kb')).toBe('work-abc');
+        expect(extractWorkIdFromPath('/works/work-abc/kb/brand/voice')).toBe('work-abc');
+    });
+
+    it('still accepts the legacy locale-prefixed shape /<locale>/works/:id/...', () => {
+        // Older bookmarks redirect via the proxy, but render-time
+        // `usePathname()` may still see the legacy shape for a tick.
+        expect(extractWorkIdFromPath('/en/works/work-abc')).toBe('work-abc');
         expect(extractWorkIdFromPath('/en/works/work-abc/items')).toBe('work-abc');
-        expect(extractWorkIdFromPath('/en/works/work-abc/kb')).toBe('work-abc');
         expect(extractWorkIdFromPath('/en/works/work-abc/kb/brand/voice')).toBe('work-abc');
     });
 
     it('handles UUID-style ids', () => {
         const uuid = '5b1f9c4e-9b1f-4c4e-9b1f-9c4e9b1f4c4e';
+        expect(extractWorkIdFromPath(`/works/${uuid}`)).toBe(uuid);
+        expect(extractWorkIdFromPath(`/works/${uuid}/kb`)).toBe(uuid);
         expect(extractWorkIdFromPath(`/en/works/${uuid}`)).toBe(uuid);
-        expect(extractWorkIdFromPath(`/en/works/${uuid}/kb`)).toBe(uuid);
     });
 
-    it('survives different locale prefixes', () => {
+    it('survives different (legacy) locale prefixes', () => {
         expect(extractWorkIdFromPath('/fr/works/work-abc/kb')).toBe('work-abc');
         expect(extractWorkIdFromPath('/zh/works/work-abc/kb')).toBe('work-abc');
         expect(extractWorkIdFromPath('/ar/works/work-abc/kb')).toBe('work-abc');
     });
 
     it('ignores query string + hash after the id', () => {
+        expect(extractWorkIdFromPath('/works/work-abc?tab=kb')).toBe('work-abc');
+        expect(extractWorkIdFromPath('/works/work-abc#section')).toBe('work-abc');
         expect(extractWorkIdFromPath('/en/works/work-abc?tab=kb')).toBe('work-abc');
-        expect(extractWorkIdFromPath('/en/works/work-abc#section')).toBe('work-abc');
-    });
-
-    it('returns null when there is no locale segment (/works at root)', () => {
-        // The dashboard route is locale-prefixed in this project, so a
-        // bare `/works/:id` is not expected and we conservatively reject.
-        expect(extractWorkIdFromPath('/works/work-abc')).toBeNull();
     });
 
     it('returns null for the index/list page /works without id', () => {
+        expect(extractWorkIdFromPath('/works')).toBeNull();
+        expect(extractWorkIdFromPath('/works/')).toBeNull();
         expect(extractWorkIdFromPath('/en/works')).toBeNull();
         expect(extractWorkIdFromPath('/en/works/')).toBeNull();
     });

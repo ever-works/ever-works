@@ -18,10 +18,12 @@ export async function registerViaUI(
 
     await page.locator('button[type="submit"]').click();
 
-    // Wait for redirect to dashboard
-    await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-        timeout: 30_000,
-    });
+    // Wait for redirect to dashboard. Matches both legacy `/en/<path>`
+    // and the canonical unprefixed `/<path>` shape (PR #1052).
+    await page.waitForURL(
+        /^https?:\/\/[^/]+(?:\/en)?(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+        { timeout: 30_000 },
+    );
 }
 
 /**
@@ -36,10 +38,12 @@ export async function loginViaUI(page: Page, credentials: { email: string; passw
 
     await page.locator('button[type="submit"]').click();
 
-    // Wait for redirect to dashboard
-    await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-        timeout: 30_000,
-    });
+    // Wait for redirect to dashboard. Matches both legacy `/en/<path>`
+    // and the canonical unprefixed `/<path>` shape (PR #1052).
+    await page.waitForURL(
+        /^https?:\/\/[^/]+(?:\/en)?(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+        { timeout: 30_000 },
+    );
 }
 
 /**

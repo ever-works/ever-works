@@ -36,13 +36,26 @@ test.describe('Works — public routes', () => {
         });
     }
 
-    const publicPages = ['/en/login', '/en/register', '/en/forgot-password'];
+    // Path pairs: [legacy /en/<path>, canonical /<path>]. PR #1052
+    // (`localePrefix: 'never'`) 307-redirects the legacy form to the
+    // canonical form. The final URL after navigation is the canonical
+    // shape — the test asserts the page loads AND that we ended up on
+    // the right page (login → /login, register → /register, etc.),
+    // regardless of which input form was used.
+    const publicPages: Array<{ entry: string; canonical: RegExp }> = [
+        { entry: '/en/login', canonical: /\/login(\?|#|$)/ },
+        { entry: '/en/register', canonical: /\/register(\?|#|$)/ },
+        { entry: '/en/forgot-password', canonical: /\/forgot-password(\?|#|$)/ },
+    ];
 
-    for (const path of publicPages) {
-        test(`public page ${path} loads (no redirect)`, async ({ page }) => {
-            const response = await page.goto(path, { waitUntil: 'networkidle' });
-            expect(response?.status(), `${path} should not 5xx`).toBeLessThan(500);
-            expect(page.url(), `${path} should not redirect away`).toContain(path);
+    for (const { entry, canonical } of publicPages) {
+        test(`public page ${entry} loads and lands on the canonical path`, async ({ page }) => {
+            const response = await page.goto(entry, { waitUntil: 'networkidle' });
+            expect(response?.status(), `${entry} should not 5xx`).toBeLessThan(500);
+            expect(
+                page.url(),
+                `${entry} should land on the canonical unprefixed path (PR #1052)`,
+            ).toMatch(canonical);
         });
     }
 

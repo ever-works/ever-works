@@ -120,6 +120,14 @@ export class WorkKnowledgeUpload {
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, unknown> | null;
 
+    // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
+    // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.
+    @Column({ type: 'uuid', nullable: true })
+    tenantId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    organizationId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 
