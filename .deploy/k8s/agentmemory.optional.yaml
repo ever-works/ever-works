@@ -1,0 +1,156 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# agentmemory — OPTIONAL self-hosted deployment.
+#
+# This manifest spins up a `agentmemory` REST server alongside the platform
+# inside the same cluster. It is intentionally NOT included from any of the
+# environment manifests (`k8s-manifest.{dev,stage,prod}.yaml`) — operators
+# opt in by applying this file manually:
+#
+#   kubectl apply -f .deploy/k8s/agentmemory.optional.yaml -n ever-works
+#
+# The `@ever-works/agentmemory-plugin` then needs a single setting:
+#   baseUrl = http://agentmemory.ever-works.svc.cluster.local:3111
+# (set either in the plugin's admin settings or via the `AGENTMEMORY_BASE_URL`
+# env var on the API deployment).
+#
+# Operators who prefer the hosted SaaS — or who already run `agentmemory`
+# externally — should SKIP this manifest and point the plugin at the
+# external URL instead. The plugin doesn't care which mode is in use.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentmemory
+  labels:
+    app: agentmemory
+spec:
+  selector:
+    app: agentmemory
+  ports:
+    - name: rest
+      protocol: TCP
+      port: 3111
+      targetPort: 3111
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: agentmemory-data
+  labels:
+    app: agentmemory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # 5Gi is enough headroom for tens of millions of observations on
+      # agentmemory's default SQLite layout. Bump (and shrink the LRU
+      # retention via AGENTMEMORY_RETENTION_DAYS) for heavy workloads.
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agentmemory-secret
+  labels:
+    app: agentmemory
+type: Opaque
+stringData:
+  # The agentmemory server treats this as the Bearer token clients must
+  # send in Authorization. The `@ever-works/agentmemory-plugin` reads
+  # the same value from its `apiKey` setting (or `AGENTMEMORY_API_KEY`).
+  AGENTMEMORY_SECRET: "$AGENTMEMORY_SECRET"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentmemory
+  labels:
+    app: agentmemory
+spec:
+  # Single replica — SQLite is the canonical backend and isn't sharded
+  # cluster-wide. Operators who need HA should run agentmemory externally
+  # against a managed Postgres / vector DB instead, then point the plugin
+  # at that URL.
+  replicas: 1
+  strategy:
+    # Recreate (not RollingUpdate) — only one pod ever owns the PVC.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: agentmemory
+  template:
+    metadata:
+      labels:
+        app: agentmemory
+    spec:
+      # Container ships as non-root in the upstream Dockerfile; mirror
+      # the platform's own hardening profile.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      containers:
+        - name: agentmemory
+          # Pin a specific tag in production — `latest` is fine for an
+          # opt-in optional deployment, but operators MUST swap for an
+          # immutable SHA once they decide which version is canonical.
+          image: ghcr.io/rohitg00/agentmemory:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: rest
+              containerPort: 3111
+          env:
+            - name: III_REST_PORT
+              value: "3111"
+            - name: AGENTMEMORY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: agentmemory-secret
+                  key: AGENTMEMORY_SECRET
+            # The viewer UI binds to 3113 and stays loopback-only by
+            # default. Operators who want to expose it can add an
+            # additional Service + Ingress; we leave it private here.
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          # Health + readiness probes hit the public `/agentmemory/health`
+          # route — same one the plugin's `validateConnection` calls.
+          readinessProbe:
+            httpGet:
+              path: /agentmemory/health
+              port: 3111
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /agentmemory/health
+              port: 3111
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: agentmemory-data
