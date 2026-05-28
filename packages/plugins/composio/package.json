@@ -51,7 +51,8 @@
 			"category": "pipeline",
 			"capabilities": [
 				"pipeline",
-				"form-schema-provider"
+				"form-schema-provider",
+				"skills-provider"
 			],
 			"description": "Pipeline plugin that executes Composio tools across 500+ third-party apps (Gmail, Slack, GitHub, Notion, Linear, Salesforce, …) during Work generation. Composio brokers OAuth so each user connects their own accounts once and the platform reuses them.",
 			"author": {
