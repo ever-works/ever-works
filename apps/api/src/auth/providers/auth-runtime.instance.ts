@@ -47,6 +47,26 @@ function getInitializedDatabaseClient(dataSource: DataSource): any {
     );
 }
 
+/**
+ * EW-652 Phase 0 — keep this in lockstep with `User.deriveSlugIfMissing()`
+ * in `packages/agent/src/entities/user.entity.ts` and with
+ * `UsernameAllocatorService.normalize()` in
+ * `apps/api/src/users/services/username-allocator.service.ts`. All three
+ * sites must produce the same slug shape for a given input or the
+ * cross-table uniqueness contract breaks.
+ */
+function deriveSlugFromName(name: string | undefined | null): string {
+    if (!name) {
+        return 'u-anon';
+    }
+    const normalized = name
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return normalized.length > 0 ? normalized : 'u-anon';
+}
+
 function getTrustedOrigins() {
     const origins = new Set<string>();
     const configuredOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
@@ -143,6 +163,23 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                     input: false,
                     required: false,
                 },
+                // EW-652 (Tenants & Organizations Phase 0) — `users.slug` is
+                // a NOT NULL UNIQUE column added by
+                // `1779991001000-AddSlugToUsers.ts`. Better Auth writes through
+                // its own DB adapter (raw SQL via the Postgres pool extracted
+                // from TypeORM), which bypasses the User entity's
+                // `@BeforeInsert deriveSlugIfMissing()` hook — so without an
+                // explicit `slug` value the INSERT fails with
+                // `null value in column "slug" violates not-null constraint`
+                // and Better Auth wraps it as `FAILED_TO_CREATE_USER` (HTTP
+                // 422 "Failed to create user"). Declaring it here as an
+                // additional field with `input: false` lets the `before`
+                // hook below populate it before the INSERT runs.
+                slug: {
+                    type: 'string',
+                    input: false,
+                    required: false,
+                },
             },
         },
         account: {
@@ -198,6 +235,27 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                                 password: await bcrypt.hash(randomUUID(), getBcryptCost()),
                                 registrationProvider: RegistrationProvider.LOCAL,
                                 isActive: true,
+                                // EW-652 Phase 0 — derive the URL-safe `slug`
+                                // from the username. Mirrors the User
+                                // entity's `@BeforeInsert deriveSlugIfMissing()`,
+                                // which is bypassed because Better Auth
+                                // INSERTs through its own DB adapter rather
+                                // than the TypeORM repository. The DB UNIQUE
+                                // constraint on `slug` is the final
+                                // authority — racing duplicates will surface
+                                // as 422 to the caller, same as a duplicate
+                                // username. Better Auth applies its
+                                // `user.fields.name → username` mapping
+                                // before invoking this hook, so the column
+                                // name is available either as `username`
+                                // (post-mapping) or as the original `name`
+                                // (depending on adapter internals); we read
+                                // both for robustness across Better Auth
+                                // versions.
+                                slug: deriveSlugFromName(
+                                    (user as { username?: string }).username ??
+                                        (user as { name?: string }).name,
+                                ),
                             },
                         };
                     },

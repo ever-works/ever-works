@@ -404,7 +404,7 @@ describe('createAuthRuntimeInstance', () => {
             expect(additionalFields.committerEmail.type).toBe('string');
         });
 
-        it('declares exactly the seven documented additionalFields (regression guard)', () => {
+        it('declares exactly the eight documented additionalFields (regression guard)', () => {
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
             const keys = Object.keys(getCapturedOptions().user.additionalFields).sort();
@@ -417,6 +417,9 @@ describe('createAuthRuntimeInstance', () => {
                     'lastLoginIp',
                     'password',
                     'registrationProvider',
+                    // EW-652 Phase 0 — Better Auth must include the `slug`
+                    // column in its INSERT (NOT NULL DB constraint).
+                    'slug',
                 ].sort(),
             );
         });
@@ -524,6 +527,10 @@ describe('createAuthRuntimeInstance', () => {
                     password: 'hashed-uuid-fixture',
                     registrationProvider: RegistrationProvider.LOCAL,
                     isActive: true,
+                    // EW-652 Phase 0 — auto-derived from `username`. The
+                    // `users.slug` NOT NULL column would otherwise reject
+                    // the INSERT and surface as `FAILED_TO_CREATE_USER` 422.
+                    slug: 'someone',
                 },
             });
             // L-07: synthetic password is hashed at the configured cost (default 12).
