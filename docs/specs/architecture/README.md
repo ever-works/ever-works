@@ -37,10 +37,11 @@ wide-angle first.
 
 ### Trigger.dev & background work
 
-| Spec                                              | Focus                                                                 |
-| ------------------------------------------------- | --------------------------------------------------------------------- |
-| [`trigger-integration`](./trigger-integration.md) | API → Trigger.dev dispatch, payload contract, callback channel        |
-| [`trigger-worker`](./trigger-worker.md)           | Internals: per-task NestJS bootstrap, plugin hydration, logger bridge |
+| Spec                                                  | Focus                                                                                                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`trigger-integration`](./trigger-integration.md)     | API → Trigger.dev dispatch, payload contract, callback channel                                                                                              |
+| [`trigger-worker`](./trigger-worker.md)               | Internals: per-task NestJS bootstrap, plugin hydration, logger bridge                                                                                       |
+| [`job-runtime-providers`](./job-runtime-providers.md) | Proposed: pluggable runtime (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest) — [ADR-015](../decisions/015-job-runtime-provider-pluggability.md) |
 
 ### Plugins & capabilities
 
